@@ -70,6 +70,16 @@ import {
   uniqueStrings,
 } from './assessmentUtils';
 import { AssessmentHistoryModal } from './AssessmentHistoryModal';
+import {
+  formatAssessmentDate,
+  formatDateCompact,
+  formatWeekdayCompact,
+  safeGender,
+  getProgress,
+  buildAssessmentChartData,
+  checkChartHasData,
+  CHART_OPTIONS,
+} from './assessmentChartData';
 
 
 interface AssessmentHistoryProps {
@@ -347,7 +357,7 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
       setTimeout(() => {
         try {
           planAnchorRefs.current[id]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        } catch {}
+        } catch { }
       }, 50);
     } catch (e) {
       const id = String(assessment?.id || '');
@@ -372,7 +382,7 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
       setPlanModalAssessment(assessment);
       setPlanModalOpen(true);
       await handleGenerateAssessmentPlan(assessment, { openDetails: false });
-    } catch {}
+    } catch { }
   };
 
   const sortedAssessments = useMemo(() => {
@@ -476,7 +486,7 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
             .lte('completed_at', toIso)
             .order('completed_at', { ascending: true });
           if (!wErr && Array.isArray(data)) rows.push(...data);
-        } catch {}
+        } catch { }
 
         try {
           const { data, error: wErr } = await supabase
@@ -488,7 +498,7 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
             .lte('completed_at', toIso)
             .order('completed_at', { ascending: true });
           if (!wErr && Array.isArray(data)) rows.push(...data);
-        } catch {}
+        } catch { }
 
         if (fromDay && toDay) {
           try {
@@ -501,7 +511,7 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
               .lte('date', toDay)
               .order('date', { ascending: true });
             if (!wErr && Array.isArray(data)) rows.push(...data);
-          } catch {}
+          } catch { }
 
           try {
             const { data, error: wErr } = await supabase
@@ -513,7 +523,7 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
               .lte('date', toDay)
               .order('date', { ascending: true });
             if (!wErr && Array.isArray(data)) rows.push(...data);
-          } catch {}
+          } catch { }
         }
 
         const byId = new Map<string, AssessmentRow>();
@@ -538,7 +548,7 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
                 const sum = exerciseDurations.reduce<number>((acc: number, v: unknown) => acc + (Number(v) || 0), 0);
                 if (Number.isFinite(sum) && sum > 0) rawSeconds = sum;
               }
-            } catch {}
+            } catch { }
           }
           if (!rawSeconds) return;
           const seconds = Math.min(rawSeconds, MAX_SESSION_SECONDS);
@@ -632,167 +642,15 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
     return out;
   }, [sortedAssessments, workoutSessions]);
 
-  const formatDate = (rawDate: unknown, options?: Intl.DateTimeFormatOptions) => {
-    if (!rawDate) return '-';
-    const date = new Date(typeof rawDate === 'string' || typeof rawDate === 'number' || rawDate instanceof Date ? rawDate : String(rawDate));
-    if (Number.isNaN(date.getTime())) return '-';
-    return date.toLocaleDateString('pt-BR', options);
-  };
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const chartData = useMemo(() => buildAssessmentChartData(sortedAssessments) as any, [sortedAssessments]);
 
-  const formatDateCompact = (rawDate: unknown) => {
-    return formatDate(rawDate, { day: '2-digit', month: '2-digit', year: 'numeric' });
-  };
+  const chartHasData = useMemo(() => checkChartHasData(chartData), [chartData]);
 
-  const formatWeekdayCompact = (rawDate: unknown) => {
-    return formatDate(rawDate, { weekday: 'long' });
-  };
-
-  const safeGender = (raw: unknown) => {
-    return raw === 'F' || raw === 'M' ? raw : 'M';
-  };
-
-  const chartData = useMemo(() => {
-    const labels = sortedAssessments.map(assessment => {
-      const rawDate = assessment?.date ?? assessment?.assessment_date;
-      const date = new Date(typeof rawDate === 'string' || typeof rawDate === 'number' || rawDate instanceof Date ? rawDate : String(rawDate ?? ''));
-      return Number.isNaN(date.getTime()) ? '-' : date.toLocaleDateString('pt-BR');
-    });
-
-    return {
-      bodyComposition: {
-        labels,
-        datasets: [
-          {
-            label: '% Gordura',
-            data: sortedAssessments.map(getBodyFatPercent),
-            borderColor: 'rgb(239, 68, 68)',
-            backgroundColor: 'rgba(239, 68, 68, 0.1)',
-            fill: true,
-            tension: 0.4
-          },
-          {
-            label: 'Massa Magra (kg)',
-            data: sortedAssessments.map(getLeanMassKg),
-            borderColor: 'rgb(34, 197, 94)',
-            backgroundColor: 'rgba(34, 197, 94, 0.1)',
-            fill: true,
-            tension: 0.4
-          },
-          {
-            label: 'Massa Gorda (kg)',
-            data: sortedAssessments.map(getFatMassKg),
-            borderColor: 'rgb(245, 158, 11)',
-            backgroundColor: 'rgba(245, 158, 11, 0.1)',
-            fill: true,
-            tension: 0.4
-          }
-        ]
-      },
-      weightProgress: {
-        labels,
-        datasets: [
-          {
-            label: 'Peso (kg)',
-            data: sortedAssessments.map(getWeightKg),
-            borderColor: 'rgb(59, 130, 246)',
-            backgroundColor: 'rgba(59, 130, 246, 0.1)',
-            fill: true,
-            tension: 0.4
-          }
-        ]
-      },
-      measurements: {
-        labels,
-        datasets: [
-          {
-            label: 'Braço (cm)',
-            data: sortedAssessments.map(a => getMeasurementCm(a, 'arm')),
-            backgroundColor: 'rgba(168, 85, 247, 0.8)'
-          },
-          {
-            label: 'Peito (cm)',
-            data: sortedAssessments.map(a => getMeasurementCm(a, 'chest')),
-            backgroundColor: 'rgba(59, 130, 246, 0.8)'
-          },
-          {
-            label: 'Cintura (cm)',
-            data: sortedAssessments.map(a => getMeasurementCm(a, 'waist')),
-            backgroundColor: 'rgba(236, 72, 153, 0.8)'
-          },
-          {
-            label: 'Quadril (cm)',
-            data: sortedAssessments.map(a => getMeasurementCm(a, 'hip')),
-            backgroundColor: 'rgba(14, 165, 233, 0.8)'
-          },
-          {
-            label: 'Coxa (cm)',
-            data: sortedAssessments.map(a => getMeasurementCm(a, 'thigh')),
-            backgroundColor: 'rgba(34, 197, 94, 0.8)'
-          },
-          {
-            label: 'Panturrilha (cm)',
-            data: sortedAssessments.map(a => getMeasurementCm(a, 'calf')),
-            backgroundColor: 'rgba(251, 191, 36, 0.8)'
-          },
-          {
-            label: 'Dobras Soma (mm)',
-            data: sortedAssessments.map(getSum7Mm),
-            backgroundColor: 'rgba(245, 158, 11, 0.8)'
-          }
-        ]
-      }
-    };
-  }, [sortedAssessments]);
-
-  const chartHasData = useMemo(() => {
-    const hasNumber = (data: unknown): boolean => {
-      return Array.isArray(data) && data.some((v: unknown) => typeof v === 'number' && Number.isFinite(v));
-    };
-
-    const hasDatasetNumbers = (datasets: unknown): boolean => {
-      return Array.isArray(datasets) && datasets.some((ds: unknown) => hasNumber(isRecord(ds) ? ds.data : null));
-    };
-
-    return {
-      bodyComposition: hasDatasetNumbers(chartData?.bodyComposition?.datasets),
-      weightProgress: hasDatasetNumbers(chartData?.weightProgress?.datasets),
-      measurements: hasDatasetNumbers(chartData?.measurements?.datasets)
-    };
-  }, [chartData]);
-
-  const chartOptions = {
-    responsive: true,
-    maintainAspectRatio: false,
-    plugins: {
-      legend: {
-        position: 'top' as const,
-      },
-      title: {
-        display: false,
-        text: ''
-      }
-    },
-    scales: {
-      y: {
-        beginAtZero: true
-      }
-    }
-  };
+  const chartOptions = CHART_OPTIONS;
 
   const latestAssessment = sortedAssessments[sortedAssessments.length - 1];
   const previousAssessment = sortedAssessments[sortedAssessments.length - 2];
-
-  const getProgress = (currentRaw: unknown, previousRaw: unknown) => {
-    if (currentRaw === null || currentRaw === undefined) return null;
-    if (previousRaw === null || previousRaw === undefined) return null;
-    const current = Number(currentRaw);
-    const previous = Number(previousRaw);
-    if (!Number.isFinite(current) || !Number.isFinite(previous) || previous === 0) return null;
-    const change = current - previous;
-    const percentage = (change / previous) * 100;
-    if (!Number.isFinite(percentage)) return null;
-    return { change, percentage };
-  };
 
   if (loading) {
     return (
@@ -884,18 +742,18 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
 
   return (
     <DialogProvider>
-    <GlobalDialog />
+      <GlobalDialog />
       <div className="p-4 bg-neutral-900 text-white">
-      <AssessmentHeader
-        onCreate={() => setShowForm(true)}
-        onShowHistory={() => setShowHistory(true)}
-        onScan={handleScanClick}
-        importing={importing}
-        studentId={studentId}
-        onClose={onClose}
-        scanInputRef={scanInputRef}
-        onScanFileChange={handleScanFileChange}
-      />
+        <AssessmentHeader
+          onCreate={() => setShowForm(true)}
+          onShowHistory={() => setShowHistory(true)}
+          onScan={handleScanClick}
+          importing={importing}
+          studentId={studentId}
+          onClose={onClose}
+          scanInputRef={scanInputRef}
+          onScanFileChange={handleScanFileChange}
+        />
         {latestAssessment && previousAssessment && (
           <AssessmentSummaryCards
             latestAssessment={latestAssessment}
@@ -908,242 +766,379 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
           />
         )}
 
-      {/* Gráficos escuros */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        <div className="bg-neutral-800 rounded-xl border border-neutral-700 p-6">
-          <h3 className="text-lg font-bold text-white mb-4">Evolução da Composição Corporal</h3>
-          <div className="h-64">
-            {chartHasData.bodyComposition ? (
-              <Line data={chartData.bodyComposition} options={chartOptions} />
-            ) : (
-              <div className="h-full flex items-center justify-center text-neutral-400 text-sm text-center px-6">
-                Sem dados de composição corporal suficientes.
-              </div>
-            )}
-          </div>
-        </div>
-        <div className="bg-neutral-800 rounded-xl border border-neutral-700 p-6">
-          <h3 className="text-lg font-bold text-white mb-4">Evolução do Peso</h3>
-          <div className="h-64">
-            {chartHasData.weightProgress ? (
-              <Line data={chartData.weightProgress} options={chartOptions} />
-            ) : (
-              <div className="h-full flex items-center justify-center text-neutral-400 text-sm text-center px-6">
-                Sem dados de peso suficientes.
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
-
-      <div className="bg-neutral-800 rounded-xl border border-neutral-700 p-6 mb-6">
-        <h3 className="text-lg font-bold text-white mb-4">Evolução das Circunferências</h3>
-        <div className="h-64">
-          {chartHasData.measurements ? (
-            <Bar data={chartData.measurements} options={chartOptions} />
-          ) : (
-            <div className="h-full flex items-center justify-center text-neutral-400 text-sm text-center px-6">
-              Sem dados de circunferências suficientes.
+        {/* Gráficos escuros */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+          <div className="bg-neutral-800 rounded-xl border border-neutral-700 p-6">
+            <h3 className="text-lg font-bold text-white mb-4">Evolução da Composição Corporal</h3>
+            <div className="h-64">
+              {chartHasData.bodyComposition ? (
+                <Line data={chartData.bodyComposition} options={chartOptions} />
+              ) : (
+                <div className="h-full flex items-center justify-center text-neutral-400 text-sm text-center px-6">
+                  Sem dados de composição corporal suficientes.
+                </div>
+              )}
             </div>
-          )}
-        </div>
-      </div>
-
-      {/* Lista escura */}
-      <div className="bg-neutral-800 rounded-xl border border-neutral-700">
-        <div className="p-6 border-b border-neutral-700">
-          <h3 className="text-lg font-bold text-white flex items-center">
-            <Calendar className="w-5 h-5 mr-2" />
-            Histórico Completo
-          </h3>
-        </div>
-        <div id="assessments-history" className="divide-y divide-neutral-700">
-          {sortedAssessments.map((assessment, idx) => {
-            const assessmentId = String(assessment?.id ?? idx)
-            const photos = Array.isArray(assessment?.photos) ? assessment.photos : []
-            const ageLabel = String(assessment?.age ?? '-')
-            return (
-            <div key={assessmentId} className="p-6 hover:bg-neutral-900 transition-colors">
-              <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                      <div className="font-black text-white text-sm sm:text-base truncate">
-                        {formatDateCompact(assessment.date || assessment.assessment_date)}
-                      </div>
-                      <div className="text-xs text-neutral-500 mt-0.5 truncate">
-                        {formatWeekdayCompact(assessment.date || assessment.assessment_date)}
-                      </div>
-                    </div>
-                    <div className="shrink-0 flex items-center gap-2">
-                      <span className="px-2.5 py-1 bg-yellow-500/15 text-yellow-400 text-xs rounded-full border border-yellow-500/20 font-bold">
-                        {ageLabel} anos
-                      </span>
-                      {photos.length > 0 && (
-                        <span className="px-2.5 py-1 bg-green-500/15 text-green-400 text-xs rounded-full border border-green-500/20 font-bold">
-                          Com fotos
-                        </span>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mt-4 text-sm">
-                    <div className="bg-neutral-900/40 border border-neutral-800 rounded-xl p-3">
-                      <div className="text-[10px] text-neutral-500 font-bold uppercase tracking-wider">Peso</div>
-                      <div className="text-white font-black mt-1">{(() => {
-                        const w = getWeightKg(assessment);
-                        return w ? `${w.toFixed(1)} kg` : '-';
-                      })()}</div>
-                    </div>
-                    <div className="bg-neutral-900/40 border border-neutral-800 rounded-xl p-3">
-                      <div className="text-[10px] text-neutral-500 font-bold uppercase tracking-wider">% Gordura</div>
-                      <div className="text-white font-black mt-1">{(() => {
-                        const bf = getBodyFatPercent(assessment);
-                        return bf ? `${bf.toFixed(1)}%` : '-';
-                      })()}</div>
-                    </div>
-                    <div className="bg-neutral-900/40 border border-neutral-800 rounded-xl p-3">
-                      <div className="text-[10px] text-neutral-500 font-bold uppercase tracking-wider">Massa Magra</div>
-                      <div className="text-white font-black mt-1">{(() => {
-                        const lm = getLeanMassKg(assessment);
-                        return lm ? `${lm.toFixed(1)} kg` : '-';
-                      })()}</div>
-                    </div>
-                    <div className="bg-neutral-900/40 border border-neutral-800 rounded-xl p-3">
-                      <div className="text-[10px] text-neutral-500 font-bold uppercase tracking-wider">BMR</div>
-                      <div className="text-white font-black mt-1">{(() => {
-                        const v = getBmrKcal(assessment);
-                        return v ? `${v.toFixed(0)} kcal` : '-';
-                      })()}</div>
-                    </div>
-                    <div className="bg-neutral-900/40 border border-neutral-800 rounded-xl p-3">
-                      <div className="text-[10px] text-neutral-500 font-bold uppercase tracking-wider">TDEE</div>
-                      <div className="text-white font-black mt-1">{(() => {
-                        if (workoutSessionsLoading) return '...';
-                        const v = tdeeByAssessmentId.get(String(assessment.id));
-                        return v ? `${v.toFixed(0)} kcal` : '-';
-                      })()}</div>
-                    </div>
-                  </div>
+          </div>
+          <div className="bg-neutral-800 rounded-xl border border-neutral-700 p-6">
+            <h3 className="text-lg font-bold text-white mb-4">Evolução do Peso</h3>
+            <div className="h-64">
+              {chartHasData.weightProgress ? (
+                <Line data={chartData.weightProgress} options={chartOptions} />
+              ) : (
+                <div className="h-full flex items-center justify-center text-neutral-400 text-sm text-center px-6">
+                  Sem dados de peso suficientes.
                 </div>
+              )}
+            </div>
+          </div>
+        </div>
 
-                <div className="flex flex-row flex-wrap items-center gap-2 md:justify-end">
-                  <button
-                    onClick={() => setSelectedAssessment(selectedAssessment === assessmentId ? null : assessmentId)}
-                    className="min-h-[44px] px-4 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-yellow-500 hover:text-yellow-400 font-black hover:bg-neutral-800 transition-all duration-300 active:scale-95"
-                    type="button"
-                  >
-                    {selectedAssessment === assessmentId ? 'Ocultar' : 'Detalhes'}
-                  </button>
-                  <AssessmentPDFGenerator
-                    formData={{
-                      assessment_date: String(assessment.assessment_date ?? ''),
-                      weight: String(assessment.weight || ''),
-                      height: String(assessment.height || ''),
-                      age: String(assessment.age || ''),
-                      gender: safeGender(assessment.gender),
-                      arm_circ: String(getMeasurementCm(assessment, 'arm') || ''),
-                      chest_circ: String(getMeasurementCm(assessment, 'chest') || ''),
-                      waist_circ: String(getMeasurementCm(assessment, 'waist') || ''),
-                      hip_circ: String(getMeasurementCm(assessment, 'hip') || ''),
-                      thigh_circ: String(getMeasurementCm(assessment, 'thigh') || ''),
-                      calf_circ: String(getMeasurementCm(assessment, 'calf') || ''),
-                      triceps_skinfold: String(getSkinfoldMm(assessment, 'triceps') || ''),
-                      biceps_skinfold: String(getSkinfoldMm(assessment, 'biceps') || ''),
-                      subscapular_skinfold: String(getSkinfoldMm(assessment, 'subscapular') || ''),
-                      suprailiac_skinfold: String(getSkinfoldMm(assessment, 'suprailiac') || ''),
-                      abdominal_skinfold: String(getSkinfoldMm(assessment, 'abdominal') || ''),
-                      thigh_skinfold: String(getSkinfoldMm(assessment, 'thigh') || ''),
-                      calf_skinfold: String(getSkinfoldMm(assessment, 'calf') || ''),
-                      observations: ''
-                    }}
-                    studentName={String(assessment.student_name ?? '')}
-                    trainerName={String(assessment.trainer_name ?? '')}
-                    assessmentDate={new Date(
-                      typeof assessment.assessment_date === 'string' || typeof assessment.assessment_date === 'number' || assessment.assessment_date instanceof Date
-                        ? assessment.assessment_date
-                        : String(assessment.assessment_date ?? Date.now()),
-                    )}
-                  />
-                  <button
-                    type="button"
-                    onClick={() => handleOpenAssessmentPlanModal(assessment)}
-                    disabled={!!aiPlanByAssessmentId[String(assessment.id)]?.loading}
-                    className="min-h-[44px] px-4 py-2 rounded-xl bg-yellow-500 text-black font-black hover:bg-yellow-400 transition-all duration-300 active:scale-95"
-                  >
-                    {aiPlanByAssessmentId[String(assessment.id)]?.loading ? 'Gerando plano…' : 'Plano Tático (AI)'}
-                  </button>
-                </div>
+        <div className="bg-neutral-800 rounded-xl border border-neutral-700 p-6 mb-6">
+          <h3 className="text-lg font-bold text-white mb-4">Evolução das Circunferências</h3>
+          <div className="h-64">
+            {chartHasData.measurements ? (
+              <Bar data={chartData.measurements} options={chartOptions} />
+            ) : (
+              <div className="h-full flex items-center justify-center text-neutral-400 text-sm text-center px-6">
+                Sem dados de circunferências suficientes.
               </div>
-              {selectedAssessment === assessmentId && (
-                <div className="mt-4 pt-4 border-t border-neutral-700">
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <h4 className="font-bold text-white mb-2">Dobras Cutâneas (mm)</h4>
-                      <div className="grid grid-cols-2 gap-2 text-sm">
-                        {skinfoldFields.map(({ key, label }) => {
-                          const value = getSkinfoldMm(assessment, key);
-                          return (
-                            <div key={key} className="flex justify-between">
-                              <span className="text-neutral-400">{label}:</span>
-                              <span className="font-medium text-white">{value == null ? '-' : String(value)}</span>
-                            </div>
-                          );
-                        })}
+            )}
+          </div>
+        </div>
+
+        {/* Lista escura */}
+        <div className="bg-neutral-800 rounded-xl border border-neutral-700">
+          <div className="p-6 border-b border-neutral-700">
+            <h3 className="text-lg font-bold text-white flex items-center">
+              <Calendar className="w-5 h-5 mr-2" />
+              Histórico Completo
+            </h3>
+          </div>
+          <div id="assessments-history" className="divide-y divide-neutral-700">
+            {sortedAssessments.map((assessment, idx) => {
+              const assessmentId = String(assessment?.id ?? idx)
+              const photos = Array.isArray(assessment?.photos) ? assessment.photos : []
+              const ageLabel = String(assessment?.age ?? '-')
+              return (
+                <div key={assessmentId} className="p-6 hover:bg-neutral-900 transition-colors">
+                  <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="font-black text-white text-sm sm:text-base truncate">
+                            {formatDateCompact(assessment.date || assessment.assessment_date)}
+                          </div>
+                          <div className="text-xs text-neutral-500 mt-0.5 truncate">
+                            {formatWeekdayCompact(assessment.date || assessment.assessment_date)}
+                          </div>
+                        </div>
+                        <div className="shrink-0 flex items-center gap-2">
+                          <span className="px-2.5 py-1 bg-yellow-500/15 text-yellow-400 text-xs rounded-full border border-yellow-500/20 font-bold">
+                            {ageLabel} anos
+                          </span>
+                          {photos.length > 0 && (
+                            <span className="px-2.5 py-1 bg-green-500/15 text-green-400 text-xs rounded-full border border-green-500/20 font-bold">
+                              Com fotos
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mt-4 text-sm">
+                        <div className="bg-neutral-900/40 border border-neutral-800 rounded-xl p-3">
+                          <div className="text-[10px] text-neutral-500 font-bold uppercase tracking-wider">Peso</div>
+                          <div className="text-white font-black mt-1">{(() => {
+                            const w = getWeightKg(assessment);
+                            return w ? `${w.toFixed(1)} kg` : '-';
+                          })()}</div>
+                        </div>
+                        <div className="bg-neutral-900/40 border border-neutral-800 rounded-xl p-3">
+                          <div className="text-[10px] text-neutral-500 font-bold uppercase tracking-wider">% Gordura</div>
+                          <div className="text-white font-black mt-1">{(() => {
+                            const bf = getBodyFatPercent(assessment);
+                            return bf ? `${bf.toFixed(1)}%` : '-';
+                          })()}</div>
+                        </div>
+                        <div className="bg-neutral-900/40 border border-neutral-800 rounded-xl p-3">
+                          <div className="text-[10px] text-neutral-500 font-bold uppercase tracking-wider">Massa Magra</div>
+                          <div className="text-white font-black mt-1">{(() => {
+                            const lm = getLeanMassKg(assessment);
+                            return lm ? `${lm.toFixed(1)} kg` : '-';
+                          })()}</div>
+                        </div>
+                        <div className="bg-neutral-900/40 border border-neutral-800 rounded-xl p-3">
+                          <div className="text-[10px] text-neutral-500 font-bold uppercase tracking-wider">BMR</div>
+                          <div className="text-white font-black mt-1">{(() => {
+                            const v = getBmrKcal(assessment);
+                            return v ? `${v.toFixed(0)} kcal` : '-';
+                          })()}</div>
+                        </div>
+                        <div className="bg-neutral-900/40 border border-neutral-800 rounded-xl p-3">
+                          <div className="text-[10px] text-neutral-500 font-bold uppercase tracking-wider">TDEE</div>
+                          <div className="text-white font-black mt-1">{(() => {
+                            if (workoutSessionsLoading) return '...';
+                            const v = tdeeByAssessmentId.get(String(assessment.id));
+                            return v ? `${v.toFixed(0)} kcal` : '-';
+                          })()}</div>
+                        </div>
                       </div>
                     </div>
-                    <div>
-                      <h4 className="font-bold text-white mb-2">Circunferências (cm)</h4>
-                      <div className="grid grid-cols-2 gap-2 text-sm">
-                        {measurementFields.map(({ key, label }) => {
-                          const value = getMeasurementCm(assessment, key);
-                          return (
-                            <div key={key} className="flex justify-between">
-                              <span className="text-neutral-400">{label}:</span>
-                              <span className="font-medium text-white">{value == null ? '-' : String(value)}</span>
-                            </div>
-                          );
-                        })}
-                      </div>
+
+                    <div className="flex flex-row flex-wrap items-center gap-2 md:justify-end">
+                      <button
+                        onClick={() => setSelectedAssessment(selectedAssessment === assessmentId ? null : assessmentId)}
+                        className="min-h-[44px] px-4 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-yellow-500 hover:text-yellow-400 font-black hover:bg-neutral-800 transition-all duration-300 active:scale-95"
+                        type="button"
+                      >
+                        {selectedAssessment === assessmentId ? 'Ocultar' : 'Detalhes'}
+                      </button>
+                      <AssessmentPDFGenerator
+                        formData={{
+                          assessment_date: String(assessment.assessment_date ?? ''),
+                          weight: String(assessment.weight || ''),
+                          height: String(assessment.height || ''),
+                          age: String(assessment.age || ''),
+                          gender: safeGender(assessment.gender),
+                          arm_circ: String(getMeasurementCm(assessment, 'arm') || ''),
+                          chest_circ: String(getMeasurementCm(assessment, 'chest') || ''),
+                          waist_circ: String(getMeasurementCm(assessment, 'waist') || ''),
+                          hip_circ: String(getMeasurementCm(assessment, 'hip') || ''),
+                          thigh_circ: String(getMeasurementCm(assessment, 'thigh') || ''),
+                          calf_circ: String(getMeasurementCm(assessment, 'calf') || ''),
+                          triceps_skinfold: String(getSkinfoldMm(assessment, 'triceps') || ''),
+                          biceps_skinfold: String(getSkinfoldMm(assessment, 'biceps') || ''),
+                          subscapular_skinfold: String(getSkinfoldMm(assessment, 'subscapular') || ''),
+                          suprailiac_skinfold: String(getSkinfoldMm(assessment, 'suprailiac') || ''),
+                          abdominal_skinfold: String(getSkinfoldMm(assessment, 'abdominal') || ''),
+                          thigh_skinfold: String(getSkinfoldMm(assessment, 'thigh') || ''),
+                          calf_skinfold: String(getSkinfoldMm(assessment, 'calf') || ''),
+                          observations: ''
+                        }}
+                        studentName={String(assessment.student_name ?? '')}
+                        trainerName={String(assessment.trainer_name ?? '')}
+                        assessmentDate={new Date(
+                          typeof assessment.assessment_date === 'string' || typeof assessment.assessment_date === 'number' || assessment.assessment_date instanceof Date
+                            ? assessment.assessment_date
+                            : String(assessment.assessment_date ?? Date.now()),
+                        )}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => handleOpenAssessmentPlanModal(assessment)}
+                        disabled={!!aiPlanByAssessmentId[String(assessment.id)]?.loading}
+                        className="min-h-[44px] px-4 py-2 rounded-xl bg-yellow-500 text-black font-black hover:bg-yellow-400 transition-all duration-300 active:scale-95"
+                      >
+                        {aiPlanByAssessmentId[String(assessment.id)]?.loading ? 'Gerando plano…' : 'Plano Tático (AI)'}
+                      </button>
                     </div>
                   </div>
-                  {(() => {
-                    const s = aiPlanByAssessmentId[String(assessment.id)];
-                    if (!s) return null;
-                    const plan = s.plan && typeof s.plan === 'object' ? s.plan : null;
-                    if (!plan && !s.loading && !s.error) return null;
-                    const badge = (() => {
-                      if (s.loading) return null;
-                      if (s.error) return null;
-                      if (s.usedAi) return { text: 'IA', tone: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/25' };
-                      if (s.reason === 'missing_api_key') return { text: 'Sem IA (config)', tone: 'bg-neutral-800 text-neutral-200 border-neutral-700' };
-                      if (s.reason === 'insufficient_data') return { text: 'Dados insuf.', tone: 'bg-neutral-800 text-neutral-200 border-neutral-700' };
-                      if (s.reason === 'ai_failed') return { text: 'Fallback', tone: 'bg-neutral-800 text-neutral-200 border-neutral-700' };
-                      return { text: 'Plano base', tone: 'bg-neutral-800 text-neutral-200 border-neutral-700' };
-                    })();
-                    return (
-                      <div
-                        className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4"
-                        ref={(el) => {
-                          try {
-                            planAnchorRefs.current[String(assessment.id)] = el;
-                          } catch {}
-                        }}
-                      >
-                        <div className="bg-neutral-900/70 border border-neutral-700 rounded-xl p-4">
-                          <div className="flex items-center justify-between gap-2 mb-2">
-                            <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Resumo Tático</div>
-                            {badge ? (
-                              <div className={`px-2 py-1 rounded-full border text-[10px] font-black uppercase tracking-widest ${badge.tone}`}>
-                                {badge.text}
+                  {selectedAssessment === assessmentId && (
+                    <div className="mt-4 pt-4 border-t border-neutral-700">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <h4 className="font-bold text-white mb-2">Dobras Cutâneas (mm)</h4>
+                          <div className="grid grid-cols-2 gap-2 text-sm">
+                            {skinfoldFields.map(({ key, label }) => {
+                              const value = getSkinfoldMm(assessment, key);
+                              return (
+                                <div key={key} className="flex justify-between">
+                                  <span className="text-neutral-400">{label}:</span>
+                                  <span className="font-medium text-white">{value == null ? '-' : String(value)}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-white mb-2">Circunferências (cm)</h4>
+                          <div className="grid grid-cols-2 gap-2 text-sm">
+                            {measurementFields.map(({ key, label }) => {
+                              const value = getMeasurementCm(assessment, key);
+                              return (
+                                <div key={key} className="flex justify-between">
+                                  <span className="text-neutral-400">{label}:</span>
+                                  <span className="font-medium text-white">{value == null ? '-' : String(value)}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                      {(() => {
+                        const s = aiPlanByAssessmentId[String(assessment.id)];
+                        if (!s) return null;
+                        const plan = s.plan && typeof s.plan === 'object' ? s.plan : null;
+                        if (!plan && !s.loading && !s.error) return null;
+                        const badge = (() => {
+                          if (s.loading) return null;
+                          if (s.error) return null;
+                          if (s.usedAi) return { text: 'IA', tone: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/25' };
+                          if (s.reason === 'missing_api_key') return { text: 'Sem IA (config)', tone: 'bg-neutral-800 text-neutral-200 border-neutral-700' };
+                          if (s.reason === 'insufficient_data') return { text: 'Dados insuf.', tone: 'bg-neutral-800 text-neutral-200 border-neutral-700' };
+                          if (s.reason === 'ai_failed') return { text: 'Fallback', tone: 'bg-neutral-800 text-neutral-200 border-neutral-700' };
+                          return { text: 'Plano base', tone: 'bg-neutral-800 text-neutral-200 border-neutral-700' };
+                        })();
+                        return (
+                          <div
+                            className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4"
+                            ref={(el) => {
+                              try {
+                                planAnchorRefs.current[String(assessment.id)] = el;
+                              } catch { }
+                            }}
+                          >
+                            <div className="bg-neutral-900/70 border border-neutral-700 rounded-xl p-4">
+                              <div className="flex items-center justify-between gap-2 mb-2">
+                                <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Resumo Tático</div>
+                                {badge ? (
+                                  <div className={`px-2 py-1 rounded-full border text-[10px] font-black uppercase tracking-widest ${badge.tone}`}>
+                                    {badge.text}
+                                  </div>
+                                ) : null}
+                              </div>
+                              {s.loading ? (
+                                <div className="text-sm text-neutral-300">Gerando plano tático personalizado…</div>
+                              ) : s.error ? (
+                                <div className="text-sm text-red-400">{s.error}</div>
+                              ) : plan ? (
+                                <ul className="text-sm text-neutral-200 space-y-1 list-disc list-inside">
+                                  {(() => {
+                                    const raw = plan.summary
+                                    const items = Array.isArray(raw) ? raw : []
+                                    return items.length
+                                      ? items.map((item: unknown, idx: number) => <li key={idx}>{String(item ?? '')}</li>)
+                                      : null
+                                  })()}
+                                </ul>
+                              ) : null}
+                            </div>
+                            {plan ? (
+                              <div className="bg-neutral-900/70 border border-neutral-700 rounded-xl p-4 space-y-3">
+                                {(() => {
+                                  const raw = plan.training
+                                  const items = Array.isArray(raw) ? raw : []
+                                  if (!items.length) return null
+                                  return (
+                                    <div>
+                                      <div className="text-xs font-black uppercase tracking-widest text-yellow-500 mb-1">Treino</div>
+                                      <ul className="text-sm text-neutral-200 space-y-1 list-disc list-inside">
+                                        {items.map((item: unknown, idx: number) => (
+                                          <li key={idx}>{String(item ?? '')}</li>
+                                        ))}
+                                      </ul>
+                                    </div>
+                                  )
+                                })()}
+                                {(() => {
+                                  const raw = plan.nutrition
+                                  const items = Array.isArray(raw) ? raw : []
+                                  if (!items.length) return null
+                                  return (
+                                    <div>
+                                      <div className="text-xs font-black uppercase tracking-widest text-yellow-500 mb-1">Nutrição</div>
+                                      <ul className="text-sm text-neutral-200 space-y-1 list-disc list-inside">
+                                        {items.map((item: unknown, idx: number) => (
+                                          <li key={idx}>{String(item ?? '')}</li>
+                                        ))}
+                                      </ul>
+                                    </div>
+                                  )
+                                })()}
+                                {(() => {
+                                  const raw = plan.habits
+                                  const items = Array.isArray(raw) ? raw : []
+                                  if (!items.length) return null
+                                  return (
+                                    <div>
+                                      <div className="text-xs font-black uppercase tracking-widest text-yellow-500 mb-1">Hábitos</div>
+                                      <ul className="text-sm text-neutral-200 space-y-1 list-disc list-inside">
+                                        {items.map((item: unknown, idx: number) => (
+                                          <li key={idx}>{String(item ?? '')}</li>
+                                        ))}
+                                      </ul>
+                                    </div>
+                                  )
+                                })()}
+                                {(() => {
+                                  const raw = plan.warnings
+                                  const items = Array.isArray(raw) ? raw : []
+                                  if (!items.length) return null
+                                  return (
+                                    <div>
+                                      <div className="text-xs font-black uppercase tracking-widest text-yellow-500 mb-1">Alertas</div>
+                                      <ul className="text-sm text-neutral-300 space-y-1 list-disc list-inside">
+                                        {items.map((item: unknown, idx: number) => (
+                                          <li key={idx}>{String(item ?? '')}</li>
+                                        ))}
+                                      </ul>
+                                    </div>
+                                  )
+                                })()}
                               </div>
                             ) : null}
                           </div>
-                          {s.loading ? (
-                            <div className="text-sm text-neutral-300">Gerando plano tático personalizado…</div>
-                          ) : s.error ? (
-                            <div className="text-sm text-red-400">{s.error}</div>
-                          ) : plan ? (
+                        );
+                      })()}
+                    </div>
+                  )}
+                </div>
+              )
+            })}
+          </div>
+        </div>
+
+        {planModalOpen && planModalAssessment ? (
+          <div className="fixed inset-0 z-[80] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setPlanModalOpen(false)}>
+            <div className="bg-neutral-900 w-full max-w-3xl rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+              <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="text-[11px] uppercase tracking-widest text-neutral-500 font-bold truncate">Plano Tático</div>
+                  <div className="text-white font-black truncate">
+                    {formatDateCompact(planModalAssessment?.date || planModalAssessment?.assessment_date)}
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPlanModalOpen(false)}
+                  className="w-10 h-10 rounded-full bg-neutral-900/70 border border-neutral-800 hover:bg-neutral-900 text-neutral-300 hover:text-white flex items-center justify-center transition-all duration-300 active:scale-95"
+                  aria-label="Fechar"
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+              <div className="p-4 max-h-[80vh] overflow-y-auto space-y-3">
+                {(() => {
+                  const id = String(planModalAssessment?.id || '');
+                  const s = id ? aiPlanByAssessmentId[id] : null;
+                  const plan = s?.plan && typeof s.plan === 'object' ? s.plan : null;
+                  const badge = (() => {
+                    if (!s || s.loading) return null;
+                    if (s.error) return null;
+                    if (s.usedAi) return { text: 'IA', tone: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/25' };
+                    if (s.reason === 'missing_api_key') return { text: 'Sem IA (config)', tone: 'bg-neutral-800 text-neutral-200 border-neutral-700' };
+                    if (s.reason === 'insufficient_data') return { text: 'Dados insuf.', tone: 'bg-neutral-800 text-neutral-200 border-neutral-700' };
+                    if (s.reason === 'ai_failed') return { text: 'Fallback', tone: 'bg-neutral-800 text-neutral-200 border-neutral-700' };
+                    return { text: 'Plano base', tone: 'bg-neutral-800 text-neutral-200 border-neutral-700' };
+                  })();
+
+                  return (
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Resumo Tático</div>
+                        {badge ? (
+                          <div className={`px-2 py-1 rounded-full border text-[10px] font-black uppercase tracking-widest ${badge.tone}`}>
+                            {badge.text}
+                          </div>
+                        ) : null}
+                      </div>
+                      {s?.loading ? (
+                        <div className="text-sm text-neutral-300">Gerando plano tático personalizado…</div>
+                      ) : s?.error ? (
+                        <div className="text-sm text-red-400">{s.error}</div>
+                      ) : plan ? (
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          <div className="bg-neutral-900/70 border border-neutral-700 rounded-xl p-4">
                             <ul className="text-sm text-neutral-200 space-y-1 list-disc list-inside">
                               {(() => {
                                 const raw = plan.summary
@@ -1153,23 +1148,21 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
                                   : null
                               })()}
                             </ul>
-                          ) : null}
-                        </div>
-                        {plan ? (
+                          </div>
                           <div className="bg-neutral-900/70 border border-neutral-700 rounded-xl p-4 space-y-3">
                             {(() => {
                               const raw = plan.training
                               const items = Array.isArray(raw) ? raw : []
                               if (!items.length) return null
                               return (
-                              <div>
-                                <div className="text-xs font-black uppercase tracking-widest text-yellow-500 mb-1">Treino</div>
-                                <ul className="text-sm text-neutral-200 space-y-1 list-disc list-inside">
-                                  {items.map((item: unknown, idx: number) => (
-                                    <li key={idx}>{String(item ?? '')}</li>
-                                  ))}
-                                </ul>
-                              </div>
+                                <div>
+                                  <div className="text-xs font-black uppercase tracking-widest text-yellow-500 mb-1">Treino</div>
+                                  <ul className="text-sm text-neutral-200 space-y-1 list-disc list-inside">
+                                    {items.map((item: unknown, idx: number) => (
+                                      <li key={idx}>{String(item ?? '')}</li>
+                                    ))}
+                                  </ul>
+                                </div>
                               )
                             })()}
                             {(() => {
@@ -1177,14 +1170,14 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
                               const items = Array.isArray(raw) ? raw : []
                               if (!items.length) return null
                               return (
-                              <div>
-                                <div className="text-xs font-black uppercase tracking-widest text-yellow-500 mb-1">Nutrição</div>
-                                <ul className="text-sm text-neutral-200 space-y-1 list-disc list-inside">
-                                  {items.map((item: unknown, idx: number) => (
-                                    <li key={idx}>{String(item ?? '')}</li>
-                                  ))}
-                                </ul>
-                              </div>
+                                <div>
+                                  <div className="text-xs font-black uppercase tracking-widest text-yellow-500 mb-1">Nutrição</div>
+                                  <ul className="text-sm text-neutral-200 space-y-1 list-disc list-inside">
+                                    {items.map((item: unknown, idx: number) => (
+                                      <li key={idx}>{String(item ?? '')}</li>
+                                    ))}
+                                  </ul>
+                                </div>
                               )
                             })()}
                             {(() => {
@@ -1192,14 +1185,14 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
                               const items = Array.isArray(raw) ? raw : []
                               if (!items.length) return null
                               return (
-                              <div>
-                                <div className="text-xs font-black uppercase tracking-widest text-yellow-500 mb-1">Hábitos</div>
-                                <ul className="text-sm text-neutral-200 space-y-1 list-disc list-inside">
-                                  {items.map((item: unknown, idx: number) => (
-                                    <li key={idx}>{String(item ?? '')}</li>
-                                  ))}
-                                </ul>
-                              </div>
+                                <div>
+                                  <div className="text-xs font-black uppercase tracking-widest text-yellow-500 mb-1">Hábitos</div>
+                                  <ul className="text-sm text-neutral-200 space-y-1 list-disc list-inside">
+                                    {items.map((item: unknown, idx: number) => (
+                                      <li key={idx}>{String(item ?? '')}</li>
+                                    ))}
+                                  </ul>
+                                </div>
                               )
                             })()}
                             {(() => {
@@ -1207,220 +1200,85 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
                               const items = Array.isArray(raw) ? raw : []
                               if (!items.length) return null
                               return (
-                              <div>
-                                <div className="text-xs font-black uppercase tracking-widest text-yellow-500 mb-1">Alertas</div>
-                                <ul className="text-sm text-neutral-300 space-y-1 list-disc list-inside">
-                                  {items.map((item: unknown, idx: number) => (
-                                    <li key={idx}>{String(item ?? '')}</li>
-                                  ))}
-                                </ul>
-                              </div>
+                                <div>
+                                  <div className="text-xs font-black uppercase tracking-widest text-yellow-500 mb-1">Alertas</div>
+                                  <ul className="text-sm text-neutral-300 space-y-1 list-disc list-inside">
+                                    {items.map((item: unknown, idx: number) => (
+                                      <li key={idx}>{String(item ?? '')}</li>
+                                    ))}
+                                  </ul>
+                                </div>
                               )
                             })()}
                           </div>
-                        ) : null}
+                        </div>
+                      ) : (
+                        <div className="text-sm text-neutral-400">Nenhum plano disponível.</div>
+                      )}
+                      <div className="flex flex-col sm:flex-row gap-2">
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            try {
+                              await handleGenerateAssessmentPlan(planModalAssessment, { openDetails: false });
+                            } catch { }
+                          }}
+                          disabled={!!s?.loading}
+                          className="flex-1 min-h-[44px] px-4 py-2 rounded-xl bg-yellow-500 text-black font-black hover:bg-yellow-400 transition-all duration-300 active:scale-95 disabled:opacity-60"
+                        >
+                          {s?.loading ? 'Gerando…' : 'Gerar novamente'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setPlanModalOpen(false)}
+                          className="flex-1 min-h-[44px] px-4 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black hover:bg-neutral-800 transition-all duration-300 active:scale-95"
+                        >
+                          Fechar
+                        </button>
                       </div>
-                    );
-                  })()}
-                </div>
-              )}
-            </div>
-            )
-          })}
-        </div>
-      </div>
-
-      {planModalOpen && planModalAssessment ? (
-        <div className="fixed inset-0 z-[80] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setPlanModalOpen(false)}>
-          <div className="bg-neutral-900 w-full max-w-3xl rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
-            <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
-              <div className="min-w-0">
-                <div className="text-[11px] uppercase tracking-widest text-neutral-500 font-bold truncate">Plano Tático</div>
-                <div className="text-white font-black truncate">
-                  {formatDateCompact(planModalAssessment?.date || planModalAssessment?.assessment_date)}
-                </div>
+                    </div>
+                  );
+                })()}
               </div>
-              <button
-                type="button"
-                onClick={() => setPlanModalOpen(false)}
-                className="w-10 h-10 rounded-full bg-neutral-900/70 border border-neutral-800 hover:bg-neutral-900 text-neutral-300 hover:text-white flex items-center justify-center transition-all duration-300 active:scale-95"
-                aria-label="Fechar"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
-            <div className="p-4 max-h-[80vh] overflow-y-auto space-y-3">
-              {(() => {
-                const id = String(planModalAssessment?.id || '');
-                const s = id ? aiPlanByAssessmentId[id] : null;
-                const plan = s?.plan && typeof s.plan === 'object' ? s.plan : null;
-                const badge = (() => {
-                  if (!s || s.loading) return null;
-                  if (s.error) return null;
-                  if (s.usedAi) return { text: 'IA', tone: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/25' };
-                  if (s.reason === 'missing_api_key') return { text: 'Sem IA (config)', tone: 'bg-neutral-800 text-neutral-200 border-neutral-700' };
-                  if (s.reason === 'insufficient_data') return { text: 'Dados insuf.', tone: 'bg-neutral-800 text-neutral-200 border-neutral-700' };
-                  if (s.reason === 'ai_failed') return { text: 'Fallback', tone: 'bg-neutral-800 text-neutral-200 border-neutral-700' };
-                  return { text: 'Plano base', tone: 'bg-neutral-800 text-neutral-200 border-neutral-700' };
-                })();
-
-                return (
-                  <div className="space-y-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Resumo Tático</div>
-                      {badge ? (
-                        <div className={`px-2 py-1 rounded-full border text-[10px] font-black uppercase tracking-widest ${badge.tone}`}>
-                          {badge.text}
-                        </div>
-                      ) : null}
-                    </div>
-                    {s?.loading ? (
-                      <div className="text-sm text-neutral-300">Gerando plano tático personalizado…</div>
-                    ) : s?.error ? (
-                      <div className="text-sm text-red-400">{s.error}</div>
-                    ) : plan ? (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                        <div className="bg-neutral-900/70 border border-neutral-700 rounded-xl p-4">
-                          <ul className="text-sm text-neutral-200 space-y-1 list-disc list-inside">
-                            {(() => {
-                              const raw = plan.summary
-                              const items = Array.isArray(raw) ? raw : []
-                              return items.length
-                                ? items.map((item: unknown, idx: number) => <li key={idx}>{String(item ?? '')}</li>)
-                                : null
-                            })()}
-                          </ul>
-                        </div>
-                        <div className="bg-neutral-900/70 border border-neutral-700 rounded-xl p-4 space-y-3">
-                          {(() => {
-                            const raw = plan.training
-                            const items = Array.isArray(raw) ? raw : []
-                            if (!items.length) return null
-                            return (
-                            <div>
-                              <div className="text-xs font-black uppercase tracking-widest text-yellow-500 mb-1">Treino</div>
-                              <ul className="text-sm text-neutral-200 space-y-1 list-disc list-inside">
-                                {items.map((item: unknown, idx: number) => (
-                                  <li key={idx}>{String(item ?? '')}</li>
-                                ))}
-                              </ul>
-                            </div>
-                            )
-                          })()}
-                          {(() => {
-                            const raw = plan.nutrition
-                            const items = Array.isArray(raw) ? raw : []
-                            if (!items.length) return null
-                            return (
-                            <div>
-                              <div className="text-xs font-black uppercase tracking-widest text-yellow-500 mb-1">Nutrição</div>
-                              <ul className="text-sm text-neutral-200 space-y-1 list-disc list-inside">
-                                {items.map((item: unknown, idx: number) => (
-                                  <li key={idx}>{String(item ?? '')}</li>
-                                ))}
-                              </ul>
-                            </div>
-                            )
-                          })()}
-                          {(() => {
-                            const raw = plan.habits
-                            const items = Array.isArray(raw) ? raw : []
-                            if (!items.length) return null
-                            return (
-                            <div>
-                              <div className="text-xs font-black uppercase tracking-widest text-yellow-500 mb-1">Hábitos</div>
-                              <ul className="text-sm text-neutral-200 space-y-1 list-disc list-inside">
-                                {items.map((item: unknown, idx: number) => (
-                                  <li key={idx}>{String(item ?? '')}</li>
-                                ))}
-                              </ul>
-                            </div>
-                            )
-                          })()}
-                          {(() => {
-                            const raw = plan.warnings
-                            const items = Array.isArray(raw) ? raw : []
-                            if (!items.length) return null
-                            return (
-                            <div>
-                              <div className="text-xs font-black uppercase tracking-widest text-yellow-500 mb-1">Alertas</div>
-                              <ul className="text-sm text-neutral-300 space-y-1 list-disc list-inside">
-                                {items.map((item: unknown, idx: number) => (
-                                  <li key={idx}>{String(item ?? '')}</li>
-                                ))}
-                              </ul>
-                            </div>
-                            )
-                          })()}
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="text-sm text-neutral-400">Nenhum plano disponível.</div>
-                    )}
-                    <div className="flex flex-col sm:flex-row gap-2">
-                      <button
-                        type="button"
-                        onClick={async () => {
-                          try {
-                            await handleGenerateAssessmentPlan(planModalAssessment, { openDetails: false });
-                          } catch {}
-                        }}
-                        disabled={!!s?.loading}
-                        className="flex-1 min-h-[44px] px-4 py-2 rounded-xl bg-yellow-500 text-black font-black hover:bg-yellow-400 transition-all duration-300 active:scale-95 disabled:opacity-60"
-                      >
-                        {s?.loading ? 'Gerando…' : 'Gerar novamente'}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setPlanModalOpen(false)}
-                        className="flex-1 min-h-[44px] px-4 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black hover:bg-neutral-800 transition-all duration-300 active:scale-95"
-                      >
-                        Fechar
-                      </button>
-                    </div>
-                  </div>
-                );
-              })()}
             </div>
           </div>
-        </div>
-      ) : null}
+        ) : null}
 
-      {/* Modal do Formulário */}
-      {showForm && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowForm(false)}>
-          <div className="bg-neutral-900 w-full max-w-3xl rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
-            <div className="p-4 border-b border-neutral-800 flex justify-between items-center">
-              <h3 className="font-bold text-white">Nova Avaliação</h3>
-              <button onClick={() => setShowForm(false)} className="p-2 hover:bg-neutral-800 rounded-full"><X className="w-5 h-5 text-neutral-400"/></button>
-            </div>
-            <div className="p-4 max-h-[80vh] overflow-y-auto bg-neutral-900">
-              <AssessmentForm
-                studentId={studentId!}
-                studentName={studentName}
-                onSuccess={() => { setShowForm(false); location.reload(); }}
-                onCancel={() => setShowForm(false)}
-              />
+        {/* Modal do Formulário */}
+        {showForm && (
+          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowForm(false)}>
+            <div className="bg-neutral-900 w-full max-w-3xl rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+              <div className="p-4 border-b border-neutral-800 flex justify-between items-center">
+                <h3 className="font-bold text-white">Nova Avaliação</h3>
+                <button onClick={() => setShowForm(false)} className="p-2 hover:bg-neutral-800 rounded-full"><X className="w-5 h-5 text-neutral-400" /></button>
+              </div>
+              <div className="p-4 max-h-[80vh] overflow-y-auto bg-neutral-900">
+                <AssessmentForm
+                  studentId={studentId!}
+                  studentName={studentName}
+                  onSuccess={() => { setShowForm(false); location.reload(); }}
+                  onCancel={() => setShowForm(false)}
+                />
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )}
 
 
-      {showHistory && (
-        <AssessmentHistoryModal
-          assessments={sortedAssessments}
-          selectedAssessment={selectedAssessment}
-          setSelectedAssessment={setSelectedAssessment}
-          measurementFields={measurementFields}
-          skinfoldFields={skinfoldFields}
-          studentName={studentName}
-          formatDateCompact={formatDateCompact}
-          safeGender={safeGender}
-          onClose={() => setShowHistory(false)}
-        />
-      )}
-    </div>
+        {showHistory && (
+          <AssessmentHistoryModal
+            assessments={sortedAssessments}
+            selectedAssessment={selectedAssessment}
+            setSelectedAssessment={setSelectedAssessment}
+            measurementFields={measurementFields}
+            skinfoldFields={skinfoldFields}
+            studentName={studentName}
+            formatDateCompact={formatDateCompact}
+            safeGender={safeGender}
+            onClose={() => setShowHistory(false)}
+          />
+        )}
+      </div>
     </DialogProvider>
   );
 }
