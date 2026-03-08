@@ -4,38 +4,45 @@
  * login-gate.tsx
  *
  * Guard that checks for an existing Supabase session before mounting
- * LoginScreen. If a session is found, immediately redirects to /dashboard.
- * This prevents the login form from ever flashing for already-logged-in users.
+ * LoginScreen. If a session is found, immediately redirects to /dashboard
+ * using Next.js client-side navigation (no full page reload = no black screen).
  */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
 import LoadingScreen from '@/components/LoadingScreen'
 import LoginScreen from '@/components/LoginScreen'
 
 export default function LoginGate() {
-  // null = still checking, true = has session, false = no session
-  const [hasSession, setHasSession] = useState<boolean | null>(null)
+  const router = useRouter()
+  // null = still checking, false = no session → show login
+  const [noSession, setNoSession] = useState<boolean>(false)
+  const didCheck = useRef(false)
 
   useEffect(() => {
-    // getSession() reads from localStorage — no network request
+    if (didCheck.current) return
+    didCheck.current = true
+
+    // Prefetch dashboard chunks immediately (parallel with session check)
+    router.prefetch('/dashboard')
+
     const supabase = createClient()
+    // getSession() reads from localStorage — no network request, very fast
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user?.id) {
-        // Session found — redirect immediately
-        window.location.replace('/dashboard')
-        // Stay in loading state while navigating
+        // Client-side navigation: no page reload, no black screen
+        router.replace('/dashboard')
+        // Keep showing LoadingScreen while navigating
       } else {
-        setHasSession(false)
+        setNoSession(true)
       }
     }).catch(() => {
-      // On error, show the login form
-      setHasSession(false)
+      setNoSession(true)
     })
-  }, [])
+  }, [router])
 
-  // Show loading screen while checking session or navigating to dashboard
-  if (hasSession !== false) {
+  if (!noSession) {
     return <LoadingScreen />
   }
 

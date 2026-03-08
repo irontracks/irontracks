@@ -103,7 +103,7 @@ const LoginScreen = () => {
                                     headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify({ access_token: data.session.access_token, refresh_token: data.session.refresh_token })
                                 }).then(() => {
-                                    window.location.replace('/dashboard');
+                                    router.replace('/dashboard');
                                 }).catch(() => setIsLoading(false));
                             } else {
                                 setIsLoading(false);
