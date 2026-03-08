@@ -10,6 +10,7 @@ import { normalizeExerciseName } from '@/utils/normalizeExerciseName'
 import { resolveCanonicalExerciseName } from '@/utils/exerciseCanonical'
 import { MUSCLE_GROUPS } from '@/utils/muscleMapConfig'
 import { buildHeuristicExerciseMap } from '@/utils/exerciseMuscleHeuristics'
+import { getErrorMessage } from '@/utils/errorMessage'
 
 export const dynamic = 'force-dynamic'
 
@@ -692,7 +693,7 @@ export async function POST(req: Request) {
       try {
         insightsFromAi = await generateWeeklyInsightsWithAi(apiKey, insightInput)
       } catch (e: unknown) {
-        aiError = String((e as Error)?.message ?? e)
+        aiError = getErrorMessage(e)
       }
     }
     const cachedInsights = isVip && cachedPayload?.insights && typeof cachedPayload.insights === 'object' ? cachedPayload.insights : null
@@ -748,6 +749,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json(payload)
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: String((e as Error)?.message ?? e) }, { status: 500 })
+    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
   }
 }

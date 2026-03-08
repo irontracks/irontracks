@@ -94,51 +94,51 @@ const toCheckoutUserMessage = (raw: string) => {
 
 // Tier Definitions for UI
 const TIERS = {
-    start: {
-        label: 'VIP Start',
-        color: 'text-yellow-500',
-        bg: 'bg-yellow-500',
-        border: 'border-yellow-500',
-        icon: Star,
-        tagline: 'Para quem está começando',
-        features: [
-            'Coach IA: 10 msg/dia',
-            'Insights: 3/semana',
-            'Wizard: 1/semana',
-            'Histórico: 60 dias'
-        ]
-    },
-    pro: {
-        label: 'VIP Pro',
-        color: 'text-green-400',
-        bg: 'bg-green-500',
-        border: 'border-green-500',
-        icon: Zap,
-        tagline: 'Evolução constante e consistente',
-        features: [
-            'Coach IA: 40 msg/dia',
-            'Insights: 7/semana',
-            'Wizard: 3/semana',
-            'Histórico Ilimitado',
-            'Nutrição: Macros',
-            'Modo Offline'
-        ]
-    },
-    elite: {
-        label: 'VIP Elite',
-        color: 'text-purple-400',
-        bg: 'bg-purple-500',
-        border: 'border-purple-500',
-        icon: Crown,
-        tagline: 'Alta performance sem limites',
-        features: [
-            'Coach IA: Ilimitado',
-            'Insights: Ilimitado',
-            'Wizard: Ilimitado',
-            'Chef IA',
-            'Analytics Avançado'
-        ]
-    }
+  start: {
+    label: 'VIP Start',
+    color: 'text-yellow-500',
+    bg: 'bg-yellow-500',
+    border: 'border-yellow-500',
+    icon: Star,
+    tagline: 'Para quem está começando',
+    features: [
+      'Coach IA: 10 msg/dia',
+      'Insights: 3/semana',
+      'Wizard: 1/semana',
+      'Histórico: 60 dias'
+    ]
+  },
+  pro: {
+    label: 'VIP Pro',
+    color: 'text-green-400',
+    bg: 'bg-green-500',
+    border: 'border-green-500',
+    icon: Zap,
+    tagline: 'Evolução constante e consistente',
+    features: [
+      'Coach IA: 40 msg/dia',
+      'Insights: 7/semana',
+      'Wizard: 3/semana',
+      'Histórico Ilimitado',
+      'Nutrição: Macros',
+      'Modo Offline'
+    ]
+  },
+  elite: {
+    label: 'VIP Elite',
+    color: 'text-purple-400',
+    bg: 'bg-purple-500',
+    border: 'border-purple-500',
+    icon: Crown,
+    tagline: 'Alta performance sem limites',
+    features: [
+      'Coach IA: Ilimitado',
+      'Insights: Ilimitado',
+      'Wizard: Ilimitado',
+      'Chef IA',
+      'Analytics Avançado'
+    ]
+  }
 }
 
 export default function MarketplaceClient() {
@@ -150,7 +150,7 @@ export default function MarketplaceClient() {
   const [userId, setUserId] = useState<string>('')
   const [plans, setPlans] = useState<AppPlan[]>([])
   const [loadingPlans, setLoadingPlans] = useState(false)
-  
+
   const [selectedTier, setSelectedTier] = useState<'start' | 'pro' | 'elite' | null>(null)
   const [billingCycle, setBillingCycle] = useState<'month' | 'year'>('month')
 
@@ -175,8 +175,8 @@ export default function MarketplaceClient() {
 
   const goBack = useCallback(() => {
     if (selectedTier) {
-        setSelectedTier(null)
-        return
+      setSelectedTier(null)
+      return
     }
     try {
       router.back()
@@ -202,8 +202,8 @@ export default function MarketplaceClient() {
       if (isIosNative) {
         const apiKey = String(
           process.env.NEXT_PUBLIC_REVENUECAT_IOS_API_KEY ||
-            process.env.NEXT_PUBLIC_REVENUECAT_API_KEY ||
-            '',
+          process.env.NEXT_PUBLIC_REVENUECAT_API_KEY ||
+          '',
         ).trim()
         if (apiKey) {
           try {
@@ -244,15 +244,15 @@ export default function MarketplaceClient() {
     const searchKey = cycle === 'year' ? `${tierKey}_annual` : tierKey
     // Fallback search logic: if ID contains key
     const plan = plans.find(p => {
-        if (cycle === 'year') {
-            return p.id.includes(tierKey) && p.interval === 'year'
-        }
-        return p.id.includes(tierKey) && p.interval === 'month'
+      if (cycle === 'year') {
+        return p.id.includes(tierKey) && p.interval === 'year'
+      }
+      return p.id.includes(tierKey) && p.interval === 'month'
     })
 
     if (!plan) {
-        alert('Plano não encontrado.')
-        return
+      alert('Plano não encontrado.')
+      return
     }
 
     setSelectedPlan(plan)
@@ -438,7 +438,7 @@ export default function MarketplaceClient() {
 
   const canCancelPending = Boolean(
     (checkoutResult && checkoutResult.ok && checkoutResult.resumed) ||
-      (checkoutResult && !checkoutResult.ok && ['already_subscribed', 'pending_subscription_exists'].includes(String(checkoutResult.error || ''))),
+    (checkoutResult && !checkoutResult.ok && ['already_subscribed', 'pending_subscription_exists'].includes(String(checkoutResult.error || ''))),
   )
 
   const copyToClipboard = useCallback(async (text: string) => {
@@ -454,8 +454,8 @@ export default function MarketplaceClient() {
 
   const getPlanPrice = (tierKey: string, cycle: 'month' | 'year') => {
     const plan = plans.find(p => {
-        if (cycle === 'year') return p.id.includes(tierKey) && p.interval === 'year'
-        return p.id.includes(tierKey) && p.interval === 'month'
+      if (cycle === 'year') return p.id.includes(tierKey) && p.interval === 'year'
+      return p.id.includes(tierKey) && p.interval === 'month'
     })
     return plan?.price_cents || 0
   }
@@ -464,42 +464,42 @@ export default function MarketplaceClient() {
 
   const renderSelectionView = () => (
     <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-        <div className="text-center space-y-2 pt-4">
-            <h1 className="text-3xl font-black text-white">Escolha seu Nível</h1>
-            <p className="text-neutral-400">Desbloqueie o poder da IA no seu treino.</p>
-        </div>
+      <div className="text-center space-y-2 pt-4">
+        <h1 className="text-3xl font-black text-white">Escolha seu Nível</h1>
+        <p className="text-neutral-400">Desbloqueie o poder da IA no seu treino.</p>
+      </div>
 
-        <div className="grid grid-cols-1 gap-4 mt-8">
-            {(Object.keys(TIERS) as Array<keyof typeof TIERS>).map((key) => {
-                const tier = TIERS[key]
-                const Icon = tier.icon
-                return (
-                    <button
-                        key={key}
-                        onClick={() => setSelectedTier(key)}
-                        className={`relative group overflow-hidden rounded-3xl p-6 border bg-neutral-900/50 hover:bg-neutral-900 transition-all duration-300 text-left ${key === 'pro' ? 'border-yellow-500/30 shadow-lg shadow-yellow-500/10' : 'border-neutral-800 hover:border-neutral-700'}`}
-                    >
-                        {key === 'pro' && (
-                            <div className="absolute top-0 right-0 bg-yellow-500 text-black text-[10px] font-black px-3 py-1 rounded-bl-xl uppercase tracking-wider">
-                                Recomendado
-                            </div>
-                        )}
-                        <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-4">
-                                <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${key === 'elite' ? 'bg-purple-500/20 text-purple-400' : key === 'pro' ? 'bg-yellow-500/20 text-yellow-500' : 'bg-neutral-800 text-white'}`}>
-                                    <Icon size={24} fill={key === 'start' ? "currentColor" : "none"} />
-                                </div>
-                                <div>
-                                    <h3 className={`text-xl font-black ${tier.color}`}>{tier.label}</h3>
-                                    <p className="text-xs text-neutral-400 font-medium mt-0.5">{tier.tagline}</p>
-                                </div>
-                            </div>
-                            <ChevronRight className="text-neutral-600 group-hover:text-white transition-colors" />
-                        </div>
-                    </button>
-                )
-            })}
-        </div>
+      <div className="grid grid-cols-1 gap-4 mt-8">
+        {(Object.keys(TIERS) as Array<keyof typeof TIERS>).map((key) => {
+          const tier = TIERS[key]
+          const Icon = tier.icon
+          return (
+            <button
+              key={key}
+              onClick={() => setSelectedTier(key)}
+              className={`relative group overflow-hidden rounded-3xl p-6 border bg-neutral-900/50 hover:bg-neutral-900 transition-all duration-300 text-left ${key === 'pro' ? 'border-yellow-500/30 shadow-lg shadow-yellow-500/10' : 'border-neutral-800 hover:border-neutral-700'}`}
+            >
+              {key === 'pro' && (
+                <div className="absolute top-0 right-0 bg-yellow-500 text-black text-[10px] font-black px-3 py-1 rounded-bl-xl uppercase tracking-wider">
+                  Recomendado
+                </div>
+              )}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-4">
+                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${key === 'elite' ? 'bg-purple-500/20 text-purple-400' : key === 'pro' ? 'bg-yellow-500/20 text-yellow-500' : 'bg-neutral-800 text-white'}`}>
+                    <Icon size={24} fill={key === 'start' ? "currentColor" : "none"} />
+                  </div>
+                  <div>
+                    <h3 className={`text-xl font-black ${tier.color}`}>{tier.label}</h3>
+                    <p className="text-xs text-neutral-400 font-medium mt-0.5">{tier.tagline}</p>
+                  </div>
+                </div>
+                <ChevronRight className="text-neutral-600 group-hover:text-white transition-colors" />
+              </div>
+            </button>
+          )
+        })}
+      </div>
     </div>
   )
 
@@ -511,74 +511,74 @@ export default function MarketplaceClient() {
     const yearlyMonthlyEquivalent = Math.round(yearlyPrice / 12)
 
     return (
-        <div className="space-y-6 animate-in fade-in slide-in-from-right-8 duration-300">
-            {/* Mobile Back Button (Inline) */}
-            <button 
-                onClick={() => setSelectedTier(null)}
-                className="md:hidden flex items-center gap-2 text-sm font-bold text-neutral-400 hover:text-white transition-colors mb-4"
-            >
-                <ArrowLeft size={16} />
-                Voltar para planos
-            </button>
+      <div className="space-y-6 animate-in fade-in slide-in-from-right-8 duration-300">
+        {/* Mobile Back Button (Inline) */}
+        <button
+          onClick={() => setSelectedTier(null)}
+          className="md:hidden flex items-center gap-2 text-sm font-bold text-neutral-400 hover:text-white transition-colors mb-4"
+        >
+          <ArrowLeft size={16} />
+          Voltar para planos
+        </button>
 
-            <div className="text-center space-y-2 pt-2">
-                <div className={`inline-flex items-center justify-center w-16 h-16 rounded-3xl mb-4 ${selectedTier === 'elite' ? 'bg-purple-500/20 text-purple-400' : selectedTier === 'pro' ? 'bg-yellow-500/20 text-yellow-500' : 'bg-neutral-800 text-white'}`}>
-                    <tier.icon size={32} fill={selectedTier === 'start' ? "currentColor" : "none"} />
-                </div>
-                <h1 className={`text-3xl font-black ${tier.color}`}>{tier.label}</h1>
-                <p className="text-neutral-400">{tier.tagline}</p>
-            </div>
-
-            {/* Billing Selection */}
-            <div className={`grid ${isIosNative ? 'grid-cols-1' : 'grid-cols-2'} gap-3 mt-8`}>
-                <button
-                    onClick={() => setBillingCycle('month')}
-                    className={`relative p-4 rounded-2xl border text-left transition-all ${billingCycle === 'month' ? `bg-neutral-900 ${tier.border} shadow-lg` : 'bg-neutral-900/30 border-neutral-800 hover:bg-neutral-900'}`}
-                >
-                    <div className="text-xs font-bold text-neutral-500 uppercase tracking-wider mb-1">Mensal</div>
-                    <div className="text-xl font-black text-white">{formatMoney(monthlyPrice)}</div>
-                    <div className="text-[10px] text-neutral-500 mt-1">Cobrado todo mês</div>
-                </button>
-
-                {!isIosNative ? (
-                  <button
-                      onClick={() => setBillingCycle('year')}
-                      className={`relative p-4 rounded-2xl border text-left transition-all ${billingCycle === 'year' ? `bg-neutral-900 ${tier.border} shadow-lg` : 'bg-neutral-900/30 border-neutral-800 hover:bg-neutral-900'}`}
-                  >
-                      <div className="absolute -top-3 right-4 bg-green-500 text-black text-[10px] font-black px-2 py-0.5 rounded-full">
-                          ECONOMIZE 17%
-                      </div>
-                      <div className="text-xs font-bold text-neutral-500 uppercase tracking-wider mb-1">Anual</div>
-                      <div className="text-xl font-black text-white">{formatMoney(yearlyMonthlyEquivalent)}</div>
-                      <div className="text-[10px] text-neutral-500 mt-1">Cobrado {formatMoney(yearlyPrice)}/ano</div>
-                  </button>
-                ) : null}
-            </div>
-
-            {/* Action Button */}
-            <button
-                onClick={() => openCheckout(selectedTier === 'start' ? 'vip_start' : selectedTier === 'pro' ? 'vip_pro' : 'vip_elite', billingCycle)}
-                className={`w-full py-4 rounded-xl font-black text-lg flex items-center justify-center gap-2 shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all ${selectedTier === 'elite' ? 'bg-purple-600 text-white shadow-purple-900/20' : selectedTier === 'pro' ? 'bg-yellow-500 text-black shadow-yellow-900/20' : 'bg-white text-black'}`}
-            >
-                Assinar {tier.label}
-            </button>
-
-            {/* Feature List */}
-            <div className="bg-neutral-900/30 rounded-2xl p-6 border border-neutral-800 mt-6">
-                <h3 className="font-bold text-white mb-4 flex items-center gap-2">
-                    <Sparkles size={16} className={tier.color} />
-                    O que está incluído:
-                </h3>
-                <ul className="space-y-3">
-                    {tier.features.map((feat, idx) => (
-                        <li key={idx} className="flex items-start gap-3 text-sm text-neutral-300">
-                            <Check size={16} className={`mt-0.5 ${tier.color}`} />
-                            <span>{renderFeatureText(feat)}</span>
-                        </li>
-                    ))}
-                </ul>
-            </div>
+        <div className="text-center space-y-2 pt-2">
+          <div className={`inline-flex items-center justify-center w-16 h-16 rounded-3xl mb-4 ${selectedTier === 'elite' ? 'bg-purple-500/20 text-purple-400' : selectedTier === 'pro' ? 'bg-yellow-500/20 text-yellow-500' : 'bg-neutral-800 text-white'}`}>
+            <tier.icon size={32} fill={selectedTier === 'start' ? "currentColor" : "none"} />
+          </div>
+          <h1 className={`text-3xl font-black ${tier.color}`}>{tier.label}</h1>
+          <p className="text-neutral-400">{tier.tagline}</p>
         </div>
+
+        {/* Billing Selection */}
+        <div className={`grid ${isIosNative ? 'grid-cols-1' : 'grid-cols-2'} gap-3 mt-8`}>
+          <button
+            onClick={() => setBillingCycle('month')}
+            className={`relative p-4 rounded-2xl border text-left transition-all ${billingCycle === 'month' ? `bg-neutral-900 ${tier.border} shadow-lg` : 'bg-neutral-900/30 border-neutral-800 hover:bg-neutral-900'}`}
+          >
+            <div className="text-xs font-bold text-neutral-500 uppercase tracking-wider mb-1">Mensal</div>
+            <div className="text-xl font-black text-white">{formatMoney(monthlyPrice)}</div>
+            <div className="text-[10px] text-neutral-500 mt-1">Cobrado todo mês</div>
+          </button>
+
+          {!isIosNative ? (
+            <button
+              onClick={() => setBillingCycle('year')}
+              className={`relative p-4 rounded-2xl border text-left transition-all ${billingCycle === 'year' ? `bg-neutral-900 ${tier.border} shadow-lg` : 'bg-neutral-900/30 border-neutral-800 hover:bg-neutral-900'}`}
+            >
+              <div className="absolute -top-3 right-4 bg-green-500 text-black text-[10px] font-black px-2 py-0.5 rounded-full">
+                ECONOMIZE 17%
+              </div>
+              <div className="text-xs font-bold text-neutral-500 uppercase tracking-wider mb-1">Anual</div>
+              <div className="text-xl font-black text-white">{formatMoney(yearlyMonthlyEquivalent)}</div>
+              <div className="text-[10px] text-neutral-500 mt-1">Cobrado {formatMoney(yearlyPrice)}/ano</div>
+            </button>
+          ) : null}
+        </div>
+
+        {/* Action Button */}
+        <button
+          onClick={() => openCheckout(selectedTier === 'start' ? 'vip_start' : selectedTier === 'pro' ? 'vip_pro' : 'vip_elite', billingCycle)}
+          className={`w-full py-4 rounded-xl font-black text-lg flex items-center justify-center gap-2 shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all ${selectedTier === 'elite' ? 'bg-purple-600 text-white shadow-purple-900/20' : selectedTier === 'pro' ? 'bg-yellow-500 text-black shadow-yellow-900/20' : 'bg-white text-black'}`}
+        >
+          Assinar {tier.label}
+        </button>
+
+        {/* Feature List */}
+        <div className="bg-neutral-900/30 rounded-2xl p-6 border border-neutral-800 mt-6">
+          <h3 className="font-bold text-white mb-4 flex items-center gap-2">
+            <Sparkles size={16} className={tier.color} />
+            O que está incluído:
+          </h3>
+          <ul className="space-y-3">
+            {tier.features.map((feat, idx) => (
+              <li key={idx} className="flex items-start gap-3 text-sm text-neutral-300">
+                <Check size={16} className={`mt-0.5 ${tier.color}`} />
+                <span>{renderFeatureText(feat)}</span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      </div>
     )
   }
 
@@ -586,11 +586,11 @@ export default function MarketplaceClient() {
     <div className="min-h-screen bg-neutral-950 text-white pb-safe-extra">
       {/* Header */}
       <div className="bg-neutral-950 sticky top-0 z-10 px-4 py-4 pt-safe flex items-center border-b border-neutral-900/50 backdrop-blur-md bg-neutral-950/80">
-        <button onClick={goBack} className="w-10 h-10 flex items-center justify-center hover:bg-neutral-900 rounded-xl transition-colors text-white">
-            <ArrowLeft size={24} />
+        <button onClick={goBack} aria-label="Voltar" className="w-10 h-10 flex items-center justify-center hover:bg-neutral-900 rounded-xl transition-colors text-white">
+          <ArrowLeft size={24} />
         </button>
         <div className="flex-1 text-center font-black text-lg pr-10 tracking-tight">
-            {selectedTier ? 'Detalhes do Plano' : 'Planos VIP'}
+          {selectedTier ? 'Detalhes do Plano' : 'Planos VIP'}
         </div>
       </div>
 
@@ -604,7 +604,7 @@ export default function MarketplaceClient() {
           <div className="w-full max-w-lg bg-neutral-900 rounded-3xl border border-neutral-800 overflow-hidden shadow-2xl">
             <div className="p-4 border-b border-neutral-800 flex items-center justify-between">
               <div className="font-black text-lg">Checkout Seguro</div>
-              <button onClick={closeCheckout} className={`${minButtonClass} p-2 hover:bg-neutral-800 rounded-xl`}>
+              <button onClick={closeCheckout} aria-label="Fechar checkout" className={`${minButtonClass} p-2 hover:bg-neutral-800 rounded-xl`}>
                 <X size={20} />
               </button>
             </div>
@@ -612,11 +612,11 @@ export default function MarketplaceClient() {
             <div className="p-5 space-y-4">
               <div className="flex items-center justify-between bg-neutral-950 p-4 rounded-2xl border border-neutral-800">
                 <div>
-                    <div className="text-xs font-bold uppercase tracking-wider text-neutral-500 mb-1">{selectedPlan.name}</div>
-                    <div className="text-2xl font-black text-white">{formatMoney(selectedPlan.price_cents)}</div>
+                  <div className="text-xs font-bold uppercase tracking-wider text-neutral-500 mb-1">{selectedPlan.name}</div>
+                  <div className="text-2xl font-black text-white">{formatMoney(selectedPlan.price_cents)}</div>
                 </div>
                 <div className="text-right text-xs text-neutral-500 bg-neutral-900 px-3 py-1 rounded-lg border border-neutral-800">
-                    {selectedPlan.interval === 'year' ? 'Anual' : 'Mensal'}
+                  {selectedPlan.interval === 'year' ? 'Anual' : 'Mensal'}
                 </div>
               </div>
 
@@ -686,21 +686,21 @@ export default function MarketplaceClient() {
 
                   <div className="space-y-3 pt-2">
                     <button
-                        onClick={startCheckout}
-                        disabled={checkingOut}
-                        className={`${minButtonClass} w-full px-4 py-3.5 rounded-xl bg-green-500 hover:bg-green-400 text-black font-black disabled:opacity-60 flex items-center justify-center gap-2 transition-all shadow-lg shadow-green-500/20`}
+                      onClick={startCheckout}
+                      disabled={checkingOut}
+                      className={`${minButtonClass} w-full px-4 py-3.5 rounded-xl bg-green-500 hover:bg-green-400 text-black font-black disabled:opacity-60 flex items-center justify-center gap-2 transition-all shadow-lg shadow-green-500/20`}
                     >
-                        <QrCode size={20} />
-                        {checkingOut ? 'Gerando PIX...' : 'Pagar com PIX'}
+                      <QrCode size={20} />
+                      {checkingOut ? 'Gerando PIX...' : 'Pagar com PIX'}
                     </button>
 
                     <button
-                        onClick={startCardCheckout}
-                        disabled={cardRedirecting}
-                        className={`${minButtonClass} w-full px-4 py-3.5 rounded-xl bg-neutral-800 border border-neutral-700 hover:bg-neutral-700 text-white font-bold disabled:opacity-60 flex items-center justify-center gap-2 transition-all`}
+                      onClick={startCardCheckout}
+                      disabled={cardRedirecting}
+                      className={`${minButtonClass} w-full px-4 py-3.5 rounded-xl bg-neutral-800 border border-neutral-700 hover:bg-neutral-700 text-white font-bold disabled:opacity-60 flex items-center justify-center gap-2 transition-all`}
                     >
-                        <CreditCard size={20} />
-                        {cardRedirecting ? 'Redirecionando...' : 'Pagar com Cartão'}
+                      <CreditCard size={20} />
+                      {cardRedirecting ? 'Redirecionando...' : 'Pagar com Cartão'}
                     </button>
                   </div>
 
