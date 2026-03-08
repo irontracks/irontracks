@@ -1064,6 +1064,7 @@ const HistoryList: React.FC<HistoryListProps> = ({ user, settings, onViewReport,
                         <HistoryEmptyState
                             isReadOnly={isReadOnly}
                             onAdd={() => setShowManual(true)}
+                        />
                     )}
 
                     {!loading && historyItems.length > 0 && filteredHistory.length === 0 && (
@@ -1248,8 +1249,7 @@ const HistoryList: React.FC<HistoryListProps> = ({ user, settings, onViewReport,
                         )}
                     </div>
                 )}
-            </div >
-        </div >
+            </div>
 
             {!isReadOnly && isSelectionMode && (
                 <div className="fixed bottom-0 left-0 right-0 p-4 bg-neutral-950 border-t border-neutral-800 pb-safe z-50 flex justify-between items-center">
@@ -1262,87 +1262,78 @@ const HistoryList: React.FC<HistoryListProps> = ({ user, settings, onViewReport,
                         <Trash2 size={18} /> Excluir
                     </button>
                 </div>
-            )
-}
+            )}
 
-{
-    !isReadOnly && showManual && (
-        <HistoryListManualModal
-            manualTab={manualTab as 'existing' | 'new'}
-            setManualTab={setManualTab as (v: 'existing' | 'new') => void}
-            manualDate={manualDate}
-            setManualDate={setManualDate}
-            manualDuration={manualDuration}
-            setManualDuration={setManualDuration}
-            manualNotes={manualNotes}
-            setManualNotes={setManualNotes}
-            availableWorkouts={availableWorkouts}
-            selectedTemplate={selectedTemplate}
-            setSelectedTemplate={setSelectedTemplate}
-            manualExercises={manualExercises}
-            updateManualExercise={updateManualExercise}
-            editorWorkout={editorWorkout}
-            setNewWorkout={(w) => setNewWorkout(normalizeEditorWorkout(w))}
-            normalizeEditorWorkout={normalizeEditorWorkout}
-            supabase={supabase}
-            onClose={() => setShowManual(false)}
-            onSaveExisting={saveManualExisting}
-            onSaveNew={saveManualNew}
-        />
-    )
-}
-
-{
-    periodReport && (
-        <HistoryListPeriodReportModal
-            periodReport={periodReport}
-            periodAi={periodAi}
-            periodPdf={periodPdf}
-            shareError={shareError}
-            buildShareText={buildShareText}
-            onClose={closePeriodReport}
-            onDownloadPdf={downloadPeriodPdf}
-            onShareReport={handleShareReport}
-        />
-    )
-}
-
-{
-    showEdit && (
-        <HistoryListEditModal
-            editTitle={editTitle}
-            setEditTitle={setEditTitle}
-            editDate={editDate}
-            setEditDate={setEditDate}
-            editDuration={editDuration}
-            setEditDuration={setEditDuration}
-            editNotes={editNotes}
-            setEditNotes={setEditNotes}
-            editExercises={editExercises}
-            updateEditExercise={updateEditExercise}
-            onClose={() => setShowEdit(false)}
-            onSave={saveEdit}
-        />
-    )
-}
-
-{
-    selectedSession && (
-        <div className="fixed inset-0 z-[1200] bg-neutral-900 overflow-y-auto pt-safe" onClick={() => setSelectedSession(null)}>
-            <div onClick={(e) => e.stopPropagation()}>
-                <WorkoutReport
-                    session={selectedSession}
-                    previousSession={null}
-                    user={user}
-                    isVip={false}
-                    settings={settings}
-                    onClose={() => setSelectedSession(null)}
-                    onUpgrade={onUpgrade}
+            {!isReadOnly && showManual && (
+                <HistoryListManualModal
+                    manualTab={manualTab as 'existing' | 'new'}
+                    setManualTab={setManualTab as (v: 'existing' | 'new') => void}
+                    manualDate={manualDate}
+                    setManualDate={setManualDate}
+                    manualDuration={manualDuration}
+                    setManualDuration={setManualDuration}
+                    manualNotes={manualNotes}
+                    setManualNotes={setManualNotes}
+                    availableWorkouts={availableWorkouts}
+                    selectedTemplate={selectedTemplate}
+                    setSelectedTemplate={setSelectedTemplate}
+                    manualExercises={manualExercises}
+                    updateManualExercise={updateManualExercise}
+                    editorWorkout={editorWorkout}
+                    setNewWorkout={(w) => setNewWorkout(normalizeEditorWorkout(w))}
+                    normalizeEditorWorkout={normalizeEditorWorkout}
+                    supabase={supabase}
+                    onClose={() => setShowManual(false)}
+                    onSaveExisting={saveManualExisting}
+                    onSaveNew={saveManualNew}
                 />
-            </div>
-        </div>
-    )
-}
+            )}
+
+            {periodReport && (
+                <HistoryListPeriodReportModal
+                    periodReport={periodReport}
+                    periodAi={periodAi}
+                    periodPdf={periodPdf}
+                    shareError={shareError}
+                    buildShareText={buildShareText}
+                    onClose={closePeriodReport}
+                    onDownloadPdf={downloadPeriodPdf}
+                    onShareReport={handleShareReport}
+                />
+            )}
+
+            {showEdit && (
+                <HistoryListEditModal
+                    editTitle={editTitle}
+                    setEditTitle={setEditTitle}
+                    editDate={editDate}
+                    setEditDate={setEditDate}
+                    editDuration={editDuration}
+                    setEditDuration={setEditDuration}
+                    editNotes={editNotes}
+                    setEditNotes={setEditNotes}
+                    editExercises={editExercises}
+                    updateEditExercise={updateEditExercise}
+                    onClose={() => setShowEdit(false)}
+                    onSave={saveEdit}
+                />
+            )}
+
+            {selectedSession && (
+                <div className="fixed inset-0 z-[1200] bg-neutral-900 overflow-y-auto pt-safe" onClick={() => setSelectedSession(null)}>
+                    <div onClick={(e) => e.stopPropagation()}>
+                        <WorkoutReport
+                            session={selectedSession}
+                            previousSession={null}
+                            user={user}
+                            isVip={false}
+                            settings={settings}
+                            onClose={() => setSelectedSession(null)}
+                            onUpgrade={onUpgrade}
+                        />
+                    </div>
+                </div>
+            )}
         </>
     );
 };
