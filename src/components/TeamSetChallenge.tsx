@@ -42,6 +42,7 @@ export function TeamSetChallenge({ currentExName, currentWeight, currentReps, on
 
     // Auto-dismiss after 15s
     useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         if (!pendingChallenge) { setBeatSent(false); return }
         const t = setTimeout(() => dismissChallenge(), 15_000)
         return () => clearTimeout(t)

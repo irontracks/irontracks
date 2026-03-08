@@ -252,6 +252,7 @@ export default function StudentDashboard(props: Props) {
   const showIronRank = props.settings?.showIronRank !== false
   const showBadges = props.settings?.showBadges !== false
   const showStoriesBar = props.settings?.moduleSocial !== false && props.settings?.showStoriesBar !== false && !!String(props.currentUserId || '').trim()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const workoutsForTab = useMemo(
     () =>
       workoutsTab === 'periodized'
