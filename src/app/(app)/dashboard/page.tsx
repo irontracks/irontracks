@@ -77,13 +77,15 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
   } = await supabase.auth.getUser()
   if (error || !user?.id) redirect('/?next=/dashboard')
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('role, display_name, photo_url')
-    .eq('id', user.id)
-    .maybeSingle()
-
-  const resolved = await resolveRoleByUser({ id: user.id, email: user.email ?? null })
+  // Parallel fetch: profile + role + initial workouts
+  const [{ data: profile }, resolved] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select('role, display_name, photo_url')
+      .eq('id', user.id)
+      .maybeSingle(),
+    resolveRoleByUser({ id: user.id, email: user.email ?? null }),
+  ])
 
   const initialUser = {
     id: user.id,

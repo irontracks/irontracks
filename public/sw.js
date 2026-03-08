@@ -14,6 +14,7 @@ const STATIC_CACHE = 'irontracks-static-v1'
 // Páginas críticas pré-cacheadas na instalação
 const PRECACHE_URLS = [
     '/',
+    '/dashboard',
     '/offline',
 ]
 
