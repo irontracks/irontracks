@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { parseTrainingNumber } from '@/utils/trainingNumber';
 import { Check, MessageSquare, Pencil } from 'lucide-react';
 import { useWorkoutContext } from '../WorkoutContext';
 import {
