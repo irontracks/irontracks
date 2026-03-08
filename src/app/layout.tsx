@@ -318,6 +318,12 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
       <head>
         <link rel="icon" href="/icone.png" type="image/png" />
         <link rel="apple-touch-icon" href="/icone.png" />
+        <link rel="preconnect" href="https://enbueukmvgodngydkpzm.supabase.co" />
+        <link rel="dns-prefetch" href="https://enbueukmvgodngydkpzm.supabase.co" />
+        <link rel="preconnect" href="https://api.cloudinary.com" />
+        <link rel="dns-prefetch" href="https://api.cloudinary.com" />
+        <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
+        <link rel="dns-prefetch" href="https://generativelanguage.googleapis.com" />
         {inlineScript ? (
           <script
             nonce={nonce || undefined}
