@@ -264,6 +264,7 @@ export async function POST(request: Request) {
         }
 
         // Case B: Key existed — lookup existing workout (idempotent response)
+        let existingFound = false
         try {
           const { data: existing } = await supabase
             .from('workouts')
@@ -276,10 +277,20 @@ export async function POST(request: Request) {
             .maybeSingle()
 
           if (existing?.id) {
+            // Workout was already saved — return idempotent success
             return NextResponse.json({ ok: true, saved: existing, idempotent: true })
           }
-        } catch { }
-        return NextResponse.json({ ok: false, error: 'concurrent_request_detected' }, { status: 429 })
+          // No existing workout found: previous request died before saving.
+          // Fall through to allow this request to save the workout.
+          existingFound = false
+        } catch {
+          existingFound = false
+        }
+        // If we couldn't confirm an existing workout, fall through and attempt the insert
+        if (existingFound) {
+          return NextResponse.json({ ok: false, error: 'concurrent_request_detected' }, { status: 429 })
+        }
+        // else: fall through to insert
       }
     }
 
