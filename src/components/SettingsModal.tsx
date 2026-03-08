@@ -134,7 +134,7 @@ export default function SettingsModal(props: SettingsModalProps) {
   const canSave = isOpen && !saving
 
   const title = useMemo(() => 'Configurações', [])
-  const focusTrapRef = useFocusTrap(isOpen)
+  const focusTrapRef = useFocusTrap(isOpen, onClose)
 
   useEffect(() => {
     if (!isOpen) return
@@ -1206,7 +1206,7 @@ export default function SettingsModal(props: SettingsModalProps) {
                       return
                     }
                     await supabase.auth.signOut({ scope: 'global' })
-                    try { window.location.href = '/auth/login' } catch { }
+                    try { window.location.href = '/auth/signin' } catch { }
                   } catch (e: unknown) {
                     await alert('Falha ao sair: ' + (getErrorMessage(e) ?? String(e)))
                   }
@@ -1244,7 +1244,7 @@ export default function SettingsModal(props: SettingsModalProps) {
                       }
                       if (supabase) await supabase.auth.signOut({ scope: 'global' })
                     } catch { }
-                    try { window.location.href = '/auth/login' } catch { }
+                    try { window.location.href = '/auth/signin' } catch { }
                   } catch (e: unknown) {
                     await alert('Falha ao excluir conta: ' + (getErrorMessage(e) ?? String(e)))
                   }

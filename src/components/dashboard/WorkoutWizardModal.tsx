@@ -1,4 +1,6 @@
 'use client'
+// Focus trap for accessibility
+import { useFocusTrap } from '@/hooks/useFocusTrap'
 
 import React, { useEffect, useMemo, useState } from 'react'
 import { X, ChevronLeft, Sparkles } from 'lucide-react'
@@ -222,7 +224,7 @@ export default function WorkoutWizardModal(props: Props) {
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 pt-safe" style={{ background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(16px)' }}>
+    <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 pt-safe" style={{ background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(16px)' }} role="dialog" aria-modal="true" aria-label="WorkoutWizard">
       <div className="w-full max-w-2xl rounded-2xl overflow-hidden" style={{ background: 'rgba(10,10,10,0.99)', border: '1px solid rgba(234,179,8,0.2)', boxShadow: '0 0 40px rgba(234,179,8,0.07), 0 32px 80px rgba(0,0,0,0.7)' }}>
         <div className="p-4 flex items-center justify-between gap-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
           <div className="min-w-0">

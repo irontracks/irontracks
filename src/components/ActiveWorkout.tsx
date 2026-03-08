@@ -54,7 +54,7 @@ export default function ActiveWorkout(props: ActiveWorkoutProps) {
 
   if (!session || !workout) {
     return (
-      <div className="min-h-screen bg-neutral-900 text-white p-6">
+      <div aria-live="polite" className="min-h-screen bg-neutral-900 text-white p-6">
         <div className="max-w-lg mx-auto rounded-xl bg-neutral-800 border border-neutral-700 p-6">
           <div className="text-sm text-neutral-300">Sessão inválida.</div>
           <div className="mt-4">

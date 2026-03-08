@@ -1,4 +1,6 @@
 'use client'
+// Focus trap for accessibility
+import { useFocusTrap } from '@/hooks/useFocusTrap'
 
 import React, { useEffect } from 'react'
 import { X } from 'lucide-react'
@@ -53,7 +55,7 @@ export default function WhatsNewModal({ isOpen, entry, update, onClose }: Props)
   const versionLabel = String(safeUpdate?.version || '').trim()
 
   return (
-    <div className="fixed inset-0 z-[1350] flex items-center justify-center p-4 pt-safe" style={{ background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(16px)' }}>
+    <div className="fixed inset-0 z-[1350] flex items-center justify-center p-4 pt-safe" style={{ background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(16px)' }} role="dialog" aria-modal="true" aria-label="WhatsNew">
       <div className="w-full max-w-lg rounded-2xl overflow-hidden shadow-2xl" style={{ background: 'rgba(12,12,12,0.99)', border: '1px solid rgba(234,179,8,0.22)', boxShadow: '0 0 40px rgba(234,179,8,0.10), 0 30px 80px rgba(0,0,0,0.65)' }}>
         <div className="px-5 pt-5 pb-4 flex items-center justify-between gap-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
           <div className="min-w-0">

@@ -1,5 +1,6 @@
 "use client";
 
+import { useFocusTrap } from '@/hooks/useFocusTrap'
 import React, { useState, useEffect } from 'react';
 import { Users, Dumbbell } from 'lucide-react';
 import Image from 'next/image';
@@ -80,7 +81,7 @@ const IncomingInviteModal = ({ onStartSession }: IncomingInviteModalProps) => {
     const hostPhoto = latestInvite?.from?.photoURL || latestInvite?.from?.photo_url || latestInvite?.profiles?.photo_url || null
 
     return (
-        <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex items-center justify-center p-6 pt-safe pb-safe animate-fade-in">
+        <div className="fixed inset-0 z-[100] bg-black/90 backdrop-blur-md flex items-center justify-center p-6 pt-safe pb-safe animate-fade-in" role="dialog" aria-modal="true" aria-label="IncomingInvite">
             <div className="bg-neutral-900 p-6 rounded-3xl border border-yellow-500 shadow-2xl max-w-sm w-full text-center">
                 {/* Host avatar */}
                 <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-4 overflow-hidden border-2 border-yellow-500 animate-bounce">
