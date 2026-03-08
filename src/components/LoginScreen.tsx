@@ -29,23 +29,19 @@ const LoginScreen = () => {
     useNativeAppSetup(null)
     const appVersionLabel = useMemo(() => 'v1.0', []);
     // Lazy initializer: verifica sessão existente SINCRONAMENTE no primeiro render.
-    // Se houver cookie de sessão Supabase OU backup no localStorage, começa com
+    // Se houver flag de login OU backup no localStorage, começa com
     // isLoading=true para exibir o LoadingScreen — elimina o flash da tela de login.
     const [isLoading, setIsLoading] = useState(() => {
         if (typeof window === 'undefined') return false
         try {
-            // 1. Check for session backup (iOS cookie wipe recovery)
+            // 1. Check for logged-in flag (set on successful login)
+            if (localStorage.getItem('it.logged_in') === '1') return true
+            // 2. Check for session backup (iOS cookie wipe recovery)
             const raw = localStorage.getItem('it.session.backup')
             if (raw) {
                 const backup = JSON.parse(raw) as Record<string, unknown>
                 if (backup?.access_token && backup?.refresh_token) return true
             }
-            // 2. Check for existing Supabase cookies (user already logged in)
-            const cookies = document.cookie || ''
-            if (cookies.split(';').some(c => {
-                const name = c.trim().split('=')[0] || ''
-                return name.startsWith('sb-') || name.includes('supabase')
-            })) return true
         } catch { }
         return false
     });
@@ -128,6 +124,7 @@ const LoginScreen = () => {
                                     headers: { 'Content-Type': 'application/json' },
                                     body: JSON.stringify({ access_token: data.session.access_token, refresh_token: data.session.refresh_token })
                                 }).then(() => {
+                                    try { localStorage.setItem('it.logged_in', '1') } catch { }
                                     router.replace('/dashboard')
                                     try { router.refresh() } catch { }
                                 }).catch(() => setIsLoading(false))
@@ -327,6 +324,7 @@ const LoginScreen = () => {
                     });
                 }
 
+                try { localStorage.setItem('it.logged_in', '1') } catch { }
                 router.replace('/dashboard');
                 try { router.refresh(); } catch { }
                 return;
@@ -379,6 +377,7 @@ const LoginScreen = () => {
                     });
                 }
                 holdLoading = true;
+                try { localStorage.setItem('it.logged_in', '1') } catch { }
                 router.replace('/dashboard');
                 try { router.refresh(); } catch { }
             }
@@ -483,6 +482,7 @@ const LoginScreen = () => {
                     });
                 }
                 holdLoading = true;
+                try { localStorage.setItem('it.logged_in', '1') } catch { }
                 router.replace('/dashboard');
                 try { router.refresh(); } catch { }
             }

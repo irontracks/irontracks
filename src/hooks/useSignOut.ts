@@ -73,6 +73,7 @@ export function useSignOut({ userId, supabase, onClear }: UseSignOutOptions): Us
     try {
       localStorage.removeItem('activeSession')
       localStorage.removeItem('appView')
+      localStorage.removeItem('it.logged_in')
       if (userId) {
         localStorage.removeItem(`irontracks.activeSession.v2.${userId}`)
         localStorage.removeItem(`irontracks.appView.v2.${userId}`)

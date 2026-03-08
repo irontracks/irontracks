@@ -13,7 +13,6 @@ const STATIC_CACHE = 'irontracks-static-v1'
 
 // Páginas críticas pré-cacheadas na instalação
 const PRECACHE_URLS = [
-    '/',
     '/dashboard',
     '/offline',
 ]
@@ -75,6 +74,20 @@ self.addEventListener('fetch', (event) => {
                 if (response.ok) cache.put(request, response.clone())
                 return response
             })
+        )
+        return
+    }
+
+    // Root path — always network-first (middleware redirects logged-in users)
+    // Using stale-while-revalidate here would flash the cached login page.
+    if (url.pathname === '/') {
+        event.respondWith(
+            fetch(request)
+                .then((response) => {
+                    if (response.ok) caches.open(CACHE_NAME).then((c) => c.put(request, response.clone()))
+                    return response
+                })
+                .catch(() => caches.match(request).then((r) => r ?? new Response('Offline', { status: 503 })))
         )
         return
     }
