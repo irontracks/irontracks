@@ -4,11 +4,10 @@ import { useWorkoutTicker } from './hooks/useWorkoutTicker';
 import { useWorkoutModals } from './hooks/useWorkoutModals';
 import { useWorkoutDeload } from './hooks/useWorkoutDeload';
 import { useWorkoutExerciseCrud } from './hooks/useWorkoutExerciseCrud';
+import { useWorkoutFinish } from './hooks/useWorkoutFinish';
 import { useWorkoutMethodSavers } from './hooks/useWorkoutMethodSavers';
 import { useDialog } from '@/contexts/DialogContext';
 import { useTeamWorkout } from '@/contexts/TeamWorkoutContext';
-import { queueFinishWorkout, isOnline } from '@/lib/offline/offlineSync';
-import { buildFinishWorkoutPayload } from '@/lib/finishWorkoutPayload';
 import { useStableSupabaseClient } from '@/hooks/useStableSupabaseClient';
 import {
   ActiveWorkoutProps,
@@ -269,161 +268,17 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     openOrganizeModal, requestCloseOrganize, saveOrganize,
   } = exerciseCrud;
 
-  const requestPostWorkoutCheckin = async (): Promise<unknown | null> => {
-    if (postCheckinOpen) return null;
-    return await new Promise<unknown | null>((resolve) => {
-      postCheckinResolveRef.current = (value: unknown) => {
-        resolve(value ?? null);
-      };
-      setPostCheckinDraft({ rpe: '', satisfaction: '', soreness: '', notes: '' });
-      setPostCheckinOpen(true);
-    });
-  };
 
-  const finishWorkout = async () => {
-    if (!session || !workout) return;
-    if (finishing) return;
+  // ── Finish workout (extracted to useWorkoutFinish) ──────────────────────
+  const finishHook = useWorkoutFinish({
+    session, workout, exercises, logs, ui, settings, ticker,
+    postCheckinOpen, setPostCheckinOpen, postCheckinDraft, setPostCheckinDraft,
+    postCheckinResolveRef, persistDeloadHistoryFromSession,
+    finishing, setFinishing,
+    alert, confirm, onFinish: props.onFinish,
+  });
+  const { finishWorkout, requestPostWorkoutCheckin } = finishHook;
 
-    const startedAtMs = parseStartedAtMs(session?.startedAt);
-    const elapsedSeconds = startedAtMs > 0 ? Math.max(0, Math.floor((ticker - startedAtMs) / 1000)) : 0;
-
-    const minSecondsForFullSession = 30 * 60;
-    const elapsedSafe = Number(elapsedSeconds) || 0;
-    let showReport = true;
-
-    let ok = false;
-    try {
-      ok =
-        typeof confirm === 'function'
-          ? await confirm('Deseja finalizar o treino?', 'Finalizar treino', {
-            confirmText: 'Sim',
-            cancelText: 'Não',
-          })
-          : false;
-    } catch {
-      ok = false;
-    }
-    if (!ok) return;
-
-    const isShort = elapsedSafe > 0 && Number.isFinite(elapsedSafe) && elapsedSafe < minSecondsForFullSession;
-    let shouldSaveHistory = true;
-
-    if (isShort) {
-      let allowSaveShort = false;
-      try {
-        allowSaveShort =
-          typeof confirm === 'function'
-            ? await confirm(
-              'Esse treino durou menos de 30 minutos. Deseja adicioná-lo no histórico?',
-              'Treino curto (< 30 min)',
-              {
-                confirmText: 'Sim',
-                cancelText: 'Não',
-              }
-            )
-            : false;
-      } catch {
-        allowSaveShort = false;
-      }
-      shouldSaveHistory = !!allowSaveShort;
-    }
-
-    try {
-      showReport =
-        typeof confirm === 'function'
-          ? await confirm('Deseja o relatório desse treino?', 'Gerar relatório?', {
-            confirmText: 'Sim',
-            cancelText: 'Não',
-          })
-          : true;
-    } catch {
-      showReport = true;
-    }
-
-    let postCheckin = null;
-    if (shouldSaveHistory) {
-      try {
-        const prompt = settings ? settings.promptPostWorkoutCheckin !== false : true;
-        if (prompt) postCheckin = await requestPostWorkoutCheckin();
-      } catch {
-        postCheckin = null;
-      }
-    }
-
-    setFinishing(true);
-    try {
-      persistDeloadHistoryFromSession();
-      const safePostCheckin = postCheckin && typeof postCheckin === 'object' ? (postCheckin as Record<string, unknown>) : null;
-      const payload = buildFinishWorkoutPayload({ workout, elapsedSeconds, logs, ui, postCheckin: safePostCheckin });
-
-      let savedId = null;
-      if (shouldSaveHistory) {
-        const idempotencyKey = `finish_${workout?.id || 'unknown'}_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-        const submission = { session: payload, idempotencyKey };
-
-        try {
-          let onlineSuccess = false;
-          if (isOnline()) {
-            try {
-              const resp = await fetch('/api/workouts/finish', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(submission),
-              });
-
-              if (resp.ok) {
-                const json = await resp.json();
-                savedId = json?.saved?.id ?? null;
-                onlineSuccess = true;
-              } else {
-                if (resp.status >= 400 && resp.status < 500) {
-                  const errText = await resp.text();
-                  throw new Error(`Erro de validação: ${errText}`);
-                }
-                throw new Error(`Erro do servidor: ${resp.status}`);
-              }
-            } catch (fetchErr: unknown) {
-              if (String(fetchErr).includes('Erro de validação')) throw fetchErr;
-              logWarn('warn', 'Online save failed, attempting offline queue', fetchErr);
-            }
-          }
-
-          if (!onlineSuccess) {
-            await queueFinishWorkout(submission);
-            await alert('Sem conexão estável. Treino salvo na fila e será sincronizado automaticamente.', 'Salvo Offline');
-            savedId = 'offline-pending';
-          }
-
-        } catch (e: unknown) {
-          const msg = isObject(e) && typeof e.message === 'string' ? e.message : String(e);
-          if (msg.includes('Erro de validação')) {
-            await alert(msg);
-            setFinishing(false);
-            return;
-          }
-          await alert('CRÍTICO: Erro ao salvar treino: ' + (msg || 'erro inesperado'));
-          setFinishing(false);
-          return;
-        }
-      }
-
-      const sessionForReport = {
-        ...payload,
-        id: savedId,
-      };
-
-      try {
-        if (typeof props?.onFinish === 'function') {
-          props.onFinish(sessionForReport, showReport);
-        }
-      } catch { }
-    } catch (e: unknown) {
-      const msg = isObject(e) && typeof e.message === 'string' ? e.message : String(e);
-      await alert('Erro ao finalizar: ' + (msg || 'erro inesperado'));
-    } finally {
-      setFinishing(false);
-    }
-  };
 
 
   const currentExercise = exercises[currentExerciseIdx] ?? null;
