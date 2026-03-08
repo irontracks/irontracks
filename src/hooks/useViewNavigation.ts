@@ -50,6 +50,9 @@ export function useViewNavigation({
   }, [hideVipOnIos, startViewTransition, setView])
 
   const handleOpenHistory = useCallback(() => {
+    // Prefetch history API in parallel with chunk download — the browser
+    // caches the response so HistoryList's fetch() gets a cache hit.
+    try { fetch('/api/workouts/history?limit=50', { priority: 'high' as RequestPriority }).catch(() => { }) } catch { }
     startViewTransition(() => setView('history'))
   }, [startViewTransition, setView])
 

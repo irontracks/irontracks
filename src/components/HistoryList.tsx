@@ -459,7 +459,7 @@ const HistoryList: React.FC<HistoryListProps> = ({ user, settings, onViewReport,
                     if (!json?.ok) throw new Error(json?.error || 'Falha ao carregar histórico');
                     data = Array.isArray(json?.rows) ? json.rows : [];
                 } else {
-                    const resp = await fetch('/api/workouts/history?limit=200')
+                    const resp = await fetch('/api/workouts/history?limit=50')
                     const json = await resp.json()
                     if (!json?.ok) throw new Error(json?.error || 'Falha ao carregar histórico')
                     data = Array.isArray(json?.rows) ? json.rows : []
