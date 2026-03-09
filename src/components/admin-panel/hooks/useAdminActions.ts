@@ -143,6 +143,7 @@ export function useAdminActions({
             setUsersList((prev) =>
                 prev.map((u) => (u.id === studentId ? { ...u, teacher_id: nextTid } : u))
             );
+            await alert(nextTid ? 'Professor atribuído com sucesso! ✅' : 'Professor removido com sucesso.');
         } catch (e: unknown) {
             const msg = e && typeof e === 'object' && 'message' in e && typeof (e as { message?: unknown }).message === 'string' ? (e as { message: string }).message : String(e);
             await alert('Erro ao atualizar professor: ' + msg);
@@ -150,7 +151,7 @@ export function useAdminActions({
     };
 
     const handleUpdateStudentStatus = async (student: AdminUser, newStatus: string) => {
-        if (!newStatus || newStatus === student.status) return;
+        if (!newStatus || newStatus === (student.status || 'pendente')) return;
         const statusLabels: Record<string, string> = {
             pago: 'Pago ✅',
             pendente: 'Pendente ⏳',
@@ -171,6 +172,7 @@ export function useAdminActions({
             setUsersList((prev) =>
                 prev.map((u) => (u.id === student.id ? { ...u, status: newStatus } : u))
             );
+            await alert(`Status de "${student.name || student.email}" atualizado para ${label}. Caso o aluno tenha saído da lista, use o filtro "Todos" para vê-lo.`, 'Status atualizado ✅');
         } catch (e: unknown) {
             const msg = e && typeof e === 'object' && 'message' in e && typeof (e as { message?: unknown }).message === 'string' ? (e as { message: string }).message : String(e);
             await alert('Erro ao atualizar status: ' + msg);
