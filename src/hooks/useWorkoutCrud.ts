@@ -179,7 +179,7 @@ export function useWorkoutCrud({
             playStartSound({ enabled, volume })
         }
 
-        const sessionWorkout = { ...workoutObj, exercises: resolvedExercises } as ActiveSession
+        const sessionWorkout = { ...workoutObj, exercises: resolvedExercises } as unknown as ActiveSession
         setActiveSession({
             workout: sessionWorkout,
             logs: {} as Record<string, unknown>,
@@ -286,7 +286,7 @@ export function useWorkoutCrud({
                 setCurrentWorkout({
                     ...mappedObj,
                     exercises: exercises as Array<Record<string, unknown>>,
-                } as ActiveSession)
+                } as unknown as ActiveSession)
             } catch {
                 setCurrentWorkout(mapped as ActiveSession)
             }

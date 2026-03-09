@@ -29,16 +29,14 @@ export const DropSetSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: 
   const ds = isObject(log.drop_set) ? (log.drop_set as UnknownRecord) : ({} as UnknownRecord);
   const stagesSavedRaw: unknown[] = Array.isArray(ds.stages) ? (ds.stages as unknown[]) : [];
   const stagesCount = Math.max(stagesPlannedRaw.length, stagesSavedRaw.length);
-  
+
   // Se não houver estágios, não deveria renderizar DropSetSet, mas retornamos null ou NormalSet (se fosse decidido assim)
   // No código original, chamava renderNormalSet se !stagesCount.
   // Aqui assumimos que o pai decide, mas se vier vazio, renderizamos NormalSet (mas não posso importar NormalSet recursivamente se for circular).
   // Vou assumir que o pai verifica. Se passar aqui com 0, vai renderizar algo estranho ou vazio.
   if (!stagesCount) {
-      // Fallback para NormalSet se necessário, mas idealmente o pai controla.
-      // Vou renderizar um aviso ou tentar renderizar NormalSet importando.
-      // Como estão no mesmo arquivo, posso chamar NormalSet.
-      return <NormalSet ex={ex} exIdx={exIdx} setIdx={setIdx} />;
+    // Parent controls routing to the proper renderer; return null as a safe fallback
+    return null;
   }
 
   const auto = isObject(plannedSet?.it_auto) ? (plannedSet.it_auto as UnknownRecord) : null;

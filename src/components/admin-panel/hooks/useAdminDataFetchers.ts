@@ -422,7 +422,7 @@ export function useAdminDataFetchers(deps: AdminDataFetchersDeps) {
                 }
                 setVideoMissingCount(missing);
             } catch {
-                setVideoMissingCount(null);
+                setVideoMissingCount(0);
             } finally {
                 setVideoMissingLoading(false);
             }
@@ -528,7 +528,7 @@ export function useAdminDataFetchers(deps: AdminDataFetchersDeps) {
             }
             try {
                 const key = String(selectedStudent?.id || selectedStudent?.email || targetUserId || '');
-                if (key && !loadedStudentInfo.current.has(key)) {
+                if (key && !loadedStudentInfo.current[key]) {
                     const authHeaders = await getAdminAuthHeaders();
                     let js = null;
                     try {
@@ -546,14 +546,13 @@ export function useAdminDataFetchers(deps: AdminDataFetchersDeps) {
                             const nextUserId = row.user_id ? String(row.user_id) : '';
                             const shouldUpdate = (nextTeacher !== selectedStudent.teacher_id) || (nextUserId !== String(selectedStudent.user_id || ''));
                             if (shouldUpdate) {
-                                setSelectedStudent(prev => {
-                                    if (!prev) return prev;
-                                    if (expectedStudentId && prev?.id && String(prev.id) !== String(expectedStudentId)) return prev;
-                                    return { ...prev, teacher_id: nextTeacher, user_id: nextUserId || null };
-                                });
+                                const currentStudent = selectedStudent;
+                                if (currentStudent && (!expectedStudentId || String(currentStudent.id) === String(expectedStudentId))) {
+                                    setSelectedStudent({ ...currentStudent, teacher_id: nextTeacher, user_id: nextUserId || null });
+                                }
                             }
                         }
-                        loadedStudentInfo.current.add(key);
+                        loadedStudentInfo.current[key] = true;
                     }
                 }
             } catch { }
@@ -561,7 +560,10 @@ export function useAdminDataFetchers(deps: AdminDataFetchersDeps) {
                 if (!selectedStudent.teacher_id && selectedStudent.email) {
                     const cached = localStorage.getItem('student_teacher_' + String(selectedStudent.email));
                     if (cached != null && cached !== String(selectedStudent.teacher_id || '')) {
-                        setSelectedStudent(prev => (prev ? { ...prev, teacher_id: cached || null } : prev));
+                        const currentStudent2 = selectedStudent;
+                        if (currentStudent2) {
+                            setSelectedStudent({ ...currentStudent2, teacher_id: cached || null });
+                        }
                     }
                 }
             } catch { }

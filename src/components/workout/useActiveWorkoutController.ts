@@ -98,6 +98,8 @@ const parseStartedAtMs = (raw: unknown): number => {
 
 export function useActiveWorkoutController(props: ActiveWorkoutProps) {
   const { alert, confirm } = useDialog();
+  // Bridge DialogContext alert (Promise<boolean>) to Promise<void> for child hooks
+  const alertVoid = useCallback(async (msg: string, title?: string): Promise<void> => { await alert(msg, title); }, [alert]);
   const teamWorkout = useTeamWorkout() as unknown as {
     sendInvite: (targetUser: unknown, workout: UnknownRecord) => Promise<unknown>
     broadcastMyLog: (exIdx: number, sIdx: number, weight: string, reps: string) => void
@@ -227,9 +229,9 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
   // ── Deload + report history (extracted to useWorkoutDeload) ──────────────
   const deload = useWorkoutDeload({
     session, workout, exercises, logs, getLog, updateLog,
-    getPlanConfig: (ex, setIdx) => getPlanConfig(ex, exercises, setIdx, getLog),
+    getPlanConfig: (ex, setIdx) => getPlanConfig(ex, setIdx),
     getPlannedSet: (ex, setIdx) => getPlannedSet(ex, setIdx),
-    ticker, alert,
+    ticker, alert: alertVoid, confirm,
   });
   const {
     reportHistory, reportHistoryStatus, reportHistoryUpdatedAt,
@@ -305,9 +307,9 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     organizeSaving, setOrganizeSaving,
     organizeError, setOrganizeError,
     organizeOpen, setOrganizeOpen,
-    organizeDirty, organizeBaseKeysRef,
+    organizeDirty, organizeBaseKeysRef: organizeBaseKeysRef as unknown as React.MutableRefObject<string>,
     onUpdateSession: props.onUpdateSession,
-    alert, confirm,
+    alert: alertVoid, confirm,
   });
   const {
     toggleCollapse, toggleLinkWeights,
@@ -356,10 +358,13 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
   // ── Finish workout (extracted to useWorkoutFinish) ──────────────────────
   const finishHook = useWorkoutFinish({
     session, workout, exercises, logs, ui, settings, ticker,
-    postCheckinOpen, setPostCheckinOpen, postCheckinDraft, setPostCheckinDraft,
+    postCheckinOpen, setPostCheckinOpen,
+    postCheckinDraft: postCheckinDraft as Record<string, string>,
+    setPostCheckinDraft: setPostCheckinDraft as (v: Record<string, string>) => void,
     postCheckinResolveRef, persistDeloadHistoryFromSession,
     finishing, setFinishing,
-    alert, confirm, onFinish: props.onFinish,
+    alert: alertVoid,
+    confirm, onFinish: props.onFinish as ((session: unknown, showReport: boolean) => void) | undefined,
   });
   const { finishWorkout, requestPostWorkoutCheckin } = finishHook;
 

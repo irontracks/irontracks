@@ -36,6 +36,7 @@ import {
   REPORT_FETCH_TIMEOUT_MS,
   REPORT_HISTORY_LIMIT,
   AI_SUGGESTION_TIMEOUT_MS,
+  AI_SUGGESTION_MIN_HISTORY,
 } from '../utils';
 import {
   collectExerciseSetInputs,
@@ -64,6 +65,7 @@ interface UseWorkoutDeloadProps {
   getPlannedSet: (ex: WorkoutExercise, setIdx: number) => UnknownRecord | null;
   ticker: number;
   alert: (msg: string, title?: string) => Promise<void>;
+  confirm: (msg: string, title?: string) => Promise<boolean>;
 }
 
 export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
@@ -78,6 +80,7 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
     getPlannedSet,
     ticker,
     alert,
+    confirm,
   } = props;
 
   // Report history state
@@ -504,7 +507,7 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
           let ok = false;
           try {
             ok = typeof confirm === 'function'
-              ? await confirm('Deseja analisar deload para este exercício?', 'Aplicar Deload', { confirmText: 'Analisar', cancelText: 'Cancelar' })
+              ? await confirm('Deseja analisar deload para este exercício?', 'Aplicar Deload')
               : false;
           } catch {
             ok = false;
