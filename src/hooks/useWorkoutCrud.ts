@@ -142,6 +142,7 @@ export function useWorkoutCrud({
                     const sorenessN = Number(pre.soreness)
                     const timeN = Number(pre.timeMinutes)
                     const supabase = createClient()
+                    const weightKgN = Number(String(pre.weight ?? '').replace(',', '.'))
                     const { error: checkinError } = await supabase.from('workout_checkins').insert({
                         user_id: user.id,
                         kind: 'pre',
@@ -152,6 +153,7 @@ export function useWorkoutCrud({
                         notes: String(pre.notes || '').trim() ? String(pre.notes || '').trim() : null,
                         answers: {
                             time_minutes: Number.isFinite(timeN) && timeN > 0 ? Math.round(timeN) : null,
+                            body_weight_kg: Number.isFinite(weightKgN) && weightKgN >= 20 && weightKgN <= 300 ? Math.round(weightKgN * 10) / 10 : null,
                         },
                     })
                     if (checkinError) throw checkinError

@@ -555,6 +555,9 @@ export default function DashboardModals(props: DashboardModalsProps) {
                                     onChange={(e) => setPreCheckinDraft({ ...(preCheckinDraft || {}), weight: e.target.value })}
                                     className="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-yellow-500"
                                 />
+                                <p className="mt-1.5 text-[11px] text-yellow-500/70 leading-snug">
+                                    ⚡ Preencher melhora a precisão do gasto calórico no relatório final.
+                                </p>
                             </div>
                             <div>
                                 <label className="block text-xs font-bold uppercase text-neutral-500 mb-2">Como se sente?</label>
