@@ -11,8 +11,7 @@ import { AdvancedConfig } from '@/types/app'
 import { StoriesBarSkeleton, MuscleMapSkeleton, SectionSkeleton } from '@/components/ui/SuspenseFallbacks'
 
 // Lazy-loaded dashboard sections for granular Suspense
-const BadgesGallery = React.lazy(() => import('./BadgesGallery'))
-const RecentAchievements = React.lazy(() => import('./RecentAchievements'))
+const IronRankCard = React.lazy(() => import('./IronRankCard'))
 const StoriesBar = React.lazy(() => import('./StoriesBar'))
 const MuscleMapCard = React.lazy(() => import('./MuscleMapCard'))
 
@@ -706,21 +705,17 @@ export default function StudentDashboard(props: Props) {
             </div>
           )}
 
-          {showNewRecordsCard ? (
+          {(showIronRank || showBadges || showNewRecordsCard) && (
             <Suspense fallback={<SectionSkeleton lines={2} />}>
-              <RecentAchievements userId={props.currentUserId} badges={props.streakStats?.badges ?? []} showBadges={showBadges} reloadKey={props.newRecordsReloadKey} />
-            </Suspense>
-          ) : null}
-
-          {(showIronRank || showBadges) && (
-            <Suspense fallback={<SectionSkeleton lines={2} />}>
-              <BadgesGallery
+              <IronRankCard
                 badges={props.streakStats?.badges ?? []}
                 currentStreak={props.streakStats?.currentStreak ?? 0}
                 totalVolumeKg={props.streakStats?.totalVolumeKg ?? 0}
                 currentUserId={props.currentUserId}
                 showIronRank={showIronRank}
-                showBadges={!showNewRecordsCard && showBadges}
+                showBadges={showBadges}
+                showRecords={showNewRecordsCard}
+                reloadKey={props.newRecordsReloadKey}
               />
             </Suspense>
           )}
