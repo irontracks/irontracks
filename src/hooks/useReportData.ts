@@ -257,13 +257,13 @@ export const useReportData = ({ session, previousSession, user }: UseReportDataP
   useEffect(() => {
     if (!session) { setKcalEstimate(0); return }
     let cancelled = false
-    ;(async () => {
-      try {
-        const kcal = await getKcalEstimate({ session, workoutId: session?.id ?? null })
-        if (cancelled) return
-        if (Number.isFinite(Number(kcal)) && Number(kcal) > 0) setKcalEstimate(Math.round(Number(kcal)))
-      } catch (e) { logWarn('useReportData', 'kcal estimate failed', e) }
-    })()
+      ; (async () => {
+        try {
+          const kcal = await getKcalEstimate({ session, workoutId: session?.id ?? null })
+          if (cancelled) return
+          if (Number.isFinite(Number(kcal)) && Number(kcal) > 0) setKcalEstimate(Math.round(Number(kcal)))
+        } catch (e) { logWarn('useReportData', 'kcal estimate failed', e) }
+      })()
     return () => { cancelled = true }
   }, [session])
 
@@ -311,12 +311,38 @@ export const useReportData = ({ session, previousSession, user }: UseReportDataP
   const durationInMinutes = (Number(safeSession?.totalTime) || 0) / 60
   const outdoorBike = safeSession?.outdoorBike && typeof safeSession.outdoorBike === 'object' ? (safeSession.outdoorBike as AnyObj) : null
 
+  // Body weight from pre-workout check-in (answers.body_weight_kg), falls back to 75 kg default
+  const preCheckinAnswers = (() => {
+    const pc = preCheckin && typeof preCheckin === 'object' ? (preCheckin as AnyObj) : null
+    if (!pc) return null
+    return pc?.answers && typeof pc.answers === 'object' ? (pc.answers as AnyObj) : null
+  })()
+  const checkinBodyWeightKg = (() => {
+    // Try both the top-level checkin and the session's pre-checkin answers
+    const fromAnswers = Number(preCheckinAnswers?.body_weight_kg)
+    if (Number.isFinite(fromAnswers) && fromAnswers >= 20 && fromAnswers <= 300) return fromAnswers
+    const fromSession = Number((safeSession?.preCheckin as AnyObj)?.weight ?? (safeSession?.preCheckin as AnyObj)?.body_weight_kg)
+    if (Number.isFinite(fromSession) && fromSession >= 20 && fromSession <= 300) return fromSession
+    return null
+  })()
+
+  // Exercise names for complexity factor calculation
+  const sessionExerciseNames = (() => {
+    if (!Array.isArray(safeSession?.exercises)) return null
+    return (safeSession.exercises as unknown[])
+      .map((ex) => {
+        const e = ex && typeof ex === 'object' ? (ex as AnyObj) : null
+        return String(e?.name || '').trim()
+      })
+      .filter(Boolean) as string[]
+  })()
+
   const calories = (() => {
     const ov = Number(kcalEstimate)
     if (Number.isFinite(ov) && ov > 0) return Math.round(ov)
     const bikeKcal = Number(outdoorBike?.caloriesKcal)
     if (Number.isFinite(bikeKcal) && bikeKcal > 0) return Math.round(bikeKcal)
-    return estimateCaloriesMet(sessionLogs, durationInMinutes)
+    return estimateCaloriesMet(sessionLogs, durationInMinutes, checkinBodyWeightKg, sessionExerciseNames)
   })()
 
   const reportMeta = safeSession?.reportMeta && typeof safeSession.reportMeta === 'object' ? (safeSession.reportMeta as AnyObj) : null
@@ -334,26 +360,26 @@ export const useReportData = ({ session, previousSession, user }: UseReportDataP
     const out: Record<string, unknown> = {}
     if (effectivePreviousSession && Array.isArray(effectivePreviousSession?.exercises)) {
       const safePrevLogs = prevSessionLogs as Record<string, unknown>
-      ;(effectivePreviousSession.exercises as unknown[]).forEach((ex: unknown, exIdx: number) => {
-        const exObj = ex && typeof ex === 'object' ? (ex as AnyObj) : null
-        if (!exObj) return
-        const exName = String(exObj?.name || '').trim()
-        const keyName = normalizeExerciseKey(exName)
-        if (!keyName) return
-        const exLogs: Array<Record<string, unknown>> = []
-        Object.keys(safePrevLogs).forEach((key) => {
-          try {
-            const parts = String(key || '').split('-')
-            const eIdx = Number(parts[0])
-            const sIdx = Number(parts[1])
-            if (!Number.isFinite(eIdx) || !Number.isFinite(sIdx)) return
-            if (eIdx !== exIdx) return
-            const value = safePrevLogs[key]
-            if (value && typeof value === 'object') exLogs[sIdx] = value as Record<string, unknown>
-          } catch { return }
+        ; (effectivePreviousSession.exercises as unknown[]).forEach((ex: unknown, exIdx: number) => {
+          const exObj = ex && typeof ex === 'object' ? (ex as AnyObj) : null
+          if (!exObj) return
+          const exName = String(exObj?.name || '').trim()
+          const keyName = normalizeExerciseKey(exName)
+          if (!keyName) return
+          const exLogs: Array<Record<string, unknown>> = []
+          Object.keys(safePrevLogs).forEach((key) => {
+            try {
+              const parts = String(key || '').split('-')
+              const eIdx = Number(parts[0])
+              const sIdx = Number(parts[1])
+              if (!Number.isFinite(eIdx) || !Number.isFinite(sIdx)) return
+              if (eIdx !== exIdx) return
+              const value = safePrevLogs[key]
+              if (value && typeof value === 'object') exLogs[sIdx] = value as Record<string, unknown>
+            } catch { return }
+          })
+          out[keyName] = exLogs
         })
-        out[keyName] = exLogs
-      })
     }
     return out
   })()
