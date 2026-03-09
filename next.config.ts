@@ -1,6 +1,15 @@
 import type { NextConfig } from 'next'
 
 const nextConfig: NextConfig = {
+  // ─── Gzip / Brotli compression for serverless responses ───────────────────
+  compress: true,
+
+  // ─── Tree-shake heavy libs at build time (reduces JS bundle size) ─────────
+  // lucide-react: saves ~200kb by only importing icons actually used
+  // chart.js / react-chartjs-2: only bundles chart types imported
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  ...({ optimizePackageImports: ['lucide-react', 'chart.js', 'react-chartjs-2', '@tanstack/react-virtual'] } as any),
+
   typescript: {
     // TSC validates with 0 errors. These are strict cast issues
     // (GenericStringError→Record, Exercise→{sets}) that don't affect runtime.
