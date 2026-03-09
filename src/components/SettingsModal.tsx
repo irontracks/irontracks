@@ -36,6 +36,7 @@ import {
   SettingsTimerSection,
   SettingsPrivacySection,
   SettingsSecuritySection,
+  SettingsHealthKitSection,
   SettingsModulesModal,
 } from '@/components/settings/SettingsSections'
 
@@ -62,6 +63,8 @@ export default function SettingsModal(props: SettingsModalProps) {
   const [iosDiag, setIosDiag] = useState<Record<string, unknown> | null>(null)
   const [iosDiagBusy, setIosDiagBusy] = useState(false)
   const [iosLiveTestId, setIosLiveTestId] = useState<string>('')
+  const [healthKitGranted, setHealthKitGranted] = useState(false)
+  const [healthKitBusy, setHealthKitBusy] = useState(false)
 
   const setValue = (key: string, value: unknown) => {
     if (!key) return
@@ -135,6 +138,14 @@ export default function SettingsModal(props: SettingsModalProps) {
     } catch { setIosNotifStatus('unknown') } finally { setIosNotifBusy(false) }
   }
 
+  const handleRequestHealthKitPermission = async () => {
+    try {
+      setHealthKitBusy(true)
+      const res = await requestHealthKitPermission()
+      setHealthKitGranted(!!res?.granted)
+    } catch { setHealthKitGranted(false) } finally { setHealthKitBusy(false) }
+  }
+
   const handleOpenAppSettings = async () => {
     try { setIosNotifBusy(true); await openAppSettings() } catch { } finally { setIosNotifBusy(false) }
   }
@@ -176,6 +187,15 @@ export default function SettingsModal(props: SettingsModalProps) {
             onRequestIosNotifPermission={handleRequestIosNotifPermission}
             onOpenAppSettings={handleOpenAppSettings}
           />
+          {isIosNative() && (
+            <SettingsHealthKitSection
+              isHealthKitAvailable={Boolean(iosDiagObj?.healthKitAvailable)}
+              healthKitGranted={healthKitGranted}
+              healthKitBusy={healthKitBusy}
+              onRequestPermission={handleRequestHealthKitPermission}
+              onOpenAppSettings={handleOpenAppSettings}
+            />
+          )}
           {isIosNative() && <SettingsSecuritySection draft={draft} setValue={setValue} />}
 
           {/* iOS Diagnostics */}
@@ -210,7 +230,7 @@ export default function SettingsModal(props: SettingsModalProps) {
               <div className="mt-3 flex flex-wrap gap-2">
                 <button type="button" onClick={async () => { try { await triggerHaptic('success'); alert('Ok', 'Haptic') } catch { alert('Falhou', 'Haptic') } }} className="px-3 py-2 rounded-xl bg-yellow-500 text-black font-black">Testar Haptic</button>
                 <button type="button" onClick={async () => { try { const res = await authenticateWithBiometrics('Confirmar Face ID / Touch ID'); alert(res?.success ? 'Ok' : String(res?.error || 'Falhou'), 'Biometria') } catch { alert('Falhou', 'Biometria') } }} className="px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black">Testar Biometria</button>
-                <button type="button" onClick={async () => { try { const res = await requestHealthKitPermission(); alert(res?.granted ? 'Permissão ok' : String(res?.error || 'Negado'), 'HealthKit') } catch { alert('Falhou', 'HealthKit') } }} className="px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black">Pedir HealthKit</button>
+                <button type="button" onClick={async () => { try { const res = await requestHealthKitPermission(); setHealthKitGranted(!!res?.granted); alert(res?.granted ? 'Permissão ok' : String(res?.error || 'Negado'), 'HealthKit') } catch { alert('Falhou', 'HealthKit') } }} className="px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black">HK (debug)</button>
                 <button type="button" onClick={async () => { try { const id = iosLiveTestId || `diagnostic-${Date.now()}`; await startRestLiveActivity(id, 60, 'Diagnóstico'); setIosLiveTestId(id); alert('Iniciada (60s)', 'Live Activity') } catch { alert('Falhou', 'Live Activity') } }} className="px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black">Testar Live Activity</button>
                 <button type="button" disabled={!iosLiveTestId} onClick={async () => { try { await endRestLiveActivity(iosLiveTestId); setIosLiveTestId(''); alert('Encerrada', 'Live Activity') } catch { alert('Falhou', 'Live Activity') } }} className="px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black disabled:opacity-60">Encerrar Live Activity</button>
               </div>
