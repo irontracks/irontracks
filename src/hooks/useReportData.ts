@@ -337,12 +337,22 @@ export const useReportData = ({ session, previousSession, user }: UseReportDataP
       .filter(Boolean) as string[]
   })()
 
+  // RPE from post-workout check-in (answers.rpe) — used to scale MET ±15%
+  const postCheckinRpe = (() => {
+    const pc = postCheckin && typeof postCheckin === 'object' ? (postCheckin as AnyObj) : null
+    if (!pc) return null
+    const answers = pc?.answers && typeof pc.answers === 'object' ? (pc.answers as AnyObj) : null
+    const rpe = answers?.rpe ?? pc?.rpe
+    const n = Number(rpe)
+    return Number.isFinite(n) && n >= 1 && n <= 10 ? n : null
+  })()
+
   const calories = (() => {
     const ov = Number(kcalEstimate)
     if (Number.isFinite(ov) && ov > 0) return Math.round(ov)
     const bikeKcal = Number(outdoorBike?.caloriesKcal)
     if (Number.isFinite(bikeKcal) && bikeKcal > 0) return Math.round(bikeKcal)
-    return estimateCaloriesMet(sessionLogs, durationInMinutes, checkinBodyWeightKg, sessionExerciseNames)
+    return estimateCaloriesMet(sessionLogs, durationInMinutes, checkinBodyWeightKg, sessionExerciseNames, postCheckinRpe)
   })()
 
   const reportMeta = safeSession?.reportMeta && typeof safeSession.reportMeta === 'object' ? (safeSession.reportMeta as AnyObj) : null
