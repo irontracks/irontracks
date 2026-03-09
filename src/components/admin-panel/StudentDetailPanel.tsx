@@ -7,18 +7,20 @@ import {
 } from 'lucide-react';
 import HistoryList from '@/components/HistoryList';
 import AdminWorkoutEditor, { AdminWorkout } from '@/components/AdminWorkoutEditor';
-import { workoutPlanHtml } from '@/utils/report/templates';
 import { escapeHtml } from '@/utils/escapeHtml';
 import { parseJsonWithSchema } from '@/utils/zod';
 import { z } from 'zod';
 import { normalizeWorkoutTitle } from '@/utils/workoutTitle';
 import { updateWorkout } from '@/actions/workout-actions';
+
 import type { AdminUser, AdminWorkoutTemplate } from '@/types/admin';
 import { useAdminPanel } from './AdminPanelContext';
 import { useDialog } from '@/contexts/DialogContext';
 import type { UnknownRecord } from '@/types/app'
 import { StudentCheckinsTab } from './StudentCheckinsTab';
 import { StudentEvolutionTab } from './StudentEvolutionTab';
+import { StudentWorkoutsTab } from './StudentWorkoutsTab';
+import { StudentVideosTab } from './StudentVideosTab';
 
 
 export const StudentDetailPanel: React.FC = () => {
@@ -45,14 +47,6 @@ export const StudentDetailPanel: React.FC = () => {
         setStudentCheckinsRange,
         studentCheckinsFilter,
         setStudentCheckinsFilter,
-        executionVideos,
-        setExecutionVideos,
-        executionVideosLoading,
-        setExecutionVideosLoading,
-        executionVideosError,
-        setExecutionVideosError,
-        executionVideoFeedbackDraft,
-        setExecutionVideoFeedbackDraft,
         executionVideoModalOpen,
         setExecutionVideoModalOpen,
         executionVideoModalUrl,
@@ -79,10 +73,8 @@ export const StudentDetailPanel: React.FC = () => {
         // Bug #4 fix: using memoized versions from controller instead of inline re-definitions
         handleEditStudent,
         handleSaveStudentEdit,
-        handleAddTemplateToStudent,
         handleExportPdf,
         handleExportJson,
-        openEditWorkout,
         getSetsCount,
     } = useAdminPanel();
 
@@ -360,416 +352,12 @@ export const StudentDetailPanel: React.FC = () => {
 
                 {
                     !loading && subTab === 'workouts' && (
-                        <div className="space-y-4" >
-                            <div className="bg-neutral-900/40 border border-neutral-800 rounded-2xl p-4 shadow-[0_16px_40px_rgba(0,0,0,0.25)]" >
-                                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3" >
-                                    <div className="min-w-0" >
-                                        <div className="flex items-center gap-2" >
-                                            <Dumbbell size={18} className="text-yellow-500" />
-                                            <h3 className="text-base font-black text-white tracking-tight" > Treinos do aluno </h3>
-                                        </div>
-                                        < div className="mt-1 text-xs text-neutral-400 font-semibold" >
-                                            {(Array.isArray(studentWorkouts) ? studentWorkouts.length : 0) + (Array.isArray(syncedWorkouts) ? syncedWorkouts.length : 0)} atribuídos
-                                        </div>
-                                    </div>
-                                    < div className="flex flex-col sm:flex-row gap-2" >
-                                        <button
-                                            type="button"
-                                            data-tour="adminpanel.student.workouts.history"
-                                            onClick={() => setHistoryOpen(true)}
-                                            className="min-h-[44px] px-4 py-3 bg-neutral-900/70 border border-yellow-500/25 text-yellow-400 rounded-xl text-[11px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-yellow-500/10 transition-all duration-300 active:scale-95"
-                                        >
-                                            <History size={16} /> Histórico
-                                        </button>
-                                        < button
-                                            type="button"
-                                            data-tour="adminpanel.student.workouts.create"
-                                            onClick={() => setEditingStudentWorkout({ id: null, title: '', exercises: [] })}
-                                            className="min-h-[44px] px-4 py-3 bg-yellow-500 hover:bg-yellow-400 text-black rounded-xl text-[11px] font-black uppercase tracking-widest transition-all duration-300 shadow-lg shadow-yellow-500/15 active:scale-95"
-                                        >
-                                            Criar treino
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                            {
-                                templates.length > 0 && (
-                                    <button onClick={
-                                        async () => {
-                                            try {
-                                                const looksLikeUuid = (v: unknown) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(v || '').trim());
-                                                const maybeId = selectedStudent.user_id || selectedStudent.id || null;
-                                                let payloadId = looksLikeUuid(maybeId) ? String(maybeId) : undefined;
-                                                const payloadEmail = String(selectedStudent.email || '').trim();
-                                                if (!payloadId && payloadEmail) {
-                                                    try {
-                                                        const { data: profile } = await supabase
-                                                            .from('profiles')
-                                                            .select('id')
-                                                            .ilike('email', payloadEmail)
-                                                            .maybeSingle();
-                                                        if (profile?.id) payloadId = String(profile.id);
-                                                    } catch { }
-                                                }
-                                                if (!payloadId && !payloadEmail) {
-                                                    await alert('Este aluno ainda não possui acesso ao app. Solicite que ele faça o cadastro primeiro.');
-                                                    return;
-                                                }
-                                                if (!payloadId && payloadEmail) {
-                                                    await alert('Este aluno ainda não possui acesso ao app. Solicite que ele faça o cadastro primeiro.');
-                                                    return;
-                                                }
-                                                const normalize = (s: unknown) => String(s || '')
-                                                    .toLowerCase()
-                                                    .normalize('NFD')
-                                                    .replace(/[\u0300-\u036f]/g, '')
-                                                    .replace(/\s+/g, ' ')
-                                                    .trim();
-                                                const extractLetter = (rawName: unknown) => {
-                                                    const nn = normalize(rawName);
-                                                    if (!nn) return null;
-                                                    const m = nn.match(/^treino\s*\(?([a-z])/);
-                                                    if (m && m[1]) return m[1];
-                                                    const m2 = nn.match(/\(([a-z])\)/);
-                                                    if (m2 && m2[1]) return m2[1];
-                                                    return null;
-                                                };
-                                                void extractLetter; // used in normalize logic above
-                                                const authHeaders = await getAdminAuthHeaders();
-                                                const res = await fetch('/api/admin/workouts/sync-templates', {
-                                                    method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders },
-                                                    body: JSON.stringify({
-                                                        id: payloadId,
-                                                        email: payloadEmail,
-                                                        mode: 'all'
-                                                    })
-                                                })
-                                                const json: UnknownRecord = await res.json().catch(() => ({} as UnknownRecord));
-                                                if (json.ok) {
-                                                    const debugObj: UnknownRecord | null = json.debug && typeof json.debug === 'object' ? (json.debug as UnknownRecord) : null;
-                                                    const selectedUserId = String((selectedStudent as UnknownRecord | null)?.user_id || '').trim();
-                                                    const resolvedTargetUserId = String(debugObj?.targetUserId || selectedUserId || '').trim();
-                                                    if (!resolvedTargetUserId) {
-                                                        await alert('Não foi possível identificar o aluno. Tente recarregar a página.');
-                                                        return;
-                                                    }
-                                                    // Se rota retorna vazio, reforçar fetch direto por OR user_id/student_id
-                                                    let rows: UnknownRecord[] = Array.isArray(json.rows) ? (json.rows as UnknownRecord[]) : [];
-                                                    if (rows.length === 0) {
-                                                        try {
-                                                            const { data: refreshed } = await supabase
-                                                                .from('workouts')
-                                                                .select('*, exercises(*, sets(*))')
-                                                                .eq('user_id', resolvedTargetUserId)
-                                                                .eq('is_template', true)
-                                                                .order('name');
-                                                            rows = Array.isArray(refreshed) ? (refreshed as UnknownRecord[]) : [];
-                                                        } catch { }
-                                                    }
-                                                    const scoped = rows.filter((w) => String(w?.user_id || '') === resolvedTargetUserId);
-                                                    const synced = scoped.filter((w) => (w?.is_template && String(w?.created_by || '') === String(user.id)));
-                                                    const syncedIds = new Set(synced.map((w) => w?.id).filter(Boolean));
-                                                    const others = scoped.filter((w) => !syncedIds.has(w?.id));
-                                                    setStudentWorkouts(others)
-                                                    setSyncedWorkouts(synced)
-                                                    const createdCount = Number(json.created_count) || 0;
-                                                    const updatedCount = Number(json.updated_count) || 0;
-                                                    const msg = `Sincronização contínua ativada: ${createdCount} criado(s), ${updatedCount} atualizado(s)`
-                                                    if (createdCount + updatedCount === 0 && debugObj) {
-                                                        const pickedNames: unknown[] = Array.isArray(debugObj.picked_names) ? (debugObj.picked_names as unknown[]) : [];
-                                                        const sampleNames: unknown[] = Array.isArray(debugObj.source_sample_names) ? (debugObj.source_sample_names as unknown[]) : [];
-                                                        const extra = `\n\nDiagnóstico:\n- sourceUserId: ${String(debugObj.sourceUserId || '-')}\n- source_mode: ${String(debugObj.source_mode || '-')}\n- owner_raw: ${String(debugObj.owner_raw_count ?? '-')}\n- owner_matched: ${String(debugObj.owner_matched_count ?? '-')}\n- source_count: ${String(debugObj.source_count ?? '-')}\n- picked: ${String(debugObj.picked_count ?? '-')}\n- picked_names: ${pickedNames.slice(0, 3).map(String).join(' | ') || '-'}\n- sample: ${sampleNames.slice(0, 3).map(String).join(' | ') || '-'}`
-                                                        await alert(msg + extra)
-                                                    } else {
-                                                        await alert(msg)
-                                                    }
-                                                } else {
-                                                    const debugObj: UnknownRecord | null = json.debug && typeof json.debug === 'object' ? (json.debug as UnknownRecord) : null;
-                                                    if (debugObj) {
-                                                        const ownerSample: unknown[] = Array.isArray(debugObj.owner_sample_names) ? (debugObj.owner_sample_names as unknown[]) : [];
-                                                        const sample = ownerSample.slice(0, 3).map(String).join(' | ') || '-'
-                                                        const extra = `\n\nDiagnóstico:\n- authUserId: ${String(debugObj.authUserId || '-')}\n- sourceUserId: ${String(debugObj.sourceUserId || '-')}\n- syncMode: ${String(debugObj.syncMode || '-')}\n- owner_raw: ${String(debugObj.owner_raw_count ?? '-')}\n- owner_owned: ${String(debugObj.owner_owned_count ?? '-')}\n- owner_matched: ${String(debugObj.owner_matched_count ?? '-')}\n- sample: ${sample}`
-                                                        await alert('Erro: ' + (String(json.error || '') || 'Falha ao sincronizar') + extra)
-                                                    } else {
-                                                        await alert('Erro: ' + (String(json.error || '') || 'Falha ao sincronizar'))
-                                                    }
-                                                }
-                                            } catch (e: unknown) {
-                                                const msg = e && typeof e === 'object' && 'message' in e && typeof (e as { message?: unknown }).message === 'string' ? (e as { message: string }).message : String(e);
-                                                await alert('Erro ao sincronizar: ' + msg);
-                                            }
-                                        }
-                                    } className="px-3 py-2 bg-neutral-800 border border-neutral-700 text-neutral-200 rounded-lg text-xs font-bold" > Sincronizar com Meus Treinos </button>
-                                )
-                            }
-                            {
-                                syncedWorkouts.length > 0 && (
-                                    <div className="mt-4" >
-                                        <h3 className="font-bold text-yellow-500 text-xs uppercase tracking-widest mb-2" > Treinos sincronizados </h3>
-                                        {
-                                            syncedWorkouts.map((w) => (
-                                                <div key={String((w as UnknownRecord)?.id ?? '')
-                                                } className="bg-neutral-800 p-4 rounded-xl border border-neutral-700 flex justify-between items-center cursor-pointer" onClick={() => setViewWorkout(w)
-                                                }>
-                                                    <div>
-                                                        <h4 className="font-bold text-white" > {normalizeWorkoutTitle(String((w as UnknownRecord)?.name ?? ''))}</h4>
-                                                        < p className="text-xs text-neutral-500" > {Array.isArray((w as UnknownRecord)?.exercises) ? ((w as UnknownRecord).exercises as unknown[]).length : 0} exercícios </p>
-                                                    </div>
-                                                    < div className="flex items-center gap-2" >
-                                                        <button onClick={(e) => openEditWorkout(e, w)} className="p-2 bg-neutral-700 hover:bg-yellow-500 text-neutral-300 hover:text-black rounded" > <Edit3 size={16} /></button >
-                                                        <button onClick={async (e) => { e.stopPropagation(); if (!(await confirm('Remover este treino do aluno?'))) return; try { const authHeaders = await getAdminAuthHeaders(); const res = await fetch('/api/admin/workouts/delete', { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders }, body: JSON.stringify({ id: (w as UnknownRecord)?.id }) }); const json: UnknownRecord = await res.json().catch(() => ({} as UnknownRecord)); if (!json.ok) throw new Error(String(json.error || 'Falha ao remover')); setStudentWorkouts(prev => prev.filter(x => x.id !== (w as UnknownRecord)?.id)); setSyncedWorkouts(prev => prev.filter(x => x.id !== (w as UnknownRecord)?.id)); } catch (e: unknown) { const msg = e && typeof e === 'object' && 'message' in e && typeof (e as { message?: unknown }).message === 'string' ? (e as { message: string }).message : String(e); await alert('Erro ao remover: ' + msg); } }} className="p-2 text-red-500 hover:bg-red-900/20 rounded" > <Trash2 size={18} /></button >
-                                                    </div>
-                                                </div>
-                                            ))}
-                                    </div>
-                                )}
-                            {studentWorkouts.length === 0 && <p className="text-neutral-500 text-sm" > Nenhum treino atribuído.</p>}
-                            {
-                                studentWorkouts.map((w) => (
-                                    <div key={String((w as UnknownRecord)?.id ?? '')
-                                    } className="bg-neutral-800 p-4 rounded-xl border border-neutral-700 flex justify-between items-center cursor-pointer" onClick={() => setViewWorkout(w)}>
-                                        <div>
-                                            <h4 className="font-bold text-white" > {normalizeWorkoutTitle(String((w as UnknownRecord)?.name ?? ''))}</h4>
-                                            < p className="text-xs text-neutral-500" > {Array.isArray((w as UnknownRecord)?.exercises) ? ((w as UnknownRecord).exercises as unknown[]).length : 0} exercícios </p>
-                                        </div>
-                                        < div className="flex items-center gap-2" >
-                                            <button onClick={(e) => openEditWorkout(e, w)} className="p-2 bg-neutral-700 hover:bg-yellow-500 text-neutral-300 hover:text-black rounded" > <Edit3 size={16} /></button >
-                                            <button
-                                                onClick={
-                                                    async (e) => {
-                                                        e.stopPropagation();
-                                                        if (!(await confirm('Remover este treino do aluno?'))) return;
-                                                        try {
-                                                            const authHeaders = await getAdminAuthHeaders();
-                                                            const workoutId = (w as UnknownRecord)?.id;
-                                                            const res = await fetch('/api/admin/workouts/delete', {
-                                                                method: 'POST',
-                                                                headers: { 'Content-Type': 'application/json', ...authHeaders },
-                                                                body: JSON.stringify({ id: workoutId }),
-                                                            });
-                                                            const json: UnknownRecord = await res.json().catch(() => ({} as UnknownRecord));
-                                                            if (!json.ok) throw new Error(String(json.error || 'Falha ao remover'));
-                                                            setStudentWorkouts((prev) => prev.filter((x) => x.id !== workoutId));
-                                                        } catch (err: unknown) {
-                                                            const msg = err && typeof err === 'object' && 'message' in err && typeof (err as { message?: unknown }).message === 'string' ? (err as { message: string }).message : String(err);
-                                                            await alert('Erro ao remover: ' + msg);
-                                                        }
-                                                    }
-                                                }
-                                                className="p-2 text-red-500 hover:bg-red-900/20 rounded"
-                                            >
-                                                <Trash2 size={18} />
-                                            </button>
-                                        </div>
-                                    </div>
-                                ))}
-                            <div className="mt-6" >
-                                <h3 className="font-bold text-yellow-500 text-xs uppercase tracking-widest mb-2" > Meus Treinos </h3>
-                                {templates.length === 0 && <p className="text-neutral-500 text-sm" > Nenhum treino seu encontrado.</p>}
-                                {
-                                    templates.map((t, idx) => (
-                                        <button key={String(t.id ?? t.name ?? `idx:${idx}`)
-                                        } onClick={() => handleAddTemplateToStudent(t)} className="w-full text-left p-3 bg-neutral-800 hover:bg-neutral-700 rounded-xl border border-neutral-700 flex justify-between group" >
-                                            <span>{String(t.name ?? '')} </span>
-                                            < Plus className="text-neutral-500 group-hover:text-yellow-500" />
-                                        </button>
-                                    ))}
-                            </div>
-                        </div>
+                        <StudentWorkoutsTab />
                     )}
 
                 {
                     !loading && executionVideoEnabled && subTab === 'videos' && (
-                        <div className="space-y-4" >
-                            <div className="bg-neutral-900/40 border border-neutral-800 rounded-2xl p-4 shadow-[0_16px_40px_rgba(0,0,0,0.25)]" >
-                                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3" >
-                                    <div className="min-w-0" >
-                                        <div className="flex items-center gap-2" >
-                                            <Video size={18} className="text-yellow-500" />
-                                            <h3 className="text-base font-black text-white tracking-tight" > Vídeos de execução </h3>
-                                        </div>
-                                        < div className="mt-1 text-xs text-neutral-400 font-semibold" >
-                                            {executionVideosLoading ? 'Carregando...' : `${Array.isArray(executionVideos) ? executionVideos.length : 0} enviado(s)`}
-                                        </div>
-                                    </div>
-                                    < button
-                                        type="button"
-                                        onClick={async () => {
-                                            try {
-                                                if (!selectedStudent?.user_id) return;
-                                                setExecutionVideosLoading(true);
-                                                setExecutionVideosError('');
-                                                const res = await fetch(`/api/teacher/execution-videos/by-student?student_user_id=${encodeURIComponent(String(selectedStudent.user_id))}`, { cache: 'no-store', credentials: 'include' });
-                                                const json = await res.json().catch((): null => null);
-                                                if (!res.ok || !json?.ok) {
-                                                    setExecutionVideos([]);
-                                                    setExecutionVideosError(String(json?.error || `Falha ao carregar (${res.status})`));
-                                                    return;
-                                                }
-                                                setExecutionVideos(Array.isArray(json.items) ? json.items : []);
-                                            } catch (e: unknown) {
-                                                setExecutionVideos([]);
-                                                const msg = e && typeof e === 'object' && 'message' in e && typeof (e as { message?: unknown }).message === 'string' ? (e as { message: string }).message : '';
-                                                setExecutionVideosError(msg || 'Erro ao carregar');
-                                            } finally {
-                                                setExecutionVideosLoading(false);
-                                            }
-                                        }
-                                        }
-                                        disabled={executionVideosLoading}
-                                        className="min-h-[44px] px-4 py-3 bg-neutral-900/70 border border-neutral-800 hover:bg-neutral-900 text-neutral-200 rounded-xl font-black flex items-center justify-center gap-2 transition-all duration-300 active:scale-95 disabled:opacity-60"
-                                    >
-                                        Atualizar
-                                    </button>
-                                </div>
-                            </div>
-
-                            {
-                                executionVideosError ? (
-                                    <div className="bg-neutral-900/60 border border-red-500/30 rounded-2xl p-4 text-red-200 font-bold text-sm" >
-                                        {executionVideosError}
-                                    </div>
-                                ) : null
-                            }
-
-                            {
-                                executionVideosLoading ? (
-                                    <div className="text-center animate-pulse text-neutral-400 font-semibold" > Carregando vídeos...</div>
-                                ) : !Array.isArray(executionVideos) || executionVideos.length === 0 ? (
-                                    <div className="bg-neutral-900/40 border border-neutral-800 rounded-2xl p-4 text-neutral-400 font-semibold" >
-                                        Nenhum vídeo enviado ainda.
-                                    </div>
-                                ) : (
-                                    <div className="space-y-3" >
-                                        {
-                                            executionVideos.map((it) => {
-                                                const id = it?.id ? String(it.id) : '';
-                                                const when = it?.created_at ? new Date(String(it.created_at)) : null;
-                                                const title = String(it?.exercise_name || 'Execução').trim();
-                                                const status = String(it?.status || 'pending').toLowerCase();
-                                                const draft = executionVideoFeedbackDraft && typeof executionVideoFeedbackDraft === 'object' ? String((executionVideoFeedbackDraft as UnknownRecord)[id] ?? '') : '';
-                                                const statusLabel = status === 'approved' ? 'Aprovado' : status === 'rejected' ? 'Reprovado' : 'Pendente';
-                                                const statusTone =
-                                                    status === 'approved'
-                                                        ? 'border-green-500/30 text-green-300'
-                                                        : status === 'rejected'
-                                                            ? 'border-red-500/30 text-red-300'
-                                                            : 'border-yellow-500/30 text-yellow-300';
-                                                return (
-                                                    <div key={id || Math.random().toString(36).slice(2)
-                                                    } className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-4 shadow-[0_16px_40px_rgba(0,0,0,0.25)]" >
-                                                        <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3" >
-                                                            <div className="min-w-0" >
-                                                                <div className="flex flex-wrap items-center gap-2" >
-                                                                    <div className="text-base font-black text-white truncate" > {title} </div>
-                                                                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-widest border ${statusTone}`} > {statusLabel} </span>
-                                                                </div>
-                                                                < div className="mt-1 text-xs text-neutral-400 font-semibold" >
-                                                                    {when ? when.toLocaleString() : ''}
-                                                                </div>
-                                                            </div>
-                                                            < div className="flex flex-col sm:flex-row gap-2" >
-                                                                <button
-                                                                    type="button"
-                                                                    onClick={async () => {
-                                                                        try {
-                                                                            const res = await fetch('/api/execution-videos/media', {
-                                                                                method: 'POST',
-                                                                                credentials: 'include',
-                                                                                headers: { 'content-type': 'application/json' },
-                                                                                body: JSON.stringify({ submission_id: id }),
-                                                                            });
-                                                                            const json = await res.json().catch((): null => null);
-                                                                            if (!res.ok || !json?.ok || !json?.url) {
-                                                                                await alert(String(json?.error || `Falha ao abrir (${res.status})`));
-                                                                                return;
-                                                                            }
-                                                                            setExecutionVideoModalUrl(String(json.url));
-                                                                            setExecutionVideoModalOpen(true);
-                                                                        } catch (e: unknown) {
-                                                                            const msg = e && typeof e === 'object' && 'message' in e && typeof (e as { message?: unknown }).message === 'string' ? (e as { message: string }).message : String(e);
-                                                                            await alert('Erro: ' + msg);
-                                                                        }
-                                                                    }
-                                                                    }
-                                                                    className="min-h-[44px] px-4 py-3 bg-neutral-900/70 border border-neutral-800 hover:bg-neutral-900 text-neutral-200 rounded-xl font-black flex items-center justify-center gap-2 transition-all duration-300 active:scale-95"
-                                                                >
-                                                                    Assistir
-                                                                </button>
-                                                                < button
-                                                                    type="button"
-                                                                    onClick={async () => {
-                                                                        try {
-                                                                            const feedback = String(draft || '').trim();
-                                                                            const res = await fetch('/api/teacher/execution-videos/review', {
-                                                                                method: 'POST',
-                                                                                credentials: 'include',
-                                                                                headers: { 'content-type': 'application/json' },
-                                                                                body: JSON.stringify({ submission_id: id, status: 'approved', feedback, send_message: true }),
-                                                                            });
-                                                                            const json = await res.json().catch((): null => null);
-                                                                            if (!res.ok || !json?.ok) {
-                                                                                await alert(String(json?.error || `Falha ao aprovar (${res.status})`));
-                                                                                return;
-                                                                            }
-                                                                            setExecutionVideos((prev) => (Array.isArray(prev) ? prev.map((x) => (String(x?.id || '') === id ? { ...x, status: 'approved', teacher_feedback: feedback } : x)) : prev));
-                                                                        } catch (e: unknown) {
-                                                                            const msg = e && typeof e === 'object' && 'message' in e && typeof (e as { message?: unknown }).message === 'string' ? (e as { message: string }).message : String(e);
-                                                                            await alert('Erro: ' + msg);
-                                                                        }
-                                                                    }}
-                                                                    className="min-h-[44px] px-4 py-3 bg-green-600 hover:bg-green-500 text-white rounded-xl font-black transition-all duration-300 active:scale-95"
-                                                                >
-                                                                    Aprovar
-                                                                </button>
-                                                                < button
-                                                                    type="button"
-                                                                    onClick={async () => {
-                                                                        try {
-                                                                            const feedback = String(draft || '').trim();
-                                                                            const res = await fetch('/api/teacher/execution-videos/review', {
-                                                                                method: 'POST',
-                                                                                credentials: 'include',
-                                                                                headers: { 'content-type': 'application/json' },
-                                                                                body: JSON.stringify({ submission_id: id, status: 'rejected', feedback, send_message: true }),
-                                                                            });
-                                                                            const json = await res.json().catch((): null => null);
-                                                                            if (!res.ok || !json?.ok) {
-                                                                                await alert(String(json?.error || `Falha ao reprovar (${res.status})`));
-                                                                                return;
-                                                                            }
-                                                                            setExecutionVideos((prev) => (Array.isArray(prev) ? prev.map((x) => (String(x?.id || '') === id ? { ...x, status: 'rejected', teacher_feedback: feedback } : x)) : prev));
-                                                                        } catch (e: unknown) {
-                                                                            const msg = e && typeof e === 'object' && 'message' in e && typeof (e as { message?: unknown }).message === 'string' ? (e as { message: string }).message : String(e);
-                                                                            await alert('Erro: ' + msg);
-                                                                        }
-                                                                    }}
-                                                                    className="min-h-[44px] px-4 py-3 bg-red-600 hover:bg-red-500 text-white rounded-xl font-black transition-all duration-300 active:scale-95"
-                                                                >
-                                                                    Reprovar
-                                                                </button>
-                                                            </div>
-                                                        </div>
-
-                                                        < div className="mt-3" >
-                                                            <label className="block text-[11px] font-black uppercase tracking-widest text-neutral-500 mb-2" > Mensagem para o aluno </label>
-                                                            < textarea
-                                                                value={String(draft || '')}
-                                                                onChange={(e) => {
-                                                                    const v = e?.target?.value ?? '';
-                                                                    setExecutionVideoFeedbackDraft((prev) => ({ ...(prev && typeof prev === 'object' ? prev : {}), [id]: v }));
-                                                                }}
-                                                                rows={3}
-                                                                className="w-full bg-neutral-900/70 border border-neutral-800 rounded-xl px-3 py-2 text-white placeholder:text-neutral-600 focus:border-yellow-500 focus:outline-none"
-                                                                placeholder="Escreva seu feedback..."
-                                                            />
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })}
-                                    </div>
-                                )}
-                        </div>
+                        <StudentVideosTab />
                     )}
 
                 {
