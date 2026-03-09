@@ -49,12 +49,24 @@ export const RestPauseSet = ({
 
   // SST override takes priority for config values
   const pauseSec = sstOverride ? sstOverride.restSec : (parseTrainingNumber(cfg?.rest_time_sec) ?? 15);
-  const miniSets = sstOverride
-    ? sstOverride.miniCount
-    : Math.max(0, Math.floor(parseTrainingNumber(cfg?.mini_sets) ?? 0));
+
+
 
   const rp = isObject(log.rest_pause) ? (log.rest_pause as UnknownRecord) : ({} as UnknownRecord);
   const minisArrRaw: unknown[] = Array.isArray(rp?.mini_reps) ? (rp.mini_reps as unknown[]) : [];
+
+  // miniSets: priority chain — sstOverride > cfg.mini_sets > log.rest_pause.planned_mini_sets > mini_reps already saved
+  const miniSets = sstOverride
+    ? sstOverride.miniCount
+    : (() => {
+      const fromCfg = Math.floor(parseTrainingNumber(cfg?.mini_sets) ?? 0)
+      if (fromCfg > 0) return fromCfg
+      const fromLog = Math.floor(parseTrainingNumber(rp?.planned_mini_sets) ?? 0)
+      if (fromLog > 0) return fromLog
+      // If mini_reps are already saved in the log, use their count
+      return minisArrRaw.length
+    })()
+
   const minis: Array<number | null> = Array.from({ length: miniSets }).map((_, idx) => {
     const v = minisArrRaw[idx];
     return parseTrainingNumber(v);
@@ -62,7 +74,8 @@ export const RestPauseSet = ({
 
   const total = minis.reduce<number>((acc, v) => acc + (typeof v === 'number' ? v : 0), 0);
   const done = !!log.done;
-  const canDone = miniSets > 0 && minis.every((v) => typeof v === 'number' && Number.isFinite(v) && v > 0);
+  // canDone: requires at least 1 mini AND all minis have positive reps
+  const canDone = miniSets > 0 && minis.length > 0 && minis.every((v) => typeof v === 'number' && Number.isFinite(v) && v > 0);
 
   const notesValue = String(log.notes ?? '');
 
