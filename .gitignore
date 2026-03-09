@@ -59,3 +59,33 @@ push_bg.sh
 
 # Playwright auth state
 e2e/.auth/
+
+# iOS build artifacts & Xcode package caches
+ios/App/build/
+ios/App/DerivedData/
+ios/App/*.xcworkspace/xcshareddata/
+ios/App/*.xcworkspace/xcuserdata/
+ios/App/Pods/
+ios/App/build/SourcePackages/
+ios/LocalPackages/capacitor-swift-pm/
+ios/LocalPackages/purchases-hybrid-common/
+ios/LocalPackages/purchases-ios-spm/
+*.dSYM
+*.dSYM/
+
+# Android build artifacts
+android/app/build/
+android/build/
+android/.gradle/
+
+# Capacitor Cordova plugin resources (auto-generated)
+ios/capacitor-cordova-ios-plugins/resources/
+android/capacitor-cordova-android-plugins/
+
+# Accidental duplicate folders created by editor (spaces in name)
+**/* 2/
+**/* 2.ts
+**/* 2.tsx
+**/* 2.css
+**/* 2.json
+**/* 2.txt
