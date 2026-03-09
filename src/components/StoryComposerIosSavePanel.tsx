@@ -49,6 +49,7 @@ export function StoryComposerIosSavePanel({
             <img
                 src={saveImageUrl}
                 alt="Story para salvar"
+                loading="lazy"
                 className="rounded-2xl shadow-2xl max-h-[60vh] w-auto"
                 style={
                     {

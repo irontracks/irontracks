@@ -180,6 +180,7 @@ export default function BodyMapSvg({ view, muscles, onSelect, selected, calibrat
         key={view}
         src={view === 'front' ? '/body-front.png' : '/body-back.png'}
         alt={`Photorealistic Body Base ${view}`}
+        loading="lazy"
         className="absolute inset-0 w-full h-full object-cover pointer-events-none opacity-90"
         style={{ objectPosition: 'center top' }}
         onError={(e) => { e.currentTarget.style.display = 'none'; }}
