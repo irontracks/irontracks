@@ -12,10 +12,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
     func applicationDidBecomeActive(_ application: UIApplication) {
-        // Register IronTracksNativePlugin on first activation, after Capacitor bridge is ready.
         guard !ionicPluginRegistered else { return }
-        if let vc = window?.rootViewController as? CAPBridgeViewController {
-            vc.bridge.registerPluginInstance(IronTracksNativePlugin())
+        if let vc = window?.rootViewController as? CAPBridgeViewController,
+           let bridge = vc.bridge {
+            bridge.registerPluginInstance(IronTracksNativePlugin())
             ionicPluginRegistered = true
             print("⚡ [IronTracks] IronTracksNativePlugin registered via AppDelegate")
         }
