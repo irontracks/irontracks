@@ -2,7 +2,7 @@
 
 import React, { memo, useEffect, useState } from 'react'
 import Image from 'next/image'
-import { Crown, X, ChevronRight, Trophy, TrendingUp, ChevronDown, Zap, Flame, Dumbbell, Star } from 'lucide-react'
+import { Crown, X, ChevronRight, Trophy, TrendingUp, ChevronDown, Zap, Star } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { getIronRankLeaderboard, getLatestWorkoutPrs } from '@/actions/workout-actions'
 import BadgesInline, { type Badge } from './BadgesInline'
@@ -199,43 +199,43 @@ const IronRankCard = memo(function IronRankCard({
                         <button
                             type="button"
                             onClick={() => setRankOpen(true)}
-                            className="w-full text-left relative z-10 p-4 group focus:outline-none"
+                            className="w-full text-left relative z-10 p-3 group focus:outline-none"
                             aria-label="Abrir ranking Iron Rank"
                         >
-                            <div className="flex items-center gap-3">
+                            <div className="flex items-center gap-2.5">
                                 {/* Level badge */}
                                 <div className="shrink-0 relative">
-                                    <div className="absolute inset-0 rounded-xl blur-sm opacity-50" style={{ background: 'rgba(245,158,11,0.5)' }} />
-                                    <div className="relative px-2.5 py-1.5 rounded-xl font-black text-[11px] leading-none text-black"
+                                    <div className="absolute inset-0 rounded-lg blur-sm opacity-40" style={{ background: 'rgba(245,158,11,0.5)' }} />
+                                    <div className="relative px-2 py-1 rounded-lg font-black text-[10px] leading-none text-black"
                                         style={{ background: 'linear-gradient(135deg, #facc15 0%, #f59e0b 60%, #b45309 100%)' }}>
                                         NIV {level}
                                     </div>
                                 </div>
                                 {/* Title */}
                                 <div className="min-w-0 flex-1">
-                                    <div className="text-[9px] font-black uppercase tracking-[0.22em] text-yellow-500 leading-none mb-0.5">Iron Rank</div>
-                                    <div className="text-white font-black text-[15px] leading-tight truncate">{levelName}</div>
+                                    <div className="text-[8px] font-black uppercase tracking-[0.22em] text-yellow-500 leading-none mb-0.5">Iron Rank</div>
+                                    <div className="text-white font-black text-[13px] leading-tight truncate">{levelName}</div>
                                 </div>
                                 {/* Streak + arrow */}
-                                <div className="shrink-0 flex items-center gap-2">
+                                <div className="shrink-0 flex items-center gap-1.5">
                                     {currentStreak > 0 && (
-                                        <div className="flex items-center gap-1 rounded-xl px-2 py-1.5"
+                                        <div className="flex items-center gap-1 rounded-lg px-1.5 py-1"
                                             style={{ background: 'rgba(249,115,22,0.1)', border: '1px solid rgba(249,115,22,0.2)' }}>
-                                            <span className="text-sm leading-none">🔥</span>
-                                            <span className="text-orange-400 font-black text-xs leading-none">{currentStreak}d</span>
+                                            <span className="text-xs leading-none">🔥</span>
+                                            <span className="text-orange-400 font-black text-[10px] leading-none">{currentStreak}d</span>
                                         </div>
                                     )}
-                                    <ChevronRight size={14} className="text-neutral-600 group-hover:text-yellow-500 transition-colors" />
+                                    <ChevronRight size={13} className="text-neutral-600 group-hover:text-yellow-500 transition-colors" />
                                 </div>
                             </div>
 
                             {/* Progress */}
-                            <div className="mt-3">
-                                <div className="flex items-baseline justify-between mb-1.5">
-                                    <span className="text-[11px] text-neutral-500 font-semibold">{totalVolumeKg.toLocaleString('pt-BR')}kg levantados</span>
-                                    <span className="text-[11px] font-black tabular-nums text-yellow-400">{Math.round(progress)}%</span>
+                            <div className="mt-2">
+                                <div className="flex items-baseline justify-between mb-1">
+                                    <span className="text-[10px] text-neutral-500 font-semibold">{totalVolumeKg.toLocaleString('pt-BR')}kg levantados</span>
+                                    <span className="text-[10px] font-black tabular-nums text-yellow-400">{Math.round(progress)}%</span>
                                 </div>
-                                <div className="h-2 rounded-full overflow-hidden"
+                                <div className="h-1.5 rounded-full overflow-hidden"
                                     style={{ background: 'rgba(255,255,255,0.06)', boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.4)' }}>
                                     <motion.div
                                         initial={{ width: 0 }} animate={{ width: `${progress}%` }}
@@ -247,8 +247,8 @@ const IronRankCard = memo(function IronRankCard({
                                     </motion.div>
                                 </div>
                                 <div className="flex justify-between mt-1">
-                                    <span className="text-[10px] text-neutral-700">Toque para ver o ranking</span>
-                                    <span className="text-[10px] text-neutral-700">próx. {nextVol.toLocaleString('pt-BR')}kg</span>
+                                    <span className="text-[9px] text-neutral-700">Toque para ver o ranking</span>
+                                    <span className="text-[9px] text-neutral-700">próx. {nextVol.toLocaleString('pt-BR')}kg</span>
                                 </div>
                             </div>
                         </button>
@@ -264,63 +264,56 @@ const IronRankCard = memo(function IronRankCard({
                         <div className="relative z-10">
                             {/* Records header */}
                             <div
-                                className="flex items-center gap-3 px-4 py-3 cursor-pointer"
+                                className="flex items-center gap-2.5 px-3 py-2 cursor-pointer"
                                 role="button" tabIndex={0}
                                 onClick={() => setPrsExpanded(v => !v)}
                                 onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setPrsExpanded(v => !v) } }}
                             >
                                 {/* Icon */}
                                 <div className="relative shrink-0">
-                                    <div className="absolute inset-0 rounded-xl opacity-40" style={{ background: 'rgba(234,179,8,0.3)', filter: 'blur(4px)' }} />
-                                    <div className="relative w-9 h-9 rounded-xl flex items-center justify-center"
-                                        style={{ background: 'linear-gradient(135deg, rgba(234,179,8,0.18), rgba(234,179,8,0.05))', border: '1px solid rgba(234,179,8,0.28)' }}>
-                                        <Trophy size={15} className="text-yellow-400" />
+                                    <div className="absolute inset-0 rounded-lg opacity-35" style={{ background: 'rgba(234,179,8,0.3)', filter: 'blur(3px)' }} />
+                                    <div className="relative w-8 h-8 rounded-lg flex items-center justify-center"
+                                        style={{ background: 'linear-gradient(135deg, rgba(234,179,8,0.16), rgba(234,179,8,0.04))', border: '1px solid rgba(234,179,8,0.25)' }}>
+                                        <Trophy size={13} className="text-yellow-400" />
                                     </div>
                                 </div>
 
                                 <div className="min-w-0 flex-1">
-                                    <div className="flex items-center gap-2 flex-wrap">
-                                        <span className="text-[9px] font-black uppercase tracking-[0.22em] text-yellow-500">Novos Recordes</span>
+                                    <div className="flex items-center gap-1.5 flex-wrap">
+                                        <span className="text-[8px] font-black uppercase tracking-[0.22em] text-yellow-500">Novos Recordes</span>
                                         {prs.length > 0 && (
-                                            <span className="px-1.5 py-0.5 rounded-lg text-[9px] font-black uppercase text-black"
+                                            <span className="px-1.5 py-0.5 rounded text-[8px] font-black uppercase text-black"
                                                 style={{ background: 'linear-gradient(90deg, #d97706, #f59e0b)' }}>
                                                 {prs.length} PR{prs.length > 1 ? 's' : ''}
                                             </span>
                                         )}
                                     </div>
                                     {prsDate
-                                        ? <div className="text-[10px] text-neutral-600 mt-0.5 truncate">
-                                            <span style={{ color: 'rgba(234,179,8,0.7)' }}>{prsTitle}</span>
+                                        ? <div className="text-[9px] text-neutral-600 mt-0.5 truncate">
+                                            <span style={{ color: 'rgba(234,179,8,0.65)' }}>{prsTitle}</span>
                                         </div>
-                                        : <div className="text-[10px] text-neutral-700 mt-0.5">Faça um treino para ver seus recordes.</div>
+                                        : <div className="text-[9px] text-neutral-700 mt-0.5">Faça um treino para ver seus recordes.</div>
                                     }
                                 </div>
 
                                 <motion.span className="text-neutral-600 shrink-0" animate={{ rotate: prsExpanded ? 180 : 0 }} transition={{ duration: 0.2 }}>
-                                    <ChevronDown size={14} />
+                                    <ChevronDown size={13} />
                                 </motion.span>
                             </div>
 
                             {/* Best PR quick-view */}
                             {prs.length > 0 && bestPr && bestTier && (
-                                <div className="px-4 pb-3 -mt-1">
-                                    <div className="flex items-center gap-2 px-3 py-2 rounded-xl"
-                                        style={{ background: bestTier.accent, border: `1px solid ${bestTier.color}35` }}>
-                                        <Zap size={11} style={{ color: bestTier.color }} className="shrink-0" />
-                                        <span className="text-[10px] font-black shrink-0" style={{ color: bestTier.color }}>{bestTier.label}</span>
-                                        <span className="text-xs text-neutral-300 truncate flex-1 font-semibold">{bestPr.exercise}</span>
-                                        <div className="flex items-center gap-1.5 shrink-0 text-[10px] font-black">
+                                <div className="px-3 pb-2 -mt-0.5">
+                                    <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg"
+                                        style={{ background: bestTier.accent, border: `1px solid ${bestTier.color}30` }}>
+                                        <Zap size={10} style={{ color: bestTier.color }} className="shrink-0" />
+                                        <span className="text-[9px] font-black shrink-0" style={{ color: bestTier.color }}>{bestTier.label}</span>
+                                        <span className="text-[10px] text-neutral-300 truncate flex-1 font-semibold">{bestPr.exercise}</span>
+                                        <div className="flex items-center gap-1 shrink-0 text-[9px] font-black">
                                             {bestPr.improved?.weight && <span className="text-yellow-400">{fmt(bestPr.weight)}kg</span>}
                                             {bestPr.improved?.reps && <span className="text-yellow-300">{fmt(bestPr.reps, 0)} rep</span>}
                                             {bestPr.improved?.volume && <span className="text-amber-300">{fmt(Math.round(bestPr.volume), 0)}kg vol</span>}
                                         </div>
-                                    </div>
-
-                                    {/* Mini stats */}
-                                    <div className="grid grid-cols-3 gap-1.5 mt-1.5">
-                                        <StatChip icon={<Flame size={10} className="text-orange-400" />} label="PRs" value={String(totalImproved)} />
-                                        <StatChip icon={<Dumbbell size={10} className="text-yellow-400" />} label="Exercícios" value={String(prs.length)} />
-                                        <StatChip icon={<Star size={10} className="text-amber-400" />} label="Conquistas" value={String(safeBadges.length)} />
                                     </div>
                                 </div>
                             )}

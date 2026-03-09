@@ -28,6 +28,7 @@ export const DashboardTab: React.FC = () => {
         isAdmin,
         isTeacher,
         setTab,
+        setStudentStatusFilter,
         usersList,
         teachersList,
         dashboardCharts,
@@ -116,7 +117,7 @@ export const DashboardTab: React.FC = () => {
 
                 <button
                     type="button"
-                    onClick={() => setTab(isAdmin ? 'requests' : 'students')}
+                    onClick={() => { setTab('students'); setStudentStatusFilter('pendente'); }}
                     className="rounded-2xl p-4 text-left transition-all duration-200 hover:bg-white/[0.04] active:scale-95 cursor-pointer group"
                     style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}
                 >
