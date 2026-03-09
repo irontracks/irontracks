@@ -157,9 +157,6 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
         if (!changed) return;
         onChange?.({ ...workout, exercises: nextExercises });
     }, [ensureSetDetails, normalizeMethod, workout, onChange]);
-    if (!workout) return null;
-
-
     // ── All handlers via hook ───────────────────────────────────────────────
     const {
         getExerciseType,
@@ -186,6 +183,7 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
     const handleScannerFileClick = () => { if (!scannerLoading && scannerFileInputRef.current) scannerFileInputRef.current.click(); };
     const handleImportJsonClick = () => fileInputRef.current?.click();
 
+    if (!workout) return null;
 
     return (
         <div className="h-full flex flex-col bg-neutral-900">
