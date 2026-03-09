@@ -285,7 +285,7 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin {
         attributes.title = title
         attributes.contentDescription = call.getString("subtitle") ?? "Treino IronTracks"
         let dateMs = call.getDouble("dateMs")
-        if let ms = dateMs { attributes.creationDate = Date(timeIntervalSince1970: ms / 1000) }
+        if let ms = dateMs { attributes.contentCreationDate = Date(timeIntervalSince1970: ms / 1000) }
         let item = CSSearchableItem(uniqueIdentifier: "irontracks_workout_\(id)",
                                     domainIdentifier: "com.irontracks.workout",
                                     attributeSet: attributes)
