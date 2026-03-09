@@ -1,0 +1,16 @@
+{
+	"appId": "com.irontracks.app",
+	"appName": "IronTracks",
+	"webDir": "out",
+	"server": {
+		"url": "https://irontracks.com.br"
+	},
+	"packageClassList": [
+		"SignInWithApple",
+		"AppPlugin",
+		"DevicePlugin",
+		"FilesystemPlugin",
+		"PushNotificationsPlugin",
+		"PurchasesPlugin"
+	]
+}
