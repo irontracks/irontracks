@@ -743,9 +743,9 @@ export default function StudentDashboard(props: Props) {
               } catch { }
             }}
             disabled={creatingWorkout}
-            className="w-full min-h-[44px] bg-yellow-500 p-4 rounded-xl font-black text-black flex items-center justify-center gap-2 shadow-lg shadow-yellow-900/20 hover:bg-yellow-400 transition-transform active:scale-95 disabled:opacity-70"
+            className="w-full min-h-[48px] bg-neutral-900 border border-neutral-700 hover:border-yellow-500/60 p-4 rounded-xl font-bold text-neutral-200 hover:text-white flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-70 group"
           >
-            {creatingWorkout ? <Loader2 size={20} className="animate-spin" /> : <Plus size={24} />}
+            {creatingWorkout ? <Loader2 size={18} className="animate-spin text-yellow-500" /> : <Plus size={20} className="text-yellow-500 group-hover:scale-110 transition-transform" />}
             {creatingWorkout ? 'Abrindo editor...' : 'Novo Treino'}
           </button>
 
@@ -761,8 +761,8 @@ export default function StudentDashboard(props: Props) {
                   }}
                   className={
                     workoutsTab === 'normal'
-                      ? 'flex-1 min-h-[40px] px-3 py-2 bg-yellow-500 text-black font-black text-[11px] uppercase tracking-wider text-center'
-                      : 'flex-1 min-h-[40px] px-3 py-2 text-neutral-400 font-bold text-[11px] uppercase tracking-wider hover:bg-neutral-800 text-center'
+                      ? 'flex-1 min-h-[40px] px-3 py-2 text-yellow-400 font-black text-[11px] uppercase tracking-wider text-center border-b-2 border-yellow-500 bg-yellow-500/5'
+                      : 'flex-1 min-h-[40px] px-3 py-2 text-neutral-400 font-bold text-[11px] uppercase tracking-wider hover:text-neutral-200 text-center border-b-2 border-transparent'
                   }
                 >
                   Meus Treinos
@@ -778,8 +778,8 @@ export default function StudentDashboard(props: Props) {
                   }}
                   className={
                     workoutsTab === 'periodized'
-                      ? 'flex-1 min-h-[40px] px-3 py-2 bg-yellow-500 text-black font-black text-[11px] uppercase tracking-wider text-center'
-                      : 'flex-1 min-h-[40px] px-3 py-2 text-neutral-400 font-bold text-[11px] uppercase tracking-wider hover:bg-neutral-800 text-center'
+                      ? 'flex-1 min-h-[40px] px-3 py-2 text-yellow-400 font-black text-[11px] uppercase tracking-wider text-center border-b-2 border-yellow-500 bg-yellow-500/5'
+                      : 'flex-1 min-h-[40px] px-3 py-2 text-neutral-400 font-bold text-[11px] uppercase tracking-wider hover:text-neutral-200 text-center border-b-2 border-transparent'
                   }
                 >
                   <span className="inline-flex items-center justify-center gap-1">
@@ -797,8 +797,8 @@ export default function StudentDashboard(props: Props) {
                   onClick={() => setShowArchived((v) => !v)}
                   className={
                     showArchived
-                      ? 'flex-1 min-h-[40px] px-3 py-2 bg-yellow-500 text-black rounded-xl font-black text-[11px] uppercase tracking-wider'
-                      : 'flex-1 min-h-[40px] px-3 py-2 bg-neutral-800 border border-neutral-700 text-neutral-300 rounded-xl font-bold text-[11px] uppercase tracking-wider hover:bg-neutral-700'
+                      ? 'flex-1 min-h-[40px] px-3 py-2 bg-neutral-800 border border-yellow-500/50 text-yellow-400 rounded-xl font-bold text-[11px] uppercase tracking-wider'
+                      : 'flex-1 min-h-[40px] px-3 py-2 bg-neutral-900 border border-neutral-700 text-neutral-400 rounded-xl font-bold text-[11px] uppercase tracking-wider hover:border-neutral-600 hover:text-neutral-300'
                   }
                 >
                   {showArchived ? `Arquivados (${archivedCount})` : `Arquivados (${archivedCount})`}
@@ -984,7 +984,7 @@ export default function StudentDashboard(props: Props) {
                         }}
                         data-tour="workout-start"
                         disabled={isWorkoutBusy(getWorkoutKey(w, idx)) || (Boolean(w?.archived_at) && typeof props.onRestoreWorkout !== 'function')}
-                        className="relative z-30 flex-1 bg-yellow-500/90 hover:bg-yellow-400 py-2.5 rounded-xl flex items-center justify-center gap-2 text-black font-black text-sm transition-all border border-yellow-400/50 active:scale-95 touch-manipulation disabled:opacity-60 shadow-sm shadow-yellow-500/20"
+                        className="relative z-30 flex-1 bg-neutral-900 hover:bg-neutral-800 py-2.5 rounded-xl flex items-center justify-center gap-2 text-yellow-400 hover:text-yellow-300 font-black text-sm transition-all border border-yellow-500/40 hover:border-yellow-500/70 active:scale-95 touch-manipulation disabled:opacity-60"
                       >
                         {w?.archived_at ? (
                           isActionBusy(getWorkoutKey(w, idx), 'restore') ? (
