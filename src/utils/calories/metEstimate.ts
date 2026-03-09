@@ -106,24 +106,82 @@ export const getExerciseComplexityFactor = (exerciseName: string): number => {
   return 1.00
 }
 
+// ── RPE multiplier ────────────────────────────────────────────────────────────
+
+/**
+ * Maps post-workout RPE (1–10) to an intensity multiplier applied on top of MET.
+ *
+ * Rationale: MET tables assume an "average" effort (~RPE 7-8). An RPE of 10
+ * signals near-maximal output; RPE 4 signals a recovery session.
+ *
+ * @param rpe - Rate of Perceived Exertion (1–10). Returns 1.0 for unknown/null.
+ */
+export const getRpeMultiplier = (rpe: number | null | undefined): number => {
+  if (rpe == null || !Number.isFinite(rpe)) return 1.0
+  const r = Math.max(1, Math.min(10, Math.round(rpe)))
+  // Piecewise linear: RPE 7-8 → 1.00 baseline
+  if (r <= 3) return 0.80
+  if (r === 4) return 0.87
+  if (r === 5) return 0.92
+  if (r === 6) return 0.96
+  if (r <= 8) return 1.00
+  if (r === 9) return 1.08
+  return 1.15 // RPE 10
+}
+
+// ── Active work time ──────────────────────────────────────────────────────────
+
+/**
+ * Computes the actual work time in minutes by subtracting tracked rest time
+ * from total session duration.
+ *
+ * Each set log entry may contain `restSeconds` — the time the athlete rested
+ * after that set (measured from when they tapped the rest timer until they
+ * confirmed start of the next set). These are already recorded by the app.
+ *
+ * The result is clamped so that active time is at least 35% of total time
+ * (guards against bad data / very long rests being logged incorrectly).
+ *
+ * @param sessionLogs     - Log entries keyed by `"exerciseIdx-setIdx"`.
+ * @param totalMinutes    - Total session duration in minutes.
+ * @returns Estimated active work time in minutes.
+ */
+export const computeActiveWorkMinutes = (
+  sessionLogs: Record<string, unknown>,
+  totalMinutes: number,
+): number => {
+  if (!totalMinutes || totalMinutes <= 0) return 0
+  let totalRestSeconds = 0
+  for (const v of Object.values(sessionLogs)) {
+    if (!v || typeof v !== 'object') continue
+    const obj = v as Record<string, unknown>
+    const rs = Number(obj?.restSeconds)
+    if (Number.isFinite(rs) && rs > 0 && rs < 600) totalRestSeconds += rs // ignore >10 min outliers
+  }
+  const totalRestMinutes = totalRestSeconds / 60
+  const active = totalMinutes - totalRestMinutes
+  const minActive = totalMinutes * 0.35 // floor: at least 35% of total is active
+  return Math.max(active, minActive)
+}
+
 // ── Main export ───────────────────────────────────────────────────────────────
 
 /**
  * Estimates calories burned during a resistance training session using MET.
  *
- * @param sessionLogs        - The session's log entries keyed by `"exerciseIdx-setIdx"`.
- * @param durationMinutes    - Total duration of the session in minutes.
- * @param bodyWeightKg       - Athlete body weight in kg (optional; defaults to 75 kg when omitted).
- * @param exerciseNames      - Optional array of exercise names in order, used to compute
- *                             the average complexity factor for the session.
- * @returns Estimated kcal burned, rounded to the nearest integer. Returns 0 if
- *          duration is zero or inputs are invalid.
+ * @param sessionLogs     - The session's log entries keyed by `"exerciseIdx-setIdx"`.
+ * @param durationMinutes - Total duration of the session in minutes.
+ * @param bodyWeightKg    - Athlete body weight in kg (optional; defaults to 75 kg).
+ * @param exerciseNames   - Optional exercise names, used to compute complexity factor.
+ * @param rpe             - Post-workout RPE (1–10). Adjusts MET by ±15%.
+ * @returns Estimated kcal burned, rounded to the nearest integer.
  */
 export const estimateCaloriesMet = (
   sessionLogs: Record<string, unknown>,
   durationMinutes: number,
   bodyWeightKg?: number | null,
   exerciseNames?: string[] | null,
+  rpe?: number | null,
 ): number => {
   if (!durationMinutes || durationMinutes <= 0) return 0
 
@@ -157,6 +215,12 @@ export const estimateCaloriesMet = (
     ? bodyWeightKg
     : DEFAULT_BODY_WEIGHT_KG
 
-  const kcal = met * complexityFactor * bw * (durationMinutes / 60)
+  // Active work time: subtract rest periods tracked in logs
+  const activeMinutes = computeActiveWorkMinutes(sessionLogs, durationMinutes)
+
+  // RPE intensity multiplier from post-workout check-in
+  const rpeMultiplier = getRpeMultiplier(rpe)
+
+  const kcal = met * complexityFactor * bw * (activeMinutes / 60) * rpeMultiplier
   return Number.isFinite(kcal) && kcal > 0 ? Math.round(kcal) : 0
 }
