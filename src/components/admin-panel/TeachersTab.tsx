@@ -17,6 +17,7 @@ const TeacherAvatar = ({ teacher, size = 'md' }: { teacher: AdminTeacher; size?:
             <img
                 src={teacher.photo_url}
                 alt={teacher.name || ''}
+                loading="lazy"
                 className={`${sizes[size]} rounded-2xl object-cover border border-yellow-500/30 shadow-lg shadow-yellow-500/10`}
             />
         );
