@@ -509,8 +509,8 @@ export async function POST(req: Request) {
       .map((it) => it.canonical)
 
     const missingUnique = Array.from(new Set(missingCanonicals.map((v) => String(v || '').trim()).filter(Boolean)))
-    const mappingBatchLimit = isVip ? (refreshAi ? 60 : 20) : 0
-    const toMapWithAi = (apiKey && isVip) ? missingUnique.slice(0, mappingBatchLimit) : []
+    const mappingBatchLimit = isVip ? (refreshAi ? 60 : 30) : 15
+    const toMapWithAi = apiKey ? missingUnique.slice(0, mappingBatchLimit) : []
     let newlyMapped: Array<Record<string, unknown>> = []
     if (toMapWithAi.length) {
       try {
