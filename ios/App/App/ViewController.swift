@@ -5,6 +5,7 @@ import Capacitor
 /// Main.storyboard references this class via customClass="ViewController".
 class ViewController: CAPBridgeViewController {
     override open func capacitorDidLoad() {
+        super.capacitorDidLoad()
         bridge?.registerPluginInstance(IronTracksNativePlugin())
     }
 }
