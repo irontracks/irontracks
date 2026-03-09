@@ -410,6 +410,102 @@ export function SettingsNotificationsSection({ draft, setValue, iosNotifStatus, 
     )
 }
 
+// ── Apple Health (HealthKit) — exigido pela Guideline 2.5.1 da Apple ─────────
+interface SettingsHealthKitSectionProps {
+    isHealthKitAvailable: boolean
+    healthKitGranted: boolean
+    healthKitBusy: boolean
+    onRequestPermission: () => Promise<void>
+    onOpenAppSettings: () => Promise<void>
+}
+export function SettingsHealthKitSection({
+    isHealthKitAvailable,
+    healthKitGranted,
+    healthKitBusy,
+    onRequestPermission,
+    onOpenAppSettings,
+}: SettingsHealthKitSectionProps) {
+    if (!isHealthKitAvailable) return null
+    return (
+        <SectionCard>
+            {/* Header com ícone do Apple Health */}
+            <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'linear-gradient(135deg, #ff2d55 0%, #ff6b87 100%)' }}>
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                        <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+                    </svg>
+                </div>
+                <div className="flex-1 min-w-0">
+                    <div className="text-xs font-black uppercase tracking-[0.16em] text-rose-400">Apple Health</div>
+                    <div className="text-white font-black text-sm truncate">Integração com Saúde</div>
+                </div>
+                <div className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wide shrink-0 ${healthKitGranted ? 'bg-green-500/20 text-green-400 border border-green-500/30' : 'bg-neutral-800 text-neutral-400 border border-neutral-700'}`}>
+                    {healthKitGranted ? '✓ Conectado' : 'Não conectado'}
+                </div>
+            </div>
+
+            {/* Descrição clara dos dados acessados — exigido pela Guideline 2.5.1 */}
+            <div className="rounded-xl bg-neutral-900/60 border border-neutral-800 p-3 mb-4 space-y-2.5">
+                <div className="text-[10px] font-black uppercase tracking-widest text-neutral-500 mb-1">O que o IronTracks acessa no Apple Health</div>
+                <div className="flex items-start gap-2.5">
+                    <div className="w-1.5 h-1.5 rounded-full bg-rose-400 shrink-0 mt-1.5" />
+                    <div>
+                        <div className="text-xs font-bold text-neutral-200">Gravação de treinos</div>
+                        <div className="text-[11px] text-neutral-400 leading-relaxed">Salva seus treinos concluídos (duração e calorias estimadas) como atividades no app Saúde.</div>
+                    </div>
+                </div>
+                <div className="flex items-start gap-2.5">
+                    <div className="w-1.5 h-1.5 rounded-full bg-rose-400 shrink-0 mt-1.5" />
+                    <div>
+                        <div className="text-xs font-bold text-neutral-200">Leitura de passos</div>
+                        <div className="text-[11px] text-neutral-400 leading-relaxed">Lê a contagem de passos diários para contexto no resumo de atividade.</div>
+                    </div>
+                </div>
+                <div className="pt-1 text-[10px] text-neutral-500 leading-relaxed border-t border-neutral-800/60">
+                    Seus dados de saúde nunca são compartilhados com terceiros. Você pode revogar o acesso em Ajustes → Saúde → Acesso a dados → IronTracks.
+                </div>
+            </div>
+
+            {/* Botões de ação */}
+            <div className="flex flex-col sm:flex-row gap-2">
+                {!healthKitGranted ? (
+                    <button
+                        type="button"
+                        disabled={healthKitBusy}
+                        onClick={onRequestPermission}
+                        id="healthkit-connect-button"
+                        aria-label="Conectar ao Apple Health"
+                        className="flex-1 min-h-[44px] px-4 py-3 rounded-xl font-black text-sm text-white inline-flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-60"
+                        style={{ background: 'linear-gradient(135deg, #ff2d55 0%, #ff6b87 100%)' }}
+                    >
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                            <path d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z" />
+                        </svg>
+                        {healthKitBusy ? 'Solicitando...' : 'Conectar ao Apple Health'}
+                    </button>
+                ) : (
+                    <div className="flex-1 min-h-[44px] px-4 py-3 rounded-xl bg-green-500/10 border border-green-500/30 text-green-400 font-black text-sm inline-flex items-center justify-center gap-2">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                            <path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z" />
+                        </svg>
+                        Apple Health conectado
+                    </div>
+                )}
+                <button
+                    type="button"
+                    disabled={healthKitBusy}
+                    onClick={onOpenAppSettings}
+                    id="healthkit-settings-button"
+                    aria-label="Abrir Configurações do iOS para gerenciar acesso ao HealthKit"
+                    className="min-h-[44px] px-4 py-3 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black text-sm hover:bg-neutral-800 transition-colors disabled:opacity-60"
+                >
+                    Gerenciar em Ajustes
+                </button>
+            </div>
+        </SectionCard>
+    )
+}
+
 // ── Segurança (iOS only) ─────────────────────────────────────────────────────
 export function SettingsSecuritySection({ draft, setValue }: SettingsSectionProps) {
     const requireBiometricsOnStartup = Boolean(draft?.requireBiometricsOnStartup ?? false)
