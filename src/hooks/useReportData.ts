@@ -259,7 +259,15 @@ export const useReportData = ({ session, previousSession, user }: UseReportDataP
     let cancelled = false
       ; (async () => {
         try {
-          const kcal = await getKcalEstimate({ session, workoutId: session?.id ?? null })
+          const postRpe = (() => {
+            if (!postCheckin || typeof postCheckin !== 'object') return null
+            const pc = postCheckin as Record<string, unknown>
+            const answers = pc?.answers && typeof pc.answers === 'object' ? (pc.answers as Record<string, unknown>) : null
+            const v = answers?.rpe ?? pc?.rpe
+            const n = Number(v)
+            return Number.isFinite(n) && n >= 1 && n <= 10 ? n : null
+          })()
+          const kcal = await getKcalEstimate({ session, workoutId: session?.id ?? null, rpe: postRpe })
           if (cancelled) return
           if (Number.isFinite(Number(kcal)) && Number(kcal) > 0) setKcalEstimate(Math.round(Number(kcal)))
         } catch (e) { logWarn('useReportData', 'kcal estimate failed', e) }
