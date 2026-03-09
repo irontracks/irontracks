@@ -112,7 +112,9 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
   const sharedLogs = teamWorkout.sharedLogs
   const session = props.session;
   const workout = session?.workout ?? null;
-  const exercises = useMemo<WorkoutExercise[]>(() => (Array.isArray(workout?.exercises) ? workout.exercises : []), [workout?.exercises]);
+  const workoutExercises = workout?.exercises;
+  const exercises = useMemo<WorkoutExercise[]>(() => (Array.isArray(workoutExercises) ? workoutExercises : []), [workoutExercises]);
+
   const logs: Record<string, unknown> = (session?.logs ?? {}) as Record<string, unknown>;
   const ui: UnknownRecord = (session?.ui ?? {}) as UnknownRecord;
   const settings = props.settings ?? null;

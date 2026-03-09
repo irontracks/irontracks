@@ -341,7 +341,9 @@ export const useAdminPanelController = ({ user, onClose }: AdminPanelProps) => {
 
     useEffect(() => {
         if (selectedStudent) setSelectedTeacher(null);
-    }, [selectedStudent, setSelectedTeacher]);
+        // Intentional: clearing selectedTeacher when a student is selected is the desired behavior
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedStudent]);
 
     return {
         user,

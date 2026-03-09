@@ -1,0 +1,131 @@
+'use client'
+
+import React from 'react'
+import { Dumbbell, Crown } from 'lucide-react'
+import HeaderActionsMenu from '@/components/HeaderActionsMenu'
+import type { AdminUser } from '@/types/admin'
+
+interface SyncState {
+    pending?: number
+    failed?: number
+    online?: boolean
+    syncing?: boolean
+}
+
+interface VipAccess {
+    hasVip?: boolean
+}
+
+interface DashboardHeaderProps {
+    isCoach: boolean
+    view: string
+    user: AdminUser | null
+    hasUnreadChat: boolean
+    hasUnreadNotification: boolean
+    hideVipOnIos: boolean
+    vipAccess: VipAccess | null
+    syncState: SyncState | null
+    userSettings: Record<string, unknown> | null
+    isHeaderVisible: boolean
+    coachPending: boolean
+    onGoHome: () => void
+    onOpenVip: () => void
+    onOpenAdmin: () => void
+    onOpenChatList: () => void
+    onOpenGlobalChat: () => void
+    onOpenHistory: () => void
+    onOpenNotifications: () => void
+    onOpenSchedule: () => void
+    onOpenWallet: () => void
+    onOpenSettings: () => void
+    onOpenTour: () => void
+    onLogout: () => void
+    onOfflineSyncOpen: () => void
+    onAcceptCoach: () => Promise<void>
+}
+
+export function DashboardHeader({
+    isCoach, user, hasUnreadChat, hasUnreadNotification,
+    hideVipOnIos, vipAccess, syncState, userSettings,
+    isHeaderVisible, coachPending,
+    onGoHome, onOpenVip, onOpenAdmin, onOpenChatList, onOpenGlobalChat,
+    onOpenHistory, onOpenNotifications, onOpenSchedule, onOpenWallet,
+    onOpenSettings, onOpenTour, onLogout, onOfflineSyncOpen, onAcceptCoach,
+}: DashboardHeaderProps) {
+    if (!isHeaderVisible) return null
+
+    const pending = Number(syncState?.pending || 0)
+    const failed = Number(syncState?.failed || 0)
+    const online = syncState?.online !== false
+    const offlineSyncV2Enabled = userSettings?.featuresKillSwitch !== true && userSettings?.featureOfflineSyncV2 === true
+
+    const syncBadge = (() => {
+        if (!online) {
+            return <div className="hidden sm:inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 text-xs font-black uppercase tracking-widest">Offline</div>;
+        }
+        if (offlineSyncV2Enabled && (pending > 0 || failed > 0)) {
+            return (
+                <button type="button" onClick={onOfflineSyncOpen} className="hidden sm:inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-yellow-500/10 border border-yellow-500/30 text-yellow-300 text-xs font-black uppercase tracking-widest hover:bg-yellow-500/15" title="Abrir central de pendências">
+                    {syncState?.syncing ? 'Sincronizando' : 'Pendentes'}: {pending}{failed > 0 ? ` • Falhas: ${failed}` : ''}
+                </button>
+            )
+        }
+        if (pending > 0) {
+            return <div className="hidden sm:inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-yellow-500/10 border border-yellow-500/30 text-yellow-300 text-xs font-black uppercase tracking-widest">{syncState?.syncing ? 'Sincronizando' : 'Pendentes'}: {pending}</div>;
+        }
+        return null;
+    })();
+
+    return (
+        <>
+            <div className="bg-neutral-950 flex justify-between items-center fixed top-0 left-0 right-0 z-40 border-b border-zinc-800 px-6 shadow-lg pt-[env(safe-area-inset-top)] min-h-[calc(4rem+env(safe-area-inset-top))]">
+                <div className="flex items-center cursor-pointer group" onClick={onGoHome}>
+                    <div className="flex items-center gap-2">
+                        <Dumbbell size={18} className="text-yellow-500 opacity-25" />
+                        <h1 className="text-2xl font-black tracking-tighter italic leading-none text-white group-hover:opacity-80 transition-opacity">
+                            IRON<span className="text-yellow-500">TRACKS</span>
+                        </h1>
+                    </div>
+                    <div className="h-6 w-px bg-yellow-500 mx-4 opacity-50" />
+                    <div className="flex items-center gap-2">
+                        <span className="text-zinc-400 text-xs font-medium tracking-wide uppercase">
+                            {isCoach ? 'Bem vindo Coach' : 'Bem vindo Atleta'}
+                        </span>
+                        {!hideVipOnIos && vipAccess?.hasVip && (
+                            <button type="button" onClick={(e) => { e.stopPropagation(); onOpenVip() }} className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-yellow-500/10 border border-yellow-500/20 shadow-[0_0_10px_-3px_rgba(234,179,8,0.3)] mr-3 hover:bg-yellow-500/15">
+                                <Crown size={11} className="text-yellow-500 fill-yellow-500" />
+                                <span className="text-[10px] font-black text-yellow-500 tracking-widest leading-none">VIP</span>
+                            </button>
+                        )}
+                    </div>
+                </div>
+                <div className="flex items-center gap-4">
+                    {syncBadge}
+                    <HeaderActionsMenu
+                        user={user as AdminUser}
+                        isCoach={isCoach}
+                        hasUnreadChat={hasUnreadChat}
+                        hasUnreadNotification={hasUnreadNotification}
+                        onOpenAdmin={onOpenAdmin}
+                        onOpenChatList={onOpenChatList}
+                        onOpenGlobalChat={onOpenGlobalChat}
+                        onOpenHistory={onOpenHistory}
+                        onOpenNotifications={onOpenNotifications}
+                        onOpenSchedule={onOpenSchedule}
+                        onOpenWallet={onOpenWallet}
+                        onOpenSettings={onOpenSettings}
+                        onOpenTour={onOpenTour}
+                        onLogout={onLogout}
+                    />
+                </div>
+            </div>
+
+            {isCoach && coachPending && (
+                <div className="bg-yellow-500 text-black text-sm font-bold px-4 py-2 text-center" style={{ marginTop: 'calc(4rem + env(safe-area-inset-top))' }}>
+                    Sua conta de Professor está pendente.{' '}
+                    <button className="underline" onClick={onAcceptCoach}>Aceitar</button>
+                </div>
+            )}
+        </>
+    )
+}
