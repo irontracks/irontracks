@@ -311,6 +311,60 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
     } catch { }
   }, [ticker]);
 
+  // ── Popula deloadSuggestions com o peso do último treino como watermark ──
+  // Roda sempre que reportHistory muda (carregou do cache ou da rede).
+  // Não altera logs já preenchidos — é só placeholder.
+  useEffect(() => {
+    try {
+      const exerciseKeys = Object.keys(reportHistory.exercises ?? {});
+      if (!exerciseKeys.length) return;
+      if (!Array.isArray(exercises) || !exercises.length) return;
+
+      const patch: Record<string, unknown> = {};
+
+      exercises.forEach((ex, exIdx) => {
+        const name = String(ex?.name || '').trim();
+        if (!name) return;
+        const exKey = normalizeExerciseKey(name);
+        const histEntry = reportHistory.exercises[exKey];
+        if (!histEntry) return;
+
+        const items: ReportHistoryItem[] = Array.isArray(histEntry.items) ? histEntry.items : [];
+        if (!items.length) return;
+
+        // Último treino (mais recente)
+        const latest = items.slice().sort((a, b) => Number(b.ts || 0) - Number(a.ts || 0))[0];
+        const lastWeight = toNumber(latest?.topWeight ?? latest?.avgWeight ?? null);
+        const lastReps = toNumber(latest?.avgReps ?? null);
+        if (!lastWeight || !Number.isFinite(lastWeight) || lastWeight <= 0) return;
+
+        // Número de séries do exercício atual
+        const setsHeader = Math.max(0, Number(ex?.sets ?? 0));
+        const sdArr: unknown[] = Array.isArray(ex?.setDetails) ? (ex.setDetails as unknown[]) :
+          Array.isArray((ex as unknown as Record<string, unknown>)?.set_details) ?
+            ((ex as unknown as Record<string, unknown>).set_details as unknown[]) : [];
+        const setsCount = Math.max(setsHeader, sdArr.length, 1);
+
+        for (let setIdx = 0; setIdx < setsCount; setIdx++) {
+          const setKey = `${exIdx}-${setIdx}`;
+          const existingSuggestion = deloadSuggestions[setKey];
+          // Não sobrescreve sugestão de deload já calculada (só adiciona se vazio)
+          if (isObject(existingSuggestion) && (existingSuggestion as Record<string, unknown>).weight != null) continue;
+          patch[setKey] = {
+            weight: lastWeight,
+            reps: lastReps ?? null,
+            rpe: null,
+          };
+        }
+      });
+
+      if (Object.keys(patch).length > 0) {
+        setDeloadSuggestions((prev) => ({ ...(isObject(prev) ? prev : {}), ...patch }));
+      }
+    } catch { }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reportHistory, exercises]);
+
 
   const buildExerciseHistoryEntry = (ex: WorkoutExercise, exIdx: number): ReportHistoryItem | null => {
     const { sets } = collectExerciseSetInputs(ex, exIdx, getLog);

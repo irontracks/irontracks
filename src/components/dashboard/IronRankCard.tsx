@@ -4,6 +4,7 @@ import React, { memo, useEffect, useState } from 'react'
 import Image from 'next/image'
 import { Crown, X, ChevronRight, Trophy, TrendingUp, ChevronDown, Zap, Star } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
+import { useFocusTrap } from '@/hooks/useFocusTrap'
 import { getIronRankLeaderboard, getLatestWorkoutPrs } from '@/actions/workout-actions'
 import BadgesInline, { type Badge } from './BadgesInline'
 import { getErrorMessage } from '@/utils/errorMessage'
@@ -93,6 +94,7 @@ const IronRankCard = memo(function IronRankCard({
     const [prsDate, setPrsDate] = useState('')
     const [prsLoading, setPrsLoading] = useState(true)
     const [prsExpanded, setPrsExpanded] = useState(false)
+    const rankFocusTrapRef = useFocusTrap(rankOpen, () => setRankOpen(false))
 
     // ── Load PRs ───────────────────────────────────────────────────────────────
     useEffect(() => {
@@ -394,8 +396,15 @@ const IronRankCard = memo(function IronRankCard({
 
             {/* ─── Leaderboard modal ──────────────────────────────────────────────── */}
             {showIronRank && rankOpen && (
-                <div className="fixed inset-0 z-[1250] bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 pt-safe">
+                <div
+                    className="fixed inset-0 z-[1250] bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 pt-safe"
+                    aria-hidden="false"
+                >
                     <motion.div
+                        ref={rankFocusTrapRef}
+                        role="dialog"
+                        aria-modal="true"
+                        aria-label="Ranking Global Iron Rank"
                         initial={{ opacity: 0, scale: 0.96, y: 12 }} animate={{ opacity: 1, scale: 1, y: 0 }}
                         transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
                         className="w-full max-w-lg overflow-hidden rounded-2xl"
@@ -462,7 +471,7 @@ const IronRankCard = memo(function IronRankCard({
                                             <div className="w-9 h-9 rounded-xl overflow-hidden flex items-center justify-center shrink-0"
                                                 style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}>
                                                 {row.photoUrl
-                                                    ? <Image src={row.photoUrl} alt="" width={36} height={36} className="w-full h-full object-cover" />
+                                                    ? <Image src={row.photoUrl} alt="" width={36} height={36} className="w-full h-full object-cover" loading="lazy" />
                                                     : <span className="text-yellow-400 font-black text-sm">{String(name).slice(0, 1).toUpperCase()}</span>}
                                             </div>
                                             <div className="min-w-0 flex-1">

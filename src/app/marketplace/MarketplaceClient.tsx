@@ -83,13 +83,39 @@ const renderFeatureText = (feature: string) => {
 const toCheckoutUserMessage = (raw: string) => {
   const s = String(raw || '').trim()
   if (!s) return 'Erro ao criar cobrança.'
+  // Backend errors
   if (s === 'db_migration_required') return 'O banco de dados ainda não foi atualizado (migrations pendentes).'
   if (s === 'already_has_active_subscription') return 'Você já tem uma assinatura ativa ou pendente nesta conta.'
   if (s === 'already_subscribed') return 'Você já iniciou uma assinatura deste plano nesta conta.'
   if (s === 'pending_subscription_exists') return 'Você tem uma tentativa de assinatura pendente. Finalize ou cancele para tentar novamente.'
   if (s === 'mercadopago_access_token_missing') return 'Pagamento indisponível (Mercado Pago não configurado no servidor).'
   if (s === 'unauthorized') return 'Você precisa estar logado para assinar.'
-  return s
+  if (s === 'cpf_cnpj_required') return 'Por favor, informe seu CPF ou CNPJ.'
+  if (s === 'mobile_phone_required') return 'Por favor, informe seu número de celular.'
+  if (s === 'rate_limited') return 'Muitas tentativas. Aguarde alguns segundos e tente novamente.'
+  if (s === 'plan_not_found') return 'Plano não encontrado ou indisponível.'
+  // MercadoPago API errors (surface-level messages)
+  const sl = s.toLowerCase()
+  if (sl.includes('invalid_identificacion_number') || sl.includes('cpf') || sl.includes('cnpj') || sl.includes('identificacao') || sl.includes('identification')) {
+    return 'CPF/CNPJ inválido. Verifique o número informado e tente novamente.'
+  }
+  if (sl.includes('pix') && (sl.includes('not enabled') || sl.includes('unavailable') || sl.includes('not available') || sl.includes('inactive'))) {
+    return 'Pagamento via Pix temporariamente indisponível. Tente pelo cartão ou contate o suporte.'
+  }
+  if (sl.includes('account') && (sl.includes('blocked') || sl.includes('suspended') || sl.includes('restricted'))) {
+    return 'Conta de pagamento bloqueada temporariamente. Por favor, contate o suporte.'
+  }
+  if (sl.includes('phone') || sl.includes('telefone') || sl.includes('celular')) {
+    return 'Número de celular inválido. Informe DDD + número (ex: 11999999999).'
+  }
+  if (sl.includes('unauthorized') || sl.includes('token') || sl.includes('credentials')) {
+    return 'Erro de autenticação no processador de pagamento. Por favor, contate o suporte.'
+  }
+  if (sl.includes('amount') || sl.includes('valor') || sl.includes('price')) {
+    return 'Valor inválido para o plano selecionado. Por favor, contate o suporte.'
+  }
+  // Generic fallback with original message for debugging
+  return `Erro ao processar pagamento: ${s}`
 }
 
 // Tier Definitions for UI

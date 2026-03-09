@@ -1,12 +1,30 @@
 "use client";
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useCallback } from 'react';
 import { useDialog } from '@/contexts/DialogContext';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
 import { AlertCircle, HelpCircle, X, MessageSquare, CheckCircle2 } from 'lucide-react';
 
 const GlobalDialog = () => {
 	const { dialog, closeDialog } = useDialog();
 	const inputRef = useRef<HTMLInputElement | null>(null);
+	const isOpen = !!dialog;
+
+	const handleClose = useCallback(() => {
+		try {
+			if ((dialog?.type === 'confirm' || dialog?.type === 'prompt') && typeof dialog.onCancel === 'function') {
+				dialog.onCancel();
+				return;
+			}
+		} catch { }
+		closeDialog();
+	}, [dialog, closeDialog]);
+
+	const onEscape = useCallback(() => {
+		if (dialog?.type !== 'loading') handleClose();
+	}, [dialog?.type, handleClose]);
+
+	const focusTrapRef = useFocusTrap(isOpen, onEscape);
 
 	useEffect(() => {
 		if (dialog?.type === 'prompt') {
@@ -15,16 +33,6 @@ const GlobalDialog = () => {
 	}, [dialog?.type]);
 
 	if (!dialog) return null;
-
-	const handleClose = () => {
-		try {
-			if ((dialog.type === 'confirm' || dialog.type === 'prompt') && typeof dialog.onCancel === 'function') {
-				dialog.onCancel();
-				return;
-			}
-		} catch { }
-		closeDialog();
-	};
 
 	const handleConfirm = () => {
 		if (dialog.type === 'prompt') {
@@ -66,8 +74,23 @@ const GlobalDialog = () => {
 	})();
 
 	return (
-		<div role="dialog" aria-modal="true" aria-label="Confirmação" className="fixed inset-0 z-[5000] flex items-center justify-center p-4 pt-safe pb-safe animate-fade-in" style={{ background: 'rgba(0,0,0,0.92)', backdropFilter: 'blur(20px)' }}>
-			<div className="rounded-2xl max-w-sm w-full overflow-hidden animate-slide-up" style={{ background: 'rgba(10,10,10,0.99)', border: '1px solid rgba(234,179,8,0.2)', boxShadow: '0 0 50px rgba(234,179,8,0.08), 0 30px 80px rgba(0,0,0,0.7)' }}>
+		<div
+			aria-hidden="false"
+			className="fixed inset-0 z-[5000] flex items-center justify-center p-4 pt-safe pb-safe animate-fade-in"
+			style={{ background: 'rgba(0,0,0,0.92)', backdropFilter: 'blur(20px)' }}
+		>
+			{/* aria-live region so screen readers announce the dialog immediately */}
+			<div aria-live="assertive" aria-atomic="true" className="sr-only">
+				{dialog.title} — {dialog.message}
+			</div>
+			<div
+				ref={focusTrapRef}
+				role="dialog"
+				aria-modal="true"
+				aria-label={dialog.title || 'Confirmação'}
+				className="rounded-2xl max-w-sm w-full overflow-hidden animate-slide-up"
+				style={{ background: 'rgba(10,10,10,0.99)', border: '1px solid rgba(234,179,8,0.2)', boxShadow: '0 0 50px rgba(234,179,8,0.08), 0 30px 80px rgba(0,0,0,0.7)' }}
+			>
 
 				{/* Premium header with big centered icon */}
 				<div className="px-6 pt-6 pb-4 text-center relative">
