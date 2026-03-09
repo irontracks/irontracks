@@ -86,7 +86,7 @@ const normalizeText = (s: unknown): string =>
 const templateSignature = (tpl: WorkoutTemplate): string => {
   const nameParts: string[] = []
   const exs = sortByOrder(
-    safeArray<ExerciseRow>(tpl?.exercises ?? []) as Array<Record<string, unknown>>,
+    safeArray<ExerciseRow>(tpl?.exercises ?? []) as unknown as Array<Record<string, unknown>>,
   )
   for (const row of exs) {
     const e = row as unknown as ExerciseRow
@@ -228,10 +228,10 @@ const replaceExercisesAndSets = async ({
   const exercises = sortByOrder(
     safeArray<ExerciseRow>(template?.exercises ?? [])
       .filter((x) => x && typeof x === 'object')
-      .map((x) => x as Record<string, unknown>),
+      .map((x) => x as unknown as Record<string, unknown>),
   )
   for (const e of exercises) {
-    const ex = e as ExerciseRow
+    const ex = e as unknown as ExerciseRow
     const { data: newEx, error } = await admin
       .from('exercises')
       .insert({
@@ -259,14 +259,14 @@ const replaceExercisesAndSets = async ({
       sets.map((s) => {
         const set = s as SetRow
         return {
-        exercise_id: newEx.id,
-        weight: set?.weight ?? null,
-        reps: set?.reps ?? null,
-        rpe: set?.rpe ?? null,
-        set_number: set?.set_number ?? 1,
-        is_warmup: !!set?.is_warmup,
-        advanced_config: set?.advanced_config ?? null,
-        completed: false,
+          exercise_id: newEx.id,
+          weight: set?.weight ?? null,
+          reps: set?.reps ?? null,
+          rpe: set?.rpe ?? null,
+          set_number: set?.set_number ?? 1,
+          is_warmup: !!set?.is_warmup,
+          advanced_config: set?.advanced_config ?? null,
+          completed: false,
         }
       }),
     )
@@ -395,7 +395,7 @@ export async function syncTemplateToSubscribers({
         const tid = String(s?.target_user_id || '').trim()
         if (tid) targetsSet.add(tid)
       }
-    } catch {}
+    } catch { }
   }
 
   if (supportsSourceWorkoutId) {
@@ -411,7 +411,7 @@ export async function syncTemplateToSubscribers({
         const tid = String(r?.user_id || '').trim()
         if (tid && tid !== String(sourceUserId)) targetsSet.add(tid)
       }
-    } catch {}
+    } catch { }
 
     const sig = templateSignature(tpl)
     try {
@@ -431,9 +431,9 @@ export async function syncTemplateToSubscribers({
         try {
           await admin.from('workouts').update({ source_workout_id: sourceWorkoutId }).eq('id', wid)
           targetsSet.add(tid)
-        } catch {}
+        } catch { }
       }
-    } catch {}
+    } catch { }
   }
 
   const targets = Array.from(targetsSet.values()).filter(Boolean)

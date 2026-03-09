@@ -1,4 +1,4 @@
-import type { UnknownRecord, WorkoutExercise } from '../types';
+import type { UnknownRecord, WorkoutExercise, WorkoutSetDetail } from '../types';
 import { isObject } from '../utils';
 import { collectExerciseSetInputs } from '../helpers/setPlanningHelpers';
 import { parseTrainingNumber } from '@/utils/trainingNumber';
@@ -80,7 +80,7 @@ export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
   };
 
   const addExtraSetToExercise = async (exIdx: unknown) => {
-    if (!workout || typeof props?.onUpdateSession !== 'function') return;
+    if (!workout || typeof onUpdateSession !== 'function') return;
     const idx = Number(exIdx);
     if (!Number.isFinite(idx) || idx < 0) return;
     if (idx >= exercises.length) return;
@@ -111,7 +111,7 @@ export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
         sets: setsCount + 1,
         setDetails: sdArr,
       };
-      props.onUpdateSession({ workout: { ...workout, exercises: nextExercises } });
+      onUpdateSession({ workout: { ...workout, exercises: nextExercises } });
       setCollapsed((prev) => {
         const next = new Set(prev);
         if (next.has(idx)) next.delete(idx);
@@ -126,7 +126,7 @@ export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
   };
 
   const removeExtraSetFromExercise = async (exIdx: unknown) => {
-    if (!workout || typeof props?.onUpdateSession !== 'function') return;
+    if (!workout || typeof onUpdateSession !== 'function') return;
     const idx = Number(exIdx);
     if (!Number.isFinite(idx) || idx < 0) return;
     if (idx >= exercises.length) return;
@@ -154,7 +154,7 @@ export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
         delete nextLogs[discardedKey];
       } catch { }
 
-      props.onUpdateSession({ workout: { ...workout, exercises: nextExercises }, logs: nextLogs });
+      onUpdateSession({ workout: { ...workout, exercises: nextExercises }, logs: nextLogs });
     } catch (e: unknown) {
       try {
         const msg = isObject(e) && typeof e.message === 'string' ? e.message : String(e || '');
@@ -190,7 +190,7 @@ export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
   };
 
   const saveEditExercise = async () => {
-    if (!workout || typeof props?.onUpdateSession !== 'function') return;
+    if (!workout || typeof onUpdateSession !== 'function') return;
     const idx = typeof editExerciseIdx === 'number' ? editExerciseIdx : -1;
     if (idx < 0 || idx >= exercises.length) return;
     const name = String(editExerciseDraft?.name || '').trim();
@@ -244,7 +244,7 @@ export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
         }
       }
 
-      props.onUpdateSession({ workout: { ...workout, exercises: nextExercises }, logs: nextLogs });
+      onUpdateSession({ workout: { ...workout, exercises: nextExercises }, logs: nextLogs });
       setEditExerciseOpen(false);
       setEditExerciseIdx(null);
     } catch (e: unknown) {
@@ -256,7 +256,7 @@ export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
   };
 
   const addExtraExerciseToWorkout = async () => {
-    if (!workout || typeof props?.onUpdateSession !== 'function') return;
+    if (!workout || typeof onUpdateSession !== 'function') return;
     if (exercises.length >= MAX_EXTRA_EXERCISES_PER_WORKOUT) return;
     const name = String(addExerciseDraft?.name || '').trim();
     if (!name) {
@@ -276,7 +276,7 @@ export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
       setDetails: [] as unknown[],
     };
     try {
-      props.onUpdateSession({ workout: { ...workout, exercises: [...exercises, nextExercise] } });
+      onUpdateSession({ workout: { ...workout, exercises: [...exercises, nextExercise] } });
       setAddExerciseOpen(false);
       setAddExerciseDraft({ name: '', sets: String(sets), restTime: String(restTime ?? DEFAULT_EXTRA_EXERCISE_REST_TIME_S) });
     } catch (e: unknown) {
@@ -291,7 +291,7 @@ export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
     const draft = buildExerciseDraft(exercises);
     const safeDraft: UnknownRecord[] = Array.isArray(draft) ? (draft as UnknownRecord[]) : [];
     setOrganizeDraft(safeDraft);
-    organizeBaseKeysRef.current = draftOrderKeys(safeDraft);
+    organizeBaseKeysRef.current = Array.isArray(draftOrderKeys(safeDraft)) ? (draftOrderKeys(safeDraft) as string[]).join(',') : String(draftOrderKeys(safeDraft));
     setOrganizeError('');
     setOrganizeOpen(true);
   };
@@ -333,10 +333,10 @@ export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
         setOrganizeSaving(false);
         return;
       }
-      if (typeof props?.onUpdateSession === 'function') {
-        props.onUpdateSession({ workout: { ...workout, exercises: orderedExercises } });
+      if (typeof onUpdateSession === 'function') {
+        onUpdateSession({ workout: { ...workout, exercises: orderedExercises } });
       }
-      organizeBaseKeysRef.current = draftOrderKeys(organizeDraft);
+      organizeBaseKeysRef.current = Array.isArray(draftOrderKeys(organizeDraft)) ? (draftOrderKeys(organizeDraft) as string[]).join(',') : String(draftOrderKeys(organizeDraft));
       setOrganizeOpen(false);
       try {
         await alert('Ordem dos exercícios salva com sucesso.');

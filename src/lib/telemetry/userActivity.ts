@@ -62,7 +62,7 @@ const writeStored = (items: unknown[]) => {
   try {
     if (typeof window === 'undefined') return
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(items.slice(-MAX_QUEUE)))
-  } catch {}
+  } catch { }
 }
 
 const mergeQueueFromStorage = () => {
@@ -77,7 +77,7 @@ const scheduleFlush = () => {
   flushTimer = window.setTimeout(() => {
     flushTimer = null
     flush({ preferBeacon: false })
-  }, 2000) as ReturnType<typeof setTimeout>
+  }, 2000) as unknown as ReturnType<typeof setTimeout>
 }
 
 const shouldDrop = (key: string, ms: number) => {
@@ -128,7 +128,7 @@ export function trackUserEvent(eventName: string, data?: Omit<UserActivityEvent,
     if (queue.length > MAX_QUEUE) queue = queue.slice(-MAX_QUEUE)
     writeStored(queue)
     scheduleFlush()
-  } catch {}
+  } catch { }
 }
 
 export function trackScreen(screen: string, extra?: Record<string, unknown>) {
@@ -144,7 +144,7 @@ async function flush({ preferBeacon }: { preferBeacon: boolean }) {
     if (typeof window === 'undefined') return
     try {
       if (navigator && 'onLine' in navigator && navigator.onLine === false) return
-    } catch {}
+    } catch { }
     if (flushing) return
     flushing = true
 
@@ -183,7 +183,7 @@ async function flush({ preferBeacon }: { preferBeacon: boolean }) {
       queue = queue.slice(batch.length)
       writeStored(queue)
     }
-  } catch {} finally {
+  } catch { } finally {
     flushing = false
   }
 }
@@ -197,5 +197,5 @@ if (typeof window !== 'undefined') {
     window.addEventListener('pagehide', () => {
       flush({ preferBeacon: true })
     })
-  } catch {}
+  } catch { }
 }

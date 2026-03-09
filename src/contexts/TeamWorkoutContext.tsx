@@ -492,15 +492,13 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
                         }
 
                         const nextParticipants = Array.isArray(updated.participants) ? updated.participants : [];
-                        setTeamSession(prev => {
-                            const base = prev && typeof prev === 'object' ? prev : null;
-                            const nextId = base?.id ?? teamSession?.id ?? updated.id ?? null;
-                            return {
-                                ...base,
-                                id: nextId,
-                                participants: nextParticipants as TeamParticipant[]
-                            };
-                        });
+                        const nextId = teamSession?.id ?? String(updated.id ?? '');
+                        if (!nextId) return;
+                        setTeamSession((prev) => ({
+                            ...(prev && typeof prev === 'object' ? prev : {}),
+                            id: nextId,
+                            participants: nextParticipants as TeamParticipant[]
+                        } as TeamSession));
                     } catch {
                         return;
                     }
