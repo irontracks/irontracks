@@ -46,6 +46,7 @@
   "exclude": [
     "node_modules",
     ".next",
+    "ios",
     "eslint.config.ts",
     "eslint.config 2.ts",
     "_archive",

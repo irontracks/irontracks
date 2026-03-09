@@ -15,14 +15,12 @@ import {
     Plus,
     Flame,
     Play,
-    Dumbbell,
     Check,
     LogOut,
     Clock,
     Upload,
     ArrowLeft,
     X,
-    Crown
 } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 import { createWorkout, updateWorkout, deleteWorkout, importData, setWorkoutArchived, setWorkoutSortOrder } from '@/actions/workout-actions';
@@ -34,7 +32,7 @@ const RestTimerOverlay = dynamic(() => import('@/components/workout/RestTimerOve
 const IncomingInviteModal = dynamic(() => import('@/components/IncomingInviteModal'), { ssr: false, loading: () => null });
 const InviteAcceptedModal = dynamic(() => import('@/components/InviteAcceptedModal'), { ssr: false, loading: () => null });
 const NotificationCenter = dynamic(() => import('@/components/NotificationCenter'), { ssr: false });
-import HeaderActionsMenu from '@/components/HeaderActionsMenu';
+import { DashboardHeader } from './DashboardHeader';
 
 // Heavy components — loaded only when needed
 const AdminPanelV2 = dynamic(() => import('@/components/AdminPanelV2'), { ssr: false });
@@ -796,120 +794,38 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                             }}
                         />
 
-                        {/* Header */}
-                        {isHeaderVisible && (
-                            <div className="bg-neutral-950 flex justify-between items-center fixed top-0 left-0 right-0 z-40 border-b border-zinc-800 px-6 shadow-lg pt-[env(safe-area-inset-top)] min-h-[calc(4rem+env(safe-area-inset-top))]">
-                                <div
-                                    className="flex items-center cursor-pointer group"
-                                    onClick={() => setView('dashboard')}
-                                >
-                                    <div className="flex items-center gap-2">
-                                        <Dumbbell size={18} className="text-yellow-500 opacity-25" />
-                                        <h1 className="text-2xl font-black tracking-tighter italic leading-none text-white group-hover:opacity-80 transition-opacity">
-                                            IRON<span className="text-yellow-500">TRACKS</span>
-                                        </h1>
-                                    </div>
-                                    <div className="h-6 w-px bg-yellow-500 mx-4 opacity-50"></div>
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-zinc-400 text-xs font-medium tracking-wide uppercase">
-                                            {isCoach ? 'Bem vindo Coach' : 'Bem vindo Atleta'}
-                                        </span>
-                                        {!hideVipOnIos && vipAccess?.hasVip && (
-                                            <button
-                                                type="button"
-                                                onClick={(e) => {
-                                                    e.stopPropagation()
-                                                    openVipView()
-                                                }}
-                                                className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-yellow-500/10 border border-yellow-500/20 shadow-[0_0_10px_-3px_rgba(234,179,8,0.3)] mr-3 hover:bg-yellow-500/15"
-                                            >
-                                                <Crown size={11} className="text-yellow-500 fill-yellow-500" />
-                                                <span className="text-[10px] font-black text-yellow-500 tracking-widest leading-none">VIP</span>
-                                            </button>
-                                        )}
-                                    </div>
-                                </div>
-
-                                <div className="flex items-center gap-4">
-                                    {(() => {
-                                        const pending = Number(syncState?.pending || 0)
-                                        const failed = Number(syncState?.failed || 0)
-                                        const online = syncState?.online !== false
-                                        const settings = userSettingsApi?.settings && typeof userSettingsApi.settings === 'object' ? userSettingsApi.settings : null
-                                        const offlineSyncV2Enabled = settings?.featuresKillSwitch !== true && settings?.featureOfflineSyncV2 === true
-                                        if (!online) {
-                                            return (
-                                                <div className="hidden sm:inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 text-xs font-black uppercase tracking-widest">
-                                                    Offline
-                                                </div>
-                                            )
-                                        }
-                                        if (offlineSyncV2Enabled && (pending > 0 || failed > 0)) {
-                                            return (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => setOfflineSyncOpen(true)}
-                                                    className="hidden sm:inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-yellow-500/10 border border-yellow-500/30 text-yellow-300 text-xs font-black uppercase tracking-widest hover:bg-yellow-500/15"
-                                                    title="Abrir central de pendências"
-                                                >
-                                                    {syncState?.syncing ? 'Sincronizando' : 'Pendentes'}: {pending}{failed > 0 ? ` • Falhas: ${failed}` : ''}
-                                                </button>
-                                            )
-                                        }
-                                        if (pending > 0) {
-                                            return (
-                                                <div className="hidden sm:inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-yellow-500/10 border border-yellow-500/30 text-yellow-300 text-xs font-black uppercase tracking-widest">
-                                                    {syncState?.syncing ? 'Sincronizando' : 'Pendentes'}: {pending}
-                                                </div>
-                                            )
-                                        }
-                                        return null
-                                    })()}
-                                    <HeaderActionsMenu
-                                        user={user as AdminUser}
-                                        isCoach={isCoach}
-                                        hasUnreadChat={hasUnreadChat}
-                                        hasUnreadNotification={hasUnreadNotification}
-                                        onOpenAdmin={() => {
-                                            if (typeof window !== 'undefined') {
-                                                const url = new URL(window.location.href);
-                                                url.searchParams.delete('view');
-                                                window.history.replaceState({}, '', url);
-                                            }
-                                            const tab = (() => {
-                                                try {
-                                                    const url = new URL(window.location.href);
-                                                    const current = String(url.searchParams.get('tab') || '').trim();
-                                                    if (current) return current;
-                                                } catch { }
-                                                try {
-                                                    const stored = String(sessionStorage.getItem('irontracks_admin_panel_tab') || '').trim();
-                                                    if (stored) return stored;
-                                                } catch { }
-                                                return 'dashboard';
-                                            })();
-                                            openAdminPanel(tab);
-                                            setView('admin');
-                                        }}
-                                        onOpenChatList={handleOpenChatList}
-                                        onOpenGlobalChat={handleOpenGlobalChat}
-                                        onOpenHistory={handleOpenHistory}
-                                        onOpenNotifications={handleOpenNotifications}
-                                        onOpenSchedule={() => router.push('/dashboard/schedule')}
-                                        onOpenWallet={() => openVipView()}
-                                        onOpenSettings={() => setSettingsOpen(true)}
-                                        onOpenTour={handleOpenTour}
-                                        onLogout={handleLogout}
-                                    />
-                                </div>
-                            </div>
-                        )}
-
-                        {isCoach && coachPending && (
-                            <div className="bg-yellow-500 text-black text-sm font-bold px-4 py-2 text-center">
-                                Sua conta de Professor está pendente. <button className="underline" onClick={async () => { try { const r = await fetch('/api/teachers/accept', { method: 'POST' }); const j = await r.json(); if (j.ok) { setCoachPending(false); await alert('Conta ativada!'); } else { await alert('Falha ao ativar: ' + (j.error || '')); } } catch (e) { const m = e instanceof Error ? e.message : String(e); await alert('Erro: ' + m); } }}>Aceitar</button>
-                            </div>
-                        )}
+                        {/* Header — extracted to DashboardHeader */}
+                        <DashboardHeader
+                            isCoach={isCoach}
+                            view={view}
+                            user={user as import('@/types/admin').AdminUser}
+                            hasUnreadChat={hasUnreadChat}
+                            hasUnreadNotification={hasUnreadNotification}
+                            hideVipOnIos={hideVipOnIos}
+                            vipAccess={vipAccess as { hasVip?: boolean } | null}
+                            syncState={syncState as { pending?: number; failed?: number; online?: boolean; syncing?: boolean } | null}
+                            userSettings={userSettingsApi?.settings && typeof userSettingsApi.settings === 'object' ? (userSettingsApi.settings as Record<string, unknown>) : null}
+                            isHeaderVisible={isHeaderVisible}
+                            coachPending={coachPending}
+                            onGoHome={() => setView('dashboard')}
+                            onOpenVip={openVipView}
+                            onOpenAdmin={() => {
+                                if (typeof window !== 'undefined') { const url = new URL(window.location.href); url.searchParams.delete('view'); window.history.replaceState({}, '', url) }
+                                const tab = (() => { try { const url = new URL(window.location.href); const c = String(url.searchParams.get('tab') || '').trim(); if (c) return c } catch { } try { const s = String(sessionStorage.getItem('irontracks_admin_panel_tab') || '').trim(); if (s) return s } catch { } return 'dashboard' })()
+                                openAdminPanel(tab); setView('admin')
+                            }}
+                            onOpenChatList={handleOpenChatList}
+                            onOpenGlobalChat={handleOpenGlobalChat}
+                            onOpenHistory={handleOpenHistory}
+                            onOpenNotifications={handleOpenNotifications}
+                            onOpenSchedule={() => router.push('/dashboard/schedule')}
+                            onOpenWallet={() => openVipView()}
+                            onOpenSettings={() => setSettingsOpen(true)}
+                            onOpenTour={handleOpenTour}
+                            onLogout={handleLogout}
+                            onOfflineSyncOpen={() => setOfflineSyncOpen(true)}
+                            onAcceptCoach={async () => { try { const r = await fetch('/api/teachers/accept', { method: 'POST' }); const j = await r.json(); if (j.ok) { setCoachPending(false); await alert('Conta ativada!') } else { await alert('Falha ao ativar: ' + (j.error || '')) } } catch (e) { const m = e instanceof Error ? e.message : String(e); await alert('Erro: ' + m) } }}
+                        />
 
                         {/* Main Content */}
                         <div
