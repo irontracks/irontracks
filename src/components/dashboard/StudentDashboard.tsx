@@ -743,9 +743,9 @@ export default function StudentDashboard(props: Props) {
               } catch { }
             }}
             disabled={creatingWorkout}
-            className="w-full min-h-[48px] bg-neutral-900 border border-neutral-700 hover:border-yellow-500/60 p-4 rounded-xl font-bold text-neutral-200 hover:text-white flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-70 group"
+            className="w-full min-h-[48px] bg-yellow-500 hover:bg-yellow-400 p-4 rounded-xl font-black text-black flex items-center justify-center gap-2 shadow-lg shadow-yellow-900/20 transition-all active:scale-95 disabled:opacity-70"
           >
-            {creatingWorkout ? <Loader2 size={18} className="animate-spin text-yellow-500" /> : <Plus size={20} className="text-yellow-500 group-hover:scale-110 transition-transform" />}
+            {creatingWorkout ? <Loader2 size={20} className="animate-spin" /> : <Plus size={22} />}
             {creatingWorkout ? 'Abrindo editor...' : 'Novo Treino'}
           </button>
 
