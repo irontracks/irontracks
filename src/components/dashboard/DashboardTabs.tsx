@@ -17,6 +17,11 @@ const tabs = [
   { key: 'assessments', label: 'Avaliações', Icon: BarChart2 },
 ] as const
 
+/** Dot indicator for active tab — yellow glow */
+const ActiveDot = () => (
+  <span className="absolute bottom-[5px] left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-yellow-500 shadow-[0_0_6px_2px_rgba(234,179,8,0.5)]" />
+)
+
 export const DashboardTabs = memo(({
   view,
   onChangeView,
@@ -25,20 +30,24 @@ export const DashboardTabs = memo(({
   vipLabel,
   vipLocked,
 }: DashboardTabsProps) => {
+  const tabCls = (active: boolean) =>
+    `flex-1 min-h-[52px] px-2 sm:px-3 rounded-xl text-[11px] sm:text-xs uppercase tracking-wider whitespace-nowrap leading-none transition-all duration-200 flex flex-col items-center justify-center gap-[5px] relative ${active
+      ? 'text-yellow-400 font-black'
+      : 'text-neutral-500 hover:text-neutral-300 font-bold hover:bg-white/[0.03]'
+    }`
+
   return (
     <div className="min-h-[64px]">
       <div className="sticky top-[var(--dashboard-sticky-top)] z-30">
-        {/* Outer glass container */}
+        {/* Glass container — borda neutra sutil, sem amarelo dominante */}
         <div
-          className="rounded-2xl p-[1.5px] shadow-2xl shadow-black/50"
-          style={{
-            background: 'linear-gradient(135deg, rgba(234,179,8,0.25) 0%, rgba(255,255,255,0.04) 50%, rgba(234,179,8,0.10) 100%)',
-          }}
+          className="rounded-2xl p-[1px] shadow-2xl shadow-black/60"
+          style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.02) 100%)' }}
         >
           <div
             className="rounded-[14px] p-1 flex gap-1"
             style={{
-              background: 'linear-gradient(160deg, rgba(20,20,20,0.98) 0%, rgba(10,10,10,0.98) 100%)',
+              background: 'linear-gradient(160deg, rgba(18,18,18,0.99) 0%, rgba(10,10,10,0.99) 100%)',
               backdropFilter: 'blur(20px)',
             }}
           >
@@ -50,16 +59,11 @@ export const DashboardTabs = memo(({
                   type="button"
                   onClick={() => onChangeView(key as typeof view)}
                   data-tour={`tab-${key === 'dashboard' ? 'workouts' : key}`}
-                  className={`flex-1 min-h-[48px] px-2 sm:px-3 rounded-xl font-black text-[11px] sm:text-xs uppercase tracking-wider whitespace-nowrap leading-none transition-all duration-200 flex flex-col items-center justify-center gap-[3px] ${active
-                      ? 'text-black shadow-lg shadow-yellow-600/30 scale-[1.02]'
-                      : 'text-neutral-500 hover:text-white hover:bg-white/5'
-                    }`}
-                  style={active ? {
-                    background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 50%, #b45309 100%)',
-                  } : {}}
+                  className={tabCls(active)}
                 >
-                  <Icon size={14} strokeWidth={active ? 2.5 : 2} />
+                  <Icon size={15} strokeWidth={active ? 2.5 : 1.8} />
                   <span>{label}</span>
+                  {active && <ActiveDot />}
                 </button>
               )
             })}
@@ -69,16 +73,11 @@ export const DashboardTabs = memo(({
                 type="button"
                 onClick={() => onChangeView('community')}
                 data-tour="tab-community"
-                className={`flex-1 min-h-[48px] px-2 sm:px-3 rounded-xl font-black text-[11px] sm:text-xs uppercase tracking-wider whitespace-nowrap leading-none transition-all duration-200 flex flex-col items-center justify-center gap-[3px] ${view === 'community'
-                    ? 'text-black shadow-lg shadow-yellow-600/30 scale-[1.02]'
-                    : 'text-neutral-500 hover:text-white hover:bg-white/5'
-                  }`}
-                style={view === 'community' ? {
-                  background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 50%, #b45309 100%)',
-                } : {}}
+                className={tabCls(view === 'community')}
               >
-                <Users size={14} strokeWidth={view === 'community' ? 2.5 : 2} />
+                <Users size={15} strokeWidth={view === 'community' ? 2.5 : 1.8} />
                 <span>Comunidade</span>
+                {view === 'community' && <ActiveDot />}
               </button>
             )}
 
@@ -87,16 +86,11 @@ export const DashboardTabs = memo(({
                 type="button"
                 onClick={() => onChangeView('vip')}
                 data-tour="tab-vip"
-                className={`flex-1 min-h-[48px] px-2 sm:px-3 rounded-xl font-black text-[11px] sm:text-xs uppercase tracking-wider whitespace-nowrap leading-none transition-all duration-200 flex flex-col items-center justify-center gap-[3px] ${view === 'vip'
-                    ? 'text-black shadow-lg shadow-yellow-600/30 scale-[1.02]'
-                    : 'text-neutral-500 hover:text-white hover:bg-white/5'
-                  }`}
-                style={view === 'vip' ? {
-                  background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 50%, #b45309 100%)',
-                } : {}}
+                className={tabCls(view === 'vip')}
               >
-                <Star size={14} strokeWidth={view === 'vip' ? 2.5 : 2} />
+                <Star size={15} strokeWidth={view === 'vip' ? 2.5 : 1.8} />
                 <span>{vipLabel}{vipLocked ? ' 🔒' : ''}</span>
+                {view === 'vip' && <ActiveDot />}
               </button>
             )}
           </div>
