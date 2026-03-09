@@ -278,7 +278,7 @@ export default function StoriesBar({ currentUserId }: { currentUserId?: string }
                     ringType !== 'none' ? 'inset-[3px]' : 'inset-0 border border-neutral-800',
                   ].join(' ')}>
                     {g.photoUrl ? (
-                      <Image src={g.photoUrl} alt={name} width={64} height={64} className="w-full h-full object-cover" />
+                      <Image src={g.photoUrl} alt={name} width={64} height={64} className="w-full h-full object-cover" loading="lazy" />
                     ) : (
                       <span className="text-yellow-500 font-black">{initials(name)}</span>
                     )}

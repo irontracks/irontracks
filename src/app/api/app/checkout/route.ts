@@ -6,6 +6,7 @@ import { mercadopagoRequest } from '@/lib/mercadopago'
 import { parseJsonBody } from '@/utils/zod'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
+import { logError } from '@/lib/logger'
 
 export const dynamic = 'force-dynamic'
 
@@ -146,22 +147,32 @@ export async function POST(req: Request) {
     const baseUrl = resolveBaseUrl(req)
     const idDigits = onlyDigits(cpfCnpj)
     const idType = idDigits.length === 14 ? 'CNPJ' : 'CPF'
-    const payment = await mercadopagoRequest<Record<string, unknown>>({
-      method: 'POST',
-      path: '/v1/payments',
-      body: {
-        transaction_amount: amount,
-        description: plan.name,
-        payment_method_id: 'pix',
-        external_reference: `vip:${user.id}:${plan.id}`,
-        notification_url: `${baseUrl}/api/billing/webhooks/mercadopago`,
-        payer: {
-          email: user.email || undefined,
-          first_name: payerName || undefined,
-          identification: idDigits ? { type: idType, number: idDigits } : undefined,
+    let payment: Record<string, unknown>
+    try {
+      payment = await mercadopagoRequest<Record<string, unknown>>({
+        method: 'POST',
+        path: '/v1/payments',
+        body: {
+          transaction_amount: amount,
+          description: plan.name,
+          payment_method_id: 'pix',
+          external_reference: `vip:${user.id}:${plan.id}`,
+          notification_url: `${baseUrl}/api/billing/webhooks/mercadopago`,
+          payer: {
+            email: user.email || undefined,
+            first_name: payerName || undefined,
+            identification: idDigits ? { type: idType, number: idDigits } : undefined,
+          },
         },
-      },
-    })
+      })
+    } catch (mpErr: unknown) {
+      // Rollback: cancel the subscription so the user can retry without hitting 'pending_subscription_exists'
+      try {
+        await admin.from('app_subscriptions').update({ status: 'cancelled', updated_at: new Date().toISOString() }).eq('id', subRow.id)
+      } catch { }
+      logError('checkout', 'MercadoPago payment creation failed', { userId: user.id, planId: plan.id, error: getErrorMessage(mpErr) })
+      return NextResponse.json({ ok: false, error: getErrorMessage(mpErr) || 'mercadopago_payment_failed' }, { status: 502 })
+    }
 
     const providerPaymentId = String(payment?.id || '').trim()
     const pointOfInteraction = (payment?.point_of_interaction || {}) as Record<string, unknown>

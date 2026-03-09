@@ -324,6 +324,8 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
         <link rel="dns-prefetch" href="https://enbueukmvgodngydkpzm.supabase.co" />
         <link rel="preconnect" href="https://api.cloudinary.com" />
         <link rel="dns-prefetch" href="https://api.cloudinary.com" />
+        <link rel="preconnect" href="https://fonts.googleapis.com" />
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
         <link rel="dns-prefetch" href="https://fonts.googleapis.com" />
         <link rel="dns-prefetch" href="https://generativelanguage.googleapis.com" />
         {inlineScript ? (

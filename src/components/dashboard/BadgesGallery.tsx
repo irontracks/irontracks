@@ -346,7 +346,7 @@ const BadgesGallery = memo(function BadgesGallery({ badges, currentStreak, total
                         <div className="w-9 h-9 rounded-xl overflow-hidden flex items-center justify-center shrink-0"
                           style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}>
                           {row.photoUrl ? (
-                            <Image src={row.photoUrl} alt="Perfil" width={36} height={36} className="w-full h-full object-cover" />
+                            <Image src={row.photoUrl} alt="Perfil" width={36} height={36} className="w-full h-full object-cover" loading="lazy" />
                           ) : (
                             <span className="text-yellow-400 font-black text-sm">
                               {String(name).slice(0, 1).toUpperCase()}
