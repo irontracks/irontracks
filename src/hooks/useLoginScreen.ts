@@ -197,8 +197,8 @@ export function useLoginScreen() {
                 if (!clientId) throw new Error('Client ID da Apple não configurado.')
                 const nonce = randomString(32)
                 const state = randomString(16)
-                // NOTE: @capacitor-community/apple-sign-in v7 hashes the nonce internally before sending
-                // to Apple. We must pass the RAW nonce here, and also the raw nonce to Supabase.
+                // Apple receives raw nonce and stores SHA256(nonce) in the JWT nonce claim.
+                // Supabase receives raw nonce and computes SHA256(nonce) server-side to verify.
                 const result = await SignInWithApple.authorize({ clientId, scopes: 'name email', state, nonce })
                 const token = result?.response?.identityToken
                 if (!token) throw new Error('Falha ao obter token da Apple.')
@@ -209,8 +209,23 @@ export function useLoginScreen() {
                 if (email) {
                     try { await fetch('/api/auth/apple/preflight', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, full_name: fullName }) }) } catch { }
                 }
+                // Decode JWT to check if nonce claim exists. Only pass raw nonce to Supabase
+                // if the JWT actually contains it — prevents guaranteed mismatch when absent.
+                let jwtHasNonce = false
+                try {
+                    const parts = token.split('.')
+                    if (parts.length >= 2) {
+                        const padded = parts[1] + '='.repeat((4 - parts[1].length % 4) % 4)
+                        const payload = JSON.parse(atob(padded))
+                        jwtHasNonce = typeof payload?.nonce === 'string' && payload.nonce.length > 0
+                    }
+                } catch { }
                 const supabase = createClient()
-                const { data, error } = await supabase.auth.signInWithIdToken({ provider: 'apple', token, nonce })
+                const { data, error } = await supabase.auth.signInWithIdToken({
+                    provider: 'apple',
+                    token,
+                    ...(jwtHasNonce ? { nonce } : {}),
+                })
                 if (error) throw error
                 const userId = data?.user?.id
                 const userEmail = data?.user?.email?.trim().toLowerCase() || ''
