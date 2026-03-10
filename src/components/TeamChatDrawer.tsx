@@ -74,10 +74,12 @@ export function TeamChatDrawer({ myUserId, myDisplayName, myPhotoURL, participan
         if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); handleSend() }
     }
 
-    const getParticipantName = (uid: string) => {
+    const getParticipantName = (uid: string, msgDisplayName?: string) => {
         if (uid === myUserId) return 'Você'
+        // Prefer the displayName from the broadcast message payload
+        if (msgDisplayName && msgDisplayName !== 'Parceiro') return msgDisplayName
         const p = Array.isArray(participants) ? participants.find(p => String(p.user_id || '') === uid) : null
-        return String(p?.display_name || 'Parceiro').trim()
+        return String(p?.display_name || msgDisplayName || 'Parceiro').trim()
     }
     const getParticipantPhoto = (uid: string) => {
         if (uid === myUserId) return myPhotoURL ?? null
@@ -127,10 +129,13 @@ export function TeamChatDrawer({ myUserId, myDisplayName, myPhotoURL, participan
                                 <p className="text-xs text-center">Nenhuma mensagem ainda.<br />Seja o primeiro a mandar fogo! 🔥</p>
                             </div>
                         ) : (
-                            chatMessages.map((msg) => {
+                            chatMessages.map((msg, msgIdx) => {
                                 const isMine = msg.userId === myUserId
-                                const name = getParticipantName(msg.userId)
+                                const name = getParticipantName(msg.userId, msg.displayName)
                                 const photo = getParticipantPhoto(msg.userId)
+                                // Show name label when sender differs from previous message
+                                const prevMsg = msgIdx > 0 ? chatMessages[msgIdx - 1] : null
+                                const showName = !isMine && (!prevMsg || prevMsg.userId !== msg.userId)
                                 return (
                                     <div key={msg.id} className={`flex gap-2 items-end ${isMine ? 'flex-row-reverse' : 'flex-row'}`}>
                                         {/* Avatar */}
@@ -145,7 +150,7 @@ export function TeamChatDrawer({ myUserId, myDisplayName, myPhotoURL, participan
                                         </div>
                                         {/* Bubble */}
                                         <div className={`max-w-[70%] rounded-2xl px-3 py-2 text-xs ${isMine ? 'bg-yellow-500 text-black rounded-br-sm' : 'bg-neutral-800 text-white rounded-bl-sm'}`}>
-                                            {!isMine && <p className="text-[9px] font-bold opacity-60 mb-0.5">{name}</p>}
+                                            {showName && <p className="text-[10px] font-black text-yellow-400 mb-0.5">{name}</p>}
                                             <p className="leading-snug break-words">{msg.text}</p>
                                         </div>
                                     </div>
