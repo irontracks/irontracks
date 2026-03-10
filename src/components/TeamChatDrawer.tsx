@@ -95,7 +95,7 @@ export function TeamChatDrawer({ myUserId, myDisplayName, myPhotoURL, participan
             {!open && (
                 <button
                     onClick={handleOpen}
-                    className="fixed bottom-20 right-4 z-[60] w-12 h-12 rounded-full bg-yellow-500 text-black flex items-center justify-center shadow-xl shadow-yellow-900/30 hover:bg-yellow-400 transition-transform active:scale-95"
+                    className="fixed bottom-[88px] right-4 z-[60] w-12 h-12 rounded-full bg-yellow-500 text-black flex items-center justify-center shadow-xl shadow-yellow-900/30 hover:bg-yellow-400 transition-transform active:scale-95"
                     aria-label="Abrir chat da equipe"
                 >
                     <MessageCircle size={20} />
