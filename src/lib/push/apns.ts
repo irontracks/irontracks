@@ -69,7 +69,8 @@ async function sendOneApnsPush(
                 ...extra,
             })
 
-            const isProduction = process.env.NODE_ENV === 'production'
+            // Xcode debug builds use sandbox tokens; set APNS_PRODUCTION=true for TestFlight/App Store
+            const isProduction = String(process.env.APNS_PRODUCTION || '').trim().toLowerCase() === 'true'
             const host = isProduction
                 ? 'https://api.push.apple.com'
                 : 'https://api.sandbox.push.apple.com'
