@@ -766,7 +766,20 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
         try {
             ch.send({ type: 'broadcast', event: 'chat', payload: { ...newMsg } })
         } catch { }
-    }, [user?.id])
+        // Fire-and-forget: push notification to teammates with the app in background
+        if (teamSession?.id) {
+            void fetch('/api/team/chat/notify', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    sessionId: teamSession.id,
+                    senderId: user.id,
+                    senderName: String(myDisplayNameRef.current || 'Parceiro'),
+                    preview: trimmed.slice(0, 100),
+                }),
+            }).catch(() => { })
+        }
+    }, [user?.id, teamSession?.id])
 
     const pauseSession = useCallback(() => {
         const ch = teamBroadcastChannelRef.current
