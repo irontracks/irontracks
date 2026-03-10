@@ -3,6 +3,7 @@
 import React, { useMemo } from 'react';
 import { ArrowDown, CheckCircle2, ChevronDown, ChevronUp, Dumbbell, Link, Loader2, Pencil, Play, Plus, Trash2, Trophy } from 'lucide-react';
 import { useWorkoutContext } from './WorkoutContext';
+import { ExerciseAIChat } from '@/components/ExerciseAIChat';
 import {
   NormalSet,
   RestPauseSet,
@@ -64,6 +65,19 @@ export default function ExerciseCard({ ex, exIdx }: { ex: WorkoutExercise; exIdx
     return !!log.done;
   }).length;
   const cardProgressPct = setsCount > 0 ? Math.round((doneSetsCount / setsCount) * 100) : 0;
+
+  // AI chat context — built from this exercise's data
+  const exAny = ex as unknown as Record<string, unknown>
+  const aiContext = {
+    exerciseName: name,
+    muscleGroup: String(exAny?.muscle_group ?? exAny?.muscleGroup ?? '').trim() || undefined,
+    method: String(ex?.method || '').trim() || 'Normal',
+    setsPlanned: setsCount || undefined,
+    setsDone: doneSetsCount || undefined,
+    repsPlanned: String(ex?.reps ?? exAny?.repsRange ?? '').trim() || undefined,
+    notes: observation || undefined,
+  };
+
 
   // Compute whether all sets in this exercise are marked done
   const allSetsDone = setsCount > 0 && doneSetsCount === setsCount;
@@ -369,6 +383,7 @@ export default function ExerciseCard({ ex, exIdx }: { ex: WorkoutExercise; exIdx
           >
             <Link size={14} className={linkedWeightExercises?.has(exIdx) ? '' : 'opacity-60'} />
           </button>
+          <ExerciseAIChat context={aiContext} />
           <button
             type="button"
             onClick={async (e) => {

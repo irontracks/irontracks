@@ -90,8 +90,6 @@ export default function ActiveWorkout(props: ActiveWorkoutProps) {
         <WorkoutFooter />
         <Modals />
 
-        {/* Team panels */}
-        <TeamProgressPanel exercises={panelExercises} />
         {inTeamSession && (
           <TeamChatDrawer
             myUserId={String(props.settings?.userId ?? props.session?.userId ?? '')}
