@@ -69,12 +69,12 @@ async function sendOneApnsPush(
                 ...extra,
             })
 
-            // aps-environment in App.entitlements is 'production' — tokens are always production
-            // Set APNS_SANDBOX=true only if you explicitly switch entitlements to 'development'
-            const isSandbox = String(process.env.APNS_SANDBOX || '').trim().toLowerCase() === 'true'
-            const host = isSandbox
-                ? 'https://api.sandbox.push.apple.com'
-                : 'https://api.push.apple.com'
+            // Xcode debug builds use development provisioning profile → sandbox tokens
+            // Set APNS_PRODUCTION=true in Vercel env only for TestFlight/App Store builds
+            const isProduction = String(process.env.APNS_PRODUCTION || '').trim().toLowerCase() === 'true'
+            const host = isProduction
+                ? 'https://api.push.apple.com'
+                : 'https://api.sandbox.push.apple.com'
 
             const client = http2.connect(host)
 
