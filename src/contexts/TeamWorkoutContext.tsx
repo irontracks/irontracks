@@ -176,6 +176,24 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
     const myDisplayNameRef = useRef<string>('')
     const myPhotoUrlRef = useRef<string | null>(null)
     const supabase = useMemo(() => createClient(), []);
+
+    // Populate display name and photo refs from the user's profile
+    useEffect(() => {
+        if (!user?.id) return
+        const fetchProfile = async () => {
+            try {
+                const { data } = await supabase
+                    .from('profiles')
+                    .select('display_name, photo_url')
+                    .eq('id', user.id)
+                    .maybeSingle()
+                if (data?.display_name) myDisplayNameRef.current = String(data.display_name).trim()
+                if (data?.photo_url) myPhotoUrlRef.current = String(data.photo_url).trim()
+            } catch { }
+        }
+        fetchProfile()
+    }, [user?.id, supabase])
+
     const seenAcceptedInviteIdsRef = useRef(new Set());
     const { notify } = useInAppNotifications();
     const joinHandledRef = useRef(new Set());
