@@ -38,15 +38,27 @@ export const ClusterSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: 
   const totalRepsPlanned = parseTrainingNumber(cfg?.total_reps);
   const clusterSize = parseTrainingNumber(cfg?.cluster_size);
   const intra = parseTrainingNumber(cfg?.intra_rest_sec) ?? 15;
-  const plannedBlocks = buildPlannedBlocks(totalRepsPlanned, clusterSize);
+  const plannedBlocksFromCfg = buildPlannedBlocks(totalRepsPlanned, clusterSize);
 
   const cluster = isObject(log.cluster) ? (log.cluster as UnknownRecord) : ({} as UnknownRecord);
   const blocksRaw: unknown[] = Array.isArray(cluster.blocks) ? (cluster.blocks as unknown[]) : [];
+
+  // Use saved blocks from log when no cluster_size config exists (configured via modal's buildBlocksByCount)
+  const plannedBlocks = plannedBlocksFromCfg.length > 0
+    ? plannedBlocksFromCfg
+    : blocksRaw.map((v) => parseTrainingNumber(v) ?? 0);
+
   const blocks: Array<number | null> = plannedBlocks.map((_, idx) => parseTrainingNumber(blocksRaw[idx]));
 
   const total = blocks.reduce<number>((acc, v) => acc + (typeof v === 'number' ? v : 0), 0);
   const done = !!log.done;
-  const canDone = plannedBlocks.length > 0 && blocks.every((v) => typeof v === 'number' && Number.isFinite(v) && v > 0);
+  // canDone when either: (1) blocks have values from inline inputs, or (2) log already has saved blocks from modal
+  const canDone =
+    plannedBlocks.length > 0 &&
+    (
+      blocks.every((v) => typeof v === 'number' && Number.isFinite(v) && v > 0) ||
+      (blocksRaw.length > 0 && blocksRaw.every((v) => { const n = parseTrainingNumber(v); return typeof n === 'number' && Number.isFinite(n) && n > 0; }))
+    );
 
   const lastRestAfterBlock = Number(cluster.last_rest_after_block);
   const lastRest = Number.isFinite(lastRestAfterBlock) ? lastRestAfterBlock : -1;
@@ -76,7 +88,7 @@ export const ClusterSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: 
       if (!intra || intra <= 0) return;
       startTimer(intra, { kind: 'cluster', key, blockIndex: idx });
       updateCluster({ last_rest_after_block: idx });
-    } catch {}
+    } catch { }
   };
 
   const notation = plannedBlocks.length ? plannedBlocks.join('+') : '';
