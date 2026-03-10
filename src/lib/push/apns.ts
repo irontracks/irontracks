@@ -64,11 +64,12 @@ async function sendOneApnsPush(
                     alert: { title, body },
                     sound: 'default',
                     badge: 1,
+                    'content-available': 1,
                 },
                 ...extra,
             })
 
-            const isProduction = false // Xcode debug builds use sandbox tokens
+            const isProduction = process.env.NODE_ENV === 'production'
             const host = isProduction
                 ? 'https://api.push.apple.com'
                 : 'https://api.sandbox.push.apple.com'
