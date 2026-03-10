@@ -612,7 +612,7 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
             try { supabase.removeChannel(teamBroadcastChannelRef.current) } catch { }
         }
         const ch = supabase
-            .channel(`team_logs:${teamSession.id}`, { config: { broadcast: { self: false } } })
+            .channel(`team_logs:${teamSession.id}`, { config: { broadcast: { self: false, ack: true } } })
             .on('broadcast', { event: 'log_update' }, (msg) => {
                 const payload = msg?.payload && typeof msg.payload === 'object' ? msg.payload as Record<string, unknown> : null
                 if (!payload) return
