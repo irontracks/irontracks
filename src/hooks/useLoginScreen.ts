@@ -197,8 +197,9 @@ export function useLoginScreen() {
                 if (!clientId) throw new Error('Client ID da Apple não configurado.')
                 const nonce = randomString(32)
                 const state = randomString(16)
-                const hashedNonce = await hashSha256(nonce)
-                const result = await SignInWithApple.authorize({ clientId, scopes: 'name email', state, nonce: hashedNonce || undefined })
+                // NOTE: @capacitor-community/apple-sign-in v7 hashes the nonce internally before sending
+                // to Apple. We must pass the RAW nonce here, and also the raw nonce to Supabase.
+                const result = await SignInWithApple.authorize({ clientId, scopes: 'name email', state, nonce })
                 const token = result?.response?.identityToken
                 if (!token) throw new Error('Falha ao obter token da Apple.')
                 const email = String(result?.response?.email || '').trim()
