@@ -64,16 +64,17 @@ async function sendOneApnsPush(
                     alert: { title, body },
                     sound: 'default',
                     badge: 1,
-                    'content-available': 1,
+                    'interruption-level': 'time-sensitive',
                 },
                 ...extra,
             })
 
-            // Xcode debug builds use sandbox tokens; set APNS_PRODUCTION=true for TestFlight/App Store
-            const isProduction = String(process.env.APNS_PRODUCTION || '').trim().toLowerCase() === 'true'
-            const host = isProduction
-                ? 'https://api.push.apple.com'
-                : 'https://api.sandbox.push.apple.com'
+            // aps-environment in App.entitlements is 'production' — tokens are always production
+            // Set APNS_SANDBOX=true only if you explicitly switch entitlements to 'development'
+            const isSandbox = String(process.env.APNS_SANDBOX || '').trim().toLowerCase() === 'true'
+            const host = isSandbox
+                ? 'https://api.sandbox.push.apple.com'
+                : 'https://api.push.apple.com'
 
             const client = http2.connect(host)
 
