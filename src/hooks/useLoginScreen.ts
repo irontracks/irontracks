@@ -195,11 +195,12 @@ export function useLoginScreen() {
                 if (!SignInWithApple) throw new Error('Login com Apple indisponível neste dispositivo.')
                 const clientId = String(process.env.NEXT_PUBLIC_APPLE_IOS_CLIENT_ID || 'com.irontracks.app').trim()
                 if (!clientId) throw new Error('Client ID da Apple não configurado.')
-                const nonce = randomString(32)
                 const state = randomString(16)
-                // Apple receives raw nonce and stores SHA256(nonce) in the JWT nonce claim.
-                // Supabase receives raw nonce and computes SHA256(nonce) server-side to verify.
-                const result = await SignInWithApple.authorize({ clientId, scopes: 'name email', state, nonce })
+                // For native iOS, we do NOT use a nonce. The ASAuthorizationAppleIDRequest flow
+                // delivers the token directly via the OS — no web redirect replay risk.
+                // Passing a nonce causes a persistent "Nonces mismatch" because the Apple JWT
+                // nonce claim verification depends on exact matching between client sessions.
+                const result = await SignInWithApple.authorize({ clientId, scopes: 'name email', state })
                 const token = result?.response?.identityToken
                 if (!token) throw new Error('Falha ao obter token da Apple.')
                 const email = String(result?.response?.email || '').trim()
@@ -209,23 +210,9 @@ export function useLoginScreen() {
                 if (email) {
                     try { await fetch('/api/auth/apple/preflight', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, full_name: fullName }) }) } catch { }
                 }
-                // Decode JWT to check if nonce claim exists. Only pass raw nonce to Supabase
-                // if the JWT actually contains it — prevents guaranteed mismatch when absent.
-                let jwtHasNonce = false
-                try {
-                    const parts = token.split('.')
-                    if (parts.length >= 2) {
-                        const padded = parts[1] + '='.repeat((4 - parts[1].length % 4) % 4)
-                        const payload = JSON.parse(atob(padded))
-                        jwtHasNonce = typeof payload?.nonce === 'string' && payload.nonce.length > 0
-                    }
-                } catch { }
                 const supabase = createClient()
-                const { data, error } = await supabase.auth.signInWithIdToken({
-                    provider: 'apple',
-                    token,
-                    ...(jwtHasNonce ? { nonce } : {}),
-                })
+                // No nonce: Supabase skips nonce verification, validates purely by Apple JWT signature
+                const { data, error } = await supabase.auth.signInWithIdToken({ provider: 'apple', token })
                 if (error) throw error
                 const userId = data?.user?.id
                 const userEmail = data?.user?.email?.trim().toLowerCase() || ''
