@@ -655,15 +655,20 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
                 const fromUid = String(payload.userId || '').trim()
                 // Show messages from others only (own messages are added optimistically)
                 if (!fromUid || fromUid === String(user?.id || '').trim()) return
+                const msgId = String(payload.id || `${fromUid}:${Date.now()}`)
                 const newMsg: ChatMessage = {
-                    id: String(payload.id || `${fromUid}:${Date.now()}`),
+                    id: msgId,
                     userId: fromUid,
                     displayName: String(payload.displayName || 'Parceiro'),
                     photoURL: payload.photoURL ? String(payload.photoURL) : null,
                     text: String(payload.text || '').slice(0, 200),
                     ts: Number(payload.ts || Date.now()),
                 }
-                setChatMessages(prev => [...prev, newMsg].slice(-MAX_CHAT_MESSAGES))
+                // Deduplicate: skip if message ID already exists (server relay duplicate)
+                setChatMessages(prev => {
+                    if (prev.some(m => m.id === msgId)) return prev
+                    return [...prev, newMsg].slice(-MAX_CHAT_MESSAGES)
+                })
             })
             .on('broadcast', { event: 'pause' }, (msg) => {
                 const payload = msg?.payload && typeof msg.payload === 'object' ? msg.payload as Record<string, unknown> : null
@@ -784,7 +789,7 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
         try {
             ch.send({ type: 'broadcast', event: 'chat', payload: { ...newMsg } })
         } catch { }
-        // Fire-and-forget: push notification to teammates with the app in background
+        // Fire-and-forget: server relay broadcast + push notification
         if (teamSession?.id) {
             void fetch('/api/team/chat/notify', {
                 method: 'POST',
@@ -793,7 +798,11 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
                     sessionId: teamSession.id,
                     senderId: user.id,
                     senderName: String(myDisplayNameRef.current || 'Parceiro'),
-                    preview: trimmed.slice(0, 100),
+                    preview: trimmed,
+                    msgId: id,
+                    msgDisplayName: String(myDisplayNameRef.current || 'Parceiro'),
+                    msgPhotoURL: myPhotoUrlRef.current,
+                    msgTs: newMsg.ts,
                 }),
             }).catch(() => { })
         }
