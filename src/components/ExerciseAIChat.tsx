@@ -1,5 +1,6 @@
 'use client'
 import React, { useState, useRef, useEffect, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { Sparkles, Send, X, ChevronDown, Loader2, Zap } from 'lucide-react'
 
 export interface ExerciseChatContext {
@@ -39,7 +40,11 @@ export function ExerciseAIChat({ context }: ExerciseAIChatProps) {
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [mounted, setMounted] = useState(false)
   const bottomRef = useRef<HTMLDivElement>(null)
+
+  // Ensure we're client-side (needed for createPortal)
+  useEffect(() => { setMounted(true) }, [])
 
   // Auto-scroll on new messages
   useEffect(() => {
@@ -120,8 +125,8 @@ export function ExerciseAIChat({ context }: ExerciseAIChatProps) {
         <Sparkles size={14} />
       </button>
 
-      {/* ── Drawer bottom-sheet ── */}
-      {open && (
+      {/* ── Drawer rendered via portal to document.body — avoids event bubbling to ExerciseCard ── */}
+      {mounted && open && createPortal(
         <div
           className="fixed inset-0 z-[80] flex items-end"
           onClick={() => setOpen(false)}
@@ -129,7 +134,7 @@ export function ExerciseAIChat({ context }: ExerciseAIChatProps) {
           {/* Backdrop */}
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
 
-          {/* Sheet */}
+          {/* Sheet — stopPropagation so backdrop click doesn't close when clicking inside */}
           <div
             className="relative w-full max-h-[80vh] flex flex-col rounded-t-3xl bg-neutral-950 border-t border-l border-r border-neutral-800 shadow-2xl overflow-hidden"
             onClick={e => e.stopPropagation()}
@@ -151,6 +156,7 @@ export function ExerciseAIChat({ context }: ExerciseAIChatProps) {
                 </div>
               </div>
               <button
+                type="button"
                 onClick={() => setOpen(false)}
                 className="w-7 h-7 flex items-center justify-center rounded-xl bg-neutral-800 text-neutral-400 hover:text-white transition-colors"
               >
@@ -229,6 +235,7 @@ export function ExerciseAIChat({ context }: ExerciseAIChatProps) {
                 placeholder="Pergunte algo sobre este exercício…"
                 maxLength={300}
                 disabled={loading}
+                autoComplete="off"
                 className="flex-1 bg-neutral-800 text-white text-xs rounded-xl px-3 py-2.5 outline-none placeholder:text-neutral-500 border border-neutral-700 focus:border-violet-500/50 transition-colors disabled:opacity-50"
               />
               <button
@@ -241,7 +248,8 @@ export function ExerciseAIChat({ context }: ExerciseAIChatProps) {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body
       )}
     </>
   )
