@@ -13,6 +13,11 @@ const BodySchema = z
     senderId: z.string().min(1),
     senderName: z.string().min(1),
     preview: z.string().min(1).max(200),
+    // Full message payload for server-side broadcast relay
+    msgId: z.string().optional(),
+    msgDisplayName: z.string().optional(),
+    msgPhotoURL: z.string().nullable().optional(),
+    msgTs: z.number().optional(),
   })
   .strip()
 
@@ -22,42 +27,59 @@ export async function POST(req: Request) {
 
     const parsedBody = await parseJsonBody(req, BodySchema)
     if (parsedBody.response) return parsedBody.response
-    const { sessionId, senderId, senderName, preview } = parsedBody.data!
-
-    // Rate-limit: max 1 push burst per sender per session per 30s
-    // This prevents spam during active workout sessions
-    const rl = await checkRateLimitAsync(`team:chat:push:${sessionId}:${senderId}:${ip}`, 2, 30_000)
-    if (!rl.allowed) return NextResponse.json({ ok: true, skipped: 'rate_limited' })
+    const { sessionId, senderId, senderName, preview, msgId, msgDisplayName, msgPhotoURL, msgTs } = parsedBody.data!
 
     const admin = createAdminClient()
 
-    // Fetch session participants
-    const { data: session, error } = await admin
-      .from('team_sessions')
-      .select('participants')
-      .eq('id', sessionId)
-      .maybeSingle()
-
-    if (error || !session) return NextResponse.json({ ok: false, error: 'session_not_found' }, { status: 404 })
-
-    const participants = Array.isArray(session.participants) ? session.participants : []
-
-    // Collect recipient user IDs (everyone except the sender)
-    const recipientIds = participants
-      .map((p: unknown) => {
-        const pObj = p && typeof p === 'object' ? (p as Record<string, unknown>) : null
-        return String(pObj?.uid || pObj?.user_id || pObj?.id || '').trim()
+    // ─── 1. Server-side broadcast relay (reliable delivery) ─────────────
+    // Re-broadcasts the chat message from the server to ensure all
+    // connected clients receive it, even if the sender's client broadcast
+    // was dropped due to WebSocket instability.
+    try {
+      const ch = admin.channel(`team_logs:${sessionId}`)
+      await ch.send({
+        type: 'broadcast',
+        event: 'chat',
+        payload: {
+          id: msgId || `${senderId}:${Date.now()}`,
+          userId: senderId,
+          displayName: msgDisplayName || senderName,
+          photoURL: msgPhotoURL ?? null,
+          text: preview,
+          ts: msgTs || Date.now(),
+          relay: true, // marks this as server relay (for dedup)
+        },
       })
-      .filter((uid) => uid && uid !== senderId)
+      // Clean up the channel immediately
+      admin.removeChannel(ch)
+    } catch { }
 
-    if (!recipientIds.length) return NextResponse.json({ ok: true, sent: 0 })
+    // ─── 2. Push notification (rate-limited) ────────────────────────────
+    const rl = await checkRateLimitAsync(`team:chat:push:${sessionId}:${senderId}:${ip}`, 2, 30_000)
+    if (rl.allowed) {
+      // Fetch session participants for push
+      const { data: session } = await admin
+        .from('team_sessions')
+        .select('participants')
+        .eq('id', sessionId)
+        .maybeSingle()
 
-    const safeName = senderName.slice(0, 80)
-    const safePreview = preview.slice(0, 100)
+      const participants = Array.isArray(session?.participants) ? session.participants : []
+      const recipientIds = participants
+        .map((p: unknown) => {
+          const pObj = p && typeof p === 'object' ? (p as Record<string, unknown>) : null
+          return String(pObj?.uid || pObj?.user_id || pObj?.id || '').trim()
+        })
+        .filter((uid) => uid && uid !== senderId)
 
-    void sendPushToUsers(recipientIds, `💬 ${safeName}`, safePreview).catch(() => { })
+      if (recipientIds.length) {
+        const safeName = senderName.slice(0, 80)
+        const safePreview = preview.slice(0, 100)
+        void sendPushToUsers(recipientIds, `💬 ${safeName}`, safePreview).catch(() => { })
+      }
+    }
 
-    return NextResponse.json({ ok: true, sent: recipientIds.length })
+    return NextResponse.json({ ok: true })
   } catch (e: unknown) {
     return NextResponse.json(
       { ok: false, error: (e as Record<string, unknown>)?.message ?? String(e) },
