@@ -9,6 +9,7 @@ import { AdminUser, AdminTeacher } from '@/types/admin';
 import { sendBroadcastMessage, addTeacher, updateTeacher } from '@/actions/admin-actions';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { UnknownRecord } from '@/types/app'
+import { apiAdmin } from '@/lib/api'
 
 type AlertFn = (msg: string, title?: string) => Promise<unknown>;
 type ConfirmFn = (msg: string, title?: string) => Promise<boolean>;
@@ -129,16 +130,12 @@ export function useAdminActions({
             // updating students.teacher_id, avoiding the students_teacher_id_fkey FK violation
             // that occurred when passing teachers.id (PK) instead of teachers.user_id (profiles FK).
             const authHeaders = await getAdminAuthHeaders();
-            const res = await fetch('/api/admin/students/assign-teacher', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', ...authHeaders },
-                body: JSON.stringify({
-                    student_id: studentId,
-                    teacher_user_id: teacherUserId || null,
-                }),
-            });
-            const json = await res.json().catch(() => ({})) as Record<string, unknown>;
-            if (!json?.ok) throw new Error(String(json?.error || `HTTP ${res.status}`));
+            const json = await apiAdmin.assignTeacher(
+                studentId,
+                teacherUserId || null,
+                authHeaders
+            ).catch(() => ({ ok: false, error: 'Falha na requisição' })) as Record<string, unknown>;
+            if (!json?.ok) throw new Error(String(json?.error || 'Falha ao atribuir professor'));
             const nextTid = (json.teacher_user_id as string | null) ?? teacherUserId ?? null;
             setUsersList((prev) =>
                 prev.map((u) => (u.id === studentId ? { ...u, teacher_id: nextTid } : u))
@@ -162,13 +159,9 @@ export function useAdminActions({
         if (!(await confirm(`Mudar status de "${student.name || student.email}" para ${label}?`))) return;
         try {
             const authHeaders = await getAdminAuthHeaders();
-            const res = await fetch('/api/admin/students/status', {
-                method: 'POST',
-                headers: { ...authHeaders, 'Content-Type': 'application/json' },
-                body: JSON.stringify({ id: student.id, status: newStatus }),
-            });
-            const json = await res.json().catch(() => ({}));
-            if (!res.ok || !json?.ok) throw new Error(String(json?.error || `HTTP ${res.status}`));
+            const json = await apiAdmin.updateStudentStatus(student.id, newStatus, authHeaders)
+                .catch(() => ({ ok: false, error: 'Falha na requisição' })) as Record<string, unknown>;
+            if (!json?.ok) throw new Error(String(json?.error || 'Falha ao atualizar status'));
             setUsersList((prev) =>
                 prev.map((u) => (u.id === student.id ? { ...u, status: newStatus } : u))
             );
@@ -190,18 +183,12 @@ export function useAdminActions({
             'Excluir Aluno'
         ))) return;
         try {
-            // Get access token for the minimal auth-user deletion route
             const { data: sessionData } = await supabase.auth.getSession();
             const token = sessionData?.session?.access_token || '';
             const authHeaders = await getAdminAuthHeaders();
-
-            const res = await fetch('/api/admin/students/delete', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', ...authHeaders },
-                body: JSON.stringify({ id: studentId, token }),
-            });
-            const json = await res.json().catch(() => ({})) as Record<string, unknown>;
-            if (!res.ok || !json?.ok) throw new Error(String(json?.error || `HTTP ${res.status}`));
+            const json = await apiAdmin.deleteStudent(studentId, token, authHeaders)
+                .catch(() => ({ ok: false, error: 'Falha na requisição' })) as Record<string, unknown>;
+            if (!json?.ok) throw new Error(String(json?.error || 'Falha ao excluir aluno'));
             setUsersList((prev) => prev.filter((u) => u.id !== studentId && u.user_id !== studentId));
             await alert('Aluno excluído com sucesso!', 'Concluído');
             onSuccess?.();
@@ -355,18 +342,11 @@ export function useAdminActions({
                 try { await supabase.from('profiles').update({ role: 'user' }).eq('id', tUserId).eq('role', 'teacher'); } catch { }
             }
 
-            // Delete from auth.users via minimal route
             if (tUserId) {
                 try {
                     const { data: sessionData } = await supabase.auth.getSession();
                     const token = sessionData?.session?.access_token || '';
-                    if (token) {
-                        await fetch('/api/admin/delete-auth-user', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ user_id: tUserId, token }),
-                        });
-                    }
+                    if (token) await apiAdmin.deleteAuthUserWithToken(tUserId, token).catch(() => null);
                 } catch { }
             }
 
@@ -375,13 +355,7 @@ export function useAdminActions({
                 try {
                     const { data: sessionData } = await supabase.auth.getSession();
                     const token = sessionData?.session?.access_token || '';
-                    if (token) {
-                        await fetch('/api/admin/delete-auth-user', {
-                            method: 'POST',
-                            headers: { 'Content-Type': 'application/json' },
-                            body: JSON.stringify({ user_id: suid, token }),
-                        });
-                    }
+                    if (token) await apiAdmin.deleteAuthUserWithToken(suid, token).catch(() => null);
                 } catch { }
             }
 

@@ -6,6 +6,7 @@ import { Chart as ChartJS, CategoryScale, LinearScale, BarElement, Title, Toolti
 import { CalendarDays, Crown, RefreshCw, Sparkles, TrendingUp } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 import { getErrorMessage, getFriendlyApiError } from '@/utils/errorMessage'
+import { apiVip } from '@/lib/api'
 
 ChartJS.register(CategoryScale, LinearScale, BarElement, Title, Tooltip, Legend)
 
@@ -112,12 +113,12 @@ export default function VipPeriodizationPanel({
     setLoading(true)
     setError('')
     try {
-      const res = await fetch('/api/vip/periodization/active', { method: 'GET', credentials: 'include', cache: 'no-store' })
-      const json = (await res.json().catch((): null => null)) as ActiveProgramResponse | null
+      const json = await apiVip.getPeriodizationActive().catch(() => null) as ActiveProgramResponse | null
       if (!json?.ok) {
         setProgram(null)
         setSchedule([])
-        if (json && 'error' in json && typeof json.error === 'string') setError(getFriendlyApiError(json.error, 'Falha ao carregar periodização.'))
+        if (json && 'error' in json && typeof (json as Record<string, unknown>).error === 'string')
+          setError(getFriendlyApiError((json as Record<string, unknown>).error as string, 'Falha ao carregar periodização.'))
         return
       }
       setProgram(json.program || null)
@@ -132,10 +133,9 @@ export default function VipPeriodizationPanel({
   const loadStats = useCallback(async () => {
     if (isLocked) return
     try {
-      const res = await fetch('/api/vip/periodization/stats', { method: 'GET', credentials: 'include', cache: 'no-store' })
-      const json = (await res.json().catch((): null => null)) as StatsResponse | null
+      const json = await apiVip.getPeriodizationStats().catch(() => null) as StatsResponse | null
       if (!json?.ok) return
-      setStats(Array.isArray(json.weekly) ? json.weekly : [])
+      setStats(Array.isArray((json as unknown as { weekly?: WeeklyStat[] }).weekly) ? (json as unknown as { weekly: WeeklyStat[] }).weekly : [])
     } catch { }
   }, [isLocked])
 
@@ -173,15 +173,14 @@ export default function VipPeriodizationPanel({
         limitations: safeString(form.limitations),
         startDate: startDateIso,
       }
-      const res = await fetch('/api/vip/periodization/create', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        credentials: 'include',
-        body: JSON.stringify(payload),
-      })
-      const json = await res.json().catch((): null => null)
+      const json = await apiVip.createPeriodization({
+        goal: payload.goal,
+        weeks: payload.weeks,
+        daysPerWeek: payload.daysPerWeek,
+        focusAreas: Array.isArray(payload.equipment) ? payload.equipment : [],
+      }).catch(() => null)
       if (!json?.ok) {
-        setError(friendlyCreateError(json?.error))
+        setError(friendlyCreateError((json as Record<string, unknown> | null)?.error))
         return
       }
       await loadActive()
@@ -202,13 +201,12 @@ export default function VipPeriodizationPanel({
     setError('')
     setSuccess('')
     try {
-      const res = await fetch('/api/vip/periodization/cleanup', { method: 'POST', credentials: 'include', cache: 'no-store' })
-      const json = await res.json().catch((): null => null)
+      const json = await apiVip.cleanupPeriodization().catch(() => null)
       if (!json?.ok) {
-        setError(friendlyCreateError(json?.error))
+        setError(friendlyCreateError((json as Record<string, unknown> | null)?.error))
         return
       }
-      const n = Number(json?.archived || 0)
+      const n = Number((json as Record<string, unknown> | null)?.archived ?? 0)
       setSuccess(n > 0 ? `Treinos antigos arquivados: ${n}.` : 'Nenhum treino antigo para arquivar.')
     } catch (e: unknown) {
       setError(getErrorMessage(e) ? String(getErrorMessage(e)) : 'Falha ao limpar treinos antigos.')

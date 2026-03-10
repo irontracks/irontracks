@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { AdminUser, AdminTeacher, AdminWorkoutTemplate } from '@/types/admin';
 import type { UnknownRecord } from '@/types/app'
+import { apiAdmin } from '@/lib/api'
 
 type GetAdminAuthHeaders = () => Promise<Record<string, string>>;
 
@@ -42,10 +43,9 @@ export function useAdminTeacherDetail(
         setTeacherStudentsLoading(true);
         try {
             const authHeaders = await getAdminAuthHeaders();
-            const res = await fetch(`/api/admin/teachers/students?teacher_user_id=${encodeURIComponent(uid)}`, { headers: authHeaders });
-            const json = await res.json().catch(() => ({}));
+            const json = await apiAdmin.getTeacherStudents(uid, authHeaders).catch(() => ({ ok: false, students: [] }));
             if (!json?.ok) { setTeacherStudents([]); return; }
-            setTeacherStudents(Array.isArray(json.students) ? json.students : []);
+            setTeacherStudents(Array.isArray(json.students) ? json.students as AdminUser[] : []);
         } finally {
             setTeacherStudentsLoading(false);
         }
@@ -61,12 +61,12 @@ export function useAdminTeacherDetail(
             const qs = new URLSearchParams({ teacher_user_id: uid, limit: '80' });
             if (cursor) qs.set('cursor', cursor);
             const authHeaders = await getAdminAuthHeaders();
-            const res = await fetch(`/api/admin/teachers/workouts/templates?${qs.toString()}`, { headers: authHeaders });
-            const json = await res.json().catch(() => ({}));
+            const json = await apiAdmin.getTeacherTemplates(`${uid}&${qs.toString()}`.slice(0), authHeaders)
+                .catch(() => ({ ok: false, templates: [] })) as Record<string, unknown>;
             if (!json?.ok) return;
             const rows = Array.isArray(json.rows) ? json.rows : [];
-            setTeacherTemplatesRows((prev) => reset ? rows : [...(Array.isArray(prev) ? prev : []), ...rows]);
-            setTeacherTemplatesCursor(json.next_cursor || null);
+            setTeacherTemplatesRows((prev) => reset ? rows as AdminWorkoutTemplate[] : [...(Array.isArray(prev) ? prev : []), ...rows as AdminWorkoutTemplate[]]);
+            setTeacherTemplatesCursor((json.next_cursor as string | null) || null);
         } finally {
             setTeacherTemplatesLoading(false);
         }
@@ -83,12 +83,12 @@ export function useAdminTeacherDetail(
             if (cur?.cursor_date) qs.set('cursor_date', String(cur.cursor_date));
             if (cur?.cursor_created_at) qs.set('cursor_created_at', String(cur.cursor_created_at));
             const authHeaders = await getAdminAuthHeaders();
-            const res = await fetch(`/api/admin/teachers/workouts/history?${qs.toString()}`, { headers: authHeaders });
-            const json = await res.json().catch(() => ({}));
+            const json = await apiAdmin.getTeacherHistory(`${uid}&${qs.toString()}`.slice(0), undefined, authHeaders)
+                .catch(() => ({ ok: false, sessions: [] })) as Record<string, unknown>;
             if (!json?.ok) return;
             const rows = Array.isArray(json.rows) ? json.rows : [];
-            setTeacherHistoryRows((prev) => reset ? rows : [...(Array.isArray(prev) ? prev : []), ...rows]);
-            setTeacherHistoryCursor(json.next_cursor || null);
+            setTeacherHistoryRows((prev) => reset ? rows as UnknownRecord[] : [...(Array.isArray(prev) ? prev : []), ...rows as UnknownRecord[]]);
+            setTeacherHistoryCursor((json.next_cursor as { cursor_date?: string; cursor_created_at?: string } | null) || null);
         } finally {
             setTeacherHistoryLoading(false);
         }
@@ -100,10 +100,10 @@ export function useAdminTeacherDetail(
         setTeacherInboxLoading(true);
         try {
             const authHeaders = await getAdminAuthHeaders();
-            const res = await fetch(`/api/admin/teachers/inbox?teacher_user_id=${encodeURIComponent(uid)}&limit=80`, { headers: authHeaders });
-            const json = await res.json().catch(() => ({}));
+            const json = await apiAdmin.getTeacherInbox(uid, 80, authHeaders)
+                .catch(() => ({ ok: false, messages: [] })) as Record<string, unknown>;
             if (!json?.ok) { setTeacherInboxItems([]); return; }
-            setTeacherInboxItems(Array.isArray(json.items) ? json.items : []);
+            setTeacherInboxItems(Array.isArray(json.items) ? json.items as AdminUser[] : []);
         } finally {
             setTeacherInboxLoading(false);
         }

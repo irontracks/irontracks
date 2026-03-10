@@ -14,7 +14,7 @@
     "strictFunctionTypes": true,
     "noUnusedLocals": false,
     "noUnusedParameters": false,
-    "useUnknownInCatchVariables": false,
+    "useUnknownInCatchVariables": true,
     "forceConsistentCasingInFileNames": true,
     "noEmit": true,
     "esModuleInterop": true,

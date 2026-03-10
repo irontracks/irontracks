@@ -2,7 +2,8 @@ import { useCallback, useEffect, useRef } from 'react';
 import { useState } from 'react';
 import type { AdminUser } from '@/types/admin';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { UnknownRecord } from '@/types/app'
+import type { UnknownRecord } from '@/types/app';
+import { apiAdmin } from '@/lib/api';
 
 type GetAdminAuthHeaders = () => Promise<Record<string, string>>;
 
@@ -59,14 +60,13 @@ export function useAdminUserActivity({
             if (rr && rr !== 'all') qs.set('role', rr);
             qs.set('limit', '200');
             const authHeaders = await getAdminAuthHeaders();
-            const res = await fetch(`/api/admin/user-activity/users?${qs.toString()}`, { headers: authHeaders });
-            const json = await res.json().catch((): null => null);
-            if (!res.ok || !json?.ok) {
+            const json = await apiAdmin.getUserActivityUsers(qs.toString(), authHeaders).catch((): null => null);
+            if (!json?.ok) {
                 setUserActivityUsers([]);
-                setUserActivityError(String(json?.error || `Falha ao carregar usuários (${res.status})`));
+                setUserActivityError(String((json as Record<string, unknown>)?.error || 'Falha ao carregar usuários'));
                 return;
             }
-            setUserActivityUsers(Array.isArray(json?.users) ? json.users : []);
+            setUserActivityUsers(Array.isArray((json as Record<string, unknown>)?.users) ? ((json as Record<string, unknown>).users as AdminUser[]) : []);
         } catch (e: unknown) {
             setUserActivityUsers([]);
             setUserActivityError(getErrorMsg(e));
@@ -84,10 +84,9 @@ export function useAdminUserActivity({
         try {
             const qs = new URLSearchParams({ user_id: uid, days: String(d) });
             const authHeaders = await getAdminAuthHeaders();
-            const res = await fetch(`/api/admin/user-activity/summary?${qs.toString()}`, { headers: authHeaders });
-            const json = await res.json().catch((): null => null);
-            if (!res.ok || !json?.ok) { setUserActivitySummary(null); return; }
-            setUserActivitySummary(json);
+            const json = await apiAdmin.getActivitySummary(qs.toString(), authHeaders).catch((): null => null);
+            if (!json?.ok) { setUserActivitySummary(null); return; }
+            setUserActivitySummary(json as UnknownRecord);
         } catch {
             setUserActivitySummary(null);
         } finally {
@@ -104,11 +103,10 @@ export function useAdminUserActivity({
             const qs = new URLSearchParams({ user_id: uid, limit: '80' });
             if (before) qs.set('before', String(before));
             const authHeaders = await getAdminAuthHeaders();
-            const res = await fetch(`/api/admin/user-activity/events?${qs.toString()}`, { headers: authHeaders });
-            const json = await res.json().catch((): null => null);
-            if (!res.ok || !json?.ok) { if (reset) setUserActivityEvents([]); return; }
-            const list = Array.isArray(json?.events) ? json.events : [];
-            setUserActivityEventsBefore(json?.nextBefore ?? null);
+            const json = await apiAdmin.getActivityEvents(qs.toString(), authHeaders).catch((): null => null);
+            if (!json?.ok) { if (reset) setUserActivityEvents([]); return; }
+            const list = Array.isArray((json as Record<string, unknown>)?.events) ? ((json as Record<string, unknown>).events as UnknownRecord[]) : [];
+            setUserActivityEventsBefore((json as Record<string, unknown>)?.nextBefore as string ?? null);
             setUserActivityEvents((prev) => (reset ? list : [...prev, ...list]));
         } catch {
             if (reset) setUserActivityEvents([]);

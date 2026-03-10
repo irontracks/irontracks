@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ShieldAlert, Download, Upload, Trash2, MessageSquare, Database, RefreshCw, ChevronDown, FileText } from 'lucide-react';
 import { useAdminPanel } from './AdminPanelContext';
+import { apiAdmin } from '@/lib/api';
 
 export const SystemTab: React.FC = () => {
     const {
@@ -72,10 +73,9 @@ export const SystemTab: React.FC = () => {
         setGrantHistoryError('');
         try {
             const authHeaders = await getAdminAuthHeaders();
-            const res = await fetch('/api/admin/vip/grant-history?limit=80', { headers: { ...(authHeaders || {}) } });
-            const json = await res.json().catch(() => null) as Record<string, unknown> | null;
-            if (!res.ok || !json?.ok) {
-                setGrantHistoryError(String(json?.error || `Falha ao carregar histórico (${res.status})`));
+            const json = await apiAdmin.getVipGrantHistory(80, authHeaders).catch((): null => null) as Record<string, unknown> | null;
+            if (!json?.ok) {
+                setGrantHistoryError(String(json?.error || 'Falha ao carregar histórico'));
                 setGrantHistory([]);
                 return;
             }
@@ -130,14 +130,12 @@ export const SystemTab: React.FC = () => {
         setGrantResults([]);
         try {
             const authHeaders = await getAdminAuthHeaders();
-            const res = await fetch('/api/admin/vip/grant-trial', {
-                method: 'POST',
-                headers: { 'content-type': 'application/json', ...(authHeaders || {}) },
-                body: JSON.stringify({ grants: grantList.map((g) => ({ email: g.email || undefined, user_id: g.user_id || undefined, plan_id: g.plan_id, days: g.days })) }),
-            });
-            const json = await res.json().catch(() => null) as Record<string, unknown> | null;
-            if (!res.ok || !json?.ok) {
-                setGrantError(String(json?.error || `Falha ao doar degustações (${res.status})`));
+            const json = await apiAdmin.grantVipTrials(
+                grantList.map((g) => ({ email: g.email || '', plan_id: g.plan_id, days: g.days })),
+                authHeaders
+            ).catch((): null => null) as Record<string, unknown> | null;
+            if (!json?.ok) {
+                setGrantError(String(json?.error || 'Falha ao doar degustações'));
                 return;
             }
             const results = Array.isArray(json?.results) ? (json?.results as Record<string, unknown>[]) : [];
@@ -169,10 +167,9 @@ export const SystemTab: React.FC = () => {
             const qs = new URLSearchParams();
             if (targetId) qs.set('id', targetId);
             if (!targetId && targetEmail) qs.set('email', targetEmail);
-            const res = await fetch(`/api/admin/vip/entitlement?${qs.toString()}`, { headers: { ...(authHeaders || {}) } });
-            const json = await res.json().catch(() => null) as Record<string, unknown> | null;
-            if (!res.ok || !json?.ok) {
-                setVipCheckError(String(json?.error || `Falha ao checar VIP (${res.status})`));
+            const json = await apiAdmin.getVipEntitlement(qs.toString(), authHeaders).catch((): null => null) as Record<string, unknown> | null;
+            if (!json?.ok) {
+                setVipCheckError(String(json?.error || 'Falha ao checar VIP'));
                 return;
             }
             const entitlement = json?.entitlement && typeof json.entitlement === 'object' ? (json.entitlement as Record<string, unknown>) : null;

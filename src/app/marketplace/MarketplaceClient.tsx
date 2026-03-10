@@ -8,6 +8,7 @@ import { ArrowLeft, Check, Copy, CreditCard, ExternalLink, QrCode, X, Zap, Crown
 import { Purchases, CustomerInfo, PurchasesOfferings, PurchasesPackage } from '@revenuecat/purchases-capacitor'
 import { isIosNative as getIsIosNative } from '@/utils/platform'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { apiBilling } from '@/lib/api'
 
 type AppPlan = {
   id: string
@@ -250,9 +251,8 @@ export default function MarketplaceClient() {
   const loadPlans = useCallback(async () => {
     setLoadingPlans(true)
     try {
-      const res = await fetch('/api/app/plans', { cache: 'no-store' })
-      const json = await res.json().catch(() => ({}))
-      const rows = Array.isArray(json?.plans) ? (json.plans as AppPlan[]) : []
+      const json = await apiBilling.getPlans().catch(() => ({ ok: false, plans: [] }))
+      const rows = Array.isArray((json as { plans?: unknown[] })?.plans) ? ((json as { plans: AppPlan[] }).plans) : []
       setPlans(rows)
     } catch {
       setPlans([])
@@ -326,11 +326,8 @@ export default function MarketplaceClient() {
 
   const syncIapToBackend = useCallback(async () => {
     try {
-      const res = await fetch('/api/billing/revenuecat/sync', { method: 'POST' })
-      const json = await res.json().catch(() => ({}))
-      if (!json?.ok) {
-        throw new Error(String(json?.error || 'Falha ao validar assinatura.'))
-      }
+      const json = await apiBilling.syncRevenueCat().catch((e: unknown) => { throw e })
+      if (!json?.ok) throw new Error(String((json as { error?: string })?.error || 'Falha ao validar assinatura.'))
       return true
     } catch (e: unknown) {
       setIapError(getErrorMessage(e) ? String(getErrorMessage(e)) : 'Falha ao validar assinatura.')
@@ -393,18 +390,13 @@ export default function MarketplaceClient() {
     setCheckingOut(true)
     setCheckoutResult(null)
     try {
-      const res = await fetch('/api/app/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          planId: selectedPlan.id,
-          billingType: 'PIX',
-          cpfCnpj,
-          mobilePhone,
-          name: payerName,
-        }),
-      })
-      const json = (await res.json().catch(() => ({}))) as CheckoutResponse
+      const json = await apiBilling.createCheckout({
+        planId: selectedPlan.id,
+        billingType: 'PIX',
+        cpfCnpj,
+        mobilePhone,
+        name: payerName,
+      }).catch((e: unknown) => { throw e }) as CheckoutResponse
       setCheckoutResult(json)
     } catch (e: unknown) {
       setCheckoutResult({ ok: false, error: getErrorMessage(e) || String(e) })
@@ -419,21 +411,10 @@ export default function MarketplaceClient() {
     setCardRedirecting(true)
     setCheckoutResult(null)
     try {
-      const res = await fetch('/api/billing/mercadopago/subscribe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ planId: selectedPlan.id }),
-      })
-      const json = await res.json().catch(() => ({}))
+      const json = await apiBilling.mercadoPagoSubscribe({ planId: selectedPlan.id }).catch((e: unknown) => { throw e }) as { ok: boolean; redirect_url?: string; error?: string }
       const redirectUrl = String(json?.redirect_url || '').trim()
-      if (!json?.ok) {
-        setCheckoutResult({ ok: false, error: String(json?.error || 'Falha ao iniciar checkout com cartão.') })
-        return
-      }
-      if (!redirectUrl) {
-        setCheckoutResult({ ok: false, error: 'Checkout do cartão sem URL de redirecionamento.' })
-        return
-      }
+      if (!json?.ok) { setCheckoutResult({ ok: false, error: String(json?.error || 'Falha ao iniciar checkout com cartão.') }); return }
+      if (!redirectUrl) { setCheckoutResult({ ok: false, error: 'Checkout do cartão sem URL de redirecionamento.' }); return }
       window.location.href = redirectUrl
     } catch (e: unknown) {
       setCheckoutResult({ ok: false, error: getErrorMessage(e) || String(e) })
@@ -445,16 +426,8 @@ export default function MarketplaceClient() {
   const cancelPendingAttempt = useCallback(async () => {
     if (!selectedPlan) return
     try {
-      const res = await fetch('/api/app/subscriptions/cancel-pending', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ planId: selectedPlan.id }),
-      })
-      const json = await res.json().catch(() => ({}))
-      if (!json?.ok) {
-        setCheckoutResult({ ok: false, error: String(json?.error || 'Falha ao cancelar tentativa.') })
-        return
-      }
+      const json = await apiBilling.cancelPendingSubscription({ planId: selectedPlan.id }).catch((e: unknown) => { throw e }) as { ok: boolean; error?: string }
+      if (!json?.ok) { setCheckoutResult({ ok: false, error: String(json?.error || 'Falha ao cancelar tentativa.') }); return }
       setCheckoutResult(null)
       window.alert('Tentativa cancelada. Você pode tentar novamente.')
     } catch (e: unknown) {

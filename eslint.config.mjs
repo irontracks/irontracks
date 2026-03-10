@@ -24,6 +24,18 @@ const eslintConfig = defineConfig([
     },
     rules: {
       "@typescript-eslint/no-explicit-any": "error",
+      // Dead code detection: warn (same intent as noUnusedLocals:true but non-blocking)
+      // Variables/args prefixed with _ are intentionally unused (convention)
+      "@typescript-eslint/no-unused-vars": [
+        "warn",
+        {
+          "vars": "all",
+          "varsIgnorePattern": "^_",
+          "args": "after-used",
+          "argsIgnorePattern": "^_",
+          "ignoreRestSiblings": true
+        }
+      ],
       // A11y rules: critical as error, high-volume as warn (fix incrementally)
       ...Object.fromEntries(
         Object.entries(jsxA11y.configs.recommended.rules).map(([key]) => [key, "error"])

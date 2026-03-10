@@ -1,4 +1,5 @@
 import type { ActionResult } from '@/types/actions'
+import { apiAi } from '@/lib/api'
 
 // ─── AI / Progression actions ─────────────────────────────────────────────────
 
@@ -6,18 +7,12 @@ export async function generatePostWorkoutInsights(
     input: unknown,
 ): Promise<ActionResult<Record<string, unknown>>> {
     try {
-        const body = input && typeof input === 'object' ? input : {}
-        const res = await fetch('/api/ai/post-workout-insights', {
-            method: 'POST',
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify(body),
-        })
-        const json = await res.json().catch((): null => null)
-        if (!res.ok || !json?.ok) return { ok: false, error: json?.error || 'Falha ao gerar insights', upgradeRequired: json?.upgradeRequired } as ActionResult<Record<string, unknown>>
+        const body = input && typeof input === 'object' ? (input as Record<string, unknown>) : {}
+        const json = await apiAi.postWorkoutInsights(body).catch((): null => null) as Record<string, unknown> | null
+        if (!json?.ok) return { ok: false, error: (json?.error as string | undefined) || 'Falha ao gerar insights', upgradeRequired: json?.upgradeRequired } as ActionResult<Record<string, unknown>>
         return json as ActionResult<Record<string, unknown>>
     } catch (e) {
-        const message = e instanceof Error ? e.message : String(e)
-        return { ok: false, error: message }
+        return { ok: false, error: e instanceof Error ? e.message : String(e) }
     }
 }
 
@@ -25,18 +20,12 @@ export async function generateExerciseMuscleMap(
     input: unknown,
 ): Promise<ActionResult<Record<string, unknown>>> {
     try {
-        const body = input && typeof input === 'object' ? input : {}
-        const res = await fetch('/api/ai/exercise-muscle-map', {
-            method: 'POST',
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify(body),
-        })
-        const json = await res.json().catch((): null => null)
-        if (!res.ok || !json?.ok) return { ok: false, error: json?.error || 'Falha ao mapear exercícios' }
+        const body = input && typeof input === 'object' ? (input as Record<string, unknown>) : {}
+        const json = await apiAi.exerciseMuscleMap(body).catch((): null => null) as Record<string, unknown> | null
+        if (!json?.ok) return { ok: false, error: (json?.error as string | undefined) || 'Falha ao mapear exercícios' }
         return json as ActionResult<Record<string, unknown>>
     } catch (e) {
-        const message = e instanceof Error ? e.message : String(e)
-        return { ok: false, error: message }
+        return { ok: false, error: e instanceof Error ? e.message : String(e) }
     }
 }
 
@@ -44,18 +33,12 @@ export async function getMuscleMapWeek(
     input: unknown,
 ): Promise<ActionResult<Record<string, unknown>>> {
     try {
-        const body = input && typeof input === 'object' ? input : {}
-        const res = await fetch('/api/ai/muscle-map-week', {
-            method: 'POST',
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify(body),
-        })
-        const json = await res.json().catch((): null => null)
-        if (!res.ok || !json?.ok) return { ok: false, error: json?.error || 'Falha ao gerar mapa muscular' }
+        const body = input && typeof input === 'object' ? (input as Record<string, unknown>) : {}
+        const json = await apiAi.muscleMapWeek(body).catch((): null => null) as Record<string, unknown> | null
+        if (!json?.ok) return { ok: false, error: (json?.error as string | undefined) || 'Falha ao gerar mapa muscular' }
         return json as ActionResult<Record<string, unknown>>
     } catch (e) {
-        const message = e instanceof Error ? e.message : String(e)
-        return { ok: false, error: message }
+        return { ok: false, error: e instanceof Error ? e.message : String(e) }
     }
 }
 
@@ -63,18 +46,12 @@ export async function getMuscleMapDay(
     input: unknown,
 ): Promise<ActionResult<Record<string, unknown>>> {
     try {
-        const body = input && typeof input === 'object' ? input : {}
-        const res = await fetch('/api/ai/muscle-map-day', {
-            method: 'POST',
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify(body),
-        })
-        const json = await res.json().catch((): null => null)
-        if (!res.ok || !json?.ok) return { ok: false, error: json?.error || 'Falha ao gerar mapa muscular do dia' }
+        const body = input && typeof input === 'object' ? (input as Record<string, unknown>) : {}
+        const json = await apiAi.muscleMapDay(body).catch((): null => null) as Record<string, unknown> | null
+        if (!json?.ok) return { ok: false, error: (json?.error as string | undefined) || 'Falha ao gerar mapa muscular do dia' }
         return json as ActionResult<Record<string, unknown>>
     } catch (e) {
-        const message = e instanceof Error ? e.message : String(e)
-        return { ok: false, error: message }
+        return { ok: false, error: e instanceof Error ? e.message : String(e) }
     }
 }
 
@@ -82,18 +59,12 @@ export async function backfillExerciseMuscleMaps(
     input: unknown,
 ): Promise<ActionResult<Record<string, unknown>>> {
     try {
-        const body = input && typeof input === 'object' ? input : {}
-        const res = await fetch('/api/ai/exercise-muscle-map-backfill', {
-            method: 'POST',
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify(body),
-        })
-        const json = await res.json().catch((): null => null)
-        if (!res.ok || !json?.ok) return { ok: false, error: json?.error || 'Falha ao reprocessar histórico' }
+        const body = input && typeof input === 'object' ? (input as Record<string, unknown>) : {}
+        const json = await apiAi.exerciseMuscleMapBackfill(body).catch((): null => null) as Record<string, unknown> | null
+        if (!json?.ok) return { ok: false, error: (json?.error as string | undefined) || 'Falha ao reprocessar histórico' }
         return json as ActionResult<Record<string, unknown>>
     } catch (e) {
-        const message = e instanceof Error ? e.message : String(e)
-        return { ok: false, error: message }
+        return { ok: false, error: e instanceof Error ? e.message : String(e) }
     }
 }
 
@@ -101,18 +72,12 @@ export async function applyProgressionToNextTemplate(
     input: unknown,
 ): Promise<ActionResult<Record<string, unknown>>> {
     try {
-        const body = input && typeof input === 'object' ? input : {}
-        const res = await fetch('/api/ai/apply-progression-next', {
-            method: 'POST',
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify(body),
-        })
-        const json = await res.json().catch((): null => null)
-        if (!res.ok || !json?.ok) return { ok: false, error: json?.error || 'Falha ao aplicar progressão' }
+        const body = input && typeof input === 'object' ? (input as Record<string, unknown>) : {}
+        const json = await apiAi.applyProgressionNext(body).catch((): null => null) as Record<string, unknown> | null
+        if (!json?.ok) return { ok: false, error: (json?.error as string | undefined) || 'Falha ao aplicar progressão' }
         return json as ActionResult<Record<string, unknown>>
     } catch (e) {
-        const message = e instanceof Error ? e.message : String(e)
-        return { ok: false, error: message }
+        return { ok: false, error: e instanceof Error ? e.message : String(e) }
     }
 }
 
@@ -140,16 +105,9 @@ export async function generatePeriodReportInsights(input: unknown) {
         const topFreqName = String((topByFreq?.[0] as Record<string, unknown>)?.name ?? '').trim()
 
         try {
-            const aiRes = await fetch('/api/ai/period-insights', {
-                method: 'POST',
-                headers: { 'content-type': 'application/json' },
-                body: JSON.stringify({ type, stats }),
-            })
-            if (aiRes.ok) {
-                const aiJson = await aiRes.json().catch((): null => null)
-                if (aiJson?.ok && aiJson?.ai && typeof aiJson.ai === 'object') {
-                    return { ok: true, ai: aiJson.ai }
-                }
+            const aiJson = await apiAi.periodInsights({ type, stats }).catch((): null => null) as Record<string, unknown> | null
+            if (aiJson?.ok && aiJson?.ai && typeof aiJson.ai === 'object') {
+                return { ok: true, ai: aiJson.ai }
             }
         } catch { /* silenced — fall through to deterministic */ }
 

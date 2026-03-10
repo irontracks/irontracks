@@ -7,9 +7,18 @@ describe('buildHeuristicExerciseMap', () => {
     expect(buildHeuristicExerciseMap('   ')).toBeNull()
   })
 
-  it('returns null for exercises without known heuristic', () => {
-    expect(buildHeuristicExerciseMap('Supino Reto')).toBeNull()
-    expect(buildHeuristicExerciseMap('Agachamento Livre')).toBeNull()
+  it('detects Supino Reto as chest exercise', () => {
+    const result = buildHeuristicExerciseMap('Supino Reto')
+    expect(result).not.toBeNull()
+    expect(result?.mapping.contributions[0].muscleId).toBe('chest')
+    expect(result?.source).toBe('heuristic')
+  })
+
+  it('detects Agachamento Livre as quads exercise', () => {
+    const result = buildHeuristicExerciseMap('Agachamento Livre')
+    expect(result).not.toBeNull()
+    expect(result?.mapping.contributions[0].muscleId).toBe('quads')
+    expect(result?.source).toBe('heuristic')
   })
 
   it('detects calf exercises by keyword', () => {

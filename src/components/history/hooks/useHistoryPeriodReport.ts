@@ -123,7 +123,7 @@ export function useHistoryPeriodReport({ historyItems, user, alert }: UseHistory
             try {
                 const res = await generatePeriodReportInsights({ type, stats });
                 if (!res?.ok) { setPeriodAi({ status: 'error', ai: null, error: String(res?.error || 'Falha ao gerar insights') }); return; }
-                setPeriodAi({ status: 'ready', ai: res.ai || null, error: '' });
+                setPeriodAi({ status: 'ready', ai: (res.ai as Record<string, unknown>) || null, error: '' });
             } catch (err) {
                 const msg = err instanceof Error ? err.message : String(err);
                 setPeriodAi({ status: 'error', ai: null, error: msg || 'Falha ao gerar insights' });
