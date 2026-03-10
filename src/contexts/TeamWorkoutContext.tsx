@@ -649,27 +649,8 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
                 setSharedLogs(prev => { const next = { ...prev }; delete next[fromUid]; return next })
                 setPresence(prev => { const next = { ...prev }; delete next[fromUid]; return next })
             })
-            .on('broadcast', { event: 'chat' }, (msg) => {
-                const payload = msg?.payload && typeof msg.payload === 'object' ? msg.payload as Record<string, unknown> : null
-                if (!payload) return
-                const fromUid = String(payload.userId || '').trim()
-                // Show messages from others only (own messages are added optimistically)
-                if (!fromUid || fromUid === String(user?.id || '').trim()) return
-                const msgId = String(payload.id || `${fromUid}:${Date.now()}`)
-                const newMsg: ChatMessage = {
-                    id: msgId,
-                    userId: fromUid,
-                    displayName: String(payload.displayName || 'Parceiro'),
-                    photoURL: payload.photoURL ? String(payload.photoURL) : null,
-                    text: String(payload.text || '').slice(0, 200),
-                    ts: Number(payload.ts || Date.now()),
-                }
-                // Deduplicate: skip if message ID already exists (server relay duplicate)
-                setChatMessages(prev => {
-                    if (prev.some(m => m.id === msgId)) return prev
-                    return [...prev, newMsg].slice(-MAX_CHAT_MESSAGES)
-                })
-            })
+            // Chat messages are now delivered via postgres_changes on `messages` table (see useEffect below)
+            // Broadcast is no longer used for chat — removed for reliability
             .on('broadcast', { event: 'pause' }, (msg) => {
                 const payload = msg?.payload && typeof msg.payload === 'object' ? msg.payload as Record<string, unknown> : null
                 if (!payload) return
@@ -771,13 +752,12 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
     }
 
     const sendChatMessage = useCallback((text: string) => {
-        const ch = teamBroadcastChannelRef.current
-        if (!ch || !user?.id) return
+        if (!user?.id || !teamSession?.id) return
         const trimmed = String(text || '').trim().slice(0, 200)
         if (!trimmed) return
-        const id = `${user.id}:${Date.now()}`
+        const tempId = `temp:${user.id}:${Date.now()}`
         const newMsg: ChatMessage = {
-            id,
+            id: tempId,
             userId: user.id,
             displayName: String(myDisplayNameRef.current || 'Eu'),
             photoURL: myPhotoUrlRef.current,
@@ -786,27 +766,107 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
         }
         // Optimistic add for sender
         setChatMessages(prev => [...prev, newMsg].slice(-MAX_CHAT_MESSAGES))
-        try {
-            ch.send({ type: 'broadcast', event: 'chat', payload: { ...newMsg } })
-        } catch { }
-        // Fire-and-forget: server relay broadcast + push notification
-        if (teamSession?.id) {
-            void fetch('/api/team/chat/notify', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    sessionId: teamSession.id,
-                    senderId: user.id,
-                    senderName: String(myDisplayNameRef.current || 'Parceiro'),
-                    preview: trimmed,
-                    msgId: id,
-                    msgDisplayName: String(myDisplayNameRef.current || 'Parceiro'),
-                    msgPhotoURL: myPhotoUrlRef.current,
-                    msgTs: newMsg.ts,
-                }),
-            }).catch(() => { })
-        }
+        // Send via API (persists to DB → arrives via postgres_changes + push)
+        void fetch('/api/team/chat/notify', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                sessionId: teamSession.id,
+                senderId: user.id,
+                senderName: String(myDisplayNameRef.current || 'Parceiro'),
+                text: trimmed,
+            }),
+        }).catch(() => { })
     }, [user?.id, teamSession?.id])
+
+    // ── Reliable chat: postgres_changes + polling fallback ─────────────────
+    useEffect(() => {
+        if (!teamSession?.id || !user?.id) return
+        const sessionId = teamSession.id
+        const myUid = user.id
+
+        // Helper to fetch persisted messages from DB
+        const loadPersistedMessages = async () => {
+            try {
+                const res = await fetch(`/api/team/chat/messages?sessionId=${sessionId}`)
+                const json = await res.json().catch(() => ({}))
+                if (!json.ok || !Array.isArray(json.data)) return
+                const dbMessages: ChatMessage[] = json.data.map((row: Record<string, unknown>) => ({
+                    id: String(row.id || ''),
+                    userId: String(row.user_id || ''),
+                    displayName: String((row.profiles as Record<string, unknown>)?.display_name || 'Parceiro'),
+                    photoURL: (row.profiles as Record<string, unknown>)?.photo_url ? String((row.profiles as Record<string, unknown>).photo_url) : null,
+                    text: String(row.content || ''),
+                    ts: new Date(String(row.created_at || '')).getTime() || Date.now(),
+                }))
+                setChatMessages(prev => {
+                    // Merge: keep optimistic temp messages, replace with DB versions, add new ones
+                    const merged = new Map<string, ChatMessage>()
+                    for (const m of dbMessages) merged.set(m.id, m)
+                    for (const m of prev) {
+                        if (m.id.startsWith('temp:') && !dbMessages.some(d => d.userId === m.userId && d.text === m.text)) {
+                            merged.set(m.id, m) // keep temp messages not yet in DB
+                        }
+                    }
+                    return Array.from(merged.values()).sort((a, b) => a.ts - b.ts).slice(-MAX_CHAT_MESSAGES)
+                })
+            } catch { }
+        }
+
+        // Initial load
+        loadPersistedMessages()
+
+        // Subscribe to postgres_changes for real-time delivery
+        const rtChannel = supabase
+            .channel(`team_chat_rt:${sessionId}`)
+            .on('postgres_changes',
+                { event: 'INSERT', schema: 'public', table: 'messages', filter: `channel_id=eq.${sessionId}` },
+                async (payload: Record<string, unknown>) => {
+                    const row = payload?.new && typeof payload.new === 'object' ? (payload.new as Record<string, unknown>) : null
+                    if (!row) return
+                    const senderId = String(row.user_id || '')
+                    const msgId = String(row.id || '')
+                    // Fetch sender profile for display name
+                    let displayName = 'Parceiro'
+                    let photoURL: string | null = null
+                    try {
+                        const { data: profile } = await supabase
+                            .from('profiles')
+                            .select('display_name, photo_url')
+                            .eq('id', senderId)
+                            .maybeSingle()
+                        if (profile?.display_name) displayName = String(profile.display_name)
+                        if (profile?.photo_url) photoURL = String(profile.photo_url)
+                    } catch { }
+                    const newMsg: ChatMessage = {
+                        id: msgId,
+                        userId: senderId,
+                        displayName,
+                        photoURL,
+                        text: String(row.content || ''),
+                        ts: new Date(String(row.created_at || '')).getTime() || Date.now(),
+                    }
+                    setChatMessages(prev => {
+                        // Skip if already have this message
+                        if (prev.some(m => m.id === msgId)) return prev
+                        // Remove matching temp message from same sender with same text
+                        const filtered = senderId === myUid
+                            ? prev.filter(m => !(m.id.startsWith('temp:') && m.userId === senderId && m.text === newMsg.text))
+                            : prev
+                        return [...filtered, newMsg].slice(-MAX_CHAT_MESSAGES)
+                    })
+                }
+            )
+            .subscribe()
+
+        // Polling fallback every 5s (catches anything postgres_changes missed)
+        const poll = setInterval(loadPersistedMessages, 5000)
+
+        return () => {
+            supabase.removeChannel(rtChannel)
+            clearInterval(poll)
+        }
+    }, [teamSession?.id, user?.id, supabase])
 
     const pauseSession = useCallback(() => {
         const ch = teamBroadcastChannelRef.current
