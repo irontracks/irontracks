@@ -23,6 +23,7 @@ import { createClient } from '@/utils/supabase/client';
 import { useDialog } from '@/contexts/DialogContext';
 import { compressImage, generateImageThumbnail } from '@/utils/chat/media';
 import { getErrorMessage } from '@/utils/errorMessage'
+import { apiChat, apiStorage } from '@/lib/api'
 import { logError, logWarn, logInfo } from '@/lib/logger'
 import { parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
@@ -106,10 +107,9 @@ const ChatScreen = ({ user, onClose }: ChatScreenProps) => {
     const [sendingInviteTo, setSendingInviteTo] = useState<{ uid: string; displayName: string } | null>(null);
 
     const fetchGlobalId = useCallback(async () => {
-        const res = await fetch('/api/chat/global-id')
-        const j = await res.json()
-        if (!j.ok) throw new Error(j.error)
-        return j.id
+        const j = await apiChat.getGlobalChannelId()
+        if (!j.ok) throw new Error(j.channel_id ? '' : 'Failed to get channel')
+        return j.channel_id
     }, [])
 
     const loadData = useCallback(async () => {
@@ -127,7 +127,7 @@ const ChatScreen = ({ user, onClose }: ChatScreenProps) => {
 
     const ensureBucket = useCallback(async () => {
         try {
-            await fetch('/api/storage/ensure-bucket', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name: 'chat-media' }) })
+            await apiStorage.ensureBucket('chat-media')
         } catch {}
     }, [])
 
@@ -292,11 +292,7 @@ const ChatScreen = ({ user, onClose }: ChatScreenProps) => {
         const text = newMessage;
         setNewMessage('');
         
-        await fetch('/api/chat/send', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ channel_id: activeChannel.id, content: text })
-        })
+        await apiChat.sendMessage({ channel_id: activeChannel.id, content: text })
     };
 
     const handleDeleteMessage = async (msg: FormattedMessage) => {
@@ -305,13 +301,8 @@ const ChatScreen = ({ user, onClose }: ChatScreenProps) => {
         const ok = await confirmRef.current('Tem certeza que deseja deletar esta mensagem?\nEssa ação é irreversível.', 'Deletar mensagem', { confirmText: 'Deletar', cancelText: 'Cancelar' });
         if (!ok) return;
         try {
-            const res = await fetch('/api/chat/delete', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ messageId: id, scope: 'channel' })
-            });
-            const json = await res.json().catch(() => ({}));
-            if (!res.ok || !json?.ok) throw new Error(json?.error || 'Erro ao deletar mensagem.');
+            const json = await apiChat.deleteMessage(id).catch(() => ({ ok: false })) as Record<string, unknown>;
+            if (!json?.ok) throw new Error((json?.error as string | undefined) || 'Erro ao deletar mensagem.');
             setMessages((prev) => prev.filter((m) => String(m?.id || '') !== id));
         } catch (e) {
             const msg = (e as Record<string, unknown>)?.message
@@ -335,24 +326,24 @@ const ChatScreen = ({ user, onClose }: ChatScreenProps) => {
                 if (isImage) {
                     const compressed = (await compressImage(file, { maxWidth: 1280, quality: 0.8 })) as Blob
                     const thumb = (await generateImageThumbnail(file, { thumbWidth: 360 })) as Blob
-                    const signMain = await fetch('/api/storage/signed-upload', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: `${pathBase}.jpg` }) }).then(r => r.json())
-                    if (!signMain.ok) throw new Error(signMain.error || 'Falha ao assinar upload')
-                    await supabase.storage.from('chat-media').uploadToSignedUrl(signMain.path, signMain.token, compressed)
-                    const signThumb = await fetch('/api/storage/signed-upload', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: `${pathBase}_thumb.jpg` }) }).then(r => r.json())
-                    if (!signThumb.ok) throw new Error(signThumb.error || 'Falha ao assinar thumbnail')
-                    await supabase.storage.from('chat-media').uploadToSignedUrl(signThumb.path, signThumb.token, thumb)
-                    const { data: pub } = await supabase.storage.from('chat-media').getPublicUrl(signMain.path)
-                    const { data: pubThumb } = await supabase.storage.from('chat-media').getPublicUrl(signThumb.path)
+                    const signMain = await apiStorage.getSignedUpload(`${pathBase}.jpg`)
+                    if (!signMain.ok) throw new Error(signMain.url ? '' : 'Falha ao assinar upload')
+                    await supabase.storage.from('chat-media').uploadToSignedUrl((signMain as Record<string, unknown>).path as string, (signMain as Record<string, unknown>).token as string, compressed)
+                    const signThumb = await apiStorage.getSignedUpload(`${pathBase}_thumb.jpg`)
+                    if (!signThumb.ok) throw new Error(signThumb.url ? '' : 'Falha ao assinar thumbnail')
+                    await supabase.storage.from('chat-media').uploadToSignedUrl((signThumb as Record<string, unknown>).path as string, (signThumb as Record<string, unknown>).token as string, thumb)
+                    const { data: pub } = await supabase.storage.from('chat-media').getPublicUrl((signMain as Record<string, unknown>).path as string)
+                    const { data: pubThumb } = await supabase.storage.from('chat-media').getPublicUrl((signThumb as Record<string, unknown>).path as string)
                     const payload = { type: 'image', media_url: pub.publicUrl, thumb_url: pubThumb.publicUrl }
-                    await fetch('/api/chat/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ channel_id: activeChannel.id, content: JSON.stringify(payload) }) })
+                    await apiChat.sendMessage({ channel_id: activeChannel.id, content: JSON.stringify(payload) })
                 } else if (isVideo) {
                     if (file.size > 200 * 1024 * 1024) { await alertRef.current('Vídeo acima de 200MB. Comprima antes.'); continue }
-                    const signVid = await fetch('/api/storage/signed-upload', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: `${pathBase}` }) }).then(r => r.json())
-                    if (!signVid.ok) throw new Error(signVid.error || 'Falha ao assinar upload')
-                    await supabase.storage.from('chat-media').uploadToSignedUrl(signVid.path, signVid.token, file)
-                    const { data: pub } = await supabase.storage.from('chat-media').getPublicUrl(signVid.path)
+                    const signVid = await apiStorage.getSignedUpload(`${pathBase}`)
+                    if (!signVid.ok) throw new Error(signVid.url ? '' : 'Falha ao assinar upload')
+                    await supabase.storage.from('chat-media').uploadToSignedUrl((signVid as Record<string, unknown>).path as string, (signVid as Record<string, unknown>).token as string, file)
+                    const { data: pub } = await supabase.storage.from('chat-media').getPublicUrl((signVid as Record<string, unknown>).path as string)
                     const payload = { type: 'video', media_url: pub.publicUrl }
-                    await fetch('/api/chat/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ channel_id: activeChannel.id, content: JSON.stringify(payload) }) })
+                    await apiChat.sendMessage({ channel_id: activeChannel.id, content: JSON.stringify(payload) })
                 }
             }
         } catch (err) {
@@ -369,7 +360,7 @@ const ChatScreen = ({ user, onClose }: ChatScreenProps) => {
         const url = await promptRef.current('Cole a URL do GIF (GIPHY/Tenor):', 'GIF')
         if (!url || !activeChannel) return
         const payload = { type: 'gif', media_url: url }
-        await fetch('/api/chat/send', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ channel_id: activeChannel.id, content: JSON.stringify(payload) }) })
+        await apiChat.sendMessage({ channel_id: activeChannel.id, content: JSON.stringify(payload) })
     }
 
     const handleUserClick = async (targetUser: Record<string, unknown>) => {

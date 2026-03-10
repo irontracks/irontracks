@@ -9,6 +9,7 @@ import { workoutTitleKey, normalizeWorkoutTitle } from '@/utils/workoutTitle'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { z } from 'zod'
 import { parseJsonWithSchema } from '@/utils/zod'
+import { apiAdmin, apiWorkouts } from '@/lib/api'
 
 interface AdminDataFetchersDeps {
     user: AdminUser
@@ -229,9 +230,8 @@ export function useAdminDataFetchers(deps: AdminDataFetchersDeps) {
                 const authHeaders = await getAdminAuthHeaders();
                 let json = null;
                 try {
-                    const res = await fetch('/api/admin/teachers/list', { headers: authHeaders });
-                    const raw = await res.text();
-                    json = raw ? parseJsonWithSchema(raw, z.record(z.unknown())) : null;
+                    const raw = await apiAdmin.listTeachers(authHeaders);
+                    json = raw as Record<string, unknown>;
                 } catch { }
                 if (json?.ok) {
                     const list = Array.isArray((json as Record<string, unknown>)?.teachers)
@@ -300,8 +300,7 @@ export function useAdminDataFetchers(deps: AdminDataFetchersDeps) {
                 if (isAdmin || isTeacher) {
                     try {
                         const authHeaders = await getAdminAuthHeaders();
-                        const res = await fetch('/api/admin/workouts/mine', { headers: authHeaders });
-                        const json = await res.json();
+                        const json = await apiAdmin.getAdminWorkouts(authHeaders);
                         if (json.ok) {
                             list = (json.rows || []).filter((w: UnknownRecord) => w?.is_template === true && w?.user_id === currentUser.id);
                         }
@@ -329,10 +328,9 @@ export function useAdminDataFetchers(deps: AdminDataFetchersDeps) {
                     } catch (e) { logError('error', "Supabase fetch error", e); }
                 }
                 try {
-                    const resLegacy = await fetch('/api/workouts/list');
-                    const jsonLegacy = await resLegacy.json();
+                    const jsonLegacy = await apiWorkouts.list().catch(() => ({ ok: false, rows: [] })) as Record<string, unknown>;
                     if (jsonLegacy.ok) {
-                        const legacy = (jsonLegacy.rows || []).map((w: UnknownRecord) => ({ id: w.id || w.uuid, name: w.name, exercises: [] as WorkoutExercise[] }));
+                        const legacy = ((jsonLegacy.rows as UnknownRecord[] | undefined) || []).map((w: UnknownRecord) => ({ id: w.id || w.uuid, name: w.name, exercises: [] as WorkoutExercise[] }));
                         list = [...list, ...legacy];
                     }
                 } catch { }
@@ -530,30 +528,25 @@ export function useAdminDataFetchers(deps: AdminDataFetchersDeps) {
                 const key = String(selectedStudent?.id || selectedStudent?.email || targetUserId || '');
                 if (key && !loadedStudentInfo.current[key]) {
                     const authHeaders = await getAdminAuthHeaders();
-                    let js = null;
                     try {
-                        const resp = await fetch('/api/admin/students/list', { headers: authHeaders });
-                        const raw = await resp.text();
-                        js = raw ? parseJsonWithSchema(raw, z.record(z.unknown())) : null;
-                    } catch { }
-                    if (js?.ok) {
-                        const studentsList = Array.isArray((js as Record<string, unknown>)?.students)
-                            ? ((js as Record<string, unknown>).students as UnknownRecord[])
-                            : [];
-                        const row = studentsList.find((s: UnknownRecord) => (s.id === selectedStudent.id) || (s.user_id && s.user_id === (selectedStudent.user_id || targetUserId)) || (String(s.email || '').toLowerCase() === String(selectedStudent.email || '').toLowerCase()));
-                        if (row) {
-                            const nextTeacher = row.teacher_id ? String(row.teacher_id) : null;
-                            const nextUserId = row.user_id ? String(row.user_id) : '';
-                            const shouldUpdate = (nextTeacher !== selectedStudent.teacher_id) || (nextUserId !== String(selectedStudent.user_id || ''));
-                            if (shouldUpdate) {
-                                const currentStudent = selectedStudent;
-                                if (currentStudent && (!expectedStudentId || String(currentStudent.id) === String(expectedStudentId))) {
-                                    setSelectedStudent({ ...currentStudent, teacher_id: nextTeacher, user_id: nextUserId || null });
+                        const js = await apiAdmin.listStudents(authHeaders);
+                        const jsStudents = js.students as unknown as UnknownRecord[];
+                        if (js.ok && Array.isArray(jsStudents)) {
+                            const row = jsStudents.find((s: UnknownRecord) => (s.id === selectedStudent.id) || (s.user_id && s.user_id === (selectedStudent.user_id || targetUserId)) || (String(s.email || '').toLowerCase() === String(selectedStudent.email || '').toLowerCase()));
+                            if (row) {
+                                const nextTeacher = row.teacher_id ? String(row.teacher_id) : null;
+                                const nextUserId = row.user_id ? String(row.user_id) : '';
+                                const shouldUpdate = (nextTeacher !== selectedStudent.teacher_id) || (nextUserId !== String(selectedStudent.user_id || ''));
+                                if (shouldUpdate) {
+                                    const currentStudent = selectedStudent;
+                                    if (currentStudent && (!expectedStudentId || String(currentStudent.id) === String(expectedStudentId))) {
+                                        setSelectedStudent({ ...currentStudent, teacher_id: nextTeacher, user_id: nextUserId || null });
+                                    }
                                 }
                             }
+                            loadedStudentInfo.current[key] = true;
                         }
-                        loadedStudentInfo.current[key] = true;
-                    }
+                    } catch { }
                 }
             } catch { }
             try {
@@ -593,9 +586,8 @@ export function useAdminDataFetchers(deps: AdminDataFetchersDeps) {
                 let my: UnknownRecord[] = [];
                 try {
                     const authHeaders = await getAdminAuthHeaders();
-                    const resMine = await fetch('/api/admin/workouts/mine', { headers: authHeaders });
-                    const jsonMine = await resMine.json();
-                    if (jsonMine.ok) my = jsonMine.rows || [];
+                    const jsonMine = await apiAdmin.getAdminWorkouts(authHeaders).catch(() => ({ ok: false, rows: [] })) as Record<string, unknown>;
+                    if (jsonMine.ok) my = (jsonMine.rows as UnknownRecord[] | undefined) || [];
                     else {
                         const { data } = await supabase
                             .from('workouts')
@@ -632,13 +624,12 @@ export function useAdminDataFetchers(deps: AdminDataFetchersDeps) {
                     }
                 }
                 try {
-                    const resLegacy = await fetch('/api/workouts/list');
-                    const jsonLegacy = await resLegacy.json();
+                    const jsonLegacy = await apiWorkouts.list().catch(() => ({ ok: false, rows: [] })) as Record<string, unknown>;
                     if (jsonLegacy.ok) {
-                        for (const r of (jsonLegacy.rows || [])) {
-                            const key = workoutTitleKey(r.name);
+                        for (const r of ((jsonLegacy.rows as UnknownRecord[] | undefined) || [])) {
+                            const key = workoutTitleKey(r.name as string);
                             const prev = tMap.get(key);
-                            const candidate = { id: r.id || r.uuid, name: normalizeWorkoutTitle(r.name), exercises: [] as WorkoutExercise[] };
+                            const candidate = { id: r.id || r.uuid, name: normalizeWorkoutTitle(r.name as string), exercises: [] as WorkoutExercise[] };
                             const prevExs = Array.isArray(prev?.exercises) ? prev.exercises : [];
                             if (!prev || prevExs.length < 1) tMap.set(key, candidate);
                         }

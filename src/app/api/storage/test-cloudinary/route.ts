@@ -5,6 +5,10 @@ import { requireUser } from '@/utils/auth/route'
 export const dynamic = 'force-dynamic'
 
 export async function GET() {
+  if (process.env.NODE_ENV !== 'development') {
+    return new NextResponse(null, { status: 404 })
+  }
+
   const auth = await requireUser()
   if (!auth.ok) return auth.response
 

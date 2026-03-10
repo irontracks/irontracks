@@ -17,6 +17,7 @@ import { compressImage, generateImageThumbnail } from '@/utils/chat/media';
 import { logError, logWarn, logInfo } from '@/lib/logger'
 import { parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
+import { apiChat, apiStorage } from '@/lib/api'
 
 interface ChatUser {
     uid: string
@@ -102,13 +103,8 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
         const ok = await confirm('Tem certeza que deseja deletar esta mensagem?\nEssa ação é irreversível.', 'Deletar mensagem', { confirmText: 'Deletar', cancelText: 'Cancelar' });
         if (!ok) return;
         try {
-            const res = await fetch('/api/chat/delete', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ messageId: id, scope: 'direct' })
-            });
-            const json = await res.json().catch(() => ({}));
-            if (!res.ok || !json?.ok) throw new Error(json?.error || 'Erro ao deletar mensagem.');
+            const json = await apiChat.deleteMessage(id, 'direct').catch(() => ({ ok: false })) as Record<string, unknown>;
+            if (!json?.ok) throw new Error((json?.error as string | undefined) || 'Erro ao deletar mensagem.');
             setMessages((prev) => prev.filter((m) => String(m?.id || '') !== id));
         } catch (e) {
             const msg = (e as Record<string, unknown>)?.message
@@ -420,24 +416,24 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
                     const compressed = (await compressImage(file, { maxWidth: 1280, quality: 0.8 })) as Blob
                     const thumb = (await generateImageThumbnail(file, { thumbWidth: 360 })) as Blob
 
-                    const signMain = await fetch('/api/storage/signed-upload', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: `${pathBase}.jpg` }) }).then(r => r.json())
-                    if (!signMain.ok) throw new Error(signMain.error)
-                    await supabase.storage.from('chat-media').uploadToSignedUrl(signMain.path, signMain.token, compressed)
+                    const signMain = await apiStorage.getSignedUpload(`${pathBase}.jpg`)
+                    if (!signMain.ok) throw new Error(signMain.url ? '' : 'Falha ao assinar upload')
+                    await supabase.storage.from('chat-media').uploadToSignedUrl(signMain.path ?? '', signMain.token ?? '', compressed)
 
-                    const signThumb = await fetch('/api/storage/signed-upload', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: `${pathBase}_thumb.jpg` }) }).then(r => r.json())
-                    if (!signThumb.ok) throw new Error(signThumb.error)
-                    await supabase.storage.from('chat-media').uploadToSignedUrl(signThumb.path, signThumb.token, thumb)
+                    const signThumb = await apiStorage.getSignedUpload(`${pathBase}_thumb.jpg`)
+                    if (!signThumb.ok) throw new Error(signThumb.url ? '' : 'Falha ao assinar thumbnail')
+                    await supabase.storage.from('chat-media').uploadToSignedUrl(signThumb.path ?? '', signThumb.token ?? '', thumb)
 
-                    const { data: pub } = await supabase.storage.from('chat-media').getPublicUrl(signMain.path)
-                    const { data: pubThumb } = await supabase.storage.from('chat-media').getPublicUrl(signThumb.path)
+                    const { data: pub } = await supabase.storage.from('chat-media').getPublicUrl(signMain.path ?? '')
+                    const { data: pubThumb } = await supabase.storage.from('chat-media').getPublicUrl(signThumb.path ?? '')
 
                     payload = { type: 'image', media_url: pub.publicUrl, thumb_url: pubThumb.publicUrl }
                 } else if (isVideo) {
                     if (file.size > 200 * 1024 * 1024) { await alert('Vídeo acima de 200MB. Comprima antes.'); continue }
-                    const signVid = await fetch('/api/storage/signed-upload', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ path: `${pathBase}` }) }).then(r => r.json())
-                    if (!signVid.ok) throw new Error(signVid.error)
-                    await supabase.storage.from('chat-media').uploadToSignedUrl(signVid.path, signVid.token, file)
-                    const { data: pub } = await supabase.storage.from('chat-media').getPublicUrl(signVid.path)
+                    const signVid = await apiStorage.getSignedUpload(`${pathBase}`)
+                    if (!signVid.ok) throw new Error(signVid.url ? '' : 'Falha ao assinar upload')
+                    await supabase.storage.from('chat-media').uploadToSignedUrl(signVid.path ?? '', signVid.token ?? '', file)
+                    const { data: pub } = await supabase.storage.from('chat-media').getPublicUrl(signVid.path ?? '')
                     payload = { type: 'video', media_url: pub.publicUrl }
                 }
 

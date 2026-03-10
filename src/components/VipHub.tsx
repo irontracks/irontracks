@@ -14,6 +14,7 @@ import { useRouter } from 'next/navigation'
 import type { Workout } from '@/types/app'
 import { parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
+import { apiVip } from '@/lib/api'
 
 interface VipHubProps {
   user: {
@@ -79,10 +80,9 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
     let cancelled = false
       ; (async () => {
         try {
-          const res = await fetch('/api/vip/status', { credentials: 'include', cache: 'no-store' })
-          const data = await res.json().catch(() => null) as Record<string, unknown> | null
+          const data = await apiVip.getStatus()
           if (cancelled) return
-          if (data && typeof data === 'object' && data.ok) setVipStatus(data as VipStatus)
+          if (data?.ok) setVipStatus(data as unknown as VipStatus)
         } catch {
         }
       })()
@@ -151,19 +151,13 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
     try {
       let tid = String(threadId || '').trim()
       if (!tid) {
-        const tRes = await fetch('/api/vip/chat/thread', { method: 'GET', credentials: 'include', cache: 'no-store' })
-        const tJson = await tRes.json().catch(() => null) as Record<string, unknown> | null
-        const thread = tJson && typeof tJson === 'object' ? (tJson.thread as Record<string, unknown> | undefined) : undefined
+        const tData = await apiVip.getChatThread().catch(() => null)
+        const thread = tData?.thread as Record<string, unknown> | undefined
         tid = String(thread?.id || '').trim()
         if (tid) setThreadId(tid)
       }
       if (tid) {
-        await fetch('/api/vip/chat/messages', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          credentials: 'include',
-          body: JSON.stringify({ thread_id: tid, role: 'user', content: text }),
-        }).catch(() => null)
+        await apiVip.saveChatMessage({ thread_id: tid, role: 'user', content: text }).catch(() => null)
       }
       const res = await fetch('/api/ai/vip-coach', {
         method: 'POST',
@@ -247,17 +241,15 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
     setChatLoading(true)
       ; (async () => {
         try {
-          const tRes = await fetch('/api/vip/chat/thread', { method: 'GET', credentials: 'include', cache: 'no-store' })
-          const tJson = await tRes.json().catch(() => null) as Record<string, unknown> | null
-          const thread = tJson && typeof tJson === 'object' ? (tJson.thread as Record<string, unknown> | undefined) : undefined
+          const tData = await apiVip.getChatThread().catch(() => null)
+          const thread = tData?.thread as Record<string, unknown> | undefined
           const tid = String(thread?.id || '').trim()
           if (!tid) return
           if (cancelled) return
           setThreadId(tid)
-          const mRes = await fetch(`/api/vip/chat/messages?thread_id=${encodeURIComponent(tid)}&limit=80`, { method: 'GET', credentials: 'include', cache: 'no-store' })
-          const mJson = await mRes.json().catch(() => null) as Record<string, unknown> | null
+          const mData = await apiVip.getChatMessages(tid, 80).catch(() => null)
           if (cancelled) return
-          const rows = Array.isArray(mJson?.messages) ? mJson.messages : []
+          const rows = Array.isArray(mData?.messages) ? mData.messages : []
           const parsed = rows.map((r: unknown) => {
             const obj = r && typeof r === 'object' ? (r as Record<string, unknown>) : {}
             const role = String(obj.role || '').trim()

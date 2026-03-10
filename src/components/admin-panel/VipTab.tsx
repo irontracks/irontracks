@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useMemo, useCallback } from 'react'
+import { apiAdmin } from '@/lib/api'
 import {
     Crown, Search, Loader2, Filter, RefreshCw,
     UserPlus, XCircle, ChevronDown, Calendar, Shield,
@@ -196,10 +197,9 @@ export const VipTab: React.FC = () => {
     const fetchList = useCallback(async () => {
         setLoading(true)
         try {
-            const res = await fetch('/api/admin/vip/list', { credentials: 'include', cache: 'no-store' })
-            const data = await res.json()
+            const data = await apiAdmin.listVip().catch(() => ({ ok: false, items: [] }))
             if (data?.ok && Array.isArray(data.items)) {
-                setItems(data.items)
+                setItems(data.items as VipItem[])
             }
         } catch { /* silent */ }
         finally { setLoading(false) }
@@ -234,15 +234,9 @@ export const VipTab: React.FC = () => {
 
     // ─── Grant VIP ───────────────────────────────────────────────
     const handleGrant = async (email: string, plan: string, days: number) => {
-        const res = await fetch('/api/admin/vip/grant-trial', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            credentials: 'include',
-            body: JSON.stringify({ grants: [{ email, plan_id: plan, days }] }),
-        })
-        const data = await res.json()
-        if (!data?.ok) throw new Error(data?.error || 'Falha ao conceder')
-        const r = Array.isArray(data.results) ? data.results[0] : null
+        const data = await apiAdmin.grantVipTrials([{ email, plan_id: plan, days }])
+        if (!data?.ok) throw new Error((data?.error as string | undefined) || 'Falha ao conceder')
+        const r = Array.isArray(data.results) ? (data.results[0] as ({ ok: boolean; error?: string } | null)) : null
         if (r && !r.ok) throw new Error(r.error || 'Falha ao conceder')
         await fetchList()
     }
@@ -252,12 +246,7 @@ export const VipTab: React.FC = () => {
         if (!window.confirm(`Revogar VIP de ${item.name || item.email}?`)) return
         setRevoking(item.id)
         try {
-            await fetch('/api/admin/vip/revoke', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({ entitlement_id: item.id }),
-            })
+            await apiAdmin.revokeVip(item.id)
             await fetchList()
         } catch { /* silent */ }
         finally { setRevoking(null) }

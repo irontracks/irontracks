@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { AdminUser, ExecutionVideo } from '@/types/admin';
 import type { UnknownRecord } from '@/types/app';
 import { useDialog } from '@/contexts/DialogContext';
+import { apiAdmin } from '@/lib/api';
 
 export type UseAdminStudentOpsParams = {
     selectedStudent: AdminUser | null;
@@ -211,17 +212,12 @@ export const useAdminStudentOps = ({
     const approvePendingProfile = useCallback(async (profile: UnknownRecord) => {
         try {
             const authHeaders = await getAdminAuthHeaders();
-            const res = await fetch('/api/admin/students/assign-teacher', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json', ...authHeaders },
-                body: JSON.stringify({
-                    student_id: String(profile.user_id || ''),
-                    email: String(profile.email || ''),
-                    teacher_user_id: null,
-                }),
-            });
-            const json = await res.json().catch(() => ({})) as Record<string, unknown>;
-            if (!json?.ok) throw new Error(String(json?.error || `HTTP ${res.status}`));
+            const json = await apiAdmin.assignTeacher(
+                String(profile.user_id || ''),
+                null,
+                authHeaders
+            ).catch((e: unknown) => { throw e }) as Record<string, unknown>;
+            if (!json?.ok) throw new Error(String(json?.error || 'Falha'));
             const newStudent: UnknownRecord = {
                 id: json.student_id || profile.user_id,
                 user_id: String(profile.user_id || ''),
@@ -232,7 +228,6 @@ export const useAdminStudentOps = ({
                 workouts: [],
             };
             setUsersList(prev => [...prev, newStudent as AdminUser]);
-            // Update both the local state and the external setter
             setPendingProfilesLocal(prev => prev.filter(p => p.user_id !== profile.user_id));
             setPendingProfiles(prev => prev.filter(p => p.user_id !== profile.user_id));
         } catch (e: unknown) {

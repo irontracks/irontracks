@@ -5,6 +5,7 @@ import { createClient } from '@/utils/supabase/client'
 import { useRouter } from 'next/navigation'
 import { isIosNative } from '@/utils/platform'
 import { logError } from '@/lib/logger'
+import { apiAuth } from '@/lib/api'
 
 // ─── Capacitor optional imports ───────────────────────────────────────────────
 let Capacitor: { getPlatform: () => string } = { getPlatform: () => 'web' }
@@ -163,7 +164,7 @@ export function useLoginScreen() {
                     const supabase = createClient()
                     supabase.auth.setSession({ access_token: backup.access_token, refresh_token: backup.refresh_token }).then(({ error, data }) => {
                         if (!error && data?.session) {
-                            fetch('/api/auth/session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ access_token: data.session.access_token, refresh_token: data.session.refresh_token }) })
+                            apiAuth.persistSession(data.session.access_token, data.session.refresh_token)
                                 .then(() => { try { localStorage.setItem('it.logged_in', '1') } catch { }; window.location.replace('/dashboard') })
                                 .catch(() => setIsLoading(false))
                         } else { setIsLoading(false) }
@@ -208,7 +209,7 @@ export function useLoginScreen() {
                 const familyName = String(result?.response?.familyName || '').trim()
                 const fullName = `${givenName} ${familyName}`.trim()
                 if (email) {
-                    try { await fetch('/api/auth/apple/preflight', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, full_name: fullName }) }) } catch { }
+                    try { await apiAuth.appleSignInPreflight(email, fullName) } catch { }
                 }
                 const supabase = createClient()
                 // No nonce: Supabase skips nonce verification, validates purely by Apple JWT signature
@@ -219,13 +220,13 @@ export function useLoginScreen() {
                 if (userId) {
                     const { data: profile } = await supabase.from('profiles').select('id').eq('id', userId).maybeSingle()
                     if (!profile?.id) {
-                        const checkRes = await fetch('/api/auth/apple/preflight', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: userEmail, full_name: '', check_only: true }) }).then(r => r.json()).catch(() => ({ ok: false }))
+                        const checkRes = await apiAuth.appleSignInPreflight(userEmail, '', true).catch(() => ({ ok: false, existed: false }))
                         if (!checkRes?.existed) { await supabase.auth.signOut(); setShowNoAccountModal(true); setIsLoading(false); return }
                     }
                 }
                 const session = data?.session
                 if (session?.access_token && session?.refresh_token) {
-                    await fetch('/api/auth/session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ access_token: session.access_token, refresh_token: session.refresh_token }) })
+                    await apiAuth.persistSession(session.access_token, session.refresh_token)
                 }
                 try { localStorage.setItem('it.logged_in', '1') } catch { }
                 router.replace('/dashboard'); try { router.refresh() } catch { }
@@ -252,7 +253,7 @@ export function useLoginScreen() {
                 if (error) throw error
                 if (rememberMe) localStorage.setItem('it_remembered_email', email); else localStorage.removeItem('it_remembered_email')
                 const session = data?.session
-                if (session?.access_token && session?.refresh_token) await fetch('/api/auth/session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ access_token: session.access_token, refresh_token: session.refresh_token }) })
+                if (session?.access_token && session?.refresh_token) await apiAuth.persistSession(session.access_token, session.refresh_token)
                 holdLoading = true; try { localStorage.setItem('it.logged_in', '1') } catch { }
                 router.replace('/dashboard'); try { router.refresh() } catch { }
             } else if (authMode === 'signup') {
@@ -263,9 +264,8 @@ export function useLoginScreen() {
                 const cleanPhone = emailData.phone.replace(/\D/g, '')
                 if (cleanPhone.length < 10) throw new Error('Telefone inválido (mínimo 10 dígitos com DDD).')
                 try {
-                    const res = await fetch('/api/access-request/create', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, full_name: emailData.fullName, phone: emailData.phone, birth_date: emailData.birthDate, role_requested: isTeacher ? 'teacher' : 'student', cref: isTeacher ? cref : null }) })
-                    const json = await res.json().catch(() => ({}))
-                    if (!res.ok || !json?.ok) throw new Error(json?.error || 'Não foi possível enviar sua solicitação.')
+                    const json = await apiAuth.createAccessRequest({ email, full_name: emailData.fullName, phone: emailData.phone, birth_date: emailData.birthDate, role_requested: isTeacher ? 'teacher' : 'student', cref: isTeacher ? cref : null })
+                    if (!json?.ok) throw new Error((json?.error as string | undefined) || 'Não foi possível enviar sua solicitação.')
                 } catch (e: unknown) { throw new Error(e instanceof Error ? e.message : 'Não foi possível enviar sua solicitação.') }
                 const { error } = await supabase.auth.signUp({ email, password, options: { data: { full_name: emailData.fullName, display_name: emailData.fullName, phone: emailData.phone, birth_date: emailData.birthDate, role_requested: isTeacher ? 'teacher' : 'student', cref: isTeacher ? cref : null } } })
                 if (error) throw error
@@ -283,13 +283,12 @@ export function useLoginScreen() {
                 if (password !== p2) throw new Error('As senhas não coincidem.')
                 const code = String(recoveryCode || '').trim()
                 if (!code) throw new Error('Digite o código de recuperação.')
-                const res = await fetch('/api/auth/recovery-code', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, code, password }) })
-                const json = await res.json().catch(() => ({}))
-                if (!res.ok || !json?.ok) throw new Error(json?.error || 'Código inválido.')
+                const json = await apiAuth.verifyRecoveryCode(email, code, password).catch(() => ({ ok: false }))
+                if (!json?.ok) throw new Error((json as Record<string, unknown>)?.error as string | undefined || 'Código inválido.')
                 const { data, error } = await supabase.auth.signInWithPassword({ email, password })
                 if (error) throw error
                 const session = data?.session
-                if (session?.access_token && session?.refresh_token) await fetch('/api/auth/session', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ access_token: session.access_token, refresh_token: session.refresh_token }) })
+                if (session?.access_token && session?.refresh_token) await apiAuth.persistSession(session.access_token, session.refresh_token)
                 holdLoading = true; try { localStorage.setItem('it.logged_in', '1') } catch { }
                 router.replace('/dashboard'); try { router.refresh() } catch { }
             }
@@ -309,9 +308,8 @@ export function useLoginScreen() {
         if (cleanPhone.length < 10 || cleanPhone.length > 11) { setReqError('Telefone inválido (DDD + Número).'); setReqLoading(false); return }
         const payload = { ...formData, role_requested: formData.is_teacher ? 'teacher' : 'student', cref: formData.is_teacher ? formData.cref : null }
         try {
-            const res = await fetch('/api/access-request/create', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) })
-            const json = await res.json()
-            if (!res.ok || !json.ok) throw new Error(json.error || 'Erro ao enviar solicitação.')
+            const json = await apiAuth.createAccessRequest({ email: payload.email, full_name: payload.full_name, phone: payload.phone, birth_date: payload.birth_date, role_requested: payload.role_requested as 'teacher' | 'student', cref: payload.cref })
+            if (!json?.ok) throw new Error((json?.error as string | undefined) || 'Erro ao enviar solicitação.')
             setReqSuccess(true)
         } catch (err: unknown) { setReqError(err instanceof Error ? err.message : 'Erro de conexão.') }
         finally { setReqLoading(false) }

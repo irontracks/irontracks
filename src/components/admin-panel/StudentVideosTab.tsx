@@ -5,6 +5,7 @@ import { Video } from 'lucide-react';
 import { useAdminPanel } from './AdminPanelContext';
 import { useDialog } from '@/contexts/DialogContext';
 import type { UnknownRecord } from '@/types/app';
+import { apiAdmin } from '@/lib/api';
 
 export const StudentVideosTab: React.FC = () => {
     const { alert } = useDialog();
@@ -45,14 +46,14 @@ export const StudentVideosTab: React.FC = () => {
                                 if (!selectedStudent?.user_id) return;
                                 setExecutionVideosLoading(true);
                                 setExecutionVideosError('');
-                                const res = await fetch(`/api/teacher/execution-videos/by-student?student_user_id=${encodeURIComponent(String(selectedStudent.user_id))}`, { cache: 'no-store', credentials: 'include' });
-                                const json = await res.json().catch((): null => null);
-                                if (!res.ok || !json?.ok) {
+                                const json = await apiAdmin.getExecutionVideosByStudent(String(selectedStudent.user_id))
+                                    .catch((): null => null) as Record<string, unknown> | null;
+                                if (!json?.ok) {
                                     setExecutionVideos([]);
-                                    setExecutionVideosError(String(json?.error || `Falha ao carregar (${res.status})`));
+                                    setExecutionVideosError(String((json?.error as string | undefined) || 'Falha ao carregar'));
                                     return;
                                 }
-                                setExecutionVideos(Array.isArray(json.items) ? json.items : []);
+                                setExecutionVideos(Array.isArray(json.items) ? json.items as unknown as import('@/types/admin').ExecutionVideo[] : []);
                             } catch (e: unknown) {
                                 setExecutionVideos([]);
                                 const msg = e && typeof e === 'object' && 'message' in e && typeof (e as { message?: unknown }).message === 'string' ? (e as { message: string }).message : '';
@@ -113,9 +114,9 @@ export const StudentVideosTab: React.FC = () => {
                                             type="button"
                                             onClick={async () => {
                                                 try {
-                                                    const res = await fetch('/api/execution-videos/media', { method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ submission_id: id }) });
-                                                    const json = await res.json().catch((): null => null);
-                                                    if (!res.ok || !json?.ok || !json?.url) { await alert(String(json?.error || `Falha ao abrir (${res.status})`)); return; }
+                                                    const json = await apiAdmin.getExecutionVideoMedia(id)
+                                                        .catch((): null => null) as Record<string, unknown> | null;
+                                                    if (!json?.ok || !json?.url) { await alert(String((json?.error as string | undefined) || 'Falha ao abrir')); return; }
                                                     setExecutionVideoModalUrl(String(json.url));
                                                     setExecutionVideoModalOpen(true);
                                                 } catch (e: unknown) {
@@ -133,9 +134,9 @@ export const StudentVideosTab: React.FC = () => {
                                             onClick={async () => {
                                                 try {
                                                     const feedback = String(draft || '').trim();
-                                                    const res = await fetch('/api/teacher/execution-videos/review', { method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ submission_id: id, status: 'approved', feedback, send_message: true }) });
-                                                    const json = await res.json().catch((): null => null);
-                                                    if (!res.ok || !json?.ok) { await alert(String(json?.error || `Falha ao aprovar (${res.status})`)); return; }
+                                                    const json = await apiAdmin.reviewExecutionVideo({ video_id: id, status: 'reviewed', feedback })
+                                                        .catch((): null => null) as Record<string, unknown> | null;
+                                                    if (!json?.ok) { await alert(String((json?.error as string | undefined) || 'Falha ao aprovar')); return; }
                                                     setExecutionVideos((prev) => (Array.isArray(prev) ? prev.map((x) => (String(x?.id || '') === id ? { ...x, status: 'approved', teacher_feedback: feedback } : x)) : prev));
                                                 } catch (e: unknown) {
                                                     const msg = e && typeof e === 'object' && 'message' in e && typeof (e as { message?: unknown }).message === 'string' ? (e as { message: string }).message : String(e);
@@ -152,9 +153,9 @@ export const StudentVideosTab: React.FC = () => {
                                             onClick={async () => {
                                                 try {
                                                     const feedback = String(draft || '').trim();
-                                                    const res = await fetch('/api/teacher/execution-videos/review', { method: 'POST', credentials: 'include', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ submission_id: id, status: 'rejected', feedback, send_message: true }) });
-                                                    const json = await res.json().catch((): null => null);
-                                                    if (!res.ok || !json?.ok) { await alert(String(json?.error || `Falha ao reprovar (${res.status})`)); return; }
+                                                    const json = await apiAdmin.reviewExecutionVideo({ video_id: id, status: 'rejected', feedback })
+                                                        .catch((): null => null) as Record<string, unknown> | null;
+                                                    if (!json?.ok) { await alert(String((json?.error as string | undefined) || 'Falha ao reprovar')); return; }
                                                     setExecutionVideos((prev) => (Array.isArray(prev) ? prev.map((x) => (String(x?.id || '') === id ? { ...x, status: 'rejected', teacher_feedback: feedback } : x)) : prev));
                                                 } catch (e: unknown) {
                                                     const msg = e && typeof e === 'object' && 'message' in e && typeof (e as { message?: unknown }).message === 'string' ? (e as { message: string }).message : String(e);

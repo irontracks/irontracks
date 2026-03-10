@@ -6,6 +6,7 @@ import { normalizeWorkoutTitle } from '@/utils/workoutTitle';
 import { useAdminPanel } from './AdminPanelContext';
 import { useDialog } from '@/contexts/DialogContext';
 import type { UnknownRecord } from '@/types/app';
+import { apiAdmin } from '@/lib/api';
 
 export const StudentWorkoutsTab: React.FC = () => {
     const { alert, confirm } = useDialog();
@@ -87,12 +88,10 @@ export const StudentWorkoutsTab: React.FC = () => {
                                 return;
                             }
                             const authHeaders = await getAdminAuthHeaders();
-                            const res = await fetch('/api/admin/workouts/sync-templates', {
-                                method: 'POST',
-                                headers: { 'Content-Type': 'application/json', ...authHeaders },
-                                body: JSON.stringify({ id: payloadId, email: payloadEmail, mode: 'all' }),
-                            });
-                            const json: UnknownRecord = await res.json().catch(() => ({} as UnknownRecord));
+                            const json: UnknownRecord = await apiAdmin.syncWorkoutTemplates(
+                                { id: payloadId, email: payloadEmail, mode: 'all' },
+                                authHeaders
+                            ).then(r => r as UnknownRecord).catch(() => ({} as UnknownRecord));
                             if (json.ok) {
                                 const debugObj: UnknownRecord | null = json.debug && typeof json.debug === 'object' ? (json.debug as UnknownRecord) : null;
                                 const selectedUserId = String((selectedStudent as UnknownRecord | null)?.user_id || '').trim();

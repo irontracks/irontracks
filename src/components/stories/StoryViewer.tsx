@@ -9,6 +9,7 @@ import { Story, StoryGroup } from '@/types/social'
 import { mediaKindFromUrl } from '@/utils/mediaUtils'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { logError } from '@/lib/logger'
+import { apiSocial } from '@/lib/api'
 
 const MAX_VIDEO_SECONDS = 60
 const PHOTO_SECONDS = 15
@@ -170,11 +171,7 @@ export default function StoryViewer({
   useEffect(() => {
     if (!storyId || storyViewed) return
     onStoryUpdated(storyId, { viewed: true })
-    fetch('/api/social/stories/view', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ storyId }),
-    }).catch(() => { })
+    apiSocial.viewStory(storyId).catch(() => { })
   }, [storyId, storyViewed, onStoryUpdated])
 
   // Navegação e Timer
@@ -396,10 +393,8 @@ export default function StoryViewer({
     setCommentsLoading(true)
     setCommentsError('')
     try {
-      const res = await fetch(`/api/social/stories/comments?storyId=${encodeURIComponent(storyId)}&limit=200`)
-      const json = await res.json()
-      if (!res.ok) throw new Error(json.error)
-      setComments(json.data || [])
+      const json = await apiSocial.getStoryComments(storyId, 200)
+      setComments((json as Record<string, unknown>).data as unknown[] || [])
     } catch (e: unknown) {
       setCommentsError(getErrorMessage(e))
     } finally {
@@ -411,10 +406,8 @@ export default function StoryViewer({
     setViewersLoading(true)
     setViewersError('')
     try {
-      const res = await fetch(`/api/social/stories/views?storyId=${encodeURIComponent(storyId)}`)
-      const json = await res.json()
-      if (!res.ok) throw new Error(json.error)
-      setViewers(json.data || [])
+      const json = await apiSocial.getStoryViews(storyId)
+      setViewers((json as Record<string, unknown>).data as unknown[] || [])
       viewersStoryIdRef.current = storyId
     } catch (e: unknown) {
       setViewersError(getErrorMessage(e))
@@ -429,11 +422,7 @@ export default function StoryViewer({
     const nextLiked = !story.hasLiked
     onStoryUpdated(story.id, { hasLiked: nextLiked, likeCount: Math.max(0, story.likeCount + (nextLiked ? 1 : -1)) })
     try {
-      await fetch('/api/social/stories/like', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ storyId: story.id, like: nextLiked }),
-      })
+      await apiSocial.likeStory(story.id, nextLiked)
     } catch {
       onStoryUpdated(story.id, { hasLiked: story.hasLiked, likeCount: story.likeCount })
     }
@@ -444,14 +433,9 @@ export default function StoryViewer({
     const text = commentText.trim()
     setCommentText('')
     try {
-      const res = await fetch('/api/social/stories/comments', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ storyId: story.id, body: text }),
-      })
-      const json = await res.json()
-      if (res.ok) {
-        setComments((prev) => [...prev, json.data])
+      const json = await apiSocial.addStoryComment(story.id, text)
+      if ((json as Record<string, unknown>).ok) {
+        setComments((prev) => [...prev, (json as Record<string, unknown>).data])
         onStoryUpdated(story.id, { commentCount: story.commentCount + 1 })
       }
     } catch { }
@@ -463,18 +447,13 @@ export default function StoryViewer({
     if (!ok) return
     setDeleting(true)
     try {
-      const res = await fetch('/api/social/stories/delete', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ storyId: story.id }),
-      })
-      const json = await res.json().catch(() => null)
-      if (res.ok && json?.ok) {
+      const json = await apiSocial.deleteStory(story.id).catch(() => null) as Record<string, unknown> | null
+      if (json?.ok) {
         onStoryDeleted(story.id)
         onClose()
       } else {
-        const errMsg = json?.error || `Status ${res.status}`
-        logError('StoryViewer.delete', `Delete failed: ${res.status}`, json)
+        const errMsg = (json?.error as string | undefined) || 'Falha ao deletar'
+        logError('StoryViewer.delete', `Delete failed`, json)
         await alert(`Erro ao deletar: ${errMsg}`)
       }
     } catch (e) {
