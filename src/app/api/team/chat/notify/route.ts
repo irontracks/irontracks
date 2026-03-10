@@ -13,6 +13,7 @@ const BodySchema = z
     sessionId: z.string().min(1),
     senderId: z.string().min(1),
     senderName: z.string().min(1),
+    senderPhoto: z.string().nullable().optional(),
     text: z.string().min(1).max(200),
   })
   .strip()
@@ -23,28 +24,29 @@ export async function POST(req: Request) {
 
     const parsedBody = await parseJsonBody(req, BodySchema)
     if (parsedBody.response) return parsedBody.response
-    const { sessionId, senderId, senderName, text } = parsedBody.data!
+    const { sessionId, senderId, senderName, senderPhoto, text } = parsedBody.data!
 
     const admin = createAdminClient()
 
-    // ─── 1. Persist message to `messages` table (reliable delivery via postgres_changes) ──
-    // Uses session_id as channel_id so clients can subscribe to postgres_changes
+    // ─── 1. Persist to dedicated team_chat_messages table ──────────────
     const { data: inserted, error: insertErr } = await admin
-      .from('messages')
+      .from('team_chat_messages')
       .insert({
-        channel_id: sessionId,
+        session_id: sessionId,
         user_id: senderId,
+        display_name: senderName,
+        photo_url: senderPhoto ?? null,
         content: text,
       })
       .select('id, created_at')
       .single()
 
     if (insertErr) {
-      logError('team-chat', '[TeamChat] Failed to insert message', insertErr)
+      logError('team-chat', '[TeamChat] INSERT failed', insertErr)
       return NextResponse.json({ ok: false, error: insertErr.message }, { status: 500 })
     }
 
-    logInfo('team-chat', `[TeamChat] Message persisted: ${inserted.id}`)
+    logInfo('team-chat', `[TeamChat] Persisted msg ${inserted.id} in session ${sessionId}`)
 
     // ─── 2. Push notification (rate-limited) ────────────────────────────
     const rl = await checkRateLimitAsync(`team:chat:push:${sessionId}:${senderId}:${ip}`, 2, 30_000)

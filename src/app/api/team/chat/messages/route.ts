@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic'
 
 /**
  * GET /api/team/chat/messages?sessionId=xxx
- * Returns the last 50 messages for a team session (used as polling fallback).
+ * Returns the last 50 team chat messages for a session (polling fallback).
  */
 export async function GET(req: NextRequest) {
   try {
@@ -17,10 +17,10 @@ export async function GET(req: NextRequest) {
     const admin = createAdminClient()
 
     const { data, error } = await admin
-      .from('messages')
-      .select('id, channel_id, user_id, content, created_at, profiles:user_id(display_name, photo_url)')
-      .eq('channel_id', sessionId)
-      .order('created_at', { ascending: false })
+      .from('team_chat_messages')
+      .select('id, session_id, user_id, display_name, photo_url, content, created_at')
+      .eq('session_id', sessionId)
+      .order('created_at', { ascending: true })
       .limit(50)
 
     if (error) {

@@ -774,12 +774,13 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
                 sessionId: teamSession.id,
                 senderId: user.id,
                 senderName: String(myDisplayNameRef.current || 'Parceiro'),
+                senderPhoto: myPhotoUrlRef.current,
                 text: trimmed,
             }),
         }).catch(() => { })
     }, [user?.id, teamSession?.id])
 
-    // ── Reliable chat: postgres_changes + polling fallback ─────────────────
+    // ── Reliable chat: postgres_changes on team_chat_messages + polling fallback ──
     useEffect(() => {
         if (!teamSession?.id || !user?.id) return
         const sessionId = teamSession.id
@@ -794,8 +795,8 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
                 const dbMessages: ChatMessage[] = json.data.map((row: Record<string, unknown>) => ({
                     id: String(row.id || ''),
                     userId: String(row.user_id || ''),
-                    displayName: String((row.profiles as Record<string, unknown>)?.display_name || 'Parceiro'),
-                    photoURL: (row.profiles as Record<string, unknown>)?.photo_url ? String((row.profiles as Record<string, unknown>).photo_url) : null,
+                    displayName: String(row.display_name || 'Parceiro'),
+                    photoURL: row.photo_url ? String(row.photo_url) : null,
                     text: String(row.content || ''),
                     ts: new Date(String(row.created_at || '')).getTime() || Date.now(),
                 }))
@@ -820,29 +821,17 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
         const rtChannel = supabase
             .channel(`team_chat_rt:${sessionId}`)
             .on('postgres_changes',
-                { event: 'INSERT', schema: 'public', table: 'messages', filter: `channel_id=eq.${sessionId}` },
-                async (payload: Record<string, unknown>) => {
+                { event: 'INSERT', schema: 'public', table: 'team_chat_messages', filter: `session_id=eq.${sessionId}` },
+                (payload: Record<string, unknown>) => {
                     const row = payload?.new && typeof payload.new === 'object' ? (payload.new as Record<string, unknown>) : null
                     if (!row) return
                     const senderId = String(row.user_id || '')
                     const msgId = String(row.id || '')
-                    // Fetch sender profile for display name
-                    let displayName = 'Parceiro'
-                    let photoURL: string | null = null
-                    try {
-                        const { data: profile } = await supabase
-                            .from('profiles')
-                            .select('display_name, photo_url')
-                            .eq('id', senderId)
-                            .maybeSingle()
-                        if (profile?.display_name) displayName = String(profile.display_name)
-                        if (profile?.photo_url) photoURL = String(profile.photo_url)
-                    } catch { }
                     const newMsg: ChatMessage = {
                         id: msgId,
                         userId: senderId,
-                        displayName,
-                        photoURL,
+                        displayName: String(row.display_name || 'Parceiro'),
+                        photoURL: row.photo_url ? String(row.photo_url) : null,
                         text: String(row.content || ''),
                         ts: new Date(String(row.created_at || '')).getTime() || Date.now(),
                     }
