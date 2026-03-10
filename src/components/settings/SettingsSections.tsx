@@ -462,7 +462,7 @@ export function SettingsHealthKitSection({
                     </div>
                 </div>
                 <div className="pt-1 text-[10px] text-neutral-500 leading-relaxed border-t border-neutral-800/60">
-                    Seus dados de saúde nunca são compartilhados com terceiros. Você pode revogar o acesso em Ajustes → Saúde → Acesso a dados → IronTracks.
+                    Seus dados de saúde nunca são compartilhados com terceiros. Você pode revogar o acesso em Ajustes → Privacidade e Segurança → Saúde → IronTracks.
                 </div>
             </div>
 
