@@ -5,6 +5,7 @@ import {
     applyProgressionToNextTemplate,
 } from '@/actions/workout-actions'
 import { buildReportHTML } from '@/utils/report/buildHtml'
+import { fetchLogoDataUrl } from '@/utils/report/fetchLogoDataUrl'
 import { getErrorMessage } from '@/utils/errorMessage'
 import {
     remapPrevLogsByCanonical,
@@ -113,10 +114,12 @@ export function useWorkoutReportHandlers({
                 } catch { }
             }
 
+            const logoDataUrl = await fetchLogoDataUrl().catch(() => null)
             const html = buildReportHTML(sessionForReport, prevForReport, String(user?.displayName || user?.email || ''), calories, {
                 prevLogsByExercise: prevLogsForReport,
                 prevBaseMsByExercise: prevBaseForReport,
                 ai: aiToUse || null,
+                logoDataUrl: logoDataUrl || undefined,
             })
             const title = String(session?.workoutTitle || 'Treino').trim() || 'Treino'
             const fileName = `${title.replace(/\s+/g, '_')}_irontracks.html`
