@@ -83,9 +83,9 @@ const applyTierCaps = (tier: string, limits: VipTierLimits): VipTierLimits => {
     if (normalized === 'vip_elite') {
       return {
         ...limits,
-        chat_daily: capNumber(limits.chat_daily, 9999),
-        insights_weekly: capNumber(limits.insights_weekly, 9999),
-        wizard_weekly: capNumber(limits.wizard_weekly, 9999),
+        chat_daily: 9999,
+        insights_weekly: 9999,
+        wizard_weekly: 9999,
         history_days: null,
         nutrition_macros: true,
         analytics: true,
@@ -102,8 +102,8 @@ const applyTierCaps = (tier: string, limits: VipTierLimits): VipTierLimits => {
 // ────────────────────────────────────────────────────────────────────────────
 
 describe('FREE_LIMITS e UNLIMITED_LIMITS (constantes públicas)', () => {
-  it('FREE_LIMITS: chat_daily=0 (sem acesso ao chat)', () => {
-    expect(FREE_LIMITS.chat_daily).toBe(0)
+  it('FREE_LIMITS: chat_daily=5 (acesso semanal ao chat)', () => {
+    expect(FREE_LIMITS.chat_daily).toBe(5)
   })
 
   it('FREE_LIMITS: history_days=30 (30 dias de histórico)', () => {
