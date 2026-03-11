@@ -215,8 +215,9 @@ export const useReportData = ({ session, previousSession, user }: UseReportDataP
   // ── Apply progression ────────────────────────────────────────────────────
   const [applyState, setApplyState] = useState<ApplyState>({ status: 'idle', error: '', templateId: null })
 
-  // ── Kcal estimate ────────────────────────────────────────────────────────
-  const [kcalEstimate, setKcalEstimate] = useState(0)
+  // ── Kcal: no async state here (eliminates oscillation) ──────────────────
+  // Calories are computed deterministically in useMemo below using all
+  // available session + checkin data. No useState/useEffect for kcal.
 
   // ── Target user id ───────────────────────────────────────────────────────
   const targetUserId = useMemo(() => {
@@ -253,27 +254,17 @@ export const useReportData = ({ session, previousSession, user }: UseReportDataP
     }
   }, [])
 
-  // ── Effect: Kcal estimate ────────────────────────────────────────────────
+  // ── Fire-and-forget: API call for server logging only ───────────────────
+  // Does NOT update any state. The displayed calories value is in useMemo below.
+  const kcalApiCalledRef = useRef(false)
   useEffect(() => {
-    if (!session) { setKcalEstimate(0); return }
-    let cancelled = false
-      ; (async () => {
-        try {
-          const postRpe = (() => {
-            if (!postCheckin || typeof postCheckin !== 'object') return null
-            const pc = postCheckin as Record<string, unknown>
-            const answers = pc?.answers && typeof pc.answers === 'object' ? (pc.answers as Record<string, unknown>) : null
-            const v = answers?.rpe ?? pc?.rpe
-            const n = Number(v)
-            return Number.isFinite(n) && n >= 1 && n <= 10 ? n : null
-          })()
-          const kcal = await getKcalEstimate({ session, workoutId: session?.id ?? null, rpe: postRpe })
-          if (cancelled) return
-          if (Number.isFinite(Number(kcal)) && Number(kcal) > 0) setKcalEstimate(Math.round(Number(kcal)))
-        } catch (e) { logWarn('useReportData', 'kcal estimate failed', e) }
-      })()
-    return () => { cancelled = true }
-  }, [session])
+    if (!session || kcalApiCalledRef.current) return
+    kcalApiCalledRef.current = true
+    getKcalEstimate({ session, workoutId: session?.id ?? null, rpe: null }).catch(
+      (e) => logWarn('useReportData', 'kcal api log failed', e)
+    )
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.id])
 
   // ── Sub-hooks composition ────────────────────────────────────────────────
 
@@ -355,13 +346,30 @@ export const useReportData = ({ session, previousSession, user }: UseReportDataP
     return Number.isFinite(n) && n >= 1 && n <= 10 ? n : null
   })()
 
-  const calories = (() => {
-    const ov = Number(kcalEstimate)
-    if (Number.isFinite(ov) && ov > 0) return Math.round(ov)
+  // ── Calories: deterministic useMemo — stable from first render ───────────
+  // Uses two-factor MET (avg load + density), complexity factor, body weight,
+  // active vs rest time split, and RPE multiplier. No async state involved.
+  const calories = useMemo(() => {
     const bikeKcal = Number(outdoorBike?.caloriesKcal)
     if (Number.isFinite(bikeKcal) && bikeKcal > 0) return Math.round(bikeKcal)
-    return estimateCaloriesMet(sessionLogs, durationInMinutes, checkinBodyWeightKg, sessionExerciseNames, postCheckinRpe)
-  })()
+
+    // Prefer explicit exec/rest seconds from session over total duration
+    const execSeconds = Number(safeSession?.executionTotalSeconds ?? safeSession?.execution_total_seconds ?? 0) || 0
+    const restSecondsSession = Number(safeSession?.restTotalSeconds ?? safeSession?.rest_total_seconds ?? 0) || 0
+    const totalTimeSeconds = Number(safeSession?.totalTime) || 0
+    const execMinutesOverride = execSeconds > 0 ? execSeconds / 60 : null
+    const restMinutesOverride = restSecondsSession > 0 ? restSecondsSession / 60 : null
+
+    return estimateCaloriesMet(
+      sessionLogs,
+      durationInMinutes || (totalTimeSeconds / 60),
+      checkinBodyWeightKg,
+      sessionExerciseNames,
+      postCheckinRpe,
+      execMinutesOverride,
+      restMinutesOverride,
+    )
+  }, [sessionLogs, durationInMinutes, checkinBodyWeightKg, sessionExerciseNames, postCheckinRpe, outdoorBike, safeSession?.executionTotalSeconds, safeSession?.restTotalSeconds, safeSession?.totalTime])
 
   const reportMeta = safeSession?.reportMeta && typeof safeSession.reportMeta === 'object' ? (safeSession.reportMeta as AnyObj) : null
   const reportTotals = reportMeta?.totals && typeof reportMeta.totals === 'object' ? (reportMeta.totals as AnyObj) : null
