@@ -63,7 +63,7 @@ const LoginScreen = () => {
 
                 <div className="px-8 pb-8 pt-4 w-full flex flex-col items-center">
 
-                <h1 className="text-3xl font-black mb-1 tracking-tighter italic text-center drop-shadow-lg">
+                <h1 className="text-3xl font-black mb-1 tracking-tighter italic text-center drop-shadow-lg pr-2">
                     IRON<span className="text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-amber-500">TRACKS</span>
                 </h1>
 
