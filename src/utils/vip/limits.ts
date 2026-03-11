@@ -1,6 +1,7 @@
 import { createClient } from '@/utils/supabase/server'
 import { SupabaseClient } from '@supabase/supabase-js'
 import { logError, logWarn, logInfo } from '@/lib/logger'
+import { getWeeklyResetStart } from './weekReset'
 
 export type VipTierLimits = {
   chat_daily: number
@@ -30,9 +31,9 @@ export type VipPlanResult = {
 }
 
 export const FREE_LIMITS: VipTierLimits = {
-  chat_daily: 0,
-  wizard_weekly: 0,
-  insights_weekly: 0,
+  chat_daily: 5,        // 5 mensagens/semana (free usa período weekly)
+  wizard_weekly: 3,     // 3 gerações do Wizard por semana
+  insights_weekly: 2,   // 2 insights por semana
   history_days: 30,
   nutrition_macros: false,
   analytics: false,
@@ -126,9 +127,9 @@ const applyTierCaps = (tier: string, limits: VipTierLimits) => {
     if (normalized === 'vip_elite') {
       return {
         ...limits,
-        chat_daily: capNumber(limits.chat_daily, 9999),
-        insights_weekly: capNumber(limits.insights_weekly, 9999),
-        wizard_weekly: capNumber(limits.wizard_weekly, 9999),
+        chat_daily: 9999,
+        insights_weekly: 9999,
+        wizard_weekly: 9999,
         history_days: null,
         nutrition_macros: true,
         analytics: true,
@@ -275,53 +276,6 @@ async function fetchPlanLimits(supabase: SupabaseClient, planId: string): Promis
   }
 }
 
-const toTzParts = (date: Date, timeZone: string) => {
-  const formatter = new Intl.DateTimeFormat('en-CA', {
-    timeZone,
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    weekday: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-    second: '2-digit',
-    hour12: false,
-  })
-  const parts = formatter.formatToParts(date)
-  const map = parts.reduce<Record<string, string>>((acc, part) => {
-    if (part.type !== 'literal') acc[part.type] = part.value
-    return acc
-  }, {})
-  const weekday = String(map.weekday || '').toLowerCase()
-  const weekdayIndex =
-    weekday === 'mon' ? 1 : weekday === 'tue' ? 2 : weekday === 'wed' ? 3 : weekday === 'thu' ? 4 : weekday === 'fri' ? 5 : weekday === 'sat' ? 6 : 0
-  return {
-    year: Number(map.year),
-    month: Number(map.month),
-    day: Number(map.day),
-    weekdayIndex,
-  }
-}
-
-const tzDateToUtc = (timeZone: string, year: number, month: number, day: number, hour: number, minute: number, second: number) => {
-  const utcGuess = new Date(Date.UTC(year, month - 1, day, hour, minute, second))
-  const tzDate = new Date(utcGuess.toLocaleString('en-US', { timeZone }))
-  const offset = utcGuess.getTime() - tzDate.getTime()
-  return new Date(utcGuess.getTime() + offset)
-}
-
-const getWeeklyResetStart = (now: Date) => {
-  const timeZone = 'America/Sao_Paulo'
-  const currentParts = toTzParts(now, timeZone)
-  const daysSinceMonday = (currentParts.weekdayIndex + 6) % 7
-  const mondayDay = currentParts.day - daysSinceMonday
-  const weekStart = tzDateToUtc(timeZone, currentParts.year, currentParts.month, mondayDay, 3, 0, 0)
-  if (now.getTime() < weekStart.getTime()) {
-    const prevMonday = new Date(weekStart.getTime() - 7 * 24 * 60 * 60 * 1000)
-    return prevMonday
-  }
-  return weekStart
-}
 
 export async function checkVipFeatureAccess(
   supabase: SupabaseClient, 
