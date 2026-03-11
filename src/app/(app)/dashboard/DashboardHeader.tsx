@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import { Dumbbell, Crown } from 'lucide-react'
+import { Crown } from 'lucide-react'
 import HeaderActionsMenu from '@/components/HeaderActionsMenu'
 import type { AdminUser } from '@/types/admin'
 
@@ -84,10 +84,19 @@ export function DashboardHeader({
         <>
             <div className="bg-neutral-950 flex justify-between items-center fixed top-0 left-0 right-0 z-40 border-b border-zinc-800 px-6 shadow-lg pt-[env(safe-area-inset-top)] min-h-[calc(4rem+env(safe-area-inset-top))]">
                 <div className="flex items-center cursor-pointer group" onClick={onGoHome}>
-                    <div className="flex items-center gap-2">
-                        <Dumbbell size={18} className="text-yellow-500 opacity-25" />
-                        <h1 className="text-2xl font-black tracking-tighter italic leading-none text-white group-hover:opacity-80 transition-opacity">
-                            IRON<span className="text-yellow-500">TRACKS</span>
+                    <div className="flex items-center">
+                        <h1
+                            className="text-[1.6rem] font-black italic leading-none tracking-tight group-hover:opacity-80 transition-opacity select-none"
+                            style={{ letterSpacing: '-0.03em' }}
+                        >
+                            <span className="text-white">IRON</span><span
+                                style={{
+                                    background: 'linear-gradient(90deg, #f59e0b 0%, #fbbf24 50%, #f59e0b 100%)',
+                                    WebkitBackgroundClip: 'text',
+                                    WebkitTextFillColor: 'transparent',
+                                    backgroundClip: 'text',
+                                }}
+                            >TRACKS</span>
                         </h1>
                     </div>
                     {/* Removed 'BEM VINDO COACH/ATLETA' — story ring in header now acts as identity anchor */}
