@@ -18,7 +18,7 @@ export const DELOAD_REDUCTION_MIN = 0.05;
 export const DELOAD_REDUCTION_MAX = 0.4;
 export const WEIGHT_ROUND_STEP = 0.5;
 export const REPORT_HISTORY_LIMIT = 80;
-export const REPORT_CACHE_KEY = 'irontracks.report.history.v1';
+export const REPORT_CACHE_KEY = 'irontracks.report.history.v2';
 export const REPORT_CACHE_TTL_MS = 1000 * 60 * 15;
 export const REPORT_FETCH_TIMEOUT_MS = 9000;
 export const DELOAD_SUGGEST_MODE = 'watermark';
@@ -158,6 +158,13 @@ export const normalizeReportHistory = (data: unknown): ReportHistory => {
         const topWeight = typeof it.topWeight === 'number' ? it.topWeight : null;
         const setsCount = Number(it.setsCount);
         const maybeName = typeof it.name === 'string' ? it.name : null;
+        // Preserva pesos e reps por série para mostrar progressão correta
+        const setWeights = Array.isArray(it.setWeights)
+          ? (it.setWeights as unknown[]).filter((v): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0)
+          : undefined;
+        const setReps = Array.isArray(it.setReps)
+          ? (it.setReps as unknown[]).filter((v): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0)
+          : undefined;
         return {
           ts,
           avgWeight,
@@ -166,7 +173,9 @@ export const normalizeReportHistory = (data: unknown): ReportHistory => {
           topWeight,
           setsCount: Number.isFinite(setsCount) ? setsCount : 0,
           ...(maybeName ? { name: maybeName } : {}),
-        };
+          ...(setWeights && setWeights.length > 0 ? { setWeights } : {}),
+          ...(setReps && setReps.length > 0 ? { setReps } : {}),
+        } as ReportHistoryItem;
       })
       .filter((v): v is ReportHistoryItem => v !== null);
     exercises[key] = { name, items };
