@@ -40,28 +40,28 @@ const LoginScreen = () => {
 
     return (
         <div className="relative flex flex-col items-center justify-center min-h-[100dvh] overflow-hidden bg-neutral-950 text-white p-6">
-            {/* Premium Hero Background */}
+            {/* Subtle ambient glow */}
             <div className="absolute inset-0 pointer-events-none">
-                <div
-                    className="absolute inset-0 opacity-35"
-                    style={{
-                        backgroundImage: `url(data:image/webp;base64,UklGRsgQAABXRUJQVlA4ILwQAACwdgCdASqQAZABPu12tFUppzA2IxIo8sAdiWdu3s7zah2apDxIXpt03z+CH07/9L01fT56Wuc09IHRFer1/ZPUz86++hu9HJPebuD/cuNuis+/9g/tFsF/1v1Bv0r6yXhKLRev1+v1+v1+iJxOJxOJxNMWsc4F+H3LmiWd4GCVEVCXyAuHBdAmpWlSgOmUDehpwYEbx/Du/t6I4ltqsQi1TFOpYYrIiihp5n+JrNa+jY1lNdDKexI77luNZnuN+lvL8G3XvP+DA775Qr4+508mvUMVJT65vGTr6rs9ikvca67TSWz7aTmMlFFhtP8X/ZmA7vs5kKsjqLP8uFI2iF9pLel5puF/+seD0C5sgQAOtG2kghmFm75NLx8tjKmtQWDBwnSnh1LctpUsVhBEZ/ozgS4tt9xnUpp+y4jBVm8UVfrLMabJ4nE7XgFpoQ87gdQv1N2kwGGRmEGHVrR57yoaAjSOVye+UGJyHFwKo+e/e7MjmS5oBfDSN+ssxqA8LdspLJofmm/bOwfVqvw6PGMPrroJjGga6+IJdbSX8AZYuRAulPdGaTz9djALoqLHufIlj1OgzIgGistGoJB24R2jUYMhf9RPMfYbcSYadHuSG9Pilff+nCvyI+v8plOZODRgNc5mjOz29TyNpkD0iQvnwFsOFIIzYO7vhwZe5N3q1Yuxd3CilFRLwKzYasiNN94KKc0/P5CA3eZgOF9UHWQ7YxvM959N3BoBHYojuS+CZGlXCE/I7BaveJ2dutAZDz3L6Htmr9CGfpG4bgIZCEfrxhnRn+m/1NBX2N+MOwFphTS3dDxSBHuQsmUDRyjKO5qPHVMz2w+J80ve5gHjQXUwagA6Iw+VJuM/3RbRhsgH6S+D2iiQolugWBGbHe736uGEuOvQYDcYHkX7DGmyWxoYLeOYs22OQTHWsJZXv9X0CM2Dk+0lgYjNviZXsyys47PNzugWBGbIy/etnogtTdUcWcUqbKF5TMxHIelvuRKF7a7CXXyz0M5Bsoqcg3ZYMbVDZtKyDpLlTohe7gUotLhF6XWvmNt24L3AoIzoNRJAdaCxeR4/ndWtZpGf2/y/uSL8Y7nMiczHAERXSP/OT1Jw/ml71fR8ijdj4MwA4a7yYPEIG7Bd1Xy5j5K0CT8HH6UvN9YXB5cLseFt4wuOS/AI11iqPgp3s3WuATwDSO3Y133YYf1VItN2PcQ4P7zUKijYvvAlneGrrSm8jEEvhXUmUPOiQ+5kgqODAoHrsAsEJvLJSPwpcHZM5cTkEzNAAP7zYq9JM8cRRayGxvA2JbdIx1kJtA76+JKCXNh2A20ILveBcdQ2+m7wABLtELNxm6NfJtChib4zjuiLV6AY/hRS6644tDmgLxg7hjZTTuvFVYcgKbteItgk+aoze8+4OMGyd3DhlIWjd2iatgw6n7CzFuf+91p4PdgsfTOYp+bqFFPnZDaryFotbxG7Y6wW6d+nFeGxKzhJsrHOVqlq7KWSQpLRYIX6iYKRfVT7dSxfoHpZhCSw7VoaXQ5cg7VgChm0mmyVg13hhGJCrVbg/w1GczuKSW3hZg1g16rXjaNsQsNQKPilx188Cu5REuGm0fwPD5jfx6ZJssPwsIyIiz5zyKJ7LFw7WuY+NA/hrm/vV6ZzXXiWUsnAbtSYZR1cs0ovPHTrIXyVZ2vS6N3cMwUwuDPnuiZduyIr+g0G5r/YQxTzldkasSa7PkUsGs6ABudH/9M7I3RDwojIRVe9l/T113ieZRCm/EZKvDhyWU2Hy6PaIzsp1e5sNLzW/XidN02sKbDuDsnXM8wEncmXhCxzjMKdp/JHUss521r7guvK/aq8GjkxLbc5ZNfVOpLvO/PhjYK/U1WxyPUe6RQO9l4+Rf8EQipX3Uw7YuzESo0EldKTwSt6MGAsbKFv8B1Dj4Zk428KtEaslyLqgHxMAd84F40w76mSj64To74Yb/N/DhW7LSsXfHcFoxDLf0t4nqHypRcrkC6c/CiQd7dr73rPML3hIy0YEoIgQ48ciL4fu2sk0jvjsWp3bb/tCCVKLKh02kF6JHvRWamSzIrAvIIjFIqyn3NYX5xstFKMtsfb4NFuF7+7SvHAEj+UVcLSQgQc5BlLdZ+xsS9xqSB6EY/a7/fLkNYmIrmPKOJJLs3GU7AEfbNWIn65ZdBzA8nO3BClhVk+HVoweRIQADqSclooVituKaVN0+Ae8RSjcb1dXaJNsOg1LIS4UcHgsV3xvtt6TW9Ea6Y7Bf+Vo1rqrSjzLJQu+ArZP5wMl+ZrqjrQnKXUME7TobEsVlgW5/P1D2aDY8k/JpoM1Mbc0YqVq0ICL0+qDGdo0LSUEwAKJPmNEKvhIwWEI/9KAbRGDxMVnyKHV3PUVAHKAazxg+MwGG36ilDws/25Bp7dfXgVnXv3WwvTzLbv+dD7Fz4tsZNguLBVnpni2Q+HnWCHRQXDlcoeOV+g8kAUfX07wptGISD14qFhJZnYmzrfiglgXPk8EvVqRR4VDglSQpCnG1iMw4LA6KUhX0FJTwoYXKd1MS0AAWGLdgLgo1RvzwE6zP0u8IsMMcOtKYuK4XVCNBqU8iTwr3DvPOEyrRWbu4LHGWdSn0sa7P95/FmX+o+gBhiG31L0RAz1PuhvKPQVwBcZCtlATt+HnvbZ+nr7dKo993A6gcUnj76tV7ZzcLLc6xg1/N+rpBAo0dPzko3N8Cv3CkEOEwCtE6gqYrghf6XJ31nmYb0qBlf6Znqh10nUWuaOYyFdhksXCI7EmuvXXk7imbsqUwRPVRnXR9LAeEcWNNeBJwUbrd+kP54Q83eK0BBed8wNdfh5bAx1C7FFXDyttCK1l1WffJ4McsguHIm94RlOwHREyf1ZwVPd2qoe9+AF1trd6nl9F3DdDJffH2EUQFEiDJ9R3YhtJ8+mUl69tP/uzwwJlXgbTIOC1PIud75ooKKdM565MuzicHfAAD+W8UEmuzu4o0PUg+tE64JWQUXdmstKVU6FDTHe7UTkuJBSgapEDCVnjgeQhTvLLF7neIdXNCAgTGQJsdx08qdDdqQc4GpxUJzqkSELvjIOHwwkp6t4J4rhMF53nJorkgKjZDjE0r/pT9euAfR+LkFpkvPXDIef0ZTrTtX76aB8p4sGlXZw/ZCp3Dtsymp+HFb315vckzD0a89HFaKH+r2nNAa086pBdhjoQTWP6X0jbG98UquLFnfH6Jj3FRbCksRKbV7RyaLGDzO6A6svNNCkyPdmP2u8A+k7P/GZVgp0ELrP994PHHnX+UajhSPoONI+Wp93qH1+5fVZfnO6YjEXViah2mWYn4uHrDZMr7KwPnQtm1RGXEwgjPkW8Hp/elatRPiBNy1+62kuPxmVQWF0sBbcZ15npvTxZSku74S2u1kEa+lk6ttDyFeuRjuluPzRIfg5oEWUnsMHj1Y4UcCDxl2QDG/itjwjjf4Xx1WQarAx6AP5p3Srzrh+S8OBvaEOxgH2AN8rNUBCgqTrHCesJnppeurY7oAnbJHdoax+Q9y60gHoDz98UrF8cKzKBJkL1R6ryL+IsIatt3VuehcIU5pVV5Np+KO7Dgwxt9xFUna/FEm0FQpMjNx6H9MvFpK7V0VMHr80MpCk3Qslj1qmbhM4r1Pp/yOV/2fYSmLLx7MN1QmJjDMIcqPfqDbgn3gz1wY5vG0F0h9PL18J5C9XURwWUIaTgco3llCEU2rgZie1wza7lz8tVu5gTzBuMJWBKPW3F8PT4IBiaa30lAti7r5Tg4dBPaapoXNl+HZhJdzF1LYQUcYJVoARXZTeWTB4CNyxyBeZcX1OAAUf4H7UAvnwLWvsKfaGye02YYYbCNtJh32vBV+HrgcucCKauBKXEjKbpMu/lN/DQQh0VtO+t5OjFN6Z/gRydx0qDKjnwNNsHGDV8Q8KT4D1B3QUdGLgxpG/H2IuaCqaAbQqsfGEGaJVeB5bQvVKRSnIvwFNdTMLoVqY2SxD/iTkA/DQ9L7Ct+cvV0qYzeKtkV8qfphMsqL+ybLpY+j1VvsaONpc8nkRi99MXDPAufbDUiJuDwZm07VwqedaoSDz6aiUra6NUyjbrT0CrSMDA/vSRumbx49SCk5K46aaKUBvcA1iYfvdItJy6ZgFocSgOdgzCxOoqiCU18PgZjfypL/AbBVwP5rASwRjFBGQYPwjpRJsMHWCBgLOaU4c1KxXE/vWdyRlgQTNKZ9JDduc/VWqEyds+ihfUqpeNL96T0H3DlX9mfKHBrhYZqILiub8lOgTFnqakAaJManQcGABWNVr+N8YXoCOb6ydP3J+KQ+KVorV9hYLdIB2+w5RdB+23le3AOBXUprJEg7/axXvmulHMVDks7KP4YQEPW3HmUJuHfQfd5y9GUCiUDYBbMaGA8r6jpr5URN3Nue0l1G1uOEXNjdpugLLMjL9BxARIONxdB1CovrWgIhlJYpHmfpn5d6n+NJ+VTRqCF4JxRs5SaCWNF2hv66mddEivMQ2cSk8pINmT6vYfyHE5hHD5UrsMeBQ6Fk9SDElE+/FTakF1cFCKcdyjQ7XX2D3V3c63BQjSwS6dtwo6qiyGskvvKdOsXsDEct6jxdCR+By0TvhP2TdQ3wMK88iQUYzWBwxYSYmFVIBk9/tAFSpC2me13QmH+CgDlFW6H9vASXu3hTSZjA6GB4swEjMysSzPAtqT+YmdxihExQ7JAdK1GKI4A9cLCddQjS0CR81flmLCd04c9Errycn2xxhJRbeTIOFMhySSvvizASxnx/VolPzw4EjBAN2BISBnOlgpwMsHY7u0MaobM7HusywAEnxQ+5E20fSChiydDvw7RNnVhLIYFmk0Ze3eAFWDKAMfSwk1/r3xQx/ayIQRx9ch+W6kT7UZZtjNzlCCZfLAZx2KB43JvJnZ+SQmZGW0afrqQc2PrBPR/9xcqXZAVP1SAjWRdRpTwQ6+xUmLJGlzTapWDqKs+AANai0vcTLEo2MkbuXdMMhy8kozNUrDqyb6Tj9VFZFLxgFm/dr7Wm+hG4KNPILNe0a9oU1qI6kMTGJi+ZBWc903wN0rTnT/sLvUAAhhXc58wYskgB5OK2Nhk4b9Hs22DT9QoNR0g4GNZAkxqmmCeUFtfiCOHMw0ZYLITTYMK2qj7FAHIi3vC7V0qWtOpEdUwtvGliEDzGedv5JGr1uJknAPufyxaNilDGzLUOY32sUQyjeL+dCBPp2X03rlRD0Xcl1Fu91eNrL1tNcVTM6fVhKP6rBd26dL2wmrCMJUOx3VwFduX1XUWY2nj2Y+b6bBV+7LMzJqr8H6+Mbz4ZqVnn7ck+H9PGawZ0CYes5A+d7Da8egpzuXsD/a2gEDcndYi8YnqdM8o33EdsjNYNJwKrpjxcaLmcaaCFgG28+SA3V9W+Kk6MAbOUDPSBV/9grQZrYUmzJzfjAe9tM1HWFjAhEW4kyxPUA32GFgiNfk6Jzptd8RtNBFWhZVV/EGK3Xz5bAa9QftK2ND1+qJ1xmbKAF/Nw5YLe8CSxEagvCwgzq/+eCG5PLbgbOn5e1rbr2fNxzk/qwPhxbCqMvTUtJsd71wGA6XXVCWtrAWc9cIxX/bF85oG4x8NhOeLzNUytO2l+iweZihx3DO5gHl0QB8ODK3GvRJLXYFEsjXTNQIeUSi0mIxqJlbPRp90LTtYotdPLVhzazUcAoKCohrs5L61UPpqSeoQtnmmdc8cgJLVV0UpcMUhPPgAA=)`,
-                        backgroundSize: 'cover',
-                        backgroundPosition: 'center center',
-                        backgroundRepeat: 'no-repeat',
-                    }}
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-neutral-950 via-neutral-950/70 to-neutral-950/40" />
-                <div className="absolute inset-0 bg-gradient-to-b from-neutral-950/80 via-transparent to-transparent" />
-                <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjAwIDIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZmlsdGVyIGlkPSJub2lzZUZpbHRlciI+PGZlVHVyYnVsZW5jZSB0eXBlPSJmcmFjdGFsTm9pc2UiIGJhc2VGcmVxdWVuY3k9IjAuNjUiIG51bU9jdGF2ZXM9IjMiIHN0aXRjaFRpbGVzPSJzdGl0Y2giLz48L2ZpbHRlcj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWx0ZXI9InVybCgjbm9pc2VGaWx0ZXIpIiBvcGFjaXR5PSIwLjUiLz48L3N2Zz4=')] opacity-15 brightness-100 contrast-150 mix-blend-overlay" />
+                <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-amber-500/8 rounded-full blur-[100px]" />
+                <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjAwIDIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZmlsdGVyIGlkPSJub2lzZUZpbHRlciI+PGZlVHVyYnVsZW5jZSB0eXBlPSJmcmFjdGFsTm9pc2UiIGJhc2VGcmVxdWVuY3k9IjAuNjUiIG51bU9jdGF2ZXM9IjMiIHN0aXRjaFRpbGVzPSJzdGl0Y2giLz48L2ZpbHRlcj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWx0ZXI9InVybCgjbm9pc2VGaWx0ZXIpIiBvcGFjaXR5PSIwLjUiLz48L3N2Zz4=')] opacity-15 mix-blend-overlay" />
             </div>
 
-            {/* Glassmorphism Card */}
-            <div className="relative z-10 w-full max-w-sm p-8 rounded-[2rem] border border-white/5 bg-neutral-900/40 backdrop-blur-xl shadow-2xl shadow-black/50 flex flex-col items-center transition-all duration-500">
+            {/* Card with integrated hero */}
+            <div className="relative z-10 w-full max-w-sm rounded-[2rem] border border-white/5 bg-neutral-900/60 backdrop-blur-xl shadow-2xl shadow-black/50 flex flex-col items-center transition-all duration-500 overflow-hidden">
 
-                <div className="mb-8 p-6 bg-gradient-to-br from-yellow-500 to-amber-600 rounded-3xl shadow-[0_0_40px_-10px_rgba(245,158,11,0.5)] ring-1 ring-white/20 animate-pulse-slow">
-                    <Dumbbell size={48} className="text-black drop-shadow-md" />
+                {/* Hero image section — visible on all devices */}
+                <div className="relative w-full h-48 sm:h-56 overflow-hidden">
+                    <img
+                        src="/login-hero.png"
+                        alt=""
+                        className="w-full h-full object-cover object-top"
+                        draggable={false}
+                    />
+                    <div className="absolute inset-0 bg-gradient-to-t from-neutral-900 via-transparent to-transparent" />
+                    <div className="absolute inset-0 bg-gradient-to-b from-neutral-900/40 via-transparent to-transparent" />
                 </div>
+
+                <div className="px-8 pb-8 pt-4 w-full flex flex-col items-center">
 
                 <h1 className="text-4xl font-black mb-2 tracking-tighter italic text-center drop-shadow-lg">
                     IRON<span className="text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-amber-500">TRACKS</span>
@@ -456,6 +456,7 @@ const LoginScreen = () => {
                         Não tem acesso? <span className="text-yellow-500 underline decoration-yellow-500/30 underline-offset-4 hover:decoration-yellow-500">Pedir agora</span>
                     </button>
                 )}
+                </div>
             </div>
 
             <div className="absolute bottom-6 text-[10px] text-zinc-700 font-mono tracking-widest uppercase opacity-50">
