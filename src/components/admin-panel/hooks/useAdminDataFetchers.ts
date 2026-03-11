@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react'
+import { useCallback, useEffect, useRef } from 'react'
 import { useStableSupabaseClient } from '@/hooks/useStableSupabaseClient'
 import { logError, logWarn } from '@/lib/logger'
 import type { AdminUser, AdminTeacher, AdminWorkoutTemplate } from '@/types/admin'
@@ -510,37 +510,44 @@ export function useAdminDataFetchers(deps: AdminDataFetchersDeps) {
     }, [tab, isAdmin, supabase, setExerciseAliasesError, setExerciseAliasesLoading, setExerciseAliasesReview]);
 
     // fetchDetails
+    // IMPORTANT: deps use primitive keys (id/email) NOT the full selectedStudent object.
+    // Using the full object caused an infinite loop:
+    //   fetchDetails → setSelectedStudent() → selectedStudent changes → effect re-runs → loading=true flash
+    const selectedStudentRef = useRef(selectedStudent);
+    selectedStudentRef.current = selectedStudent;
+
     useEffect(() => {
         if (!selectedStudent) return;
         const fetchDetails = async () => {
+            const student = selectedStudentRef.current;
+            if (!student) return;
             setLoading(true);
-            const expectedStudentId = selectedStudent?.id || null;
-            let targetUserId = selectedStudent.user_id || '';
-            if (!targetUserId && selectedStudent.email) {
+            const expectedStudentId = student?.id || null;
+            let targetUserId = student.user_id || '';
+            if (!targetUserId && student.email) {
                 const { data: profile } = await supabase
                     .from('profiles')
                     .select('id')
-                    .ilike('email', String(selectedStudent.email))
+                    .ilike('email', String(student.email))
                     .maybeSingle();
                 targetUserId = profile?.id || targetUserId;
             }
             try {
-                const key = String(selectedStudent?.id || selectedStudent?.email || targetUserId || '');
+                const key = String(student?.id || student?.email || targetUserId || '');
                 if (key && !loadedStudentInfo.current[key]) {
                     const authHeaders = await getAdminAuthHeaders();
                     try {
                         const js = await apiAdmin.listStudents(authHeaders);
                         const jsStudents = js.students as unknown as UnknownRecord[];
                         if (js.ok && Array.isArray(jsStudents)) {
-                            const row = jsStudents.find((s: UnknownRecord) => (s.id === selectedStudent.id) || (s.user_id && s.user_id === (selectedStudent.user_id || targetUserId)) || (String(s.email || '').toLowerCase() === String(selectedStudent.email || '').toLowerCase()));
+                            const row = jsStudents.find((s: UnknownRecord) => (s.id === student.id) || (s.user_id && s.user_id === (student.user_id || targetUserId)) || (String(s.email || '').toLowerCase() === String(student.email || '').toLowerCase()));
                             if (row) {
                                 const nextTeacher = row.teacher_id ? String(row.teacher_id) : null;
                                 const nextUserId = row.user_id ? String(row.user_id) : '';
-                                const shouldUpdate = (nextTeacher !== selectedStudent.teacher_id) || (nextUserId !== String(selectedStudent.user_id || ''));
+                                const shouldUpdate = (nextTeacher !== student.teacher_id) || (nextUserId !== String(student.user_id || ''));
                                 if (shouldUpdate) {
-                                    const currentStudent = selectedStudent;
-                                    if (currentStudent && (!expectedStudentId || String(currentStudent.id) === String(expectedStudentId))) {
-                                        setSelectedStudent({ ...currentStudent, teacher_id: nextTeacher, user_id: nextUserId || null });
+                                    if (student && (!expectedStudentId || String(student.id) === String(expectedStudentId))) {
+                                        setSelectedStudent({ ...student, teacher_id: nextTeacher, user_id: nextUserId || null });
                                     }
                                 }
                             }
@@ -550,13 +557,10 @@ export function useAdminDataFetchers(deps: AdminDataFetchersDeps) {
                 }
             } catch { }
             try {
-                if (!selectedStudent.teacher_id && selectedStudent.email) {
-                    const cached = localStorage.getItem('student_teacher_' + String(selectedStudent.email));
-                    if (cached != null && cached !== String(selectedStudent.teacher_id || '')) {
-                        const currentStudent2 = selectedStudent;
-                        if (currentStudent2) {
-                            setSelectedStudent({ ...currentStudent2, teacher_id: cached || null });
-                        }
+                if (!student.teacher_id && student.email) {
+                    const cached = localStorage.getItem('student_teacher_' + String(student.email));
+                    if (cached != null && cached !== String(student.teacher_id || '')) {
+                        setSelectedStudent({ ...student, teacher_id: cached || null });
                     }
                 }
             } catch { }
@@ -642,7 +646,7 @@ export function useAdminDataFetchers(deps: AdminDataFetchersDeps) {
             }
             if (targetUserId) {
                 const assessmentOrParts: unknown[] = [];
-                if (selectedStudent?.id) assessmentOrParts.push(`student_id.eq.${selectedStudent.id}`);
+                if (student?.id) assessmentOrParts.push(`student_id.eq.${student.id}`);
                 if (targetUserId) assessmentOrParts.push(`user_id.eq.${targetUserId}`);
                 if (assessmentOrParts.length > 0) {
                     const { data: aData } = await supabase
@@ -658,6 +662,10 @@ export function useAdminDataFetchers(deps: AdminDataFetchersDeps) {
             setLoading(false);
         };
         fetchDetails();
-    }, [selectedStudent, supabase, user?.id, isAdmin, isTeacher, getAdminAuthHeaders, loadedStudentInfo, setAssessments, setLoading, setSelectedStudent, setStudentWorkouts, setSyncedWorkouts, setTemplates]);
+        // CRITICAL: deps use primitive keys (id/email) NOT the full selectedStudent object
+        // to prevent the infinite loop where setSelectedStudent() triggers this effect again.
+        // selectedStudentRef.current is used inside to access the latest student data.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [selectedStudent?.id, selectedStudent?.email, supabase, user?.id, isAdmin, isTeacher, getAdminAuthHeaders, loadedStudentInfo, setAssessments, setLoading, setSelectedStudent, setStudentWorkouts, setSyncedWorkouts, setTemplates]);
 
 }
