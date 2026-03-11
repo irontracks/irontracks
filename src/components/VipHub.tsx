@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useEffect, useMemo, useRef, useState } from 'react'
+import NextImage from 'next/image'
 import { Crown, Sparkles, ArrowRight, Lock, MessageSquare, CalendarDays, TrendingUp, Trash2, Zap, BarChart3, ChefHat, FileText } from 'lucide-react'
 import { isIosNative } from '@/utils/platform'
 import dynamic from 'next/dynamic'
@@ -350,27 +351,60 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
   if (isLocked) {
     return (
       <div className="rounded-2xl p-[1px]" style={{ background: 'linear-gradient(135deg, rgba(234,179,8,0.4) 0%, rgba(255,255,255,0.04) 50%, rgba(234,179,8,0.15) 100%)' }}>
-        <div className="rounded-[15px] p-8 text-center space-y-6" style={{ background: 'rgba(15,15,15,0.98)' }}>
-          <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)', boxShadow: '0 8px 32px rgba(234,179,8,0.3)' }}>
-            <Crown size={32} fill="currentColor" className="text-black" />
+        <div className="rounded-[15px] text-center overflow-hidden" style={{ background: 'rgba(15,15,15,0.98)' }}>
+
+          {/* Crown hero — full width, bleeds edge-to-edge */}
+          <div className="relative w-full h-52 overflow-hidden">
+            <NextImage
+              src="/vip-crown.png"
+              alt="VIP"
+              fill
+              priority
+              unoptimized
+              className="object-cover object-center scale-110"
+            />
+            {/* Bottom gradient fade into card */}
+            <div className="absolute inset-0 bg-gradient-to-t from-[#0f0f0f] via-[#0f0f0f]/20 to-transparent" />
+            {/* Top vignette */}
+            <div className="absolute inset-0 bg-gradient-to-b from-[#0f0f0f]/50 via-transparent to-transparent" />
+            {/* VIP badge overlay */}
+            <div className="absolute top-4 left-1/2 -translate-x-1/2">
+              <div className="px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-[0.25em]" style={{ background: 'rgba(234,179,8,0.15)', border: '1px solid rgba(234,179,8,0.4)', color: '#f59e0b' }}>
+                Exclusivo VIP
+              </div>
+            </div>
           </div>
-          <div>
-            <h2 className="text-2xl font-black text-white">Área VIP Exclusiva</h2>
-            <p className="text-neutral-400 mt-2 max-w-md mx-auto text-sm">
-              Desbloqueie o Coach IA, Nutrição Avançada, Histórico Ilimitado e muito mais.
-            </p>
+
+          {/* Content */}
+          <div className="px-8 pb-8 space-y-4">
+            <div>
+              <h2 className="text-2xl font-black text-white">Área VIP Exclusiva</h2>
+              <p className="text-neutral-400 mt-2 max-w-md mx-auto text-sm leading-relaxed">
+                Desbloqueie o Coach IA, Nutrição Avançada, Histórico Ilimitado e muito mais.
+              </p>
+            </div>
+
+            {/* Feature preview pills */}
+            <div className="flex flex-wrap justify-center gap-2">
+              {['🤖 Coach IA', '📊 Analytics', '🍽️ Nutrição', '📅 Periodização'].map((f) => (
+                <span key={f} className="px-3 py-1 rounded-full text-[11px] font-bold text-neutral-400" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                  {f}
+                </span>
+              ))}
+            </div>
+
+            {!hideVipCtas ? (
+              <button
+                onClick={() => window.location.href = '/marketplace'}
+                className="w-full px-8 py-4 rounded-xl font-black text-black text-sm transition-all active:scale-[0.97]"
+                style={{ background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 60%, #b45309 100%)', boxShadow: '0 4px 24px rgba(234,179,8,0.4)' }}
+              >
+                Ver Planos e Assinar →
+              </button>
+            ) : (
+              <div className="text-xs font-bold text-neutral-400">Planos indisponíveis no iOS no momento.</div>
+            )}
           </div>
-          {!hideVipCtas ? (
-            <button
-              onClick={() => window.location.href = '/marketplace'}
-              className="px-8 py-3.5 rounded-xl font-black text-black text-sm transition-all active:scale-[0.97]"
-              style={{ background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 60%, #b45309 100%)', boxShadow: '0 4px 20px rgba(234,179,8,0.35)' }}
-            >
-              Ver Planos e Assinar
-            </button>
-          ) : (
-            <div className="text-xs font-bold text-neutral-400">Planos indisponíveis no iOS no momento.</div>
-          )}
         </div>
       </div>
     )
