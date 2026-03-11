@@ -27,6 +27,8 @@ interface HeaderActionsMenuProps {
   isCoach?: boolean
   hasUnreadChat?: boolean
   hasUnreadNotification?: boolean
+  hasActiveStory?: boolean      // ← true if user has a live story
+  onAddStory?: () => void       // ← opens story creator on long press
   onOpenAdmin?: () => void
   onOpenChatList?: () => void
   onOpenGlobalChat?: () => void
@@ -122,6 +124,8 @@ export default function HeaderActionsMenu({
   isCoach,
   hasUnreadChat,
   hasUnreadNotification,
+  hasActiveStory = false,
+  onAddStory,
   onOpenAdmin,
   onOpenChatList,
   onOpenGlobalChat,
@@ -181,31 +185,67 @@ export default function HeaderActionsMenu({
   const initial = displayName.slice(0, 1).toUpperCase()
   const roleLabel = isCoach ? 'Coach' : user?.role === 'admin' ? 'Admin' : null
 
+  // Long-press detection for "add story"
+  const longPressTimer = React.useRef<ReturnType<typeof setTimeout> | null>(null)
+  const didLongPress = React.useRef(false)
+
+  const handlePointerDown = () => {
+    didLongPress.current = false
+    if (onAddStory) {
+      longPressTimer.current = setTimeout(() => {
+        didLongPress.current = true
+        onAddStory()
+      }, 600)
+    }
+  }
+  const handlePointerUp = () => {
+    if (longPressTimer.current) clearTimeout(longPressTimer.current)
+  }
+  const handleClick = () => {
+    if (didLongPress.current) { didLongPress.current = false; return }
+    setOpen((v) => !v)
+  }
+
   return (
     <div className="relative">
-      {/* Avatar trigger — relative wrapper so badge can overflow outside the circle */}
+      {/* Story Ring Avatar trigger */}
       <button
         type="button"
         data-tour="header-menu"
         aria-label="Menu"
         aria-expanded={open}
-        onClick={() => setOpen((v) => !v)}
-        className="relative w-10 h-10 rounded-full border-2 border-yellow-500 hover:opacity-80 transition-opacity focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2 focus:ring-offset-neutral-950"
+        onPointerDown={handlePointerDown}
+        onPointerUp={handlePointerUp}
+        onPointerCancel={handlePointerUp}
+        onClick={handleClick}
+        className="relative focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2 focus:ring-offset-neutral-950 rounded-full"
+        title={onAddStory ? 'Toque para menu • Segure para adicionar story' : 'Menu'}
       >
-        {/* Photo / initial — overflow-hidden applied only here */}
-        <div className="w-full h-full rounded-full overflow-hidden">
-          {user?.photoURL ? (
-            <Image src={user.photoURL} width={40} height={40} className="w-full h-full object-cover" alt="Perfil" unoptimized />
-          ) : (
-            <div className="w-full h-full bg-neutral-800 flex items-center justify-center font-black text-yellow-500 text-sm">
-              {initial}
-            </div>
-          )}
+        {/* Outer ring — animated when has story, dashed when empty */}
+        <div className={[
+          'w-[50px] h-[50px] rounded-full flex items-center justify-center',
+          hasActiveStory
+            ? 'p-[2.5px] bg-gradient-to-br from-yellow-400 via-amber-500 to-yellow-600 shadow-[0_0_14px_3px_rgba(234,179,8,0.35)] animate-spin-slow'
+            : 'p-[2px] border-2 border-dashed border-yellow-500/50',
+        ].join(' ')}>
+          {/* Inner avatar */}
+          <div className={[
+            'rounded-full overflow-hidden bg-neutral-900 flex items-center justify-center',
+            hasActiveStory ? 'w-[42px] h-[42px]' : 'w-[42px] h-[42px]',
+          ].join(' ')}>
+            {user?.photoURL ? (
+              <Image src={user.photoURL} width={42} height={42} className="w-full h-full object-cover" alt="Perfil" unoptimized />
+            ) : (
+              <div className="w-full h-full bg-neutral-800 flex items-center justify-center font-black text-yellow-500 text-sm">
+                {initial}
+              </div>
+            )}
+          </div>
         </div>
 
-        {/* Notification badge — outside overflow-hidden, only when menu is closed and there are unreads */}
+        {/* Notification badge */}
         {!open && (hasUnreadChat || hasUnreadNotification) && (
-          <span className="pointer-events-none absolute -top-1 -right-1 w-3.5 h-3.5 bg-red-500 rounded-full border-2 border-neutral-950 shadow-lg shadow-red-900/60 animate-pulse" />
+          <span className="pointer-events-none absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-red-500 rounded-full border-2 border-neutral-950 shadow-lg shadow-red-900/60 animate-pulse" />
         )}
       </button>
 

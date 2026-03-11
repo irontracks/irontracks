@@ -156,6 +156,14 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
     const [authLoading, setAuthLoading] = useState(false);
     const [view, setView] = useState('dashboard');
     const [directChat, setDirectChat] = useState<DirectChatState | null>(null);
+    // ── Story Ring state: own story status (fed up from StoriesBar) ────────────
+    const [hasActiveStory, setHasActiveStory] = useState(false)
+    const handleMyStoryStateChange = useCallback((active: boolean) => setHasActiveStory(active), [])
+    // onAddStory: triggers story creator via a custom window event so StoriesBar
+    // can open the modal without needing a direct React ref
+    const handleAddStory = useCallback(() => {
+        try { window.dispatchEvent(new CustomEvent('irontracks:stories:open-creator')) } catch { }
+    }, [])
     // ── Native iOS setup (notifications + biometric lock) ─────────────────────
     useNativeAppSetup(user?.id)
     const userName = String(user?.displayName || user?.email || '')
@@ -808,6 +816,8 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                             user={user as import('@/types/admin').AdminUser}
                             hasUnreadChat={hasUnreadChat}
                             hasUnreadNotification={hasUnreadNotification}
+                            hasActiveStory={hasActiveStory}
+                            onAddStory={handleAddStory}
                             hideVipOnIos={hideVipOnIos}
                             vipAccess={vipAccess as { hasVip?: boolean } | null}
                             syncState={syncState as { pending?: number; failed?: number; online?: boolean; syncing?: boolean } | null}
@@ -905,6 +915,8 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                     onOpenIronScanner={() => {
                                         try { openManualWorkoutEditor() } catch { }
                                     }}
+                                    onMyStoryStateChange={handleMyStoryStateChange}
+                                    onAddStory={handleAddStory}
                                 />
                             )}
 

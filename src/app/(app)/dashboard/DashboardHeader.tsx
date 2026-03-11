@@ -22,6 +22,7 @@ interface DashboardHeaderProps {
     user: AdminUser | null
     hasUnreadChat: boolean
     hasUnreadNotification: boolean
+    hasActiveStory?: boolean      // ← user has a live story
     hideVipOnIos: boolean
     vipAccess: VipAccess | null
     syncState: SyncState | null
@@ -43,15 +44,17 @@ interface DashboardHeaderProps {
     onLogout: () => void
     onOfflineSyncOpen: () => void
     onAcceptCoach: () => Promise<void>
+    onAddStory?: () => void        // ← triggers story creator from header long-press
 }
 
 export function DashboardHeader({
-    isCoach, user, hasUnreadChat, hasUnreadNotification,
+    isCoach, user, hasUnreadChat, hasUnreadNotification, hasActiveStory,
     hideVipOnIos, vipAccess, syncState, userSettings,
     isHeaderVisible, coachPending,
     onGoHome, onOpenVip, onOpenAdmin, onOpenChatList, onOpenGlobalChat,
     onOpenHistory, onOpenNotifications, onOpenSchedule, onOpenWallet,
     onOpenSettings, onOpenTour, onOpenProfile, onLogout, onOfflineSyncOpen, onAcceptCoach,
+    onAddStory,
 }: DashboardHeaderProps) {
     if (!isHeaderVisible) return null
 
@@ -87,18 +90,13 @@ export function DashboardHeader({
                             IRON<span className="text-yellow-500">TRACKS</span>
                         </h1>
                     </div>
-                    <div className="h-6 w-px bg-yellow-500 mx-4 opacity-50" />
-                    <div className="flex items-center gap-2">
-                        <span className="text-zinc-400 text-xs font-medium tracking-wide uppercase">
-                            {isCoach ? 'Bem vindo Coach' : 'Bem vindo Atleta'}
-                        </span>
-                        {!hideVipOnIos && vipAccess?.hasVip && (
-                            <button type="button" onClick={(e) => { e.stopPropagation(); onOpenVip() }} className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-yellow-500/10 border border-yellow-500/20 shadow-[0_0_10px_-3px_rgba(234,179,8,0.3)] mr-3 hover:bg-yellow-500/15">
-                                <Crown size={11} className="text-yellow-500 fill-yellow-500" />
-                                <span className="text-[10px] font-black text-yellow-500 tracking-widest leading-none">VIP</span>
-                            </button>
-                        )}
-                    </div>
+                    {/* Removed 'BEM VINDO COACH/ATLETA' — story ring in header now acts as identity anchor */}
+                    {!hideVipOnIos && vipAccess?.hasVip && (
+                        <button type="button" onClick={(e) => { e.stopPropagation(); onOpenVip() }} className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-yellow-500/10 border border-yellow-500/20 shadow-[0_0_10px_-3px_rgba(234,179,8,0.3)] mx-3 hover:bg-yellow-500/15">
+                            <Crown size={11} className="text-yellow-500 fill-yellow-500" />
+                            <span className="text-[10px] font-black text-yellow-500 tracking-widest leading-none">VIP</span>
+                        </button>
+                    )}
                 </div>
                 <div className="flex items-center gap-4">
                     {syncBadge}
@@ -107,6 +105,8 @@ export function DashboardHeader({
                         isCoach={isCoach}
                         hasUnreadChat={hasUnreadChat}
                         hasUnreadNotification={hasUnreadNotification}
+                        hasActiveStory={hasActiveStory}
+                        onAddStory={onAddStory}
                         onOpenAdmin={onOpenAdmin}
                         onOpenChatList={onOpenChatList}
                         onOpenGlobalChat={onOpenGlobalChat}
