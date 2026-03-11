@@ -71,7 +71,7 @@ const BodyMapSvg = memo(function BodyMapSvg({ view, muscles, onSelect, selected 
   const layers = useMemo(() => dedup(overlays, muscles), [overlays, muscles])
 
   return (
-    <div className="relative w-full max-w-[280px] mx-auto select-none overflow-hidden rounded-2xl bg-black border border-neutral-800 flex items-center justify-center min-h-[460px]">
+    <div className="relative w-full max-w-[280px] mx-auto select-none overflow-hidden rounded-2xl bg-black border border-neutral-800 aspect-square">
 
       {/* Base body (dark mannequin) */}
       <img
@@ -80,8 +80,7 @@ const BodyMapSvg = memo(function BodyMapSvg({ view, muscles, onSelect, selected 
         alt={`Body ${view}`}
         loading="lazy"
         draggable={false}
-        className="w-full h-full object-cover pointer-events-none"
-        style={{ objectPosition: 'center top' }}
+        className="absolute inset-0 w-full h-full object-contain pointer-events-none"
         onError={(e) => { e.currentTarget.style.display = 'none' }}
       />
 
@@ -98,9 +97,8 @@ const BodyMapSvg = memo(function BodyMapSvg({ view, muscles, onSelect, selected 
             alt=""
             loading="lazy"
             draggable={false}
-            className="absolute inset-0 w-full h-full object-cover pointer-events-none transition-opacity duration-500"
+            className="absolute inset-0 w-full h-full object-contain pointer-events-none transition-opacity duration-500"
             style={{
-              objectPosition: 'center top',
               opacity,
               mixBlendMode: 'lighten',
               filter: isSelected ? 'saturate(1.4) brightness(1.15)' : 'none',
@@ -121,9 +119,8 @@ const BodyMapSvg = memo(function BodyMapSvg({ view, muscles, onSelect, selected 
             alt=""
             loading="lazy"
             draggable={false}
-            className="absolute inset-0 w-full h-full object-cover pointer-events-none"
+            className="absolute inset-0 w-full h-full object-contain pointer-events-none"
             style={{
-              objectPosition: 'center top',
               opacity: 0.4,
               mixBlendMode: 'screen',
               filter: 'blur(8px) brightness(1.5)',
