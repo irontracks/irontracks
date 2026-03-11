@@ -112,6 +112,7 @@ interface UseReportDataParams {
   session: AnyObj | null
   previousSession?: AnyObj | null
   user: AnyObj | null
+  settings?: AnyObj | null
 }
 
 export interface UseReportDataReturn {
@@ -192,7 +193,7 @@ export interface UseReportDataReturn {
  * @param params.previousSession  - Optional previous session already known by the caller
  * @param params.user             - Authenticated user object (for `user.id`)
  */
-export const useReportData = ({ session, previousSession, user }: UseReportDataParams): UseReportDataReturn => {
+export const useReportData = ({ session, previousSession, user, settings }: UseReportDataParams): UseReportDataReturn => {
   const safeSession = session && typeof session === 'object' ? (session as AnyObj) : null
 
   // ── Supabase client ──────────────────────────────────────────────────────
@@ -360,6 +361,9 @@ export const useReportData = ({ session, previousSession, user }: UseReportDataP
     const execMinutesOverride = execSeconds > 0 ? execSeconds / 60 : null
     const restMinutesOverride = restSecondsSession > 0 ? restSecondsSession / 60 : null
 
+    // Biological sex from user settings (improves calorie precision by ±10%)
+    const biologicalSex = String(settings?.biologicalSex ?? 'not_informed') || 'not_informed'
+
     return estimateCaloriesMet(
       sessionLogs,
       durationInMinutes || (totalTimeSeconds / 60),
@@ -368,8 +372,9 @@ export const useReportData = ({ session, previousSession, user }: UseReportDataP
       postCheckinRpe,
       execMinutesOverride,
       restMinutesOverride,
+      biologicalSex,
     )
-  }, [sessionLogs, durationInMinutes, checkinBodyWeightKg, sessionExerciseNames, postCheckinRpe, outdoorBike, safeSession?.executionTotalSeconds, safeSession?.restTotalSeconds, safeSession?.totalTime])
+  }, [sessionLogs, durationInMinutes, checkinBodyWeightKg, sessionExerciseNames, postCheckinRpe, outdoorBike, safeSession?.executionTotalSeconds, safeSession?.restTotalSeconds, safeSession?.totalTime, settings?.biologicalSex])
 
   const reportMeta = safeSession?.reportMeta && typeof safeSession.reportMeta === 'object' ? (safeSession.reportMeta as AnyObj) : null
   const reportTotals = reportMeta?.totals && typeof reportMeta.totals === 'object' ? (reportMeta.totals as AnyObj) : null

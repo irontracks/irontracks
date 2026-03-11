@@ -2,6 +2,7 @@ import { z } from 'zod'
 
 export const UserSettingsSchema = z
   .object({
+    biologicalSex: z.enum(['male', 'female', 'not_informed']).default('not_informed'),
     units: z.enum(['kg', 'lb']).default('kg'),
     dashboardDensity: z.enum(['comfortable', 'compact']).default('comfortable'),
     uiMode: z.enum(['beginner', 'intermediate', 'advanced']).default('beginner'),

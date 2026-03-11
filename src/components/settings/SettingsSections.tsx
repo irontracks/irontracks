@@ -1,7 +1,44 @@
 'use client'
 import React from 'react'
-import { Palette, CalendarDays, Layers, Wrench, Dumbbell, Volume2, Bell, Timer, Lock, RotateCcw } from 'lucide-react'
+import { Palette, CalendarDays, Layers, Wrench, Dumbbell, Volume2, Bell, Timer, Lock, RotateCcw, User } from 'lucide-react'
 import { SectionCard, SectionHeader, ToggleSwitch, type SettingsSectionProps } from './settingsShared'
+
+// ── Perfil ───────────────────────────────────────────────────────────────────
+export function SettingsProfileSection({ draft, setValue }: SettingsSectionProps) {
+    const biologicalSex = String(draft?.biologicalSex ?? 'not_informed')
+    const options = [
+        { value: 'male', label: '♂ Masculino' },
+        { value: 'female', label: '♀ Feminino' },
+        { value: 'not_informed', label: 'Não informar' },
+    ]
+    return (
+        <SectionCard>
+            <SectionHeader icon={User} label="Perfil" />
+            <div className="space-y-3">
+                <div>
+                    <div className="text-sm font-bold text-white mb-1">Sexo biológico</div>
+                    <div className="text-xs text-neutral-400 mb-3">Usado para estimar calorias com mais precisão (±10%).</div>
+                    <div className="grid grid-cols-3 gap-2">
+                        {options.map((opt) => (
+                            <button
+                                key={opt.value}
+                                type="button"
+                                onClick={() => setValue('biologicalSex', opt.value)}
+                                className={`py-2.5 px-2 rounded-xl text-xs font-black border transition-all ${
+                                    biologicalSex === opt.value
+                                        ? 'bg-yellow-500 border-yellow-500 text-black'
+                                        : 'bg-neutral-900 border-neutral-700 text-neutral-300 hover:border-neutral-500'
+                                }`}
+                            >
+                                {opt.label}
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            </div>
+        </SectionCard>
+    )
+}
 
 // ── Aparência ────────────────────────────────────────────────────────────────
 export function SettingsAppearanceSection({ draft, setValue }: SettingsSectionProps) {
