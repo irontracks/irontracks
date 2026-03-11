@@ -42,12 +42,14 @@ const LoginScreen = () => {
         <div className="relative flex flex-col items-center justify-center min-h-[100dvh] overflow-hidden bg-neutral-950 text-white p-6">
             {/* Premium Hero Background */}
             <div className="absolute inset-0 pointer-events-none">
-                <img
-                    src="/login-hero.png"
-                    alt=""
-                    className="absolute inset-0 w-full h-full object-cover object-center opacity-30"
-                    draggable={false}
-                    loading="eager"
+                <div
+                    className="absolute inset-0 opacity-35"
+                    style={{
+                        backgroundImage: 'url(/login-hero.png)',
+                        backgroundSize: 'cover',
+                        backgroundPosition: 'center center',
+                        backgroundRepeat: 'no-repeat',
+                    }}
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-neutral-950 via-neutral-950/70 to-neutral-950/40" />
                 <div className="absolute inset-0 bg-gradient-to-b from-neutral-950/80 via-transparent to-transparent" />
