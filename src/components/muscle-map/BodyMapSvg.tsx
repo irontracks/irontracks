@@ -28,35 +28,36 @@ function ms(id: MuscleId, muscles: Record<string, MuscleState>, selected?: Muscl
     return {
       fill: m.color || '#f59e0b',
       fillOpacity: String(intensity > 0.6 ? intensity - 0.1 : intensity),
-      stroke: 'rgba(255,255,255,0.4)',
-      strokeWidth: 1,
+      stroke: 'rgba(255,255,255,0.25)',
+      strokeWidth: 0.5,
       className: 'cursor-pointer transition-all duration-300 hover:fill-opacity-100',
       style: {
         mixBlendMode: 'normal' as React.CSSProperties['mixBlendMode'],
-        filter: 'none',
+        filter: 'blur(2px)',
         transformOrigin: 'auto',
       },
     }
   }
 
-  // Premium color system: richer, glow-based, no blur smudge
+  // Organic color system — colors blend INTO the body surface
+  // 'color' blend mode: applies overlay hue/saturation to base luminosity
+  // = colors follow the body's natural lighting and contours
   const fill = hasColor ? m.color! : 'transparent'
-  const fillAlpha = hasColor ? (isSelected ? '1.0' : String(intensity)) : '0.0'
+  const fillAlpha = hasColor
+    ? isSelected ? '0.92' : '0.55'
+    : '0.0'
 
   return {
     fill,
     fillOpacity: fillAlpha,
-    stroke: hasColor ? m.color! : 'transparent',
-    strokeWidth: isSelected ? 1.5 : (hasColor ? 0.5 : 0),
-    strokeOpacity: isSelected ? 0.9 : 0.3,
-    className: 'cursor-pointer transition-all duration-300 hover:fill-opacity-100 hover:stroke-opacity-80',
+    stroke: 'transparent',
+    strokeWidth: 0,
+    className: 'cursor-pointer transition-all duration-500 hover:fill-opacity-80',
     style: {
-      mixBlendMode: 'screen' as React.CSSProperties['mixBlendMode'],
+      mixBlendMode: 'color' as React.CSSProperties['mixBlendMode'],
       filter: isSelected
-        ? `drop-shadow(0 0 10px ${fill}) drop-shadow(0 0 4px ${fill})`
-        : hasColor
-          ? `drop-shadow(0 0 3px ${fill})`
-          : 'none',
+        ? 'blur(4px) saturate(1.8)'
+        : 'blur(6px) saturate(1.3)',
       transformOrigin: 'auto',
     },
   }
