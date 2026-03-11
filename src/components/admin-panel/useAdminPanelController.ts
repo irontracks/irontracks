@@ -310,26 +310,40 @@ export const useAdminPanelController = ({ user, onClose }: AdminPanelProps) => {
         return cachedHeadersRef.current;
     }, [getAdminAuthHeaders]);
 
+    // ─── Stable setters for useAdminDataFetchers ─────────────────────────────────
+    // CRITICAL: these MUST be useCallback-memoized. Passing inline arrow functions
+    // (v) => setX(v) creates new references every render, causing ALL useEffect
+    // deps arrays in useAdminDataFetchers to fire on every render → loading=true loop.
+    const stableSetUsersList = useCallback((v: AdminUser[]) => setUsersList(v), [setUsersList]);
+    const stableSetTeachersList = useCallback((v: AdminTeacher[]) => setTeachersList(v), [setTeachersList]);
+    const stableSetTemplates = useCallback((v: unknown[]) => setTemplates(v as Parameters<typeof setTemplates>[0]), [setTemplates]);
+    const stableSetStudentWorkouts = useCallback((v: unknown[]) => setStudentWorkouts(v as Parameters<typeof setStudentWorkouts>[0]), [setStudentWorkouts]);
+    const stableSetSyncedWorkouts = useCallback((v: unknown[]) => setSyncedWorkouts(v as Parameters<typeof setSyncedWorkouts>[0]), [setSyncedWorkouts]);
+    const stableSetAssessments = useCallback((v: unknown[]) => setAssessments(v as Parameters<typeof setAssessments>[0]), [setAssessments]);
+    const stableSetPendingProfiles = useCallback((v: unknown[]) => setPendingProfiles(v as Parameters<typeof setPendingProfiles>[0]), [setPendingProfiles]);
+    const stableSetErrorReports = useCallback((v: unknown[]) => setErrorReports(v as Parameters<typeof setErrorReports>[0]), [setErrorReports]);
+    const stableSetVideoQueue = useCallback((v: unknown[]) => setVideoQueue(v as Parameters<typeof setVideoQueue>[0]), [setVideoQueue]);
+    const stableSetExerciseAliasesReview = useCallback((v: unknown[]) => setExerciseAliasesReview(v as Parameters<typeof setExerciseAliasesReview>[0]), [setExerciseAliasesReview]);
+
     // --- Data Fetchers (extracted) ---
-    // useAdminDataFetchers expects simple (v: T) => void, so we wrap each Dispatch with a simple function
     useAdminDataFetchers({
         user, isAdmin, isTeacher, selectedStudent, tab, subTab,
         registering, teachersList, addingTeacher, editingTeacher,
         getAdminAuthHeaders: syncGetAdminAuthHeaders, loadedStudentInfo,
-        setUsersList: (v) => setUsersList(v),
-        setTeachersList: (v) => setTeachersList(v),
-        setTemplates: (v) => setTemplates(v as Parameters<typeof setTemplates>[0]),
-        setStudentWorkouts: (v) => setStudentWorkouts(v as Parameters<typeof setStudentWorkouts>[0]),
-        setSyncedWorkouts: (v) => setSyncedWorkouts(v as Parameters<typeof setSyncedWorkouts>[0]),
-        setAssessments: (v) => setAssessments(v as Parameters<typeof setAssessments>[0]),
-        setPendingProfiles: (v) => setPendingProfiles(v as Parameters<typeof setPendingProfiles>[0]),
+        setUsersList: stableSetUsersList,
+        setTeachersList: stableSetTeachersList,
+        setTemplates: stableSetTemplates,
+        setStudentWorkouts: stableSetStudentWorkouts,
+        setSyncedWorkouts: stableSetSyncedWorkouts,
+        setAssessments: stableSetAssessments,
+        setPendingProfiles: stableSetPendingProfiles,
         setSelectedStudent,
         setLoading, setDebugError,
-        setErrorReports: (v) => setErrorReports(v as Parameters<typeof setErrorReports>[0]),
+        setErrorReports: stableSetErrorReports,
         setErrorsLoading,
-        setVideoQueue: (v) => setVideoQueue(v as Parameters<typeof setVideoQueue>[0]),
+        setVideoQueue: stableSetVideoQueue,
         setVideoLoading, setVideoMissingCount, setVideoMissingLoading,
-        setExerciseAliasesReview: (v) => setExerciseAliasesReview(v as Parameters<typeof setExerciseAliasesReview>[0]),
+        setExerciseAliasesReview: stableSetExerciseAliasesReview,
         setExerciseAliasesLoading, setExerciseAliasesError,
         setTab,
     })
