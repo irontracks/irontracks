@@ -1,6 +1,7 @@
 'use client'
 
-import React, { useRef } from 'react'
+import React, { useRef, useState, useCallback } from 'react'
+import NextImage from 'next/image'
 import { X, Upload, Scissors } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useStoryComposer } from '@/components/stories/useStoryComposer'
@@ -24,6 +25,11 @@ interface StoryComposerProps {
   onClose: () => void
 }
 
+const STICKERS = [
+  { id: 'fire', src: '/sticker-fire.png', label: '🔥 Fogo', alt: 'Sticker fogo' },
+  { id: 'lightning', src: '/sticker-lightning.png', label: '⚡ Raio', alt: 'Sticker raio' },
+]
+
 export default function StoryComposer({ open, session, onClose }: StoryComposerProps) {
   const previewRef = useRef<HTMLDivElement>(null)
   const previewCanvasRef = useRef<HTMLCanvasElement>(null)
@@ -41,6 +47,40 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
     onPiecePointerDown, onPiecePointerMove, onPiecePointerUp,
     shareImage, postToIronTracks,
   } = useStoryComposer({ open, session, onClose })
+
+  // ── Sticker state ───────────────────────────────────────────────────
+  const [selectedSticker, setSelectedSticker] = useState<string | null>(null)
+  const [stickerPos, setStickerPos] = useState({ x: 0.5, y: 0.5 })
+  const stickerDragRef = useRef<{ startX: number; startY: number; startPosX: number; startPosY: number } | null>(null)
+
+  const onStickerPointerDown = useCallback((e: React.PointerEvent<HTMLImageElement>) => {
+    e.currentTarget.setPointerCapture(e.pointerId)
+    const rect = previewRef.current?.getBoundingClientRect()
+    if (!rect) return
+    stickerDragRef.current = { startX: e.clientX, startY: e.clientY, startPosX: stickerPos.x, startPosY: stickerPos.y }
+  }, [stickerPos])
+
+  const onStickerPointerMove = useCallback((e: React.PointerEvent<HTMLImageElement>) => {
+    if (!stickerDragRef.current) return
+    const rect = previewRef.current?.getBoundingClientRect()
+    if (!rect) return
+    const dx = (e.clientX - stickerDragRef.current.startX) / rect.width
+    const dy = (e.clientY - stickerDragRef.current.startY) / rect.height
+    setStickerPos({
+      x: Math.max(0.05, Math.min(0.85, stickerDragRef.current.startPosX + dx)),
+      y: Math.max(0.05, Math.min(0.85, stickerDragRef.current.startPosY + dy)),
+    })
+  }, [])
+
+  const onStickerPointerUp = useCallback((e: React.PointerEvent<HTMLImageElement>) => {
+    e.currentTarget.releasePointerCapture(e.pointerId)
+    stickerDragRef.current = null
+  }, [])
+
+  const toggleSticker = (id: string) => {
+    setSelectedSticker(prev => prev === id ? null : id)
+    if (selectedSticker !== id) setStickerPos({ x: 0.5, y: 0.35 })
+  }
 
   // Draw loop
   React.useEffect(() => {
@@ -160,6 +200,57 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
                         })}
                       </div>
                     )}
+                        {selectedSticker && (() => {
+                          const stk = STICKERS.find(s => s.id === selectedSticker)
+                          if (!stk) return null
+                          return (
+                            <img
+                              src={stk.src}
+                              alt={stk.alt}
+                              draggable={false}
+                              onPointerDown={onStickerPointerDown}
+                              onPointerMove={onStickerPointerMove}
+                              onPointerUp={onStickerPointerUp}
+                              onPointerCancel={onStickerPointerUp}
+                              className="absolute z-30 w-24 h-24 object-contain cursor-grab active:cursor-grabbing select-none touch-none drop-shadow-2xl"
+                              style={{ left: `${stickerPos.x * 100}%`, top: `${stickerPos.y * 100}%`, transform: 'translate(-50%, -50%)' }}
+                            />
+                          )
+                        })()}
+                  </div>
+
+                  {/* Sticker Picker */}
+                  <div className="w-full max-w-[300px] sm:max-w-[340px]">
+                    <p className="text-[9px] font-black uppercase tracking-[0.2em] text-neutral-500 mb-2">Stickers</p>
+                    <div className="flex items-center gap-2">
+                      {STICKERS.map(stk => (
+                        <button
+                          key={stk.id}
+                          type="button"
+                          onClick={() => toggleSticker(stk.id)}
+                          className={[
+                            'relative w-16 h-16 rounded-2xl border-2 transition-all active:scale-95 overflow-hidden flex items-center justify-center',
+                            selectedSticker === stk.id
+                              ? 'border-yellow-400 bg-yellow-500/15 shadow-lg shadow-yellow-900/30'
+                              : 'border-neutral-700/60 bg-neutral-900/60 hover:border-neutral-600'
+                          ].join(' ')}
+                        >
+                          <NextImage src={stk.src} alt={stk.alt} width={52} height={52} unoptimized className="object-contain" />
+                          {selectedSticker === stk.id && (
+                            <div className="absolute inset-0 rounded-xl ring-2 ring-yellow-400/60 ring-inset" />
+                          )}
+                        </button>
+                      ))}
+                      {selectedSticker && (
+                        <button
+                          type="button"
+                          onClick={() => setSelectedSticker(null)}
+                          className="w-10 h-10 rounded-xl bg-neutral-900 border border-neutral-700/60 text-neutral-400 hover:text-red-400 text-xs font-black transition-colors flex items-center justify-center"
+                        >
+                          ✕
+                        </button>
+                      )}
+                    </div>
                   </div>
 
                   {/* Media Controls */}
