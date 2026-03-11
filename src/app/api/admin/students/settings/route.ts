@@ -24,15 +24,16 @@ export async function GET(req: Request) {
     if (!q?.user_id) return jsonError(400, 'user_id required')
 
     // Use admin client to bypass RLS on user_settings
+    // Column is 'preferences', not 'settings'
     const { data, error } = await admin
       .from('user_settings')
-      .select('settings')
+      .select('preferences')
       .eq('user_id', q.user_id)
       .maybeSingle()
 
     if (error) return NextResponse.json({ ok: false, error: `db_error: ${error.message}` }, { status: 400 })
 
-    return NextResponse.json({ ok: true, settings: data?.settings ?? null })
+    return NextResponse.json({ ok: true, settings: data?.preferences ?? null })
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : String(e)
     return NextResponse.json({ ok: false, error: message }, { status: 500 })
