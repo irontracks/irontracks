@@ -210,6 +210,10 @@ type Props = {
   onNormalizeAiWorkoutTitles?: () => MaybePromise<void>
   onApplyTitleRule?: () => MaybePromise<void>
   onOpenIronScanner: () => void
+  /** Called when user's own story active state changes (for header story ring) */
+  onMyStoryStateChange?: (hasActiveStory: boolean) => void
+  /** External trigger: open story creator (from header long-press) */
+  onAddStory?: () => void
   streakStats?: {
     currentStreak: number
     bestStreak: number
@@ -607,7 +611,11 @@ export default function StudentDashboard(props: Props) {
 
       {props.view === 'dashboard' && showStoriesBar ? (
         <Suspense fallback={<StoriesBarSkeleton />}>
-          <StoriesBar currentUserId={props.currentUserId} />
+          <StoriesBar
+            currentUserId={props.currentUserId}
+            onMyStoryStateChange={props.onMyStoryStateChange}
+            onAddStory={props.onAddStory}
+          />
         </Suspense>
       ) : null}
 

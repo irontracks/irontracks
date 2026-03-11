@@ -19,7 +19,17 @@ const initials = (name: string) => {
   return n.slice(0, 1).toUpperCase()
 }
 
-export default function StoriesBar({ currentUserId }: { currentUserId?: string }) {
+export default function StoriesBar({
+  currentUserId,
+  onMyStoryStateChange,
+  onAddStory: externalAddStory,
+}: {
+  currentUserId?: string
+  /** Called whenever user's own story state changes: (hasActiveStory) */
+  onMyStoryStateChange?: (hasActiveStory: boolean) => void
+  /** Triggered from outside (e.g. header long-press) to open story creator */
+  onAddStory?: () => void
+}) {
   const myId = typeof currentUserId === 'string' ? currentUserId : ''
   const [groups, setGroups] = useState<StoryGroup[]>([])
   const [loading, setLoading] = useState(false)
@@ -46,6 +56,29 @@ export default function StoriesBar({ currentUserId }: { currentUserId?: string }
       setGroups([])
     } finally {
       setLoading(false)
+    }
+  }, [])
+
+  // Notify parent when our own story state changes
+  const prevMyStoryActive = useRef<boolean | null>(null)
+  useEffect(() => {
+    if (!myId || !onMyStoryStateChange) return
+    const mine = groups.find((g) => g.authorId === myId)
+    const hasActive = !!(mine && Array.isArray(mine.stories) && mine.stories.length > 0)
+    if (prevMyStoryActive.current !== hasActive) {
+      prevMyStoryActive.current = hasActive
+      onMyStoryStateChange(hasActive)
+    }
+  }, [groups, myId, onMyStoryStateChange])
+
+
+
+  // Listen for the window event dispatched by the header long-press
+  useEffect(() => {
+    const handler = () => setIsCreatorOpen(true)
+    try { window.addEventListener('irontracks:stories:open-creator', handler) } catch { }
+    return () => {
+      try { window.removeEventListener('irontracks:stories:open-creator', handler) } catch { }
     }
   }, [])
 
@@ -151,9 +184,8 @@ export default function StoriesBar({ currentUserId }: { currentUserId?: string }
   const ordered = useMemo(() => {
     const arr = Array.isArray(groups) ? groups : []
     if (!myId) return arr
-    const mine = arr.find((g) => g.authorId === myId)
-    if (!mine) return arr
-    return [mine, ...arr.filter((g) => g.authorId !== myId)]
+    // Own avatar removed from visual row — it lives in the header Story Ring
+    return arr.filter((g) => g.authorId !== myId)
   }, [groups, myId])
 
   const currentGroup = useMemo(() => ordered.find((g) => g.authorId === openAuthorId) || null, [ordered, openAuthorId])
@@ -231,16 +263,10 @@ export default function StoriesBar({ currentUserId }: { currentUserId?: string }
         {ordered.map((g) => {
           const hasStories = Array.isArray(g.stories) && g.stories.length > 0
           const hasUnseen = !!g.hasUnseen
-          const name = String(g.displayName || '').trim() || (g.authorId === myId ? 'Você' : 'Amigo')
-          const isMine = g.authorId === myId
+          const name = String(g.displayName || '').trim() || 'Amigo'
 
-          // Premium ring logic:
-          // - Own avatar without stories: pulsating yellow ring
-          // - Unseen stories: animated gradient ring (Instagram-style)
-          // - Seen stories: neutral ring
-          // - No stories (other): transparent
           const ringType = !hasStories
-            ? (isMine ? 'own-empty' : 'none')
+            ? 'none'
             : hasUnseen ? 'unseen' : 'seen'
 
           return (
@@ -270,9 +296,7 @@ export default function StoriesBar({ currentUserId }: { currentUserId?: string }
                   {ringType === 'seen' && (
                     <div className="absolute inset-0 rounded-full" style={{ background: 'conic-gradient(from 0deg, #525252, #737373)', padding: '2px', borderRadius: '9999px' }} />
                   )}
-                  {ringType === 'own-empty' && (
-                    <div className="absolute inset-0 rounded-full animate-pulse" style={{ background: 'conic-gradient(from 0deg, #eab308, #f59e0b)', padding: '2px', borderRadius: '9999px', opacity: 0.7 }} />
-                  )}
+
                   <div className={[
                     'absolute rounded-full overflow-hidden bg-neutral-900 flex items-center justify-center',
                     ringType !== 'none' ? 'inset-[3px]' : 'inset-0 border border-neutral-800',
@@ -286,21 +310,6 @@ export default function StoriesBar({ currentUserId }: { currentUserId?: string }
                 </div>
                 <div className="mt-1 text-[11px] text-neutral-300 font-bold truncate text-center">{name}</div>
               </button>
-
-              {isMine ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (uploading) return
-                    setIsCreatorOpen(true)
-                  }}
-                  className="absolute left-[calc(50%+18px)] top-[40px] w-6 h-6 rounded-full bg-yellow-500 border-2 border-neutral-950 flex items-center justify-center shadow-sm shadow-yellow-500/40"
-                  aria-label="Adicionar story (foto ou vídeo)"
-                  disabled={uploading}
-                >
-                  <Plus size={13} className="text-black" />
-                </button>
-              ) : null}
             </div>
           )
         })}
@@ -308,7 +317,7 @@ export default function StoriesBar({ currentUserId }: { currentUserId?: string }
 
       {ordered.length === 0 && !loading && !error ? (
         <div className="mt-2 px-1 text-[11px] text-neutral-400 font-bold">
-          Stories ainda não carregaram. Toque em <span className="text-neutral-200">Atualizar</span>.
+          Nenhum story de amigos ainda. Segure seu avatar no topo para publicar.
         </div>
       ) : null}
 
