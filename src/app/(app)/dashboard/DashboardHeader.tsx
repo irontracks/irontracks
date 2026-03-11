@@ -93,10 +93,7 @@ export function DashboardHeader({
                             width={32}
                             height={32}
                             className="flex-shrink-0 group-hover:opacity-80 transition-opacity"
-                            style={{
-                                mixBlendMode: 'screen',
-                                filter: 'drop-shadow(0 0 6px rgba(245,158,11,0.55))',
-                            }}
+                            style={{ filter: 'drop-shadow(0 0 6px rgba(245,158,11,0.55))' }}
                         />
                         <h1
                             className="text-[1.7rem] font-black italic leading-none select-none group-hover:opacity-80 transition-opacity"
