@@ -86,15 +86,13 @@ export function DashboardHeader({
                 <div className="flex items-center cursor-pointer group" onClick={onGoHome}>
                     <div className="flex items-center">
                         <h1
-                            className="text-[1.6rem] font-black italic leading-none tracking-tight group-hover:opacity-80 transition-opacity select-none"
-                            style={{ letterSpacing: '-0.03em' }}
+                            className="text-[1.7rem] font-black italic leading-none select-none group-hover:opacity-80 transition-opacity"
+                            style={{ letterSpacing: '-0.04em' }}
                         >
-                            <span className="text-white">IRON</span><span
+                            <span style={{ color: '#ffffff' }}>IRON</span><span
                                 style={{
-                                    background: 'linear-gradient(90deg, #f59e0b 0%, #fbbf24 50%, #f59e0b 100%)',
-                                    WebkitBackgroundClip: 'text',
-                                    WebkitTextFillColor: 'transparent',
-                                    backgroundClip: 'text',
+                                    color: '#f59e0b',
+                                    textShadow: '0 0 20px rgba(245,158,11,0.6), 0 0 40px rgba(245,158,11,0.2)',
                                 }}
                             >TRACKS</span>
                         </h1>
