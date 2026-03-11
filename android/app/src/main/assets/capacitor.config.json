@@ -1,7 +1,7 @@
 {
 	"appId": "com.irontracks.app",
 	"appName": "IronTracks",
-	"webDir": "public",
+	"webDir": "out",
 	"server": {
 		"url": "https://irontracks.com.br"
 	}
