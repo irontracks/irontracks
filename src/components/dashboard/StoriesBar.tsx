@@ -188,7 +188,30 @@ export default function StoriesBar({
     return arr.filter((g) => g.authorId !== myId)
   }, [groups, myId])
 
-  const currentGroup = useMemo(() => ordered.find((g) => g.authorId === openAuthorId) || null, [ordered, openAuthorId])
+  // Keep own story group available for viewing from the header tap
+  const myGroup = useMemo(() => {
+    const arr = Array.isArray(groups) ? groups : []
+    return arr.find((g) => g.authorId === myId) || null
+  }, [groups, myId])
+
+  // Listen for 'view own story' event dispatched by header tap
+  useEffect(() => {
+    const handler = () => {
+      if (!myGroup || !Array.isArray(myGroup.stories) || myGroup.stories.length === 0) return
+      setOpenAuthorId(myId)
+      setOpen(true)
+    }
+    try { window.addEventListener('irontracks:stories:view-mine', handler) } catch { }
+    return () => {
+      try { window.removeEventListener('irontracks:stories:view-mine', handler) } catch { }
+    }
+  }, [myGroup, myId])
+
+  // currentGroup now searches both friends (ordered) AND own story (myGroup)
+  const currentGroup = useMemo(() => {
+    if (openAuthorId === myId && myGroup) return myGroup
+    return ordered.find((g) => g.authorId === openAuthorId) || null
+  }, [ordered, openAuthorId, myId, myGroup])
   const closeViewer = useCallback(() => setOpen(false), [])
   const handleStoryUpdated = useCallback(
     (storyId: string, patch: Partial<Story>) => {
