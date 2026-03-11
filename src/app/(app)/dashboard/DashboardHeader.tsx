@@ -1,7 +1,6 @@
 'use client'
 
 import React from 'react'
-import Image from 'next/image'
 import { Crown } from 'lucide-react'
 import HeaderActionsMenu from '@/components/HeaderActionsMenu'
 import type { AdminUser } from '@/types/admin'
@@ -86,15 +85,15 @@ export function DashboardHeader({
             <div className="bg-neutral-950 flex justify-between items-center fixed top-0 left-0 right-0 z-40 border-b border-zinc-800 px-6 shadow-lg pt-[env(safe-area-inset-top)] min-h-[calc(4rem+env(safe-area-inset-top))]">
                 <div className="flex items-center cursor-pointer group" onClick={onGoHome}>
                     <div className="flex items-center gap-2">
-                        {/* Premium 3D dumbbell icon */}
-                        <Image
+                        {/* Premium 3D dumbbell icon — plain img avoids next/image optimizer (Capacitor-safe) */}
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
                             src="/header-dumbbell.png"
                             alt=""
                             width={28}
                             height={28}
                             className="flex-shrink-0 group-hover:opacity-80 transition-opacity"
                             style={{ filter: 'drop-shadow(0 0 6px rgba(245,158,11,0.55))' }}
-                            priority
                         />
                         <h1
                             className="text-[1.7rem] font-black italic leading-none select-none group-hover:opacity-80 transition-opacity"
