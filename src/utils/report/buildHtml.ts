@@ -259,6 +259,8 @@ export function buildReportData(
     ? window.location.origin
     : ''
 
+  const logoDataUrl = typeof opts?.logoDataUrl === 'string' && opts.logoDataUrl ? opts.logoDataUrl : null
+
   return {
     meta: {
       reportVersion: 'workout-report-v1',
@@ -269,7 +271,7 @@ export function buildReportData(
     brand: {
       appName: 'IronTracks',
       accentColor: '#f59e0b',
-      logoUrl: `${origin}/icone.png`,
+      logoUrl: logoDataUrl || `${origin}/icone.png`,
     },
     athlete: {
       id: sessionObj?.user_id || sessionObj?.userId || null,

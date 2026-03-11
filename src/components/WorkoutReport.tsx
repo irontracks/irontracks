@@ -4,6 +4,7 @@ import dynamic from 'next/dynamic';
 import NextImage from 'next/image';
 import { Download, ArrowLeft, FileText, Code, Users, Sparkles, Loader2, Check, MessageSquare } from 'lucide-react';
 import { buildReportHTML } from '@/utils/report/buildHtml';
+import { fetchLogoDataUrl } from '@/utils/report/fetchLogoDataUrl';
 import { workoutPlanHtml } from '@/utils/report/templates';
 import { generatePostWorkoutInsights, applyProgressionToNextTemplate } from '@/actions/workout-actions';
 import { useVipCredits } from '@/hooks/useVipCredits';
@@ -201,10 +202,12 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                     }
                 } catch { }
             }
+            const logoDataUrl = await fetchLogoDataUrl().catch(() => null)
             const html = buildReportHTML(sessionForReport, prevForReport, String(user?.displayName || user?.email || ''), calories, {
                 prevLogsByExercise: prevLogsForReport,
                 prevBaseMsByExercise: prevBaseForReport,
                 ai: aiToUse || null,
+                logoDataUrl: logoDataUrl || undefined,
             });
 
             const title = String(session?.workoutTitle || 'Treino').trim() || 'Treino'
