@@ -218,25 +218,31 @@ export default function HeaderActionsMenu({
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
         onClick={handleClick}
-        className="relative focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2 focus:ring-offset-neutral-950 rounded-full"
+        onContextMenu={(e) => { e.preventDefault(); return false }}
+        className="relative focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:ring-offset-2 focus:ring-offset-neutral-950 rounded-full select-none"
+        style={{ WebkitTouchCallout: 'none', WebkitUserSelect: 'none' } as React.CSSProperties}
         title={onAddStory ? 'Toque para menu • Segure para adicionar story' : 'Menu'}
       >
         {/* Outer ring — animated when has story, dashed when empty */}
-        <div className={[
-          'w-[50px] h-[50px] rounded-full flex items-center justify-center',
-          hasActiveStory
-            ? 'p-[2.5px] bg-gradient-to-br from-yellow-400 via-amber-500 to-yellow-600 shadow-[0_0_14px_3px_rgba(234,179,8,0.35)] animate-spin-slow'
-            : 'p-[2px] border-2 border-dashed border-yellow-500/50',
-        ].join(' ')}>
+        <div
+          className={[
+            'w-[50px] h-[50px] rounded-full flex items-center justify-center',
+            hasActiveStory
+              ? 'p-[2.5px] bg-gradient-to-br from-yellow-400 via-amber-500 to-yellow-600 shadow-[0_0_14px_3px_rgba(234,179,8,0.35)] animate-spin-slow'
+              : 'p-[2px] border-2 border-dashed border-yellow-500/50',
+          ].join(' ')}
+          style={{ WebkitTouchCallout: 'none', pointerEvents: 'none' } as React.CSSProperties}
+        >
           {/* Inner avatar */}
-          <div className={[
-            'rounded-full overflow-hidden bg-neutral-900 flex items-center justify-center',
-            hasActiveStory ? 'w-[42px] h-[42px]' : 'w-[42px] h-[42px]',
-          ].join(' ')}>
+          <div className="w-[42px] h-[42px] rounded-full overflow-hidden bg-neutral-900 flex items-center justify-center">
             {user?.photoURL ? (
-              <Image src={user.photoURL} width={42} height={42} className="w-full h-full object-cover" alt="Perfil" unoptimized />
+              <Image
+                src={user.photoURL} width={42} height={42}
+                className="w-full h-full object-cover pointer-events-none"
+                alt="Perfil" unoptimized draggable={false}
+              />
             ) : (
-              <div className="w-full h-full bg-neutral-800 flex items-center justify-center font-black text-yellow-500 text-sm">
+              <div className="w-full h-full bg-neutral-800 flex items-center justify-center font-black text-yellow-500 text-sm select-none">
                 {initial}
               </div>
             )}
