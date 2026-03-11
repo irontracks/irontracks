@@ -84,7 +84,15 @@ export function DashboardHeader({
         <>
             <div className="bg-neutral-950 flex justify-between items-center fixed top-0 left-0 right-0 z-40 border-b border-zinc-800 px-6 shadow-lg pt-[env(safe-area-inset-top)] min-h-[calc(4rem+env(safe-area-inset-top))]">
                 <div className="flex items-center cursor-pointer group" onClick={onGoHome}>
-                    <div className="flex items-center">
+                    <div className="flex items-center gap-2">
+                        {/* Gold dumbbell icon — inline SVG, transparent bg, scales perfectly */}
+                        <svg width="22" height="14" viewBox="0 0 22 14" fill="none" xmlns="http://www.w3.org/2000/svg" className="flex-shrink-0 group-hover:opacity-80 transition-opacity" style={{ filter: 'drop-shadow(0 0 4px rgba(245,158,11,0.5))' }}>
+                            <rect x="0" y="3" width="3" height="8" rx="1.5" fill="#f59e0b"/>
+                            <rect x="3" y="1" width="2.5" height="12" rx="1.25" fill="#fbbf24"/>
+                            <rect x="5.5" y="5.5" width="11" height="3" rx="1.5" fill="#f59e0b"/>
+                            <rect x="16.5" y="1" width="2.5" height="12" rx="1.25" fill="#fbbf24"/>
+                            <rect x="19" y="3" width="3" height="8" rx="1.5" fill="#f59e0b"/>
+                        </svg>
                         <h1
                             className="text-[1.7rem] font-black italic leading-none select-none group-hover:opacity-80 transition-opacity"
                             style={{ letterSpacing: '-0.04em' }}
@@ -97,12 +105,21 @@ export function DashboardHeader({
                             >TRACKS</span>
                         </h1>
                     </div>
-                    {/* Removed 'BEM VINDO COACH/ATLETA' — story ring in header now acts as identity anchor */}
-                    {!hideVipOnIos && vipAccess?.hasVip && (
-                        <button type="button" onClick={(e) => { e.stopPropagation(); onOpenVip() }} className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-yellow-500/10 border border-yellow-500/20 shadow-[0_0_10px_-3px_rgba(234,179,8,0.3)] mx-3 hover:bg-yellow-500/15">
-                            <Crown size={11} className="text-yellow-500 fill-yellow-500" />
-                            <span className="text-[10px] font-black text-yellow-500 tracking-widest leading-none">VIP</span>
-                        </button>
+                    {/* VIP badge — shows on all platforms; non-interactive on iOS (no IAP nav) */}
+                    {vipAccess?.hasVip && (
+                        hideVipOnIos
+                            ? (
+                                <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-yellow-500/10 border border-yellow-500/20 shadow-[0_0_10px_-3px_rgba(234,179,8,0.3)] ml-3">
+                                    <Crown size={11} className="text-yellow-500 fill-yellow-500" />
+                                    <span className="text-[10px] font-black text-yellow-500 tracking-widest leading-none">VIP</span>
+                                </div>
+                            )
+                            : (
+                                <button type="button" onClick={(e) => { e.stopPropagation(); onOpenVip() }} className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-yellow-500/10 border border-yellow-500/20 shadow-[0_0_10px_-3px_rgba(234,179,8,0.3)] ml-3 hover:bg-yellow-500/15">
+                                    <Crown size={11} className="text-yellow-500 fill-yellow-500" />
+                                    <span className="text-[10px] font-black text-yellow-500 tracking-widest leading-none">VIP</span>
+                                </button>
+                            )
                     )}
                 </div>
                 <div className="flex items-center gap-4">
