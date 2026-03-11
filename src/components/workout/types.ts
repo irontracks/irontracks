@@ -65,6 +65,10 @@ export type ReportHistoryItem = {
   topWeight: number | null;
   setsCount: number;
   name?: string;
+  /** Pesos individuais por série, na ordem de execução */
+  setWeights?: number[] | null;
+  /** Reps individuais por série, na ordem de execução */
+  setReps?: number[] | null;
 };
 
 export type ReportHistory = {

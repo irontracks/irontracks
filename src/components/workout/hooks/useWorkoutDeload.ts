@@ -112,12 +112,15 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
         const base = isObject(sessionObj) ? sessionObj : null;
         if (!base) return null;
         const logsObj: UnknownRecord = isObject(base.logs) ? (base.logs as UnknownRecord) : {};
-        const sets: Array<{ weight: number | null; reps: number | null }> = [];
+        // Coleta sets com índice para manter a ordenção correta
+        const indexedSets: Array<{ setIdx: number; weight: number | null; reps: number | null }> = [];
         Object.entries(logsObj).forEach(([key, value]) => {
           try {
             const parts = String(key || '').split('-');
             const eIdx = Number(parts[0]);
+            const sIdx = Number(parts[1]);
             if (!Number.isFinite(eIdx) || eIdx !== exIdx) return;
+            if (!Number.isFinite(sIdx)) return;
             const log = isObject(value) ? value : null;
             if (!log) return;
             const weight = extractLogWeight(log);
@@ -127,11 +130,14 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
             const done = doneRaw == null ? true : doneRaw === true || String(doneRaw || '').toLowerCase() === 'true';
             if (!done && !hasValues) return;
             if (hasValues) {
-              sets.push({ weight, reps });
+              indexedSets.push({ setIdx: sIdx, weight, reps });
             }
           } catch { }
         });
-        if (!sets.length) return null;
+        if (!indexedSets.length) return null;
+        // Ordena por índice de série para preservar progressão correta
+        indexedSets.sort((a, b) => a.setIdx - b.setIdx);
+        const sets = indexedSets.map(s => ({ weight: s.weight, reps: s.reps }));
         const weightList = sets
           .map((s) => s.weight)
           .filter((v): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0);
@@ -156,6 +162,13 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
           toDateMs(meta.date) ??
           toDateMs(meta.created_at) ??
           Date.now();
+        // Armazena pesos e reps individuais por série
+        const setWeights = indexedSets
+          .map(s => s.weight)
+          .filter((v): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0);
+        const setReps = indexedSets
+          .map(s => s.reps)
+          .filter((v): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0);
         return {
           ts,
           avgWeight: avgWeight ?? null,
@@ -163,6 +176,8 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
           totalVolume: Number.isFinite(totalVolume) ? totalVolume : 0,
           topWeight,
           setsCount: sets.length,
+          setWeights: setWeights.length > 0 ? setWeights : null,
+          setReps: setReps.length > 0 ? setReps : null,
         };
       } catch {
         return null;
@@ -334,9 +349,13 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
 
         // Último treino (mais recente)
         const latest = items.slice().sort((a, b) => Number(b.ts || 0) - Number(a.ts || 0))[0];
-        const lastWeight = toNumber(latest?.topWeight ?? latest?.avgWeight ?? null);
-        const lastReps = toNumber(latest?.avgReps ?? null);
-        if (!lastWeight || !Number.isFinite(lastWeight) || lastWeight <= 0) return;
+        // Pesos por série do último treino (preservados se existirem)
+        const perSetWeights: number[] = Array.isArray(latest?.setWeights) ? (latest.setWeights as number[]) : [];
+        const perSetReps: number[] = Array.isArray(latest?.setReps) ? (latest.setReps as number[]) : [];
+        // Fallback de peso único quando não há dados por série
+        const fallbackWeight = toNumber(latest?.topWeight ?? latest?.avgWeight ?? null);
+        const fallbackReps = toNumber(latest?.avgReps ?? null);
+        if (!fallbackWeight && !perSetWeights.length) return;
 
         // Número de séries do exercício atual
         const setsHeader = Math.max(0, Number(ex?.sets ?? 0));
@@ -350,9 +369,13 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
           const existingSuggestion = deloadSuggestions[setKey];
           // Não sobrescreve sugestão de deload já calculada (só adiciona se vazio)
           if (isObject(existingSuggestion) && (existingSuggestion as Record<string, unknown>).weight != null) continue;
+          // Usa o peso específico da série se disponível, senão usa fallback (topWeight ou avgWeight)
+          const setWeight = perSetWeights[setIdx] ?? fallbackWeight;
+          const setRepsVal = perSetReps[setIdx] ?? fallbackReps;
+          if (!setWeight || !Number.isFinite(setWeight) || setWeight <= 0) continue;
           patch[setKey] = {
-            weight: lastWeight,
-            reps: lastReps ?? null,
+            weight: setWeight,
+            reps: setRepsVal ?? null,
             rpe: null,
           };
         }
