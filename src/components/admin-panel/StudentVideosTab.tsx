@@ -70,8 +70,8 @@ export const StudentVideosTab: React.FC = () => {
                 </div>
             </div>
 
-            {/* Error */}
-            {executionVideosError ? (
+            {/* Error — only show real errors, not the 'disabled' feature-flag response */}
+            {executionVideosError && executionVideosError !== 'disabled' ? (
                 <div className="bg-neutral-900/60 border border-red-500/30 rounded-2xl p-4 text-red-200 font-bold text-sm">
                     {executionVideosError}
                 </div>
