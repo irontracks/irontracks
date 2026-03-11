@@ -147,23 +147,36 @@ export async function POST(req: Request) {
     const baseUrl = resolveBaseUrl(req)
     const idDigits = onlyDigits(cpfCnpj)
     const idType = idDigits.length === 14 ? 'CNPJ' : 'CPF'
+    const pixKey = (process.env.MERCADOPAGO_PIX_KEY || '').trim() || undefined
     let payment: Record<string, unknown>
     try {
+      const paymentBody: Record<string, unknown> = {
+        transaction_amount: amount,
+        description: plan.name,
+        payment_method_id: 'pix',
+        external_reference: `vip:${user.id}:${plan.id}`,
+        notification_url: `${baseUrl}/api/billing/webhooks/mercadopago`,
+        payer: {
+          email: user.email || undefined,
+          first_name: payerName || undefined,
+          identification: idDigits ? { type: idType, number: idDigits } : undefined,
+        },
+      }
+      // Attach receiver PIX key if configured (resolves PIXPP02 — "conta destino não pode receber PIX")
+      if (pixKey) {
+        paymentBody.additional_info = {
+          ...(typeof paymentBody.additional_info === 'object' ? paymentBody.additional_info as Record<string, unknown> : {}),
+          pix_key: pixKey,
+        }
+        paymentBody.point_of_interaction = {
+          type: 'PIX_TRANSFER',
+          transaction_data: { bank_info: { pix: { key: pixKey, key_type: 'EVP' } } },
+        }
+      }
       payment = await mercadopagoRequest<Record<string, unknown>>({
         method: 'POST',
         path: '/v1/payments',
-        body: {
-          transaction_amount: amount,
-          description: plan.name,
-          payment_method_id: 'pix',
-          external_reference: `vip:${user.id}:${plan.id}`,
-          notification_url: `${baseUrl}/api/billing/webhooks/mercadopago`,
-          payer: {
-            email: user.email || undefined,
-            first_name: payerName || undefined,
-            identification: idDigits ? { type: idType, number: idDigits } : undefined,
-          },
-        },
+        body: paymentBody,
       })
     } catch (mpErr: unknown) {
       // Rollback: cancel the subscription so the user can retry without hitting 'pending_subscription_exists'
