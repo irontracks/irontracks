@@ -191,19 +191,24 @@ export default function HeaderActionsMenu({
 
   const handlePointerDown = () => {
     didLongPress.current = false
-    if (onAddStory) {
-      longPressTimer.current = setTimeout(() => {
-        didLongPress.current = true
-        onAddStory()
-      }, 600)
-    }
+    // Long press ALWAYS opens story creator (add more stories even when has active story)
+    longPressTimer.current = setTimeout(() => {
+      didLongPress.current = true
+      try { window.dispatchEvent(new CustomEvent('irontracks:stories:open-creator')) } catch { }
+    }, 600)
   }
   const handlePointerUp = () => {
     if (longPressTimer.current) clearTimeout(longPressTimer.current)
   }
   const handleClick = () => {
     if (didLongPress.current) { didLongPress.current = false; return }
-    setOpen((v) => !v)
+    if (hasActiveStory) {
+      // Tap with active story → view own story in StoriesBar
+      try { window.dispatchEvent(new CustomEvent('irontracks:stories:view-mine')) } catch { }
+    } else {
+      // No story → open menu
+      setOpen((v) => !v)
+    }
   }
 
   return (
@@ -223,12 +228,12 @@ export default function HeaderActionsMenu({
         style={{ WebkitTouchCallout: 'none', WebkitUserSelect: 'none' } as React.CSSProperties}
         title={onAddStory ? 'Toque para menu • Segure para adicionar story' : 'Menu'}
       >
-        {/* Outer ring — animated when has story, dashed when empty */}
+        {/* Outer ring — pulsing yellow when has story, dashed when empty */}
         <div
           className={[
-            'w-[50px] h-[50px] rounded-full flex items-center justify-center',
+            'w-[50px] h-[50px] rounded-full flex items-center justify-center transition-all duration-300',
             hasActiveStory
-              ? 'p-[2.5px] bg-gradient-to-br from-yellow-400 via-amber-500 to-yellow-600 shadow-[0_0_14px_3px_rgba(234,179,8,0.35)] animate-spin-slow'
+              ? 'p-[2.5px] border-[3px] border-yellow-400 shadow-[0_0_12px_2px_rgba(234,179,8,0.45)] animate-pulse'
               : 'p-[2px] border-2 border-dashed border-yellow-500/50',
           ].join(' ')}
           style={{ WebkitTouchCallout: 'none', pointerEvents: 'none' } as React.CSSProperties}
