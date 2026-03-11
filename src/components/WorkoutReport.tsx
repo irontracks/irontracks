@@ -1,6 +1,7 @@
 "use client"
 import React, { useRef, useState, useEffect, useMemo, Suspense } from 'react';
 import dynamic from 'next/dynamic';
+import NextImage from 'next/image';
 import { Download, ArrowLeft, FileText, Code, Users, Sparkles, Loader2, Check, MessageSquare } from 'lucide-react';
 import { buildReportHTML } from '@/utils/report/buildHtml';
 import { workoutPlanHtml } from '@/utils/report/templates';
@@ -530,44 +531,44 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
             {/* 8.1 — Celebration Splash Overlay */}
             {showSplash && (
                 <div
-                    className="fixed inset-0 z-[1200] flex flex-col items-center justify-center bg-neutral-950 animate-fade-in"
+                    className="fixed inset-0 z-[1200] flex flex-col items-end justify-end bg-neutral-950 overflow-hidden"
                     onClick={() => setShowSplash(false)}
                 >
-                    {/* Confetti particles */}
-                    <div className="absolute inset-0 overflow-hidden pointer-events-none">
-                        {[...Array(18)].map((_, i) => (
-                            <div
-                                key={i}
-                                className="absolute w-2 h-2 rounded-full animate-bounce"
-                                style={{
-                                    left: `${(i * 17 + 8) % 95}%`,
-                                    top: `${(i * 23 + 5) % 90}%`,
-                                    backgroundColor: ['#eab308', '#f59e0b', '#84cc16', '#22c55e', '#a78bfa', '#f472b6', '#60a5fa'][i % 7],
-                                    animationDelay: `${(i * 0.15) % 1}s`,
-                                    animationDuration: `${0.8 + (i % 3) * 0.3}s`,
-                                }}
-                            />
-                        ))}
+                    {/* Victory hero — full screen background */}
+                    <div className="absolute inset-0">
+                        <NextImage
+                            src="/report-victory.png"
+                            alt=""
+                            fill
+                            priority
+                            unoptimized
+                            className="object-cover object-center"
+                        />
+                        {/* Bottom gradient so text is readable */}
+                        <div className="absolute inset-0 bg-gradient-to-t from-neutral-950 via-neutral-950/50 to-neutral-950/20" />
+                        {/* Top vignette */}
+                        <div className="absolute inset-0 bg-gradient-to-b from-neutral-950/70 via-transparent to-transparent" />
                     </div>
-                    <div className="relative z-10 flex flex-col items-center gap-4 text-center px-6">
-                        <div className="text-6xl">🏆</div>
-                        <div className="text-3xl sm:text-4xl font-black uppercase tracking-tight text-white">
+
+                    {/* Content — pinned to bottom */}
+                    <div className="relative z-10 w-full px-6 pb-16 flex flex-col items-center text-center gap-3">
+                        <div className="text-[10px] font-black uppercase tracking-[0.3em] text-yellow-500">IronTracks</div>
+                        <div className="text-4xl sm:text-5xl font-black uppercase tracking-tight text-white leading-tight">
                             Treino Finalizado!
                         </div>
-                        <div className="text-lg font-black text-yellow-400 truncate max-w-xs">
+                        <div className="text-base font-black text-yellow-400 max-w-xs truncate">
                             {String(safeSession?.workoutTitle || '')}
                         </div>
-                        <div className="flex items-center gap-6 mt-2">
-                            {Number(safeSession?.totalTime) > 0 && (
-                                <div className="text-center">
-                                    <div className="text-2xl font-black text-white">
-                                        {Math.floor(Number(safeSession?.totalTime ?? 0) / 60)}min
-                                    </div>
-                                    <div className="text-[10px] font-black uppercase text-neutral-500">Duração</div>
-                                </div>
-                            )}
-                        </div>
-                        <div className="mt-4 text-xs font-bold text-neutral-500">Toque para continuar</div>
+                        {Number(safeSession?.totalTime) > 0 && (
+                            <div className="flex items-center gap-2 px-4 py-2 rounded-full mt-1"
+                                style={{ background: 'rgba(234,179,8,0.12)', border: '1px solid rgba(234,179,8,0.3)' }}>
+                                <span className="text-xl font-black text-white">
+                                    {Math.floor(Number(safeSession?.totalTime ?? 0) / 60)}min
+                                </span>
+                                <span className="text-[10px] font-black uppercase text-yellow-500">duração</span>
+                            </div>
+                        )}
+                        <div className="mt-3 text-xs font-bold text-neutral-400">Toque para ver o relatório</div>
                     </div>
                 </div>
             )}
@@ -655,19 +656,26 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                         <div className="text-[10px] font-black uppercase tracking-widest text-yellow-400 mb-3">⚡ Destaques da sessão</div>
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                             {prCount > 0 && (
-                                <div className="bg-yellow-500/10 border border-yellow-500/30 rounded-xl p-3 flex flex-col gap-1">
-                                    <div className="text-2xl font-black text-yellow-400">{prCount}</div>
-                                    <div className="text-[10px] font-black uppercase tracking-widest text-yellow-300">
-                                        {prCount === 1 ? 'PR alcançado' : 'PRs alcançados'}
+                                <div className="relative overflow-hidden border border-yellow-500/40 rounded-xl flex flex-col"
+                                    style={{ background: 'linear-gradient(135deg, rgba(234,179,8,0.12), rgba(180,83,9,0.08))' }}>
+                                    {/* PR explosion background */}
+                                    <div className="absolute inset-0 opacity-20">
+                                        <NextImage src="/report-pr.png" alt="" fill unoptimized className="object-cover object-center" />
                                     </div>
-                                    {allTimePrCount > 0 && (
-                                        <div className="text-[10px] text-amber-300 font-black">★ {allTimePrCount} recorde{allTimePrCount > 1 ? 's' : ''} histórico{allTimePrCount > 1 ? 's' : ''}!</div>
-                                    )}
-                                    {detectedPrs[0] && (
-                                        <div className="text-[10px] text-yellow-200 opacity-80 truncate">
-                                            {detectedPrs[0].isAllTimePr ? '★ ' : ''}{detectedPrs[0].exerciseName}: {detectedPrs[0].e1rm.toFixed(1)} kg 1RM
+                                    <div className="relative z-10 p-3 flex flex-col gap-1">
+                                        <div className="text-2xl font-black text-yellow-400">{prCount}</div>
+                                        <div className="text-[10px] font-black uppercase tracking-widest text-yellow-300">
+                                            {prCount === 1 ? 'PR alcançado' : 'PRs alcançados'}
                                         </div>
-                                    )}
+                                        {allTimePrCount > 0 && (
+                                            <div className="text-[10px] text-amber-300 font-black">★ {allTimePrCount} recorde{allTimePrCount > 1 ? 's' : ''} histórico{allTimePrCount > 1 ? 's' : ''}!</div>
+                                        )}
+                                        {detectedPrs[0] && (
+                                            <div className="text-[10px] text-yellow-200 opacity-80 truncate">
+                                                {detectedPrs[0].isAllTimePr ? '★ ' : ''}{detectedPrs[0].exerciseName}: {detectedPrs[0].e1rm.toFixed(1)} kg 1RM
+                                            </div>
+                                        )}
+                                    </div>
                                 </div>
                             )}
                             {volumeDeltaAbs !== 0 && currentVolume > 0 && (
