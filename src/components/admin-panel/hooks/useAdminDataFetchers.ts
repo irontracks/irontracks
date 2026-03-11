@@ -220,8 +220,11 @@ export function useAdminDataFetchers(deps: AdminDataFetchersDeps) {
         // Bug #3 fix: removed teachersList.length from deps — it caused an infinite re-fetch loop
         // (fetchStudents sets teachersList → teachersList.length changes → re-triggers fetchStudents)
         // Teachers are loaded independently via the dedicated fetchTeachers useEffect below.
+        // Bug #5 fix: removed selectedStudent?.teacher_id from deps — when fetchDetails calls
+        // setSelectedStudent() updating teacher_id, it would re-trigger fetchStudents → loading=true flash.
+        // The student list is already refreshed inline in StudentDetailPanel after teacher assignment.
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [registering, isAdmin, supabase, selectedStudent?.teacher_id, getAdminAuthHeaders, setLoading, setUsersList, setTeachersList]);
+    }, [registering, isAdmin, supabase, getAdminAuthHeaders, setLoading, setUsersList, setTeachersList]);
 
     // fetchTeachers
     useEffect(() => {
