@@ -321,6 +321,7 @@ export function buildReportHTML(
     ? Number(reportData.summaryMetrics.volumeDeltaPctVsPrev).toFixed(1)
     : '0.0'
 
+  // ─── AI Section ──────────────────────────────────────────────────────────────
   const buildAiSection = () => {
     if (!aiRaw) return ''
     const ratingRaw = aiRaw?.rating ?? aiRaw?.stars ?? aiRaw?.score
@@ -332,98 +333,83 @@ export function buildReportHTML(
     const motivation = String(aiRaw?.motivation || '').trim()
     const highlights = Array.isArray(aiRaw?.highlights) ? aiRaw.highlights.filter(Boolean).map((v) => String(v)) : []
     const warnings = Array.isArray(aiRaw?.warnings) ? aiRaw.warnings.filter(Boolean).map((v) => String(v)) : []
-
-    const prs = Array.isArray(aiRaw?.prs) ? aiRaw.prs.filter(Boolean) : []
-    const prItems = prs.slice(0, 10).map((p) => {
-      const ex = escapeHtml(p?.exercise || p?.name || '')
-      const val = escapeHtml(p?.value || p?.text || '')
-      if (!ex && !val) return ''
-      return `<li><span style="font-weight:900; color:#f5f5f5">${ex || 'PR'}</span><span style="color:#a3a3a3"> — ${val}</span></li>`
-    }).filter(Boolean)
-
     const progression = Array.isArray(aiRaw?.progression) ? aiRaw.progression.filter(Boolean) : []
-    const progItems = progression.slice(0, 10).map((it) => {
-      const ex = escapeHtml(it?.exercise || it?.name || '')
-      const rec = escapeHtml(it?.recommendation || it?.action || it?.text || '')
-      if (!ex && !rec) return ''
-      return `<li><span style="font-weight:900; color:#f5f5f5">${ex || 'Ajuste'}</span><span style="color:#a3a3a3"> — ${rec}</span></li>`
-    }).filter(Boolean)
 
-    const bullets = (items: string[]) => {
+    const bullets = (items: string[], accent = false) => {
       if (!items?.length) return ''
-      return `<ul style="margin:10px 0 0; padding-left: 18px; display:grid; gap: 6px">${items.map((v) => `<li style="color:#e5e7eb">${escapeHtml(v)}</li>`).join('')}</ul>`
+      return `<ul class="bullet-list">${items.map(v => `<li style="color:${accent ? '#fcd34d' : '#d4d4d4'}">${escapeHtml(v)}</li>`).join('')}</ul>`
     }
 
     const summaryBlock = (() => {
       if (summaryItems.length) return bullets(summaryItems)
-      if (summaryText) return `<div style="font-size:14px; color:#f5f5f5; font-weight:700">${escapeHtml(summaryText)}</div>`
+      if (summaryText) return `<p style="color:#e5e7eb;font-size:13px;line-height:1.6;margin:8px 0 0">${escapeHtml(summaryText)}</p>`
       return ''
     })()
 
-    const sections: string[] = [];
+    const progItems = progression.slice(0, 10).map((it) => {
+      const ex = escapeHtml(it?.exercise || it?.name || '')
+      const rec = escapeHtml(it?.recommendation || it?.action || it?.text || '')
+      if (!ex && !rec) return ''
+      return `<li><strong style="color:#fafafa">${ex || 'Ajuste'}</strong> — <span style="color:#a3a3a3">${rec}</span></li>`
+    }).filter(Boolean)
+
+    let html = `
+      <!-- AI Section -->
+      <div class="section-block">
+        <div class="section-title">
+          <span class="section-dot"></span>Análise Inteligente
+        </div>
+        <div class="ai-grid">`
+
     if (rating != null) {
-      const filled = '★'.repeat(rating)
-      const empty = '☆'.repeat(Math.max(0, 5 - rating))
-      sections.push(`
-        <div class="card" style="border-color: rgba(245, 158, 11, .35); background: rgba(245, 158, 11, .06)">
-          <div class="muted" style="margin-bottom:8px; color:#f59e0b">Avaliação da IA</div>
-          <div style="font-size:20px; letter-spacing:6px; color:#fbbf24; font-weight:900">${escapeHtml(filled + empty)}</div>
-          <div style="margin-top:6px; font-size:12px; color:#e5e7eb; font-weight:900">${escapeHtml(String(rating))}/5</div>
-          ${ratingReason ? `<div style="margin-top:10px; font-size:12px; color:#a3a3a3">${escapeHtml(ratingReason)}</div>` : ''}
-        </div>
-      `)
-    }
-    if (summaryBlock) {
-      sections.push(`
-        <div class="card" style="border-color: rgba(245, 158, 11, .35); background: rgba(245, 158, 11, .06)">
-          <div class="muted" style="margin-bottom:8px; color:#f59e0b">Insights da IA</div>
-          ${summaryBlock}
-          ${motivation ? `<div style="margin-top:10px; font-size:12px; color:#a3a3a3">${escapeHtml(motivation)}</div>` : ''}
-        </div>
-      `)
-    }
-    if (highlights.length) {
-      sections.push(`
-        <div class="card">
-          <div class="muted" style="margin-bottom:8px">Pontos Fortes</div>
-          ${bullets(highlights)}
-        </div>
-      `)
-    }
-    if (warnings.length) {
-      sections.push(`
-        <div class="card" style="border-color: rgba(239, 68, 68, .35); background: rgba(239, 68, 68, .06)">
-          <div class="muted" style="margin-bottom:8px; color:#ef4444">Alertas</div>
-          ${bullets(warnings)}
-        </div>
-      `)
-    }
-    if (prItems.length) {
-      sections.push(`
-        <div class="card">
-          <div class="muted" style="margin-bottom:8px">PRs</div>
-          <ul style="margin:10px 0 0; padding-left: 18px; display:grid; gap: 6px">${prItems.join('')}</ul>
-        </div>
-      `)
-    }
-    if (progItems.length) {
-      sections.push(`
-        <div class="card">
-          <div class="muted" style="margin-bottom:8px">Progressão Sugerida</div>
-          <ul style="margin:10px 0 0; padding-left: 18px; display:grid; gap: 6px">${progItems.join('')}</ul>
-        </div>
-      `)
+      const stars = '★'.repeat(rating) + '☆'.repeat(Math.max(0, 5 - rating))
+      html += `
+          <div class="ai-card ai-card-gold">
+            <div class="ai-card-label">Avaliação da IA</div>
+            <div style="font-size:22px;letter-spacing:8px;color:#fbbf24;margin:6px 0">${escapeHtml(stars)}</div>
+            <div style="font-size:12px;color:#fde68a;font-weight:900">${escapeHtml(String(rating))}/5</div>
+            ${ratingReason ? `<p style="margin:10px 0 0;font-size:12px;color:#d4d4d4;line-height:1.5">${escapeHtml(ratingReason)}</p>` : ''}
+          </div>`
     }
 
-    if (!sections.length) return ''
-    return `
-      <div style="margin: 10px 0 26px; page-break-inside: avoid">
-        <div class="muted" style="margin-bottom:10px">Análise Inteligente</div>
-        <div class="grid-2">${sections.join('')}</div>
-      </div>
-    `
+    if (summaryBlock) {
+      html += `
+          <div class="ai-card ai-card-gold">
+            <div class="ai-card-label">Insights</div>
+            ${summaryBlock}
+            ${motivation ? `<p style="margin:10px 0 0;font-size:12px;color:#9ca3af;font-style:italic">${escapeHtml(motivation)}</p>` : ''}
+          </div>`
+    }
+
+    if (highlights.length) {
+      html += `
+          <div class="ai-card">
+            <div class="ai-card-label ai-label-green">✓ Pontos Fortes</div>
+            ${bullets(highlights)}
+          </div>`
+    }
+
+    if (warnings.length) {
+      html += `
+          <div class="ai-card ai-card-red">
+            <div class="ai-card-label ai-label-red">⚠ Alertas</div>
+            ${bullets(warnings)}
+          </div>`
+    }
+
+    if (progItems.length) {
+      html += `
+          <div class="ai-card" style="grid-column: 1 / -1">
+            <div class="ai-card-label">Progressão Sugerida</div>
+            <ul class="bullet-list" style="columns:2;gap:12px">${progItems.join('')}</ul>
+          </div>`
+    }
+
+    html += `</div></div>`
+    return html
   }
 
+  // ─── Bike Cards ───────────────────────────────────────────────────────────────
   const buildBikeCards = () => {
     const bike = reportData?.outdoorBike && typeof reportData.outdoorBike === 'object' ? reportData.outdoorBike : null
     if (!bike) return ''
@@ -432,32 +418,65 @@ export function buildReportHTML(
     const avg = Number(bike?.avgSpeedKmh)
     const max = Number(bike?.maxSpeedKmh)
     if ((!Number.isFinite(km) || km <= 0) && (!Number.isFinite(dur) || dur <= 0)) return ''
-    const formatKmh = (v: unknown) => (Number.isFinite(Number(v)) && Number(v) > 0 ? `${Number(v).toFixed(1)} km/h` : '-')
+    const fmtKmh = (v: unknown) => (Number.isFinite(Number(v)) && Number(v) > 0 ? `${Number(v).toFixed(1)} km/h` : '—')
     return `
-      <div style="margin: 12px 0 24px">
-        <div class="muted" style="margin-bottom:8px">Bike Outdoor</div>
-        <div class="stats" style="grid-template-columns:repeat(4,1fr); margin-bottom:0">
-          <div class="card">
-            <div class="muted" style="margin-bottom:4px">Distância</div>
-            <div style="font-size:20px; font-family: ui-monospace; font-weight:800">${Number.isFinite(km) && km > 0 ? `${km.toFixed(2)} km` : '-'}</div>
-          </div>
-          <div class="card">
-            <div class="muted" style="margin-bottom:4px">Vel. Média</div>
-            <div style="font-size:20px; font-family: ui-monospace; font-weight:800">${formatKmh(avg)}</div>
-          </div>
-          <div class="card">
-            <div class="muted" style="margin-bottom:4px">Vel. Máx</div>
-            <div style="font-size:20px; font-family: ui-monospace; font-weight:800">${formatKmh(max)}</div>
-          </div>
-          <div class="card">
-            <div class="muted" style="margin-bottom:4px">Tempo Bike</div>
-            <div style="font-size:20px; font-family: ui-monospace; font-weight:800">${formatDuration(dur || 0)}</div>
-          </div>
+      <div class="section-block">
+        <div class="section-title"><span class="section-dot"></span>Bike Outdoor</div>
+        <div class="stats-grid stats-4">
+          <div class="stat-card"><div class="stat-label">Distância</div><div class="stat-value">${Number.isFinite(km) && km > 0 ? `${km.toFixed(2)} km` : '—'}</div></div>
+          <div class="stat-card"><div class="stat-label">Vel. Média</div><div class="stat-value">${fmtKmh(avg)}</div></div>
+          <div class="stat-card"><div class="stat-label">Vel. Máx</div><div class="stat-value">${fmtKmh(max)}</div></div>
+          <div class="stat-card"><div class="stat-label">Tempo Bike</div><div class="stat-value">${formatDuration(dur || 0)}</div></div>
         </div>
-      </div>
-    `
+      </div>`
   }
 
+  // ─── Detail by exercise ───────────────────────────────────────────────────────
+  const detailByExerciseHtml = (() => {
+    const sessionObj = isRecord(session) ? (session as Record<string, unknown>) : {}
+    const reportMeta = isRecord(sessionObj.reportMeta) ? (sessionObj.reportMeta as Record<string, unknown>) : null
+    const list = reportMeta && Array.isArray(reportMeta.exercises) ? (reportMeta.exercises as unknown[]) : []
+    if (!list.length) return ''
+    const rows = list.map((raw, idx) => {
+      const ex = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : null
+      if (!ex) return ''
+      const order = Number(ex.order || idx + 1)
+      const name = escapeHtml(String(ex.name || '').trim() || '—')
+      const execMin = Number(ex.executionMinutes || 0)
+      const restMin = Number(ex.restMinutes || 0)
+      const restPlan = Number(ex.restTimePlannedSec || 0)
+      const zebra = idx % 2 === 0 ? '' : 'background:rgba(255,255,255,0.025)'
+      return `
+        <tr style="${zebra}">
+          <td class="td-mono td-muted" style="width:40px">${Number.isFinite(order) ? order : idx + 1}</td>
+          <td class="td-name">${name}</td>
+          <td class="td-mono td-center">${Number.isFinite(execMin) && execMin > 0 ? `${execMin.toFixed(1)} min` : '—'}</td>
+          <td class="td-mono td-center">${Number.isFinite(restMin) && restMin > 0 ? `${restMin.toFixed(1)} min` : '—'}</td>
+          <td class="td-mono td-center td-muted">${Number.isFinite(restPlan) && restPlan > 0 ? `${Math.round(restPlan)}s` : '—'}</td>
+        </tr>`
+    }).filter(Boolean).join('')
+    if (!rows) return ''
+    return `
+      <div class="section-block">
+        <div class="section-title"><span class="section-dot"></span>Detalhe por Exercício</div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr class="thead-row">
+                <th class="th" style="width:40px">#</th>
+                <th class="th">Exercício</th>
+                <th class="th th-center">Execução</th>
+                <th class="th th-center">Descanso Real</th>
+                <th class="th th-center">Descanso Plan.</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </div>
+      </div>`
+  })()
+
+  // ─── Exercises ────────────────────────────────────────────────────────────────
   const exercisesHtml = (Array.isArray(reportData?.exercises) ? reportData.exercises : []).map((ex, exIdx) => {
     const sets = Array.isArray(ex?.sets) ? ex.sets : []
     if (!sets.length) return ''
@@ -466,287 +485,391 @@ export function buildReportHTML(
     const method = ex?.method ? String(ex.method) : ''
     const rpe = ex?.rpe != null ? String(ex.rpe) : ''
 
-    const rows = sets.map((set) => {
+    const rows = sets.map((set, rowIdx) => {
       const tag = set?.tag ? String(set.tag) : ''
-      const tagHtml = tag ? `<span style="margin-left:4px; font-size:10px; color:#a3a3a3">(${escapeHtml(tag)})</span>` : ''
+      const tagHtml = tag ? `<span class="set-tag">${escapeHtml(tag)}</span>` : ''
       const note = set?.note ? String(set.note) : ''
-      const weight = set?.weight ?? '-'
-      const reps = set?.reps ?? '-'
-      const cadence = set?.cadence ?? '-'
+      const weight = set?.weight ?? '—'
+      const reps = set?.reps ?? '—'
       const prog = set?.progression && typeof set.progression === 'object' ? set.progression : null
-      const progText = prog?.deltaText ? String(prog.deltaText) : '-'
-      const direction = prog?.direction ? String(prog.direction) : ''
-      const progClass =
-        direction === 'up'
-          ? 'color:#22c55e; font-weight:900; background: rgba(34,197,94,.12); border: 1px solid rgba(34,197,94,.22)'
-          : direction === 'down'
-            ? 'color:#ef4444; font-weight:900; background: rgba(239,68,68,.10); border: 1px solid rgba(239,68,68,.20)'
-            : 'color:#e5e7eb; font-weight:900; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.10)'
+      const progText = prog?.deltaText ? String(prog.deltaText) : '—'
+      const dir = prog?.direction ? String(prog.direction) : ''
+      const progStyle = dir === 'up'
+        ? 'color:#4ade80;background:rgba(34,197,94,.15);border:1px solid rgba(34,197,94,.3)'
+        : dir === 'down'
+          ? 'color:#f87171;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.25)'
+          : 'color:#737373;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08)'
+      const zebra = rowIdx % 2 === 0 ? '' : 'background:rgba(255,255,255,0.025)'
 
       let rowHtml = `
-        <tr style="border-bottom:1px solid #262626">
-          <td style="padding:12px; font-family: ui-monospace; color:#a3a3a3">#${escapeHtml(set?.index || '')}${tagHtml}</td>
-          <td style="padding:12px; text-align:center; font-weight:800; font-size:16px; color:#f5f5f5">${escapeHtml(weight)}</td>
-          <td style="padding:12px; text-align:center; font-family: ui-monospace; color:#e5e7eb">${escapeHtml(reps)}</td>
-          <td style="padding:12px; text-align:center; font-family: ui-monospace; color:#e5e7eb">${escapeHtml(cadence)}</td>
-          ${showProgression ? `<td style="padding:10px 12px; text-align:center; font-size:12px; text-transform:uppercase; border-radius:999px; ${progClass}">${escapeHtml(progText)}</td>` : ''}
+        <tr style="${zebra}">
+          <td class="td-mono td-muted">#${escapeHtml(String(set?.index || ''))}${tagHtml}</td>
+          <td class="td-weight">${escapeHtml(String(weight))}</td>
+          <td class="td-mono td-center">${escapeHtml(String(reps))}</td>
+          ${showProgression ? `<td style="padding:10px 12px;text-align:center;font-size:11px;font-weight:900;border-radius:6px;${progStyle}">${escapeHtml(progText)}</td>` : ''}
         </tr>`
 
       if (note) {
-        const colSpan = showProgression ? 5 : 4
-        rowHtml += `
-        <tr>
-          <td colspan="${colSpan}" style="padding:8px 12px; font-size:12px; color:#d4d4d4; background: rgba(255,255,255,.04)">Obs: ${escapeHtml(note)}</td>
-        </tr>`
+        const colSpan = showProgression ? 4 : 3
+        rowHtml += `<tr><td colspan="${colSpan}" class="td-note">Obs: ${escapeHtml(note)}</td></tr>`
       }
       return rowHtml
     }).join('')
 
     return `
-      <div style="page-break-inside: avoid; margin-bottom:24px">
-        <div style="display:flex; justify-content:space-between; align-items:flex-end; margin-bottom:8px; border-bottom:2px solid #262626; padding-bottom:8px">
-          <h3 style="font-size:18px; font-weight:800; text-transform:uppercase; display:flex; align-items:center; gap:8px">
-            <span style="background:#f59e0b; color:#0b0b0c; width:24px; height:24px; display:inline-flex; align-items:center; justify-content:center; border-radius:6px; font-size:12px">${exIdx + 1}</span>
-            ${escapeHtml(ex?.name || '')}
-          </h3>
-          <div style="display:flex; gap:12px; font-size:12px; font-family: ui-monospace; color:#a3a3a3">
-            ${baseText ? `<span>${escapeHtml(baseText)}</span>` : ''}
-            ${method ? `<span style="color:#ef4444; font-weight:900; text-transform:uppercase">${escapeHtml(method)}</span>` : ''}
-            ${rpe ? `<span>RPE: <span style="font-weight:900; color:#f5f5f5">${escapeHtml(rpe)}</span></span>` : ''}
+      <div class="exercise-block">
+        <div class="exercise-header">
+          <div style="display:flex;align-items:center;gap:10px">
+            <span class="exercise-num">${exIdx + 1}</span>
+            <span class="exercise-name">${escapeHtml(ex?.name || '')}</span>
+          </div>
+          <div class="exercise-meta">
+            ${baseText ? `<span class="meta-pill">${escapeHtml(baseText)}</span>` : ''}
+            ${method ? `<span class="meta-pill meta-pill-red">${escapeHtml(method)}</span>` : ''}
+            ${rpe ? `<span class="meta-pill">RPE <strong style="color:#fafafa">${escapeHtml(rpe)}</strong></span>` : ''}
           </div>
         </div>
-        <table style="width:100%; font-size:14px; border-collapse:collapse">
-          <thead>
-            <tr style="color:#e5e7eb; border-bottom:1px solid #262626">
-              <th style="padding:8px; text-align:left; width:64px; border-bottom:1px solid #262626">Série</th>
-              <th style="padding:8px; text-align:center; width:96px; border-bottom:1px solid #262626">Carga</th>
-              <th style="padding:8px; text-align:center; width:96px; border-bottom:1px solid #262626">Reps</th>
-              <th style="padding:8px; text-align:center; width:80px; border-bottom:1px solid #262626">Cad</th>
-              ${showProgression ? `<th style="padding:8px; text-align:center; width:128px; border-bottom:1px solid #262626">Evolução</th>` : ''}
-            </tr>
-          </thead>
-          <tbody>${rows}</tbody>
-        </table>
-      </div>
-    `
-  }).filter(Boolean).join('')
-
-  const logoUrl = String(reportData?.brand?.logoUrl || '')
-  const safeLogoUrl = /^https?:\/\//i.test(logoUrl) ? escapeHtml(logoUrl) : ''
-  const aiSectionHtml = buildAiSection()
-  const detailByExerciseHtml = (() => {
-    const sessionObj = isRecord(session) ? (session as Record<string, unknown>) : {}
-    const reportMeta = isRecord(sessionObj.reportMeta) ? (sessionObj.reportMeta as Record<string, unknown>) : null
-    const list = reportMeta && Array.isArray(reportMeta.exercises) ? (reportMeta.exercises as unknown[]) : []
-    if (!list.length) return ''
-    const rows = list
-      .map((raw, idx) => {
-        const ex = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : null
-        if (!ex) return ''
-        const order = Number(ex.order || idx + 1)
-        const name = escapeHtml(String(ex.name || '').trim() || '—')
-        const execMin = Number(ex.executionMinutes || 0)
-        const restMin = Number(ex.restMinutes || 0)
-        const restPlan = Number(ex.restTimePlannedSec || 0)
-        return `
-          <tr style="border-bottom:1px solid #262626">
-            <td style="padding:10px 12px; font-family: ui-monospace; color:#a3a3a3">${Number.isFinite(order) ? order : idx + 1}</td>
-            <td style="padding:10px 12px; font-weight:900; color:#f5f5f5">${name}</td>
-            <td style="padding:10px 12px; text-align:center; font-family: ui-monospace; color:#e5e7eb">${Number.isFinite(execMin) && execMin > 0 ? `${execMin.toFixed(1)} min` : '—'}</td>
-            <td style="padding:10px 12px; text-align:center; font-family: ui-monospace; color:#e5e7eb">${Number.isFinite(restMin) && restMin > 0 ? `${restMin.toFixed(1)} min` : '—'}</td>
-            <td style="padding:10px 12px; text-align:center; font-family: ui-monospace; color:#a3a3a3">${Number.isFinite(restPlan) && restPlan > 0 ? `${Math.round(restPlan)}s` : '—'}</td>
-          </tr>
-        `
-      })
-      .filter(Boolean)
-      .join('')
-    if (!rows) return ''
-    return `
-      <div style="margin: 12px 0 24px">
-        <div class="muted" style="margin-bottom:8px">Detalhe por exercício</div>
-        <div class="card" style="padding:0; overflow:hidden">
-          <table style="width:100%; border-collapse:collapse; font-size:13px">
+        <div class="table-wrap">
+          <table>
             <thead>
-              <tr style="background:#0b0b0c; color:#a3a3a3; text-transform:uppercase; letter-spacing:.12em; font-size:10px">
-                <th style="padding:10px 12px; text-align:left; width:44px">#</th>
-                <th style="padding:10px 12px; text-align:left">Exercício</th>
-                <th style="padding:10px 12px; text-align:center; width:110px">Execução</th>
-                <th style="padding:10px 12px; text-align:center; width:130px">Descanso real</th>
-                <th style="padding:10px 12px; text-align:center; width:120px">Descanso plan</th>
+              <tr class="thead-row">
+                <th class="th" style="width:60px">Série</th>
+                <th class="th">Carga</th>
+                <th class="th th-center">Reps</th>
+                ${showProgression ? `<th class="th th-center" style="width:110px">Evolução</th>` : ''}
               </tr>
             </thead>
             <tbody>${rows}</tbody>
           </table>
         </div>
-      </div>
-    `
-  })()
+      </div>`
+  }).filter(Boolean).join('')
+
+  // ─── Assemble ─────────────────────────────────────────────────────────────────
+  const logoUrl = String(reportData?.brand?.logoUrl || '')
+  const safeLogoUrl = /^https?:\/\//i.test(logoUrl) ? escapeHtml(logoUrl) : ''
   const workoutTitleSafe = escapeHtml(reportData?.session?.workoutTitle || 'Treino')
   const studentNameSafe = escapeHtml(reportData?.athlete?.name || '')
+  const dateSafe = escapeHtml(formatDate(isRecord(session) ? (session as Record<string, unknown>).date : null))
+  const timeSafe = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+
+  const volDelta = reportData?.summaryMetrics?.volumeDeltaPctVsPrev
+  const volDeltaColor = volDelta != null && Number(volDelta) >= 0 ? '#4ade80' : '#f87171'
+  const volDeltaLabel = volDelta != null ? `${Number(volDelta) > 0 ? '+' : ''}${escapeHtml(volumeDeltaStr)}%` : ''
 
   return `<!doctype html>
-  <html>
-    <head>
-      <meta charset="utf-8" />
-      <meta name="viewport" content="width=device-width, initial-scale=1" />
-      <title>Relatório IronTracks</title>
-      <style>
-        * { box-sizing: border-box; }
-        body {
-          background: #0a0a0a;
-          color: #fafafa;
-          font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial;
-          margin: 0;
-          line-height: 1.35;
-        }
-        img { max-width: 100%; height: auto; }
-        .container { max-width: 880px; margin: 0 auto; padding: 28px; }
-        .header {
-          border-bottom: 1px solid #262626;
-          padding-bottom: 20px;
-          margin-bottom: 24px;
-          display: flex;
-          justify-content: space-between;
-          align-items: flex-end;
-          gap: 16px;
-          flex-wrap: wrap;
-        }
-        .brand { font-size: 34px; font-weight: 900; font-style: italic; letter-spacing: -0.03em; line-height: 1; }
-        .muted { color: #a3a3a3; font-weight: 800; text-transform: uppercase; letter-spacing: .18em; font-size: 11px; }
-        .card {
-          background: #171717;
-          border: 1px solid #262626;
-          border-radius: 14px;
-          padding: 16px;
-          box-shadow: 0 1px 0 rgba(0,0,0,.35);
-          break-inside: avoid;
-          page-break-inside: avoid;
-        }
-        .card-accent { background: rgba(245, 158, 11, .08); border-color: rgba(245, 158, 11, .35); }
-        .card-accent .muted { color: #f59e0b; }
-        .card-invert { background: #000; border-color: #262626; color: #fff; }
-        .card-invert .muted { color: #a3a3a3; }
-        .value {
-          font-size: clamp(20px, 5.6vw, 28px);
-          font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
-          font-weight: 800;
-          line-height: 1.05;
-          overflow-wrap: anywhere;
-        }
-        .value-accent { color: #f59e0b; }
-        .value-row { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; min-width: 0; }
-        .unit { font-size: 12px; font-weight: 900; color: #a3a3a3; text-transform: uppercase; letter-spacing: .08em; }
-        .stats {
-          display: grid;
-          grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-          gap: 14px;
-          margin-bottom: 22px;
-        }
-        .grid-2 {
-          display: grid;
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-          gap: 14px;
-        }
-        table { width: 100%; border-collapse: collapse; }
-        thead { display: table-header-group; }
-        tr { break-inside: avoid; page-break-inside: avoid; }
-        @media (max-width: 520px) {
-          .container { padding: 16px; }
-          .brand { font-size: 30px; }
-          .header { padding-bottom: 16px; margin-bottom: 18px; }
-          .stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
-          .grid-2 { grid-template-columns: 1fr; }
-        }
-        @media print {
-          @page { size: auto; margin: 12mm; }
-          body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-          .container { max-width: none; padding: 0; }
-          .no-print { display: none !important; }
-        }
-      </style>
-    </head>
-    <body>
-      <div class="container">
-        <div class="header">
-          <div style="display:flex; align-items:flex-end; gap:12px">
-            <img src="${safeLogoUrl}" alt="IronTracks" style="width:40px; height:40px; border-radius:10px; object-fit:contain; border:1px solid rgba(245,158,11,.55); background:#000" />
-            <div>
-              <div class="brand">IRONTRACKS</div>
-              <div class="muted">Relatório de Performance</div>
-            </div>
-          </div>
-          <div style="text-align:right">
-            <div style="font-size:20px; font-weight:900; color:#fafafa">${workoutTitleSafe}</div>
-            <div style="color:#a3a3a3">${escapeHtml(formatDate(isRecord(session) ? (session as Record<string, unknown>).date : null))}</div>
-            ${studentNameSafe ? `<div style="color:#a3a3a3; font-size:12px; text-transform:uppercase; letter-spacing:.08em">Aluno: <span style="color:#fafafa; font-weight:900">${studentNameSafe}</span></div>` : ''}
-          </div>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>${workoutTitleSafe} · IronTracks</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
+    body {
+      background: #0d0d0d !important;
+      color: #f5f5f5;
+      font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    img { max-width: 100%; display: block; }
+
+    /* ── Layout ─────────────────────────────────── */
+    .page { max-width: 900px; margin: 0 auto; }
+
+    /* ── Header Banner ──────────────────────────── */
+    .header-banner {
+      background: linear-gradient(135deg, #111111 0%, #1a1508 60%, #0d0d0d 100%) !important;
+      border-bottom: 3px solid #f59e0b;
+      padding: 28px 36px 22px;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 20px;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    .header-brand-row { display: flex; align-items: center; gap: 14px; }
+    .header-logo { width: 44px; height: 44px; border-radius: 12px; border: 1.5px solid rgba(245,158,11,0.55); background: #000; object-fit: contain; }
+    .header-wordmark { font-size: 32px; font-weight: 900; font-style: italic; letter-spacing: -0.04em; line-height: 1; }
+    .header-wordmark span { color: #f59e0b; }
+    .header-sub { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.22em; color: #a3a3a3; margin-top: 3px; }
+    .header-right { text-align: right; }
+    .header-workout { font-size: 22px; font-weight: 900; color: #ffffff; line-height: 1.15; max-width: 340px; }
+    .header-date { font-size: 12px; color: #a3a3a3; margin-top: 4px; }
+    .header-athlete { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: #6b7280; margin-top: 2px; }
+    .header-athlete strong { color: #d4d4d4; }
+
+    /* ── Gold accent stripe under header ─────────── */
+    .accent-stripe {
+      background: linear-gradient(90deg, #f59e0b, #d97706, rgba(245,158,11,0)) !important;
+      height: 3px;
+      margin-bottom: 28px;
+      -webkit-print-color-adjust: exact !important;
+    }
+
+    /* ── Container ── */
+    .container { padding: 0 36px 36px; }
+
+    /* ── Section ──────────────────────────────────── */
+    .section-block { margin-bottom: 32px; }
+    .section-title {
+      font-size: 10px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.22em;
+      color: #a3a3a3;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .section-dot {
+      display: inline-block;
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #f59e0b !important;
+      -webkit-print-color-adjust: exact !important;
+      flex-shrink: 0;
+    }
+
+    /* ── Stats Grid ───────────────────────────────── */
+    .stats-grid {
+      display: grid;
+      gap: 12px;
+      margin-bottom: 0;
+    }
+    .stats-main { grid-template-columns: repeat(4, 1fr); }
+    .stats-sub  { grid-template-columns: repeat(4, 1fr); }
+    .stats-4    { grid-template-columns: repeat(4, 1fr); }
+    .stat-card {
+      background: #161616 !important;
+      border: 1px solid #2a2a2a;
+      border-radius: 14px;
+      padding: 16px;
+      page-break-inside: avoid;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    .stat-card-accent {
+      background: linear-gradient(135deg, rgba(245,158,11,0.12), rgba(180,83,9,0.08)) !important;
+      border-color: rgba(245,158,11,0.4) !important;
+    }
+    .stat-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.18em; color: #6b7280; margin-bottom: 6px; }
+    .stat-value { font-size: 26px; font-weight: 900; color: #ffffff; line-height: 1.05; font-variant-numeric: tabular-nums; }
+    .stat-value-gold { color: #f59e0b !important; }
+    .stat-unit  { font-size: 11px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.08em; }
+    .stat-sub   { font-size: 11px; font-weight: 700; color: #6b7280; margin-top: 3px; }
+
+    /* ── AI Cards ─────────────────────────────────── */
+    .ai-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+    .ai-card {
+      background: #161616 !important;
+      border: 1px solid #2a2a2a;
+      border-radius: 14px;
+      padding: 16px;
+      page-break-inside: avoid;
+      -webkit-print-color-adjust: exact !important;
+    }
+    .ai-card-gold {
+      background: linear-gradient(135deg, rgba(245,158,11,0.1), rgba(120,53,15,0.08)) !important;
+      border-color: rgba(245,158,11,0.35) !important;
+    }
+    .ai-card-red {
+      background: rgba(239,68,68,0.07) !important;
+      border-color: rgba(239,68,68,0.3) !important;
+    }
+    .ai-card-label { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.2em; color: #6b7280; margin-bottom: 10px; }
+    .ai-label-green { color: #4ade80 !important; }
+    .ai-label-red   { color: #f87171 !important; }
+    .bullet-list { padding-left: 0; list-style: none; display: grid; gap: 6px; margin-top: 4px; }
+    .bullet-list li { font-size: 13px; color: #d4d4d4; line-height: 1.5; padding-left: 14px; position: relative; }
+    .bullet-list li::before { content: '–'; position: absolute; left: 0; color: #f59e0b; }
+
+    /* ── Tables ───────────────────────────────────── */
+    .table-wrap { border-radius: 14px; overflow: hidden; border: 1px solid #262626; }
+    table { width: 100%; border-collapse: collapse; }
+    .thead-row { background: #0b0b0b !important; -webkit-print-color-adjust: exact !important; }
+    .th { padding: 10px 12px; text-align: left; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.14em; color: #6b7280; border-bottom: 1px solid #262626; }
+    .th-center { text-align: center; }
+    .td-mono  { padding: 11px 12px; font-family: ui-monospace, monospace; }
+    .td-muted { color: #6b7280; }
+    .td-name  { padding: 11px 12px; font-weight: 700; color: #f5f5f5; }
+    .td-weight { padding: 11px 12px; font-size: 17px; font-weight: 900; color: #ffffff; }
+    .td-center { text-align: center; }
+    .td-note  { padding: 8px 12px; font-size: 12px; color: #a3a3a3; background: rgba(255,255,255,0.03) !important; font-style: italic; -webkit-print-color-adjust: exact !important; }
+
+    /* ── Exercise Block ────────────────────────────── */
+    .exercise-block { page-break-inside: avoid; margin-bottom: 24px; }
+    .exercise-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 12px 16px;
+      background: #141414 !important;
+      border: 1px solid #2a2a2a;
+      border-bottom: none;
+      border-radius: 14px 14px 0 0;
+      -webkit-print-color-adjust: exact !important;
+    }
+    .exercise-num {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 26px; height: 26px;
+      background: #f59e0b !important;
+      color: #000 !important;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 900;
+      flex-shrink: 0;
+      -webkit-print-color-adjust: exact !important;
+    }
+    .exercise-name { font-size: 16px; font-weight: 900; text-transform: uppercase; color: #ffffff; letter-spacing: -0.01em; }
+    .exercise-meta { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .meta-pill { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; padding: 3px 10px; border-radius: 999px; background: rgba(255,255,255,0.07) !important; color: #9ca3af; border: 1px solid rgba(255,255,255,0.1); -webkit-print-color-adjust: exact !important; }
+    .meta-pill-red { background: rgba(239,68,68,0.12) !important; color: #f87171 !important; border-color: rgba(239,68,68,0.25) !important; }
+    .set-tag { margin-left: 5px; font-size: 9px; font-weight: 700; text-transform: uppercase; color: #9ca3af; background: rgba(255,255,255,0.06) !important; padding: 1px 5px; border-radius: 4px; -webkit-print-color-adjust: exact !important; }
+
+    /* ── Footer ────────────────────────────────────── */
+    .report-footer {
+      margin-top: 36px;
+      padding: 20px 36px;
+      border-top: 1px solid #262626;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.2em;
+      color: #4a4a4a;
+    }
+    .footer-brand { color: #f59e0b !important; font-weight: 900; }
+
+    /* ── Print ─────────────────────────────────────── */
+    @media print {
+      @page { size: A4; margin: 0; }
+      html, body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
+      body { background: #0d0d0d !important; }
+      .page { max-width: none; }
+      .exercise-block { page-break-inside: avoid; }
+      .section-block { page-break-inside: avoid; }
+    }
+    @media (max-width: 600px) {
+      .header-banner { padding: 20px; flex-direction: column; }
+      .header-right { text-align: left; }
+      .stats-main, .stats-sub, .ai-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ── Header ─────────────────────────────────── -->
+  <div class="header-banner">
+    <div>
+      <div class="header-brand-row">
+        ${safeLogoUrl ? `<img src="${safeLogoUrl}" alt="IT" class="header-logo" />` : ''}
+        <div>
+          <div class="header-wordmark">IRON<span>TRACKS</span></div>
+          <div class="header-sub">Relatório de Performance</div>
         </div>
-
-        <div class="stats">
-          <div class="card">
-            <div class="muted" style="margin-bottom:4px">Tempo Total</div>
-            <div class="value">${formatDuration(reportData?.session?.totalTimeSeconds || 0)}</div>
-          </div>
-          <div class="card">
-            <div class="muted" style="margin-bottom:4px">Tempo Real</div>
-            <div class="value">${formatDuration(reportData?.session?.realTimeSeconds || 0)}</div>
-          </div>
-          ${Number(reportData?.session?.executionTotalSeconds || 0) > 0
-      ? `<div class="card">
-            <div class="muted" style="margin-bottom:4px">Execução</div>
-            <div class="value">${formatDuration(Number(reportData?.session?.executionTotalSeconds || 0))}</div>
-          </div>`
-      : ''}
-          ${Number(reportData?.session?.restTotalSeconds || 0) > 0
-      ? `<div class="card">
-            <div class="muted" style="margin-bottom:4px">Descanso</div>
-            <div class="value">${formatDuration(Number(reportData?.session?.restTotalSeconds || 0))}</div>
-          </div>`
-      : ''}
-          <div class="card">
-            <div class="muted" style="margin-bottom:4px">Séries</div>
-            <div class="value-row">
-              <span class="value">${Number(reportData?.summaryMetrics?.setsLoggedCount || 0).toLocaleString('pt-BR')}</span>
-              <span class="unit">sets</span>
-              <span style="font-size:12px; font-weight:900; color:#a3a3a3">${Number(reportData?.summaryMetrics?.exercisesLoggedCount || 0).toLocaleString('pt-BR')} ex</span>
-            </div>
-          </div>
-          <div class="card">
-            <div class="muted" style="margin-bottom:4px">Volume (Kg)</div>
-            <div class="value-row">
-              <span class="value">${Number(reportData?.summaryMetrics?.volumeTotal || 0).toLocaleString('pt-BR')}</span>
-              <span class="unit">kg</span>
-              ${reportData?.summaryMetrics?.volumeDeltaPctVsPrev != null ? `<span style="font-size:12px; font-weight:900; color:${Number(reportData.summaryMetrics.volumeDeltaPctVsPrev) >= 0 ? '#22c55e' : '#ef4444'}">${Number(reportData.summaryMetrics.volumeDeltaPctVsPrev) > 0 ? '+' : ''}${escapeHtml(volumeDeltaStr)}%</span>` : ''}
-            </div>
-          </div>
-          <div class="card card-accent">
-            <div class="muted" style="margin-bottom:4px">Calorias</div>
-            <div class="value value-accent">~${Number(reportData?.summaryMetrics?.caloriesEstimate || 0) || 0}</div>
-          </div>
-          <div class="card">
-            <div class="muted" style="margin-bottom:4px">Reps</div>
-            <div class="value-row">
-              <span class="value">${Number(reportData?.summaryMetrics?.repsTotal || 0).toLocaleString('pt-BR')}</span>
-              <span class="unit">reps</span>
-              ${Number(reportData?.summaryMetrics?.topWeight || 0) > 0 ? `<span style="font-size:12px; font-weight:900; color:#a3a3a3">Top: ${Number(reportData?.summaryMetrics?.topWeight || 0).toLocaleString('pt-BR')}kg</span>` : ''}
-            </div>
-          </div>
-          <div class="card card-invert">
-            <div class="muted" style="margin-bottom:4px">Status</div>
-            <div style="font-size:16px; font-weight:800; text-transform:uppercase; font-style:italic">Concluído</div>
-          </div>
-        </div>
-
-        ${buildBikeCards()}
-
-        ${aiSectionHtml}
-
-        ${detailByExerciseHtml}
-
-        ${exercisesHtml}
-
-        <div style="margin-top:32px; padding-top:16px; border-top:1px solid #262626; text-align:center; font-size:12px; color:#a3a3a3; text-transform:uppercase; letter-spacing:.2em">IronTracks System</div>
       </div>
-    </body>
-  </html>`
+    </div>
+    <div class="header-right">
+      <div class="header-workout">${workoutTitleSafe}</div>
+      <div class="header-date">${dateSafe} &nbsp;·&nbsp; ${timeSafe}</div>
+      ${studentNameSafe ? `<div class="header-athlete">Atleta: <strong>${studentNameSafe}</strong></div>` : ''}
+    </div>
+  </div>
+  <div class="accent-stripe"></div>
+
+  <div class="container">
+
+    <!-- ── Summary Metrics ───────────────────────── -->
+    <div class="section-block">
+      <div class="section-title"><span class="section-dot"></span>Resumo da Sessão</div>
+      <div class="stats-grid stats-main" style="margin-bottom:12px">
+        <div class="stat-card">
+          <div class="stat-label">Tempo Total</div>
+          <div class="stat-value">${formatDuration(reportData?.session?.totalTimeSeconds || 0)}</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Tempo Real</div>
+          <div class="stat-value">${formatDuration(reportData?.session?.realTimeSeconds || 0)}</div>
+        </div>
+        ${Number(reportData?.session?.executionTotalSeconds || 0) > 0 ? `
+        <div class="stat-card">
+          <div class="stat-label">Execução</div>
+          <div class="stat-value">${formatDuration(Number(reportData?.session?.executionTotalSeconds || 0))}</div>
+        </div>` : `<div class="stat-card">
+          <div class="stat-label">Exercícios</div>
+          <div class="stat-value">${Number(reportData?.summaryMetrics?.exercisesLoggedCount || 0)}</div>
+        </div>`}
+        ${Number(reportData?.session?.restTotalSeconds || 0) > 0 ? `
+        <div class="stat-card">
+          <div class="stat-label">Descanso</div>
+          <div class="stat-value">${formatDuration(Number(reportData?.session?.restTotalSeconds || 0))}</div>
+        </div>` : `<div class="stat-card">
+          <div class="stat-label">Séries</div>
+          <div class="stat-value">${Number(reportData?.summaryMetrics?.setsLoggedCount || 0)}</div>
+          <div class="stat-sub">${Number(reportData?.summaryMetrics?.exercisesLoggedCount || 0)} exercícios</div>
+        </div>`}
+      </div>
+      <div class="stats-grid stats-sub">
+        <div class="stat-card">
+          <div class="stat-label">Séries</div>
+          <div class="stat-value">${Number(reportData?.summaryMetrics?.setsLoggedCount || 0)}</div>
+          <div class="stat-sub">${Number(reportData?.summaryMetrics?.exercisesLoggedCount || 0)} ex</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Volume</div>
+          <div class="stat-value">${Number(reportData?.summaryMetrics?.volumeTotal || 0).toLocaleString('pt-BR')} <span class="stat-unit">kg</span></div>
+          ${volDeltaLabel ? `<div class="stat-sub" style="color:${volDeltaColor}">${escapeHtml(volDeltaLabel)}</div>` : ''}
+        </div>
+        <div class="stat-card stat-card-accent">
+          <div class="stat-label" style="color:rgba(245,158,11,0.7)">Calorias</div>
+          <div class="stat-value stat-value-gold">~${Number(reportData?.summaryMetrics?.caloriesEstimate || 0) || 0}</div>
+          <div class="stat-sub" style="color:rgba(245,158,11,0.4)">kcal estimada</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Repetições</div>
+          <div class="stat-value">${Number(reportData?.summaryMetrics?.repsTotal || 0).toLocaleString('pt-BR')}</div>
+          ${Number(reportData?.summaryMetrics?.topWeight || 0) > 0 ? `<div class="stat-sub">Top: ${Number(reportData?.summaryMetrics?.topWeight || 0).toLocaleString('pt-BR')} kg</div>` : ''}
+        </div>
+      </div>
+    </div>
+
+    ${buildBikeCards()}
+    ${buildAiSection()}
+    ${detailByExerciseHtml}
+
+    <!-- ── Exercises ──────────────────────────────── -->
+    ${exercisesHtml ? `
+    <div class="section-block">
+      <div class="section-title"><span class="section-dot"></span>Séries Executadas</div>
+      ${exercisesHtml}
+    </div>` : ''}
+
+  </div><!-- /container -->
+
+  <!-- ── Footer ─────────────────────────────────── -->
+  <div class="report-footer">
+    <span class="footer-brand">IronTracks</span>
+    <span>Performance Report &nbsp;·&nbsp; ${dateSafe}</span>
+    <span>irontracks.app</span>
+  </div>
+
+</div><!-- /page -->
+</body>
+</html>`
 }
