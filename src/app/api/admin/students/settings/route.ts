@@ -7,7 +7,8 @@ import { parseSearchParams } from '@/utils/zod'
 export const dynamic = 'force-dynamic'
 
 const QuerySchema = z.object({
-  user_id: z.string().uuid(),
+  // Accept any non-empty string — legacy students may have numeric IDs, not UUIDs
+  user_id: z.string().min(1),
 })
 
 export async function GET(req: Request) {
@@ -29,7 +30,7 @@ export async function GET(req: Request) {
       .eq('user_id', q.user_id)
       .maybeSingle()
 
-    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+    if (error) return NextResponse.json({ ok: false, error: `db_error: ${error.message}` }, { status: 400 })
 
     return NextResponse.json({ ok: true, settings: data?.settings ?? null })
   } catch (e: unknown) {
