@@ -14,6 +14,7 @@ import {
   Sparkles,
   Users,
   Crown,
+  User,
 } from 'lucide-react'
 import { isIosNative } from '@/utils/platform'
 
@@ -36,6 +37,7 @@ interface HeaderActionsMenuProps {
   onOpenWallet?: () => void
   onOpenSettings?: () => void
   onOpenTour?: () => void
+  onOpenProfile?: () => void
 }
 
 function IconBox({ children, gold = false }: { children: React.ReactNode; gold?: boolean }) {
@@ -130,6 +132,7 @@ export default function HeaderActionsMenu({
   onOpenWallet,
   onOpenSettings,
   onOpenTour,
+  onOpenProfile,
 }: HeaderActionsMenuProps) {
   const [open, setOpen] = useState(false)
   const [cancellingVip, setCancellingVip] = useState(false)
@@ -328,6 +331,11 @@ export default function HeaderActionsMenu({
                 icon={<History size={14} className="text-neutral-400" />}
                 label="Histórico"
                 onClick={() => { onOpenHistory?.(); close() }}
+              />
+              <MenuItem
+                icon={<User size={14} className="text-neutral-400" />}
+                label="Meu Perfil"
+                onClick={() => { onOpenProfile?.(); close() }}
               />
               <MenuItem
                 icon={<Sparkles size={14} className="text-yellow-400" />}

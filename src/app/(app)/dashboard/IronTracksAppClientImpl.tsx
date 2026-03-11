@@ -44,6 +44,7 @@ const CommunityClient = dynamic(() => import('@/app/(app)/community/CommunityCli
 const StudentEvolution = dynamic(() => import('@/components/StudentEvolution'), { ssr: false });
 const WorkoutReport = dynamic(() => import('@/components/WorkoutReport'), { ssr: false });
 const ExerciseEditor = dynamic(() => import('@/components/ExerciseEditor'), { ssr: false });
+const ProfilePage = dynamic(() => import('@/components/ProfilePage'), { ssr: false });
 import { TeamWorkoutProvider } from '@/contexts/TeamWorkoutContext';
 import { InAppNotificationsProvider, useInAppNotifications } from '@/contexts/InAppNotificationsContext';
 import ErrorBoundary from '@/components/ErrorBoundary';
@@ -224,6 +225,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
     const [showNotifCenter, setShowNotifCenter] = useState(false);
 
     // Profile completion state — extracted to useProfileCompletion hook
+    const userSettingsApi = useUserSettings(user?.id)
     const {
         profileIncomplete,
         setProfileIncomplete,
@@ -237,9 +239,9 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         userId: user?.id,
         displayName: user?.displayName ? String(user.displayName) : null,
         initialProfile,
+        settings: userSettingsApi?.settings as import('@/schemas/settings').UserSettings | null | undefined,
     });
 
-    const userSettingsApi = useUserSettings(user?.id)
     const { isLocked, unlock } = useBiometricLock(
         !!user?.id && Boolean(userSettingsApi?.settings?.requireBiometricsOnStartup)
     )
@@ -321,6 +323,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         if (view === 'directChat' && !directChat) { setView('dashboard'); return }
         if (view === 'report' && !reportData.current) { setView('dashboard'); return }
         if (view === 'active' && !activeSession) { setView('dashboard'); return }
+        if (view === 'profile' && !user?.id) { setView('dashboard'); return }
     }, [view, directChat, activeSession, reportData])
 
     useEffect(() => {
@@ -662,6 +665,10 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         tourVersion: TOUR_VERSION,
     })
 
+    const handleOpenProfile = useCallback(() => {
+        setView('profile')
+    }, [setView])
+
     useEffect(() => {
         if (!hideVipOnIos) return;
         if (view === 'vip') setView('dashboard');
@@ -822,6 +829,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                             onOpenWallet={() => openVipView()}
                             onOpenSettings={() => setSettingsOpen(true)}
                             onOpenTour={handleOpenTour}
+                            onOpenProfile={handleOpenProfile}
                             onLogout={handleLogout}
                             onOfflineSyncOpen={() => setOfflineSyncOpen(true)}
                             onAcceptCoach={async () => { try { const r = await fetch('/api/teachers/accept', { method: 'POST' }); const j = await r.json(); if (j.ok) { setCoachPending(false); await alert('Conta ativada!') } else { await alert('Falha ao ativar: ' + (j.error || '')) } } catch (e) { const m = e instanceof Error ? e.message : String(e); await alert('Erro: ' + m) } }}
@@ -842,7 +850,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                 <StudentDashboard
                                     workouts={Array.isArray(workouts) ? workouts : []}
                                     profileIncomplete={Boolean(profileIncomplete)}
-                                    onOpenCompleteProfile={() => setShowCompleteProfile(true)}
+                                    onOpenCompleteProfile={() => setView('profile')}
                                     view={view === 'assessments' ? 'assessments' : view === 'community' ? 'community' : view === 'vip' ? 'vip' : 'dashboard'}
                                     onChangeView={(next: string) => setView(next)}
                                     assessmentsContent={
@@ -1076,6 +1084,29 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                 </div>
                             )}
 
+                            {/* Profile Page */}
+                            {view === 'profile' && (
+                                <div className="fixed inset-0 z-[1200] bg-neutral-950 overflow-y-auto">
+                                    <SectionErrorBoundary section="Perfil" fullScreen onReset={() => setView('dashboard')}>
+                                        <ProfilePage
+                                            settings={userSettingsApi?.settings as import('@/schemas/settings').UserSettings | null}
+                                            displayName={String(user?.displayName || user?.email || 'Atleta')}
+                                            onBack={() => setView('dashboard')}
+                                            onSave={async (next) => {
+                                                try {
+                                                    const current = userSettingsApi?.settings && typeof userSettingsApi.settings === 'object'
+                                                        ? (userSettingsApi.settings as Record<string, unknown>)
+                                                        : {}
+                                                    const merged = { ...current, ...next }
+                                                    const saveFn = userSettingsApi?.save as ((v: unknown) => Promise<{ ok: boolean; error?: string }>) | undefined
+                                                    const res = await saveFn?.(merged)
+                                                    return !!res?.ok
+                                                } catch { return false }
+                                            }}
+                                        />
+                                    </SectionErrorBoundary>
+                                </div>
+                            )}
                             {showExportModal && exportWorkout && (
                                 <div className="fixed inset-0 z-[1200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowExportModal(false)}>
                                     <div className="bg-neutral-900 w-full max-w-md rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>

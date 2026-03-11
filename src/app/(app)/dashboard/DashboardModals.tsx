@@ -145,6 +145,15 @@ export default function DashboardModals(props: DashboardModalsProps) {
         ? (userSettingsApi as Record<string, unknown>).save as ((next: unknown) => Promise<{ ok: boolean; error?: string }>) | undefined
         : undefined
 
+    // Determine if the user already has body weight in profile (so we can hide weight from pre-checkin)
+    const profileBodyWeightKg = (() => {
+        try {
+            const s = settings as Record<string, unknown> | null
+            const val = Number(s?.bodyWeightKg)
+            return isFinite(val) && val > 0 ? val : null
+        } catch { return null }
+    })()
+
     return (
         <>
             {/* Complete Profile */}
@@ -545,20 +554,33 @@ export default function DashboardModals(props: DashboardModalsProps) {
                             ><X size={18} /></button>
                         </div>
                         <div className="p-5 space-y-6">
-                            <div>
-                                <label className="block text-xs font-bold uppercase text-neutral-500 mb-2">Peso (kg)</label>
-                                <input
-                                    type="number"
-                                    step="0.1"
-                                    placeholder="Ex: 85.0"
-                                    value={String((preCheckinDraft as Record<string, unknown>)?.weight ?? '')}
-                                    onChange={(e) => setPreCheckinDraft({ ...(preCheckinDraft || {}), weight: e.target.value })}
-                                    className="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-yellow-500"
-                                />
-                                <p className="mt-1.5 text-[11px] text-yellow-500/70 leading-snug">
-                                    ⚡ Preencher melhora a precisão do gasto calórico no relatório final.
-                                </p>
-                            </div>
+                            {/* Weight field — only show when profile doesn't have a weight set */}
+                            {!profileBodyWeightKg ? (
+                                <div>
+                                    <label className="block text-xs font-bold uppercase text-neutral-500 mb-2">Peso (kg)</label>
+                                    <input
+                                        type="number"
+                                        step="0.1"
+                                        placeholder="Ex: 85.0"
+                                        value={String((preCheckinDraft as Record<string, unknown>)?.weight ?? '')}
+                                        onChange={(e) => setPreCheckinDraft({ ...(preCheckinDraft || {}), weight: e.target.value })}
+                                        className="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-yellow-500"
+                                    />
+                                    <p className="mt-1.5 text-[11px] text-yellow-500/70 leading-snug">
+                                        ⚡ Preencher melhora a precisão do gasto calórico no relatório final.
+                                    </p>
+                                </div>
+                            ) : (
+                                <div className="flex items-center gap-3 px-4 py-3 bg-green-500/10 border border-green-500/20 rounded-xl">
+                                    <div className="w-7 h-7 rounded-full bg-green-500/20 flex items-center justify-center flex-shrink-0">
+                                        <span className="text-green-400 text-sm">✓</span>
+                                    </div>
+                                    <div>
+                                        <p className="text-xs font-black text-green-300">Peso do perfil: {profileBodyWeightKg} kg</p>
+                                        <p className="text-[11px] text-green-400/60">Gasto calórico calculado automaticamente</p>
+                                    </div>
+                                </div>
+                            )}
                             <div>
                                 <label className="block text-xs font-bold uppercase text-neutral-500 mb-2">Como se sente?</label>
                                 <div className="flex gap-2">
