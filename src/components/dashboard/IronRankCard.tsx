@@ -2,6 +2,7 @@
 
 import React, { memo, useEffect, useState } from 'react'
 import Image from 'next/image'
+import NextImage from 'next/image'
 import { Crown, X, ChevronRight, Trophy, TrendingUp, ChevronDown, Zap, Star } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useFocusTrap } from '@/hooks/useFocusTrap'
@@ -46,6 +47,18 @@ const LEVEL_NAMES = [
 
 const LEVEL_THRESHOLDS = [5000, 20000, 50000, 100000, 250000, 500000, 1000000, 10000000]
 const LEVEL_PREV = [0, 5000, 20000, 50000, 100000, 250000, 500000, 1000000]
+
+// 3D rank emblem config per level
+const RANK_EMBLEMS: Record<number, { src: string; glow: string }> = {
+    1: { src: '/rank-1.png', glow: 'rgba(180,83,9,0.5)' },
+    2: { src: '/rank-2.png', glow: 'rgba(100,116,139,0.5)' },
+    3: { src: '/rank-3.png', glow: 'rgba(148,163,184,0.5)' },
+    4: { src: '/rank-4.png', glow: 'rgba(203,213,225,0.5)' },
+    5: { src: '/rank-5.png', glow: 'rgba(234,179,8,0.6)' },
+    6: { src: '/rank-6.png', glow: 'rgba(245,158,11,0.6)' },
+    7: { src: '/rank-7.png', glow: 'rgba(226,232,240,0.55)' },
+    8: { src: '/rank-8.png', glow: 'rgba(147,197,253,0.65)' },
+}
 
 function countImprovements(pr: PrData) {
     return [pr.improved?.weight, pr.improved?.reps, pr.improved?.volume].filter(Boolean).length
@@ -205,12 +218,20 @@ const IronRankCard = memo(function IronRankCard({
                             aria-label="Abrir ranking Iron Rank"
                         >
                             <div className="flex items-center gap-2.5">
-                                {/* Level badge */}
+                                {/* Rank emblem image */}
                                 <div className="shrink-0 relative">
-                                    <div className="absolute inset-0 rounded-lg blur-sm opacity-40" style={{ background: 'rgba(245,158,11,0.5)' }} />
-                                    <div className="relative px-2 py-1 rounded-lg font-black text-[10px] leading-none text-black"
-                                        style={{ background: 'linear-gradient(135deg, #facc15 0%, #f59e0b 60%, #b45309 100%)' }}>
-                                        NIV {level}
+                                    <div
+                                        className="absolute inset-0 rounded-xl blur-md"
+                                        style={{ background: RANK_EMBLEMS[level]?.glow || 'rgba(245,158,11,0.4)', opacity: 0.7 }}
+                                    />
+                                    <div className="relative w-11 h-11 rounded-xl overflow-hidden">
+                                        <NextImage
+                                            src={RANK_EMBLEMS[level]?.src || '/rank-1.png'}
+                                            alt={`NIV ${level}`}
+                                            fill
+                                            unoptimized
+                                            className="object-cover"
+                                        />
                                     </div>
                                 </div>
                                 {/* Title */}
