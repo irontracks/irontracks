@@ -50,11 +50,14 @@ const LoginScreen = () => {
             <div className="relative z-10 w-full max-w-sm rounded-[2rem] border border-white/5 bg-neutral-900/60 backdrop-blur-xl shadow-2xl shadow-black/50 flex flex-col items-center transition-all duration-500 overflow-hidden">
 
                 {/* Hero image section — visible on all devices */}
-                <div className="relative w-full h-48 sm:h-56 overflow-hidden">
-                    <img
+                <div className="relative w-full h-48 sm:h-56">
+                    <Image
                         src="/login-hero.png"
                         alt=""
-                        className="w-full h-full object-cover object-top"
+                        fill
+                        priority
+                        unoptimized
+                        className="object-cover object-top"
                         draggable={false}
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-neutral-900 via-transparent to-transparent" />
@@ -63,7 +66,7 @@ const LoginScreen = () => {
 
                 <div className="px-8 pb-8 pt-4 w-full flex flex-col items-center">
 
-                <h1 className="text-3xl font-black mb-1 tracking-tighter italic text-center drop-shadow-lg pr-2">
+                <h1 className="text-3xl font-black mb-1 tracking-wide text-center drop-shadow-lg">
                     IRON<span className="text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-amber-500">TRACKS</span>
                 </h1>
 
