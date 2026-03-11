@@ -637,7 +637,11 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                             </div>
                         </div>
 
-                        <div className="shrink-0 text-right">
+                        <div className="shrink-0 text-right flex flex-col items-end gap-0">
+                            {/* Athlete header illustration — desktop only */}
+                            <div className="hidden sm:block opacity-30 -mb-2">
+                                <NextImage src="/report-athlete-header.png" alt="" width={88} height={88} unoptimized className="object-contain" />
+                            </div>
                             <div className="font-mono text-xs font-semibold text-neutral-300">
                                 {formatDate(safeSession?.date)}
                             </div>
@@ -657,9 +661,9 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                             {prCount > 0 && (
                                 <div className="relative overflow-hidden border border-yellow-500/40 rounded-xl flex flex-col"
-                                    style={{ background: 'linear-gradient(135deg, rgba(234,179,8,0.12), rgba(180,83,9,0.08))' }}>
-                                    {/* PR explosion background */}
-                                    <div className="absolute inset-0 opacity-20">
+                                    style={{ background: 'linear-gradient(135deg, rgba(234,179,8,0.14), rgba(180,83,9,0.10))', boxShadow: '0 0 18px rgba(234,179,8,0.18), inset 0 0 12px rgba(234,179,8,0.06)' }}>
+                                    {/* PR explosion background — upgraded to 30% */}
+                                    <div className="absolute inset-0 opacity-30">
                                         <NextImage src="/report-pr.png" alt="" fill unoptimized className="object-cover object-center" />
                                     </div>
                                     <div className="relative z-10 p-3 flex flex-col gap-1">
@@ -844,6 +848,17 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                     recommendations={checkinRecommendations}
                 />
 
+                {/* ─── AI Section Header with Brain illustration ───────────────────── */}
+                <div className="mb-3 flex items-center gap-3">
+                    <div className="w-14 h-14 rounded-2xl overflow-hidden shrink-0 opacity-90"
+                        style={{ background: 'rgba(15,10,30,0.8)', border: '1px solid rgba(100,60,255,0.2)', boxShadow: '0 0 16px rgba(80,40,255,0.12)' }}>
+                        <NextImage src="/report-ai-brain.png" alt="" width={56} height={56} unoptimized className="w-full h-full object-cover" />
+                    </div>
+                    <div>
+                        <div className="text-[10px] font-black uppercase tracking-widest text-purple-400">Análise Inteligente</div>
+                        <div className="text-base font-black text-white leading-tight">Coach IA & Insights</div>
+                    </div>
+                </div>
                 <ReportAiSection
                     ai={ai}
                     aiState={{ loading: aiState.loading, error: aiState.error, cached: aiState.cached }}
@@ -856,13 +871,16 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                 />
 
                 {isTeamSession && (
-                    <div className="mb-8 p-4 rounded-lg border border-neutral-800 bg-neutral-900/60 flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                    <div className="mb-8 p-4 rounded-xl border border-amber-500/20 bg-gradient-to-br from-amber-500/8 to-neutral-900/80 flex flex-col md:flex-row md:items-center md:justify-between gap-3"
+                        style={{ boxShadow: '0 0 20px rgba(245,158,11,0.08)' }}>
                         <div className="flex items-center gap-3">
-                            <div className="w-9 h-9 rounded-full bg-black text-white flex items-center justify-center">
-                                <Users size={18} />
+                            {/* Team duo athletes illustration */}
+                            <div className="w-16 h-12 rounded-xl overflow-hidden shrink-0"
+                                style={{ background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(245,158,11,0.2)' }}>
+                                <NextImage src="/report-team-duo.png" alt="" width={64} height={48} unoptimized className="w-full h-full object-cover object-top" />
                             </div>
                             <div>
-                                <p className="text-xs font-bold uppercase tracking-widest text-neutral-400">Treino em Equipe</p>
+                                <p className="text-xs font-bold uppercase tracking-widest text-amber-400">Treino em Equipe</p>
                                 <p className="text-sm font-semibold text-neutral-100">
                                     {partners.length === 1 ? '1 parceiro treinando com você' : `${partners.length} parceiros treinando com você`}
                                 </p>
@@ -915,8 +933,10 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                         );
                     })}
                 </div>
-                <div className="mt-12 pt-6 border-t border-neutral-800 text-center text-xs text-neutral-400 uppercase tracking-widest">
+                <div className="mt-12 pt-6 border-t border-neutral-800 text-center text-xs text-neutral-400 uppercase tracking-widest flex items-center justify-center gap-2">
+                    <NextImage src="/report-barbell-mini.png" alt="" width={18} height={18} unoptimized className="opacity-50 object-contain" />
                     IronTracks System • {getCurrentDate()}
+                    <NextImage src="/report-barbell-mini.png" alt="" width={18} height={18} unoptimized className="opacity-50 object-contain scale-x-[-1]" />
                 </div>
             </div>
 
