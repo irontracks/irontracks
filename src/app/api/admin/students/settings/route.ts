@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/admin'
-import { jsonError, requireRole, resolveRoleByUser } from '@/utils/auth/route'
+import { jsonError, requireRoleWithBearer } from '@/utils/auth/route'
 import { z } from 'zod'
 import { parseSearchParams } from '@/utils/zod'
 
@@ -14,17 +14,9 @@ export async function GET(req: Request) {
   try {
     const admin = createAdminClient()
 
-    // Auth: require admin or teacher
-    const auth = await requireRole(['admin', 'teacher'])
-    if (!auth.ok) {
-      const token = String(req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '').trim()
-      if (!token) return auth.response
-      const { data, error } = await admin.auth.getUser(token)
-      const user = data?.user ?? null
-      if (error || !user?.id) return auth.response
-      const { role } = await resolveRoleByUser({ id: user.id, email: user.email })
-      if (role !== 'admin' && role !== 'teacher') return jsonError(403, 'forbidden')
-    }
+    // Auth: require admin or teacher via Bearer token (admin panel sends Authorization header)
+    const auth = await requireRoleWithBearer(req, ['admin', 'teacher'])
+    if (!auth.ok) return auth.response
 
     const { data: q, response } = parseSearchParams(req, QuerySchema)
     if (response) return response
