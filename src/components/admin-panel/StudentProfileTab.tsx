@@ -84,12 +84,20 @@ export const StudentProfileTab: React.FC = () => {
         if (cancelled) return
 
         if (!resp.ok) {
-          setError('Erro ao carregar configurações do aluno.')
+          let detail = `HTTP ${resp.status}`
+          try {
+            const body = await resp.json()
+            detail += `: ${body?.error || resp.statusText}`
+          } catch { detail += `: ${resp.statusText}` }
+          console.warn('[StudentProfileTab] settings fetch failed:', detail, { userId, authHeaders })
+          setError(`Erro ao carregar perfil (${detail})`)
           return
         }
 
         const json = await resp.json()
         if (cancelled) return
+
+        console.log('[StudentProfileTab] settings OK:', json)
 
         if (json.ok && json.settings && typeof json.settings === 'object') {
           setSettings(json.settings as UserSettings)
