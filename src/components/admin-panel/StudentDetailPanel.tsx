@@ -300,42 +300,42 @@ export const StudentDetailPanel: React.FC = () => {
                         </div>
                     )}
 
-                <div className="mb-6" >
-                    <div className="bg-neutral-900/60 border border-neutral-800 rounded-full p-1 flex items-center gap-1 shadow-[0_10px_30px_rgba(0,0,0,0.35)]" >
+                <div className="mb-6 overflow-x-auto scrollbar-none -mx-1 px-1">
+                    <div className="bg-neutral-900/60 border border-neutral-800 rounded-full p-1 flex items-center gap-1 shadow-[0_10px_30px_rgba(0,0,0,0.35)] min-w-max">
                         <button
                             type="button"
                             onClick={() => setSubTab('workouts')}
-                            className={`flex-1 min-h-[44px] px-4 rounded-full font-black text-[11px] uppercase tracking-widest transition-all duration-300 active:scale-95 ${subTab === 'workouts'
+                            className={`flex-shrink-0 min-h-[44px] px-3 rounded-full font-black text-[10px] uppercase tracking-widest transition-all duration-300 active:scale-95 whitespace-nowrap ${subTab === 'workouts'
                                 ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/20'
                                 : 'text-neutral-200'
                                 }`}
                         >
                             Treinos
                         </button>
-                        < button
+                        <button
                             type="button"
                             onClick={() => setSubTab('evolution')}
-                            className={`flex-1 min-h-[44px] px-4 rounded-full font-black text-[11px] uppercase tracking-widest transition-all duration-300 active:scale-95 ${subTab === 'evolution'
+                            className={`flex-shrink-0 min-h-[44px] px-3 rounded-full font-black text-[10px] uppercase tracking-widest transition-all duration-300 active:scale-95 whitespace-nowrap ${subTab === 'evolution'
                                 ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/20'
                                 : 'text-neutral-200'
                                 }`}
                         >
                             Evolução
                         </button>
-                                         <button
+                        <button
                             type="button"
                             onClick={() => setSubTab('checkins')}
-                            className={`flex-1 min-h-[44px] px-4 rounded-full font-black text-[11px] uppercase tracking-widest transition-all duration-300 active:scale-95 ${subTab === 'checkins'
+                            className={`flex-shrink-0 min-h-[44px] px-3 rounded-full font-black text-[10px] uppercase tracking-widest transition-all duration-300 active:scale-95 whitespace-nowrap ${subTab === 'checkins'
                                 ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/20'
                                 : 'text-neutral-200'
                                 }`}
                         >
-                            Check - ins
+                            Check-ins
                         </button>
                         <button
                             type="button"
                             onClick={() => setSubTab('profile')}
-                            className={`flex-1 min-h-[44px] px-4 rounded-full font-black text-[11px] uppercase tracking-widest transition-all duration-300 active:scale-95 ${subTab === 'profile'
+                            className={`flex-shrink-0 min-h-[44px] px-3 rounded-full font-black text-[10px] uppercase tracking-widest transition-all duration-300 active:scale-95 whitespace-nowrap ${subTab === 'profile'
                                 ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/20'
                                 : 'text-neutral-200'
                                 }`}
@@ -346,9 +346,8 @@ export const StudentDetailPanel: React.FC = () => {
                             executionVideoEnabled ? (
                                 <button
                                     type="button"
-                                    onClick={() => setSubTab('videos')
-                                    }
-                                    className={`flex-1 min-h-[44px] px-4 rounded-full font-black text-[11px] uppercase tracking-widest transition-all duration-300 active:scale-95 ${subTab === 'videos'
+                                    onClick={() => setSubTab('videos')}
+                                    className={`flex-shrink-0 min-h-[44px] px-3 rounded-full font-black text-[10px] uppercase tracking-widest transition-all duration-300 active:scale-95 whitespace-nowrap ${subTab === 'videos'
                                         ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/20'
                                         : 'text-neutral-200'
                                         }`}
