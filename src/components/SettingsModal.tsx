@@ -26,6 +26,7 @@ import {
 } from '@/utils/native/irontracksNative'
 import { isObject } from '@/components/settings/settingsShared'
 import {
+  SettingsProfileSection,
   SettingsAppearanceSection,
   SettingsWorkoutNamesSection,
   SettingsAppModeSection,
@@ -174,6 +175,7 @@ export default function SettingsModal(props: SettingsModalProps) {
 
         {/* Sections */}
         <div className="p-4 space-y-3 max-h-[75vh] overflow-y-auto custom-scrollbar">
+          <SettingsProfileSection draft={draft} setValue={setValue} />
           <SettingsAppearanceSection draft={draft} setValue={setValue} />
           <SettingsWorkoutNamesSection draft={draft} setValue={setValue} />
           <SettingsAppModeSection draft={draft} setValue={setValue} setModulesModalOpen={setModulesModalOpen} />

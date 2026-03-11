@@ -150,7 +150,25 @@ export const getRpeMultiplier = (rpe: number | null | undefined): number => {
   return 1.15 // RPE 10
 }
 
-// ── Active work time ──────────────────────────────────────────────────────────
+// ── Sex multiplier ────────────────────────────────────────────────────────────
+
+/**
+ * Applies a biological sex correction to the MET-based calorie estimate.
+ *
+ * Based on the Harris-Benedict equation, women have ~10% lower BMR per kg
+ * of body weight compared to men of the same weight and training intensity,
+ * due to proportionally higher body fat and lower skeletal muscle mass.
+ *
+ * - male:         1.00 (baseline)
+ * - female:       0.90 (-10%)
+ * - not_informed: 1.00 (conservative — never penalizes missing data)
+ */
+export const getSexMultiplier = (sex: string | null | undefined): number => {
+  if (sex === 'female') return 0.90
+  return 1.00 // male or not_informed
+}
+
+
 
 /**
  * Computes the actual work time in minutes by subtracting tracked rest time
@@ -190,6 +208,7 @@ export const computeActiveWorkMinutes = (
  * @param rpe             - Post-workout RPE (1–10). Adjusts MET by ±15%.
  * @param execMinutesOverride - If known (from logs), use as active minutes directly.
  * @param restMinutesOverride - If known (from logs), use as rest minutes directly.
+ * @param biologicalSex       - 'male' | 'female' | 'not_informed'. Applies ±10% sex correction.
  * @returns Estimated kcal burned, rounded to the nearest integer.
  */
 export const estimateCaloriesMet = (
@@ -200,6 +219,7 @@ export const estimateCaloriesMet = (
   rpe?: number | null,
   execMinutesOverride?: number | null,
   restMinutesOverride?: number | null,
+  biologicalSex?: string | null,
 ): number => {
   if (!durationMinutes || durationMinutes <= 0) return 0
 
@@ -250,11 +270,14 @@ export const estimateCaloriesMet = (
   // RPE intensity multiplier from post-workout check-in
   const rpeMultiplier = getRpeMultiplier(rpe)
 
+  // Biological sex correction (Harris-Benedict): female ~10% lower BMR per kg
+  const sexMultiplier = getSexMultiplier(biologicalSex)
+
   // Active kcal (exercise) + rest kcal (recovery, MET ≈ 1.5)
   const activeHours = activeMinutes / 60
   const restHours = restMinutes / 60
-  const kcal = met * complexityFactor * bw * activeHours * rpeMultiplier
-    + MET_REST * bw * restHours
+  const kcal = met * complexityFactor * bw * activeHours * rpeMultiplier * sexMultiplier
+    + MET_REST * bw * restHours * sexMultiplier
 
   return Number.isFinite(kcal) && kcal > 0 ? Math.round(kcal) : 0
 }

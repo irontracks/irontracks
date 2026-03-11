@@ -105,7 +105,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
         muscleTrend, muscleTrend4w, exerciseTrend,
         isGenerating, setIsGenerating,
         pdfUrl, setPdfUrl, pdfBlob, setPdfBlob, pdfFrameRef,
-    } = useReportData({ session, previousSession, user });
+    } = useReportData({ session, previousSession, user, settings });
 
     useEffect(() => {
         if (!storiesV2Enabled) { setShowStoryPrompt(false); return; }
