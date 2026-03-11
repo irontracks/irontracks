@@ -2,6 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronRight, X } from 'lucide-react'
+import NextImage from 'next/image'
 import type { TourStep } from '@/utils/tourSteps'
 
 interface GuidedTourProps {
@@ -204,14 +205,29 @@ export default function GuidedTour({
                   key={step.id}
                   className="w-full flex-shrink-0 px-8 pb-6 pt-4 text-center"
                 >
-                  {/* Emoji */}
-                  <div
-                    className="mb-5 leading-none"
-                    style={{ fontSize: 64, filter: 'drop-shadow(0 4px 12px rgba(234,179,8,0.2))' }}
-                    aria-hidden="true"
-                  >
-                    {step.emoji}
-                  </div>
+                  {/* Illustration or emoji */}
+                  {step.image ? (
+                    <div className="relative w-full mb-4 rounded-xl overflow-hidden" style={{ height: 180 }}>
+                      <NextImage
+                        src={step.image}
+                        alt={step.title}
+                        fill
+                        unoptimized
+                        className="object-cover object-center"
+                        priority
+                      />
+                      {/* Bottom gradient fade into card */}
+                      <div className="absolute bottom-0 left-0 right-0 h-16 bg-gradient-to-t from-[#0d0d0d] to-transparent" />
+                    </div>
+                  ) : (
+                    <div
+                      className="mb-5 leading-none"
+                      style={{ fontSize: 64, filter: 'drop-shadow(0 4px 12px rgba(234,179,8,0.2))' }}
+                      aria-hidden="true"
+                    >
+                      {step.emoji}
+                    </div>
+                  )}
 
                   {/* Title */}
                   <h2 className="text-[20px] font-black text-white leading-tight mb-3">

@@ -493,7 +493,7 @@ const IronRankCard = memo(function IronRankCard({
                                                 style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}>
                                                 {row.photoUrl
                                                     ? <Image src={row.photoUrl} alt="" width={36} height={36} className="w-full h-full object-cover" loading="lazy" />
-                                                    : <span className="text-yellow-400 font-black text-sm">{String(name).slice(0, 1).toUpperCase()}</span>}
+                                                    : <NextImage src="/default-avatar.png" alt="" width={36} height={36} className="w-full h-full object-cover" unoptimized />}
                                             </div>
                                             <div className="min-w-0 flex-1">
                                                 <div className={['text-sm font-black truncate', isMe ? 'text-yellow-400' : 'text-white'].join(' ')}>
