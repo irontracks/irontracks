@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import { Award, Flame, Star } from 'lucide-react'
+import NextImage from 'next/image'
 import { motion } from 'framer-motion'
 
 export type Badge = {
@@ -10,59 +10,59 @@ export type Badge = {
   kind: string
 }
 
-const DumbbellIcon = () => (
-  <svg
-    width="18"
-    height="18"
-    viewBox="0 0 24 24"
-    fill="none"
-    stroke="currentColor"
-    strokeWidth="2"
-    strokeLinecap="round"
-    strokeLinejoin="round"
-    className="text-blue-400"
-  >
-    <path d="M6.5 6.5h11" />
-    <path d="M6.5 17.5h11" />
-    <path d="M6.5 6.5v11" />
-    <path d="M17.5 6.5v11" />
-    <path d="M2 12h20" />
-  </svg>
-)
-
-const getBadgeIcon = (id: string, kind: string) => {
-  if (kind === 'streak') return <Flame className="text-orange-500" size={18} />
-  if (kind === 'volume') return <DumbbellIcon />
-  if (id === 'first_workout') return <Star className="text-yellow-400" size={18} />
-  return <Award className="text-yellow-500" size={18} />
+const getBadgeImage = (id: string, kind: string): { src: string; glow: string } => {
+  if (kind === 'streak') return { src: '/badge-streak.png', glow: 'rgba(249,115,22,0.35)' }
+  if (kind === 'volume') return { src: '/badge-volume.png', glow: 'rgba(148,163,184,0.35)' }
+  if (id === 'first_workout') return { src: '/badge-first.png', glow: 'rgba(180,83,9,0.35)' }
+  return { src: '/badge-trophy.png', glow: 'rgba(234,179,8,0.35)' }
 }
 
 export default function BadgesInline({ badges }: { badges: Badge[] }) {
   const safeBadges = Array.isArray(badges) ? badges : []
   if (!safeBadges.length) {
     return (
-      <div className="bg-neutral-900/60 border border-neutral-800 rounded-xl p-3 text-xs text-neutral-400 font-bold">
-        Sem conquistas ainda. Complete treinos para desbloquear badges.
+      <div className="rounded-xl p-4 text-center" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
+        <p className="text-xs text-neutral-500 font-bold">Complete treinos para desbloquear conquistas.</p>
       </div>
     )
   }
 
   return (
-    <div className="flex flex-wrap gap-2">
-      {safeBadges.map((badge) => (
-        <motion.div
-          key={badge.id}
-          initial={{ opacity: 0, scale: 0.9 }}
-          animate={{ opacity: 1, scale: 1 }}
-          className="bg-neutral-900/80 border border-neutral-800 px-2 py-1.5 rounded-xl flex items-center gap-2"
-        >
-          <div className="bg-neutral-900 p-1.5 rounded-full border border-neutral-800">
-            {getBadgeIcon(badge.id, badge.kind)}
-          </div>
-          <span className="text-[11px] font-bold text-neutral-200 leading-tight">{badge.label}</span>
-        </motion.div>
-      ))}
+    <div className="flex flex-wrap gap-3">
+      {safeBadges.map((badge, i) => {
+        const { src, glow } = getBadgeImage(badge.id, badge.kind)
+        return (
+          <motion.div
+            key={badge.id}
+            initial={{ opacity: 0, scale: 0.8, y: 8 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            transition={{ delay: i * 0.07, duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+            className="flex flex-col items-center gap-1.5 cursor-default select-none"
+          >
+            {/* Medal image */}
+            <div
+              className="relative w-14 h-14 rounded-2xl overflow-hidden"
+              style={{
+                background: 'rgba(255,255,255,0.03)',
+                border: '1px solid rgba(255,255,255,0.08)',
+                boxShadow: `0 0 16px ${glow}, 0 4px 12px rgba(0,0,0,0.5)`,
+              }}
+            >
+              <NextImage
+                src={src}
+                alt={badge.label}
+                fill
+                unoptimized
+                className="object-cover"
+              />
+            </div>
+            {/* Label */}
+            <span className="text-[10px] font-bold text-neutral-400 text-center leading-tight max-w-[60px]">
+              {badge.label}
+            </span>
+          </motion.div>
+        )
+      })}
     </div>
   )
 }
-
