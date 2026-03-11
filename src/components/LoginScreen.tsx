@@ -39,7 +39,7 @@ const LoginScreen = () => {
     }
 
     return (
-        <div className="relative flex flex-col items-center justify-center min-h-[100dvh] overflow-hidden bg-neutral-950 text-white p-6">
+        <div className="relative flex flex-col items-center justify-center h-[100dvh] overflow-hidden bg-neutral-950 text-white p-4">
             {/* Subtle ambient glow */}
             <div className="absolute inset-0 pointer-events-none">
                 <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-amber-500/8 rounded-full blur-[100px]" />
@@ -63,7 +63,7 @@ const LoginScreen = () => {
 
                 <div className="px-8 pb-8 pt-4 w-full flex flex-col items-center">
 
-                <h1 className="text-4xl font-black mb-2 tracking-tighter italic text-center drop-shadow-lg">
+                <h1 className="text-3xl font-black mb-1 tracking-tighter italic text-center drop-shadow-lg">
                     IRON<span className="text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 to-amber-500">TRACKS</span>
                 </h1>
 
