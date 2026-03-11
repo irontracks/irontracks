@@ -69,6 +69,8 @@ export type ReportHistoryItem = {
   setWeights?: number[] | null;
   /** Reps individuais por série, na ordem de execução */
   setReps?: number[] | null;
+  /** RPE individual por série, na ordem de execução */
+  setRpes?: number[] | null;
 };
 
 export type ReportHistory = {

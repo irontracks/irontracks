@@ -113,7 +113,7 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
         if (!base) return null;
         const logsObj: UnknownRecord = isObject(base.logs) ? (base.logs as UnknownRecord) : {};
         // Coleta sets com índice para manter a ordenção correta
-        const indexedSets: Array<{ setIdx: number; weight: number | null; reps: number | null }> = [];
+        const indexedSets: Array<{ setIdx: number; weight: number | null; reps: number | null; rpe: number | null }> = [];
         Object.entries(logsObj).forEach(([key, value]) => {
           try {
             const parts = String(key || '').split('-');
@@ -125,15 +125,17 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
             if (!log) return;
             const weight = extractLogWeight(log);
             const reps = toNumber(log.reps ?? null);
+            const rpe = toNumber(log.rpe ?? null);
             const hasValues = weight != null || reps != null;
             const doneRaw = log.done ?? log.isDone ?? log.completed ?? null;
             const done = doneRaw == null ? true : doneRaw === true || String(doneRaw || '').toLowerCase() === 'true';
             if (!done && !hasValues) return;
             if (hasValues) {
-              indexedSets.push({ setIdx: sIdx, weight, reps });
+              indexedSets.push({ setIdx: sIdx, weight, reps, rpe });
             }
           } catch { }
         });
+
         if (!indexedSets.length) return null;
         // Ordena por índice de série para preservar progressão correta
         indexedSets.sort((a, b) => a.setIdx - b.setIdx);
@@ -162,12 +164,15 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
           toDateMs(meta.date) ??
           toDateMs(meta.created_at) ??
           Date.now();
-        // Armazena pesos e reps individuais por série
+        // Armazena pesos, reps e RPE individuais por série
         const setWeights = indexedSets
           .map(s => s.weight)
           .filter((v): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0);
         const setReps = indexedSets
           .map(s => s.reps)
+          .filter((v): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0);
+        const setRpes = indexedSets
+          .map(s => s.rpe)
           .filter((v): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0);
         return {
           ts,
@@ -178,6 +183,7 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
           setsCount: sets.length,
           setWeights: setWeights.length > 0 ? setWeights : null,
           setReps: setReps.length > 0 ? setReps : null,
+          setRpes: setRpes.length > 0 ? setRpes : null,
         };
       } catch {
         return null;
@@ -352,6 +358,7 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
         // Pesos por série do último treino (preservados se existirem)
         const perSetWeights: number[] = Array.isArray(latest?.setWeights) ? (latest.setWeights as number[]) : [];
         const perSetReps: number[] = Array.isArray(latest?.setReps) ? (latest.setReps as number[]) : [];
+        const perSetRpes: number[] = Array.isArray(latest?.setRpes) ? (latest.setRpes as number[]) : [];
         // Fallback de peso único quando não há dados por série
         const fallbackWeight = toNumber(latest?.topWeight ?? latest?.avgWeight ?? null);
         const fallbackReps = toNumber(latest?.avgReps ?? null);
@@ -372,11 +379,12 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
           // Usa o peso específico da série se disponível, senão usa fallback (topWeight ou avgWeight)
           const setWeight = perSetWeights[setIdx] ?? fallbackWeight;
           const setRepsVal = perSetReps[setIdx] ?? fallbackReps;
+          const setRpeVal = perSetRpes[setIdx] ?? null;
           if (!setWeight || !Number.isFinite(setWeight) || setWeight <= 0) continue;
           patch[setKey] = {
             weight: setWeight,
             reps: setRepsVal ?? null,
-            rpe: null,
+            rpe: setRpeVal,
           };
         }
       });

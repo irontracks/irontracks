@@ -158,12 +158,15 @@ export const normalizeReportHistory = (data: unknown): ReportHistory => {
         const topWeight = typeof it.topWeight === 'number' ? it.topWeight : null;
         const setsCount = Number(it.setsCount);
         const maybeName = typeof it.name === 'string' ? it.name : null;
-        // Preserva pesos e reps por série para mostrar progressão correta
+        // Preserva pesos, reps e RPE por série para mostrar progressão correta
         const setWeights = Array.isArray(it.setWeights)
           ? (it.setWeights as unknown[]).filter((v): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0)
           : undefined;
         const setReps = Array.isArray(it.setReps)
           ? (it.setReps as unknown[]).filter((v): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0)
+          : undefined;
+        const setRpes = Array.isArray(it.setRpes)
+          ? (it.setRpes as unknown[]).filter((v): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0)
           : undefined;
         return {
           ts,
@@ -175,6 +178,7 @@ export const normalizeReportHistory = (data: unknown): ReportHistory => {
           ...(maybeName ? { name: maybeName } : {}),
           ...(setWeights && setWeights.length > 0 ? { setWeights } : {}),
           ...(setReps && setReps.length > 0 ? { setReps } : {}),
+          ...(setRpes && setRpes.length > 0 ? { setRpes } : {}),
         } as ReportHistoryItem;
       })
       .filter((v): v is ReportHistoryItem => v !== null);
