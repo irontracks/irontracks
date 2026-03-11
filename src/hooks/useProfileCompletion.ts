@@ -2,25 +2,31 @@
  * @module useProfileCompletion
  *
  * Calculates a 0-100% profile completion score based on which fields
- * the user has filled in (display name, photo, gender, weight, height,
- * goals, etc.). Powers the "Complete your profile" nudge banner.
+ * the user has filled in (display name, sex, weight, height, goals, etc.).
+ * Powers the "Complete your profile" nudge banner and the badge on the header.
  *
  * @param userId       - Current user ID
  * @param displayName  - Current display name
- * @returns `{ completionPct, missingFields, isComplete }`
+ * @param settings     - Full user settings (for profile fields)
+ * @returns `{ profileIncomplete, completionScore, missingFields, showCompleteProfile, ... }`
  */
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
+import { getProfileCompletenessScore } from '@/schemas/settings'
+import type { UserSettings } from '@/schemas/settings'
 
 interface UseProfileCompletionOptions {
   userId?: string | null
   displayName?: string | null
   initialProfile?: unknown
+  settings?: UserSettings | null
 }
 
 interface UseProfileCompletionReturn {
   profileIncomplete: boolean
+  completionScore: number
+  missingFields: string[]
   setProfileIncomplete: (v: boolean) => void
   profileDraftName: string
   setProfileDraftName: (v: string) => void
@@ -32,18 +38,27 @@ interface UseProfileCompletionReturn {
 
 /**
  * Manages the "complete your profile" prompt state.
- * Automatically detects whether the user's display_name is missing
+ * Uses getProfileCompletenessScore to determine if profile is complete,
  * and exposes state + setters for the profile-completion modal.
  */
 export function useProfileCompletion({
   userId,
   displayName,
   initialProfile,
+  settings,
 }: UseProfileCompletionOptions): UseProfileCompletionReturn {
-  const [profileIncomplete, setProfileIncomplete] = useState(false)
   const [profileDraftName, setProfileDraftName] = useState('')
   const [savingProfile, setSavingProfile] = useState(false)
   const [showCompleteProfile, setShowCompleteProfile] = useState(false)
+
+  // Get completeness from settings (the real score)
+  const { score, missingFields, isComplete } = useMemo(
+    () => getProfileCompletenessScore(settings),
+    [settings]
+  )
+
+  // Also check display name as a baseline (if no name = definitely incomplete)
+  const [hasName, setHasName] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -51,7 +66,7 @@ export function useProfileCompletion({
     const run = async () => {
       if (!userId) {
         if (!cancelled) {
-          setProfileIncomplete(false)
+          setHasName(false)
           setProfileDraftName('')
         }
         return
@@ -66,12 +81,12 @@ export function useProfileCompletion({
           String(profileObj?.display_name || '').trim() || String(displayName || '').trim()
 
         if (!cancelled) {
-          setProfileIncomplete(!seedName)
+          setHasName(!!seedName)
           setProfileDraftName(seedName)
         }
       } catch {
         if (!cancelled) {
-          setProfileIncomplete(true)
+          setHasName(false)
           setProfileDraftName(String(displayName || '').trim())
         }
       }
@@ -83,9 +98,14 @@ export function useProfileCompletion({
     }
   }, [initialProfile, userId, displayName])
 
+  // Profile is incomplete if score < 90 OR no display name
+  const profileIncomplete = !isComplete || !hasName
+
   return {
     profileIncomplete,
-    setProfileIncomplete,
+    completionScore: score,
+    missingFields,
+    setProfileIncomplete: () => {}, // kept for backward compat
     profileDraftName,
     setProfileDraftName,
     savingProfile,

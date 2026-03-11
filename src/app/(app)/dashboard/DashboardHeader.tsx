@@ -39,6 +39,7 @@ interface DashboardHeaderProps {
     onOpenWallet: () => void
     onOpenSettings: () => void
     onOpenTour: () => void
+    onOpenProfile: () => void
     onLogout: () => void
     onOfflineSyncOpen: () => void
     onAcceptCoach: () => Promise<void>
@@ -50,7 +51,7 @@ export function DashboardHeader({
     isHeaderVisible, coachPending,
     onGoHome, onOpenVip, onOpenAdmin, onOpenChatList, onOpenGlobalChat,
     onOpenHistory, onOpenNotifications, onOpenSchedule, onOpenWallet,
-    onOpenSettings, onOpenTour, onLogout, onOfflineSyncOpen, onAcceptCoach,
+    onOpenSettings, onOpenTour, onOpenProfile, onLogout, onOfflineSyncOpen, onAcceptCoach,
 }: DashboardHeaderProps) {
     if (!isHeaderVisible) return null
 
@@ -115,6 +116,7 @@ export function DashboardHeader({
                         onOpenWallet={onOpenWallet}
                         onOpenSettings={onOpenSettings}
                         onOpenTour={onOpenTour}
+                        onOpenProfile={onOpenProfile}
                         onLogout={onLogout}
                     />
                 </div>

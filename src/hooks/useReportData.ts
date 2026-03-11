@@ -318,11 +318,14 @@ export const useReportData = ({ session, previousSession, user, settings }: UseR
     return pc?.answers && typeof pc.answers === 'object' ? (pc.answers as AnyObj) : null
   })()
   const checkinBodyWeightKg = (() => {
-    // Try both the top-level checkin and the session's pre-checkin answers
+    // Priority: 1. check-in answers, 2. pre-checkin session weight, 3. profile bodyWeightKg
     const fromAnswers = Number(preCheckinAnswers?.body_weight_kg)
     if (Number.isFinite(fromAnswers) && fromAnswers >= 20 && fromAnswers <= 300) return fromAnswers
     const fromSession = Number((safeSession?.preCheckin as AnyObj)?.weight ?? (safeSession?.preCheckin as AnyObj)?.body_weight_kg)
     if (Number.isFinite(fromSession) && fromSession >= 20 && fromSession <= 300) return fromSession
+    // Fallback: use profile bodyWeightKg for users who completed their profile (no need to ask weight at check-in)
+    const fromProfile = Number(settings?.bodyWeightKg)
+    if (Number.isFinite(fromProfile) && fromProfile >= 20 && fromProfile <= 300) return fromProfile
     return null
   })()
 
@@ -374,7 +377,7 @@ export const useReportData = ({ session, previousSession, user, settings }: UseR
       restMinutesOverride,
       biologicalSex,
     )
-  }, [sessionLogs, durationInMinutes, checkinBodyWeightKg, sessionExerciseNames, postCheckinRpe, outdoorBike, safeSession?.executionTotalSeconds, safeSession?.restTotalSeconds, safeSession?.totalTime, settings?.biologicalSex])
+  }, [sessionLogs, durationInMinutes, checkinBodyWeightKg, sessionExerciseNames, postCheckinRpe, outdoorBike, safeSession?.executionTotalSeconds, safeSession?.restTotalSeconds, safeSession?.totalTime, settings?.biologicalSex, settings?.bodyWeightKg])
 
   const reportMeta = safeSession?.reportMeta && typeof safeSession.reportMeta === 'object' ? (safeSession.reportMeta as AnyObj) : null
   const reportTotals = reportMeta?.totals && typeof reportMeta.totals === 'object' ? (reportMeta.totals as AnyObj) : null

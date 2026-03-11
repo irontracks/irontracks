@@ -182,6 +182,16 @@ type Props = {
     showNewRecordsCard?: boolean
     showIronRank?: boolean
     showBadges?: boolean
+    // Profile fields (for completeness score)
+    biologicalSex?: string
+    bodyWeightKg?: number | null
+    heightCm?: number | null
+    age?: number | null
+    fitnessLevel?: string
+    fitnessGoal?: string
+    trainingFrequencyPerWeek?: number | null
+    gym?: string
+    city?: string
   } | null
   onCreateWorkout: () => MaybePromise<void>
   onQuickView: (w: DashboardWorkout) => void
@@ -593,7 +603,7 @@ export default function StudentDashboard(props: Props) {
 
   return (
     <div className={density === 'compact' ? 'p-4 space-y-3 pb-24' : 'p-4 space-y-4 pb-24'}>
-      {props.profileIncomplete && <ProfileIncompleteBanner onComplete={props.onOpenCompleteProfile} />}
+      {props.profileIncomplete && <ProfileIncompleteBanner settings={props.settings as import('@/schemas/settings').UserSettings | null} onComplete={props.onOpenCompleteProfile} />}
 
       {props.view === 'dashboard' && showStoriesBar ? (
         <Suspense fallback={<StoriesBarSkeleton />}>
