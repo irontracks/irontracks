@@ -191,10 +191,15 @@ export default function HeaderActionsMenu({
 
   const handlePointerDown = () => {
     didLongPress.current = false
-    // Long press ALWAYS opens story creator (add more stories even when has active story)
     longPressTimer.current = setTimeout(() => {
       didLongPress.current = true
-      try { window.dispatchEvent(new CustomEvent('irontracks:stories:open-creator')) } catch { }
+      if (hasActiveStory) {
+        // Long press + has story → view own story
+        try { window.dispatchEvent(new CustomEvent('irontracks:stories:view-mine')) } catch { }
+      } else {
+        // Long press + no story → add story
+        try { window.dispatchEvent(new CustomEvent('irontracks:stories:open-creator')) } catch { }
+      }
     }, 600)
   }
   const handlePointerUp = () => {
@@ -202,13 +207,8 @@ export default function HeaderActionsMenu({
   }
   const handleClick = () => {
     if (didLongPress.current) { didLongPress.current = false; return }
-    if (hasActiveStory) {
-      // Tap with active story → view own story in StoriesBar
-      try { window.dispatchEvent(new CustomEvent('irontracks:stories:view-mine')) } catch { }
-    } else {
-      // No story → open menu
-      setOpen((v) => !v)
-    }
+    // Short tap ALWAYS opens menu
+    setOpen((v) => !v)
   }
 
   return (
