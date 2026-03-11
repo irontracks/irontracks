@@ -61,12 +61,12 @@ const GOAL_LABELS: Record<string, string> = {
 // ─── Component ────────────────────────────────────────────────────────────────
 
 export const StudentProfileTab: React.FC = () => {
-  const { selectedStudent, supabase } = useAdminPanel()
+  const { selectedStudent, supabase, getAdminAuthHeaders } = useAdminPanel()
   const [settings, setSettings] = useState<UserSettings | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
 
-  // Fetch user_settings for the selected student
+  // Fetch user_settings via admin API (bypasses RLS)
   useEffect(() => {
     const userId = String(selectedStudent?.user_id || selectedStudent?.id || '').trim()
     if (!userId) { setSettings(null); return }
@@ -77,17 +77,22 @@ export const StudentProfileTab: React.FC = () => {
 
     const run = async () => {
       try {
-        const { data, error: err } = await supabase
-          .from('user_settings')
-          .select('settings')
-          .eq('user_id', userId)
-          .maybeSingle()
-
+        const authHeaders = await getAdminAuthHeaders()
+        const resp = await fetch(`/api/admin/students/settings?user_id=${encodeURIComponent(userId)}`, {
+          headers: { 'Content-Type': 'application/json', ...authHeaders },
+        })
         if (cancelled) return
-        if (err) { setError('Erro ao carregar configurações do aluno.'); return }
 
-        if (data?.settings && typeof data.settings === 'object') {
-          setSettings(data.settings as UserSettings)
+        if (!resp.ok) {
+          setError('Erro ao carregar configurações do aluno.')
+          return
+        }
+
+        const json = await resp.json()
+        if (cancelled) return
+
+        if (json.ok && json.settings && typeof json.settings === 'object') {
+          setSettings(json.settings as UserSettings)
         } else {
           setSettings(null)
         }
@@ -100,7 +105,7 @@ export const StudentProfileTab: React.FC = () => {
 
     run()
     return () => { cancelled = true }
-  }, [selectedStudent, supabase])
+  }, [selectedStudent?.user_id, selectedStudent?.id, supabase, getAdminAuthHeaders])
 
   if (!selectedStudent) return null
 
