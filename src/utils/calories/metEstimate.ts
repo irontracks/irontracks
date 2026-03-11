@@ -1,40 +1,66 @@
 /**
  * MET-based calorie estimation for resistance training sessions.
  *
- * ## MET scale (intensity level, by average load per rep)
- * - Light    (avg load <  20 kg/rep): MET 3.5
- * - Moderate (avg load <  50 kg/rep): MET 5.0
- * - Vigorous (avg load ≥  50 kg/rep): MET 6.0
+ * ## MET selection (two-factor: avg load per rep + density)
+ * Uses the HIGHER of the two independent MET estimates:
+ *  a) Load-based MET (avg kg per rep):
+ *     - Light    (avg load < 20 kg/rep)  → MET 3.5
+ *     - Moderate (avg load < 50 kg/rep)  → MET 5.0
+ *     - Vigorous (avg load >= 50 kg/rep) → MET 6.0
+ *  b) Density-based MET (kg volume per active minute):
+ *     - < 80 kg/min   → MET 3.5
+ *     - < 200 kg/min  → MET 5.0
+ *     - < 350 kg/min  → MET 6.0
+ *     - >= 350 kg/min → MET 7.5
  *
  * ## Complexity factor (exercise type multiplier)
- * Applies a multiplier on top of the MET based on how demanding the
- * exercise type is relative to its load, using a static lookup table.
- * This is 100% deterministic — no AI, no hallucinations.
+ * Applies a multiplier on top of MET based on exercise type.
  *
- * | Category                          | Examples                             | Factor |
- * |-----------------------------------|--------------------------------------|--------|
- * | Multi-joint free-weight compound  | Levantamento terra, Agachamento livre| 1.40   |
- * | Multi-joint free-weight simple    | Supino barra, Remada curvada         | 1.15   |
- * | Multi-joint machine/assisted      | Leg press, Puxada, Remada máquina    | 1.00   |
- * | Isolation free-weight             | Rosca alternada, Elevação lateral    | 0.85   |
- * | Isolation machine/cable           | Cadeira extensora, Peck Deck         | 0.75   |
- *
- * ## Body weight
- * When the athlete's body weight is provided (from pre-workout check-in),
- * it replaces the default 75 kg estimate, improving accuracy by up to ±30%.
- *
- * Formula: kcal = MET × complexityFactor × bodyWeightKg × durationHours
+ * ## Formula
+ * kcal = MET × complexityFactor × bodyWeightKg × activeHours × rpeMultiplier
+ *       + MET_REST × bodyWeightKg × restHours
  */
 
 type AnyObj = Record<string, unknown>
 
-// ── MET constants ─────────────────────────────────────────────────────────────
+// ── MET constants ──────────────────────────────────────────────────────────────
 export const MET_LIGHT = 3.5
 export const MET_MODERATE = 5.0
 export const MET_VIGOROUS = 6.0
+export const MET_HIGH_DENSITY = 7.5
+export const MET_REST = 1.5
 
 /** Default body weight in kg used when athlete weight is unavailable. */
 export const DEFAULT_BODY_WEIGHT_KG = 75
+
+// ── MET selection (two-factor) ─────────────────────────────────────────────────
+
+/**
+ * Selects MET using both avg load per rep and density (kg/active-min).
+ * Returns the HIGHER of the two estimates to ensure heavier work = more kcal.
+ */
+export const selectMet = (
+  avgLoadPerRep: number,
+  volumeKg: number,
+  activeMinutes: number,
+): number => {
+  // Load-based MET
+  const metLoad =
+    avgLoadPerRep < 20 ? MET_LIGHT
+    : avgLoadPerRep < 50 ? MET_MODERATE
+    : MET_VIGOROUS
+
+  // Density-based MET (guards against long sessions with low load)
+  const density = activeMinutes > 0 ? volumeKg / activeMinutes : 0
+  const metDensity =
+    density < 80 ? MET_LIGHT
+    : density < 200 ? MET_MODERATE
+    : density < 350 ? MET_VIGOROUS
+    : MET_HIGH_DENSITY
+
+  // Use the higher of the two — ensures volume is always reflected
+  return Math.max(metLoad, metDensity)
+}
 
 // ── Complexity factor lookup (keyword-based, static table) ────────────────────
 
@@ -110,16 +136,11 @@ export const getExerciseComplexityFactor = (exerciseName: string): number => {
 
 /**
  * Maps post-workout RPE (1–10) to an intensity multiplier applied on top of MET.
- *
- * Rationale: MET tables assume an "average" effort (~RPE 7-8). An RPE of 10
- * signals near-maximal output; RPE 4 signals a recovery session.
- *
- * @param rpe - Rate of Perceived Exertion (1–10). Returns 1.0 for unknown/null.
+ * RPE 7-8 → 1.00 baseline (MET tables assume average effort).
  */
 export const getRpeMultiplier = (rpe: number | null | undefined): number => {
   if (rpe == null || !Number.isFinite(rpe)) return 1.0
   const r = Math.max(1, Math.min(10, Math.round(rpe)))
-  // Piecewise linear: RPE 7-8 → 1.00 baseline
   if (r <= 3) return 0.80
   if (r === 4) return 0.87
   if (r === 5) return 0.92
@@ -133,18 +154,7 @@ export const getRpeMultiplier = (rpe: number | null | undefined): number => {
 
 /**
  * Computes the actual work time in minutes by subtracting tracked rest time
- * from total session duration.
- *
- * Each set log entry may contain `restSeconds` — the time the athlete rested
- * after that set (measured from when they tapped the rest timer until they
- * confirmed start of the next set). These are already recorded by the app.
- *
- * The result is clamped so that active time is at least 35% of total time
- * (guards against bad data / very long rests being logged incorrectly).
- *
- * @param sessionLogs     - Log entries keyed by `"exerciseIdx-setIdx"`.
- * @param totalMinutes    - Total session duration in minutes.
- * @returns Estimated active work time in minutes.
+ * from total session duration. Clamped so active time is at least 35% of total.
  */
 export const computeActiveWorkMinutes = (
   sessionLogs: Record<string, unknown>,
@@ -169,11 +179,17 @@ export const computeActiveWorkMinutes = (
 /**
  * Estimates calories burned during a resistance training session using MET.
  *
- * @param sessionLogs     - The session's log entries keyed by `"exerciseIdx-setIdx"`.
+ * Uses a two-factor MET selection (avg load per rep AND density kg/min)
+ * to ensure higher-volume sessions always produce more calories than
+ * lower-volume sessions, even at the same average load.
+ *
+ * @param sessionLogs     - The session's log entries keyed by "exerciseIdx-setIdx".
  * @param durationMinutes - Total duration of the session in minutes.
  * @param bodyWeightKg    - Athlete body weight in kg (optional; defaults to 75 kg).
  * @param exerciseNames   - Optional exercise names, used to compute complexity factor.
  * @param rpe             - Post-workout RPE (1–10). Adjusts MET by ±15%.
+ * @param execMinutesOverride - If known (from logs), use as active minutes directly.
+ * @param restMinutesOverride - If known (from logs), use as rest minutes directly.
  * @returns Estimated kcal burned, rounded to the nearest integer.
  */
 export const estimateCaloriesMet = (
@@ -182,12 +198,15 @@ export const estimateCaloriesMet = (
   bodyWeightKg?: number | null,
   exerciseNames?: string[] | null,
   rpe?: number | null,
+  execMinutesOverride?: number | null,
+  restMinutesOverride?: number | null,
 ): number => {
   if (!durationMinutes || durationMinutes <= 0) return 0
 
   const logEntries = Object.values(sessionLogs)
   let totalWeightedReps = 0
   let totalReps = 0
+  let totalVolume = 0
 
   for (const v of logEntries) {
     if (!v || typeof v !== 'object') continue
@@ -197,11 +216,24 @@ export const estimateCaloriesMet = (
     if (w > 0 && r > 0) {
       totalWeightedReps += w * r
       totalReps += r
+      totalVolume += w * r
     }
   }
 
   const avgWeightPerRep = totalReps > 0 ? totalWeightedReps / totalReps : 0
-  const met = avgWeightPerRep < 20 ? MET_LIGHT : avgWeightPerRep < 50 ? MET_MODERATE : MET_VIGOROUS
+
+  // Active and rest minutes — prefer explicit values from session, fallback to computed
+  const activeMinutes = (() => {
+    if (execMinutesOverride != null && execMinutesOverride > 0) return execMinutesOverride
+    return computeActiveWorkMinutes(sessionLogs, durationMinutes)
+  })()
+  const restMinutes = (() => {
+    if (restMinutesOverride != null && restMinutesOverride >= 0) return restMinutesOverride
+    return Math.max(0, durationMinutes - activeMinutes)
+  })()
+
+  // Two-factor MET: load-based AND density-based — take the higher
+  const met = selectMet(avgWeightPerRep, totalVolume, activeMinutes)
 
   // Complexity factor: average across all exercises in the session
   let complexityFactor = 1.0
@@ -215,12 +247,14 @@ export const estimateCaloriesMet = (
     ? bodyWeightKg
     : DEFAULT_BODY_WEIGHT_KG
 
-  // Active work time: subtract rest periods tracked in logs
-  const activeMinutes = computeActiveWorkMinutes(sessionLogs, durationMinutes)
-
   // RPE intensity multiplier from post-workout check-in
   const rpeMultiplier = getRpeMultiplier(rpe)
 
-  const kcal = met * complexityFactor * bw * (activeMinutes / 60) * rpeMultiplier
+  // Active kcal (exercise) + rest kcal (recovery, MET ≈ 1.5)
+  const activeHours = activeMinutes / 60
+  const restHours = restMinutes / 60
+  const kcal = met * complexityFactor * bw * activeHours * rpeMultiplier
+    + MET_REST * bw * restHours
+
   return Number.isFinite(kcal) && kcal > 0 ? Math.round(kcal) : 0
 }
