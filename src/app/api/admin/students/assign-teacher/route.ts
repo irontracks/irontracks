@@ -10,6 +10,7 @@ export const dynamic = 'force-dynamic'
 const ZodBodySchema = z
   .object({
     student_id: z.string().optional(),
+    student_user_id: z.string().optional(),
     teacher_user_id: z.string().nullable().optional(),
     teacher_email: z.string().optional(),
     email: z.string().optional(),
@@ -28,10 +29,11 @@ export async function POST(req: Request) {
     if (parsedBody.response) return parsedBody.response
     const body = parsedBody.data!
     const student_id = body?.student_id as string | undefined
+    const student_user_id = body?.student_user_id as string | undefined
     let teacher_user_id = body?.teacher_user_id as string | null
     const teacher_email = (body?.teacher_email || '') as string
     const email = (body?.email || '') as string
-    if (!student_id && !email) return NextResponse.json({ ok: false, error: 'missing student identifier' }, { status: 400 })
+    if (!student_id && !student_user_id && !email) return NextResponse.json({ ok: false, error: 'missing student identifier' }, { status: 400 })
 
     const admin = createAdminClient()
 
@@ -57,11 +59,16 @@ export async function POST(req: Request) {
       }
     }
 
-    // Resolve student row by id or email/user_id
+    // Resolve student row by id, user_id or email
     let targetId = student_id || ''
     let srow: Record<string, unknown> | null = null
     if (targetId) {
       const { data } = await admin.from('students').select('id, email').eq('id', targetId).maybeSingle()
+      srow = data || null
+    }
+    // Resolve by student_user_id (auth uid) — this is what the admin panel sends
+    if (!srow && student_user_id) {
+      const { data } = await admin.from('students').select('id, email').eq('user_id', student_user_id).maybeSingle()
       srow = data || null
     }
     if (!srow && email) {
