@@ -139,7 +139,8 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded, open:
                     .from('notifications')
                     .select('id, user_id, type, title, body, message, data, read, is_read, read_at, created_at')
                     .eq('user_id', safeUserId)
-                    .order('created_at', { ascending: false });
+                    .order('created_at', { ascending: false })
+                    .limit(50);
                 if (isMounted) setSystemNotifications((data as NotificationItem[]) || []);
             } catch { if (isMounted) setSystemNotifications([]); }
         };
@@ -245,10 +246,11 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded, open:
             return { id: inv?.id ?? inv?.invite_id ?? `invite_${idx}`, type: 'invite', title: `Convite de ${fromName}`, message: `Chamou você para treinar: ${workoutTitle}`, timeAgo: 'Agora', data: inv, timestamp: ts, read: false };
         }),
         ...safeSystem.map(n => ({
-            id: n.id, type: n.type || 'default', title: n.title, message: n.message,
+            id: n.id, type: n.type || 'default', title: n.title,
+            message: String(n.message || (n as unknown as Record<string, unknown>).body || ''),
             timeAgo: formatTime(n.created_at), data: n,
             timestamp: (() => { try { const ms = new Date(n?.created_at || 0).getTime(); return Number.isFinite(ms) ? ms : 0; } catch { return 0; } })(),
-            read: !!(n?.read === true),
+            read: !!(n?.read === true || n?.is_read === true),
         }))
     ].sort((a, b) => b.timestamp - a.timestamp);
 
