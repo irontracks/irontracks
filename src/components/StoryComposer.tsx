@@ -58,35 +58,76 @@ export default function StoryComposer({ open, session, onClose, calories }: Stor
   // ── Sticker state ───────────────────────────────────────────────────
   const [selectedSticker, setSelectedSticker] = useState<string | null>(null)
   const [stickerPos, setStickerPos] = useState({ x: 0.5, y: 0.5 })
+  const [stickerScale, setStickerScale] = useState(1.0)
+  // Refs to avoid stale closures in pointer handlers
+  const stickerScaleRef = useRef(1.0)
+  const stickerPosRef = useRef({ x: 0.5, y: 0.5 })
+  React.useEffect(() => { stickerScaleRef.current = stickerScale }, [stickerScale])
+  React.useEffect(() => { stickerPosRef.current = stickerPos }, [stickerPos])
+
+  // Multi-pointer tracking: supports simultaneous drag (1 finger) and pinch (2 fingers)
+  const stickerPointersRef = useRef<Map<number, { x: number; y: number }>>(new Map())
+  const pinchStartRef = useRef<{ distance: number; scale: number } | null>(null)
   const stickerDragRef = useRef<{ startX: number; startY: number; startPosX: number; startPosY: number } | null>(null)
 
-  const onStickerPointerDown = useCallback((e: React.PointerEvent<HTMLImageElement>) => {
+  const onStickerPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    e.preventDefault()
     e.currentTarget.setPointerCapture(e.pointerId)
-    const rect = previewRef.current?.getBoundingClientRect()
-    if (!rect) return
-    stickerDragRef.current = { startX: e.clientX, startY: e.clientY, startPosX: stickerPos.x, startPosY: stickerPos.y }
-  }, [stickerPos])
-
-  const onStickerPointerMove = useCallback((e: React.PointerEvent<HTMLImageElement>) => {
-    if (!stickerDragRef.current) return
-    const rect = previewRef.current?.getBoundingClientRect()
-    if (!rect) return
-    const dx = (e.clientX - stickerDragRef.current.startX) / rect.width
-    const dy = (e.clientY - stickerDragRef.current.startY) / rect.height
-    setStickerPos({
-      x: Math.max(0.05, Math.min(0.85, stickerDragRef.current.startPosX + dx)),
-      y: Math.max(0.05, Math.min(0.85, stickerDragRef.current.startPosY + dy)),
-    })
+    stickerPointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
+    const pts = Array.from(stickerPointersRef.current.values())
+    if (pts.length >= 2) {
+      // Two fingers → pinch mode
+      const dist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y)
+      pinchStartRef.current = { distance: Math.max(dist, 1), scale: stickerScaleRef.current }
+      stickerDragRef.current = null
+    } else {
+      // One finger → drag mode
+      pinchStartRef.current = null
+      stickerDragRef.current = {
+        startX: e.clientX, startY: e.clientY,
+        startPosX: stickerPosRef.current.x, startPosY: stickerPosRef.current.y,
+      }
+    }
   }, [])
 
-  const onStickerPointerUp = useCallback((e: React.PointerEvent<HTMLImageElement>) => {
+  const onStickerPointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    stickerPointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
+    const pts = Array.from(stickerPointersRef.current.values())
+    if (pts.length >= 2 && pinchStartRef.current) {
+      // Pinch: scale proportionally to finger spread
+      const dist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y)
+      const newScale = Math.max(0.3, Math.min(5.0,
+        (dist / pinchStartRef.current.distance) * pinchStartRef.current.scale
+      ))
+      setStickerScale(newScale)
+    } else if (pts.length === 1 && stickerDragRef.current) {
+      // Drag: move sticker position
+      const rect = previewRef.current?.getBoundingClientRect()
+      if (!rect) return
+      const dx = (e.clientX - stickerDragRef.current.startX) / rect.width
+      const dy = (e.clientY - stickerDragRef.current.startY) / rect.height
+      setStickerPos({
+        x: Math.max(0.05, Math.min(0.95, stickerDragRef.current.startPosX + dx)),
+        y: Math.max(0.05, Math.min(0.95, stickerDragRef.current.startPosY + dy)),
+      })
+    }
+  }, [])
+
+  const onStickerPointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     e.currentTarget.releasePointerCapture(e.pointerId)
-    stickerDragRef.current = null
+    stickerPointersRef.current.delete(e.pointerId)
+    if (stickerPointersRef.current.size < 2) pinchStartRef.current = null
+    if (stickerPointersRef.current.size === 0) stickerDragRef.current = null
   }, [])
 
   const toggleSticker = (id: string) => {
-    setSelectedSticker(prev => prev === id ? null : id)
-    if (selectedSticker !== id) setStickerPos({ x: 0.5, y: 0.35 })
+    if (selectedSticker === id) {
+      setSelectedSticker(null)
+    } else {
+      setSelectedSticker(id)
+      setStickerPos({ x: 0.5, y: 0.35 })
+      setStickerScale(1.0) // reset size when switching sticker
+    }
   }
 
   // Draw loop
@@ -207,21 +248,33 @@ export default function StoryComposer({ open, session, onClose, calories }: Stor
                         })}
                       </div>
                     )}
-                        {selectedSticker && (() => {
+                            {selectedSticker && (() => {
                           const stk = STICKERS.find(s => s.id === selectedSticker)
                           if (!stk) return null
+                          const BASE_SIZE = 96 // px — base sticker size
                           return (
-                            <img
-                              src={stk.src}
-                              alt={stk.alt}
-                              draggable={false}
+                            <div
                               onPointerDown={onStickerPointerDown}
                               onPointerMove={onStickerPointerMove}
                               onPointerUp={onStickerPointerUp}
                               onPointerCancel={onStickerPointerUp}
-                              className="absolute z-30 w-24 h-24 object-contain cursor-grab active:cursor-grabbing select-none touch-none drop-shadow-2xl"
-                              style={{ left: `${stickerPos.x * 100}%`, top: `${stickerPos.y * 100}%`, transform: 'translate(-50%, -50%)' }}
-                            />
+                              className="absolute z-30 select-none touch-none cursor-grab active:cursor-grabbing"
+                              style={{
+                                left: `${stickerPos.x * 100}%`,
+                                top: `${stickerPos.y * 100}%`,
+                                width: `${BASE_SIZE}px`,
+                                height: `${BASE_SIZE}px`,
+                                transform: `translate(-50%, -50%) scale(${stickerScale})`,
+                                transformOrigin: 'center center',
+                              }}
+                            >
+                              <img
+                                src={stk.src}
+                                alt={stk.alt}
+                                draggable={false}
+                                className="w-full h-full object-contain drop-shadow-2xl pointer-events-none"
+                              />
+                            </div>
                           )
                         })()}
                   </div>
