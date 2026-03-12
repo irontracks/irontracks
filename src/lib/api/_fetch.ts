@@ -2,22 +2,14 @@
  * src/lib/api/_fetch.ts
  * Base fetch utility shared by all API client modules.
  * Provides consistent error handling and JSON parsing.
+ *
+ * # Native iOS header
+ * When running inside Capacitor iOS (WKWebView), all API requests include
+ * the header `X-Native-Platform: ios` so the server can apply the correct
+ * cookie settings (sameSite:none) for cross-site WKWebView requests.
  */
 
-// isIosNative is imported lazily (no SSR side-effects)
-let _isIosNative: (() => boolean) | null = null
-const checkIosNative = (): boolean => {
-  if (typeof window === 'undefined') return false
-  try {
-    if (!_isIosNative) {
-      // Dynamic require to avoid SSR import of Capacitor
-      _isIosNative = require('@/utils/platform').isIosNative
-    }
-    return _isIosNative ? _isIosNative() : false
-  } catch {
-    return false
-  }
-}
+import { isIosNative } from '@/utils/platform'
 
 export class ApiError extends Error {
   constructor(
@@ -40,9 +32,13 @@ export interface ApiResponse<T = unknown> {
  * Core fetch wrapper — throws ApiError on non-ok responses.
  */
 export async function apiFetch<T>(url: string, init?: RequestInit): Promise<T> {
-  const nativeHeaders: Record<string, string> = checkIosNative()
-    ? { 'X-Native-Platform': 'ios' }
-    : {}
+  // isIosNative() is guarded with `typeof window === 'undefined'` so it is
+  // safe to call on the server — it always returns false there.
+  const nativeHeaders: Record<string, string> =
+    typeof window !== 'undefined' && isIosNative()
+      ? { 'X-Native-Platform': 'ios' }
+      : {}
+
   const res = await fetch(url, {
     credentials: 'include',
     headers: { 'Content-Type': 'application/json', ...nativeHeaders, ...(init?.headers ?? {}) },
