@@ -7,6 +7,7 @@ import { useDialog } from '@/contexts/DialogContext';
 import { workoutPlanHtml } from '@/utils/report/templates';
 import { escapeHtml } from '@/utils/escapeHtml';
 import React from 'react';
+import { useStudentWorkoutCreate } from './useStudentWorkoutCreate';
 
 export type UseAdminTemplateOpsParams = {
     selectedStudent: AdminUser | null;
@@ -29,8 +30,19 @@ export const useAdminTemplateOps = ({
 
     // ─── Template/Workout State ───────────────────────────────────────────────
     const [editingTemplate, setEditingTemplate] = useState<AdminWorkoutTemplate | null>(null);
-    const [editingStudentWorkout, setEditingStudentWorkout] = useState<UnknownRecord | null>(null);
+    const [editingStudentWorkout, setEditingStudentWorkoutInternal] = useState<UnknownRecord | null>(null);
+    const setEditingStudentWorkout = useCallback((w: UnknownRecord | null) => setEditingStudentWorkoutInternal(w), []);
     const [viewWorkout, setViewWorkout] = useState<UnknownRecord | null>(null);
+
+    // ─── Student Workout Wizard / Create ──────────────────────────────────────
+    const studentWorkoutCreate = useStudentWorkoutCreate({
+        selectedStudent,
+        user,
+        supabase,
+        setStudentWorkouts: setStudentWorkouts as React.Dispatch<React.SetStateAction<UnknownRecord[]>>,
+        setSyncedWorkouts: setSyncedWorkouts as React.Dispatch<React.SetStateAction<UnknownRecord[]>>,
+        setEditingStudentWorkout,
+    });
 
     // ─── Utility ──────────────────────────────────────────────────────────────
     const getSetsCount = useCallback((value: unknown): number => {
@@ -281,5 +293,7 @@ export const useAdminTemplateOps = ({
         handleAddTemplateToStudent,
         handleExportPdf,
         handleExportJson,
+        // Student workout create (wizard + JSON import)
+        ...studentWorkoutCreate,
     };
 };

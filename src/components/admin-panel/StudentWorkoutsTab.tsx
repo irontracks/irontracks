@@ -1,12 +1,18 @@
 'use client';
 
-import React from 'react';
-import { Dumbbell, History, Edit3, Trash2, Plus } from 'lucide-react';
+import React, { useRef } from 'react';
+import dynamic from 'next/dynamic';
+import { Dumbbell, History, Edit3, Trash2, Plus, Sparkles, ChevronDown, Upload, ScanLine } from 'lucide-react';
 import { normalizeWorkoutTitle } from '@/utils/workoutTitle';
 import { useAdminPanel } from './AdminPanelContext';
 import { useDialog } from '@/contexts/DialogContext';
 import type { UnknownRecord } from '@/types/app';
 import { apiAdmin } from '@/lib/api';
+
+const WorkoutWizardModal = dynamic(
+    () => import('@/components/dashboard/WorkoutWizardModal'),
+    { ssr: false }
+);
 
 export const StudentWorkoutsTab: React.FC = () => {
     const { alert, confirm } = useDialog();
@@ -25,12 +31,49 @@ export const StudentWorkoutsTab: React.FC = () => {
         setViewWorkout,
         openEditWorkout,
         handleAddTemplateToStudent,
+        // Wizard / create
+        wizardOpen, setWizardOpen,
+        toolsPanelOpen, setToolsPanelOpen,
+        onWizardGenerate,
+        onWizardUseDraft,
+        onWizardSaveDrafts,
+        handleJsonImport,
+        openJsonImport,
+        jsonFileInputRef,
     } = useAdminPanel();
+
+    const toolsRef = useRef<HTMLDivElement>(null);
 
     if (!selectedStudent) return null;
 
+    const totalWorkouts
+        = (Array.isArray(studentWorkouts) ? studentWorkouts.length : 0)
+        + (Array.isArray(syncedWorkouts) ? syncedWorkouts.length : 0);
+
     return (
         <div className="space-y-4">
+            {/* Hidden JSON file input */}
+            <input
+                ref={jsonFileInputRef as React.RefObject<HTMLInputElement>}
+                type="file"
+                accept=".json"
+                style={{ display: 'none' }}
+                onChange={handleJsonImport}
+            />
+
+            {/* Wizard Modal */}
+            <WorkoutWizardModal
+                isOpen={wizardOpen}
+                onClose={() => setWizardOpen(false)}
+                onManual={() => {
+                    setWizardOpen(false);
+                    setEditingStudentWorkout({ id: null, title: '', exercises: [] });
+                }}
+                onGenerate={onWizardGenerate}
+                onUseDraft={onWizardUseDraft}
+                onSaveDrafts={onWizardSaveDrafts}
+            />
+
             {/* Header */}
             <div className="bg-neutral-900/40 border border-neutral-800 rounded-2xl p-4 shadow-[0_16px_40px_rgba(0,0,0,0.25)]">
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
@@ -40,10 +83,11 @@ export const StudentWorkoutsTab: React.FC = () => {
                             <h3 className="text-base font-black text-white tracking-tight">Treinos do aluno</h3>
                         </div>
                         <div className="mt-1 text-xs text-neutral-400 font-semibold">
-                            {(Array.isArray(studentWorkouts) ? studentWorkouts.length : 0) + (Array.isArray(syncedWorkouts) ? syncedWorkouts.length : 0)} atribuídos
+                            {totalWorkouts} atribuídos
                         </div>
                     </div>
                     <div className="flex flex-col sm:flex-row gap-2">
+                        {/* History button */}
                         <button
                             type="button"
                             data-tour="adminpanel.student.workouts.history"
@@ -52,14 +96,117 @@ export const StudentWorkoutsTab: React.FC = () => {
                         >
                             <History size={16} /> Histórico
                         </button>
-                        <button
-                            type="button"
-                            data-tour="adminpanel.student.workouts.create"
-                            onClick={() => setEditingStudentWorkout({ id: null, title: '', exercises: [] })}
-                            className="min-h-[44px] px-4 py-3 bg-yellow-500 hover:bg-yellow-400 text-black rounded-xl text-[11px] font-black uppercase tracking-widest transition-all duration-300 shadow-lg shadow-yellow-500/15 active:scale-95"
-                        >
-                            Criar treino
-                        </button>
+
+                        {/* Create workout — dropdown trigger */}
+                        <div className="relative" ref={toolsRef}>
+                            <button
+                                type="button"
+                                data-tour="adminpanel.student.workouts.create"
+                                onClick={() => setToolsPanelOpen(!toolsPanelOpen)}
+                                className="min-h-[44px] px-4 py-3 bg-yellow-500 hover:bg-yellow-400 text-black rounded-xl text-[11px] font-black uppercase tracking-widest transition-all duration-300 shadow-lg shadow-yellow-500/15 active:scale-95 flex items-center gap-2"
+                            >
+                                <Plus size={15} />
+                                Criar treino
+                                <ChevronDown size={13} className={`transition-transform duration-200 ${toolsPanelOpen ? 'rotate-180' : ''}`} />
+                            </button>
+
+                            {toolsPanelOpen && (
+                                <>
+                                    {/* Backdrop */}
+                                    <div className="fixed inset-0 z-40" onClick={() => setToolsPanelOpen(false)} />
+
+                                    {/* Dropdown panel */}
+                                    <div className="absolute right-0 mt-2 w-72 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
+                                        <div className="rounded-3xl border border-white/10 bg-neutral-950/97 backdrop-blur-xl shadow-2xl shadow-black/70 overflow-hidden">
+
+                                            {/* Gold top shimmer */}
+                                            <div className="h-px bg-gradient-to-r from-transparent via-yellow-500/80 to-transparent" />
+
+                                            {/* Header */}
+                                            <div className="px-4 pt-3.5 pb-2.5 flex items-center gap-2.5 border-b border-white/5">
+                                                <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-yellow-500/20 to-amber-600/10 border border-yellow-500/30 flex items-center justify-center">
+                                                    <Sparkles size={13} className="text-yellow-400" />
+                                                </div>
+                                                <div>
+                                                    <p className="text-[11px] font-black uppercase tracking-widest text-yellow-500">Criar Treino</p>
+                                                    <p className="text-[10px] text-neutral-600 font-medium leading-none mt-0.5">Escolha como criar o treino</p>
+                                                </div>
+                                            </div>
+
+                                            <div className="p-2 space-y-0.5">
+                                                {/* Group: Criar */}
+                                                <p className="px-3 pt-2 pb-1 text-[9px] font-black uppercase tracking-[0.15em] text-neutral-600">Criar</p>
+
+                                                {/* Wizard IA */}
+                                                <button
+                                                    onClick={() => { setToolsPanelOpen(false); setWizardOpen(true); }}
+                                                    className="group w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl hover:bg-gradient-to-r hover:from-yellow-500/10 hover:to-transparent transition-all duration-150 active:scale-[0.98]"
+                                                >
+                                                    <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-yellow-500/20 to-amber-600/10 border border-yellow-500/25 flex items-center justify-center flex-shrink-0">
+                                                        <Sparkles size={14} className="text-yellow-400" />
+                                                    </div>
+                                                    <div className="flex-1 text-left">
+                                                        <p className="text-[13px] font-bold text-white group-hover:text-yellow-100 leading-tight">Criar automaticamente</p>
+                                                        <p className="text-[10px] text-neutral-600">Wizard com IA</p>
+                                                    </div>
+                                                </button>
+
+                                                {/* Manual */}
+                                                <button
+                                                    onClick={() => { setToolsPanelOpen(false); setEditingStudentWorkout({ id: null, title: '', exercises: [] }); }}
+                                                    className="group w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl hover:bg-gradient-to-r hover:from-neutral-500/10 hover:to-transparent transition-all duration-150 active:scale-[0.98]"
+                                                >
+                                                    <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-neutral-600/30 to-neutral-700/10 border border-neutral-600/25 flex items-center justify-center flex-shrink-0">
+                                                        <Edit3 size={14} className="text-neutral-400" />
+                                                    </div>
+                                                    <div className="flex-1 text-left">
+                                                        <p className="text-[13px] font-bold text-white group-hover:text-neutral-100 leading-tight">Criar manualmente</p>
+                                                        <p className="text-[10px] text-neutral-600">Editor completo</p>
+                                                    </div>
+                                                </button>
+
+                                                {/* Divider */}
+                                                <div className="mx-3 my-1 h-px bg-gradient-to-r from-transparent via-white/8 to-transparent" />
+
+                                                {/* Group: Importar */}
+                                                <p className="px-3 pt-2 pb-1 text-[9px] font-black uppercase tracking-[0.15em] text-neutral-600">Importar</p>
+
+                                                {/* Importar JSON */}
+                                                <button
+                                                    onClick={() => { setToolsPanelOpen(false); openJsonImport(); }}
+                                                    className="group w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl hover:bg-gradient-to-r hover:from-purple-500/10 hover:to-transparent transition-all duration-150 active:scale-[0.98]"
+                                                >
+                                                    <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-purple-500/20 to-purple-700/10 border border-purple-500/25 flex items-center justify-center flex-shrink-0">
+                                                        <Upload size={13} className="text-purple-400" />
+                                                    </div>
+                                                    <div className="flex-1 text-left">
+                                                        <p className="text-[13px] font-bold text-white group-hover:text-purple-100 leading-tight">Importar JSON</p>
+                                                        <p className="text-[10px] text-neutral-600">Carregar treino de arquivo</p>
+                                                    </div>
+                                                </button>
+
+                                                {/* Scanner */}
+                                                <button
+                                                    onClick={() => { setToolsPanelOpen(false); alert('Scanner de treino em breve para este contexto. Use o Scanner no dashboard principal e sincronize.'); }}
+                                                    className="group w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl hover:bg-gradient-to-r hover:from-orange-500/10 hover:to-transparent transition-all duration-150 active:scale-[0.98]"
+                                                >
+                                                    <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-orange-500/20 to-red-600/10 border border-orange-500/25 flex items-center justify-center flex-shrink-0">
+                                                        <ScanLine size={14} className="text-orange-400" />
+                                                    </div>
+                                                    <div className="flex-1 text-left">
+                                                        <p className="text-[13px] font-bold text-white group-hover:text-orange-100 leading-tight">Scanner de Treino</p>
+                                                        <p className="text-[10px] text-neutral-600">Digitalizar treino físico</p>
+                                                    </div>
+                                                </button>
+                                            </div>
+
+                                            {/* Gold bottom shimmer */}
+                                            <div className="h-px bg-gradient-to-r from-transparent via-yellow-500/20 to-transparent" />
+                                        </div>
+                                    </div>
+                                </>
+                            )}
+                        </div>
                     </div>
                 </div>
             </div>

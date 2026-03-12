@@ -153,6 +153,19 @@ export const useAdminPanelController = ({ user, onClose }: AdminPanelProps) => {
         handleAddTemplateToStudent,
         handleExportPdf,
         handleExportJson,
+        // Student workout create
+        wizardOpen, setWizardOpen,
+        toolsPanelOpen, setToolsPanelOpen,
+        jsonImportOpen, setJsonImportOpen,
+        ironScannerOpen, setIronScannerOpen,
+        jsonFileInputRef,
+        onWizardGenerate,
+        onWizardUseDraft,
+        onWizardSaveDrafts,
+        handleJsonImport,
+        openJsonImport,
+        refreshStudentWorkouts,
+        saveWorkoutDraftToStudent,
     } = useAdminTemplateOps({
         selectedStudent,
         user,
@@ -560,5 +573,19 @@ export const useAdminPanelController = ({ user, onClose }: AdminPanelProps) => {
         // Pending self-registered users
         pendingProfiles, setPendingProfiles,
         approvePendingProfile,
+
+        // Student workout create (wizard + JSON import)
+        wizardOpen, setWizardOpen,
+        toolsPanelOpen, setToolsPanelOpen,
+        jsonImportOpen, setJsonImportOpen,
+        ironScannerOpen, setIronScannerOpen,
+        jsonFileInputRef,
+        onWizardGenerate,
+        onWizardUseDraft,
+        onWizardSaveDrafts,
+        handleJsonImport,
+        openJsonImport,
+        refreshStudentWorkouts,
+        saveWorkoutDraftToStudent,
     };
 };
