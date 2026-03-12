@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createClient } from '@/utils/supabase/client'
-import { getKcalEstimate } from '@/utils/calories/kcalClient'
+import { getKcalEstimate, computeFallbackKcal } from '@/utils/calories/kcalClient'
 import { VideoCompositor } from '@/lib/video/VideoCompositor'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { isIosNative } from '@/utils/platform'
@@ -24,7 +24,6 @@ import {
     formatDatePt,
     formatDuration,
     calculateTotalVolume,
-    computeKcal,
     fitCover,
     clampPctWithSize,
     computeLiveSizes,
@@ -75,7 +74,7 @@ export function useStoryComposer({ open, session, onClose }: UseStoryComposerOpt
         const logs = session?.logs && typeof session.logs === 'object' ? (session.logs as Record<string, unknown>) : {}
         const volume = calculateTotalVolume(logs)
         const totalTime = Number(session?.totalTime) || 0
-        const kcal = Number.isFinite(Number(kcalEstimate)) && Number(kcalEstimate) > 0 ? Number(kcalEstimate) : computeKcal({ session, volume })
+        const kcal = Number.isFinite(Number(kcalEstimate)) && Number(kcalEstimate) > 0 ? Number(kcalEstimate) : computeFallbackKcal({ session, volume })
         const teamObj = session?.team && typeof session.team === 'object' ? (session.team as Record<string, unknown>) : null
         const teamCountRaw = teamObj?.participantsCount ?? session?.teamParticipantsCount ?? session?.teamSessionParticipantsCount
         const teamCount = Number(teamCountRaw)
@@ -85,9 +84,19 @@ export function useStoryComposer({ open, session, onClose }: UseStoryComposerOpt
     useEffect(() => {
         if (!open || !session) return
         let cancelled = false;
-        (async () => {
+        // Extract RPE from postCheckin so the estimate matches the report
+        const postCheckin = session?.postCheckin && typeof session.postCheckin === 'object'
+            ? (session.postCheckin as Record<string, unknown>) : null
+        const postCheckinAnswers = postCheckin?.answers && typeof postCheckin.answers === 'object'
+            ? (postCheckin.answers as Record<string, unknown>) : null
+        const rpeRaw = postCheckinAnswers?.rpe ?? postCheckin?.rpe
+        const rpe = (() => {
+            const n = Number(rpeRaw)
+            return Number.isFinite(n) && n >= 1 && n <= 10 ? n : null
+        })()
+        ;(async () => {
             try {
-                const kcal = await getKcalEstimate({ session, workoutId: session?.id ?? null })
+                const kcal = await getKcalEstimate({ session, workoutId: session?.id ?? null, rpe })
                 if (cancelled) return
                 if (Number.isFinite(Number(kcal)) && Number(kcal) > 0) setKcalEstimate(Math.round(Number(kcal)))
             } catch { }
