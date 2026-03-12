@@ -367,11 +367,11 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
                 </div>
             )}
 
-            <div className="fixed bottom-0 left-0 right-0 bg-neutral-950/97 backdrop-blur-xl border-t border-neutral-800/80 p-6 shadow-2xl z-[2100] animate-slide-up pb-safe">
-                <div className="flex items-center gap-6 max-w-md mx-auto">
-                    {/* Circular SVG ring */}
-                    <div className="relative flex-shrink-0" style={{ width: 96, height: 96 }}>
-                        <svg width="96" height="96" viewBox="0 0 96 96" style={{ transform: 'rotate(-90deg)' }}>
+            <div className="fixed bottom-0 left-0 right-0 bg-neutral-950/97 backdrop-blur-xl border-t border-neutral-800/80 py-2 px-4 shadow-2xl z-[2100] animate-slide-up pb-safe">
+                <div className="flex items-center gap-3 max-w-md mx-auto">
+                    {/* Circular SVG ring — compact size matching bar height */}
+                    <div className="relative flex-shrink-0" style={{ width: 68, height: 68 }}>
+                        <svg width="68" height="68" viewBox="0 0 96 96" style={{ transform: 'rotate(-90deg)' }}>
                             {/* Track */}
                             <circle
                                 cx="48" cy="48" r={r}
@@ -400,14 +400,14 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
                         <div className="absolute inset-0 flex flex-col items-center justify-center">
                             <span
                                 className="font-mono font-black leading-none tabular-nums"
-                                style={{ fontSize: isOvertime ? 13 : 18, color: ringColor }}
+                                style={{ fontSize: isOvertime ? 10 : 13, color: ringColor }}
                             >
                                 {isOvertime
                                     ? `+${formatDuration(extraSeconds)}`
                                     : formatDuration(baseSeconds)}
                             </span>
                             <span
-                                className="text-[9px] font-black uppercase tracking-widest mt-0.5"
+                                className="text-[7px] font-black uppercase tracking-widest mt-0.5"
                                 style={{ color: isOvertime ? '#ef4444' : '#737373' }}
                             >
                                 {isOvertime ? 'extra' : 'rest'}
@@ -417,14 +417,14 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
 
                     {/* Right side: label + buttons */}
                     <div className="flex-1 min-w-0">
-                        <p className="text-[10px] text-yellow-500 uppercase font-black tracking-widest mb-1">Recuperação</p>
+                        <p className="text-[9px] text-yellow-500 uppercase font-black tracking-widest mb-1">Recuperação</p>
                         {extraSeconds > 0 && (
-                            <p className="text-sm font-black text-green-400 mb-2">{`+${formatDuration(extraSeconds)} além do planejado`}</p>
+                            <p className="text-xs font-black text-green-400 mb-1">{`+${formatDuration(extraSeconds)} além do planejado`}</p>
                         )}
-                        <div className="flex gap-2 mt-1">
+                        <div className="flex gap-2 mt-0.5">
                             <button
                                 onClick={handleStart}
-                                className="flex-1 py-2.5 bg-gradient-to-r from-yellow-500 to-amber-400 rounded-xl text-black font-black text-sm shadow-lg shadow-yellow-900/30 hover:shadow-yellow-500/40 transition-shadow active:scale-95"
+                                className="flex-1 py-2 bg-gradient-to-r from-yellow-500 to-amber-400 rounded-xl text-black font-black text-sm shadow-lg shadow-yellow-900/30 hover:shadow-yellow-500/40 transition-shadow active:scale-95"
                             >
                                 START ▶
                             </button>
@@ -435,7 +435,7 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
                                         if (typeof onClose === 'function') onClose();
                                     } catch { }
                                 }}
-                                className="px-3 py-2.5 bg-neutral-800 rounded-xl text-neutral-400 border border-neutral-700 hover:text-white hover:bg-neutral-700 text-xs font-bold active:scale-95"
+                                className="px-3 py-2 bg-neutral-800 rounded-xl text-neutral-400 border border-neutral-700 hover:text-white hover:bg-neutral-700 text-xs font-bold active:scale-95"
                             >
                                 Ocultar
                             </button>
