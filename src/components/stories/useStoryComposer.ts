@@ -2,7 +2,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createClient } from '@/utils/supabase/client'
-import { getKcalEstimate, computeFallbackKcal } from '@/utils/calories/kcalClient'
+import { getKcalEstimate } from '@/utils/calories/kcalClient'
+import { estimateCaloriesMet } from '@/utils/calories/metEstimate'
 import { VideoCompositor } from '@/lib/video/VideoCompositor'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { isIosNative } from '@/utils/platform'
@@ -58,50 +59,87 @@ export function useStoryComposer({ open, session, onClose }: UseStoryComposerOpt
     const [showSafeGuide, setShowSafeGuide] = useState(true)
     const [layout, setLayout] = useState('bottom-row')
     const [livePositions, setLivePositions] = useState<LivePositions>(DEFAULT_LIVE_POSITIONS)
-    const [kcalEstimate, setKcalEstimate] = useState(0)
     const [draggingKey, setDraggingKey] = useState<string | null>(null)
     const [saveImageUrl, setSaveImageUrl] = useState<string | null>(null)
     const [showTrimmer, setShowTrimmer] = useState(false)
     const [videoDuration, setVideoDuration] = useState(0)
     const [trimRange, setTrimRange] = useState<[number, number]>([0, 60])
     const [previewTime, setPreviewTime] = useState(0)
+    // Fire-and-forget API ref (logging only — does NOT drive the displayed kcal)
+    const kcalApiCalledRef = useRef(false)
 
     useEffect(() => { backgroundUrlRef.current = backgroundUrl }, [backgroundUrl])
 
     const metrics: Metrics = useMemo(() => {
         const title = safeString(session?.workoutTitle || session?.name || 'Treino')
         const date = formatDatePt(session?.date || session?.completed_at || session?.completedAt || session?.created_at)
-        const logs = session?.logs && typeof session.logs === 'object' ? (session.logs as Record<string, unknown>) : {}
+        const s = session && typeof session === 'object' ? (session as Record<string, unknown>) : {}
+        const logs = s?.logs && typeof s.logs === 'object' ? (s.logs as Record<string, unknown>) : {}
         const volume = calculateTotalVolume(logs)
-        const totalTime = Number(session?.totalTime) || 0
-        const kcal = Number.isFinite(Number(kcalEstimate)) && Number(kcalEstimate) > 0 ? Number(kcalEstimate) : computeFallbackKcal({ session, volume })
-        const teamObj = session?.team && typeof session.team === 'object' ? (session.team as Record<string, unknown>) : null
-        const teamCountRaw = teamObj?.participantsCount ?? session?.teamParticipantsCount ?? session?.teamSessionParticipantsCount
-        const teamCount = Number(teamCountRaw)
-        return { title, date, volume, totalTime, kcal, teamCount: Number.isFinite(teamCount) ? teamCount : 0 }
-    }, [session, kcalEstimate])
+        const totalTime = Number(s?.totalTime) || 0
 
-    useEffect(() => {
-        if (!open || !session) return
-        let cancelled = false;
-        // Extract RPE from postCheckin so the estimate matches the report
-        const postCheckin = session?.postCheckin && typeof session.postCheckin === 'object'
-            ? (session.postCheckin as Record<string, unknown>) : null
-        const postCheckinAnswers = postCheckin?.answers && typeof postCheckin.answers === 'object'
-            ? (postCheckin.answers as Record<string, unknown>) : null
-        const rpeRaw = postCheckinAnswers?.rpe ?? postCheckin?.rpe
+        // ── Extract preCheckin body weight (same priority as useReportData) ──
+        const preCheckin = s?.preCheckin && typeof s.preCheckin === 'object' ? (s.preCheckin as Record<string, unknown>) : null
+        const preCheckinAnswers = preCheckin?.answers && typeof preCheckin.answers === 'object' ? (preCheckin.answers as Record<string, unknown>) : null
+        const bodyWeightKg = (() => {
+            const candidates = [
+                preCheckinAnswers?.body_weight_kg,
+                preCheckin?.body_weight_kg,
+                preCheckin?.weight,
+            ]
+            for (const c of candidates) {
+                const n = Number(c)
+                if (Number.isFinite(n) && n >= 20 && n <= 300) return n
+            }
+            return null
+        })()
+
+        // ── Extract post-checkin RPE ──────────────────────────────────────────
+        const postCheckin = s?.postCheckin && typeof s.postCheckin === 'object' ? (s.postCheckin as Record<string, unknown>) : null
+        const postCheckinAnswers = postCheckin?.answers && typeof postCheckin.answers === 'object' ? (postCheckin.answers as Record<string, unknown>) : null
         const rpe = (() => {
+            const rpeRaw = postCheckinAnswers?.rpe ?? postCheckin?.rpe
             const n = Number(rpeRaw)
             return Number.isFinite(n) && n >= 1 && n <= 10 ? n : null
         })()
-        ;(async () => {
-            try {
-                const kcal = await getKcalEstimate({ session, workoutId: session?.id ?? null, rpe })
-                if (cancelled) return
-                if (Number.isFinite(Number(kcal)) && Number(kcal) > 0) setKcalEstimate(Math.round(Number(kcal)))
-            } catch { }
-        })()
-        return () => { cancelled = true }
+
+        // ── Extract exercise names (complexity factor) ────────────────────────
+        const exerciseNames = Array.isArray(s?.exercises)
+            ? (s.exercises as unknown[]).map((ex) => {
+                const e = ex && typeof ex === 'object' ? (ex as Record<string, unknown>) : null
+                return String(e?.name || '').trim()
+            }).filter(Boolean) as string[]
+            : null
+
+        // ── Prefer explicit exec/rest seconds from session ────────────────────
+        const execSeconds = Number(s?.executionTotalSeconds ?? s?.execution_total_seconds ?? 0) || 0
+        const restSeconds = Number(s?.restTotalSeconds ?? s?.rest_total_seconds ?? 0) || 0
+        const execMinutesOverride = execSeconds > 0 ? execSeconds / 60 : null
+        const restMinutesOverride = restSeconds > 0 ? restSeconds / 60 : null
+        const durationMinutes = totalTime / 60
+
+        // ── Calculate kcal using the same estimator as the report ─────────────
+        const kcal = estimateCaloriesMet(
+            logs,
+            durationMinutes,
+            bodyWeightKg,
+            exerciseNames,
+            rpe,
+            execMinutesOverride,
+            restMinutesOverride,
+        )
+
+        const teamObj = s?.team && typeof s.team === 'object' ? (s.team as Record<string, unknown>) : null
+        const teamCountRaw = teamObj?.participantsCount ?? s?.teamParticipantsCount ?? s?.teamSessionParticipantsCount
+        const teamCount = Number(teamCountRaw)
+        return { title, date, volume, totalTime, kcal, teamCount: Number.isFinite(teamCount) ? teamCount : 0 }
+    }, [session])
+
+    // ── Fire-and-forget: API call for server logging only (does NOT drive displayed kcal) ──
+    useEffect(() => {
+        if (!open || !session || kcalApiCalledRef.current) return
+        kcalApiCalledRef.current = true
+        getKcalEstimate({ session, workoutId: session?.id ?? null }).catch(() => {})
     }, [open, session])
 
     const liveSizes = useMemo(() => {
