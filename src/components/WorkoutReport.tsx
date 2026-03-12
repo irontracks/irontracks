@@ -958,7 +958,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                     </div>
                 </div>
             )}
-            {showStory ? <StoryComposer open={showStory} session={session} onClose={() => setShowStory(false)} /> : null}
+            {showStory ? <StoryComposer open={showStory} session={session} calories={calories} onClose={() => setShowStory(false)} /> : null}
             {showCoachChat && (
                 <CoachChatModal
                     isOpen={showCoachChat}
