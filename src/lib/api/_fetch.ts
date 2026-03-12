@@ -4,6 +4,21 @@
  * Provides consistent error handling and JSON parsing.
  */
 
+// isIosNative is imported lazily (no SSR side-effects)
+let _isIosNative: (() => boolean) | null = null
+const checkIosNative = (): boolean => {
+  if (typeof window === 'undefined') return false
+  try {
+    if (!_isIosNative) {
+      // Dynamic require to avoid SSR import of Capacitor
+      _isIosNative = require('@/utils/platform').isIosNative
+    }
+    return _isIosNative ? _isIosNative() : false
+  } catch {
+    return false
+  }
+}
+
 export class ApiError extends Error {
   constructor(
     public readonly status: number,
@@ -25,9 +40,12 @@ export interface ApiResponse<T = unknown> {
  * Core fetch wrapper — throws ApiError on non-ok responses.
  */
 export async function apiFetch<T>(url: string, init?: RequestInit): Promise<T> {
+  const nativeHeaders: Record<string, string> = checkIosNative()
+    ? { 'X-Native-Platform': 'ios' }
+    : {}
   const res = await fetch(url, {
     credentials: 'include',
-    headers: { 'Content-Type': 'application/json', ...(init?.headers ?? {}) },
+    headers: { 'Content-Type': 'application/json', ...nativeHeaders, ...(init?.headers ?? {}) },
     ...init,
   })
   if (!res.ok) {

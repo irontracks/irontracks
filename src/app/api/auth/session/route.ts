@@ -28,9 +28,19 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: 'missing_env' }, { status: 500 })
     }
 
+    // Capacitor iOS WKWebView sends requests from capacitor:// scheme.
+    // Cookies with sameSite:'lax' are blocked as cross-site in that context.
+    // When the native header is present we switch to sameSite:'none' so the
+    // session cookie is actually stored and sent on subsequent requests.
+    const isNativeIos = req.headers.get('x-native-platform') === 'ios'
+    const baseCookieOptions = getSupabaseCookieOptions()
+    const cookieOptions = isNativeIos
+      ? { ...baseCookieOptions, sameSite: 'none' as const, secure: true }
+      : baseCookieOptions
+
     const cookieStore = await cookies()
     const supabase = createServerClient(supabaseUrl, supabaseAnonKey, {
-      cookieOptions: getSupabaseCookieOptions(),
+      cookieOptions,
       cookies: {
         getAll() {
           return cookieStore.getAll()
