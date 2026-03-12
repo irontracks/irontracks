@@ -103,12 +103,30 @@ export function useStoryComposer({ open, session, onClose }: UseStoryComposerOpt
             return Number.isFinite(n) && n >= 1 && n <= 10 ? n : null
         })()
 
-        // ── Extract exercise names (complexity factor) ────────────────────────
-        const exerciseNames = Array.isArray(s?.exercises)
-            ? (s.exercises as unknown[]).map((ex) => {
+        // ── Extract exercise names and per-exercise volumes (weighted complexity) ─
+        const exercisesRaw = Array.isArray(s?.exercises) ? (s.exercises as unknown[]) : []
+        const exerciseNames = exercisesRaw.length > 0
+            ? exercisesRaw.map((ex) => {
                 const e = ex && typeof ex === 'object' ? (ex as Record<string, unknown>) : null
                 return String(e?.name || '').trim()
             }).filter(Boolean) as string[]
+            : null
+
+        // Volume per exercise: sum(w × r) for all sets — logs keyed "exerciseIdx-setIdx"
+        const exerciseVolumes = exerciseNames && exerciseNames.length > 0
+            ? exerciseNames.map((_, exIdx) => {
+                let vol = 0
+                Object.entries(logs).forEach(([key, log]) => {
+                    const parts = key.split('-')
+                    if (Number(parts[0]) !== exIdx) return
+                    const obj = log && typeof log === 'object' ? (log as Record<string, unknown>) : null
+                    if (!obj) return
+                    const w = Number(String(obj.weight ?? '').replace(',', '.'))
+                    const r = Number(String(obj.reps ?? '').replace(',', '.'))
+                    if (w > 0 && r > 0) vol += w * r
+                })
+                return vol
+            })
             : null
 
         // ── Prefer explicit exec/rest seconds from session ────────────────────
@@ -127,6 +145,8 @@ export function useStoryComposer({ open, session, onClose }: UseStoryComposerOpt
             rpe,
             execMinutesOverride,
             restMinutesOverride,
+            null, // biologicalSex not available in story context (uses default)
+            exerciseVolumes,
         )
 
         const teamObj = s?.team && typeof s.team === 'object' ? (s.team as Record<string, unknown>) : null

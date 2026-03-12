@@ -11,14 +11,21 @@
  *     - < 80 kg/min   → MET 3.5
  *     - < 200 kg/min  → MET 5.0
  *     - < 350 kg/min  → MET 6.0
- *     - >= 350 kg/min → MET 7.5
+ *     - >= 350 kg/min → MET 8.0  (Compendium of Physical Activities — vigorous circuit/weight training)
  *
  * ## Complexity factor (exercise type multiplier)
  * Applies a multiplier on top of MET based on exercise type.
+ * When per-exercise volumes are provided, uses volume-weighted average
+ * instead of simple mean — so heavy compound lifts have proportional weight.
+ *
+ * ## EPOC (Excess Post-exercise Oxygen Consumption)
+ * For high-intensity sessions (MET ≥ 6.0 and > 60 min), adds +8% to total.
+ * For moderate-high sessions (MET ≥ 5.0 and > 45 min), adds +5%.
+ * Evidence: Børsheim & Bahr (2003), Melanson et al. (2009).
  *
  * ## Formula
- * kcal = MET × complexityFactor × bodyWeightKg × activeHours × rpeMultiplier
- *       + MET_REST × bodyWeightKg × restHours
+ * kcal = (MET × complexityFactor × bodyWeightKg × activeHours × rpeMultiplier
+ *        + MET_REST × bodyWeightKg × restHours) × sexMultiplier × epocFactor
  */
 
 type AnyObj = Record<string, unknown>
@@ -27,11 +34,11 @@ type AnyObj = Record<string, unknown>
 export const MET_LIGHT = 3.5
 export const MET_MODERATE = 5.0
 export const MET_VIGOROUS = 6.0
-export const MET_HIGH_DENSITY = 7.5
+export const MET_HIGH_DENSITY = 8.0   // Compendium: vigorous circuit/weight training
 export const MET_REST = 1.5
 
-/** Default body weight in kg used when athlete weight is unavailable. */
-export const DEFAULT_BODY_WEIGHT_KG = 75
+/** Default body weight in kg (IBGE 2019 — Brazilian adult male average). */
+export const DEFAULT_BODY_WEIGHT_KG = 78
 
 // ── MET selection (two-factor) ─────────────────────────────────────────────────
 
@@ -168,6 +175,27 @@ export const getSexMultiplier = (sex: string | null | undefined): number => {
   return 1.00 // male or not_informed
 }
 
+// ── EPOC factor ───────────────────────────────────────────────────────────────
+
+/**
+ * Returns the EPOC (Excess Post-exercise Oxygen Consumption) multiplier.
+ *
+ * Resistance training — especially high-intensity sessions — elevates oxygen
+ * consumption for 24–72 hours post-exercise. This factor adds a conservative
+ * estimate of that additional caloric cost to the in-session calculation.
+ *
+ * Evidence: Børsheim & Bahr (2003), Melanson et al. (2009), Schuenke et al. (2002).
+ *
+ * - MET ≥ 6.0 AND duration > 60 min → +8% (vigorous, long session)
+ * - MET ≥ 5.0 AND duration > 45 min → +5% (moderate-high, standard session)
+ * - Otherwise                        → +0% (light session, negligible EPOC)
+ */
+export const getEpocFactor = (met: number, durationMinutes: number): number => {
+  if (met >= 6.0 && durationMinutes > 60) return 1.08
+  if (met >= 5.0 && durationMinutes > 45) return 1.05
+  return 1.0
+}
+
 
 
 /**
@@ -201,14 +229,20 @@ export const computeActiveWorkMinutes = (
  * to ensure higher-volume sessions always produce more calories than
  * lower-volume sessions, even at the same average load.
  *
- * @param sessionLogs     - The session's log entries keyed by "exerciseIdx-setIdx".
- * @param durationMinutes - Total duration of the session in minutes.
- * @param bodyWeightKg    - Athlete body weight in kg (optional; defaults to 75 kg).
- * @param exerciseNames   - Optional exercise names, used to compute complexity factor.
- * @param rpe             - Post-workout RPE (1–10). Adjusts MET by ±15%.
+ * When `exerciseVolumes` is provided (volume per exercise in kg), the
+ * complexity factor is computed as a **volume-weighted average** so that
+ * heavy compound lifts contribute proportionally more than light isolators.
+ *
+ * @param sessionLogs         - The session's log entries keyed by "exerciseIdx-setIdx".
+ * @param durationMinutes     - Total duration of the session in minutes.
+ * @param bodyWeightKg        - Athlete body weight in kg (optional; defaults to 78 kg).
+ * @param exerciseNames       - Optional exercise names, used to compute complexity factor.
+ * @param rpe                 - Post-workout RPE (1–10). Adjusts MET by ±15%.
  * @param execMinutesOverride - If known (from logs), use as active minutes directly.
  * @param restMinutesOverride - If known (from logs), use as rest minutes directly.
  * @param biologicalSex       - 'male' | 'female' | 'not_informed'. Applies ±10% sex correction.
+ * @param exerciseVolumes     - Volume (kg×reps total) per exercise, same order as exerciseNames.
+ *                              When provided, enables volume-weighted complexity factor.
  * @returns Estimated kcal burned, rounded to the nearest integer.
  */
 export const estimateCaloriesMet = (
@@ -220,6 +254,7 @@ export const estimateCaloriesMet = (
   execMinutesOverride?: number | null,
   restMinutesOverride?: number | null,
   biologicalSex?: string | null,
+  exerciseVolumes?: number[] | null,
 ): number => {
   if (!durationMinutes || durationMinutes <= 0) return 0
 
@@ -255,11 +290,28 @@ export const estimateCaloriesMet = (
   // Two-factor MET: load-based AND density-based — take the higher
   const met = selectMet(avgWeightPerRep, totalVolume, activeMinutes)
 
-  // Complexity factor: average across all exercises in the session
+  // Complexity factor: volume-weighted average when volumes are available,
+  // otherwise simple average across exercises
   let complexityFactor = 1.0
   if (exerciseNames && exerciseNames.length > 0) {
-    const factors = exerciseNames.map(getExerciseComplexityFactor)
-    complexityFactor = factors.reduce((a, b) => a + b, 0) / factors.length
+    const hasVolumes = exerciseVolumes != null
+      && exerciseVolumes.length === exerciseNames.length
+    if (hasVolumes) {
+      // Volume-weighted: heavy compound lifts contribute more
+      const totalExVol = exerciseVolumes!.reduce((a, b) => a + b, 0)
+      if (totalExVol > 0) {
+        complexityFactor = exerciseNames.reduce((acc, name, i) =>
+          acc + getExerciseComplexityFactor(name) * exerciseVolumes![i], 0) / totalExVol
+      } else {
+        // All volumes are 0 — fallback to simple average
+        const factors = exerciseNames.map(getExerciseComplexityFactor)
+        complexityFactor = factors.reduce((a, b) => a + b, 0) / factors.length
+      }
+    } else {
+      // Simple average (backward-compatible)
+      const factors = exerciseNames.map(getExerciseComplexityFactor)
+      complexityFactor = factors.reduce((a, b) => a + b, 0) / factors.length
+    }
   }
 
   // Body weight: use provided value when valid (20–300 kg), else default
@@ -273,11 +325,15 @@ export const estimateCaloriesMet = (
   // Biological sex correction (Harris-Benedict): female ~10% lower BMR per kg
   const sexMultiplier = getSexMultiplier(biologicalSex)
 
-  // Active kcal (exercise) + rest kcal (recovery, MET ≈ 1.5)
+  // EPOC: extra post-exercise oxygen consumption for intense/long sessions
+  const epocFactor = getEpocFactor(met, durationMinutes)
+
+  // Active kcal (exercise) + rest kcal (recovery, MET ≈ 1.5), then EPOC
   const activeHours = activeMinutes / 60
   const restHours = restMinutes / 60
-  const kcal = met * complexityFactor * bw * activeHours * rpeMultiplier * sexMultiplier
+  const kcalBase = met * complexityFactor * bw * activeHours * rpeMultiplier * sexMultiplier
     + MET_REST * bw * restHours * sexMultiplier
+  const kcal = kcalBase * epocFactor
 
   return Number.isFinite(kcal) && kcal > 0 ? Math.round(kcal) : 0
 }
