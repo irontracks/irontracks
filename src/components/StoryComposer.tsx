@@ -67,8 +67,20 @@ export default function StoryComposer({ open, session, onClose, calories }: Stor
 
   // Multi-pointer tracking: supports simultaneous drag (1 finger) and pinch (2 fingers)
   const stickerPointersRef = useRef<Map<number, { x: number; y: number }>>(new Map())
-  const pinchStartRef = useRef<{ distance: number; scale: number } | null>(null)
+  // Delta-based pinch: tracks the distance from the previous frame so that
+  // the same physical finger movement always produces the same scale change,
+  // regardless of the sticker's current size (unlike ratio-based which gets
+  // harder to control when the sticker is small).
+  const pinchRef = useRef<{ lastDistance: number; settled: boolean } | null>(null)
   const stickerDragRef = useRef<{ startX: number; startY: number; startPosX: number; startPosY: number } | null>(null)
+
+  // How many scale units to add/remove per pixel of finger spread/pinch.
+  // 0.007 feels natural: ~140 px of movement → 1.0 scale unit.
+  const PINCH_SENSITIVITY = 0.007
+  // Smoothing: how fast the rendered scale catches up to the target (0–1).
+  // 0.45 = responsive without snapping; lower = smoother but laggier.
+  const PINCH_SMOOTH = 0.45
+  const targetScaleRef = useRef(1.0)
 
   const onStickerPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     e.preventDefault()
@@ -76,13 +88,17 @@ export default function StoryComposer({ open, session, onClose, calories }: Stor
     stickerPointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
     const pts = Array.from(stickerPointersRef.current.values())
     if (pts.length >= 2) {
-      // Two fingers → pinch mode
+      // Two fingers → pinch mode.
+      // We mark settled=false so the FIRST pointermove just establishes the
+      // baseline distance without changing scale (prevents the initial jump
+      // that happens when the second finger lands at an arbitrary position).
       const dist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y)
-      pinchStartRef.current = { distance: Math.max(dist, 1), scale: stickerScaleRef.current }
+      pinchRef.current = { lastDistance: Math.max(dist, 10), settled: false }
+      targetScaleRef.current = stickerScaleRef.current
       stickerDragRef.current = null
     } else {
       // One finger → drag mode
-      pinchStartRef.current = null
+      pinchRef.current = null
       stickerDragRef.current = {
         startX: e.clientX, startY: e.clientY,
         startPosX: stickerPosRef.current.x, startPosY: stickerPosRef.current.y,
@@ -93,13 +109,24 @@ export default function StoryComposer({ open, session, onClose, calories }: Stor
   const onStickerPointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     stickerPointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
     const pts = Array.from(stickerPointersRef.current.values())
-    if (pts.length >= 2 && pinchStartRef.current) {
-      // Pinch: scale proportionally to finger spread
+    if (pts.length >= 2 && pinchRef.current) {
       const dist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y)
-      const newScale = Math.max(0.3, Math.min(5.0,
-        (dist / pinchStartRef.current.distance) * pinchStartRef.current.scale
-      ))
-      setStickerScale(newScale)
+      if (!pinchRef.current.settled) {
+        // First move after 2nd finger landed: just set the baseline, don't scale yet
+        pinchRef.current.lastDistance = dist
+        pinchRef.current.settled = true
+        return
+      }
+      // Delta-based: how many pixels did the spread change this frame?
+      const delta = dist - pinchRef.current.lastDistance
+      pinchRef.current.lastDistance = dist // update for next frame
+      // Add delta × sensitivity to the target scale
+      const rawTarget = Math.max(0.3, Math.min(5.0, targetScaleRef.current + delta * PINCH_SENSITIVITY))
+      targetScaleRef.current = rawTarget
+      // Smooth the rendered scale towards the target
+      const smoothed = stickerScaleRef.current + (rawTarget - stickerScaleRef.current) * PINCH_SMOOTH
+      stickerScaleRef.current = smoothed // keep ref in sync immediately
+      setStickerScale(smoothed)
     } else if (pts.length === 1 && stickerDragRef.current) {
       // Drag: move sticker position
       const rect = previewRef.current?.getBoundingClientRect()
@@ -111,12 +138,12 @@ export default function StoryComposer({ open, session, onClose, calories }: Stor
         y: Math.max(0.05, Math.min(0.95, stickerDragRef.current.startPosY + dy)),
       })
     }
-  }, [])
+  }, [PINCH_SENSITIVITY, PINCH_SMOOTH])
 
   const onStickerPointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
     e.currentTarget.releasePointerCapture(e.pointerId)
     stickerPointersRef.current.delete(e.pointerId)
-    if (stickerPointersRef.current.size < 2) pinchStartRef.current = null
+    if (stickerPointersRef.current.size < 2) pinchRef.current = null
     if (stickerPointersRef.current.size === 0) stickerDragRef.current = null
   }, [])
 
