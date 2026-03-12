@@ -23,6 +23,7 @@ import {
   getExerciseComplexityFactor,
   selectMet,
   getRpeMultiplier,
+  getEpocFactor,
   MET_REST,
   DEFAULT_BODY_WEIGHT_KG,
 } from '@/utils/calories/metEstimate'
@@ -161,7 +162,7 @@ export async function POST(request: Request) {
       : assessmentWeight != null ? 'assessment'
       : 'default_75kg'
 
-    // ── Exercise names for complexity factor ──────────────────────────────────
+    // ── Exercise names and per-exercise volumes (for weighted complexity) ────
     const exerciseNames = Array.isArray(session?.exercises)
       ? (session.exercises as unknown[]).map((ex) => {
         const e = ex && typeof ex === 'object' ? (ex as Record<string, unknown>) : null
@@ -169,8 +170,32 @@ export async function POST(request: Request) {
       }).filter(Boolean) as string[]
       : []
 
+    // Volume per exercise: sum(w × r) for all sets of that exercise
+    // Logs are keyed by "exerciseIdx-setIdx"
+    const exerciseVolumes: number[] = exerciseNames.map((_, exIdx) => {
+      let vol = 0
+      for (const [key, log] of Object.entries(logs)) {
+        const parts = key.split('-')
+        if (Number(parts[0]) !== exIdx) continue
+        if (!log || typeof log !== 'object') continue
+        const obj = log as Record<string, unknown>
+        const w = Number(safeString(obj?.weight as unknown).replace(',', '.'))
+        const r = Number(safeString(obj?.reps as unknown).replace(',', '.'))
+        if (w > 0 && r > 0) vol += w * r
+      }
+      return vol
+    })
+
+    // Volume-weighted complexity factor (heavy compounds get proportional weight)
+    const totalExVol = exerciseVolumes.reduce((a, b) => a + b, 0)
     const complexityFactor = exerciseNames.length > 0
-      ? exerciseNames.map(getExerciseComplexityFactor).reduce((a, b) => a + b, 0) / exerciseNames.length
+      ? (() => {
+          if (totalExVol > 0) {
+            return exerciseNames.reduce((acc, name, i) =>
+              acc + getExerciseComplexityFactor(name) * exerciseVolumes[i], 0) / totalExVol
+          }
+          return exerciseNames.map(getExerciseComplexityFactor).reduce((a, b) => a + b, 0) / exerciseNames.length
+        })()
       : 1.0
 
     // ── MET: two-factor (load AND density) ───────────────────────────────────
@@ -192,6 +217,9 @@ export async function POST(request: Request) {
     const rpeVal = clientRpe != null && Number.isFinite(clientRpe) ? clientRpe : null
     const rpeMultiplier = getRpeMultiplier(rpeVal)
 
+    // ── EPOC factor ────────────────────────────────────────────────────────────
+    const epocFactor = getEpocFactor(met, totalMinutes)
+
     // ── Final kcal (deterministic) ────────────────────────────────────────────
     // If we have no timing data, use the convenience wrapper
     if (totalMinutes <= 0) {
@@ -205,10 +233,9 @@ export async function POST(request: Request) {
 
     const activeHours = activeMinutes / 60
     const restHours = restMinutes / 60
-    const kcal = Math.round(
-      met * complexityFactor * bodyWeightKg * activeHours * rpeMultiplier
+    const kcalBase = met * complexityFactor * bodyWeightKg * activeHours * rpeMultiplier
       + MET_REST * bodyWeightKg * restHours
-    )
+    const kcal = Math.round(kcalBase * epocFactor)
 
     return NextResponse.json({
       ok: true,
@@ -219,6 +246,7 @@ export async function POST(request: Request) {
       activeMinutes: Math.round(activeMinutes * 10) / 10,
       restMinutes: Math.round(restMinutes * 10) / 10,
       rpeMultiplier,
+      epocFactor,
       source: 'deterministic-met',
       weightSource,
     })

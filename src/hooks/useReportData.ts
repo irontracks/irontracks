@@ -350,9 +350,28 @@ export const useReportData = ({ session, previousSession, user, settings }: UseR
     return Number.isFinite(n) && n >= 1 && n <= 10 ? n : null
   })()
 
-  // ── Calories: deterministic useMemo — stable from first render ───────────
-  // Uses two-factor MET (avg load + density), complexity factor, body weight,
-  // active vs rest time split, and RPE multiplier. No async state involved.
+  // ── Per-exercise volumes for volume-weighted complexity factor ───────────
+  // Logs keyed by "exerciseIdx-setIdx"
+  const exerciseVolumes = useMemo(() => {
+    if (!sessionExerciseNames || sessionExerciseNames.length === 0) return null
+    return sessionExerciseNames.map((_, exIdx) => {
+      let vol = 0
+      Object.entries(sessionLogs).forEach(([key, log]) => {
+        const parts = key.split('-')
+        if (Number(parts[0]) !== exIdx) return
+        const obj = log && typeof log === 'object' ? (log as AnyObj) : null
+        if (!obj) return
+        const w = Number(String(obj.weight ?? '').replace(',', '.'))
+        const r = Number(String(obj.reps ?? '').replace(',', '.'))
+        if (w > 0 && r > 0) vol += w * r
+      })
+      return vol
+    })
+  }, [sessionLogs, sessionExerciseNames])
+
+  // ── Calories: deterministic useMemo ────────────────────────────────────
+  // Uses two-factor MET (avg load + density), volume-weighted complexity,
+  // body weight, active vs rest time split, RPE multiplier, and EPOC.
   const calories = useMemo(() => {
     const bikeKcal = Number(outdoorBike?.caloriesKcal)
     if (Number.isFinite(bikeKcal) && bikeKcal > 0) return Math.round(bikeKcal)
@@ -376,8 +395,9 @@ export const useReportData = ({ session, previousSession, user, settings }: UseR
       execMinutesOverride,
       restMinutesOverride,
       biologicalSex,
+      exerciseVolumes,
     )
-  }, [sessionLogs, durationInMinutes, checkinBodyWeightKg, sessionExerciseNames, postCheckinRpe, outdoorBike, safeSession?.executionTotalSeconds, safeSession?.restTotalSeconds, safeSession?.totalTime, settings?.biologicalSex, settings?.bodyWeightKg])
+  }, [sessionLogs, durationInMinutes, checkinBodyWeightKg, sessionExerciseNames, exerciseVolumes, postCheckinRpe, outdoorBike, safeSession?.executionTotalSeconds, safeSession?.restTotalSeconds, safeSession?.totalTime, settings?.biologicalSex, settings?.bodyWeightKg])
 
   const reportMeta = safeSession?.reportMeta && typeof safeSession.reportMeta === 'object' ? (safeSession.reportMeta as AnyObj) : null
   const reportTotals = reportMeta?.totals && typeof reportMeta.totals === 'object' ? (reportMeta.totals as AnyObj) : null
