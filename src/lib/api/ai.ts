@@ -62,4 +62,8 @@ export const apiAi = {
   /** POST generate period insights (history analysis) */
   periodInsights: (payload: Record<string, unknown>) =>
     apiPost<PeriodInsightsResult>('/api/ai/period-insights', payload),
+
+  /** POST generate workout via AI wizard */
+  workoutWizard: (payload: Record<string, unknown>) =>
+    apiPost<Record<string, unknown>>('/api/ai/workout-wizard', payload),
 }
