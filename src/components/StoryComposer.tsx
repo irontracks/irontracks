@@ -23,6 +23,8 @@ interface StoryComposerProps {
   open: boolean
   session: SessionLite
   onClose: () => void
+  /** Pre-calculated calories from the report (avoids re-computation divergence) */
+  calories?: number
 }
 
 const STICKERS = [
@@ -30,7 +32,7 @@ const STICKERS = [
   { id: 'lightning', src: '/sticker-lightning.png', label: '⚡ Raio', alt: 'Sticker raio' },
 ]
 
-export default function StoryComposer({ open, session, onClose }: StoryComposerProps) {
+export default function StoryComposer({ open, session, onClose, calories }: StoryComposerProps) {
   const previewRef = useRef<HTMLDivElement>(null)
   const previewCanvasRef = useRef<HTMLCanvasElement>(null)
 
@@ -42,11 +44,16 @@ export default function StoryComposer({ open, session, onClose }: StoryComposerP
     layout, livePositions, setLivePositions,
     draggingKey, saveImageUrl, setSaveImageUrl,
     showTrimmer, setShowTrimmer, videoDuration, trimRange, setTrimRange, previewTime, setPreviewTime,
-    metrics,
+    metrics: rawMetrics,
     loadMedia, onSelectLayout,
     onPiecePointerDown, onPiecePointerMove, onPiecePointerUp,
     shareImage, postToIronTracks,
   } = useStoryComposer({ open, session, onClose })
+
+  // Override kcal with the pre-calculated value from the report if provided
+  const metrics = calories != null && Number.isFinite(calories) && calories > 0
+    ? { ...rawMetrics, kcal: Math.round(calories) }
+    : rawMetrics
 
   // ── Sticker state ───────────────────────────────────────────────────
   const [selectedSticker, setSelectedSticker] = useState<string | null>(null)
