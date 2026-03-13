@@ -12,7 +12,7 @@ import {
 } from '../utils';
 import { UnknownRecord, WorkoutExercise } from '../types';
 
-export const NormalSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: number; setIdx: number }) => {
+export const NormalSet = ({ ex, exIdx, setIdx, setsCount }: { ex: WorkoutExercise; exIdx: number; setIdx: number; setsCount?: number }) => {
   const {
     getLog,
     updateLog,
@@ -22,6 +22,8 @@ export const NormalSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: n
     openNotesKeys,
     toggleNotes,
     deloadSuggestions,
+    collapsed,
+    setCollapsed,
   } = useWorkoutContext();
 
   const key = `${exIdx}-${setIdx}`;
@@ -36,132 +38,183 @@ export const NormalSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: n
   const done = !!log.done;
   const plannedReps = String(plannedSet?.reps ?? ex?.reps ?? '').trim();
   const plannedRpe = String(plannedSet?.rpe ?? ex?.rpe ?? '').trim();
-  
+
   type DeloadEntrySuggestion = { weight?: number | null; reps?: number | null; rpe?: number | null };
   const suggestionValue = deloadSuggestions[key];
   const suggestion: DeloadEntrySuggestion | null = isObject(suggestionValue) ? (suggestionValue as DeloadEntrySuggestion) : null;
   const useWatermark = DELOAD_SUGGEST_MODE === 'watermark';
-  const weightPlaceholder = useWatermark && suggestion?.weight != null ? `${suggestion.weight} kg` : 'Peso (kg)';
+  const weightPlaceholder = useWatermark && suggestion?.weight != null ? `${suggestion.weight}` : 'kg';
   const repsPlaceholder = useWatermark && suggestion?.reps != null ? String(suggestion.reps) : 'Reps';
   const rpePlaceholder = useWatermark && suggestion?.rpe != null ? String(suggestion.rpe) : 'RPE';
 
-  const isHeaderRow = setIdx === 0;
   const notesId = `notes-${key}`;
   const hasNotes = notesValue.trim().length > 0;
   const isNotesOpen = openNotesKeys.has(key);
 
+  // Shared compact input class
+  const inputBase =
+    'w-full bg-black/40 border border-neutral-700/80 rounded-xl px-2 py-2 text-sm text-white text-center outline-none focus:ring-1 ring-yellow-500 focus:border-yellow-500/50 transition-all duration-200 placeholder:text-neutral-600 placeholder:opacity-70 focus:placeholder:opacity-0';
+
+  // Badge color
+  const badgeColors = ['bg-yellow-500 text-black', 'bg-orange-500 text-black', 'bg-amber-500 text-black', 'bg-yellow-400 text-black'];
+  const badgeColor = done ? 'bg-emerald-500 text-black' : badgeColors[setIdx % badgeColors.length];
+
+  const handleComplete = () => {
+    const nowMs = Date.now();
+    const startedRaw = (log as UnknownRecord)?.startedAtMs;
+    const startedAtMs = typeof startedRaw === 'number' ? startedRaw : Number(String(startedRaw ?? '').trim());
+    const executionSeconds =
+      Number.isFinite(startedAtMs) && startedAtMs > 0 ? Math.max(0, Math.round((nowMs - startedAtMs) / 1000)) : 0;
+    const nextDone = !done;
+    updateLog(key, {
+      done: nextDone,
+      completedAtMs: nextDone ? nowMs : null,
+      executionSeconds: nextDone ? executionSeconds : null,
+      advanced_config: cfg ?? log.advanced_config ?? null,
+    });
+
+    if (nextDone && restTime && restTime > 0) {
+      const nextPlanned = getPlannedSet(ex, setIdx + 1);
+      const nextKey = nextPlanned ? `${exIdx}-${setIdx + 1}` : null;
+      startTimer(restTime, {
+        kind: 'rest',
+        key,
+        nextKey,
+        restStartedAtMs: nowMs,
+      });
+    }
+
+    // Auto-collapse this exercise + scroll to next when ALL sets are done
+    if (nextDone && setsCount != null && setIdx === setsCount - 1) {
+      try {
+        // Small delay so the timer overlay appears first
+        setTimeout(() => {
+          try {
+            // Collapse this exercise card
+            setCollapsed?.((prev: Set<number>) => {
+              const next = new Set(prev);
+              next.add(exIdx);
+              return next;
+            });
+            // Scroll to the next exercise card
+            const nextCard = document.querySelector<HTMLElement>(`[data-exercise-idx="${exIdx + 1}"]`);
+            if (nextCard) {
+              nextCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+          } catch { /* silenced */ }
+        }, restTime && restTime > 0 ? 600 : 300);
+      } catch { /* silenced */ }
+    }
+  };
+
   return (
     <div className="space-y-1" key={key}>
-      {isHeaderRow && (
-        <div className="hidden sm:flex items-center gap-2 text-[10px] uppercase tracking-widest text-neutral-500 font-bold px-1 group">
-          <div className="w-10">Série</div>
-          <div className="w-24">Peso (kg)</div>
-          <div className="w-24">Reps</div>
-          <div className="w-24 inline-flex items-center gap-1">
-            RPE
-            <HelpHint title={HELP_TERMS.rpe.title} text={HELP_TERMS.rpe.text} tooltip={HELP_TERMS.rpe.tooltip} className="h-4 w-4 text-[10px]" />
-          </div>
-          <div className="ml-auto flex items-center gap-2">Ações</div>
-        </div>
-      )}
-      <div className="rounded-xl bg-neutral-900/50 border border-neutral-800/80 px-3 py-2.5 space-y-2 shadow-sm shadow-black/20">
-        <div className="flex items-center justify-between gap-2">
-          <div className="text-xs font-mono text-neutral-400">#{setIdx + 1}</div>
-          <button
-            type="button"
-            onClick={() => toggleNotes(key)} aria-label="Observações"
-            className={
-              isNotesOpen || hasNotes
-                ? 'inline-flex items-center justify-center rounded-lg p-2 text-yellow-500 bg-yellow-500/10 border border-yellow-500/40 hover:bg-yellow-500/15 transition duration-200'
-                : 'inline-flex items-center justify-center rounded-lg p-2 text-neutral-400 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'
-            }
+      {/* Single-line row: badge | kg | reps | rpe | notes | OK */}
+      <div
+        className={[
+          'rounded-xl border px-2 py-2 transition-all duration-300 shadow-sm',
+          done
+            ? 'bg-emerald-950/30 border-emerald-500/30 shadow-emerald-900/20'
+            : 'bg-neutral-900/50 border-neutral-800/80 shadow-black/20',
+        ].join(' ')}
+      >
+        <div className="flex items-center gap-1.5">
+          {/* Set number badge */}
+          <div
+            className={[
+              'flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center font-black text-[11px] transition-all duration-300',
+              badgeColor,
+            ].join(' ')}
           >
-            <MessageSquare size={14} />
-          </button>
-        </div>
+            {done ? <Check size={12} /> : setIdx + 1}
+          </div>
 
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-[6rem_6rem_6rem_auto] sm:items-center">
-          <input
-            inputMode="decimal"
-            value={weightValue}
-            onChange={(e) => {
-              const v = e?.target?.value ?? '';
-              updateLog(key, { weight: v, advanced_config: cfg ?? log.advanced_config ?? null });
-            }}
-            placeholder={weightPlaceholder}
-            className="w-full bg-black/30 border border-neutral-700 rounded-xl px-3 py-1.5 text-sm text-white outline-none focus:ring-1 ring-yellow-500 transition duration-200 placeholder:text-neutral-600 placeholder:opacity-40 focus:placeholder:opacity-0"
-          />
-          <div className="relative">
+          {/* kg input */}
+          <div className="flex-[2] min-w-0">
             <input
               inputMode="decimal"
+              aria-label={`Peso em kg para série ${setIdx + 1}`}
+              value={weightValue}
+              onChange={(e) => {
+                const v = e?.target?.value ?? '';
+                updateLog(key, { weight: v, advanced_config: cfg ?? log.advanced_config ?? null });
+              }}
+              placeholder={weightPlaceholder}
+              className={inputBase}
+            />
+          </div>
+
+          {/* reps input */}
+          <div className="flex-[1.5] min-w-0 relative">
+            <input
+              inputMode="decimal"
+              aria-label={`Repetições para série ${setIdx + 1}`}
               value={repsValue}
               onChange={(e) => {
                 const v = e?.target?.value ?? '';
                 updateLog(key, { reps: v, advanced_config: cfg ?? log.advanced_config ?? null });
               }}
               placeholder={repsPlaceholder}
-              className="w-full bg-black/30 border border-neutral-700 rounded-xl px-3 py-1.5 pr-10 text-sm text-white outline-none focus:ring-1 ring-yellow-500 transition duration-200 placeholder:text-neutral-600 placeholder:opacity-40 focus:placeholder:opacity-0"
+              className={`${inputBase} ${plannedReps ? 'pr-7' : ''}`}
             />
             {plannedReps ? (
-              <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-mono text-neutral-500/60">
+              <div className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] font-mono text-neutral-500/70">
                 {plannedReps}
               </div>
             ) : null}
           </div>
-          <div className="relative">
+
+          {/* RPE input */}
+          <div className="flex-[1.2] min-w-0 relative">
             <input
               inputMode="decimal"
+              aria-label={`RPE percebido para série ${setIdx + 1}`}
               value={rpeValue}
               onChange={(e) => {
                 const v = e?.target?.value ?? '';
                 updateLog(key, { rpe: v, advanced_config: cfg ?? log.advanced_config ?? null });
               }}
               placeholder={rpePlaceholder}
-              className="w-full bg-black/30 border border-yellow-500/30 rounded-xl px-3 py-1.5 pr-10 text-sm text-yellow-500 font-bold outline-none focus:ring-1 ring-yellow-500 transition duration-200 placeholder:text-yellow-500/50 focus:placeholder:opacity-0"
+              className={`${inputBase} text-yellow-400 border-yellow-500/30 placeholder:text-yellow-500/50 ${plannedRpe ? 'pr-7' : ''}`}
             />
             {plannedRpe ? (
-              <div className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-mono text-yellow-500/45">
+              <div className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] font-mono text-yellow-500/45">
                 {plannedRpe}
               </div>
             ) : null}
           </div>
+
+          {/* Notes toggle */}
           <button
             type="button"
-            onClick={() => {
-              const nowMs = Date.now();
-              const startedRaw = (log as UnknownRecord)?.startedAtMs;
-              const startedAtMs = typeof startedRaw === 'number' ? startedRaw : Number(String(startedRaw ?? '').trim());
-              const executionSeconds =
-                Number.isFinite(startedAtMs) && startedAtMs > 0 ? Math.max(0, Math.round((nowMs - startedAtMs) / 1000)) : 0;
-              const nextDone = !done;
-              updateLog(key, {
-                done: nextDone,
-                completedAtMs: nextDone ? nowMs : null,
-                executionSeconds: nextDone ? executionSeconds : null,
-                advanced_config: cfg ?? log.advanced_config ?? null,
-              });
-              if (nextDone && restTime && restTime > 0) {
-                const nextPlanned = getPlannedSet(ex, setIdx + 1);
-                const nextKey = nextPlanned ? `${exIdx}-${setIdx + 1}` : null;
-                startTimer(restTime, {
-                  kind: 'rest',
-                  key,
-                  nextKey,
-                  restStartedAtMs: nowMs,
-                });
-              }
-            }}
+            aria-label={isNotesOpen ? 'Fechar observações' : 'Abrir observações da série'}
+            onClick={() => toggleNotes(key)}
             className={
-              done
-                ? 'inline-flex items-center justify-center gap-2 min-h-[40px] px-3 py-2 rounded-xl bg-yellow-500 text-black font-black shadow-yellow-500/20 shadow-sm active:scale-95 transition duration-150'
-                : 'inline-flex items-center justify-center gap-2 min-h-[40px] px-3 py-2 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 font-bold hover:bg-neutral-700 active:scale-95 transition duration-150'
+              isNotesOpen || hasNotes
+                ? 'flex-shrink-0 inline-flex items-center justify-center rounded-lg w-7 h-7 text-yellow-500 bg-yellow-500/10 border border-yellow-500/40 hover:bg-yellow-500/15 transition duration-200'
+                : 'flex-shrink-0 inline-flex items-center justify-center rounded-lg w-7 h-7 text-neutral-500 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'
             }
           >
-            <Check size={16} />
-            <span className="text-xs">{done ? 'Feito' : 'Concluir'}</span>
+            <MessageSquare size={12} />
+          </button>
+
+          {/* OK / Concluído button */}
+          <button
+            type="button"
+            onClick={handleComplete}
+            className={[
+              'flex-shrink-0 inline-flex items-center justify-center gap-1 h-8 px-3 rounded-xl font-black text-xs active:scale-95 transition-all duration-150',
+              done
+                ? 'bg-emerald-500 text-black shadow-sm shadow-emerald-500/30'
+                : 'bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 hover:border-yellow-500/40',
+            ].join(' ')}
+          >
+            <Check size={13} />
+            <span className="whitespace-nowrap">{done ? 'Feito' : 'OK'}</span>
           </button>
         </div>
       </div>
+
       {isNotesOpen && (
         <div className="px-1">
           <textarea
