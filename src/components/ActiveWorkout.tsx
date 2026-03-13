@@ -44,6 +44,7 @@ export default function ActiveWorkout(props: ActiveWorkoutProps) {
   // ── Broadcast workout edits to teammates ──────────────────────────────────
   const isFirstMountRef = useRef(true)
   const prevWorkoutStringRef = useRef<string>('')
+  const isApplyingRemoteEditRef = useRef(false)
 
   useEffect(() => {
     if (!inTeamSession || !workout) return
@@ -55,6 +56,11 @@ export default function ActiveWorkout(props: ActiveWorkoutProps) {
     }
     if (currentStr === prevWorkoutStringRef.current) return
     prevWorkoutStringRef.current = currentStr
+    // Skip broadcast when the change came from accepting a teammate's edit
+    if (isApplyingRemoteEditRef.current) {
+      isApplyingRemoteEditRef.current = false
+      return
+    }
     try {
       teamCtx.broadcastWorkoutEdit(workout as unknown as Record<string, unknown>)
     } catch { }
@@ -67,9 +73,13 @@ export default function ActiveWorkout(props: ActiveWorkoutProps) {
     if (!edit?.workout) { teamCtx.dismissWorkoutEdit(); return }
     try {
       if (typeof props.onPersistWorkoutTemplate === 'function') {
+        // Flag to skip re-broadcasting this incoming change
+        isApplyingRemoteEditRef.current = true
         props.onPersistWorkoutTemplate(edit.workout as unknown as import('./workout/types').WorkoutDraft)
       }
-    } catch { }
+    } catch {
+      isApplyingRemoteEditRef.current = false
+    }
     teamCtx.dismissWorkoutEdit()
   }
 
