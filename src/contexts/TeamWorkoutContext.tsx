@@ -128,6 +128,10 @@ interface TeamWorkoutContextValue {
     pendingChallenge: SetChallengePayload | null
     sendSetChallenge: (exName: string, weight: number, reps: number) => void
     dismissChallenge: () => void
+    // ─ Workout Edit Sync ─────────────────────────────────────────
+    pendingWorkoutEdit: WorkoutEditPayload | null
+    broadcastWorkoutEdit: (workout: Record<string, unknown>) => void
+    dismissWorkoutEdit: () => void
 }
 
 export interface SetChallengePayload {
@@ -137,6 +141,14 @@ export interface SetChallengePayload {
     exName: string
     weight: number
     reps: number
+    ts: number
+}
+
+export interface WorkoutEditPayload {
+    id: string
+    fromUserId: string
+    fromName: string
+    workout: Record<string, unknown>
     ts: number
 }
 
@@ -173,6 +185,8 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
     const [sessionPaused, setSessionPaused] = useState(false)
     // Set challenge
     const [pendingChallenge, setPendingChallenge] = useState<SetChallengePayload | null>(null)
+    // Workout edit sync
+    const [pendingWorkoutEdit, setPendingWorkoutEdit] = useState<WorkoutEditPayload | null>(null)
     const myDisplayNameRef = useRef<string>('')
     const myPhotoUrlRef = useRef<string | null>(null)
     const supabase = useMemo(() => createClient(), []);
@@ -692,6 +706,27 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
                     notify({ id: `challenge:${fromUid}:${Date.now()}`, type: 'team_challenge', senderName: challenge.fromName, displayName: challenge.fromName, photoURL: null, text: `${challenge.fromName} te desafiou no ${challenge.exName || 'treino'}! 🔥` })
                 } catch { }
             })
+            // ─ Workout edit sync ─────────────────────────────────────────────
+            .on('broadcast', { event: 'workout_edit' }, (msg) => {
+                const payload = msg?.payload && typeof msg.payload === 'object' ? msg.payload as Record<string, unknown> : null
+                if (!payload) return
+                const fromUid = String(payload.fromUserId || '').trim()
+                if (!fromUid || fromUid === String(user?.id || '').trim()) return
+                const workout = payload.workout && typeof payload.workout === 'object' ? payload.workout as Record<string, unknown> : null
+                if (!workout) return
+                const edit: WorkoutEditPayload = {
+                    id: String(payload.id || `${fromUid}:${Date.now()}`),
+                    fromUserId: fromUid,
+                    fromName: String(payload.fromName || 'Parceiro'),
+                    workout,
+                    ts: Number(payload.ts || Date.now()),
+                }
+                setPendingWorkoutEdit(edit)
+                try {
+                    notify({ id: `workout_edit:${fromUid}:${Date.now()}`, type: 'team_workout_edit', senderName: edit.fromName, displayName: edit.fromName, photoURL: null, text: `${edit.fromName} editou o treino. Aceitar as mudanças?` })
+                } catch { }
+                try { playStartSound(soundOpts); } catch { }
+            })
             .subscribe()
         teamBroadcastChannelRef.current = ch
         return () => {
@@ -727,6 +762,24 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
     }, [user?.id])
 
     const dismissChallenge = useCallback(() => setPendingChallenge(null), [])
+
+    const broadcastWorkoutEdit = useCallback((workout: Record<string, unknown>) => {
+        const ch = teamBroadcastChannelRef.current
+        if (!ch || !user?.id) return
+        const id = `${user.id}:${Date.now()}`
+        const payload: WorkoutEditPayload = {
+            id,
+            fromUserId: user.id,
+            fromName: myDisplayNameRef.current || 'Parceiro',
+            workout,
+            ts: Date.now(),
+        }
+        try {
+            ch.send({ type: 'broadcast', event: 'workout_edit', payload })
+        } catch { }
+    }, [user?.id])
+
+    const dismissWorkoutEdit = useCallback(() => setPendingWorkoutEdit(null), [])
 
     const sendMultipleInvitesImpl = async (targets: unknown[], workout: Record<string, unknown>, _sendInvite: typeof sendInvite): Promise<Array<{ userId: string; ok: boolean; error?: string }>> => {
         const targetList = Array.isArray(targets) ? targets : []
@@ -1311,6 +1364,9 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
             pendingChallenge,
             sendSetChallenge,
             dismissChallenge,
+            pendingWorkoutEdit,
+            broadcastWorkoutEdit,
+            dismissWorkoutEdit,
         }}>
             {children}
         </TeamWorkoutContext.Provider>
