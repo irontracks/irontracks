@@ -11,7 +11,7 @@ import Modals from './workout/Modals';
 import { ActiveWorkoutProps } from './workout/types';
 import { buildFinishWorkoutPayload } from '@/lib/finishWorkoutPayload';
 import dynamic from 'next/dynamic';
-import { useTeamWorkout, WorkoutEditPayload } from '@/contexts/TeamWorkoutContext';
+import { useTeamWorkout } from '@/contexts/TeamWorkoutContext';
 
 const TeamChatDrawer = dynamic(
   () => import('@/components/TeamChatDrawer').then(m => ({ default: m.TeamChatDrawer })),
@@ -22,7 +22,7 @@ export default function ActiveWorkout(props: ActiveWorkoutProps) {
   const controller = useActiveWorkoutController(props);
   const { session, workout, exercises } = controller;
 
-  // Team context for chat, pause banner, and workout edit notifications
+  // Team context for chat, pause banner and workout edit sync
   const teamCtx = useTeamWorkout() as unknown as {
     teamSession: { id: string } | null
     sessionPaused: boolean
@@ -30,7 +30,7 @@ export default function ActiveWorkout(props: ActiveWorkoutProps) {
     resumeSession: () => void
     chatMessages: unknown[]
     sendChatMessage: (text: string) => void
-    pendingWorkoutEdit: WorkoutEditPayload | null
+    pendingWorkoutEdit: { id: string; fromName: string; workout: Record<string, unknown> } | null
     dismissWorkoutEdit: () => void
   }
 
@@ -49,6 +49,16 @@ export default function ActiveWorkout(props: ActiveWorkoutProps) {
     }
   }, [session, workout]);
   void finishPayload;
+
+  // Accept incoming workout edit from a teammate
+  const handleAcceptWorkoutEdit = React.useCallback(() => {
+    const edit = teamCtx.pendingWorkoutEdit
+    if (!edit?.workout || !props.onUpdateSession) return
+    try {
+      props.onUpdateSession({ workout: edit.workout })
+    } catch { }
+    teamCtx.dismissWorkoutEdit()
+  }, [teamCtx, props])
 
   if (!session || !workout) {
     return (
@@ -86,19 +96,18 @@ export default function ActiveWorkout(props: ActiveWorkoutProps) {
           </div>
         )}
 
-        {/* Workout Edit banner — shown when a teammate edits the workout structure */}
+        {/* Workout edit sync banner — shown when a teammate edited the workout */}
         {inTeamSession && pendingEdit && (
-          <div className="border-b border-blue-500/30 bg-blue-500/10 px-4 py-3 flex items-center justify-between gap-3 text-sm">
-            <div className="min-w-0">
-              <span className="text-blue-300 font-black">✏️ {pendingEdit.fromName}</span>
-              <span className="text-blue-200 ml-1">editou o treino. Aceitar as mudanças?</span>
+          <div className="bg-blue-500/15 border-b border-blue-500/30 px-4 py-2.5 flex items-center justify-between gap-2 text-sm">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-lg">✏️</span>
+              <span className="text-blue-200 font-semibold truncate">
+                <strong className="text-blue-100">{pendingEdit.fromName}</strong> editou o treino
+              </span>
             </div>
-            <div className="flex items-center gap-2 flex-shrink-0">
+            <div className="flex items-center gap-1.5 flex-shrink-0">
               <button
-                onClick={() => {
-                  try { props.onUpdateSession?.(pendingEdit.workout); } catch { }
-                  teamCtx.dismissWorkoutEdit();
-                }}
+                onClick={handleAcceptWorkoutEdit}
                 className="text-[11px] font-black bg-blue-500 text-white px-3 py-1.5 rounded-lg hover:bg-blue-400 transition-colors"
               >
                 Aceitar
