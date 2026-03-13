@@ -362,7 +362,8 @@ export const safeCalculateSumSkinfolds = (assessment: Partial<Assessment>): numb
     // Verificar se tem pelo menos 4 dobras para um cálculo válido
     const validSkinfolds = skinfolds.filter(s => s !== null && s !== undefined && s > 0) as number[];
 
-    if (validSkinfolds.length < 4) {
+    // Pollock 7-fold formula requires ALL 7 skinfolds — partial sums produce incorrect body fat %
+    if (validSkinfolds.length < 7) {
       return null;
     }
 

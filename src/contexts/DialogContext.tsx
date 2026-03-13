@@ -100,11 +100,12 @@ export const DialogProvider = ({ children }: { children: React.ReactNode }) => {
     }, [closeDialog]);
 
     const showLoading = useCallback((message: string, title = 'Aguarde') => {
-        setDialog({
-            type: 'loading',
-            title,
-            message
-        });
+        setDialog({ type: 'loading', title, message });
+        // Safety timeout: auto-close loading after 30s to prevent stuck spinners
+        // (e.g. if caller throws before calling closeDialog)
+        setTimeout(() => {
+            setDialog((prev) => (prev?.type === 'loading' ? null : prev));
+        }, 30_000);
     }, []);
 
     return (

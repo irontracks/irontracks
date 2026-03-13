@@ -205,9 +205,10 @@ export function useSessionSync({
                                 const stateRaw = rowNew?.state
                                 const state = isRecord(stateRaw) ? stateRaw : null
                                 if (!state || !state?.startedAt || !state?.workout) {
-                                    setActiveSession(null)
-                                    setView((prev: string) => (prev === 'active' ? 'dashboard' : prev))
-                                    try { localStorage.removeItem(`irontracks.activeSession.v2.${uid}`) } catch { }
+                                    // Payload may be truncated by Supabase Realtime — ignore partial updates
+                                    // instead of zeroing the active session (which would lose workout data)
+                                    logWarn('useSessionSync', 'ignoring partial realtime UPDATE — missing startedAt or workout')
+                                    return
                                 }
                             }
                         } catch { }
@@ -274,7 +275,7 @@ export function useSessionSync({
                         { onConflict: 'user_id' }
                     )
                 if (error && isMissingTable(error)) notifyMigrationWarning()
-            } catch { }
+            } catch (err) { logWarn('useSessionSync', 'sync upsert failed: ' + String(err)) }
         }
 
         let timerId: ReturnType<typeof setTimeout> | null = null
@@ -294,5 +295,5 @@ export function useSessionSync({
             setSessionTicker(Date.now())
         }, 1000)
         return () => clearInterval(id)
-    }, [activeSession, view, setSessionTicker])
+    }, [activeSession, setSessionTicker])
 }

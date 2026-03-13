@@ -102,7 +102,10 @@ export async function requireRoleWithBearer(req: Request, allowed: IrontracksRol
       return { ok: false as const, response: jsonError(403, 'forbidden') }
     }
 
-    return { ok: true as const, supabase: admin, user, role }
+    // Return a user-scoped client (not the admin client) so RLS policies apply.
+    // The admin client was only needed to validate the Bearer token and resolve the role.
+    const userScoped = await createClient()
+    return { ok: true as const, supabase: userScoped, user, role }
   } catch {
     return { ok: false as const, response: jsonError(401, 'unauthorized') }
   }

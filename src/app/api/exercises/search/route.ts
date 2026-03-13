@@ -37,20 +37,23 @@ export async function GET(request: Request) {
 
     const admin = createAdminClient()
 
+    // Strip PostgREST filter operators from user input to prevent injection
+    const safeQ = q.q.replace(/[,()\\.]/g, '')
+
     const { data, error } = await admin
       .from('exercises')
       .select('id, name, video_url')
-      .ilike('name', `%${q.q}%`)
+      .ilike('name', `%${safeQ}%`)
       .order('name', { ascending: true })
       .limit(80)
 
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
 
-    const qNorm = normalizeExerciseName(q.q)
+    const qNorm = normalizeExerciseName(safeQ)
     const { data: libData } = await admin
       .from('exercise_library')
       .select('id, display_name_pt, video_url')
-      .or(`display_name_pt.ilike.%${q.q}%,normalized_name.ilike.%${qNorm}%`)
+      .or(`display_name_pt.ilike.%${safeQ}%,normalized_name.ilike.%${qNorm}%`)
       .order('display_name_pt', { ascending: true })
       .limit(40)
 

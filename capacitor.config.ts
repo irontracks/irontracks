@@ -8,10 +8,10 @@ const config: CapacitorConfig = {
   // this directory is ignored at runtime. It matters for offline/static builds.
   webDir: 'out',
   server: {
-    // Use CAPACITOR_SERVER_URL to point at localhost or staging for native testing.
-    // Falls back to production when the variable is not set.
+    // Only set url when CAPACITOR_SERVER_URL is explicitly provided.
+    // Without it, Capacitor uses the bundled webDir ('out/') for offline support.
     // Example: CAPACITOR_SERVER_URL=http://192.168.1.10:3000 npx cap sync
-    url: process.env.CAPACITOR_SERVER_URL || 'https://irontracks.com.br',
+    ...(process.env.CAPACITOR_SERVER_URL ? { url: process.env.CAPACITOR_SERVER_URL } : {}),
   }
 };
 

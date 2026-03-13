@@ -92,6 +92,7 @@ export const estimate1Rm = (weight: unknown, reps: unknown): number | null => {
   const r = safeNumber(reps)
   if (w == null || r == null) return null
   if (w <= 0 || r <= 0) return null
+  if (r > 12) return null  // Epley is only accurate for 1–12 reps
   return w * (1 + r / 30)
 }
 

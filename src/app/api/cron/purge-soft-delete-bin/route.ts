@@ -14,14 +14,8 @@ const isAuthorized = (req: Request) => {
   const authHeader = req.headers.get('authorization')
   if (authHeader === `Bearer ${process.env.CRON_SECRET}`) return true
   if (hasValidInternalSecret(req)) return true
-  try {
-    const url = new URL(req.url)
-    const provided = String(url.searchParams.get('secret') || '').trim()
-    const secret = getInternalSecret()
-    return !!secret && provided === secret
-  } catch {
-    return false
-  }
+  // Query param ?secret= removed — secrets in URLs leak to access logs and Referer headers
+  return false
 }
 
 export async function GET(req: Request) {

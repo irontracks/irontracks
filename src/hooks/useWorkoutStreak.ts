@@ -27,6 +27,7 @@ export function useWorkoutStreak(userId?: string | null) {
   useEffect(() => {
     if (!userId) return;
 
+    setResolved(false);  // Reset on userId change to show loading for new user
     let cancelled = false;
 
     computeWorkoutStreakAndStats()

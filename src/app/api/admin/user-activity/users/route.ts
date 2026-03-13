@@ -40,7 +40,9 @@ export async function GET(req: Request) {
 
     let query = admin.from('profiles').select('id, display_name, photo_url, role, last_seen, email').order('last_seen', { ascending: false })
     if (search) {
-      const like = `%${search}%`
+      // Strip PostgREST filter operators to prevent filter injection
+      const safe = search.replace(/[,()\\.]/g, '')
+      const like = `%${safe}%`
       query = query.or(`display_name.ilike.${like},email.ilike.${like}`)
     }
     if (role) {
