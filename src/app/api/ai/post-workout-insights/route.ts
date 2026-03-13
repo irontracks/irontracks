@@ -34,6 +34,7 @@ const normalizeAi = (obj: unknown) => {
   }
   const prsRaw = Array.isArray(base?.prs) ? base.prs : []
   const progRaw = Array.isArray(base?.progression) ? base.progression : []
+  const painRaw = Array.isArray(base?.pain_suggestions) ? base.pain_suggestions : []
   return {
     rating: toRating(base?.rating ?? base?.stars ?? base?.score),
     rating_reason: toStr(base?.rating_reason ?? base?.ratingReason ?? base?.reason).slice(0, 500),
@@ -63,6 +64,17 @@ const normalizeAi = (obj: unknown) => {
       })
       .filter(Boolean)
       .slice(0, 12),
+    pain_suggestions: painRaw
+      .map((p: unknown) => {
+        const item = p && typeof p === 'object' ? (p as Record<string, unknown>) : {}
+        const area = toStr(item?.area || item?.region || item?.location)
+        const suggestion = toStr(item?.suggestion || item?.recommendation || item?.text)
+        const reason = toStr(item?.reason || item?.cause)
+        if (!suggestion) return null
+        return { area, suggestion, reason }
+      })
+      .filter(Boolean)
+      .slice(0, 8),
   }
 }
 
@@ -237,6 +249,54 @@ export async function POST(req: Request) {
       return null
     })()
 
+    // ── Extract pain observations from session ──────────────────────────────
+    const extractPainContext = (s: Record<string, unknown>): string => {
+      const lines: string[] = []
+      const toNum = (v: unknown) => { const n = Number(v); return Number.isFinite(n) ? n : null }
+      const getObj = (v: unknown) => v && typeof v === 'object' ? v as Record<string, unknown> : null
+      const getStr = (v: unknown) => String(v ?? '').trim()
+
+      // Check-in
+      const pre = getObj(s.preCheckin)
+      const preSoreness = toNum(pre?.soreness)
+      const preNotes = getStr(pre?.notes)
+      if (preSoreness !== null && preSoreness > 0) lines.push(`Pré-treino - Nível de dor/cansaço muscular: ${preSoreness}/10`)
+      if (preNotes) lines.push(`Pré-treino - Observações: ${preNotes}`)
+
+      // Check-out
+      const post = getObj(s.postCheckin)
+      const postSoreness = toNum(post?.soreness)
+      const postNotes = getStr(post?.notes)
+      if (postSoreness !== null && postSoreness > 0) lines.push(`Pós-treino - Nível de dor/fadiga: ${postSoreness}/10`)
+      if (postNotes) lines.push(`Pós-treino - Observações: ${postNotes}`)
+
+      // Set-level notes with pain keywords
+      const PAIN_KEYWORDS = /dor|queimação|desconforto|lesão|inflamação|formigamento|câimbra|pain|ache|hurt|sore|cramp|injury/i
+      const logs = getObj(s.logs)
+      const exercises = Array.isArray(s.exercises) ? s.exercises as unknown[] : []
+      const exNameByIdx = new Map<number, string>()
+      exercises.forEach((ex: unknown, idx: number) => {
+        const e = getObj(ex); if (!e) return
+        const name = getStr(e.name); if (name) exNameByIdx.set(idx, name)
+      })
+      if (logs) {
+        Object.entries(logs).forEach(([k, log]) => {
+          const entry = getObj(log); if (!entry) return
+          const note = getStr(entry.notes); if (!note || !PAIN_KEYWORDS.test(note)) return
+          const parts = k.split('-')
+          const exIdx = Number(parts[0])
+          const setIdx = Number(parts[1]) + 1
+          const exName = exNameByIdx.get(exIdx) || `Exercício ${exIdx + 1}`
+          lines.push(`${exName} - Série ${setIdx}: ${note}`)
+        })
+      }
+
+      return lines.length ? lines.join('\n') : ''
+    }
+
+    const painContext = extractPainContext(sessionObj)
+    const hasPainData = painContext.trim().length > 0
+
     const prompt = [
       'Você é um coach de musculação e um analista de performance do app IronTracks.',
       'Gere insights pós-treino com base na sessão atual (e na sessão anterior, se houver).',
@@ -250,7 +310,8 @@ export async function POST(req: Request) {
       '  "highlights": string[] (0-6),',
       '  "warnings": string[] (0-4) (somente se houver algo a ajustar),',
       '  "prs": [{ "exercise": string, "label": string, "value": string }],',
-      '  "progression": [{ "exercise": string, "recommendation": string, "reason": string }]',
+      '  "progression": [{ "exercise": string, "recommendation": string, "reason": string }],',
+      '  "pain_suggestions": [{ "area": string, "suggestion": string, "reason": string }]',
       '}',
       '',
       'Regras:',
@@ -258,13 +319,17 @@ export async function POST(req: Request) {
       '- Seja objetivo e prático.',
       '- Não invente números: use apenas os dados fornecidos.',
       '- Se não der para afirmar algo, omita.',
+      hasPainData
+        ? '- O atleta reportou OBSERVAÇÕES DE DOR/DESCONFORTO. Preencha pain_suggestions com (2-5 sugestões práticas) de técnicas de recuperação, mobilidade, ajuste de carga ou exercícios alternativos para cada área afetada. Seja específico e baseado em evidências.'
+        : '- Não há relatos de dor nesta sessão. Retorne pain_suggestions como array vazio [].',
       '',
       'Sessão atual:',
       JSON.stringify(session),
       '',
       'Sessão anterior (pode ser null):',
       JSON.stringify(previousSession),
-    ].join('\n')
+      hasPainData ? '\nObservações de dor/desconforto reportadas:\n' + painContext : '',
+    ].filter(s => s !== undefined).join('\n')
 
     const genAI = new GoogleGenerativeAI(apiKey)
     const model = genAI.getGenerativeModel({ model: POST_WORKOUT_MODEL })

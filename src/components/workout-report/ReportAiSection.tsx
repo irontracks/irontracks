@@ -243,6 +243,41 @@ export const ReportAiSection = ({
                                 </div>
                             </div>
                         )}
+
+                        {/* ── Pain & Recovery Suggestions ───────────────────────────────── */}
+                        {Array.isArray(ai.pain_suggestions) && (ai.pain_suggestions as unknown[]).length > 0 && (
+                            <div className="md:col-span-3 rounded-xl border border-red-500/30 bg-red-950/20 p-4">
+                                <div className="flex items-center gap-2 mb-3">
+                                    <span className="text-base">🩹</span>
+                                    <div>
+                                        <div className="text-xs font-black uppercase tracking-widest text-red-400">Dor &amp; Recuperação</div>
+                                        <div className="text-[11px] text-red-300/70">Sugestões da IA com base nas observações de dor reportadas</div>
+                                    </div>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    {(ai.pain_suggestions as unknown[]).map((item: unknown, idx: number) => {
+                                        const s = item && typeof item === 'object' ? (item as AnyObj) : ({} as AnyObj)
+                                        const area = String(s.area || '').trim()
+                                        const suggestion = String(s.suggestion || '').trim()
+                                        const reason = String(s.reason || '').trim()
+                                        if (!suggestion) return null
+                                        return (
+                                            <div key={idx} className="rounded-xl border border-red-500/20 bg-red-950/30 p-3">
+                                                {area && (
+                                                    <div className="inline-block mb-1.5 text-[10px] font-black uppercase tracking-widest text-red-400 bg-red-500/10 px-2 py-0.5 rounded-full">
+                                                        {area}
+                                                    </div>
+                                                )}
+                                                <div className="text-sm text-neutral-100">{suggestion}</div>
+                                                {reason && (
+                                                    <div className="text-xs text-red-300/60 mt-1.5">{reason}</div>
+                                                )}
+                                            </div>
+                                        )
+                                    })}
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}
