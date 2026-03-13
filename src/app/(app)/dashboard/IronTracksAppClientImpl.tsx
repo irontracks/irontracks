@@ -728,12 +728,8 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
     // to show. In that case, render the dashboard immediately (workouts will be
     // refreshed silently in the background once auth completes).
     const hasCachedWorkouts = Array.isArray(workouts) && workouts.length > 0
-    if (authLoading && !hasCachedWorkouts) return <LoadingScreen />;
-    if (!user?.id && !hasCachedWorkouts) return <LoadingScreen />;
-    // Keep the premium splash visible until streak + settings are fully loaded.
-    // This prevents any flash of default/zero data or skeleton cards.
     const isDashboardReady = !streakLoading && userSettingsApi.loaded;
-    if (!isDashboardReady) return <LoadingScreen />;
+    const isAppLoading = (authLoading && !hasCachedWorkouts) || (!user?.id && !hasCachedWorkouts) || !isDashboardReady;
 
     const currentWorkoutId = activeSession?.workout?.id;
     let nextWorkout = null;
@@ -749,6 +745,21 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
 
     return (
         <>
+            {/* Persistent loading overlay — always mounted, fades out via CSS.
+                Never unmounts so there's zero flicker between loading phases. */}
+            <div
+                aria-hidden
+                style={{
+                    position: 'fixed',
+                    inset: 0,
+                    zIndex: 9999,
+                    opacity: isAppLoading ? 1 : 0,
+                    pointerEvents: isAppLoading ? 'auto' : 'none',
+                    transition: isAppLoading ? 'none' : 'opacity 0.25s ease-out',
+                }}
+            >
+                <LoadingScreen />
+            </div>
             {/* Biometric lock — shown on top of everything when app resumes from background */}
             {isLocked && user?.id ? (
                 <BiometricLock userName={userName} onUnlocked={unlock} />
