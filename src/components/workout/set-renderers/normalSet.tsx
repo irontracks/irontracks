@@ -60,15 +60,6 @@ export const NormalSet = ({
   const hasNotes   = notesValue.trim().length > 0;
   const isNotesOpen = openNotesKeys.has(key);
 
-  // Badge colour
-  const badgeColors = [
-    'bg-yellow-500 text-black',
-    'bg-orange-500 text-black',
-    'bg-amber-500  text-black',
-    'bg-yellow-400 text-black',
-  ];
-  const badgeColor = done ? 'bg-emerald-500 text-black' : badgeColors[setIdx % badgeColors.length];
-
   // Shared input style — left-aligned so text is always visible
   const inputBase =
     'w-full bg-black/40 border border-neutral-700/80 rounded-xl px-2.5 py-2 text-sm text-white ' +
@@ -134,17 +125,7 @@ export const NormalSet = ({
           [badge 28px] [kg flex-3] [reps flex-2] [rpe flex-2] [💬 28px] [OK auto]
         */}
         <div className="grid items-center gap-1.5"
-          style={{ gridTemplateColumns: '28px 3fr 2fr 2fr 28px auto' }}>
-
-          {/* Set badge */}
-          <div
-            className={[
-              'w-7 h-7 rounded-full flex items-center justify-center font-black text-[11px] transition-all duration-300 flex-shrink-0',
-              badgeColor,
-            ].join(' ')}
-          >
-            {done ? <Check size={12} /> : setIdx + 1}
-          </div>
+          style={{ gridTemplateColumns: '3fr 2fr 2fr 28px auto' }}>
 
           {/* kg */}
           <input
