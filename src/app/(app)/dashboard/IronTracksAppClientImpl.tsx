@@ -1315,14 +1315,6 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
 }
 
 export default function IronTracksAppClient({ initialUser, initialProfile, initialWorkouts }: { initialUser?: unknown; initialProfile?: unknown; initialWorkouts?: unknown }) {
-    const [isMounted, setIsMounted] = useState(false);
-    useEffect(() => {
-        const t = setTimeout(() => {
-            setIsMounted(true);
-        }, 0);
-        return () => clearTimeout(t);
-    }, []);
-    if (!isMounted) return <LoadingScreen />;
     return (
         <DialogProvider>
             <ErrorReporterProvider>
@@ -1334,3 +1326,4 @@ export default function IronTracksAppClient({ initialUser, initialProfile, initi
         </DialogProvider>
     );
 }
+
