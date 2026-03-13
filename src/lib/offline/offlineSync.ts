@@ -165,10 +165,13 @@ export const flushOfflineQueue = async ({ max = 50, force = false } = {}) => {
     try {
       if (String(j.type || '') === 'finish_workout') {
         await processFinishWorkout(j);
+        await queueDelete(String(j.id));
+        processed++;
+      } else {
+        // Unknown job type — do NOT delete. Log and skip.
+        logWarn('offlineSync: unknown job type, skipping:', j.type, j.id);
+        continue;
       }
-      // Success
-      await queueDelete(String(j.id));
-      processed++;
     } catch (err) {
       logError('Failed to process offline job:', j, err);
       errors++;

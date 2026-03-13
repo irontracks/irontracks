@@ -152,8 +152,9 @@ export async function deleteWorkout(id: string): Promise<ActionResult> {
         const { data: { user } } = await supabase.auth.getUser()
         const workoutId = safeString(id)
         if (!workoutId) return { ok: false, error: 'missing id' }
+        if (!user?.id) return { ok: false, error: 'unauthorized' }
         try { trackUserEvent('workout_delete', { type: 'workout', metadata: { id: workoutId } }) } catch { }
-        const { error } = await supabase.from('workouts').delete().eq('id', workoutId)
+        const { error } = await supabase.from('workouts').delete().eq('id', workoutId).eq('user_id', user.id)
         if (error) return { ok: false, error: error.message }
         try { trackUserEvent('workout_delete_ok', { type: 'workout', metadata: { id: workoutId } }) } catch { }
         if (user?.id) await invalidateWorkoutCaches(user.id)
@@ -188,9 +189,10 @@ export async function setWorkoutSortOrder(ids: string[]): Promise<ActionResult> 
         const supabase = createClient()
         const { data: { user } } = await supabase.auth.getUser()
         const list = (Array.isArray(ids) ? ids : []).map((x) => safeString(x)).filter(Boolean)
+        if (!user?.id) return { ok: false, error: 'unauthorized' }
         for (let i = 0; i < list.length; i += 1) {
             const workoutId = list[i]
-            const { error } = await supabase.from('workouts').update({ sort_order: i }).eq('id', workoutId)
+            const { error } = await supabase.from('workouts').update({ sort_order: i }).eq('id', workoutId).eq('user_id', user.id)
             if (error) return { ok: false, error: error.message }
         }
         if (user?.id) await invalidateWorkoutCaches(user.id)
