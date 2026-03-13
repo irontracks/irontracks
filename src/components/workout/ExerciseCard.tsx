@@ -221,11 +221,13 @@ export default function ExerciseCard({ ex, exIdx }: { ex: WorkoutExercise; exIdx
     }
 
     // GVT, Pirâmide Crescente, Pirâmide Decrescente, and Normal all use NormalSet
-    return <NormalSet key={key} ex={ex} exIdx={exIdx} setIdx={setIdx} />;
+    return <NormalSet key={key} ex={ex} exIdx={exIdx} setIdx={setIdx} setsCount={setsCount} />;
   };
 
   return (
-    <div className={[
+    <div
+      data-exercise-idx={exIdx}
+      className={[
       'rounded-2xl bg-neutral-900/70 border p-4 shadow-[0_10px_28px_rgba(0,0,0,0.35)] transition-all duration-300',
       allSetsDone
         ? 'border-emerald-500/40 shadow-[0_0_20px_-4px_rgba(52,211,153,0.18)]'
