@@ -9,6 +9,7 @@ import { z } from 'zod'
 import { ExerciseRowSchema, SetRowSchema, WorkoutRowSchema } from '@/schemas/database'
 import { AdvancedConfig } from '@/types/app'
 import { StoriesBarSkeleton, MuscleMapSkeleton, SectionSkeleton } from '@/components/ui/SuspenseFallbacks'
+import { DashboardSkeleton } from './DashboardSkeleton'
 
 // Lazy-loaded dashboard sections for granular Suspense
 const IronRankCard = React.lazy(() => import('./IronRankCard'))
@@ -222,6 +223,7 @@ type Props = {
     badges: { id: string; label: string; kind: string }[]
   } | null
   streakLoading?: boolean
+  isDashboardReady?: boolean
 }
 
 const isPeriodizedWorkout = (w: DashboardWorkout) =>
@@ -607,460 +609,468 @@ export default function StudentDashboard(props: Props) {
 
   return (
     <div className={density === 'compact' ? 'p-4 space-y-3 pb-24' : 'p-4 space-y-4 pb-24'}>
-      {props.profileIncomplete && <ProfileIncompleteBanner settings={props.settings as import('@/schemas/settings').UserSettings | null} onComplete={props.onOpenCompleteProfile} />}
+      {/* Profile banner — only after data is ready, prevents mount-then-unmount CLS */}
+      {props.isDashboardReady !== false && props.profileIncomplete && <ProfileIncompleteBanner settings={props.settings as import('@/schemas/settings').UserSettings | null} onComplete={props.onOpenCompleteProfile} />}
 
-      {props.view === 'dashboard' && showStoriesBar ? (
-        <Suspense fallback={<StoriesBarSkeleton />}>
-          <StoriesBar
-            currentUserId={props.currentUserId}
-            onMyStoryStateChange={props.onMyStoryStateChange}
-            onAddStory={props.onAddStory}
-          />
-        </Suspense>
-      ) : null}
-
-      <DashboardTabs
-        view={props.view}
-        onChangeView={props.onChangeView}
-        showCommunityTab={showCommunityTab}
-        showVipTab={showVipTab}
-        vipLabel={vipLabel}
-        vipLocked={vipLocked}
-      />
-
-      {props.view === 'assessments' ? <div className="pt-2">{props.assessmentsContent ?? null}</div> : null}
-      {props.view === 'community' ? <div className="pt-2">{props.communityContent ?? null}</div> : null}
-      {props.view === 'vip' ? <div className="pt-2">{props.vipContent ?? null}</div> : null}
-
-      {props.view === 'dashboard' && (
+      {/* Dashboard skeleton — shown while vital data is still loading */}
+      {props.view === 'dashboard' && props.isDashboardReady === false ? (
+        <DashboardSkeleton showStoriesBar={showStoriesBar} />
+      ) : (
         <>
-          <WorkoutCalendarModal isOpen={calendarOpen} onClose={() => setCalendarOpen(false)} userId={props.currentUserId} />
-
-          <CheckinsModal
-            isOpen={checkinsOpen}
-            onClose={() => setCheckinsOpen(false)}
-            checkinsRange={checkinsRange}
-            setCheckinsRange={setCheckinsRange}
-            checkinsFilter={checkinsFilter}
-            setCheckinsFilter={setCheckinsFilter}
-            checkinsRows={checkinsRows}
-            checkinsLoading={checkinsLoading}
-            toNumberOrNull={toNumberOrNull}
-            isPlainRecord={isPlainRecord}
-          />
-
-          {editListOpen && (
-            <div className="fixed inset-0 z-[1200] flex items-center justify-center p-4 pt-safe" style={{ background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(16px)' }} onClick={() => !savingListEdits && setEditListOpen(false)}>
-              <div className="w-full max-w-2xl rounded-2xl overflow-hidden" style={{ background: 'rgba(10,10,10,0.99)', border: '1px solid rgba(234,179,8,0.2)', boxShadow: '0 0 40px rgba(234,179,8,0.07), 0 32px 80px rgba(0,0,0,0.7)' }} onClick={(e) => e.stopPropagation()}>
-                <div className="p-4 flex items-center justify-between gap-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                  <div className="min-w-0">
-                    <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Treinos</div>
-                    <div className="text-white font-black text-lg truncate">Organizar</div>
-                    <div className="text-xs text-neutral-400">Arraste para reordenar e edite os títulos.</div>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setEditListOpen(false)}
-                    disabled={savingListEdits}
-                    className="w-10 h-10 rounded-xl flex items-center justify-center text-neutral-400 hover:text-white transition-all active:scale-95 disabled:opacity-50"
-                    style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}
-                    aria-label="Fechar"
-                  >
-                    <X size={18} />
-                  </button>
-                </div>
-
-                <div className="p-4 space-y-2 max-h-[70vh] overflow-y-auto custom-scrollbar">
-                  {editListDraft.length === 0 ? (
-                    <div className="text-sm text-neutral-400">Nenhum treino para organizar.</div>
-                  ) : (
-                    <Reorder.Group axis="y" values={editListDraft} onReorder={setEditListDraft} className="space-y-2">
-                      {editListDraft.map((it, idx) => (
-                        <SortableWorkoutItem
-                          key={it.id}
-                          item={it}
-                          index={idx}
-                          saving={savingListEdits}
-                          onChangeTitle={(id, val) => {
-                            setEditListDraft((prev) => prev.map((x) => (x.id === id ? { ...x, title: val } : x)))
-                          }}
-                        />
-                      ))}
-                    </Reorder.Group>
-                  )}
-                </div>
-
-                <div className="p-4 flex items-center justify-between gap-3" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-                  <button
-                    type="button"
-                    onClick={() => setEditListOpen(false)}
-                    disabled={savingListEdits}
-                    className="min-h-[44px] px-4 py-3 rounded-xl text-neutral-200 font-black text-xs uppercase tracking-widest hover:bg-white/[0.05] disabled:opacity-50"
-                    style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    type="button"
-                    disabled={savingListEdits || typeof props.onBulkEditWorkouts !== 'function' || editListDraft.length === 0}
-                    onClick={async () => {
-                      if (typeof props.onBulkEditWorkouts !== 'function') return
-                      try {
-                        setSavingListEdits(true)
-                        await props.onBulkEditWorkouts(editListDraft)
-                        setEditListOpen(false)
-                      } finally {
-                        setSavingListEdits(false)
-                      }
-                    }}
-                    className="min-h-[44px] px-4 py-3 rounded-xl bg-yellow-500 text-black font-black text-xs uppercase tracking-widest hover:bg-yellow-400 inline-flex items-center gap-2 disabled:opacity-60"
-                  >
-                    <Save size={16} />
-                    Salvar
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {(showIronRank || showBadges || showNewRecordsCard) && (
-            <Suspense fallback={<SectionSkeleton lines={2} />}>
-              <IronRankCard
-                badges={props.streakStats?.badges ?? []}
-                currentStreak={props.streakStats?.currentStreak ?? 0}
-                totalVolumeKg={props.streakStats?.totalVolumeKg ?? 0}
+          {props.view === 'dashboard' && showStoriesBar ? (
+            <Suspense fallback={<StoriesBarSkeleton />}>
+              <StoriesBar
                 currentUserId={props.currentUserId}
-                showIronRank={showIronRank}
-                showBadges={showBadges}
-                showRecords={showNewRecordsCard}
-                reloadKey={props.newRecordsReloadKey}
+                onMyStoryStateChange={props.onMyStoryStateChange}
+                onAddStory={props.onAddStory}
               />
             </Suspense>
-          )}
+          ) : null}
 
-          <Suspense fallback={<MuscleMapSkeleton />}>
-            <MuscleMapCard onOpenWizard={props.onCreateWorkout} />
-          </Suspense>
+          <DashboardTabs
+            view={props.view}
+            onChangeView={props.onChangeView}
+            showCommunityTab={showCommunityTab}
+            showVipTab={showVipTab}
+            vipLabel={vipLabel}
+            vipLocked={vipLocked}
+          />
 
-          <button
-            onClick={() => {
-              setCreatingWorkout(true)
-              try {
-                try { trackUserEvent('click_dashboard_new_workout', { type: 'click', screen: 'dashboard' }) } catch { }
-                props.onCreateWorkout()
-              } catch {
-                setCreatingWorkout(false)
-              }
-              try {
-                window.setTimeout(() => setCreatingWorkout(false), CREATE_WORKOUT_LOADING_TIMEOUT_MS)
-              } catch { }
-            }}
-            disabled={creatingWorkout}
-            className="w-full min-h-[48px] bg-yellow-500 hover:bg-yellow-400 p-4 rounded-xl font-black text-black flex items-center justify-center gap-2 shadow-lg shadow-yellow-900/20 transition-all active:scale-95 disabled:opacity-70"
-          >
-            {creatingWorkout ? <Loader2 size={20} className="animate-spin" /> : <Plus size={22} />}
-            {creatingWorkout ? 'Abrindo editor...' : 'Novo Treino'}
-          </button>
+          {props.view === 'assessments' ? <div className="pt-2">{props.assessmentsContent ?? null}</div> : null}
+          {props.view === 'community' ? <div className="pt-2">{props.communityContent ?? null}</div> : null}
+          {props.view === 'vip' ? <div className="pt-2">{props.vipContent ?? null}</div> : null}
 
-          <div className={density === 'compact' ? 'space-y-2' : 'space-y-3'}>
-            {/* Linha 1: abas Meus Treinos / Periodizados */}
-            <div className="flex items-center gap-2">
-              <div className="flex-1 inline-flex items-center rounded-xl bg-neutral-900/40 border border-neutral-800 overflow-hidden">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowArchived(false)
-                    setWorkoutsTab('normal')
-                  }}
-                  className={
-                    workoutsTab === 'normal'
-                      ? 'flex-1 min-h-[40px] px-3 py-2 text-yellow-400 font-black text-[11px] uppercase tracking-wider text-center border-b-2 border-yellow-500 bg-yellow-500/5'
-                      : 'flex-1 min-h-[40px] px-3 py-2 text-neutral-400 font-bold text-[11px] uppercase tracking-wider hover:text-neutral-200 text-center border-b-2 border-transparent'
-                  }
-                >
-                  Meus Treinos
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowArchived(false)
-                    setPeriodizedLoaded(false)
-                    setPeriodizedWorkouts([])
-                    setPeriodizedError('')
-                    setWorkoutsTab('periodized')
-                  }}
-                  className={
-                    workoutsTab === 'periodized'
-                      ? 'flex-1 min-h-[40px] px-3 py-2 text-yellow-400 font-black text-[11px] uppercase tracking-wider text-center border-b-2 border-yellow-500 bg-yellow-500/5'
-                      : 'flex-1 min-h-[40px] px-3 py-2 text-neutral-400 font-bold text-[11px] uppercase tracking-wider hover:text-neutral-200 text-center border-b-2 border-transparent'
-                  }
-                >
-                  <span className="inline-flex items-center justify-center gap-1">
-                    <Crown size={11} className={workoutsTab === 'periodized' ? 'text-black fill-black' : 'text-yellow-500 fill-yellow-500'} />
-                    Periodizados
-                  </span>
-                </button>
-              </div>
-            </div>
+          {props.view === 'dashboard' && (
+            <>
+              <WorkoutCalendarModal isOpen={calendarOpen} onClose={() => setCalendarOpen(false)} userId={props.currentUserId} />
 
-            {/* Linha 2: botões de ação — Arquivados, Organizar, Ferramentas */}
-            <div className="flex items-center gap-2">
-              {archivedCount > 0 ? (
-                <button
-                  onClick={() => setShowArchived((v) => !v)}
-                  className={
-                    showArchived
-                      ? 'flex-1 min-h-[40px] px-3 py-2 bg-neutral-800 border border-yellow-500/50 text-yellow-400 rounded-xl font-bold text-[11px] uppercase tracking-wider'
-                      : 'flex-1 min-h-[40px] px-3 py-2 bg-neutral-900 border border-neutral-700 text-neutral-400 rounded-xl font-bold text-[11px] uppercase tracking-wider hover:border-neutral-600 hover:text-neutral-300'
-                  }
-                >
-                  {showArchived ? `Arquivados (${archivedCount})` : `Arquivados (${archivedCount})`}
-                </button>
-              ) : null}
-              <button
-                onClick={() => {
-                  try { trackUserEvent('click_dashboard_organize_workouts', { type: 'click', screen: 'dashboard' }) } catch { }
-                  const items = visibleWorkouts
-                    .map((w, idx) => {
-                      const id = String(w?.id || '').trim()
-                      if (!id) return null
-                      return { id, title: String(w?.title || 'Treino'), sort_order: idx }
-                    })
-                    .filter(Boolean) as { id: string; title: string; sort_order: number }[]
-                  setEditListDraft(items)
-                  setEditListOpen(true)
-                  setToolsOpen(false)
-                }}
-                className="flex-1 min-h-[40px] px-3 py-2 bg-neutral-800 border border-neutral-700 text-neutral-300 rounded-xl font-bold text-[11px] uppercase tracking-wider hover:bg-neutral-700 text-center"
-              >
-                Organizar
-              </button>
-              <div className="relative flex-1">
-                <button
-                  onClick={() => setToolsOpen((v) => !v)}
-                  className="w-full min-h-[40px] px-3 py-2 bg-neutral-800 border border-neutral-700 text-neutral-300 rounded-xl font-bold text-[11px] uppercase tracking-wider hover:bg-neutral-700 text-center"
-                  aria-expanded={toolsOpen}
-                >
-                  Ferramentas
-                </button>
-                {toolsOpen && (
-                  <WorkoutToolsPanel
-                    onClose={() => setToolsOpen(false)}
-                    onCreateWorkout={props.onCreateWorkout}
-                    onOpenIronScanner={props.onOpenIronScanner}
-                    onOpenJsonImport={props.onOpenJsonImport}
-                    onExportAll={props.onExportAll}
-                    exportingAll={props.exportingAll}
-                    onNormalizeAiWorkoutTitles={props.onNormalizeAiWorkoutTitles}
-                    onNormalizeExercises={props.onNormalizeExercises}
-                    onApplyTitleRule={props.onApplyTitleRule}
-                    normalizingAiTitles={normalizingAiTitles}
-                    normalizingExercises={normalizingExercises}
-                    applyingTitleRule={applyingTitleRule}
-                    setNormalizingAiTitles={setNormalizingAiTitles}
-                    setNormalizingExercises={setNormalizingExercises}
-                    setApplyingTitleRule={setApplyingTitleRule}
-                  />
-                )}
+              <CheckinsModal
+                isOpen={checkinsOpen}
+                onClose={() => setCheckinsOpen(false)}
+                checkinsRange={checkinsRange}
+                setCheckinsRange={setCheckinsRange}
+                checkinsFilter={checkinsFilter}
+                setCheckinsFilter={setCheckinsFilter}
+                checkinsRows={checkinsRows}
+                checkinsLoading={checkinsLoading}
+                toNumberOrNull={toNumberOrNull}
+                isPlainRecord={isPlainRecord}
+              />
 
-              </div>
-            </div>
-
-            {visibleWorkouts.length === 0 && (
-              <div className="text-center py-10 text-neutral-600">
-                <div className="w-16 h-16 bg-neutral-800 rounded-full flex items-center justify-center mx-auto mb-4 opacity-50">
-                  <Dumbbell size={32} />
-                </div>
-                <p>
-                  {workoutsTab === 'periodized'
-                    ? periodizedLoading
-                      ? 'Carregando treinos periodizados...'
-                      : 'Nenhum treino periodizado criado.'
-                    : 'Nenhum treino criado.'}
-                </p>
-                {workoutsTab === 'periodized' && periodizedError ? (
-                  <div className="mt-3 inline-flex items-center justify-center">
-                    <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-200 font-bold">
-                      {periodizedError}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPeriodizedLoaded(false)
-                        setPeriodizedWorkouts([])
-                        setPeriodizedError('')
-                      }}
-                      className="ml-2 min-h-[36px] px-3 py-2 bg-neutral-800 border border-neutral-700 text-neutral-200 rounded-xl font-bold text-xs uppercase hover:bg-neutral-700"
-                    >
-                      Tentar novamente
-                    </button>
-                  </div>
-                ) : workoutsTab === 'periodized' && !periodizedLoading ? (
-                  <p className="mt-2 text-xs text-neutral-500">
-                    Crie sua periodização na aba VIP para ela aparecer aqui.
-                  </p>
-                ) : null}
-              </div>
-            )}
-
-            {visibleWorkouts.map((w, idx) => {
-              // Dynamic accent color per workout (cycles through brand palette)
-              const accentColors = [
-                { border: 'border-yellow-500', gradient: 'from-yellow-500/5' },
-                { border: 'border-orange-500', gradient: 'from-orange-500/5' },
-                { border: 'border-amber-500', gradient: 'from-amber-500/5' },
-                { border: 'border-purple-500', gradient: 'from-purple-500/5' },
-              ]
-              const accent = accentColors[idx % accentColors.length]
-              // FUTURE: highlight the workout that has an ongoing session.
-              // Requires `activeSessionWorkoutId?: string` prop from the parent
-              // that connects to the active session state in useWorkoutCrud.
-              const isActive = false
-              return (
-                <div
-                  key={String(w?.id ?? idx)}
-                  className={[
-                    'rounded-xl p-4 border-l-4 transition-all group relative overflow-hidden cursor-pointer shadow-sm shadow-black/30',
-                    `bg-gradient-to-r ${accent.gradient} via-neutral-800/80 to-neutral-800`,
-                    accent.border,
-                    isActive ? 'ring-2 ring-green-500/60' : '',
-                    density === 'compact' ? 'p-3' : 'p-4',
-                  ].join(' ')}
-                  onClick={() => {
-                    const key = getWorkoutKey(w, idx)
-                    if (isWorkoutBusy(key)) return
-                    if (workoutsTab === 'periodized' && !isPeriodizedWorkoutFullyLoaded(w)) {
-                      runWorkoutAction(key, 'open', async () => {
-                        const id = String(w?.id || '').trim()
-                        const full = await loadWorkoutFullById(id)
-                        if (!full) {
-                          setPeriodizedError('Não foi possível carregar os detalhes desse treino.')
-                          return
-                        }
-                        if (!Array.isArray(full?.exercises) || full.exercises.length === 0) {
-                          setPeriodizedError('Esse treino está sem exercícios. Refaça a periodização para recriar os treinos.')
-                          return
-                        }
-                        setPeriodizedWorkouts((prev) => prev.map((p) => (String(p?.id || '') === String(full?.id || '') ? full : p)))
-                        props.onQuickView(full)
-                      })
-                      return
-                    }
-                    props.onQuickView(w)
-                  }}
-                >
-                  <div className="relative z-10">
-                    {isActive && (
-                      <div className="absolute -top-1 -left-1 w-3 h-3">
-                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
-                        <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500" />
+              {editListOpen && (
+                <div className="fixed inset-0 z-[1200] flex items-center justify-center p-4 pt-safe" style={{ background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(16px)' }} onClick={() => !savingListEdits && setEditListOpen(false)}>
+                  <div className="w-full max-w-2xl rounded-2xl overflow-hidden" style={{ background: 'rgba(10,10,10,0.99)', border: '1px solid rgba(234,179,8,0.2)', boxShadow: '0 0 40px rgba(234,179,8,0.07), 0 32px 80px rgba(0,0,0,0.7)' }} onClick={(e) => e.stopPropagation()}>
+                    <div className="p-4 flex items-center justify-between gap-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                      <div className="min-w-0">
+                        <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Treinos</div>
+                        <div className="text-white font-black text-lg truncate">Organizar</div>
+                        <div className="text-xs text-neutral-400">Arraste para reordenar e edite os títulos.</div>
                       </div>
-                    )}
-                    <h3 className="font-black text-white text-base uppercase mb-0.5 pr-28 leading-tight">{String(w?.title || 'Treino')}</h3>
-                    <p className="text-[11px] text-neutral-500 font-mono mb-3">
-                      {(Number.isFinite(Number(w?.exercises_count)) ? Math.max(0, Math.floor(Number(w.exercises_count))) : Array.isArray(w?.exercises) ? w.exercises.length : 0)} exercícios
-                    </p>
-                    {w?.archived_at ? (
-                      <div className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-neutral-300 bg-neutral-900/60 border border-neutral-700 px-2 py-1 rounded-lg mb-2">
-                        ARQUIVADO
-                      </div>
-                    ) : null}
-
-                    <div className="flex gap-2 mt-2">
                       <button
-                        onClick={async (e) => {
-                          e.stopPropagation()
-                          const key = getWorkoutKey(w, idx)
-                          if (w?.archived_at) {
-                            if (typeof props.onRestoreWorkout !== 'function') return
-                            await runWorkoutAction(key, 'restore', () => props.onRestoreWorkout?.(w))
-                            return
-                          }
-                          await runWorkoutAction(key, 'start', async () => {
-                            if (workoutsTab === 'periodized' && !isPeriodizedWorkoutFullyLoaded(w)) {
-                              const id = String(w?.id || '').trim()
-                              const full = await loadWorkoutFullById(id)
-                              if (!full) {
-                                setPeriodizedError('Não foi possível carregar os detalhes desse treino.')
-                                return
-                              }
-                              if (!Array.isArray(full?.exercises) || full.exercises.length === 0) {
-                                setPeriodizedError('Esse treino está sem exercícios. Refaça a periodização para recriar os treinos.')
-                                return
-                              }
-                              setPeriodizedWorkouts((prev) => prev.map((p) => (String(p?.id || '') === String(full?.id || '') ? full : p)))
-                              await props.onStartSession(full)
-                              return
-                            }
-                            await props.onStartSession(w)
-                          })
-                        }}
-                        data-tour="workout-start"
-                        disabled={isWorkoutBusy(getWorkoutKey(w, idx)) || (Boolean(w?.archived_at) && typeof props.onRestoreWorkout !== 'function')}
-                        className="relative z-30 flex-1 bg-neutral-900 hover:bg-neutral-800 py-2.5 rounded-xl flex items-center justify-center gap-2 text-yellow-400 hover:text-yellow-300 font-black text-sm transition-all border border-yellow-500/40 hover:border-yellow-500/70 active:scale-95 touch-manipulation disabled:opacity-60"
+                        type="button"
+                        onClick={() => setEditListOpen(false)}
+                        disabled={savingListEdits}
+                        className="w-10 h-10 rounded-xl flex items-center justify-center text-neutral-400 hover:text-white transition-all active:scale-95 disabled:opacity-50"
+                        style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}
+                        aria-label="Fechar"
                       >
-                        {w?.archived_at ? (
-                          isActionBusy(getWorkoutKey(w, idx), 'restore') ? (
-                            <>
-                              <Loader2 size={16} className="text-yellow-500 animate-spin" /> RESTAURANDO...
-                            </>
-                          ) : (
-                            <>
-                              <Undo2 size={16} /> RESTAURAR
-                            </>
-                          )
-                        ) : isActionBusy(getWorkoutKey(w, idx), 'start') ? (
-                          <>
-                            <Loader2 size={16} className="text-yellow-500 animate-spin" /> INICIANDO...
-                          </>
-                        ) : (
-                          <>
-                            <Play size={16} className="fill-white" /> INICIAR TREINO
-                          </>
-                        )}
+                        <X size={18} />
+                      </button>
+                    </div>
+
+                    <div className="p-4 space-y-2 max-h-[70vh] overflow-y-auto custom-scrollbar">
+                      {editListDraft.length === 0 ? (
+                        <div className="text-sm text-neutral-400">Nenhum treino para organizar.</div>
+                      ) : (
+                        <Reorder.Group axis="y" values={editListDraft} onReorder={setEditListDraft} className="space-y-2">
+                          {editListDraft.map((it, idx) => (
+                            <SortableWorkoutItem
+                              key={it.id}
+                              item={it}
+                              index={idx}
+                              saving={savingListEdits}
+                              onChangeTitle={(id, val) => {
+                                setEditListDraft((prev) => prev.map((x) => (x.id === id ? { ...x, title: val } : x)))
+                              }}
+                            />
+                          ))}
+                        </Reorder.Group>
+                      )}
+                    </div>
+
+                    <div className="p-4 flex items-center justify-between gap-3" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+                      <button
+                        type="button"
+                        onClick={() => setEditListOpen(false)}
+                        disabled={savingListEdits}
+                        className="min-h-[44px] px-4 py-3 rounded-xl text-neutral-200 font-black text-xs uppercase tracking-widest hover:bg-white/[0.05] disabled:opacity-50"
+                        style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}
+                      >
+                        Cancelar
+                      </button>
+                      <button
+                        type="button"
+                        disabled={savingListEdits || typeof props.onBulkEditWorkouts !== 'function' || editListDraft.length === 0}
+                        onClick={async () => {
+                          if (typeof props.onBulkEditWorkouts !== 'function') return
+                          try {
+                            setSavingListEdits(true)
+                            await props.onBulkEditWorkouts(editListDraft)
+                            setEditListOpen(false)
+                          } finally {
+                            setSavingListEdits(false)
+                          }
+                        }}
+                        className="min-h-[44px] px-4 py-3 rounded-xl bg-yellow-500 text-black font-black text-xs uppercase tracking-widest hover:bg-yellow-400 inline-flex items-center gap-2 disabled:opacity-60"
+                      >
+                        <Save size={16} />
+                        Salvar
                       </button>
                     </div>
                   </div>
+                </div>
+              )}
 
-                  <div className="absolute top-2 right-2 flex gap-1 opacity-100 transition-opacity z-20 bg-neutral-900/50 backdrop-blur-sm rounded-lg p-1 border border-white/5 md:opacity-0 md:group-hover:opacity-100">
+              {(showIronRank || showBadges || showNewRecordsCard) && (
+                <Suspense fallback={<SectionSkeleton lines={2} />}>
+                  <IronRankCard
+                    badges={props.streakStats?.badges ?? []}
+                    currentStreak={props.streakStats?.currentStreak ?? 0}
+                    totalVolumeKg={props.streakStats?.totalVolumeKg ?? 0}
+                    currentUserId={props.currentUserId}
+                    showIronRank={showIronRank}
+                    showBadges={showBadges}
+                    showRecords={showNewRecordsCard}
+                    reloadKey={props.newRecordsReloadKey}
+                  />
+                </Suspense>
+              )}
+
+              <Suspense fallback={<MuscleMapSkeleton />}>
+                <MuscleMapCard onOpenWizard={props.onCreateWorkout} />
+              </Suspense>
+
+              <button
+                onClick={() => {
+                  setCreatingWorkout(true)
+                  try {
+                    try { trackUserEvent('click_dashboard_new_workout', { type: 'click', screen: 'dashboard' }) } catch { }
+                    props.onCreateWorkout()
+                  } catch {
+                    setCreatingWorkout(false)
+                  }
+                  try {
+                    window.setTimeout(() => setCreatingWorkout(false), CREATE_WORKOUT_LOADING_TIMEOUT_MS)
+                  } catch { }
+                }}
+                disabled={creatingWorkout}
+                className="w-full min-h-[48px] bg-yellow-500 hover:bg-yellow-400 p-4 rounded-xl font-black text-black flex items-center justify-center gap-2 shadow-lg shadow-yellow-900/20 transition-all active:scale-95 disabled:opacity-70"
+              >
+                {creatingWorkout ? <Loader2 size={20} className="animate-spin" /> : <Plus size={22} />}
+                {creatingWorkout ? 'Abrindo editor...' : 'Novo Treino'}
+              </button>
+
+              <div className={density === 'compact' ? 'space-y-2' : 'space-y-3'}>
+                {/* Linha 1: abas Meus Treinos / Periodizados */}
+                <div className="flex items-center gap-2">
+                  <div className="flex-1 inline-flex items-center rounded-xl bg-neutral-900/40 border border-neutral-800 overflow-hidden">
                     <button
-                      onClick={async (e) => {
-                        e.stopPropagation()
-                        const key = getWorkoutKey(w, idx)
-                        await runWorkoutAction(key, 'share', () => props.onShareWorkout(w))
+                      type="button"
+                      onClick={() => {
+                        setShowArchived(false)
+                        setWorkoutsTab('normal')
                       }}
-                      disabled={isWorkoutBusy(getWorkoutKey(w, idx))}
-                      className="p-2 hover:bg-black/50 rounded text-neutral-400 hover:text-white disabled:opacity-60"
+                      className={
+                        workoutsTab === 'normal'
+                          ? 'flex-1 min-h-[40px] px-3 py-2 text-yellow-400 font-black text-[11px] uppercase tracking-wider text-center border-b-2 border-yellow-500 bg-yellow-500/5'
+                          : 'flex-1 min-h-[40px] px-3 py-2 text-neutral-400 font-bold text-[11px] uppercase tracking-wider hover:text-neutral-200 text-center border-b-2 border-transparent'
+                      }
                     >
-                      {isActionBusy(getWorkoutKey(w, idx), 'share') ? <Loader2 size={14} className="text-yellow-500 animate-spin" /> : <Share2 size={14} />}
+                      Meus Treinos
                     </button>
                     <button
-                      onClick={async (e) => {
-                        e.stopPropagation()
-                        const key = getWorkoutKey(w, idx)
-                        await runWorkoutAction(key, 'edit', () => props.onEditWorkout(w))
+                      type="button"
+                      onClick={() => {
+                        setShowArchived(false)
+                        setPeriodizedLoaded(false)
+                        setPeriodizedWorkouts([])
+                        setPeriodizedError('')
+                        setWorkoutsTab('periodized')
                       }}
-                      disabled={isWorkoutBusy(getWorkoutKey(w, idx))}
-                      className="p-2 hover:bg-black/50 rounded text-neutral-400 hover:text-white disabled:opacity-60"
+                      className={
+                        workoutsTab === 'periodized'
+                          ? 'flex-1 min-h-[40px] px-3 py-2 text-yellow-400 font-black text-[11px] uppercase tracking-wider text-center border-b-2 border-yellow-500 bg-yellow-500/5'
+                          : 'flex-1 min-h-[40px] px-3 py-2 text-neutral-400 font-bold text-[11px] uppercase tracking-wider hover:text-neutral-200 text-center border-b-2 border-transparent'
+                      }
                     >
-                      {isActionBusy(getWorkoutKey(w, idx), 'edit') ? <Loader2 size={14} className="text-yellow-500 animate-spin" /> : <Pencil size={14} />}
-                    </button>
-                    <button
-                      onClick={async (e) => {
-                        e.stopPropagation()
-                        const key = getWorkoutKey(w, idx)
-                        await runWorkoutAction(key, 'delete', () => props.onDeleteWorkout(w?.id, w?.title))
-                      }}
-                      disabled={isWorkoutBusy(getWorkoutKey(w, idx))}
-                      className="p-2 hover:bg-black/50 rounded text-neutral-400 hover:text-red-400 disabled:opacity-60"
-                    >
-                      {isActionBusy(getWorkoutKey(w, idx), 'delete') ? <Loader2 size={14} className="text-yellow-500 animate-spin" /> : <Trash2 size={14} />}
+                      <span className="inline-flex items-center justify-center gap-1">
+                        <Crown size={11} className={workoutsTab === 'periodized' ? 'text-black fill-black' : 'text-yellow-500 fill-yellow-500'} />
+                        Periodizados
+                      </span>
                     </button>
                   </div>
                 </div>
-              )
-            })}
-          </div>
+
+                {/* Linha 2: botões de ação — Arquivados, Organizar, Ferramentas */}
+                <div className="flex items-center gap-2">
+                  {archivedCount > 0 ? (
+                    <button
+                      onClick={() => setShowArchived((v) => !v)}
+                      className={
+                        showArchived
+                          ? 'flex-1 min-h-[40px] px-3 py-2 bg-neutral-800 border border-yellow-500/50 text-yellow-400 rounded-xl font-bold text-[11px] uppercase tracking-wider'
+                          : 'flex-1 min-h-[40px] px-3 py-2 bg-neutral-900 border border-neutral-700 text-neutral-400 rounded-xl font-bold text-[11px] uppercase tracking-wider hover:border-neutral-600 hover:text-neutral-300'
+                      }
+                    >
+                      {showArchived ? `Arquivados (${archivedCount})` : `Arquivados (${archivedCount})`}
+                    </button>
+                  ) : null}
+                  <button
+                    onClick={() => {
+                      try { trackUserEvent('click_dashboard_organize_workouts', { type: 'click', screen: 'dashboard' }) } catch { }
+                      const items = visibleWorkouts
+                        .map((w, idx) => {
+                          const id = String(w?.id || '').trim()
+                          if (!id) return null
+                          return { id, title: String(w?.title || 'Treino'), sort_order: idx }
+                        })
+                        .filter(Boolean) as { id: string; title: string; sort_order: number }[]
+                      setEditListDraft(items)
+                      setEditListOpen(true)
+                      setToolsOpen(false)
+                    }}
+                    className="flex-1 min-h-[40px] px-3 py-2 bg-neutral-800 border border-neutral-700 text-neutral-300 rounded-xl font-bold text-[11px] uppercase tracking-wider hover:bg-neutral-700 text-center"
+                  >
+                    Organizar
+                  </button>
+                  <div className="relative flex-1">
+                    <button
+                      onClick={() => setToolsOpen((v) => !v)}
+                      className="w-full min-h-[40px] px-3 py-2 bg-neutral-800 border border-neutral-700 text-neutral-300 rounded-xl font-bold text-[11px] uppercase tracking-wider hover:bg-neutral-700 text-center"
+                      aria-expanded={toolsOpen}
+                    >
+                      Ferramentas
+                    </button>
+                    {toolsOpen && (
+                      <WorkoutToolsPanel
+                        onClose={() => setToolsOpen(false)}
+                        onCreateWorkout={props.onCreateWorkout}
+                        onOpenIronScanner={props.onOpenIronScanner}
+                        onOpenJsonImport={props.onOpenJsonImport}
+                        onExportAll={props.onExportAll}
+                        exportingAll={props.exportingAll}
+                        onNormalizeAiWorkoutTitles={props.onNormalizeAiWorkoutTitles}
+                        onNormalizeExercises={props.onNormalizeExercises}
+                        onApplyTitleRule={props.onApplyTitleRule}
+                        normalizingAiTitles={normalizingAiTitles}
+                        normalizingExercises={normalizingExercises}
+                        applyingTitleRule={applyingTitleRule}
+                        setNormalizingAiTitles={setNormalizingAiTitles}
+                        setNormalizingExercises={setNormalizingExercises}
+                        setApplyingTitleRule={setApplyingTitleRule}
+                      />
+                    )}
+
+                  </div>
+                </div>
+
+                {visibleWorkouts.length === 0 && (
+                  <div className="text-center py-10 text-neutral-600">
+                    <div className="w-16 h-16 bg-neutral-800 rounded-full flex items-center justify-center mx-auto mb-4 opacity-50">
+                      <Dumbbell size={32} />
+                    </div>
+                    <p>
+                      {workoutsTab === 'periodized'
+                        ? periodizedLoading
+                          ? 'Carregando treinos periodizados...'
+                          : 'Nenhum treino periodizado criado.'
+                        : 'Nenhum treino criado.'}
+                    </p>
+                    {workoutsTab === 'periodized' && periodizedError ? (
+                      <div className="mt-3 inline-flex items-center justify-center">
+                        <div className="rounded-xl border border-red-500/30 bg-red-500/10 px-3 py-2 text-xs text-red-200 font-bold">
+                          {periodizedError}
+                        </div>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setPeriodizedLoaded(false)
+                            setPeriodizedWorkouts([])
+                            setPeriodizedError('')
+                          }}
+                          className="ml-2 min-h-[36px] px-3 py-2 bg-neutral-800 border border-neutral-700 text-neutral-200 rounded-xl font-bold text-xs uppercase hover:bg-neutral-700"
+                        >
+                          Tentar novamente
+                        </button>
+                      </div>
+                    ) : workoutsTab === 'periodized' && !periodizedLoading ? (
+                      <p className="mt-2 text-xs text-neutral-500">
+                        Crie sua periodização na aba VIP para ela aparecer aqui.
+                      </p>
+                    ) : null}
+                  </div>
+                )}
+
+                {visibleWorkouts.map((w, idx) => {
+                  // Dynamic accent color per workout (cycles through brand palette)
+                  const accentColors = [
+                    { border: 'border-yellow-500', gradient: 'from-yellow-500/5' },
+                    { border: 'border-orange-500', gradient: 'from-orange-500/5' },
+                    { border: 'border-amber-500', gradient: 'from-amber-500/5' },
+                    { border: 'border-purple-500', gradient: 'from-purple-500/5' },
+                  ]
+                  const accent = accentColors[idx % accentColors.length]
+                  // FUTURE: highlight the workout that has an ongoing session.
+                  // Requires `activeSessionWorkoutId?: string` prop from the parent
+                  // that connects to the active session state in useWorkoutCrud.
+                  const isActive = false
+                  return (
+                    <div
+                      key={String(w?.id ?? idx)}
+                      className={[
+                        'rounded-xl p-4 border-l-4 transition-all group relative overflow-hidden cursor-pointer shadow-sm shadow-black/30',
+                        `bg-gradient-to-r ${accent.gradient} via-neutral-800/80 to-neutral-800`,
+                        accent.border,
+                        isActive ? 'ring-2 ring-green-500/60' : '',
+                        density === 'compact' ? 'p-3' : 'p-4',
+                      ].join(' ')}
+                      onClick={() => {
+                        const key = getWorkoutKey(w, idx)
+                        if (isWorkoutBusy(key)) return
+                        if (workoutsTab === 'periodized' && !isPeriodizedWorkoutFullyLoaded(w)) {
+                          runWorkoutAction(key, 'open', async () => {
+                            const id = String(w?.id || '').trim()
+                            const full = await loadWorkoutFullById(id)
+                            if (!full) {
+                              setPeriodizedError('Não foi possível carregar os detalhes desse treino.')
+                              return
+                            }
+                            if (!Array.isArray(full?.exercises) || full.exercises.length === 0) {
+                              setPeriodizedError('Esse treino está sem exercícios. Refaça a periodização para recriar os treinos.')
+                              return
+                            }
+                            setPeriodizedWorkouts((prev) => prev.map((p) => (String(p?.id || '') === String(full?.id || '') ? full : p)))
+                            props.onQuickView(full)
+                          })
+                          return
+                        }
+                        props.onQuickView(w)
+                      }}
+                    >
+                      <div className="relative z-10">
+                        {isActive && (
+                          <div className="absolute -top-1 -left-1 w-3 h-3">
+                            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+                            <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500" />
+                          </div>
+                        )}
+                        <h3 className="font-black text-white text-base uppercase mb-0.5 pr-28 leading-tight">{String(w?.title || 'Treino')}</h3>
+                        <p className="text-[11px] text-neutral-500 font-mono mb-3">
+                          {(Number.isFinite(Number(w?.exercises_count)) ? Math.max(0, Math.floor(Number(w.exercises_count))) : Array.isArray(w?.exercises) ? w.exercises.length : 0)} exercícios
+                        </p>
+                        {w?.archived_at ? (
+                          <div className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-neutral-300 bg-neutral-900/60 border border-neutral-700 px-2 py-1 rounded-lg mb-2">
+                            ARQUIVADO
+                          </div>
+                        ) : null}
+
+                        <div className="flex gap-2 mt-2">
+                          <button
+                            onClick={async (e) => {
+                              e.stopPropagation()
+                              const key = getWorkoutKey(w, idx)
+                              if (w?.archived_at) {
+                                if (typeof props.onRestoreWorkout !== 'function') return
+                                await runWorkoutAction(key, 'restore', () => props.onRestoreWorkout?.(w))
+                                return
+                              }
+                              await runWorkoutAction(key, 'start', async () => {
+                                if (workoutsTab === 'periodized' && !isPeriodizedWorkoutFullyLoaded(w)) {
+                                  const id = String(w?.id || '').trim()
+                                  const full = await loadWorkoutFullById(id)
+                                  if (!full) {
+                                    setPeriodizedError('Não foi possível carregar os detalhes desse treino.')
+                                    return
+                                  }
+                                  if (!Array.isArray(full?.exercises) || full.exercises.length === 0) {
+                                    setPeriodizedError('Esse treino está sem exercícios. Refaça a periodização para recriar os treinos.')
+                                    return
+                                  }
+                                  setPeriodizedWorkouts((prev) => prev.map((p) => (String(p?.id || '') === String(full?.id || '') ? full : p)))
+                                  await props.onStartSession(full)
+                                  return
+                                }
+                                await props.onStartSession(w)
+                              })
+                            }}
+                            data-tour="workout-start"
+                            disabled={isWorkoutBusy(getWorkoutKey(w, idx)) || (Boolean(w?.archived_at) && typeof props.onRestoreWorkout !== 'function')}
+                            className="relative z-30 flex-1 bg-neutral-900 hover:bg-neutral-800 py-2.5 rounded-xl flex items-center justify-center gap-2 text-yellow-400 hover:text-yellow-300 font-black text-sm transition-all border border-yellow-500/40 hover:border-yellow-500/70 active:scale-95 touch-manipulation disabled:opacity-60"
+                          >
+                            {w?.archived_at ? (
+                              isActionBusy(getWorkoutKey(w, idx), 'restore') ? (
+                                <>
+                                  <Loader2 size={16} className="text-yellow-500 animate-spin" /> RESTAURANDO...
+                                </>
+                              ) : (
+                                <>
+                                  <Undo2 size={16} /> RESTAURAR
+                                </>
+                              )
+                            ) : isActionBusy(getWorkoutKey(w, idx), 'start') ? (
+                              <>
+                                <Loader2 size={16} className="text-yellow-500 animate-spin" /> INICIANDO...
+                              </>
+                            ) : (
+                              <>
+                                <Play size={16} className="fill-white" /> INICIAR TREINO
+                              </>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="absolute top-2 right-2 flex gap-1 opacity-100 transition-opacity z-20 bg-neutral-900/50 backdrop-blur-sm rounded-lg p-1 border border-white/5 md:opacity-0 md:group-hover:opacity-100">
+                        <button
+                          onClick={async (e) => {
+                            e.stopPropagation()
+                            const key = getWorkoutKey(w, idx)
+                            await runWorkoutAction(key, 'share', () => props.onShareWorkout(w))
+                          }}
+                          disabled={isWorkoutBusy(getWorkoutKey(w, idx))}
+                          className="p-2 hover:bg-black/50 rounded text-neutral-400 hover:text-white disabled:opacity-60"
+                        >
+                          {isActionBusy(getWorkoutKey(w, idx), 'share') ? <Loader2 size={14} className="text-yellow-500 animate-spin" /> : <Share2 size={14} />}
+                        </button>
+                        <button
+                          onClick={async (e) => {
+                            e.stopPropagation()
+                            const key = getWorkoutKey(w, idx)
+                            await runWorkoutAction(key, 'edit', () => props.onEditWorkout(w))
+                          }}
+                          disabled={isWorkoutBusy(getWorkoutKey(w, idx))}
+                          className="p-2 hover:bg-black/50 rounded text-neutral-400 hover:text-white disabled:opacity-60"
+                        >
+                          {isActionBusy(getWorkoutKey(w, idx), 'edit') ? <Loader2 size={14} className="text-yellow-500 animate-spin" /> : <Pencil size={14} />}
+                        </button>
+                        <button
+                          onClick={async (e) => {
+                            e.stopPropagation()
+                            const key = getWorkoutKey(w, idx)
+                            await runWorkoutAction(key, 'delete', () => props.onDeleteWorkout(w?.id, w?.title))
+                          }}
+                          disabled={isWorkoutBusy(getWorkoutKey(w, idx))}
+                          className="p-2 hover:bg-black/50 rounded text-neutral-400 hover:text-red-400 disabled:opacity-60"
+                        >
+                          {isActionBusy(getWorkoutKey(w, idx), 'delete') ? <Loader2 size={14} className="text-yellow-500 animate-spin" /> : <Trash2 size={14} />}
+                        </button>
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </>
+          )}
         </>
       )}
     </div>

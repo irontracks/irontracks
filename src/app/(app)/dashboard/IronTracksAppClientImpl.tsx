@@ -170,7 +170,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
 
     // workouts, stats, studentFolders, fetchWorkouts, isFetching — extraídos para useWorkoutFetch
     // Streak stats — extracted to useWorkoutStreak hook (userId resolved after auth)
-    const { streakStats, setStreakStats } = useWorkoutStreak(user?.id);
+    const { streakStats, setStreakStats, streakLoading } = useWorkoutStreak(user?.id);
     const [currentWorkout, setCurrentWorkout] = useState<ActiveSession | null>(null);
     const [createWizardOpen, setCreateWizardOpen] = useState(false)
     const [quickViewWorkout, setQuickViewWorkout] = useState<ActiveSession | null>(null);
@@ -858,6 +858,8 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                         >
                             {(view === 'dashboard' || view === 'assessments' || view === 'community' || view === 'vip') && (
                                 <StudentDashboard
+                                    isDashboardReady={!streakLoading && userSettingsApi.loaded}
+                                    streakLoading={Boolean(streakLoading)}
                                     workouts={Array.isArray(workouts) ? workouts : []}
                                     profileIncomplete={Boolean(profileIncomplete)}
                                     onOpenCompleteProfile={() => setView('profile')}

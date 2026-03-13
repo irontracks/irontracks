@@ -21,12 +21,17 @@ const isRecord = (v: unknown): v is Record<string, unknown> =>
 
 export function useWorkoutStreak(userId?: string | null) {
   const [streakStats, setStreakStats] = useState<WorkoutStreak | null>(null);
+  // Track whether the async fetch has completed (set only inside async callbacks)
+  const [resolved, setResolved] = useState(false);
 
   useEffect(() => {
     if (!userId) return;
 
+    let cancelled = false;
+
     computeWorkoutStreakAndStats()
       .then((res) => {
+        if (cancelled) return;
         if (!res?.ok || !res?.data) return;
         const d = isRecord(res.data) ? (res.data as Record<string, unknown>) : {};
 
@@ -57,8 +62,14 @@ export function useWorkoutStreak(userId?: string | null) {
 
         setStreakStats(streak);
       })
-      .catch((err) => logError('useWorkoutStreak', err));
+      .catch((err) => logError('useWorkoutStreak', err))
+      .finally(() => { if (!cancelled) setResolved(true); });
+
+    return () => { cancelled = true; };
   }, [userId]);
 
-  return { streakStats, setStreakStats };
+  // Loading when userId exists but the async fetch hasn't resolved yet
+  const streakLoading = !!userId && !resolved;
+
+  return { streakStats, setStreakStats, streakLoading };
 }
