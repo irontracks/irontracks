@@ -733,7 +733,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
     // Keep the premium splash visible until streak + settings are fully loaded.
     // This prevents any flash of default/zero data or skeleton cards.
     const isDashboardReady = !streakLoading && userSettingsApi.loaded;
-    if (!isDashboardReady && !hasCachedWorkouts) return <LoadingScreen />;
+    if (!isDashboardReady) return <LoadingScreen />;
 
     const currentWorkoutId = activeSession?.workout?.id;
     let nextWorkout = null;

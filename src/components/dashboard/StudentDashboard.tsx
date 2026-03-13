@@ -10,10 +10,10 @@ import { ExerciseRowSchema, SetRowSchema, WorkoutRowSchema } from '@/schemas/dat
 import { AdvancedConfig } from '@/types/app'
 import { StoriesBarSkeleton, MuscleMapSkeleton, SectionSkeleton } from '@/components/ui/SuspenseFallbacks'
 
-// Lazy-loaded dashboard sections for granular Suspense
-const IronRankCard = React.lazy(() => import('./IronRankCard'))
-const StoriesBar = React.lazy(() => import('./StoriesBar'))
-const MuscleMapCard = React.lazy(() => import('./MuscleMapCard'))
+// Eagerly imported — no Suspense flash on entry
+import IronRankCard from './IronRankCard'
+import StoriesBar from './StoriesBar'
+import MuscleMapCard from './MuscleMapCard'
 
 import WorkoutCalendarModal from './WorkoutCalendarModal'
 import { ProfileIncompleteBanner } from './ProfileIncompleteBanner'
@@ -611,13 +611,11 @@ export default function StudentDashboard(props: Props) {
 
       <>
           {props.view === 'dashboard' && showStoriesBar ? (
-            <Suspense fallback={<StoriesBarSkeleton />}>
-              <StoriesBar
-                currentUserId={props.currentUserId}
-                onMyStoryStateChange={props.onMyStoryStateChange}
-                onAddStory={props.onAddStory}
-              />
-            </Suspense>
+            <StoriesBar
+              currentUserId={props.currentUserId}
+              onMyStoryStateChange={props.onMyStoryStateChange}
+              onAddStory={props.onAddStory}
+            />
           ) : null}
 
           <DashboardTabs
@@ -725,23 +723,19 @@ export default function StudentDashboard(props: Props) {
               )}
 
               {(showIronRank || showBadges || showNewRecordsCard) && (
-                <Suspense fallback={<SectionSkeleton lines={2} />}>
-                  <IronRankCard
-                    badges={props.streakStats?.badges ?? []}
-                    currentStreak={props.streakStats?.currentStreak ?? 0}
-                    totalVolumeKg={props.streakStats?.totalVolumeKg ?? 0}
-                    currentUserId={props.currentUserId}
-                    showIronRank={showIronRank}
-                    showBadges={showBadges}
-                    showRecords={showNewRecordsCard}
-                    reloadKey={props.newRecordsReloadKey}
-                  />
-                </Suspense>
+              <IronRankCard
+                  badges={props.streakStats?.badges ?? []}
+                  currentStreak={props.streakStats?.currentStreak ?? 0}
+                  totalVolumeKg={props.streakStats?.totalVolumeKg ?? 0}
+                  currentUserId={props.currentUserId}
+                  showIronRank={showIronRank}
+                  showBadges={showBadges}
+                  showRecords={showNewRecordsCard}
+                  reloadKey={props.newRecordsReloadKey}
+                />
               )}
 
-              <Suspense fallback={<MuscleMapSkeleton />}>
-                <MuscleMapCard onOpenWizard={props.onCreateWorkout} />
-              </Suspense>
+              <MuscleMapCard onOpenWizard={props.onCreateWorkout} />
 
               <button
                 onClick={() => {
