@@ -72,7 +72,9 @@ const BodyMapSvg = memo(function BodyMapSvg({ view, muscles, onSelect, selected,
   const baseSrc = view === 'front'
     ? (isFemale ? '/body-front-female.png' : '/body-front.png')
     : (isFemale ? '/body-back-female.png' : '/body-back.png')
-  const overlayFolder = isFemale ? '/muscle-overlays-female' : '/muscle-overlays'
+  // Female mode reuses the same overlay set — the original overlays already depict
+  // female anatomy (chest/glutes) and have pure black backgrounds that blend correctly.
+  const overlayFolder = '/muscle-overlays'
 
   const layers = useMemo(() => dedup(overlays, muscles), [overlays, muscles])
 
