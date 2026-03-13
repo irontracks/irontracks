@@ -128,7 +128,7 @@ interface TeamWorkoutContextValue {
     pendingChallenge: SetChallengePayload | null
     sendSetChallenge: (exName: string, weight: number, reps: number) => void
     dismissChallenge: () => void
-    // ─ Workout Edit Sync ─────────────────────────────────────────
+    // ─ Workout Edit Sync ─────────────────────────────────────────────────
     pendingWorkoutEdit: WorkoutEditPayload | null
     broadcastWorkoutEdit: (workout: Record<string, unknown>) => void
     dismissWorkoutEdit: () => void

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useRef, useEffect } from 'react';
+import React from 'react';
 import { BackButton } from '@/components/ui/BackButton';
 import { useActiveWorkoutController } from './workout/useActiveWorkoutController';
 import { WorkoutProvider } from './workout/WorkoutContext';
@@ -13,10 +13,6 @@ import { buildFinishWorkoutPayload } from '@/lib/finishWorkoutPayload';
 import dynamic from 'next/dynamic';
 import { useTeamWorkout, WorkoutEditPayload } from '@/contexts/TeamWorkoutContext';
 
-const TeamProgressPanel = dynamic(
-  () => import('@/components/TeamProgressPanel').then(m => ({ default: m.TeamProgressPanel })),
-  { ssr: false }
-);
 const TeamChatDrawer = dynamic(
   () => import('@/components/TeamChatDrawer').then(m => ({ default: m.TeamChatDrawer })),
   { ssr: false }
@@ -26,7 +22,7 @@ export default function ActiveWorkout(props: ActiveWorkoutProps) {
   const controller = useActiveWorkoutController(props);
   const { session, workout, exercises } = controller;
 
-  // Team context for chat, pause banner, and workout edit sync
+  // Team context for chat, pause banner, and workout edit notifications
   const teamCtx = useTeamWorkout() as unknown as {
     teamSession: { id: string } | null
     sessionPaused: boolean
@@ -34,53 +30,8 @@ export default function ActiveWorkout(props: ActiveWorkoutProps) {
     resumeSession: () => void
     chatMessages: unknown[]
     sendChatMessage: (text: string) => void
-    broadcastWorkoutEdit: (workout: Record<string, unknown>) => void
     pendingWorkoutEdit: WorkoutEditPayload | null
     dismissWorkoutEdit: () => void
-  }
-
-  const inTeamSession = !!teamCtx.teamSession?.id
-
-  // ── Broadcast workout edits to teammates ──────────────────────────────────
-  const isFirstMountRef = useRef(true)
-  const prevWorkoutStringRef = useRef<string>('')
-  const isApplyingRemoteEditRef = useRef(false)
-
-  useEffect(() => {
-    if (!inTeamSession || !workout) return
-    const currentStr = JSON.stringify(workout)
-    if (isFirstMountRef.current) {
-      isFirstMountRef.current = false
-      prevWorkoutStringRef.current = currentStr
-      return
-    }
-    if (currentStr === prevWorkoutStringRef.current) return
-    prevWorkoutStringRef.current = currentStr
-    // Skip broadcast when the change came from accepting a teammate's edit
-    if (isApplyingRemoteEditRef.current) {
-      isApplyingRemoteEditRef.current = false
-      return
-    }
-    try {
-      teamCtx.broadcastWorkoutEdit(workout as unknown as Record<string, unknown>)
-    } catch { }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [workout, inTeamSession])
-
-  // ── Accept incoming workout edit ──────────────────────────────────────────
-  const handleAcceptEdit = () => {
-    const edit = teamCtx.pendingWorkoutEdit
-    if (!edit?.workout) { teamCtx.dismissWorkoutEdit(); return }
-    try {
-      if (typeof props.onPersistWorkoutTemplate === 'function') {
-        // Flag to skip re-broadcasting this incoming change
-        isApplyingRemoteEditRef.current = true
-        props.onPersistWorkoutTemplate(edit.workout as unknown as import('./workout/types').WorkoutDraft)
-      }
-    } catch {
-      isApplyingRemoteEditRef.current = false
-    }
-    teamCtx.dismissWorkoutEdit()
   }
 
   const finishPayload = React.useMemo(() => {
@@ -113,6 +64,9 @@ export default function ActiveWorkout(props: ActiveWorkoutProps) {
   }
 
   const panelExercises = Array.isArray(exercises) ? exercises as Array<{ name?: string }> : [];
+  void panelExercises;
+  const inTeamSession = !!teamCtx.teamSession?.id;
+  const pendingEdit = teamCtx.pendingWorkoutEdit;
 
   return (
     <WorkoutProvider value={controller}>
@@ -132,25 +86,26 @@ export default function ActiveWorkout(props: ActiveWorkoutProps) {
           </div>
         )}
 
-        {/* Workout edit banner — shown when a teammate edits the workout */}
-        {inTeamSession && teamCtx.pendingWorkoutEdit && (
-          <div className="border-b border-blue-500/40 bg-blue-900/30 px-4 py-3 flex items-center justify-between gap-3">
+        {/* Workout Edit banner — shown when a teammate edits the workout structure */}
+        {inTeamSession && pendingEdit && (
+          <div className="border-b border-blue-500/30 bg-blue-500/10 px-4 py-3 flex items-center justify-between gap-3 text-sm">
             <div className="min-w-0">
-              <div className="text-[11px] font-black uppercase tracking-widest text-blue-400 mb-0.5">✏️ Treino editado</div>
-              <div className="text-xs text-blue-200 truncate">
-                <span className="font-bold">{teamCtx.pendingWorkoutEdit.fromName}</span> modificou o treino. Aceitar as alterações?
-              </div>
+              <span className="text-blue-300 font-black">✏️ {pendingEdit.fromName}</span>
+              <span className="text-blue-200 ml-1">editou o treino. Aceitar as mudanças?</span>
             </div>
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex items-center gap-2 flex-shrink-0">
               <button
-                onClick={handleAcceptEdit}
-                className="text-[11px] font-black bg-blue-500 hover:bg-blue-400 text-white px-3 py-1.5 rounded-lg transition-colors"
+                onClick={() => {
+                  try { props.onUpdateSession?.(pendingEdit.workout); } catch { }
+                  teamCtx.dismissWorkoutEdit();
+                }}
+                className="text-[11px] font-black bg-blue-500 text-white px-3 py-1.5 rounded-lg hover:bg-blue-400 transition-colors"
               >
                 Aceitar
               </button>
               <button
                 onClick={() => teamCtx.dismissWorkoutEdit()}
-                className="text-[11px] font-black bg-neutral-700 hover:bg-neutral-600 text-neutral-200 px-3 py-1.5 rounded-lg transition-colors"
+                className="text-[11px] font-black bg-neutral-700 text-neutral-300 px-3 py-1.5 rounded-lg hover:bg-neutral-600 transition-colors"
               >
                 Ignorar
               </button>
@@ -173,4 +128,3 @@ export default function ActiveWorkout(props: ActiveWorkoutProps) {
     </WorkoutProvider>
   );
 }
-
