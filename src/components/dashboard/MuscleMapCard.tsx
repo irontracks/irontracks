@@ -60,6 +60,8 @@ type Props = {
   onOpenWizard?: () => void
   defaultViewMode?: 'day' | 'week'
   onUpgrade?: () => void
+  /** Biological sex of the user — determines which body images to use in the muscle map */
+  gender?: 'male' | 'female' | 'not_informed'
 }
 
 const localIsoDate = () => {
@@ -129,6 +131,7 @@ const writeCache = (key: string, data: ApiPayload) => {
 }
 
 const MuscleMapCard = memo(function MuscleMapCard(props: Props) {
+  const gender = props.gender ?? 'male'
   const [period, setPeriod] = useState<'day' | 'week'>(props.defaultViewMode || 'week')
   const [selectedDate, setSelectedDate] = useState(localIsoDate)
   const [view, setView] = useState<'front' | 'back'>('front')
@@ -570,6 +573,7 @@ const MuscleMapCard = memo(function MuscleMapCard(props: Props) {
                   view={view}
                   muscles={musclesForView}
                   selected={selected}
+                  gender={gender}
                   onSelect={(id) => {
                     setSelected((prev) => (prev === id ? null : id))
                   }}

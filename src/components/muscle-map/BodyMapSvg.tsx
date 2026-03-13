@@ -16,6 +16,8 @@ type Props = {
   onSelect?: (muscleId: MuscleId) => void
   selected?: MuscleId | null
   calibrationMode?: boolean
+  /** Determines which body image set to use. Defaults to 'male' for backward compatibility. */
+  gender?: 'male' | 'female' | 'not_informed'
 }
 
 // Maps each MuscleId to its overlay image filename (without path prefix)
@@ -64,9 +66,13 @@ const ratioToOpacity = (ratio: number, isSelected: boolean) => {
   return isSelected ? Math.min(1, base + 0.2) : base
 }
 
-const BodyMapSvg = memo(function BodyMapSvg({ view, muscles, onSelect, selected }: Props) {
+const BodyMapSvg = memo(function BodyMapSvg({ view, muscles, onSelect, selected, gender }: Props) {
+  const isFemale = gender === 'female'
   const overlays = view === 'front' ? FRONT_OVERLAYS : BACK_OVERLAYS
-  const baseSrc = view === 'front' ? '/body-front.png' : '/body-back.png'
+  const baseSrc = view === 'front'
+    ? (isFemale ? '/body-front-female.png' : '/body-front.png')
+    : (isFemale ? '/body-back-female.png' : '/body-back.png')
+  const overlayFolder = isFemale ? '/muscle-overlays-female' : '/muscle-overlays'
 
   const layers = useMemo(() => dedup(overlays, muscles), [overlays, muscles])
 
@@ -75,7 +81,7 @@ const BodyMapSvg = memo(function BodyMapSvg({ view, muscles, onSelect, selected 
 
       {/* Base body (dark mannequin) */}
       <img
-        key={`base-${view}`}
+        key={`base-${view}-${isFemale ? 'f' : 'm'}`}
         src={baseSrc}
         alt={`Body ${view}`}
         loading="lazy"
@@ -92,8 +98,8 @@ const BodyMapSvg = memo(function BodyMapSvg({ view, muscles, onSelect, selected 
 
         return (
           <img
-            key={file}
-            src={`/muscle-overlays/${file}`}
+            key={`${overlayFolder}/${file}`}
+            src={`${overlayFolder}/${file}`}
             alt=""
             loading="lazy"
             draggable={false}
@@ -115,7 +121,7 @@ const BodyMapSvg = memo(function BodyMapSvg({ view, muscles, onSelect, selected 
         return (
           <img
             key={`glow-${matchingLayer.file}`}
-            src={`/muscle-overlays/${matchingLayer.file}`}
+            src={`${overlayFolder}/${matchingLayer.file}`}
             alt=""
             loading="lazy"
             draggable={false}

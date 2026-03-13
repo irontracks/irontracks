@@ -735,7 +735,7 @@ export default function StudentDashboard(props: Props) {
                 />
               )}
 
-              <MuscleMapCard onOpenWizard={props.onCreateWorkout} />
+              <MuscleMapCard onOpenWizard={props.onCreateWorkout} gender={(props.settings?.biologicalSex === 'female' ? 'female' : props.settings?.biologicalSex === 'male' ? 'male' : 'not_informed')} />
 
               <button
                 onClick={() => {
