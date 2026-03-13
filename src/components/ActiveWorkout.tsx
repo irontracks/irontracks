@@ -1,6 +1,6 @@
 "use client";
 
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import { BackButton } from '@/components/ui/BackButton';
 import { useActiveWorkoutController } from './workout/useActiveWorkoutController';
 import { WorkoutProvider } from './workout/WorkoutContext';
@@ -11,7 +11,7 @@ import Modals from './workout/Modals';
 import { ActiveWorkoutProps } from './workout/types';
 import { buildFinishWorkoutPayload } from '@/lib/finishWorkoutPayload';
 import dynamic from 'next/dynamic';
-import { useTeamWorkout } from '@/contexts/TeamWorkoutContext';
+import { useTeamWorkout, WorkoutEditPayload } from '@/contexts/TeamWorkoutContext';
 
 const TeamProgressPanel = dynamic(
   () => import('@/components/TeamProgressPanel').then(m => ({ default: m.TeamProgressPanel })),
@@ -26,7 +26,7 @@ export default function ActiveWorkout(props: ActiveWorkoutProps) {
   const controller = useActiveWorkoutController(props);
   const { session, workout, exercises } = controller;
 
-  // Team context for chat and pause banner
+  // Team context for chat, pause banner, and workout edit sync
   const teamCtx = useTeamWorkout() as unknown as {
     teamSession: { id: string } | null
     sessionPaused: boolean
@@ -34,6 +34,43 @@ export default function ActiveWorkout(props: ActiveWorkoutProps) {
     resumeSession: () => void
     chatMessages: unknown[]
     sendChatMessage: (text: string) => void
+    broadcastWorkoutEdit: (workout: Record<string, unknown>) => void
+    pendingWorkoutEdit: WorkoutEditPayload | null
+    dismissWorkoutEdit: () => void
+  }
+
+  const inTeamSession = !!teamCtx.teamSession?.id
+
+  // ── Broadcast workout edits to teammates ──────────────────────────────────
+  const isFirstMountRef = useRef(true)
+  const prevWorkoutStringRef = useRef<string>('')
+
+  useEffect(() => {
+    if (!inTeamSession || !workout) return
+    const currentStr = JSON.stringify(workout)
+    if (isFirstMountRef.current) {
+      isFirstMountRef.current = false
+      prevWorkoutStringRef.current = currentStr
+      return
+    }
+    if (currentStr === prevWorkoutStringRef.current) return
+    prevWorkoutStringRef.current = currentStr
+    try {
+      teamCtx.broadcastWorkoutEdit(workout as unknown as Record<string, unknown>)
+    } catch { }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [workout, inTeamSession])
+
+  // ── Accept incoming workout edit ──────────────────────────────────────────
+  const handleAcceptEdit = () => {
+    const edit = teamCtx.pendingWorkoutEdit
+    if (!edit?.workout) { teamCtx.dismissWorkoutEdit(); return }
+    try {
+      if (typeof props.onPersistWorkoutTemplate === 'function') {
+        props.onPersistWorkoutTemplate(edit.workout as unknown as import('./workout/types').WorkoutDraft)
+      }
+    } catch { }
+    teamCtx.dismissWorkoutEdit()
   }
 
   const finishPayload = React.useMemo(() => {
@@ -66,7 +103,6 @@ export default function ActiveWorkout(props: ActiveWorkoutProps) {
   }
 
   const panelExercises = Array.isArray(exercises) ? exercises as Array<{ name?: string }> : [];
-  const inTeamSession = !!teamCtx.teamSession?.id;
 
   return (
     <WorkoutProvider value={controller}>
@@ -86,6 +122,32 @@ export default function ActiveWorkout(props: ActiveWorkoutProps) {
           </div>
         )}
 
+        {/* Workout edit banner — shown when a teammate edits the workout */}
+        {inTeamSession && teamCtx.pendingWorkoutEdit && (
+          <div className="border-b border-blue-500/40 bg-blue-900/30 px-4 py-3 flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <div className="text-[11px] font-black uppercase tracking-widest text-blue-400 mb-0.5">✏️ Treino editado</div>
+              <div className="text-xs text-blue-200 truncate">
+                <span className="font-bold">{teamCtx.pendingWorkoutEdit.fromName}</span> modificou o treino. Aceitar as alterações?
+              </div>
+            </div>
+            <div className="flex items-center gap-2 shrink-0">
+              <button
+                onClick={handleAcceptEdit}
+                className="text-[11px] font-black bg-blue-500 hover:bg-blue-400 text-white px-3 py-1.5 rounded-lg transition-colors"
+              >
+                Aceitar
+              </button>
+              <button
+                onClick={() => teamCtx.dismissWorkoutEdit()}
+                className="text-[11px] font-black bg-neutral-700 hover:bg-neutral-600 text-neutral-200 px-3 py-1.5 rounded-lg transition-colors"
+              >
+                Ignorar
+              </button>
+            </div>
+          </div>
+        )}
+
         <ExerciseList />
         <WorkoutFooter />
         <Modals />
@@ -101,3 +163,4 @@ export default function ActiveWorkout(props: ActiveWorkoutProps) {
     </WorkoutProvider>
   );
 }
+
