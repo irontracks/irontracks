@@ -6,7 +6,7 @@ export const MUSCLE_GROUPS = [
   { id: 'triceps', label: 'Tríceps', minSets: 6, maxSets: 14, view: 'front' },
   { id: 'abs', label: 'Abdômen', minSets: 4, maxSets: 12, view: 'front' },
   { id: 'quads', label: 'Quadríceps', minSets: 8, maxSets: 18, view: 'front' },
-  { id: 'calves', label: 'Panturrilhas', minSets: 6, maxSets: 16, view: 'front' },
+  { id: 'calves', label: 'Panturrilhas', minSets: 6, maxSets: 16, view: 'both' },
   { id: 'lats', label: 'Dorsais', minSets: 8, maxSets: 18, view: 'back' },
   { id: 'upper_back', label: 'Costas (superior)', minSets: 8, maxSets: 18, view: 'back' },
   { id: 'delts_rear', label: 'Deltoide (posterior)', minSets: 6, maxSets: 14, view: 'back' },

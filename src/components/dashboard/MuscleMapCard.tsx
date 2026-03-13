@@ -262,7 +262,7 @@ const MuscleMapCard = memo(function MuscleMapCard(props: Props) {
   const musclesForView = useMemo(() => {
     const data = state.data
     const items = data?.muscles && typeof data.muscles === 'object' ? data.muscles : {}
-    return Object.fromEntries(Object.entries(items).filter(([, v]) => v && typeof v === 'object' && (v as Record<string, unknown>).view === view))
+    return Object.fromEntries(Object.entries(items).filter(([, v]) => v && typeof v === 'object' && ((v as Record<string, unknown>).view === view || (v as Record<string, unknown>).view === 'both')))
   }, [state.data, view])
 
   const selectedInfo = useMemo(() => {
@@ -290,7 +290,7 @@ const MuscleMapCard = memo(function MuscleMapCard(props: Props) {
     const muscles = state.data?.muscles && typeof state.data.muscles === 'object' ? state.data.muscles : {}
     return Object.entries(muscles)
       .map(([id, m]) => ({ id, label: String((m as Record<string, unknown>)?.label || id), ratio: Number((m as Record<string, unknown>)?.ratio || 0), sets: Number((m as Record<string, unknown>)?.sets || 0), minSets: Number((m as Record<string, unknown>)?.minSets || 0), view: (m as Record<string, unknown>)?.view }))
-      .filter((x) => x.view === view)
+      .filter((x) => x.view === view || x.view === 'both')
       .sort((a, b) => a.ratio - b.ratio)
       .slice(0, 3)
   }, [state.data, view])
