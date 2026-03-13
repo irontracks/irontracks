@@ -103,11 +103,13 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
   const teamWorkout = useTeamWorkout() as unknown as {
     sendInvite: (targetUser: unknown, workout: UnknownRecord) => Promise<unknown>
     broadcastMyLog: (exIdx: number, sIdx: number, weight: string, reps: string) => void
+    broadcastWorkoutEdit: (workout: UnknownRecord) => void
     teamSession: { id: string; isHost: boolean; participants: unknown[] } | null
     sharedLogs: Record<string, Record<string, { exIdx: number; sIdx: number; weight: string; reps: string; ts: number }>>
   };
   const sendInvite = teamWorkout.sendInvite;
   const broadcastMyLog = teamWorkout.broadcastMyLog
+  const broadcastWorkoutEdit = teamWorkout.broadcastWorkoutEdit
   const teamSession = teamWorkout.teamSession
   const sharedLogs = teamWorkout.sharedLogs
   const session = props.session;
@@ -310,7 +312,15 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     organizeError, setOrganizeError,
     organizeOpen, setOrganizeOpen,
     organizeDirty, organizeBaseKeysRef: organizeBaseKeysRef as unknown as React.MutableRefObject<string>,
-    onUpdateSession: props.onUpdateSession,
+    onUpdateSession: (updatedWorkout: UnknownRecord) => {
+      props.onUpdateSession?.(updatedWorkout);
+      if (teamSession?.id && typeof broadcastWorkoutEdit === 'function') {
+        // Small delay to allow state to settle before serialising
+        setTimeout(() => {
+          try { broadcastWorkoutEdit(updatedWorkout); } catch { }
+        }, 300);
+      }
+    },
     alert: alertVoid, confirm,
   });
   const {
