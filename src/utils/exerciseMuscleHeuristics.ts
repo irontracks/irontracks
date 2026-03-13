@@ -44,7 +44,7 @@ export function buildHeuristicExerciseMap(canonicalName: string): HeuristicExerc
   const matchAll = (tokens: string[]) => tokens.every((t) => n.includes(t))
 
   // IDs válidos do MuscleId:
-  // chest | delts_front | delts_side | biceps | triceps | abs | quads | calves
+  // chest | delts_front | delts_side | biceps | triceps | abs | quads | calves | forearms
   // lats | upper_back | delts_rear | spinal_erectors | glutes | hamstrings
 
   // ── PANTURRILHA ────────────────────────────────────────────────────
@@ -169,16 +169,33 @@ export function buildHeuristicExerciseMap(canonicalName: string): HeuristicExerc
     ], false, 0.83, 'heuristic: lats_row')
   }
 
+  // ── ANTEBRAÇO (isolado) ──────────────────────────────────────────
+  const isForearms =
+    match(['antebraco', 'antebraço', 'wrist curl', 'wrist extension', 'rosca punho', 'rosca inversa punho',
+      'farmer', 'farmers carry', 'farmers walk', 'zottman', 'reverse curl', 'rosca inversa',
+      'pronador', 'supinador', 'flexao punho', 'flexão punho', 'extensao punho', 'extensão punho'])
+  if (isForearms) return make(key, raw, [
+    { muscleId: 'forearms', weight: 0.85, role: 'primary' },
+    { muscleId: 'biceps', weight: 0.15, role: 'secondary' },
+  ], match(['unilateral']), 0.85, 'heuristic: forearms')
+
   // ── BÍCEPS ────────────────────────────────────────────────────────
   const isBiceps =
     match(['rosca', 'bicep', 'curl', 'scott', 'concentrado', 'hammer', 'martelo', 'zottman'])
     && !match(['tricep', 'trícep'])
   if (isBiceps) {
+    // Hammer Curl / Martelo / Zottman: primarily forearms (brachioradialis)
+    const isHammer = match(['hammer', 'martelo'])
+    if (isHammer) return make(key, raw, [
+      { muscleId: 'forearms', weight: 0.55, role: 'primary' },
+      { muscleId: 'biceps', weight: 0.35, role: 'secondary' },
+      { muscleId: 'delts_front', weight: 0.10, role: 'stabilizer' },
+    ], true, 0.87, 'heuristic: forearms_hammer')
     return make(key, raw, [
-      { muscleId: 'biceps', weight: 0.85, role: 'primary' },
+      { muscleId: 'biceps', weight: 0.80, role: 'primary' },
+      { muscleId: 'forearms', weight: 0.10, role: 'secondary' },
       { muscleId: 'delts_front', weight: 0.10, role: 'secondary' },
-      { muscleId: 'lats', weight: 0.05, role: 'stabilizer' },
-    ], match(['alternado', 'unilateral', 'martelo', 'hammer']), 0.85, 'heuristic: biceps')
+    ], match(['alternado', 'unilateral', 'concentrado']), 0.85, 'heuristic: biceps')
   }
 
   // ── TRÍCEPS ──────────────────────────────────────────────────────

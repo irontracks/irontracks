@@ -26,6 +26,7 @@ const FRONT_OVERLAYS: { muscleId: MuscleId; file: string }[] = [
   { muscleId: 'delts_front', file: 'front-delts.png' },
   { muscleId: 'delts_side', file: 'front-delts.png' },
   { muscleId: 'biceps', file: 'front-biceps.png' },
+  { muscleId: 'forearms', file: 'front-forearms.png' },
   { muscleId: 'abs', file: 'front-abs.png' },
   { muscleId: 'quads', file: 'front-quads.png' },
   { muscleId: 'calves', file: 'front-calves.png' },
