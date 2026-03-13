@@ -92,7 +92,7 @@ export const NormalSet = ({
       startTimer(restTime, { kind: 'rest', key, nextKey, restStartedAtMs: nowMs });
     }
 
-    // Auto-collapse + scroll to next exercise when last set is done
+      // Auto-collapse + scroll to FIRST SET of next exercise when last set is done
     if (nextDone && setsCount != null && setIdx === setsCount - 1) {
       const delay = restTime && restTime > 0 ? 600 : 300;
       setTimeout(() => {
@@ -102,8 +102,12 @@ export const NormalSet = ({
             next.add(exIdx);
             return next;
           });
+          // Scroll directly to the first SET ROW of the next exercise,
+          // bypassing the card header so the first input is visible immediately.
+          const firstSetOfNext = document.querySelector<HTMLElement>(`[data-set-first="${exIdx + 1}"]`);
           const nextCard = document.querySelector<HTMLElement>(`[data-exercise-idx="${exIdx + 1}"]`);
-          if (nextCard) nextCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+          const target = firstSetOfNext ?? nextCard;
+          if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
         } catch { /* silenced */ }
       }, delay);
     }
@@ -113,6 +117,7 @@ export const NormalSet = ({
     <div className="space-y-1" key={key}>
       {/* ── Single row ──────────────────────────────────────────────── */}
       <div
+        {...(setIdx === 0 ? { 'data-set-first': exIdx } : {})}
         className={[
           'rounded-xl border px-2.5 py-2 transition-all duration-300 shadow-sm',
           done
