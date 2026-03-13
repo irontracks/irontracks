@@ -9,7 +9,6 @@ import { z } from 'zod'
 import { ExerciseRowSchema, SetRowSchema, WorkoutRowSchema } from '@/schemas/database'
 import { AdvancedConfig } from '@/types/app'
 import { StoriesBarSkeleton, MuscleMapSkeleton, SectionSkeleton } from '@/components/ui/SuspenseFallbacks'
-import { DashboardSkeleton } from './DashboardSkeleton'
 
 // Lazy-loaded dashboard sections for granular Suspense
 const IronRankCard = React.lazy(() => import('./IronRankCard'))
@@ -223,7 +222,6 @@ type Props = {
     badges: { id: string; label: string; kind: string }[]
   } | null
   streakLoading?: boolean
-  isDashboardReady?: boolean
 }
 
 const isPeriodizedWorkout = (w: DashboardWorkout) =>
@@ -609,14 +607,9 @@ export default function StudentDashboard(props: Props) {
 
   return (
     <div className={density === 'compact' ? 'p-4 space-y-3 pb-24' : 'p-4 space-y-4 pb-24'}>
-      {/* Profile banner — only after data is ready, prevents mount-then-unmount CLS */}
-      {props.isDashboardReady !== false && props.profileIncomplete && <ProfileIncompleteBanner settings={props.settings as import('@/schemas/settings').UserSettings | null} onComplete={props.onOpenCompleteProfile} />}
+      {props.profileIncomplete && <ProfileIncompleteBanner settings={props.settings as import('@/schemas/settings').UserSettings | null} onComplete={props.onOpenCompleteProfile} />}
 
-      {/* Dashboard skeleton — shown while vital data is still loading */}
-      {props.view === 'dashboard' && props.isDashboardReady === false ? (
-        <DashboardSkeleton showStoriesBar={showStoriesBar} />
-      ) : (
-        <>
+      <>
           {props.view === 'dashboard' && showStoriesBar ? (
             <Suspense fallback={<StoriesBarSkeleton />}>
               <StoriesBar
@@ -1069,10 +1062,9 @@ export default function StudentDashboard(props: Props) {
                   )
                 })}
               </div>
-            </>
-          )}
-        </>
-      )}
+          </>
+        )}
+      </>
     </div>
   )
 }

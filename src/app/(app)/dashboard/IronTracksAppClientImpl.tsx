@@ -730,6 +730,10 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
     const hasCachedWorkouts = Array.isArray(workouts) && workouts.length > 0
     if (authLoading && !hasCachedWorkouts) return <LoadingScreen />;
     if (!user?.id && !hasCachedWorkouts) return <LoadingScreen />;
+    // Keep the premium splash visible until streak + settings are fully loaded.
+    // This prevents any flash of default/zero data or skeleton cards.
+    const isDashboardReady = !streakLoading && userSettingsApi.loaded;
+    if (!isDashboardReady && !hasCachedWorkouts) return <LoadingScreen />;
 
     const currentWorkoutId = activeSession?.workout?.id;
     let nextWorkout = null;
@@ -858,8 +862,6 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                         >
                             {(view === 'dashboard' || view === 'assessments' || view === 'community' || view === 'vip') && (
                                 <StudentDashboard
-                                    isDashboardReady={!streakLoading && userSettingsApi.loaded}
-                                    streakLoading={Boolean(streakLoading)}
                                     workouts={Array.isArray(workouts) ? workouts : []}
                                     profileIncomplete={Boolean(profileIncomplete)}
                                     onOpenCompleteProfile={() => setView('profile')}
