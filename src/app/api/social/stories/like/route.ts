@@ -57,7 +57,6 @@ export async function POST(req: Request) {
               type: 'story_like',
               title: 'Nova curtida',
               message: `${name} curtiu seu story.`,
-              read: false,
               is_read: false,
               metadata: { story_id: storyId, sender_id: auth.user.id },
             }])

@@ -362,7 +362,6 @@ export async function POST(request: Request) {
             type: 'workout_finish',
             title: 'Treino finalizado',
             message: `${name} terminou um treino: ${workoutTitle}.`,
-            read: false,
             is_read: false,
             metadata: { workout_id: data?.id ?? null, workout_title: workoutTitle, sender_id: user.id },
           }))
@@ -394,7 +393,6 @@ export async function POST(request: Request) {
                   type: 'friend_streak',
                   title: 'Streak de treino',
                   message: `${name} completou ${streak} dia(s) seguidos treinando.`,
-                  read: false,
                   is_read: false,
                   metadata: { streak, sender_id: user.id },
                 }))
@@ -424,7 +422,6 @@ export async function POST(request: Request) {
                   type: 'friend_goal',
                   title: 'Marco atingido',
                   message: `${name} completou ${total} treinos no histórico.`,
-                  read: false,
                   is_read: false,
                   metadata: { total_workouts: total, sender_id: user.id },
                 }))
@@ -515,7 +512,6 @@ export async function POST(request: Request) {
                     type: 'friend_pr',
                     title: 'PR batido',
                     message: `${name} bateu PR: ${summary}.`,
-                    read: false,
                     is_read: false,
                     metadata: { prs: top, workout_id: data?.id ?? null, sender_id: user.id },
                   }))

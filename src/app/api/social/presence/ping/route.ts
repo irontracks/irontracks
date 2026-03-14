@@ -58,7 +58,6 @@ export async function POST(req: Request) {
       type: 'friend_online',
       title: 'Amigo online',
       message: `${name} entrou no app.`,
-      read: false,
       is_read: false,
       metadata: { sender_id: userId },
     }))

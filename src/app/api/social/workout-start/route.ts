@@ -53,7 +53,6 @@ export async function POST(req: Request) {
       type: 'workout_start',
       title: 'Treino iniciado',
       message: `${name} começou um treino: ${workoutTitle}.`,
-      read: false,
       is_read: false,
       metadata: { workout_id: workoutId, workout_title: workoutTitle, sender_id: userId },
     }))
