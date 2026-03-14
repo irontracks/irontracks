@@ -170,10 +170,12 @@ export async function setWorkoutArchived(id: string, archived = true): Promise<A
     try {
         const supabase = createClient()
         const { data: { user } } = await supabase.auth.getUser()
+        if (!user) return { ok: false, error: 'unauthorized' }
         const workoutId = safeString(id)
         if (!workoutId) return { ok: false, error: 'missing id' }
         const archivedAt = archived ? new Date().toISOString() : null
-        const { error } = await supabase.from('workouts').update({ archived_at: archivedAt }).eq('id', workoutId)
+        // R3#4: Add user_id filter to prevent IDOR — users can only archive their own workouts
+        const { error } = await supabase.from('workouts').update({ archived_at: archivedAt }).eq('id', workoutId).eq('user_id', user.id)
         if (error) return { ok: false, error: error.message }
         void archivedAt
         if (user?.id) await invalidateWorkoutCaches(user.id)

@@ -91,6 +91,15 @@ export async function POST(req: Request) {
     }
     if (!srow) return NextResponse.json({ ok: false, error: 'student not found' }, { status: 404 })
 
+    // R3#5: Teachers can only reassign students they own (or unassigned students)
+    if (auth.role === 'teacher') {
+      const { data: currentStudent } = await admin.from('students').select('teacher_id').eq('id', srow.id).maybeSingle()
+      const currentTeacher = currentStudent?.teacher_id ? String(currentStudent.teacher_id) : ''
+      if (currentTeacher && currentTeacher !== auth.user.id) {
+        return NextResponse.json({ ok: false, error: 'Aluno já pertence a outro professor.' }, { status: 403 })
+      }
+    }
+
     const { error } = await admin.from('students').update({ teacher_id: teacher_user_id }).eq('id', srow.id)
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
     return NextResponse.json({ ok: true, student_id: srow.id, teacher_user_id })

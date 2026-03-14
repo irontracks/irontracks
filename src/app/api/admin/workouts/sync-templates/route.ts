@@ -36,6 +36,8 @@ export async function POST(req: Request) {
 
     let targetUserId = ''
     let resolvedEmail = String(email || '').trim()
+    // R3#8: Sanitize email to prevent PostgREST .or() injection
+    resolvedEmail = resolvedEmail.replace(/[,()\\]/g, '')
     if (id) {
       const { data: sById } = await admin.from('students').select('id, user_id, email').eq('id', id).maybeSingle()
       if (sById?.user_id) targetUserId = sById.user_id

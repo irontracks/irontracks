@@ -45,9 +45,11 @@ export async function POST(req: Request) {
       }
     }
 
-    // 3. Remove message rows with media payload (global + direct)
-    const { data: globalDeleted } = await admin.from('messages').delete().like('content', '%"type"%').select('id')
-    const { data: directDeleted } = await admin.from('direct_messages').delete().like('content', '%"type"%').select('id')
+    // R3#9: Use specific filter for actual media messages only
+    // Previous pattern '%"type"%' matched ANY JSON with a "type" field (invites, notifications, etc.)
+    // Only delete messages that contain a media_url field (actual uploaded media)
+    const { data: globalDeleted } = await admin.from('messages').delete().like('content', '%"media_url"%').select('id')
+    const { data: directDeleted } = await admin.from('direct_messages').delete().like('content', '%"media_url"%').select('id')
     
     return NextResponse.json({ ok: true, deleted: allPaths.length, messagesRemoved: (globalDeleted?.length || 0) + (directDeleted?.length || 0) })
   } catch (e: unknown) {

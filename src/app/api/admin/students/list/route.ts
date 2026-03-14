@@ -31,7 +31,9 @@ export async function GET(req: Request) {
     const { data: q, response } = parseSearchParams(req, QuerySchema)
     if (response) return response
 
-    const cacheKey = `admin:students:list:${q?.teacher_id || 'all'}:${q?.status || 'all'}:${q?.limit || 50}:${q?.offset || 0}`
+    // R3#6: Include admin user ID in cache key to prevent cross-admin PII leakage
+    const adminUserId = auth.ok ? String(auth.user?.id || 'anon') : 'anon'
+    const cacheKey = `admin:students:list:${adminUserId}:${q?.teacher_id || 'all'}:${q?.status || 'all'}:${q?.limit || 50}:${q?.offset || 0}`
     const cached = await cacheGet<Record<string, unknown>>(cacheKey, (v) => (v && typeof v === 'object' ? (v as Record<string, unknown>) : null))
     if (cached) return NextResponse.json(cached)
 
