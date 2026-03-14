@@ -1,6 +1,6 @@
 'use client'
 
-import React, { memo, useCallback, useEffect, useRef, useState } from 'react'
+import React, { memo, useEffect, useState } from 'react'
 import Image from 'next/image'
 import NextImage from 'next/image'
 import { Crown, X, ChevronRight, Trophy, TrendingUp, ChevronDown, Zap, Star } from 'lucide-react'
@@ -10,7 +10,7 @@ import { getIronRankLeaderboard, getLatestWorkoutPrs } from '@/actions/workout-a
 import BadgesInline, { type Badge } from './BadgesInline'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { logError } from '@/lib/logger'
-import Confetti from '@/components/ui/Confetti'
+
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -110,9 +110,7 @@ const IronRankCard = memo(function IronRankCard({
     const [prsExpanded, setPrsExpanded] = useState(false)
     const rankFocusTrapRef = useFocusTrap(rankOpen, () => setRankOpen(false))
 
-    // ── Celebration state ──────────────────────────────────────────────────────
-    const [showConfetti, setShowConfetti] = useState(false)
-    const hasTriggeredConfettiRef = useRef(false)
+
 
     // ── Load PRs ───────────────────────────────────────────────────────────────
     useEffect(() => {
@@ -128,14 +126,7 @@ const IronRankCard = memo(function IronRankCard({
                     setPrsTitle(wo?.title ? String(wo.title) : '')
                     const loadedPrs = res?.ok && Array.isArray(res?.prs) ? res.prs : []
                     setPrs(loadedPrs)
-                    // 🎆 Trigger celebration confetti on new PRs
-                    if (loadedPrs.length > 0 && !hasTriggeredConfettiRef.current) {
-                        const hasImproved = loadedPrs.some(pr => countImprovements(pr) > 0)
-                        if (hasImproved) {
-                            hasTriggeredConfettiRef.current = true
-                            setShowConfetti(true)
-                        }
-                    }
+
                 } catch (e) { logError('error', e) }
                 finally { if (!cancelled) setPrsLoading(false) }
             })()
@@ -195,12 +186,11 @@ const IronRankCard = memo(function IronRankCard({
 
     const hasContent = showIronRank || (showRecords && !prsLoading)
 
-    const handleConfettiComplete = useCallback(() => setShowConfetti(false), [])
+
 
     return (
         <>
-            {/* 🎆 PR Celebration Confetti */}
-            <Confetti active={showConfetti} duration={2800} count={50} onComplete={handleConfettiComplete} />
+
             {hasContent && (
                 <motion.div
                     initial={{ opacity: 0, y: -10 }}
