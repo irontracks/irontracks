@@ -369,7 +369,9 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
 
   // ── Finish workout (extracted to useWorkoutFinish) ──────────────────────
   const finishHook = useWorkoutFinish({
-    session, workout, exercises, logs, ui, settings, ticker,
+    session, workout, exercises, logs, ui,
+    userId: String((settings as Record<string, unknown>)?.userId ?? (session as Record<string, unknown>)?.userId ?? ''),
+    settings, ticker,
     postCheckinOpen, setPostCheckinOpen,
     postCheckinDraft: postCheckinDraft as Record<string, string>,
     setPostCheckinDraft: setPostCheckinDraft as (v: Record<string, string>) => void,
