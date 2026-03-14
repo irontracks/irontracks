@@ -50,7 +50,11 @@ const normalizeDraft = (draft: unknown) => {
 
 const BodySchema = z
   .object({
-    answers: z.record(z.unknown()),
+    // R4#3: Limit answers size to prevent DoS via oversized payloads to Gemini
+    answers: z.record(z.unknown()).refine(
+      (val) => JSON.stringify(val).length <= 5000,
+      { message: 'answers payload too large (max 5KB)' }
+    ),
     mode: z.enum(['single', 'program']).default('single'),
   })
   .strict()
