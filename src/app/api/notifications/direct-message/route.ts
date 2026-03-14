@@ -34,8 +34,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: 'invalid' }, { status: 400 })
     }
 
-    if (receiverId !== user.id) {
-      return NextResponse.json({ ok: false, error: 'forbidden' }, { status: 403 })
+    // R4#4: receiverId is the RECIPIENT, user.id is the SENDER
+    // Prevent sending notifications to yourself
+    if (receiverId === user.id) {
+      return NextResponse.json({ ok: true, skipped: true })
     }
 
     const safeSenderName = senderName.slice(0, 80)
@@ -48,7 +50,7 @@ export async function POST(req: Request) {
     const { data: prefRow } = await admin
       .from('user_settings')
       .select('preferences')
-      .eq('user_id', user.id)
+      .eq('user_id', receiverId)
       .maybeSingle()
 
     const prefs = prefRow?.preferences && typeof prefRow.preferences === 'object' ? prefRow.preferences : null
@@ -56,7 +58,7 @@ export async function POST(req: Request) {
     if (!allow) return NextResponse.json({ ok: true, skipped: true })
 
     const { error } = await admin.from('notifications').insert({
-      user_id: user.id,
+      user_id: receiverId,
       title: safeSenderName,
       message: safePreview,
       type: 'message',
@@ -64,8 +66,8 @@ export async function POST(req: Request) {
 
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
 
-    // Fire push notification
-    void sendPushToUsers([user.id], `💬 ${safeSenderName}`, safePreview).catch(() => { })
+    // Fire push notification to the RECEIVER
+    void sendPushToUsers([receiverId], `💬 ${safeSenderName}`, safePreview).catch(() => { })
 
     return NextResponse.json({ ok: true })
   } catch (e: unknown) {

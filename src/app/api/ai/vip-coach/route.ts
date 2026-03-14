@@ -13,7 +13,7 @@ const MODEL = process.env.GOOGLE_GENERATIVE_AI_MODEL_ID || 'gemini-2.5-flash'
 
 const BodySchema = z
   .object({
-    message: z.string().min(1),
+    message: z.string().min(1).max(2000),  // R4#2: Limit message size to prevent DoS
     mode: z.enum(['general', 'nutrition', 'programming']).default('general'),
   })
   .strict()

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
-import { createAdminClient } from '@/utils/supabase/admin'
+
 import { getErrorMessage } from '@/utils/errorMessage'
 import { parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
@@ -37,16 +37,17 @@ export async function GET() {
     const cached = await cacheGet<Record<string, unknown>>(cacheKey, (v) => (v && typeof v === 'object' ? (v as Record<string, unknown>) : null))
     if (cached) return NextResponse.json(cached)
 
-    const admin = createAdminClient()
 
     const rpcRes = await supabase.rpc('iron_rank_leaderboard', { limit_count: 10 })
 
-    const workoutsCountRes = await admin
+    // R4#5: Use user-scoped client instead of admin — no need for cross-user aggregates here
+    const workoutsCountRes = await supabase
       .from('workouts')
       .select('id', { head: true, count: 'exact' })
+      .eq('user_id', user.id)
       .eq('is_template', false)
 
-    const setsCountRes = await admin
+    const setsCountRes = await supabase
       .from('sets')
       .select('id', { head: true, count: 'exact' })
       .or('completed.is.null,completed.eq.true')

@@ -35,7 +35,7 @@ export async function sendBroadcastMessage(title: string, message: string): Prom
                 title,
                 message,
                 type: 'broadcast',
-                read: false,
+                is_read: false,  // R4#8: Fixed column name (was 'read')
                 created_at: new Date().toISOString()
             }))
 
@@ -486,20 +486,22 @@ export async function exportAllData(): Promise<AdminResult & { data?: unknown }>
         await checkAdmin()
         const adminDb = createAdminClient()
 
-        const { data: profiles } = await adminDb.from('profiles').select('*')
-        const { data: teachers } = await adminDb.from('teachers').select('*')
-        const { data: students } = await adminDb.from('students').select('*')
-        const { data: assessments } = await adminDb.from('assessments').select('*')
-        const { data: notifications } = await adminDb.from('notifications').select('*')
-        const { data: chat_channels } = await adminDb.from('chat_channels').select('*')
-        const { data: messages } = await adminDb.from('messages').select('*')
-        const { data: invites } = await adminDb.from('invites').select('*')
-        const { data: team_sessions } = await adminDb.from('team_sessions').select('*')
+        // R4#6: Add limits to prevent OOM on large datasets
+        const { data: profiles } = await adminDb.from('profiles').select('*').limit(2000)
+        const { data: teachers } = await adminDb.from('teachers').select('*').limit(500)
+        const { data: students } = await adminDb.from('students').select('*').limit(2000)
+        const { data: assessments } = await adminDb.from('assessments').select('*').limit(2000)
+        const { data: notifications } = await adminDb.from('notifications').select('*').limit(5000)
+        const { data: chat_channels } = await adminDb.from('chat_channels').select('*').limit(1000)
+        const { data: messages } = await adminDb.from('messages').select('*').limit(5000)
+        const { data: invites } = await adminDb.from('invites').select('*').limit(1000)
+        const { data: team_sessions } = await adminDb.from('team_sessions').select('*').limit(1000)
 
         const { data: workouts } = await adminDb
             .from('workouts')
             .select('*, exercises(*, sets(*))')
             .order('name')
+            .limit(2000)
 
         const payload = {
             exported_at: new Date().toISOString(),

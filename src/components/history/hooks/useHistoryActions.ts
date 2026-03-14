@@ -37,7 +37,8 @@ export function useHistoryActions({ user, supabase, setHistory, alert, confirm }
         if (!(await confirm(`Excluir ${selectedIds.size} itens selecionados?`))) return;
         try {
             const ids = Array.from(selectedIds);
-            const { error } = await supabase.from('workouts').delete().in('id', ids).eq('is_template', false);
+            // R4#1: Add user_id filter to prevent IDOR
+            const { error } = await supabase.from('workouts').delete().in('id', ids).eq('is_template', false).eq('user_id', user?.id ?? '');
             if (error) throw error;
             setHistory(prev => prev.filter(h => !selectedIds.has(h.id)));
             setIsSelectionMode(false);
@@ -55,7 +56,8 @@ export function useHistoryActions({ user, supabase, setHistory, alert, confirm }
         e.preventDefault();
         if (!window.confirm('Tem certeza que deseja excluir este histórico permanentemente?')) return;
         try {
-            const { error } = await supabase.from('workouts').delete().eq('id', session.id).eq('is_template', false);
+            // R4#1: Add user_id filter to prevent IDOR
+            const { error } = await supabase.from('workouts').delete().eq('id', session.id).eq('is_template', false).eq('user_id', user?.id ?? '');
             if (error) throw error;
             setHistory(prev => prev.filter(h => h.id !== session.id));
         } catch (error) {
