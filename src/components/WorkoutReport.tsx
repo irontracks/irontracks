@@ -39,7 +39,7 @@ const ReportMusclePieChart = dynamic(() => import('@/components/workout-report/R
 
 // Modals — loaded only when user opens them
 const StoryComposer = dynamic(() => import('@/components/StoryComposer'), { ssr: false, loading: () => null })
-const CoachChatModal = dynamic(() => import('@/components/CoachChatModal'), { ssr: false, loading: () => null })
+
 import {
     useReportData,
     remapPrevLogsByCanonical,
@@ -82,7 +82,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
     const [showStory, setShowStory] = useState(false);
     const storiesV2Enabled = useMemo(() => isFeatureEnabled(settings, FEATURE_KEYS.storiesV2), [settings]);
     const [showStoryPrompt, setShowStoryPrompt] = useState(false);
-    const [showCoachChat, setShowCoachChat] = useState(false);
+
     const { credits } = useVipCredits();
     const formatLimit = (limit: number | null | undefined) => (limit == null ? '∞' : limit > 1000 ? '∞' : limit)
     const isInsightsExhausted = (entry?: { used: number; limit: number | null }) => !!entry && entry.limit !== null && entry.used >= entry.limit
@@ -869,7 +869,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                     applyState={applyState}
                     onGenerateAi={handleGenerateAi}
                     onApplyProgression={handleApplyProgression}
-                    onOpenChat={() => setShowCoachChat(true)}
+
                     renderAiRating={renderAiRating}
                 />
 
@@ -959,23 +959,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                 </div>
             )}
             {showStory ? <StoryComposer open={showStory} session={session} calories={calories} onClose={() => setShowStory(false)} /> : null}
-            {showCoachChat && (
-                <CoachChatModal
-                    isOpen={showCoachChat}
-                    onClose={() => setShowCoachChat(false)}
-                    session={session}
-                    previousSession={effectivePreviousSession ?? undefined}
-                    isVip={isVip}
-                    onUpgrade={onUpgrade}
-                    onSaveToReport={(summary: unknown) => {
-                        setAiState((prev: AiState) => {
-                            const ai = prev?.result && typeof prev.result === 'object' ? (prev.result as AnyObj) : {}
-                            const current = Array.isArray(ai.summary) ? (ai.summary as unknown[]) : []
-                            return { ...prev, result: { ...ai, summary: [...current, summary] } }
-                        })
-                    }}
-                />
-            )}
+
         </div>
     );
 };

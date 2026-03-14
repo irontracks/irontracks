@@ -543,48 +543,109 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
         <VipPeriodizationPanel locked={isLocked} onStartSession={(w) => onStartSession?.(w as Workout)} onOpenWorkoutEditor={(w) => onOpenWorkoutEditor?.(w as Workout)} />
       </div>
 
-      {/* Coach IA Chat */}
-      <div ref={chatRef} className="rounded-2xl overflow-hidden flex flex-col h-[600px]" style={{ border: '1px solid rgba(234,179,8,0.18)', background: 'rgba(10,10,10,0.99)' }}>
-        <div className="px-4 py-3.5 flex justify-between items-center" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.02)' }}>
-          <div className="text-sm font-black text-white flex items-center gap-2">
-            <Sparkles size={16} className="text-yellow-500" />
-            Coach IA
+      {/* ── CHAT PAI — Coach IA Premium ─────────────────────────────────── */}
+      <div ref={chatRef} className="rounded-2xl overflow-hidden flex flex-col h-[600px] relative" style={{ border: '1px solid rgba(234,179,8,0.25)', background: 'linear-gradient(180deg, rgba(15,15,14,0.99) 0%, rgba(10,10,9,0.99) 100%)', boxShadow: '0 0 60px rgba(234,179,8,0.06), 0 32px 80px rgba(0,0,0,0.6)' }}>
+        {/* Shimmer top line */}
+        <div className="absolute top-0 left-0 right-0 h-[2px] z-10" style={{ background: 'linear-gradient(90deg, transparent 0%, rgba(234,179,8,0.6) 40%, rgba(251,191,36,1) 50%, rgba(234,179,8,0.6) 60%, transparent 100%)' }} />
+
+        {/* Header */}
+        <div className="px-4 py-3 flex items-center justify-between relative z-10" style={{ borderBottom: '1px solid rgba(234,179,8,0.12)', background: 'linear-gradient(135deg, rgba(234,179,8,0.06) 0%, rgba(10,10,10,0.95) 60%)' }}>
+          <div className="flex items-center gap-3">
+            {/* Coach avatar with glow */}
+            <div className="relative">
+              <div className="absolute inset-0 rounded-xl blur-md" style={{ background: 'rgba(234,179,8,0.4)', opacity: 0.6 }} />
+              <div className="relative w-10 h-10 rounded-xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)', boxShadow: '0 4px 16px rgba(234,179,8,0.3)' }}>
+                <Sparkles size={18} className="text-black" />
+              </div>
+            </div>
+            <div>
+              <div className="text-[9px] font-black uppercase tracking-[0.22em] text-yellow-500">Chat Pai</div>
+              <div className="text-white font-black text-sm">Iron Coach IA</div>
+            </div>
           </div>
-          <button
-            type="button"
-            onClick={() => setMessages([])}
-            className="text-xs font-bold text-neutral-500 hover:text-red-400 flex items-center gap-1 transition-colors"
-          >
-            <Trash2 size={12} />
-            Limpar
-          </button>
+          <div className="flex items-center gap-2">
+            {credits?.chat && (
+              <div className={`text-[10px] px-2 py-1 rounded-lg font-mono font-black ${credits.chat.limit !== null && credits.chat.used >= credits.chat.limit ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'bg-neutral-900 text-neutral-400 border border-neutral-800'}`}>
+                {credits.chat.used}/{credits.chat.limit == null ? '∞' : credits.chat.limit > 1000 ? '∞' : credits.chat.limit}
+              </div>
+            )}
+            <button
+              type="button"
+              onClick={() => setMessages([])}
+              className="w-9 h-9 rounded-xl flex items-center justify-center text-neutral-500 hover:text-red-400 transition-all active:scale-95"
+              style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}
+              aria-label="Limpar conversa"
+            >
+              <Trash2 size={14} />
+            </button>
+          </div>
         </div>
 
-        <div className="flex-1 overflow-y-auto custom-scrollbar p-4 space-y-4">
+        {/* Mode selector — segmented control */}
+        <div className="px-4 py-2.5 flex items-center gap-1.5" style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', background: 'rgba(0,0,0,0.3)' }}>
+          {([
+            { key: 'coach', label: '🎯 Coach', desc: 'Treino e dúvidas' },
+            { key: 'planner', label: '📋 Planner', desc: 'Monte treinos' },
+            { key: 'diagnostic', label: '🔬 Diagnóstico', desc: 'Análise profunda' },
+          ] as const).map((m) => (
+            <button
+              key={m.key}
+              type="button"
+              onClick={() => setMode(m.key)}
+              className="flex-1 min-h-[36px] px-2 py-1.5 rounded-lg text-center transition-all active:scale-[0.97]"
+              style={mode === m.key
+                ? { background: 'linear-gradient(135deg, rgba(234,179,8,0.15), rgba(234,179,8,0.06))', border: '1px solid rgba(234,179,8,0.3)', boxShadow: '0 2px 8px rgba(234,179,8,0.1)' }
+                : { background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }
+              }
+            >
+              <div className={`text-[11px] font-black ${mode === m.key ? 'text-yellow-400' : 'text-neutral-500'}`}>{m.label}</div>
+            </button>
+          ))}
+        </div>
+
+        {/* Messages area */}
+        <div className="flex-1 overflow-y-auto p-4 space-y-3">
           {messages.length === 0 && (
-            <div className="text-center py-10">
-              <div className="w-12 h-12 rounded-2xl flex items-center justify-center mx-auto mb-3" style={{ background: 'rgba(234,179,8,0.1)', border: '1px solid rgba(234,179,8,0.2)' }}>
-                <Sparkles size={22} className="text-yellow-500" />
+            <div className="text-center py-8">
+              <div className="relative inline-block mb-4">
+                <div className="absolute inset-0 rounded-2xl blur-lg" style={{ background: 'rgba(234,179,8,0.2)' }} />
+                <div className="relative w-14 h-14 rounded-2xl flex items-center justify-center mx-auto" style={{ background: 'linear-gradient(135deg, rgba(234,179,8,0.12), rgba(234,179,8,0.04))', border: '1px solid rgba(234,179,8,0.25)' }}>
+                  <Sparkles size={24} className="text-yellow-500" />
+                </div>
               </div>
-              <p className="text-sm text-neutral-400">Olá, {name.split(' ')[0]}.</p>
-              <p className="text-xs mt-1 text-neutral-600">Como posso ajudar no seu treino hoje?</p>
+              <p className="text-sm font-bold text-neutral-300">Olá{name ? `, ${name.split(' ')[0]}` : ''}! 👋</p>
+              <p className="text-xs mt-1.5 text-neutral-600 max-w-xs mx-auto">
+                Sou seu Iron Coach com acesso completo aos seus treinos, avaliação física e progressão. Como posso ajudar?
+              </p>
+              {/* Data sources indicator */}
+              <div className="mt-4 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full" style={{ background: 'rgba(234,179,8,0.06)', border: '1px solid rgba(234,179,8,0.15)' }}>
+                <div className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+                <span className="text-[10px] font-black uppercase tracking-widest text-yellow-600">Dados conectados</span>
+              </div>
             </div>
           )}
           {messages.map((m) => (
             <div key={m.id} className={`flex ${m.role === 'assistant' ? 'justify-start' : 'justify-end'}`}>
               <div
-                className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm ${m.isLimit
+                className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${m.isLimit
                   ? 'bg-red-500/10 border border-red-500/30 text-red-200'
                   : m.role === 'assistant'
                     ? 'text-neutral-200'
-                    : 'text-white'
+                    : 'text-white font-medium'
                   }`}
                 style={m.isLimit ? {} : m.role === 'assistant'
-                  ? { background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }
-                  : { background: 'rgba(234,179,8,0.1)', border: '1px solid rgba(234,179,8,0.2)' }
+                  ? { background: 'rgba(234,179,8,0.04)', border: '1px solid rgba(234,179,8,0.12)', borderRadius: '4px 16px 16px 16px' }
+                  : { background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '16px 4px 16px 16px' }
                 }
               >
-                {m.text}
+                <div style={{ whiteSpace: 'pre-wrap' }}>{m.text}</div>
+                {/* Data sources badge on assistant messages */}
+                {m.role === 'assistant' && Array.isArray(m.dataUsed) && m.dataUsed.length > 0 && (
+                  <div className="mt-2 flex items-center gap-1.5 pt-2" style={{ borderTop: '1px solid rgba(234,179,8,0.08)' }}>
+                    <div className="w-1 h-1 rounded-full bg-yellow-500" />
+                    <span className="text-[9px] font-bold text-yellow-700">Analisou: {(m.dataUsed as unknown[]).map((d) => typeof d === 'object' && d !== null ? String((d as Record<string, unknown>).label || '') : String(d)).join(', ')}</span>
+                  </div>
+                )}
                 {m.isLimit && !hideVipCtas && (
                   <button onClick={() => window.location.href = '/marketplace'} className="block mt-2 text-xs font-black uppercase text-yellow-500 hover:underline">
                     Fazer Upgrade
@@ -593,33 +654,49 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
               </div>
             </div>
           ))}
+          {busy && (
+            <div className="flex justify-start">
+              <div className="rounded-2xl px-4 py-3 flex items-center gap-2" style={{ background: 'rgba(234,179,8,0.04)', border: '1px solid rgba(234,179,8,0.12)', borderRadius: '4px 16px 16px 16px' }}>
+                <div className="flex items-center gap-1">
+                  <div className="w-1.5 h-1.5 rounded-full bg-yellow-500 animate-bounce" style={{ animationDelay: '0ms' }} />
+                  <div className="w-1.5 h-1.5 rounded-full bg-yellow-500 animate-bounce" style={{ animationDelay: '150ms' }} />
+                  <div className="w-1.5 h-1.5 rounded-full bg-yellow-500 animate-bounce" style={{ animationDelay: '300ms' }} />
+                </div>
+                <span className="text-[10px] text-yellow-600 font-bold">Analisando seus dados...</span>
+              </div>
+            </div>
+          )}
         </div>
 
-        <div className="p-4" style={{ borderTop: '1px solid rgba(255,255,255,0.05)', background: 'rgba(255,255,255,0.01)' }}>
-          <div className="flex gap-2 mb-3 overflow-x-auto pb-1">
+        {/* Input area */}
+        <div className="p-4 relative z-10" style={{ borderTop: '1px solid rgba(234,179,8,0.1)', background: 'linear-gradient(180deg, rgba(15,15,14,0.98) 0%, rgba(10,10,9,0.99) 100%)' }}>
+          {/* Presets */}
+          <div className="flex gap-1.5 mb-3 overflow-x-auto pb-1 no-scrollbar">
             {presets.map((p) => (
-              <button key={p} onClick={() => setDraft(p)} className="whitespace-nowrap px-3 py-1.5 rounded-lg text-xs text-neutral-400 hover:text-white transition-colors" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
+              <button key={p} onClick={() => setDraft(p)} className="whitespace-nowrap px-3 py-1.5 rounded-lg text-[11px] font-bold text-neutral-500 hover:text-yellow-400 transition-all active:scale-[0.97]" style={{ background: 'rgba(234,179,8,0.04)', border: '1px solid rgba(234,179,8,0.1)' }}>
                 {p}
               </button>
             ))}
           </div>
+          {/* Input + Send */}
           <div className="flex gap-2">
             <input
               ref={inputRef}
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && send()}
-              placeholder="Digite sua mensagem..."
-              className="flex-1 rounded-xl px-4 text-sm text-white focus:outline-none transition-colors"
-              style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
+              placeholder="Pergunte ao Iron Coach..."
+              className="flex-1 rounded-xl px-4 py-3 text-sm text-white placeholder:text-neutral-600 focus:outline-none transition-all input-premium-focus"
+              style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(234,179,8,0.12)' }}
             />
             <button
               onClick={send}
-              disabled={busy}
-              className="font-bold px-4 rounded-xl text-black font-black disabled:opacity-50 transition-all active:scale-[0.97]"
-              style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)', boxShadow: busy ? 'none' : '0 4px 12px rgba(234,179,8,0.3)' }}
+              disabled={busy || !draft.trim()}
+              className="w-12 h-12 rounded-xl flex items-center justify-center text-black font-black disabled:opacity-40 transition-all active:scale-[0.95]"
+              style={{ background: busy || !draft.trim() ? 'rgba(234,179,8,0.2)' : 'linear-gradient(135deg, #f59e0b, #d97706)', boxShadow: busy || !draft.trim() ? 'none' : '0 4px 16px rgba(234,179,8,0.35)' }}
+              aria-label="Enviar mensagem"
             >
-              Enviar
+              <MessageSquare size={18} />
             </button>
           </div>
         </div>
