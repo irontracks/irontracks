@@ -82,7 +82,7 @@ export async function getReportPreviousData(params: ReportPreviousParams): Promi
 
         let query = supabase.from('workouts').select('id, date, created_at, notes, name')
             .eq('user_id', userId).eq('is_template', false)
-            .order('date', { ascending: false }).limit(200)
+            .order('date', { ascending: false }).limit(50) // R6#4: Was 200 — each row has full session JSON
         if (currentSessionId) query = query.neq('id', currentSessionId)
         const { data: rows, error } = await query
         if (error) return empty
