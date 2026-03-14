@@ -39,6 +39,8 @@ interface SetRow {
 
 let supportsSourceWorkoutId: boolean | null = null
 let supportsSubscriptions: boolean | null = null
+let supportsDetectedAt = 0 // R8#2: TTL for re-detection in serverless
+const SUPPORTS_TTL_MS = 5 * 60 * 1000 // 5 minutes
 
 const selectTemplate = `
   id,
@@ -111,6 +113,13 @@ const getAdmin = (): SupabaseAdmin | null => {
 }
 
 const detectSupports = async (admin: SupabaseAdmin): Promise<void> => {
+  // R8#2: Reset cached detection after TTL to avoid stale false in serverless
+  const now = Date.now()
+  if (supportsDetectedAt && now - supportsDetectedAt > SUPPORTS_TTL_MS) {
+    supportsSourceWorkoutId = null
+    supportsSubscriptions = null
+  }
+
   if (supportsSourceWorkoutId !== true) {
     try {
       const { error } = await admin.from('workouts').select('id, source_workout_id').limit(1)
@@ -128,6 +137,8 @@ const detectSupports = async (admin: SupabaseAdmin): Promise<void> => {
       supportsSubscriptions = false
     }
   }
+
+  supportsDetectedAt = now
 }
 
 const upsertSyncedWorkout = async ({

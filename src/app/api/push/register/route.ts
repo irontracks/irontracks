@@ -36,6 +36,21 @@ export async function POST(req: Request) {
     const platform = normalizePlatform((body as Record<string, unknown>)?.platform)
     const deviceId = normalizeToken((body as Record<string, unknown>)?.deviceId) || null
 
+    // R8#1: Prevent token hijacking — if this token already belongs to another user,
+    // remove the old registration first. Without this check, the upsert on conflict='token'
+    // would silently overwrite another user's token registration.
+    const { createAdminClient } = await import('@/utils/supabase/admin')
+    const admin = createAdminClient()
+    const { data: existing } = await admin
+      .from('device_push_tokens')
+      .select('user_id')
+      .eq('token', token)
+      .neq('user_id', user.id)
+      .maybeSingle()
+    if (existing?.user_id) {
+      await admin.from('device_push_tokens').delete().eq('token', token).neq('user_id', user.id)
+    }
+
     const { error } = await supabase
       .from('device_push_tokens')
       .upsert(
