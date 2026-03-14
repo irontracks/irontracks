@@ -258,6 +258,67 @@ select:focus-visible {
   100% { opacity: 1; transform: scale(1); }
 }
 
+/* ── Premium Gold Plus animations ──────────────────────────────────── */
+
+/* Aurora breathing pulse for story rings */
+@keyframes aurora-pulse {
+  0%, 100% { filter: brightness(1) saturate(1); }
+  50%      { filter: brightness(1.3) saturate(1.2); }
+}
+
+/* Streak fire emoji tremor */
+.streak-fire {
+  display: inline-block;
+  animation: streak-shake 2.5s ease-in-out infinite;
+}
+@keyframes streak-shake {
+  0%, 100% { transform: rotate(0deg) scale(1); }
+  25%      { transform: rotate(-5deg) scale(1.05); }
+  50%      { transform: rotate(3deg) scale(1.1); }
+  75%      { transform: rotate(-2deg) scale(1.05); }
+}
+
+/* Gold skeleton shimmer overlay */
+.shimmer-overlay-gold {
+  position: relative;
+  overflow: hidden;
+}
+.shimmer-overlay-gold::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(234,179,8,0.06), transparent);
+  animation: shimmer 1.5s infinite;
+}
+
+/* Premium input focus glow — spreads gold shadow on focus */
+.input-premium-focus:focus {
+  box-shadow: 0 0 0 3px rgba(234,179,8,0.12), 0 0 16px rgba(234,179,8,0.08);
+  border-color: rgba(234,179,8,0.5) !important;
+}
+
+/* Workout start button animated gradient */
+.btn-gold-animated {
+  background-size: 200% 100%;
+  background-image: linear-gradient(90deg, #b45309, #d97706, #f59e0b, #fbbf24, #f59e0b, #d97706, #b45309);
+  animation: gold-flow 3s ease-in-out infinite;
+}
+@keyframes gold-flow {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* PR celebration badge entrance */
+.pr-badge-enter {
+  animation: prBadgeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes prBadgeIn {
+  0%   { opacity: 0; transform: scale(0.5) rotate(-10deg); }
+  60%  { transform: scale(1.15) rotate(3deg); }
+  100% { opacity: 1; transform: scale(1) rotate(0deg); }
+}
+
 /* Stagger children — add to parent, each child gets delay */
 .stagger-children > * {
   animation: fadeIn 0.3s ease-out both;

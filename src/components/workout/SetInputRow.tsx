@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useRef, useEffect } from 'react';
 import { MessageSquare, Check } from 'lucide-react';
+import { motion, useAnimationControls } from 'framer-motion';
 import { HelpHint } from '@/components/ui/HelpHint';
 import { HELP_TERMS } from '@/utils/help/terms';
 import { useActiveWorkout } from './ActiveWorkoutContext';
@@ -63,9 +64,38 @@ export const SetInputRow: React.FC<Props> = ({ ex, exIdx, setIdx }) => {
     ? 'bg-emerald-500 text-black'
     : badgeColors[setIdx % badgeColors.length];
 
+  // Badge slam animation controller
+  const badgeControls = useAnimationControls();
+  const buttonControls = useAnimationControls();
+  const prevDoneRef = useRef(done);
+  const rowFlashRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (done && !prevDoneRef.current) {
+      // Just completed — trigger slam!
+      badgeControls.start({
+        scale: [1, 1.4, 0.9, 1.1, 1],
+        rotate: [0, -10, 8, -3, 0],
+        transition: { duration: 0.5, ease: 'easeOut' },
+      });
+      buttonControls.start({
+        scale: [1, 1.15, 1],
+        transition: { duration: 0.3, ease: 'easeOut' },
+      });
+      // Flash the row
+      if (rowFlashRef.current) {
+        rowFlashRef.current.style.boxShadow = 'inset 0 0 30px rgba(16,185,129,0.3), 0 0 20px rgba(16,185,129,0.15)';
+        setTimeout(() => {
+          if (rowFlashRef.current) rowFlashRef.current.style.boxShadow = '';
+        }, 600);
+      }
+    }
+    prevDoneRef.current = done;
+  }, [done, badgeControls, buttonControls]);
+
   // Shared input base class — unified palette (no RPE-specific color in idle state)
   const inputBase =
-    'w-full bg-black/40 border border-neutral-700/80 rounded-xl px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500 focus:border-yellow-500/50 transition-all duration-200 placeholder:text-neutral-600 placeholder:opacity-60 focus:placeholder:opacity-0';
+    'w-full bg-black/40 border border-neutral-700/80 rounded-xl px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500 focus:border-yellow-500/50 transition-all duration-200 placeholder:text-neutral-600 placeholder:opacity-60 focus:placeholder:opacity-0 input-premium-focus';
 
   return (
     <div className="space-y-1.5" key={key}>
@@ -84,24 +114,27 @@ export const SetInputRow: React.FC<Props> = ({ ex, exIdx, setIdx }) => {
 
       {/* Main row — full-width single line on mobile */}
       <div
+        ref={rowFlashRef}
         className={[
           'rounded-xl border px-3 py-2.5 transition-all duration-300 shadow-sm',
           done
             ? 'bg-emerald-950/30 border-emerald-500/30 shadow-emerald-900/20'
             : 'bg-neutral-900/50 border-neutral-800/80 shadow-black/20',
         ].join(' ')}
+        style={{ transition: 'box-shadow 0.6s ease-out, background-color 0.3s, border-color 0.3s' }}
       >
         {/* Row: badge | inputs | concluir | notes toggle */}
         <div className="flex items-center gap-2">
-          {/* Set number badge — circular, premium */}
-          <div
+          {/* Set number badge — circular, premium, with slam animation */}
+          <motion.div
+            animate={badgeControls}
             className={[
               'flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center font-black text-[11px] transition-all duration-300',
               badgeColor,
             ].join(' ')}
           >
             {done ? <Check size={12} /> : setIdx + 1}
-          </div>
+          </motion.div>
 
           {/* Inputs — 3-col on all sizes, compact */}
           <div className="flex-1 grid grid-cols-3 gap-1.5 min-w-0">
@@ -168,9 +201,10 @@ export const SetInputRow: React.FC<Props> = ({ ex, exIdx, setIdx }) => {
             <MessageSquare size={13} />
           </button>
 
-          {/* Concluir button — full label, premium feel */}
-          <button
+          {/* Concluir button — full label, premium feel with slam */}
+          <motion.button
             type="button"
+            animate={buttonControls}
             onClick={() => {
               const nextDone = !done;
               const now = Date.now();
@@ -202,13 +236,13 @@ export const SetInputRow: React.FC<Props> = ({ ex, exIdx, setIdx }) => {
             className={[
               'flex-shrink-0 inline-flex items-center justify-center gap-1.5 min-h-[36px] px-3 rounded-xl font-black text-xs active:scale-95 transition-all duration-150',
               done
-                ? 'bg-emerald-500 text-black shadow-sm shadow-emerald-500/30'
+                ? 'bg-emerald-500 text-black shadow-md shadow-emerald-500/40'
                 : 'bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 hover:border-yellow-500/40',
             ].join(' ')}
           >
             <Check size={14} />
             <span className="whitespace-nowrap">{done ? 'Feito' : 'OK'}</span>
-          </button>
+          </motion.button>
         </div>
       </div>
 
