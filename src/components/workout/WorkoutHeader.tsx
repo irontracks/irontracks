@@ -1,7 +1,7 @@
 'use client';
 
-import React, { useMemo } from 'react';
-import { ArrowDown, Clock, GripVertical, Plus, UserPlus, X } from 'lucide-react';
+import React from 'react';
+import { Clock, GripVertical, Plus, UserPlus } from 'lucide-react';
 import { BackButton } from '@/components/ui/BackButton';
 import InviteManager from '@/components/InviteManager';
 import { useWorkoutContext } from './WorkoutContext';
@@ -20,25 +20,10 @@ export default function WorkoutHeader() {
     sendInvite,
     alert,
     logs,
+    completedSets,
+    totalSets,
+    progressPct,
   } = useWorkoutContext();
-
-  // ── Real-time workout progress ─────────────────────────
-  const { completedSets, totalSets, progressPct } = useMemo(() => {
-    let total = 0;
-    let done = 0;
-    exercises.forEach((ex, exIdx) => {
-      const setsHeader = Math.max(0, parseInt(String(ex?.sets ?? '0'), 10) || 0);
-      const sdArr = Array.isArray(ex?.setDetails) ? ex.setDetails : Array.isArray((ex as Record<string, unknown>)?.set_details) ? (ex as Record<string, unknown>).set_details as unknown[] : [];
-      const count = Math.max(setsHeader, Array.isArray(sdArr) ? sdArr.length : 0);
-      total += count;
-      for (let i = 0; i < count; i++) {
-        const log = (logs as Record<string, Record<string, unknown>>)[`${exIdx}-${i}`];
-        if (log?.done) done++;
-      }
-    });
-    const pct = total > 0 ? Math.round((done / total) * 100) : 0;
-    return { completedSets: done, totalSets: total, progressPct: pct };
-  }, [exercises, logs]);
 
   // Helper function extracted from ActiveWorkout_OLD
   const isObject = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);

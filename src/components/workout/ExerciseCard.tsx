@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import { ArrowDown, CheckCircle2, ChevronDown, ChevronUp, Dumbbell, Link, Loader2, Pencil, Play, Plus, Trash2, Trophy } from 'lucide-react';
 import { useWorkoutContext } from './WorkoutContext';
 import { ExerciseAIChat } from '@/components/ExerciseAIChat';
@@ -28,7 +28,7 @@ import { WorkoutExercise, UnknownRecord } from './types';
 import ExecutionVideoCapture from '@/components/ExecutionVideoCapture';
 import { logError, logWarn, logInfo } from '@/lib/logger'
 
-export default function ExerciseCard({ ex, exIdx }: { ex: WorkoutExercise; exIdx: number }) {
+function ExerciseCardInner({ ex, exIdx }: { ex: WorkoutExercise; exIdx: number }) {
   const {
     workout,
     collapsed,
@@ -81,6 +81,18 @@ export default function ExerciseCard({ ex, exIdx }: { ex: WorkoutExercise; exIdx
 
   // Compute whether all sets in this exercise are marked done
   const allSetsDone = setsCount > 0 && doneSetsCount === setsCount;
+
+  // Completion animation — brief scale+glow when exercise finishes
+  const [justCompleted, setJustCompleted] = useState(false);
+  const prevAllDoneRef = React.useRef(allSetsDone);
+  useEffect(() => {
+    if (allSetsDone && !prevAllDoneRef.current) {
+      setJustCompleted(true);
+      const t = setTimeout(() => setJustCompleted(false), 800);
+      return () => clearTimeout(t);
+    }
+    prevAllDoneRef.current = allSetsDone;
+  }, [allSetsDone]);
 
   // PR detection: compare current session max weight with reportHistory
   const isPR = useMemo(() => {
@@ -232,6 +244,7 @@ export default function ExerciseCard({ ex, exIdx }: { ex: WorkoutExercise; exIdx
       allSetsDone
         ? 'border-emerald-500/40 shadow-[0_0_20px_-4px_rgba(52,211,153,0.18)]'
         : 'border-neutral-800/80',
+      justCompleted ? 'scale-[1.01] shadow-[0_0_30px_-4px_rgba(52,211,153,0.35)]' : '',
     ].join(' ')}>
       <div
         role="button"
@@ -434,3 +447,6 @@ export default function ExerciseCard({ ex, exIdx }: { ex: WorkoutExercise; exIdx
     </div>
   );
 }
+
+const ExerciseCard = React.memo(ExerciseCardInner);
+export default ExerciseCard;
