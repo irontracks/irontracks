@@ -58,10 +58,12 @@ export async function POST() {
       .maybeSingle()
     if (!plan?.id) return NextResponse.json({ ok: false, error: 'plan_not_found' }, { status: 400 })
 
+    // R2#6: Filter by provider to avoid overwriting subscriptions from other providers (Asaas, MercadoPago)
     const { data: existing } = await admin
       .from('app_subscriptions')
       .select('id, status')
       .eq('user_id', user.id)
+      .eq('provider', 'revenuecat')
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()

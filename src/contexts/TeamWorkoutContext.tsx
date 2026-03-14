@@ -1265,7 +1265,7 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
             try {
                 await supabase
                     .from('notifications')
-                    .update({ read: true })
+                    .update({ is_read: true })
                     .eq('user_id', user.id)
                     .eq('type', 'invite');
             } catch {

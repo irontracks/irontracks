@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/admin'
+import { createClient } from '@/utils/supabase/server'
 
 export const dynamic = 'force-dynamic'
 
@@ -9,6 +10,11 @@ export const dynamic = 'force-dynamic'
  */
 export async function GET(req: NextRequest) {
   try {
+    // R2#3: Require authenticated user
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
+
     const sessionId = req.nextUrl.searchParams.get('sessionId')?.trim()
     if (!sessionId) {
       return NextResponse.json({ ok: false, error: 'missing sessionId' }, { status: 400 })

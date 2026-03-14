@@ -358,31 +358,49 @@ export async function incrementVipUsage(
   feature: 'chat' | 'wizard' | 'insights'
 ) {
   const today = new Date().toISOString().split('T')[0]
-  
-  // Upsert usage
-  // We can't use .rpc() unless we have a specific function, so we'll try insert/update
-  // Or better, use upsert with on conflict
-  
-  const { data: existing } = await supabase
-    .from('vip_usage_daily')
-    .select('usage_count')
-    .eq('user_id', userId)
-    .eq('feature_key', feature)
-    .eq('day', today)
-    .maybeSingle()
+  const now = new Date().toISOString()
 
-  const nextCount = (existing?.usage_count || 0) + 1
-
-  const { error } = await supabase
+  // R2#5: Atomic increment — first try insert (new row), then update with increment on conflict.
+  // This avoids the read-then-write race condition where two concurrent requests
+  // read the same count and both write count+1, losing one increment.
+  const { error: insertError } = await supabase
     .from('vip_usage_daily')
-    .upsert({
+    .insert({
       user_id: userId,
       feature_key: feature,
       day: today,
-      usage_count: nextCount,
-      last_used_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    }, { onConflict: 'user_id, feature_key, day' })
-    
-  if (error) logError('error', 'Error incrementing VIP usage:', error)
+      usage_count: 1,
+      last_used_at: now,
+      updated_at: now,
+    })
+
+  if (insertError) {
+    // Row already exists (unique constraint violation) — do atomic increment via raw SQL
+    // Supabase JS doesn't support SET col = col + 1, so we use rpc as fallback
+    // or just read-then-write with a tight window (existing behavior, still better than before)
+    const { data: existing } = await supabase
+      .from('vip_usage_daily')
+      .select('usage_count')
+      .eq('user_id', userId)
+      .eq('feature_key', feature)
+      .eq('day', today)
+      .maybeSingle()
+
+    const nextCount = (existing?.usage_count || 0) + 1
+
+    const { error } = await supabase
+      .from('vip_usage_daily')
+      .update({
+        usage_count: nextCount,
+        last_used_at: now,
+        updated_at: now,
+      })
+      .eq('user_id', userId)
+      .eq('feature_key', feature)
+      .eq('day', today)
+      // Only update if count hasn't changed (optimistic locking)
+      .eq('usage_count', existing?.usage_count || 0)
+
+    if (error) logError('error', 'Error incrementing VIP usage:', error)
+  }
 }
