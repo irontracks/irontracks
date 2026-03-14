@@ -48,8 +48,9 @@ export const Modals: React.FC = () => {
         <>
             {/* Register Student Modal */}
             {showRegisterModal && (
-                <div className="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center p-4 pt-safe pb-safe backdrop-blur-sm">
-                    <div className="bg-neutral-900 p-6 rounded-2xl w-full max-w-sm border border-neutral-800 shadow-2xl animate-in zoom-in-95 duration-200">
+                <div className="fixed inset-0 z-[60] bg-black/85 flex items-center justify-center p-4 pt-safe pb-safe backdrop-blur-md">
+                    <div className="p-6 rounded-2xl w-full max-w-sm border shadow-2xl animate-in zoom-in-95 duration-200 relative overflow-hidden" style={{ background: 'linear-gradient(160deg, rgba(20,18,10,0.98) 0%, rgba(10,10,10,0.99) 40%)', borderColor: 'rgba(234,179,8,0.12)', boxShadow: '0 32px 64px -16px rgba(0,0,0,0.8), inset 0 1px 0 rgba(234,179,8,0.1)' }}>
+                        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-yellow-500/40 to-transparent" />
                         <h3 className="font-bold text-white text-xl mb-4 flex items-center gap-2">
                             <UserPlus size={24} className="text-yellow-500" /> Novo Aluno
                         </h3>
@@ -59,7 +60,8 @@ export const Modals: React.FC = () => {
                                 <input
                                     value={newStudent.name}
                                     onChange={e => setNewStudent({ ...newStudent, name: e.target.value })}
-                                    className="w-full bg-neutral-800 p-3 rounded-lg text-white border border-neutral-700 focus:border-yellow-500 outline-none"
+                                    className="w-full p-3 rounded-xl text-white border focus:border-yellow-500/40 outline-none transition-all"
+                                    style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }}
                                 />
                             </div>
                             <div>
@@ -67,13 +69,14 @@ export const Modals: React.FC = () => {
                                 <input
                                     value={newStudent.email}
                                     onChange={e => setNewStudent({ ...newStudent, email: e.target.value })}
-                                    className="w-full bg-neutral-800 p-3 rounded-lg text-white border border-neutral-700 focus:border-yellow-500 outline-none"
+                                    className="w-full p-3 rounded-xl text-white border focus:border-yellow-500/40 outline-none transition-all"
+                                    style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }}
                                 />
                             </div>
                         </div>
                         <div className="flex gap-2 mt-6">
-                            <button onClick={() => setShowRegisterModal(false)} className="flex-1 p-3 bg-neutral-800 text-neutral-400 font-bold rounded-xl hover:bg-neutral-700 transition-colors">Cancelar</button>
-                            <button onClick={handleRegisterStudent} disabled={registering} className="flex-1 p-3 bg-yellow-500 text-black font-bold rounded-xl hover:bg-yellow-400 disabled:opacity-50 transition-colors">
+                            <button onClick={() => setShowRegisterModal(false)} className="flex-1 p-3 border text-neutral-400 font-bold rounded-xl hover:text-white hover:border-yellow-500/30 transition-all" style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }}>Cancelar</button>
+                            <button onClick={handleRegisterStudent} disabled={registering} className="flex-1 p-3 font-black rounded-xl disabled:opacity-50 transition-all btn-gold-animated">
                                 {registering ? 'Cadastrando...' : 'CADASTRAR'}
                             </button>
                         </div>
@@ -83,8 +86,9 @@ export const Modals: React.FC = () => {
 
             {/* Teacher Modal */}
             {showTeacherModal && (
-                <div className="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center p-4 pt-safe pb-safe backdrop-blur-sm">
-                    <div className="bg-neutral-900 p-6 rounded-2xl w-full max-w-sm border border-neutral-800 shadow-2xl animate-in zoom-in-95 duration-200">
+                <div className="fixed inset-0 z-[60] bg-black/85 flex items-center justify-center p-4 pt-safe pb-safe backdrop-blur-md">
+                    <div className="p-6 rounded-2xl w-full max-w-sm border shadow-2xl animate-in zoom-in-95 duration-200 relative overflow-hidden" style={{ background: 'linear-gradient(160deg, rgba(20,18,10,0.98) 0%, rgba(10,10,10,0.99) 40%)', borderColor: 'rgba(234,179,8,0.12)', boxShadow: '0 32px 64px -16px rgba(0,0,0,0.8), inset 0 1px 0 rgba(234,179,8,0.1)' }}>
+                        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-yellow-500/40 to-transparent" />
                         <h3 className="font-bold text-white text-xl mb-4 flex items-center gap-2">
                             <UserPlus size={24} className="text-yellow-500" /> Novo Professor
                         </h3>
@@ -94,7 +98,8 @@ export const Modals: React.FC = () => {
                                 <input
                                     value={newTeacher.name}
                                     onChange={e => setNewTeacher({ ...newTeacher, name: e.target.value })}
-                                    className="w-full bg-neutral-800 p-3 rounded-lg text-white border border-neutral-700 focus:border-yellow-500 outline-none"
+                                    className="w-full p-3 rounded-xl text-white border focus:border-yellow-500/40 outline-none transition-all"
+                                    style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }}
                                 />
                             </div>
                             <div>
@@ -102,7 +107,8 @@ export const Modals: React.FC = () => {
                                 <input
                                     value={newTeacher.email}
                                     onChange={e => setNewTeacher({ ...newTeacher, email: e.target.value })}
-                                    className="w-full bg-neutral-800 p-3 rounded-lg text-white border border-neutral-700 focus:border-yellow-500 outline-none"
+                                    className="w-full p-3 rounded-xl text-white border focus:border-yellow-500/40 outline-none transition-all"
+                                    style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }}
                                 />
                             </div>
                             <div>
@@ -110,13 +116,14 @@ export const Modals: React.FC = () => {
                                 <input
                                     value={newTeacher.phone}
                                     onChange={e => setNewTeacher({ ...newTeacher, phone: e.target.value })}
-                                    className="w-full bg-neutral-800 p-3 rounded-lg text-white border border-neutral-700 focus:border-yellow-500 outline-none"
+                                    className="w-full p-3 rounded-xl text-white border focus:border-yellow-500/40 outline-none transition-all"
+                                    style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }}
                                 />
                             </div>
                         </div>
                         <div className="flex gap-2 mt-6">
-                            <button onClick={() => setShowTeacherModal(false)} className="flex-1 p-3 bg-neutral-800 text-neutral-400 font-bold rounded-xl hover:bg-neutral-700 transition-colors">Cancelar</button>
-                            <button onClick={handleAddTeacher} disabled={addingTeacher} className="flex-1 p-3 bg-yellow-500 text-black font-bold rounded-xl hover:bg-yellow-400 disabled:opacity-50 transition-colors">
+                            <button onClick={() => setShowTeacherModal(false)} className="flex-1 p-3 border text-neutral-400 font-bold rounded-xl hover:text-white hover:border-yellow-500/30 transition-all" style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }}>Cancelar</button>
+                            <button onClick={handleAddTeacher} disabled={addingTeacher} className="flex-1 p-3 font-black rounded-xl disabled:opacity-50 transition-all btn-gold-animated">
                                 {addingTeacher ? 'Salvando...' : 'ADICIONAR'}
                             </button>
                         </div>
@@ -126,8 +133,9 @@ export const Modals: React.FC = () => {
 
             {/* Editing Teacher Modal */}
             {editingTeacher && (
-                <div className="fixed inset-0 z-[60] bg-black/90 flex items-center justify-center p-4 pt-safe pb-safe backdrop-blur-sm">
-                    <div className="bg-neutral-900 p-6 rounded-2xl w-full max-w-sm border border-neutral-800 shadow-2xl animate-in zoom-in-95 duration-200">
+                <div className="fixed inset-0 z-[60] bg-black/85 flex items-center justify-center p-4 pt-safe pb-safe backdrop-blur-md">
+                    <div className="p-6 rounded-2xl w-full max-w-sm border shadow-2xl animate-in zoom-in-95 duration-200 relative overflow-hidden" style={{ background: 'linear-gradient(160deg, rgba(20,18,10,0.98) 0%, rgba(10,10,10,0.99) 40%)', borderColor: 'rgba(234,179,8,0.12)', boxShadow: '0 32px 64px -16px rgba(0,0,0,0.8), inset 0 1px 0 rgba(234,179,8,0.1)' }}>
+                        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-yellow-500/40 to-transparent" />
                         <h3 className="font-bold text-white text-xl mb-4 flex items-center gap-2">
                             <Edit3 size={24} className="text-yellow-500" /> Editar Professor
                         </h3>
@@ -137,7 +145,8 @@ export const Modals: React.FC = () => {
                                 <input
                                     value={editingTeacher.name}
                                     onChange={e => setEditingTeacher({ ...editingTeacher, name: e.target.value })}
-                                    className="w-full bg-neutral-800 p-3 rounded-lg text-white border border-neutral-700 focus:border-yellow-500 outline-none"
+                                    className="w-full p-3 rounded-xl text-white border focus:border-yellow-500/40 outline-none transition-all"
+                                    style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }}
                                 />
                             </div>
                             <div>
@@ -145,7 +154,8 @@ export const Modals: React.FC = () => {
                                 <input
                                     value={editingTeacher.email}
                                     onChange={e => setEditingTeacher({ ...editingTeacher, email: e.target.value })}
-                                    className="w-full bg-neutral-800 p-3 rounded-lg text-white border border-neutral-700 focus:border-yellow-500 outline-none"
+                                    className="w-full p-3 rounded-xl text-white border focus:border-yellow-500/40 outline-none transition-all"
+                                    style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }}
                                 />
                             </div>
                             <div>
@@ -153,13 +163,14 @@ export const Modals: React.FC = () => {
                                 <input
                                     value={editingTeacher.phone || ''}
                                     onChange={e => setEditingTeacher({ ...editingTeacher, phone: e.target.value })}
-                                    className="w-full bg-neutral-800 p-3 rounded-lg text-white border border-neutral-700 focus:border-yellow-500 outline-none"
+                                    className="w-full p-3 rounded-xl text-white border focus:border-yellow-500/40 outline-none transition-all"
+                                    style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }}
                                 />
                             </div>
                         </div>
                         <div className="flex gap-2 mt-6">
-                            <button onClick={() => setEditingTeacher(null)} className="flex-1 p-3 bg-neutral-800 text-neutral-400 font-bold rounded-xl hover:bg-neutral-700 transition-colors">Cancelar</button>
-                            <button onClick={handleUpdateTeacher} className="flex-1 p-3 bg-yellow-500 text-black font-bold rounded-xl hover:bg-yellow-400 transition-colors">
+                            <button onClick={() => setEditingTeacher(null)} className="flex-1 p-3 border text-neutral-400 font-bold rounded-xl hover:text-white hover:border-yellow-500/30 transition-all" style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }}>Cancelar</button>
+                            <button onClick={handleUpdateTeacher} className="flex-1 p-3 font-black rounded-xl transition-all btn-gold-animated">
                                 SALVAR
                             </button>
                         </div>
@@ -169,14 +180,16 @@ export const Modals: React.FC = () => {
 
             {/* Execution Video Modal */}
             {executionVideoModalOpen && executionVideoModalUrl && (
-                <div className="fixed inset-0 z-[80] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => { setExecutionVideoModalOpen(false); setExecutionVideoModalUrl(''); }}>
-                    <div className="bg-neutral-900 w-full max-w-3xl rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
-                        <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
-                            <div className="font-black text-white">Vídeo de execução</div>
+                <div className="fixed inset-0 z-[80] bg-black/85 backdrop-blur-md flex items-center justify-center p-4" onClick={() => { setExecutionVideoModalOpen(false); setExecutionVideoModalUrl(''); }}>
+                    <div className="w-full max-w-3xl rounded-2xl border shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 relative" style={{ background: 'linear-gradient(160deg, rgba(20,18,10,0.98) 0%, rgba(10,10,10,0.99) 40%)', borderColor: 'rgba(234,179,8,0.12)', boxShadow: '0 32px 64px -16px rgba(0,0,0,0.8), inset 0 1px 0 rgba(234,179,8,0.1)' }} onClick={(e) => e.stopPropagation()}>
+                        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-yellow-500/40 to-transparent" />
+                        <div className="p-4 flex items-center justify-between gap-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                            <div className="text-xs font-black uppercase tracking-[0.2em] text-yellow-500/80">Vídeo de execução</div>
                             <button
                                 type="button"
                                 onClick={() => { setExecutionVideoModalOpen(false); setExecutionVideoModalUrl(''); }}
-                                className="w-10 h-10 rounded-full bg-neutral-900/70 border border-neutral-800 hover:bg-neutral-900 text-neutral-300 hover:text-white flex items-center justify-center transition-all duration-300 active:scale-95"
+                                className="w-9 h-9 rounded-xl border flex items-center justify-center text-neutral-500 hover:text-white hover:border-yellow-500/40 transition-all"
+                                style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }}
                                 aria-label="Fechar"
                             >
                                 <X size={18} />
@@ -191,11 +204,12 @@ export const Modals: React.FC = () => {
 
             {/* Template Editor Modal */}
             {editingTemplate && (
-                <div className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setEditingTemplate(null)}>
-                    <div className="bg-neutral-900 w-full max-w-3xl rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
-                        <div className="p-4 border-b border-neutral-800 flex justify-between items-center">
-                            <h3 className="font-bold text-white">Editar Treino</h3>
-                            <button onClick={() => setEditingTemplate(null)} className="px-3 py-1.5 hover:bg-neutral-800 rounded-full inline-flex items-center gap-2 text-neutral-300">
+                <div className="fixed inset-0 z-[70] bg-black/85 backdrop-blur-md flex items-center justify-center p-4" onClick={() => setEditingTemplate(null)}>
+                    <div className="w-full max-w-3xl rounded-2xl border shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 relative" style={{ background: 'linear-gradient(160deg, rgba(20,18,10,0.98) 0%, rgba(10,10,10,0.99) 40%)', borderColor: 'rgba(234,179,8,0.12)', boxShadow: '0 32px 64px -16px rgba(0,0,0,0.8), inset 0 1px 0 rgba(234,179,8,0.1)' }} onClick={(e) => e.stopPropagation()}>
+                        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-yellow-500/40 to-transparent" />
+                        <div className="p-4 flex justify-between items-center" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                            <h3 className="text-xs font-black uppercase tracking-[0.2em] text-yellow-500/80">Editar Treino</h3>
+                            <button onClick={() => setEditingTemplate(null)} className="px-3 py-1.5 rounded-xl border inline-flex items-center gap-2 text-neutral-400 hover:text-white hover:border-yellow-500/30 transition-all" style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }}>
                                 <ArrowLeft size={16} /><span className="text-xs font-bold">Voltar</span>
                             </button>
                         </div>

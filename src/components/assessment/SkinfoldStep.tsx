@@ -218,7 +218,8 @@ export const SkinfoldStep: React.FC<SkinfoldStepProps> = ({
       </div>
 
       {/* Valores de Referência */}
-      <div className="bg-neutral-800 rounded-xl p-4 border border-neutral-700">
+      <div className="rounded-2xl p-4 border relative overflow-hidden" style={{ background: 'linear-gradient(160deg, rgba(20,18,10,0.8) 0%, rgba(12,12,12,0.95) 50%)', borderColor: 'rgba(255,255,255,0.06)' }}>
+        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-yellow-500/20 to-transparent" />
         <h3 className="text-sm font-bold text-white mb-3">Valores de Referência (mm):</h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs text-neutral-400">
           <div>

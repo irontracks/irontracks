@@ -146,7 +146,8 @@ export default function ResultsPreview({ formData, onBack, studentName }: Result
       </div>
 
       {/* Informações Básicas */}
-      <div className="bg-neutral-800 rounded-xl border border-neutral-700 p-6">
+      <div className="rounded-2xl border p-6 relative overflow-hidden" style={{ background: 'linear-gradient(160deg, rgba(20,18,10,0.8) 0%, rgba(12,12,12,0.95) 50%)', borderColor: 'rgba(255,255,255,0.06)' }}>
+        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-yellow-500/20 to-transparent" />
         <div className="flex items-center mb-4">
           <User className="w-5 h-5 text-yellow-500 mr-2" />
           <h3 className="text-lg font-bold text-white">Informações do Aluno</h3>
@@ -172,7 +173,8 @@ export default function ResultsPreview({ formData, onBack, studentName }: Result
       </div>
 
       {/* Medidas Antropométricas */}
-      <div className="bg-neutral-800 rounded-xl border border-neutral-700 p-6">
+      <div className="rounded-2xl border p-6 relative overflow-hidden" style={{ background: 'linear-gradient(160deg, rgba(20,18,10,0.8) 0%, rgba(12,12,12,0.95) 50%)', borderColor: 'rgba(255,255,255,0.06)' }}>
+        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-yellow-500/20 to-transparent" />
         <div className="flex items-center mb-4">
           <Ruler className="w-5 h-5 text-yellow-500 mr-2" />
           <h3 className="text-lg font-bold text-white">Medidas Antropométricas</h3>
@@ -208,7 +210,8 @@ export default function ResultsPreview({ formData, onBack, studentName }: Result
       </div>
 
       {/* Composição Corporal */}
-      <div className="bg-neutral-800 rounded-xl border border-neutral-700 p-6">
+      <div className="rounded-2xl border p-6 relative overflow-hidden" style={{ background: 'linear-gradient(160deg, rgba(20,18,10,0.8) 0%, rgba(12,12,12,0.95) 50%)', borderColor: 'rgba(255,255,255,0.06)' }}>
+        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-yellow-500/20 to-transparent" />
         <div className="flex items-center mb-4">
           <Calculator className="w-5 h-5 text-yellow-500 mr-2" />
           <h3 className="text-lg font-bold text-white">Composição Corporal</h3>
@@ -274,7 +277,8 @@ export default function ResultsPreview({ formData, onBack, studentName }: Result
         formData.thigh_circ,
         formData.calf_circ
       ].some(Boolean) && (
-          <div className="bg-neutral-800 rounded-xl border border-neutral-700 p-6">
+          <div className="rounded-2xl border p-6 relative overflow-hidden" style={{ background: 'linear-gradient(160deg, rgba(20,18,10,0.8) 0%, rgba(12,12,12,0.95) 50%)', borderColor: 'rgba(255,255,255,0.06)' }}>
+        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-yellow-500/20 to-transparent" />
             <div className="flex items-center mb-4">
               <TrendingUp className="w-5 h-5 text-yellow-500 mr-2" />
               <h3 className="text-lg font-bold text-white">Circunferências (cm)</h3>

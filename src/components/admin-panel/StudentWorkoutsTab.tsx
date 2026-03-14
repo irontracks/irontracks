@@ -305,7 +305,8 @@ export const StudentWorkoutsTab: React.FC = () => {
                     {syncedWorkouts.map((w) => (
                         <div
                             key={String((w as UnknownRecord)?.id ?? '')}
-                            className="bg-neutral-800 p-4 rounded-xl border border-neutral-700 flex justify-between items-center cursor-pointer"
+                            className="p-4 rounded-2xl border flex justify-between items-center cursor-pointer transition-all hover:border-yellow-500/15"
+                            style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'rgba(255,255,255,0.06)' }}
                             onClick={() => setViewWorkout(w)}
                         >
                             <div>
