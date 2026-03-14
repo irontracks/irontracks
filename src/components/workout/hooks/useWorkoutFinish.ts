@@ -3,6 +3,7 @@ import type { UnknownRecord, WorkoutSession } from '../types';
 import { isObject } from '../utils';
 import { queueFinishWorkout, isOnline } from '@/lib/offline/offlineSync';
 import { buildFinishWorkoutPayload } from '@/lib/finishWorkoutPayload';
+import { saveFinishBackup, clearFinishBackup } from '@/lib/workoutSafetyNet';
 import { logWarn } from '@/lib/logger';
 
 interface UseWorkoutFinishProps {
@@ -11,6 +12,7 @@ interface UseWorkoutFinishProps {
   exercises: unknown[];
   logs: Record<string, unknown>;
   ui: UnknownRecord;
+  userId?: string | null;
   settings: Record<string, unknown> | null;
   ticker: number;
   postCheckinOpen: boolean;
@@ -40,7 +42,7 @@ function parseStartedAtMs(raw: unknown): number {
 
 export function useWorkoutFinish(props: UseWorkoutFinishProps) {
   const {
-    session, workout, exercises, logs, ui, settings, ticker,
+    session, workout, exercises, logs, ui, userId, settings, ticker,
     postCheckinOpen, setPostCheckinOpen, postCheckinDraft, setPostCheckinDraft,
     postCheckinResolveRef, persistDeloadHistoryFromSession,
     finishing, setFinishing,
@@ -140,50 +142,77 @@ export function useWorkoutFinish(props: UseWorkoutFinishProps) {
         const idempotencyKey = `finish_${workout?.id || 'unknown'}_${Date.now()}_${Math.random().toString(36).slice(2)}`;
         const submission = { session: payload, idempotencyKey };
 
-        try {
-          let onlineSuccess = false;
-          if (isOnline()) {
-            try {
-              const resp = await fetch('/api/workouts/finish', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(submission),
-              });
+        // ── SAFETY NET: backup BEFORE any save attempt ──
+          const safeUserId = String(userId || '').trim();
+          if (safeUserId) {
+            saveFinishBackup(safeUserId, submission);
+          }
 
-              if (resp.ok) {
-                const json = await resp.json();
-                savedId = json?.saved?.id ?? null;
-                onlineSuccess = true;
-              } else {
-                if (resp.status >= 400 && resp.status < 500) {
-                  const errText = await resp.text();
-                  throw new Error(`Erro de validação: ${errText}`);
+          try {
+            let onlineSuccess = false;
+            let offlineQueued = false;
+
+            if (isOnline()) {
+              try {
+                const resp = await fetch('/api/workouts/finish', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(submission),
+                });
+
+                if (resp.ok) {
+                  const json = await resp.json();
+                  savedId = json?.saved?.id ?? null;
+                  onlineSuccess = true;
+                } else {
+                  if (resp.status >= 400 && resp.status < 500) {
+                    const errText = await resp.text();
+                    throw new Error(`Erro de validação: ${errText}`);
+                  }
+                  throw new Error(`Erro do servidor: ${resp.status}`);
                 }
-                throw new Error(`Erro do servidor: ${resp.status}`);
+              } catch (fetchErr: unknown) {
+                if (String(fetchErr).includes('Erro de validação')) throw fetchErr;
+                logWarn('warn', 'Online save failed, attempting offline queue', fetchErr);
               }
-            } catch (fetchErr: unknown) {
-              if (String(fetchErr).includes('Erro de validação')) throw fetchErr;
-              logWarn('warn', 'Online save failed, attempting offline queue', fetchErr);
             }
-          }
 
-          if (!onlineSuccess) {
-            await queueFinishWorkout(submission);
-            await alert('Sem conexão estável. Treino salvo na fila e será sincronizado automaticamente.', 'Salvo Offline');
-            savedId = 'offline-pending';
-          }
+            if (!onlineSuccess) {
+              try {
+                await queueFinishWorkout(submission);
+                offlineQueued = true;
+                await alert('Sem conexão estável. Treino salvo na fila e será sincronizado automaticamente.', 'Salvo Offline');
+                savedId = 'offline-pending';
+              } catch (queueErr) {
+                logWarn('warn', 'IDB queue also failed', queueErr);
+                // Both failed — but localStorage backup survives
+                await alert(
+                  'Não foi possível salvar online nem na fila offline. O treino foi salvo localmente e será recuperado na próxima vez que abrir o app.',
+                  '⚠️ Salvo Localmente'
+                );
+                savedId = 'local-backup';
+              }
+            }
 
-        } catch (e: unknown) {
-          const msg = isObject(e) && typeof e.message === 'string' ? e.message : String(e);
-          if (msg.includes('Erro de validação')) {
-            await alert(msg);
+            // ── SAFETY NET: clear backup only after confirmed save ──
+            if (safeUserId && (onlineSuccess || offlineQueued)) {
+              clearFinishBackup(safeUserId);
+            }
+
+          } catch (e: unknown) {
+            const msg = isObject(e) && typeof e.message === 'string' ? e.message : String(e);
+            if (msg.includes('Erro de validação')) {
+              // Validation errors are terminal — clear backup since retries won't help
+              const safeUid = String(userId || '').trim();
+              if (safeUid) clearFinishBackup(safeUid);
+              await alert(msg);
+              setFinishing(false);
+              return;
+            }
+            await alert('CRÍTICO: Erro ao salvar treino: ' + (msg || 'erro inesperado'));
             setFinishing(false);
             return;
           }
-          await alert('CRÍTICO: Erro ao salvar treino: ' + (msg || 'erro inesperado'));
-          setFinishing(false);
-          return;
-        }
       }
 
       const sessionForReport = {

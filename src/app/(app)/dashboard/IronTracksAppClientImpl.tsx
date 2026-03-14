@@ -70,6 +70,7 @@ const GuidedTour = dynamic(() => import('@/components/onboarding/GuidedTour'), {
 import { getTourSteps } from '@/utils/tourSteps'
 import { cacheGetWorkouts, cacheSetWorkouts } from '@/lib/offline/offlineSync'
 const OfflineSyncModal = dynamic(() => import('@/components/OfflineSyncModal'), { ssr: false })
+const WorkoutRecoveryBanner = dynamic(() => import('@/components/WorkoutRecoveryBanner'), { ssr: false, loading: () => null })
 import { useOfflineSync } from '@/hooks/useOfflineSync'
 import { useVipAccess } from '@/hooks/useVipAccess'
 import { useWorkoutStreak } from '@/hooks/useWorkoutStreak'
@@ -872,6 +873,8 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                             } as React.CSSProperties)}
                         >
                             {(view === 'dashboard' || view === 'assessments' || view === 'community' || view === 'vip') && (
+                              <>
+                                {view === 'dashboard' && <WorkoutRecoveryBanner userId={String(user?.id || initialUserObj?.id || '')} />}
                                 <StudentDashboard
                                     workouts={Array.isArray(workouts) ? workouts : []}
                                     profileIncomplete={Boolean(profileIncomplete)}
@@ -933,6 +936,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                     onMyStoryStateChange={handleMyStoryStateChange}
                                     onAddStory={handleAddStory}
                                 />
+                              </>
                             )}
 
                             <WorkoutWizardModal
