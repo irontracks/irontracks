@@ -902,7 +902,8 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
             .subscribe()
 
         // Polling fallback every 5s (catches anything postgres_changes missed)
-        const poll = setInterval(loadPersistedMessages, 5000)
+        // R9#3: Reduced from 5s to 15s — N users × 5s poll = excessive DB queries
+        const poll = setInterval(loadPersistedMessages, 15_000)
 
         return () => {
             supabase.removeChannel(rtChannel)
@@ -1262,12 +1263,14 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
                 return current.filter(i => String(i?.id || '') !== inviteId);
             });
 
+            // R9#2: Only mark this specific invite's notification as read (was marking ALL)
             try {
                 await supabase
                     .from('notifications')
                     .update({ is_read: true })
                     .eq('user_id', user.id)
-                    .eq('type', 'invite');
+                    .eq('type', 'invite')
+                    .filter('metadata->>invite_id', 'eq', inviteId);
             } catch {
             }
 
@@ -1284,10 +1287,12 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
         try {
             const safeId = inviteId ? String(inviteId) : '';
             if (!safeId) return;
+            // R9#1: Add to_uid filter to prevent IDOR — any user could reject any invite
             await supabase
                 .from('invites')
                 .update({ status: 'rejected' })
-                .eq('id', safeId);
+                .eq('id', safeId)
+                .eq('to_uid', user?.id || '');
 
             setIncomingInvites(prev => {
                 const current = Array.isArray(prev) ? prev : [];
