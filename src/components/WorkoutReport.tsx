@@ -88,7 +88,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
     const isInsightsExhausted = (entry?: { used: number; limit: number | null }) => !!entry && entry.limit !== null && entry.used >= entry.limit
     // Celebration splash — 8.1
     const [showSplash, setShowSplash] = useState(true);
-    useEffect(() => { const t = setTimeout(() => setShowSplash(false), 2500); return () => clearTimeout(t); }, []);
+    useEffect(() => { const t = setTimeout(() => setShowSplash(false), 1200); return () => clearTimeout(t); }, []);
 
     // ── Data hook ──────────────────────────────────────────────────────────
     const {

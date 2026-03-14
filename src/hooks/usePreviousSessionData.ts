@@ -52,14 +52,13 @@ export const usePreviousSessionData = ({
   }>({ logsByExercise: {}, baseMsByExercise: {} })
   const [historicalBestE1rm, setHistoricalBestE1rm] = useState<Record<string, number>>({})
 
-  const prevDataFetchRef = useRef(false)
-  const historicalFetchRef = useRef(false)
+  const fetchRef = useRef(false)
 
-  // ── Effect 1: Consolidated previous session + per-exercise data ─────────────
+  // ── Single effect: parallel fetch of previous session + historical best e1RM ──
   useEffect(() => {
     let cancelled = false
     if (!targetUserId || !session || typeof session !== 'object') return
-    if (prevDataFetchRef.current) return
+    if (fetchRef.current) return
     if (previousSession) setResolvedPreviousSession(null)
 
     const exercisesArr = Array.isArray(session?.exercises) ? (session.exercises as unknown[]) : []
@@ -67,61 +66,54 @@ export const usePreviousSessionData = ({
       .map((ex: unknown) => String((ex as AnyObj)?.name || '').trim())
       .filter(Boolean)
 
-    prevDataFetchRef.current = true
+    fetchRef.current = true
     ;(async () => {
       try {
-        const result = await getReportPreviousData({
-          userId: targetUserId,
-          currentSessionId: typeof session?.id === 'string' && session.id ? session.id : null,
-          currentDate: session?.date ? String(session.date) : null,
-          currentOriginId: session?.originWorkoutId ? String(session.originWorkoutId) : null,
-          currentTitle: session?.workoutTitle ? String(session.workoutTitle) : null,
-          exerciseNames,
-        })
+        // Fire both requests in parallel for faster loading
+        const [prevResult, histResult] = await Promise.allSettled([
+          getReportPreviousData({
+            userId: targetUserId,
+            currentSessionId: typeof session?.id === 'string' && session.id ? session.id : null,
+            currentDate: session?.date ? String(session.date) : null,
+            currentOriginId: session?.originWorkoutId ? String(session.originWorkoutId) : null,
+            currentTitle: session?.workoutTitle ? String(session.workoutTitle) : null,
+            exerciseNames,
+          }),
+          exerciseNames.length > 0
+            ? getHistoricalBestE1rm({
+                userId: targetUserId,
+                currentSessionId: typeof session?.id === 'string' && session.id ? session.id : null,
+                exerciseNames,
+              })
+            : Promise.resolve({} as Record<string, number>),
+        ])
+
         if (cancelled) return
-        if (!previousSession && result.previousSession) setResolvedPreviousSession(result.previousSession)
-        setPrevByExercise({
-          logsByExercise: result.prevLogsByExercise,
-          baseMsByExercise: result.prevBaseMsByExercise,
-        })
-      } catch {
-        if (!cancelled) setPrevByExercise({ logsByExercise: {}, baseMsByExercise: {} })
+
+        // Apply previous session data
+        if (prevResult.status === 'fulfilled') {
+          const result = prevResult.value
+          if (!previousSession && result.previousSession) setResolvedPreviousSession(result.previousSession)
+          setPrevByExercise({
+            logsByExercise: result.prevLogsByExercise,
+            baseMsByExercise: result.prevBaseMsByExercise,
+          })
+        } else {
+          setPrevByExercise({ logsByExercise: {}, baseMsByExercise: {} })
+        }
+
+        // Apply historical best e1RM
+        if (histResult.status === 'fulfilled') {
+          setHistoricalBestE1rm(histResult.value)
+        }
       } finally {
-        prevDataFetchRef.current = false
+        fetchRef.current = false
       }
     })()
 
     return () => { cancelled = true }
   }, [session, previousSession, targetUserId])
 
-  // ── Effect 2: Historical best e1RM per exercise ─────────────────────────────
-  useEffect(() => {
-    let cancelled = false
-    if (!targetUserId || !session || historicalFetchRef.current) return
-
-    const exercisesArr = Array.isArray(session?.exercises) ? (session.exercises as unknown[]) : []
-    const exerciseNames = exercisesArr
-      .map((ex: unknown) => String((ex as AnyObj)?.name || '').trim())
-      .filter(Boolean)
-    if (!exerciseNames.length) return
-
-    historicalFetchRef.current = true
-    ;(async () => {
-      try {
-        const result = await getHistoricalBestE1rm({
-          userId: targetUserId,
-          currentSessionId: typeof session?.id === 'string' && session.id ? session.id : null,
-          exerciseNames,
-        })
-        if (cancelled) return
-        setHistoricalBestE1rm(result)
-      } catch { /* best-effort; historical data is non-critical */ } finally {
-        historicalFetchRef.current = false
-      }
-    })()
-
-    return () => { cancelled = true }
-  }, [session, targetUserId])
-
   return { resolvedPreviousSession, prevByExercise, historicalBestE1rm }
 }
+
