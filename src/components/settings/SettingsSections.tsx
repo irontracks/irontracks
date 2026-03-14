@@ -13,7 +13,7 @@ export function SettingsProfileSection({ draft, setValue }: SettingsSectionProps
     ]
     return (
         <SectionCard>
-            <SectionHeader icon={User} label="Perfil" />
+            <SectionHeader icon={User} label="Perfil" color="#3b82f6" />
             <div className="space-y-3">
                 <div>
                     <div className="text-sm font-bold text-white mb-1">Sexo biológico</div>
@@ -45,7 +45,7 @@ export function SettingsAppearanceSection({ draft, setValue }: SettingsSectionPr
     const density = String(draft?.dashboardDensity || 'comfortable')
     return (
         <SectionCard>
-            <SectionHeader icon={Palette} label="Aparência" />
+            <SectionHeader icon={Palette} label="Aparência" color="#8b5cf6" />
             <div className="space-y-3">
                 <div className="flex items-center justify-between gap-3">
                     <div>
@@ -67,7 +67,7 @@ export function SettingsWorkoutNamesSection({ draft, setValue }: SettingsSection
     const programTitleStartDay = String(draft?.programTitleStartDay || 'monday')
     return (
         <SectionCard>
-            <SectionHeader icon={CalendarDays} label="Nomes de treinos" />
+            <SectionHeader icon={CalendarDays} label="Nomes de treinos" color="#f97316" />
             <div className="space-y-3">
                 <div className="flex items-center justify-between gap-3">
                     <div>
@@ -100,7 +100,7 @@ export function SettingsAppModeSection({ draft, setValue, setModulesModalOpen }:
     const promptPostWorkoutCheckin = Boolean(draft?.promptPostWorkoutCheckin ?? true)
     return (
         <SectionCard>
-            <SectionHeader icon={Layers} label="Modo do App" />
+            <SectionHeader icon={Layers} label="Modo do App" color="#06b6d4" />
             <div className="space-y-3">
                 <div className="flex items-center justify-between gap-3">
                     <div>
@@ -159,7 +159,7 @@ export function SettingsToolsSection({ draft, setValue, onOpenWhatsNew }: Settin
     const whatsNewRemind24h = Boolean(draft?.whatsNewRemind24h ?? true)
     return (
         <SectionCard>
-            <SectionHeader icon={Wrench} label="Ferramentas" />
+            <SectionHeader icon={Wrench} label="Ferramentas" color="#f43f5e" />
             <div className="space-y-3">
                 <div className="flex items-center justify-between gap-3">
                     <div><div className="text-sm font-bold text-white">Novos Recordes</div><div className="text-xs text-neutral-400">Mostra o card de PRs recentes no dashboard.</div></div>
@@ -203,7 +203,7 @@ export function SettingsWorkoutSection({ draft, setValue }: SettingsSectionProps
     const autoRestTimerWhenMissing = Boolean(draft?.autoRestTimerWhenMissing ?? false)
     return (
         <SectionCard>
-            <SectionHeader icon={Dumbbell} label="Treino" />
+            <SectionHeader icon={Dumbbell} label="Treino" color="#10b981" />
             <div className="space-y-3">
                 <div className="flex items-center justify-between gap-3">
                     <div><div className="text-sm font-bold text-white">Unidades</div><div className="text-xs text-neutral-400">Peso padrão para cargas.</div></div>
@@ -241,7 +241,7 @@ export function SettingsSoundSection({ draft, setValue, canSeeExperimental }: Se
     const featureOfflineSyncV2 = Boolean(draft?.featureOfflineSyncV2 ?? false)
     return (
         <SectionCard>
-            <SectionHeader icon={Volume2} label="Som e Convites" />
+            <SectionHeader icon={Volume2} label="Som e Convites" color="#eab308" />
             <div className="space-y-3">
                 <div className="flex items-center justify-between gap-3">
                     <div><div className="text-sm font-bold text-white">Sons do App</div><div className="text-xs text-neutral-400">Notificações e feedback sonoro.</div></div>
@@ -296,7 +296,7 @@ export function SettingsTimerSection({ draft, setValue }: SettingsSectionProps) 
     const restTimerRepeatMaxCount = Math.max(1, Math.min(120, Number(draft?.restTimerRepeatMaxCount ?? 60) || 60))
     return (
         <SectionCard>
-            <SectionHeader icon={Timer} label="Timer" />
+            <SectionHeader icon={Timer} label="Timer" color="#6366f1" />
             <div className="space-y-3">
                 <div className="flex items-center justify-between gap-3">
                     <div><div className="text-sm font-bold text-white">Notificar ao terminar</div><div className="text-xs text-neutral-400">Mostra notificação do navegador (se permitido).</div></div>
@@ -346,7 +346,7 @@ export function SettingsPrivacySection({ draft, setValue }: SettingsSectionProps
     const allowDirectMessages = Boolean(draft?.allowDirectMessages ?? true)
     return (
         <SectionCard>
-            <SectionHeader icon={Lock} label="Privacidade" />
+            <SectionHeader icon={Lock} label="Privacidade" color="#ef4444" />
             <div className="space-y-3">
                 <div className="flex items-center justify-between gap-3">
                     <div><div className="text-sm font-bold text-white">Mensagens diretas</div><div className="text-xs text-neutral-400">Permite iniciar e receber conversas diretas.</div></div>
@@ -379,7 +379,7 @@ export function SettingsNotificationsSection({ draft, setValue, iosNotifStatus, 
     const notifyFriendGoals = Boolean(draft?.notifyFriendGoals ?? true)
     return (
         <SectionCard>
-            <SectionHeader icon={Bell} label="Notificações" />
+            <SectionHeader icon={Bell} label="Notificações" color="#f59e0b" />
             <div className="space-y-3">
                 <div className="flex items-center justify-between gap-3">
                     <div><div className="text-sm font-bold text-white">Toasts no app</div><div className="text-xs text-neutral-400">Mensagens rápidas no topo da tela.</div></div>
@@ -548,7 +548,7 @@ export function SettingsSecuritySection({ draft, setValue }: SettingsSectionProp
     const requireBiometricsOnStartup = Boolean(draft?.requireBiometricsOnStartup ?? false)
     return (
         <SectionCard>
-            <SectionHeader icon={Lock} label="Segurança" />
+            <SectionHeader icon={Lock} label="Segurança" color="#14b8a6" />
             <div className="space-y-3">
                 <div className="flex items-center justify-between gap-3">
                     <div><div className="text-sm font-bold text-white">Solicitar Biometria</div><div className="text-xs text-neutral-400">Exige Face ID ou Touch ID ao abrir o app.</div></div>

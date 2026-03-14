@@ -26,14 +26,17 @@ export const ToggleSwitch = ({ checked, onChange, disabled }: { checked: boolean
     </button>
 )
 
-export const SectionHeader = ({ icon: Icon, label }: { icon: React.FC<{ size?: number; className?: string }>; label: string }) => (
-    <div className="flex items-center gap-2 mb-4">
-        <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: 'rgba(234,179,8,0.12)', border: '1px solid rgba(234,179,8,0.2)' }}>
-            <Icon size={13} className="text-yellow-500" />
+export const SectionHeader = ({ icon: Icon, label, color }: { icon: React.FC<{ size?: number; className?: string }>; label: string; color?: string }) => {
+    const accent = color || '#f59e0b'
+    return (
+        <div className="flex items-center gap-2 mb-4">
+            <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: `${accent}18`, border: `1px solid ${accent}30` }}>
+                <span style={{ color: accent }}><Icon size={13} /></span>
+            </div>
+            <div className="text-xs font-black uppercase tracking-[0.16em]" style={{ color: accent }}>{label}</div>
         </div>
-        <div className="text-xs font-black uppercase tracking-[0.16em]" style={{ color: '#f59e0b' }}>{label}</div>
-    </div>
-)
+    )
+}
 
 export const SectionCard = ({ children }: { children: React.ReactNode }) => (
     <div className="rounded-xl p-4" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
