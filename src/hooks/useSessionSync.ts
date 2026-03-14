@@ -300,4 +300,73 @@ export function useSessionSync({
         }, 1000)
         return () => clearInterval(id)
     }, [activeSession, setSessionTicker])
+
+    // 5. Heartbeat auto-save (30s interval)
+    // Complements the debounced upsert (#3) by ensuring periodic server-side
+    // snapshots even when React state hasn't changed. Uses a ref to avoid
+    // restarting the interval on every state change.
+    const activeSessionRef = useRef(activeSession)
+    activeSessionRef.current = activeSession
+
+    useEffect(() => {
+        const uid = userId ? String(userId) : ''
+        if (!uid) return
+        if (!activeSession) return // only run while a session is active
+
+        const HEARTBEAT_MS = 30_000 // 30 seconds
+        let lastHash = ''
+
+        const heartbeat = async () => {
+            try {
+                const session = activeSessionRef.current
+                if (!session) return
+                if (!session.startedAt || !session.workout) return
+
+                // Only upsert if data changed since last heartbeat
+                const hash = (() => { try { return JSON.stringify(session.logs || {}) } catch { return '' } })()
+                if (hash === lastHash) return
+                lastHash = hash
+
+                const startedAtRaw = session.startedAt
+                const startedAtMs = typeof startedAtRaw === 'number' ? startedAtRaw : new Date(startedAtRaw || 0).getTime()
+                if (!Number.isFinite(startedAtMs) || startedAtMs <= 0) return
+
+                const state = { ...(session || {}), _savedAt: Date.now() }
+
+                const { error } = await supabase
+                    .from('active_workout_sessions')
+                    .upsert(
+                        {
+                            user_id: uid,
+                            started_at: new Date(startedAtMs).toISOString(),
+                            state,
+                            updated_at: new Date().toISOString(),
+                        },
+                        { onConflict: 'user_id' }
+                    )
+                if (error && isMissingTable(error)) notifyMigrationWarning()
+            } catch { /* silent — best effort */ }
+        }
+
+        const intervalId = setInterval(heartbeat, HEARTBEAT_MS)
+        return () => clearInterval(intervalId)
+        // Intentionally only depends on userId + activeSession existence (not content)
+        // so the interval is not restarted on every log change.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [!!activeSession, supabase, userId, isMissingTable, notifyMigrationWarning])
+
+    // 6. Prevent accidental tab close during active workout (beforeunload)
+    useEffect(() => {
+        if (!activeSession) return
+
+        const handler = (e: BeforeUnloadEvent) => {
+            e.preventDefault()
+            // Modern browsers ignore custom messages but still show a confirmation dialog
+            e.returnValue = 'Você tem um treino em andamento. Deseja sair?'
+            return e.returnValue
+        }
+
+        window.addEventListener('beforeunload', handler)
+        return () => window.removeEventListener('beforeunload', handler)
+    }, [activeSession])
 }
