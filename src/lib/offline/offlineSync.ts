@@ -176,12 +176,16 @@ export const flushOfflineQueue = async ({ max = 50, force = false } = {}) => {
       logError('Failed to process offline job:', j, err);
       errors++;
 
+      // R7#2: 4xx errors are terminal — validation/auth errors never resolve on retry
+      const errMsg = String((err as Error)?.message || err)
+      const is4xx = /\b4\d{2}\b/.test(errMsg) || errMsg.toLowerCase().includes('validation error')
+
       // Update job with failure info
       const attempts = (Number(j.attempts) || 0) + 1
       const nextAttemptAt = now + (1000 * 60 * Math.pow(2, attempts))
-      const nextJob: OfflineJob = { ...j, attempts, lastError: String((err as Error)?.message || err), nextAttemptAt, status: 'pending' }
+      const nextJob: OfflineJob = { ...j, attempts, lastError: errMsg, nextAttemptAt, status: 'pending' }
 
-      if (attempts >= (Number(j.maxAttempts) || 7)) {
+      if (is4xx || attempts >= (Number(j.maxAttempts) || 7)) {
         nextJob.status = 'failed';
       } else {
         nextJob.status = 'pending';

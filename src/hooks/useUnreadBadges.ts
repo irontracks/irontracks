@@ -10,7 +10,7 @@
  */
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { logError } from '@/lib/logger'
 
@@ -117,20 +117,24 @@ export function useUnreadBadges({
   useEffect(() => {
     if (!userId) return
 
+    // R7#6: Use ref to avoid stale closure — handler always reads current view
+    const viewRef = { current: view }
     const allowNotifyDm = userSettings ? userSettings.notifyDirectMessages !== false : true
 
     const channel = supabase
       .channel(`direct-messages-badge:${userId}`)
       .on(
         'postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'direct_messages' },
+        // R7#1: Filter by receiver — without this, ALL DM inserts for ALL users
+        // are delivered to every connected client (privacy leak + bandwidth waste)
+        { event: 'INSERT', schema: 'public', table: 'direct_messages', filter: `receiver_id=eq.${userId}` },
         async (payload) => {
           try {
             if (!allowNotifyDm) return
             const msg = payload.new
             if (!msg || msg.sender_id === userId) return
 
-            const currentView = view
+            const currentView = viewRef.current
             if (
               currentView === 'chat' ||
               currentView === 'chatList' ||
