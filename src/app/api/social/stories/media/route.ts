@@ -124,11 +124,25 @@ export async function POST(req: Request) {
 
     const { data: story, error } = await auth.supabase
       .from('social_stories')
-      .select('id, media_path')
+      .select('id, media_path, author_id')
       .eq('id', storyId)
       .maybeSingle()
 
     if (error || !story?.media_path) return NextResponse.json({ ok: false, error: getErrorMessage(error) || 'not_found' }, { status: 404 })
+
+    // Security: verify follow relationship (same check as GET handler)
+    const authorId = String(story?.author_id || '').trim()
+    if (authorId && authorId !== auth.user.id) {
+      const admin = createAdminClient()
+      const { data: follow } = await admin
+        .from('social_follows')
+        .select('id')
+        .eq('follower_id', auth.user.id)
+        .eq('following_id', authorId)
+        .eq('status', 'accepted')
+        .maybeSingle()
+      if (!follow) return NextResponse.json({ ok: false, error: 'forbidden' }, { status: 403 })
+    }
 
     const mediaPath = String(story.media_path)
 

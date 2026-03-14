@@ -116,9 +116,19 @@ export async function POST(req: Request) {
 
       const meta = preapproval && typeof preapproval === 'object' ? { mercadopago: { raw: preapproval } } : { mercadopago: {} }
 
+      // Fix #4: Preserve existing metadata instead of overwriting
+      const { data: existingSub } = await admin
+        .from('app_subscriptions')
+        .select('metadata')
+        .eq('provider', 'mercadopago')
+        .eq('provider_subscription_id', providerSubscriptionId)
+        .maybeSingle()
+      const existingMeta = existingSub?.metadata && typeof existingSub.metadata === 'object' ? existingSub.metadata : {}
+      const mergedMeta = { ...existingMeta as Record<string, unknown>, ...meta }
+
       await admin
         .from('app_subscriptions')
-        .update({ status, updated_at: new Date().toISOString(), metadata: meta })
+        .update({ status, updated_at: new Date().toISOString(), metadata: mergedMeta })
         .eq('provider', 'mercadopago')
         .eq('provider_subscription_id', providerSubscriptionId)
 
@@ -242,6 +252,41 @@ export async function POST(req: Request) {
               },
               { onConflict: 'provider,provider_subscription_id' },
             )
+        }
+
+        // Fix #3: Revoke VIP on refund/chargeback/cancellation
+        const revokeStatuses = ['refunded', 'cancelled', 'charged_back', 'chargedback']
+        if (revokeStatuses.includes(status.toLowerCase())) {
+          // Revoke entitlements
+          await admin
+            .from('user_entitlements')
+            .update({
+              status: 'revoked',
+              valid_until: now.toISOString(),
+              metadata: {
+                mercadopago: {
+                  kind: 'payment_revoked',
+                  payment_id: dataId,
+                  revoke_reason: status.toLowerCase(),
+                  revoked_at: now.toISOString(),
+                  raw: payment,
+                },
+              },
+            })
+            .eq('user_id', userId)
+            .eq('provider', 'mercadopago')
+            .in('status', ['active', 'trialing'])
+
+          // Cancel subscriptions
+          await admin
+            .from('app_subscriptions')
+            .update({
+              status: 'cancelled',
+              updated_at: now.toISOString(),
+            })
+            .eq('provider', 'mercadopago')
+            .eq('user_id', userId)
+            .in('status', ['active', 'past_due', 'pending'])
         }
       }
 

@@ -15,7 +15,7 @@
 'use client'
 
 import { useEffect, useRef, useCallback } from 'react'
-import { createClient } from '@/utils/supabase/client'
+
 import { z } from 'zod'
 import type { SupabaseClient, RealtimeChannel } from '@supabase/supabase-js'
 import type { ActiveWorkoutSession } from '@/types/app'
@@ -225,11 +225,7 @@ export function useSessionSync({
             mounted = false
             try {
                 if (channel) supabase.removeChannel(channel)
-            } catch {
-                try {
-                    if (channel) createClient().removeChannel(channel)
-                } catch { }
-            }
+            } catch { /* channel cleanup failed — let it expire naturally */ }
         }
     }, [supabase, userId, inAppNotify, setActiveSession, setView, suppressForeignFinishToastUntilRef])
 

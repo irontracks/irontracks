@@ -23,6 +23,17 @@ export async function GET(req: Request) {
     if (response) return response
     if (!q?.user_id) return jsonError(400, 'user_id required')
 
+    // Security: teachers can only access their own students' settings
+    if (auth.role === 'teacher') {
+      const { data: student } = await admin
+        .from('students')
+        .select('id')
+        .eq('user_id', q.user_id)
+        .eq('teacher_id', auth.user.id)
+        .maybeSingle()
+      if (!student) return jsonError(403, 'forbidden: not your student')
+    }
+
     // Use admin client to bypass RLS on user_settings
     // Column is 'preferences', not 'settings'
     const { data, error } = await admin

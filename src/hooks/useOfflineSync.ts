@@ -64,8 +64,13 @@ export function useOfflineSync({ userId, settings }: UseOfflineSyncOptions = {})
     }
   }, [userId, settings]);
 
+  const flushingRef = useRef(false)
+
   const runFlushQueue = useCallback(async () => {
     try {
+      // Fix #8: Mutex — prevent concurrent flush operations
+      if (flushingRef.current) return
+      flushingRef.current = true
       if (!isOnline()) {
         setSyncState((prev) => ({ ...prev, online: false }));
         return;
@@ -73,6 +78,7 @@ export function useOfflineSync({ userId, settings }: UseOfflineSyncOptions = {})
       setSyncState((prev) => ({ ...prev, syncing: true, online: true }));
       await flushOfflineQueue({ max: 8 });
     } finally {
+      flushingRef.current = false
       setSyncState((prev) => ({ ...prev, syncing: false }));
       await refreshSyncState();
     }
