@@ -203,11 +203,28 @@ button:active,
   animation: spin-slow 0.6s linear;
 }
 
+/* ── Focus-visible ring — keyboard navigation accessibility ───────── */
+/* Shows gold outline ONLY on keyboard focus, never on click/tap.     */
+button:focus-visible,
+[role="button"]:focus-visible,
+a:focus-visible {
+  outline: 2px solid rgba(234, 179, 8, 0.6);
+  outline-offset: 2px;
+  border-radius: inherit;
+}
+
 /* Input focus ring — smooth appear */
 input:focus,
 textarea:focus,
 select:focus {
   transition: box-shadow 0.15s ease, border-color 0.15s ease;
+}
+
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible {
+  outline: 2px solid rgba(234, 179, 8, 0.5);
+  outline-offset: 1px;
 }
 
 /* Toast slide-in from top */

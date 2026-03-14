@@ -50,7 +50,7 @@ const ExerciseSortRow = ({
       <button
         type="button"
         onPointerDown={(e) => dragControls.start(e)}
-        className="h-10 w-10 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-300 inline-flex items-center justify-center active:scale-95"
+        className="h-11 w-11 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-300 inline-flex items-center justify-center active:scale-95"
       >
         <GripVertical size={16} />
       </button>
@@ -65,8 +65,8 @@ const ExerciseSortRow = ({
           disabled={!canMoveUp}
           className={
             canMoveUp
-              ? 'h-10 w-10 rounded-xl bg-neutral-900 border border-neutral-700 text-yellow-500 inline-flex items-center justify-center hover:bg-neutral-800 active:scale-95'
-              : 'h-10 w-10 rounded-xl bg-neutral-900 border border-neutral-800 text-neutral-700 inline-flex items-center justify-center'
+              ? 'h-11 w-11 rounded-xl bg-neutral-900 border border-neutral-700 text-yellow-500 inline-flex items-center justify-center hover:bg-neutral-800 active:scale-95'
+              : 'h-11 w-11 rounded-xl bg-neutral-900 border border-neutral-800 text-neutral-700 inline-flex items-center justify-center'
           }
         >
           <ArrowUp size={16} />
@@ -77,8 +77,8 @@ const ExerciseSortRow = ({
           disabled={!canMoveDown}
           className={
             canMoveDown
-              ? 'h-10 w-10 rounded-xl bg-neutral-900 border border-neutral-700 text-yellow-500 inline-flex items-center justify-center hover:bg-neutral-800 active:scale-95'
-              : 'h-10 w-10 rounded-xl bg-neutral-900 border border-neutral-800 text-neutral-700 inline-flex items-center justify-center'
+              ? 'h-11 w-11 rounded-xl bg-neutral-900 border border-neutral-700 text-yellow-500 inline-flex items-center justify-center hover:bg-neutral-800 active:scale-95'
+              : 'h-11 w-11 rounded-xl bg-neutral-900 border border-neutral-800 text-neutral-700 inline-flex items-center justify-center'
           }
         >
           <ArrowDown size={16} />
