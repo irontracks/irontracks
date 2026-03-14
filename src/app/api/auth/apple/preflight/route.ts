@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { parseJsonBody } from '@/utils/zod'
 import { createAdminClient } from '@/utils/supabase/admin'
+import { hasValidInternalSecret } from '@/utils/auth/route'
 
 const BodySchema = z.object({
   email: z.string().email(),
@@ -11,6 +12,24 @@ const BodySchema = z.object({
 
 export async function POST(req: Request) {
   try {
+    // R2#1: Require authentication — either internal secret or a valid Bearer token
+    const admin = createAdminClient()
+    let authenticated = false
+
+    if (hasValidInternalSecret(req)) {
+      authenticated = true
+    } else {
+      const bearer = String(req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '').trim()
+      if (bearer) {
+        const { data, error } = await admin.auth.getUser(bearer)
+        if (!error && data?.user?.id) authenticated = true
+      }
+    }
+
+    if (!authenticated) {
+      return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
+    }
+
     const parsed = await parseJsonBody(req, BodySchema)
     if (parsed.response) return parsed.response
     const body = parsed.data!
@@ -18,8 +37,6 @@ export async function POST(req: Request) {
     const email = String(body.email || '').trim().toLowerCase()
     const fullName = String(body.full_name || '').trim()
     if (!email) return NextResponse.json({ ok: false, error: 'missing_email' }, { status: 400 })
-
-    const admin = createAdminClient()
 
     const { data: existingStudent } = await admin
       .from('students')

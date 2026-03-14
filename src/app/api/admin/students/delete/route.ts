@@ -73,6 +73,15 @@ export async function POST(req: Request) {
             return NextResponse.json({ ok: false, error: 'Aluno não encontrado.' }, { status: 404 })
         }
 
+        // R2#4: Teachers can only delete their own students
+        if (actorRole === 'teacher' && actorId) {
+            const { data: studentFull } = await admin.from('students').select('teacher_id').eq('id', studentRow.id).maybeSingle()
+            const teacherId = studentFull?.teacher_id ? String(studentFull.teacher_id) : ''
+            if (teacherId && teacherId !== actorId) {
+                return NextResponse.json({ ok: false, error: 'Você não tem permissão para excluir alunos de outro professor.' }, { status: 403 })
+            }
+        }
+
         const studentUserId = studentRow.user_id
 
         // Delete cascade

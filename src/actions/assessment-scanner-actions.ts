@@ -4,6 +4,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import type { Part } from "@google/generative-ai";
 import { parseJsonWithSchema } from "@/utils/zod";
 import { z } from "zod";
+import { createClient } from "@/utils/supabase/server";
 
 type AssessmentFormDataShape = {
   assessment_date?: string;
@@ -124,6 +125,11 @@ const DEFAULT_FORM: Required<AssessmentFormDataShape> = {
 
 export async function processAssessmentDocument(formData: FormData): Promise<AssessmentScannerResponse> {
   try {
+    // R2#10: Require authenticated user to prevent AI quota drain
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return { ok: false, error: 'Não autenticado' }
+
     const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
     if (!apiKey) {
       return {

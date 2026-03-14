@@ -210,6 +210,10 @@ export function useSessionSync({
                                     logWarn('useSessionSync', 'ignoring partial realtime UPDATE — missing startedAt or workout')
                                     return
                                 }
+                                // R2#8: Apply valid state from the other device
+                                setActiveSession(state as unknown as ActiveWorkoutSession)
+                                setView('active')
+                                try { localStorage.setItem(`irontracks.activeSession.v2.${uid}`, JSON.stringify(state)) } catch { }
                             }
                         } catch { }
                     }

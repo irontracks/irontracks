@@ -78,6 +78,16 @@ export async function POST(req: Request) {
       })
       .eq('id', sub.id)
 
+    // R2#7: Also revoke user_entitlements so VIP access is removed immediately
+    // Without this, the user retains VIP until valid_until expires naturally
+    try {
+      await admin
+        .from('user_entitlements')
+        .update({ status: 'cancelled', valid_until: new Date().toISOString() })
+        .eq('user_id', user.id)
+        .in('status', ['active', 'trialing', 'past_due'])
+    } catch { }
+
     return NextResponse.json({ ok: true, cancelled: true, id: sub.id })
   } catch (e: unknown) {
     return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
