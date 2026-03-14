@@ -121,7 +121,6 @@ export async function POST(req: Request) {
                 type: 'story_posted',
                 title: 'Novo story',
                 message: `${authorName} postou um story.`,
-                read: false,
                 is_read: false,
                 metadata: { author_id: authorId, story_id: storyId },
               }))

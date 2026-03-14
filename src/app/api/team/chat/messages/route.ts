@@ -22,6 +22,25 @@ export async function GET(req: NextRequest) {
 
     const admin = createAdminClient()
 
+    // R5#1: Verify user is a member of this session (teacher or participant)
+    const { data: session } = await admin
+      .from('team_sessions')
+      .select('id, teacher_id')
+      .eq('id', sessionId)
+      .maybeSingle()
+    if (!session?.id) return NextResponse.json({ ok: false, error: 'session_not_found' }, { status: 404 })
+
+    const isTeacher = session.teacher_id === user.id
+    if (!isTeacher) {
+      const { data: participant } = await admin
+        .from('team_session_participants')
+        .select('id')
+        .eq('session_id', sessionId)
+        .eq('user_id', user.id)
+        .maybeSingle()
+      if (!participant?.id) return NextResponse.json({ ok: false, error: 'forbidden' }, { status: 403 })
+    }
+
     const { data, error } = await admin
       .from('team_chat_messages')
       .select('id, session_id, user_id, display_name, photo_url, content, created_at')

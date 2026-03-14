@@ -204,7 +204,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
     "error",
     (e) => {
       try {
-        const m = getErrorMessage(e) || e?.getErrorMessage(error) || "";
+        const m = String(e?.message || e?.error?.message || "");
         if (isChunkErr(m)) bust(m);
       } catch {}
     },
@@ -256,53 +256,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
         .catch(() => {});
     } catch {}
   };
-  const shouldRedirect = () => {
-    const p = location.pathname || "/";
-    if (p === "/" || p.startsWith("/auth/")) return false;
-    return true;
-  };
-  const doAuthPing = () => {
-    try {
-      return;
-      if (!shouldRedirect()) return;
-      fetch("/api/auth/ping", {
-        method: "GET",
-        credentials: "include",
-        cache: "no-store",
-      })
-        .then((r) => {
-          try {
-            const hasSbCookie = (() => {
-              try {
-                const raw = String(document.cookie || "");
-                return raw.split(";").some((p) => String(p || "").trim().startsWith("sb-"));
-              } catch {
-                return false;
-              }
-            })();
-            if (r && r.status === 401 && shouldRedirect() && !hasSbCookie) {
-              const s = ss();
-              const k = "it.auth.redirect.v1";
-              const t = now();
-              if (s) {
-                const last = Number(s.getItem(k) || 0) || 0;
-                if (t - last < reloadGuardMs) return;
-                s.setItem(k, String(t));
-              }
-              location.replace(
-                "/?next=" +
-                  encodeURIComponent(
-                    (location.pathname || "/") +
-                      location.search +
-                      location.hash,
-                  ),
-              );
-            }
-          } catch {}
-        })
-        .catch(() => {});
-    } catch {}
-  };
+
   const onVisible = () => {
     try {
       checkVersion();
