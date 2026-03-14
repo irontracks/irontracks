@@ -2,6 +2,7 @@
 
 import { memo } from 'react'
 import { Dumbbell, BarChart2, Users, Star } from 'lucide-react'
+import { motion } from 'framer-motion'
 
 type DashboardTabsProps = {
   view: 'dashboard' | 'assessments' | 'community' | 'vip'
@@ -17,11 +18,6 @@ const tabs = [
   { key: 'assessments', label: 'Avaliações', Icon: BarChart2 },
 ] as const
 
-/** Dot indicator for active tab — yellow glow */
-const ActiveDot = () => (
-  <span className="absolute bottom-[5px] left-1/2 -translate-x-1/2 w-1 h-1 rounded-full bg-yellow-500 shadow-[0_0_6px_2px_rgba(234,179,8,0.5)]" />
-)
-
 export const DashboardTabs = memo(({
   view,
   onChangeView,
@@ -31,21 +27,21 @@ export const DashboardTabs = memo(({
   vipLocked,
 }: DashboardTabsProps) => {
   const tabCls = (active: boolean) =>
-    `flex-1 min-h-[52px] px-2 sm:px-3 rounded-xl text-[11px] sm:text-xs uppercase tracking-wider whitespace-nowrap leading-none transition-all duration-200 flex flex-col items-center justify-center gap-[5px] relative ${active
+    `flex-1 min-h-[52px] px-2 sm:px-3 rounded-xl text-[11px] sm:text-xs uppercase tracking-wider whitespace-nowrap leading-none transition-colors duration-200 flex flex-col items-center justify-center gap-[5px] relative z-10 ${active
       ? 'text-yellow-400 font-black'
-      : 'text-neutral-500 hover:text-neutral-300 font-bold hover:bg-white/[0.03]'
+      : 'text-neutral-500 hover:text-neutral-300 font-bold'
     }`
 
   return (
     <div className="min-h-[64px]">
       <div className="sticky top-[var(--dashboard-sticky-top)] z-30">
-        {/* Glass container — borda neutra sutil, sem amarelo dominante */}
+        {/* Glass container */}
         <div
           className="rounded-2xl p-[1px] shadow-2xl shadow-black/60"
           style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.02) 100%)' }}
         >
           <div
-            className="rounded-[14px] p-1 flex gap-1"
+            className="rounded-[14px] p-1 flex gap-1 relative"
             style={{
               background: 'linear-gradient(160deg, rgba(18,18,18,0.99) 0%, rgba(10,10,10,0.99) 100%)',
               backdropFilter: 'blur(20px)',
@@ -61,9 +57,36 @@ export const DashboardTabs = memo(({
                   data-tour={`tab-${key === 'dashboard' ? 'workouts' : key}`}
                   className={tabCls(active)}
                 >
-                  <Icon size={15} strokeWidth={active ? 2.5 : 1.8} />
+                  {active && (
+                    <motion.div
+                      layoutId="active-tab-indicator"
+                      className="absolute inset-0 rounded-xl"
+                      style={{
+                        background: 'linear-gradient(135deg, rgba(234,179,8,0.1) 0%, rgba(234,179,8,0.04) 100%)',
+                        border: '1px solid rgba(234,179,8,0.18)',
+                        boxShadow: '0 0 16px rgba(234,179,8,0.08), inset 0 1px 0 rgba(234,179,8,0.1)',
+                      }}
+                      transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                    />
+                  )}
+                  <motion.div
+                    animate={{ scale: active ? 1.1 : 1, rotate: active ? 3 : 0 }}
+                    transition={{ type: 'spring', stiffness: 400, damping: 20 }}
+                  >
+                    <Icon size={15} strokeWidth={active ? 2.5 : 1.8} />
+                  </motion.div>
                   <span>{label}</span>
-                  {active && <ActiveDot />}
+                  {active && (
+                    <motion.span
+                      layoutId="active-tab-underline"
+                      className="absolute bottom-[5px] left-1/2 -translate-x-1/2 h-[2px] w-5 rounded-full"
+                      style={{
+                        background: 'linear-gradient(90deg, transparent, #eab308, transparent)',
+                        boxShadow: '0 0 8px rgba(234,179,8,0.6)',
+                      }}
+                      transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                    />
+                  )}
                 </button>
               )
             })}
@@ -75,9 +98,36 @@ export const DashboardTabs = memo(({
                 data-tour="tab-community"
                 className={tabCls(view === 'community')}
               >
-                <Users size={15} strokeWidth={view === 'community' ? 2.5 : 1.8} />
+                {view === 'community' && (
+                  <motion.div
+                    layoutId="active-tab-indicator"
+                    className="absolute inset-0 rounded-xl"
+                    style={{
+                      background: 'linear-gradient(135deg, rgba(234,179,8,0.1) 0%, rgba(234,179,8,0.04) 100%)',
+                      border: '1px solid rgba(234,179,8,0.18)',
+                      boxShadow: '0 0 16px rgba(234,179,8,0.08), inset 0 1px 0 rgba(234,179,8,0.1)',
+                    }}
+                    transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                  />
+                )}
+                <motion.div
+                  animate={{ scale: view === 'community' ? 1.1 : 1, rotate: view === 'community' ? 3 : 0 }}
+                  transition={{ type: 'spring', stiffness: 400, damping: 20 }}
+                >
+                  <Users size={15} strokeWidth={view === 'community' ? 2.5 : 1.8} />
+                </motion.div>
                 <span>Comunidade</span>
-                {view === 'community' && <ActiveDot />}
+                {view === 'community' && (
+                  <motion.span
+                    layoutId="active-tab-underline"
+                    className="absolute bottom-[5px] left-1/2 -translate-x-1/2 h-[2px] w-5 rounded-full"
+                    style={{
+                      background: 'linear-gradient(90deg, transparent, #eab308, transparent)',
+                      boxShadow: '0 0 8px rgba(234,179,8,0.6)',
+                    }}
+                    transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                  />
+                )}
               </button>
             )}
 
@@ -88,9 +138,36 @@ export const DashboardTabs = memo(({
                 data-tour="tab-vip"
                 className={tabCls(view === 'vip')}
               >
-                <Star size={15} strokeWidth={view === 'vip' ? 2.5 : 1.8} />
+                {view === 'vip' && (
+                  <motion.div
+                    layoutId="active-tab-indicator"
+                    className="absolute inset-0 rounded-xl"
+                    style={{
+                      background: 'linear-gradient(135deg, rgba(234,179,8,0.1) 0%, rgba(234,179,8,0.04) 100%)',
+                      border: '1px solid rgba(234,179,8,0.18)',
+                      boxShadow: '0 0 16px rgba(234,179,8,0.08), inset 0 1px 0 rgba(234,179,8,0.1)',
+                    }}
+                    transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                  />
+                )}
+                <motion.div
+                  animate={{ scale: view === 'vip' ? 1.1 : 1, rotate: view === 'vip' ? 3 : 0 }}
+                  transition={{ type: 'spring', stiffness: 400, damping: 20 }}
+                >
+                  <Star size={15} strokeWidth={view === 'vip' ? 2.5 : 1.8} />
+                </motion.div>
                 <span>{vipLabel}{vipLocked ? ' 🔒' : ''}</span>
-                {view === 'vip' && <ActiveDot />}
+                {view === 'vip' && (
+                  <motion.span
+                    layoutId="active-tab-underline"
+                    className="absolute bottom-[5px] left-1/2 -translate-x-1/2 h-[2px] w-5 rounded-full"
+                    style={{
+                      background: 'linear-gradient(90deg, transparent, #eab308, transparent)',
+                      boxShadow: '0 0 8px rgba(234,179,8,0.6)',
+                    }}
+                    transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+                  />
+                )}
               </button>
             )}
           </div>

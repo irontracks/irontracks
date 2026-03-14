@@ -1,6 +1,6 @@
 'use client'
 
-import React, { memo, useEffect, useState } from 'react'
+import React, { memo, useCallback, useEffect, useRef, useState } from 'react'
 import Image from 'next/image'
 import NextImage from 'next/image'
 import { Crown, X, ChevronRight, Trophy, TrendingUp, ChevronDown, Zap, Star } from 'lucide-react'
@@ -10,6 +10,7 @@ import { getIronRankLeaderboard, getLatestWorkoutPrs } from '@/actions/workout-a
 import BadgesInline, { type Badge } from './BadgesInline'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { logError } from '@/lib/logger'
+import Confetti from '@/components/ui/Confetti'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -109,6 +110,10 @@ const IronRankCard = memo(function IronRankCard({
     const [prsExpanded, setPrsExpanded] = useState(false)
     const rankFocusTrapRef = useFocusTrap(rankOpen, () => setRankOpen(false))
 
+    // ── Celebration state ──────────────────────────────────────────────────────
+    const [showConfetti, setShowConfetti] = useState(false)
+    const hasTriggeredConfettiRef = useRef(false)
+
     // ── Load PRs ───────────────────────────────────────────────────────────────
     useEffect(() => {
         if (!showRecords || !currentUserId) { setPrsLoading(false); return }
@@ -121,7 +126,16 @@ const IronRankCard = memo(function IronRankCard({
                     const wo = res?.workout && typeof res.workout === 'object' ? res.workout as Record<string, unknown> : null
                     setPrsDate(wo?.date ? String(wo.date) : '')
                     setPrsTitle(wo?.title ? String(wo.title) : '')
-                    setPrs(res?.ok && Array.isArray(res?.prs) ? res.prs : [])
+                    const loadedPrs = res?.ok && Array.isArray(res?.prs) ? res.prs : []
+                    setPrs(loadedPrs)
+                    // 🎆 Trigger celebration confetti on new PRs
+                    if (loadedPrs.length > 0 && !hasTriggeredConfettiRef.current) {
+                        const hasImproved = loadedPrs.some(pr => countImprovements(pr) > 0)
+                        if (hasImproved) {
+                            hasTriggeredConfettiRef.current = true
+                            setShowConfetti(true)
+                        }
+                    }
                 } catch (e) { logError('error', e) }
                 finally { if (!cancelled) setPrsLoading(false) }
             })()
@@ -181,8 +195,12 @@ const IronRankCard = memo(function IronRankCard({
 
     const hasContent = showIronRank || (showRecords && !prsLoading)
 
+    const handleConfettiComplete = useCallback(() => setShowConfetti(false), [])
+
     return (
         <>
+            {/* 🎆 PR Celebration Confetti */}
+            <Confetti active={showConfetti} duration={2800} count={50} onComplete={handleConfettiComplete} />
             {hasContent && (
                 <motion.div
                     initial={{ opacity: 0, y: -10 }}
@@ -244,7 +262,7 @@ const IronRankCard = memo(function IronRankCard({
                                     {currentStreak > 0 && (
                                         <div className="flex items-center gap-1 rounded-lg px-1.5 py-1"
                                             style={{ background: 'rgba(249,115,22,0.1)', border: '1px solid rgba(249,115,22,0.2)' }}>
-                                            <span className="text-xs leading-none">🔥</span>
+                                            <span className="text-xs leading-none streak-fire">🔥</span>
                                             <span className="text-orange-400 font-black text-[10px] leading-none">{currentStreak}d</span>
                                         </div>
                                     )}
@@ -258,15 +276,23 @@ const IronRankCard = memo(function IronRankCard({
                                     <span className="text-[10px] text-neutral-500 font-semibold">{totalVolumeKg.toLocaleString('pt-BR')}kg levantados</span>
                                     <span className="text-[10px] font-black tabular-nums text-yellow-400">{Math.round(progress)}%</span>
                                 </div>
-                                <div className="h-1.5 rounded-full overflow-hidden"
-                                    style={{ background: 'rgba(255,255,255,0.06)', boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.4)' }}>
+                                <div className="h-2 rounded-full overflow-hidden"
+                                    style={{ background: 'rgba(255,255,255,0.06)', boxShadow: 'inset 0 1px 3px rgba(0,0,0,0.5)' }}>
                                     <motion.div
                                         initial={{ width: 0 }} animate={{ width: `${progress}%` }}
                                         transition={{ duration: 1.4, ease: 'easeOut' }}
-                                        className="h-full rounded-full relative"
-                                        style={{ background: 'linear-gradient(90deg, #92400e 0%, #d97706 40%, #fbbf24 80%, #fde68a 100%)' }}
+                                        className="h-full rounded-full relative overflow-hidden"
+                                        style={{
+                                            background: 'linear-gradient(90deg, #78350f 0%, #b45309 20%, #d97706 40%, #f59e0b 60%, #fbbf24 80%, #fde68a 100%)',
+                                            boxShadow: '0 0 12px rgba(251,191,36,0.4), inset 0 1px 0 rgba(255,255,255,0.2)',
+                                        }}
                                     >
-                                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-[shimmer_2.5s_ease-in-out_infinite] rounded-full" />
+                                        <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/25 to-transparent animate-[shimmer_2s_ease-in-out_infinite] rounded-full" />
+                                        {/* Liquid gold particles effect */}
+                                        <div className="absolute inset-0 opacity-60" style={{
+                                            backgroundImage: 'radial-gradient(circle 2px at 20% 50%, rgba(255,255,255,0.6) 0%, transparent 100%), radial-gradient(circle 1.5px at 50% 40%, rgba(255,255,255,0.4) 0%, transparent 100%), radial-gradient(circle 2px at 80% 60%, rgba(255,255,255,0.5) 0%, transparent 100%)',
+                                            animation: 'shimmer 3s ease-in-out infinite reverse',
+                                        }} />
                                     </motion.div>
                                 </div>
                                 <div className="flex justify-between mt-1">
@@ -324,21 +350,36 @@ const IronRankCard = memo(function IronRankCard({
                                 </motion.span>
                             </div>
 
-                            {/* Best PR quick-view */}
+                            {/* Best PR quick-view — with pulse animation */}
                             {prs.length > 0 && bestPr && bestTier && (
-                                <div className="px-3 pb-2 -mt-0.5">
-                                    <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg"
+                                <motion.div
+                                    className="px-3 pb-2 -mt-0.5"
+                                    initial={{ opacity: 0, scale: 0.95 }}
+                                    animate={{ opacity: 1, scale: 1 }}
+                                    transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
+                                >
+                                    <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg relative overflow-hidden"
                                         style={{ background: bestTier.accent, border: `1px solid ${bestTier.color}30` }}>
-                                        <Zap size={10} style={{ color: bestTier.color }} className="shrink-0" />
-                                        <span className="text-[9px] font-black shrink-0" style={{ color: bestTier.color }}>{bestTier.label}</span>
-                                        <span className="text-[10px] text-neutral-300 truncate flex-1 font-semibold">{bestPr.exercise}</span>
-                                        <div className="flex items-center gap-1 shrink-0 text-[9px] font-black">
+                                        {/* Animated glow sweep */}
+                                        <div className="absolute inset-0 opacity-30" style={{
+                                            background: `linear-gradient(90deg, transparent, ${bestTier.color}40, transparent)`,
+                                            animation: 'shimmer 3s ease-in-out infinite',
+                                        }} />
+                                        <motion.div
+                                            animate={{ scale: [1, 1.3, 1] }}
+                                            transition={{ duration: 0.6, ease: 'easeOut' }}
+                                        >
+                                            <Zap size={10} style={{ color: bestTier.color }} className="shrink-0" />
+                                        </motion.div>
+                                        <span className="text-[9px] font-black shrink-0 relative" style={{ color: bestTier.color }}>{bestTier.label}</span>
+                                        <span className="text-[10px] text-neutral-300 truncate flex-1 font-semibold relative">{bestPr.exercise}</span>
+                                        <div className="flex items-center gap-1 shrink-0 text-[9px] font-black relative">
                                             {bestPr.improved?.weight && <span className="text-yellow-400">{fmt(bestPr.weight)}kg</span>}
                                             {bestPr.improved?.reps && <span className="text-yellow-300">{fmt(bestPr.reps, 0)} rep</span>}
                                             {bestPr.improved?.volume && <span className="text-amber-300">{fmt(Math.round(bestPr.volume), 0)}kg vol</span>}
                                         </div>
                                     </div>
-                                </div>
+                                </motion.div>
                             )}
 
                             {/* Expanded PR list */}

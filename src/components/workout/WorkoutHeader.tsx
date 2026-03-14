@@ -96,13 +96,31 @@ export default function WorkoutHeader() {
           </div>
         </div>
       </div>
-      {/* Progress bar — bottom of header */}
+      {/* Progress bar — premium animated gradient */}
       {totalSets > 0 && (
-        <div className="h-[3px] bg-neutral-800 w-full">
+        <div className="h-[3px] bg-neutral-800 w-full relative overflow-hidden">
           <div
-            className="h-full bg-gradient-to-r from-yellow-500 to-amber-400 transition-all duration-500 ease-out"
-            style={{ width: `${progressPct}%` }}
-          />
+            className="h-full transition-all duration-500 ease-out relative"
+            style={{
+              width: `${progressPct}%`,
+              background: progressPct >= 90
+                ? 'linear-gradient(90deg, #d97706, #f59e0b, #10b981, #34d399)'
+                : progressPct >= 50
+                  ? 'linear-gradient(90deg, #92400e, #d97706, #f59e0b, #fbbf24)'
+                  : 'linear-gradient(90deg, #78350f, #b45309, #d97706, #f59e0b)',
+              boxShadow: progressPct >= 80 ? '0 0 12px rgba(251,191,36,0.5)' : 'none',
+            }}
+          >
+            {/* Shimmer overlay */}
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent" style={{ animation: 'shimmer 2s ease-in-out infinite' }} />
+          </div>
+          {/* Completion pulse at 100% */}
+          {progressPct >= 100 && (
+            <div className="absolute inset-0" style={{
+              background: 'linear-gradient(90deg, transparent, rgba(16,185,129,0.4), transparent)',
+              animation: 'shimmer 1.5s ease-in-out infinite',
+            }} />
+          )}
         </div>
       )}
 

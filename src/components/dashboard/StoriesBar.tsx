@@ -308,16 +308,17 @@ export default function StoriesBar({
                 <div className="relative w-16 h-16 mx-auto">
                   {ringType === 'unseen' && (
                     <div
-                      className="absolute inset-0 rounded-full animate-spin-slow"
+                      className="absolute inset-0 rounded-full"
                       style={{
-                        background: 'conic-gradient(from 0deg, #f59e0b, #ef4444, #8b5cf6, #3b82f6, #f59e0b)',
-                        padding: '2px',
+                        background: 'conic-gradient(from 0deg, #f59e0b, #ef4444, #8b5cf6, #3b82f6, #10b981, #f59e0b)',
+                        padding: '2.5px',
                         borderRadius: '9999px',
+                        animation: 'spin-slow 6s linear infinite, aurora-pulse 2s ease-in-out infinite',
                       }}
                     />
                   )}
                   {ringType === 'seen' && (
-                    <div className="absolute inset-0 rounded-full" style={{ background: 'conic-gradient(from 0deg, #525252, #737373)', padding: '2px', borderRadius: '9999px' }} />
+                    <div className="absolute inset-0 rounded-full" style={{ background: 'conic-gradient(from 0deg, #404040, #525252, #404040)', padding: '2px', borderRadius: '9999px' }} />
                   )}
 
                   <div className={[
