@@ -53,18 +53,24 @@ export function HistoryListEditModal({
     return (
         <div
             role="presentation"
-            className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+            className="fixed inset-0 z-[70] bg-black/85 backdrop-blur-md flex items-center justify-center p-4"
             onClick={onClose}
         >
             <div
                 role="dialog"
                 aria-modal="true"
                 aria-label="Editar Histórico"
-                className="bg-neutral-900 w-full max-w-2xl rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden"
+                className="w-full max-w-2xl rounded-2xl border shadow-2xl overflow-hidden relative"
+                style={{
+                    background: 'linear-gradient(160deg, rgba(20,18,10,0.98) 0%, rgba(10,10,10,0.99) 40%)',
+                    borderColor: 'rgba(234,179,8,0.12)',
+                    boxShadow: '0 32px 64px -16px rgba(0,0,0,0.8), inset 0 1px 0 rgba(234,179,8,0.1)',
+                }}
                 onClick={(e) => e.stopPropagation()}
             >
-                <div className="p-4 border-b border-neutral-800">
-                    <h3 className="font-bold text-white">Editar Histórico</h3>
+                <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-yellow-500/40 to-transparent" />
+                <div className="p-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                    <h3 className="text-xs font-black uppercase tracking-[0.2em] text-yellow-500/80">Editar Histórico</h3>
                 </div>
 
                 <div className="p-4 space-y-3 max-h-[70vh] overflow-y-auto">
@@ -74,7 +80,8 @@ export function HistoryListEditModal({
                             <input
                                 value={editTitle}
                                 onChange={(e) => setEditTitle(e.target.value)}
-                                className="w-full bg-neutral-800 border border-neutral-700 rounded-xl p-3 text-white outline-none"
+                                className="w-full rounded-xl p-3 text-white outline-none border focus:border-yellow-500/40 transition-all"
+                                style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }}
                             />
                         </div>
                         <div>
@@ -83,7 +90,8 @@ export function HistoryListEditModal({
                                 type="number"
                                 value={editDuration}
                                 onChange={(e) => setEditDuration(e.target.value)}
-                                className="w-full bg-neutral-800 border border-neutral-700 rounded-xl p-3 text-white outline-none"
+                                className="w-full rounded-xl p-3 text-white outline-none border focus:border-yellow-500/40 transition-all"
+                                style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }}
                             />
                         </div>
                     </div>
@@ -94,7 +102,8 @@ export function HistoryListEditModal({
                             type="datetime-local"
                             value={editDate}
                             onChange={(e) => setEditDate(e.target.value)}
-                            className="w-full bg-neutral-800 border border-neutral-700 rounded-xl p-3 text-white outline-none"
+                            className="w-full rounded-xl p-3 text-white outline-none border focus:border-yellow-500/40 transition-all"
+                                style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }}
                         />
                     </div>
 
@@ -103,13 +112,14 @@ export function HistoryListEditModal({
                         <textarea
                             value={editNotes}
                             onChange={(e) => setEditNotes(e.target.value)}
-                            className="w-full bg-neutral-800 border border-neutral-700 rounded-xl p-3 text-white outline-none h-20 resize-none"
+                        className="w-full rounded-xl p-3 text-white outline-none h-20 resize-none border focus:border-yellow-500/40 transition-all"
+                            style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }}
                         />
                     </div>
 
                     <div className="space-y-2">
                         {editExercises.map((ex, idx) => (
-                            <div key={idx} className="p-3 bg-neutral-800 rounded-lg border border-neutral-700 space-y-2">
+                            <div key={idx} className="p-3 rounded-xl border space-y-2" style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'rgba(255,255,255,0.06)' }}>
                                 <p className="text-sm font-bold text-white">{ex.name}</p>
                                 <div className="grid grid-cols-4 gap-2">
                                     <div>
@@ -180,18 +190,19 @@ export function HistoryListEditModal({
                     </div>
                 </div>
 
-                <div className="p-4 bg-neutral-900/50 flex gap-2">
+                <div className="p-4 flex gap-2" style={{ borderTop: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)' }}>
                     <button
                         type="button"
                         onClick={onClose}
-                        className="flex-1 py-3 rounded-xl bg-neutral-800 text-neutral-300 font-bold hover:bg-neutral-700"
+                        className="flex-1 py-3 rounded-xl border text-neutral-300 font-bold hover:text-white hover:border-yellow-500/30 transition-all"
+                        style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }}
                     >
                         Cancelar
                     </button>
                     <button
                         type="button"
                         onClick={onSave}
-                        className="flex-1 py-3 rounded-xl bg-yellow-500 text-black font-bold hover:bg-yellow-400"
+                        className="flex-1 py-3 rounded-xl font-black transition-all btn-gold-animated"
                     >
                         Salvar
                     </button>

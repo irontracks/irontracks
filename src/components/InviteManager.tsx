@@ -259,15 +259,23 @@ const InviteManager = ({ isOpen, onClose, onInvite }: InviteManagerProps) => {
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-[60] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 animate-fade-in">
-            <div className="bg-neutral-900 w-full max-w-md rounded-2xl border border-neutral-800 shadow-2xl flex flex-col max-h-[80vh]">
-                <div className="p-4 border-b border-neutral-800 flex justify-between items-center bg-neutral-800/50 rounded-t-2xl">
-                    <h3 className="font-bold text-white flex items-center gap-2">
-                        <UserPlus className="text-yellow-500" size={20} />
+        <div className="fixed inset-0 z-[60] bg-black/85 backdrop-blur-md flex items-center justify-center p-4 animate-fade-in">
+            <div
+              className="w-full max-w-md rounded-2xl border shadow-2xl flex flex-col max-h-[80vh] relative overflow-hidden"
+              style={{
+                background: 'linear-gradient(160deg, rgba(20,18,10,0.98) 0%, rgba(10,10,10,0.99) 40%)',
+                borderColor: 'rgba(234,179,8,0.12)',
+                boxShadow: '0 32px 64px -16px rgba(0,0,0,0.8), inset 0 1px 0 rgba(234,179,8,0.1)',
+              }}
+            >
+                <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-yellow-500/40 to-transparent" />
+                <div className="p-4 flex justify-between items-center" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                    <h3 className="text-xs font-black uppercase tracking-[0.2em] text-yellow-500/80 flex items-center gap-2">
+                        <UserPlus size={16} />
                         Convidar Parceiro
                     </h3>
-                    <button onClick={onClose} className="p-2 hover:bg-neutral-700 rounded-full transition-colors">
-                        <X size={20} className="text-neutral-400" />
+                    <button onClick={onClose} className="w-8 h-8 rounded-xl border flex items-center justify-center text-neutral-500 hover:text-white hover:border-yellow-500/40 transition-all" style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }}>
+                        <X size={16} />
                     </button>
                 </div>
 
@@ -278,7 +286,8 @@ const InviteManager = ({ isOpen, onClose, onInvite }: InviteManagerProps) => {
                             value={searchTerm}
                             onChange={e => setSearchTerm(e.target.value)}
                             placeholder="Buscar atleta..."
-                            className="w-full bg-neutral-800 text-white pl-10 pr-4 py-3 rounded-xl outline-none focus:ring-2 ring-yellow-500/50 transition-all placeholder:text-neutral-600"
+                            className="w-full pl-10 pr-4 py-3 rounded-xl border text-white outline-none transition-all placeholder:text-neutral-600 focus:border-yellow-500/40"
+                            style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }}
                             autoFocus
                         />
                     </div>
@@ -304,7 +313,7 @@ const InviteManager = ({ isOpen, onClose, onInvite }: InviteManagerProps) => {
                         const pending = pendingIds.has(userId);
 
                         return (
-                            <div key={user.id} className="flex items-center justify-between p-3 bg-neutral-800/50 hover:bg-neutral-800 rounded-xl transition-colors group border border-transparent hover:border-neutral-700">
+                            <div key={user.id} className="flex items-center justify-between p-3 rounded-xl transition-all group border hover:border-yellow-500/15" style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'rgba(255,255,255,0.04)' }}>
                                 <div className="flex items-center gap-3">
                                     <div className="relative">
                                         {user.photoURL ? (

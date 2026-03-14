@@ -79,41 +79,48 @@ export function HistoryListManualModal({
     return (
         <div
             role="presentation"
-            className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+            className="fixed inset-0 z-[70] bg-black/85 backdrop-blur-md flex items-center justify-center p-4"
             onClick={onClose}
         >
             <div
                 role="dialog"
                 aria-modal="true"
                 aria-label="Adicionar Histórico"
-                className="bg-neutral-900 w-full max-w-2xl rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden"
+                className="w-full max-w-2xl rounded-2xl border shadow-2xl overflow-hidden relative"
+                style={{
+                    background: 'linear-gradient(160deg, rgba(20,18,10,0.98) 0%, rgba(10,10,10,0.99) 40%)',
+                    borderColor: 'rgba(234,179,8,0.12)',
+                    boxShadow: '0 32px 64px -16px rgba(0,0,0,0.8), inset 0 1px 0 rgba(234,179,8,0.1)',
+                }}
                 onClick={(e) => e.stopPropagation()}
             >
-                <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-2">
-                    <h3 className="font-bold text-white">Adicionar Histórico</h3>
+                <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-yellow-500/40 to-transparent" />
+                <div className="p-4 flex items-center justify-between gap-2" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                    <h3 className="text-xs font-black uppercase tracking-[0.2em] text-yellow-500/80">Adicionar Histórico</h3>
                     <button
                         type="button"
                         onClick={onClose}
-                        className="w-8 h-8 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 inline-flex items-center justify-center"
+                        className="w-8 h-8 rounded-xl border flex items-center justify-center text-neutral-500 hover:text-white hover:border-yellow-500/40 transition-all"
+                        style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }}
                         aria-label="Fechar"
                     >
                         <X size={16} />
                     </button>
                 </div>
 
-                <div className="p-4 border-b border-neutral-800/50">
-                    <div className="flex gap-2">
+                <div className="p-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
+                    <div className="flex gap-2 p-1 rounded-xl" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
                         <button
                             type="button"
                             onClick={() => setManualTab('existing')}
-                            className={`px-3 py-2 rounded-lg text-xs font-bold transition-colors ${manualTab === 'existing' ? 'bg-yellow-500 text-black' : 'bg-neutral-800 text-neutral-300 hover:bg-neutral-700'}`}
+                            className={`flex-1 px-3 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all ${manualTab === 'existing' ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/20' : 'text-neutral-500 hover:text-neutral-300'}`}
                         >
                             Usar Treino
                         </button>
                         <button
                             type="button"
                             onClick={() => setManualTab('new')}
-                            className={`px-3 py-2 rounded-lg text-xs font-bold transition-colors ${manualTab === 'new' ? 'bg-yellow-500 text-black' : 'bg-neutral-800 text-neutral-300 hover:bg-neutral-700'}`}
+                            className={`flex-1 px-3 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all ${manualTab === 'new' ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/20' : 'text-neutral-500 hover:text-neutral-300'}`}
                         >
                             Treino Novo
                         </button>
@@ -127,7 +134,8 @@ export function HistoryListManualModal({
                             type="datetime-local"
                             value={manualDate}
                             onChange={(e) => setManualDate(e.target.value)}
-                            className="w-full bg-neutral-800 border border-neutral-700 rounded-xl p-3 text-white outline-none"
+                            className="w-full rounded-xl p-3 text-white outline-none border focus:border-yellow-500/40 transition-all"
+                            style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }}
                         />
                     </div>
                     <div>
@@ -136,7 +144,8 @@ export function HistoryListManualModal({
                             type="number"
                             value={manualDuration}
                             onChange={(e) => setManualDuration(e.target.value)}
-                            className="w-full bg-neutral-800 border border-neutral-700 rounded-xl p-3 text-white outline-none"
+                            className="w-full rounded-xl p-3 text-white outline-none border focus:border-yellow-500/40 transition-all"
+                            style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }}
                         />
                     </div>
                     <div>
@@ -163,7 +172,8 @@ export function HistoryListManualModal({
                                         .single();
                                     setSelectedTemplate(data);
                                 }}
-                                className="w-full bg-neutral-800 border border-neutral-700 rounded-xl p-3 text-white outline-none"
+                                className="w-full rounded-xl p-3 text-white outline-none border focus:border-yellow-500/40 transition-all"
+                                style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }}
                             >
                                 <option value="">Selecione...</option>
                                 {availableWorkouts.map((t) => (
@@ -174,7 +184,7 @@ export function HistoryListManualModal({
                             {selectedTemplate && (
                                 <div className="space-y-2">
                                     {manualExercises.map((ex, idx) => (
-                                        <div key={idx} className="p-3 bg-neutral-800 rounded-lg border border-neutral-700 space-y-2">
+                                        <div key={idx} className="p-3 rounded-xl border space-y-2" style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'rgba(255,255,255,0.06)' }}>
                                             <p className="text-sm font-bold text-white">{ex.name}</p>
                                             <div className="grid grid-cols-4 gap-2">
                                                 <div>
@@ -242,11 +252,12 @@ export function HistoryListManualModal({
                     )}
                 </div>
 
-                <div className="p-4 bg-neutral-900/50 flex gap-2">
+                <div className="p-4 flex gap-2" style={{ borderTop: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)' }}>
                     <button
                         type="button"
                         onClick={onClose}
-                        className="flex-1 py-3 rounded-xl bg-neutral-800 text-neutral-300 font-bold hover:bg-neutral-700"
+                        className="flex-1 py-3 rounded-xl border text-neutral-300 font-bold hover:text-white hover:border-yellow-500/30 transition-all"
+                        style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }}
                     >
                         Cancelar
                     </button>
@@ -254,7 +265,7 @@ export function HistoryListManualModal({
                         <button
                             type="button"
                             onClick={onSaveExisting}
-                            className="flex-1 py-3 rounded-xl bg-yellow-500 text-black font-bold hover:bg-yellow-400"
+                            className="flex-1 py-3 rounded-xl font-black transition-all btn-gold-animated"
                         >
                             Salvar
                         </button>
@@ -262,7 +273,7 @@ export function HistoryListManualModal({
                         <button
                             type="button"
                             onClick={onSaveNew}
-                            className="flex-1 py-3 rounded-xl bg-yellow-500 text-black font-bold hover:bg-yellow-400"
+                            className="flex-1 py-3 rounded-xl font-black transition-all btn-gold-animated"
                         >
                             Salvar
                         </button>

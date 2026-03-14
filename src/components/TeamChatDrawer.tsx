@@ -109,15 +109,22 @@ export function TeamChatDrawer({ myUserId, myDisplayName, myPhotoURL, participan
 
             {/* Chat drawer */}
             {open && (
-                <div className="fixed bottom-0 right-0 z-[70] w-80 max-w-[100vw] h-[420px] flex flex-col rounded-t-2xl border border-neutral-700 border-b-0 bg-neutral-900 shadow-2xl overflow-hidden">
+                <div
+                    className="fixed bottom-0 right-0 z-[70] w-80 max-w-[100vw] h-[420px] flex flex-col rounded-t-2xl border border-b-0 shadow-2xl overflow-hidden"
+                    style={{
+                        background: 'linear-gradient(160deg, rgba(20,18,10,0.99) 0%, rgba(10,10,10,1) 40%)',
+                        borderColor: 'rgba(234,179,8,0.12)',
+                        boxShadow: '0 -8px 32px -8px rgba(0,0,0,0.6), inset 0 1px 0 rgba(234,179,8,0.1)',
+                    }}
+                >
                     {/* Header */}
-                    <div className="flex items-center justify-between px-4 py-3 border-b border-neutral-800 shrink-0">
+                    <div className="flex items-center justify-between px-4 py-3 shrink-0" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
                         <div className="flex items-center gap-2">
                             <MessageCircle size={14} className="text-yellow-400" />
-                            <span className="text-sm font-black text-yellow-400 uppercase tracking-wide">Chat da equipe</span>
+                            <span className="text-[10px] font-black text-yellow-500/80 uppercase tracking-[0.2em]">Chat da equipe</span>
                         </div>
-                        <button onClick={() => setOpen(false)} className="text-neutral-400 hover:text-white p-1">
-                            <ChevronDown size={16} />
+                        <button onClick={() => setOpen(false)} className="w-7 h-7 rounded-xl border flex items-center justify-center text-neutral-500 hover:text-white hover:border-yellow-500/40 transition-all" style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }}>
+                            <ChevronDown size={14} />
                         </button>
                     </div>
 
@@ -174,7 +181,7 @@ export function TeamChatDrawer({ myUserId, myDisplayName, myPhotoURL, participan
                     </div>
 
                     {/* Input */}
-                    <div className="flex items-center gap-2 px-3 py-3 border-t border-neutral-800 shrink-0">
+                    <div className="flex items-center gap-2 px-3 py-3 shrink-0" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
                         <input
                             type="text"
                             value={input}
