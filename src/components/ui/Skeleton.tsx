@@ -7,9 +7,18 @@ interface SkeletonProps {
 export function Skeleton({ className = '' }: SkeletonProps) {
   return (
     <div
-      className={`animate-pulse rounded-md bg-neutral-800 ${className}`}
+      className={`rounded-md bg-neutral-800/80 relative overflow-hidden ${className}`}
       aria-hidden="true"
-    />
+    >
+      {/* Gold shimmer sweep */}
+      <div
+        className="absolute inset-0"
+        style={{
+          background: 'linear-gradient(90deg, transparent 0%, rgba(234,179,8,0.06) 45%, rgba(234,179,8,0.1) 50%, rgba(234,179,8,0.06) 55%, transparent 100%)',
+          animation: 'shimmer 1.8s ease-in-out infinite',
+        }}
+      />
+    </div>
   )
 }
 
