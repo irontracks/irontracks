@@ -654,10 +654,10 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
 
   if (loading) {
     return (
-      <div className="p-6 flex items-center justify-center bg-neutral-900 text-white">
+      <div className="p-6 flex items-center justify-center min-h-[40vh]">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-yellow-500 mx-auto mb-4"></div>
-          <p className="text-neutral-400">Carregando histórico de avaliações...</p>
+          <div className="w-12 h-12 mx-auto mb-4 rounded-full border-2 border-yellow-500/30 border-t-yellow-500 animate-spin" />
+          <p className="text-neutral-500 text-sm font-bold">Carregando histórico de avaliações...</p>
         </div>
       </div>
     );
@@ -665,9 +665,9 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
 
   if (error) {
     return (
-      <div className="p-6 bg-neutral-900">
-        <div className="bg-red-900/20 border border-red-500/40 rounded-xl p-4 text-red-400">
-          Erro ao carregar histórico: {error}
+      <div className="p-6">
+        <div className="rounded-xl p-4 border" style={{ background: 'rgba(239,68,68,0.06)', borderColor: 'rgba(239,68,68,0.2)' }}>
+          <span className="text-red-400 font-bold">Erro ao carregar histórico:</span> <span className="text-red-300">{error}</span>
         </div>
       </div>
     );
@@ -675,66 +675,30 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
 
   if (assessments.length === 0) {
     return (
-      <div className="p-6 bg-neutral-900">
-        <div className="bg-neutral-800 rounded-xl border border-neutral-700 p-6 mb-6">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex items-center">
-              <User className="w-8 h-8 text-yellow-500 mr-3" />
-              <div>
-                <h1 className="text-xl font-black text-white">Avaliações Físicas</h1>
-                <p className="text-neutral-400 text-sm">Gerencie as avaliações e acompanhe a evolução</p>
-              </div>
-            </div>
-            <button
-              onClick={() => { if (typeof window !== 'undefined') window.history.back(); }}
-              className="shrink-0 w-11 h-11 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 hover:bg-neutral-800 transition-all duration-300 active:scale-95 flex items-center justify-center"
-              title="Fechar"
-              type="button"
-            >
-              <X className="w-5 h-5" />
-            </button>
-          </div>
+      <div className="p-4">
+        <AssessmentHeader
+          onCreate={() => studentId && router.push(`/assessments/new/${studentId}`)}
+          onShowHistory={() => {}}
+          onScan={handleScanClick}
+          importing={importing}
+          studentId={studentId}
+          onClose={undefined}
+          scanInputRef={scanInputRef}
+          onScanFileChange={handleScanFileChange}
+        />
 
-          <div className="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2">
-            <button
-              onClick={() => studentId && router.push(`/assessments/new/${studentId}`)}
-              className="w-full min-h-[44px] px-4 py-2 rounded-xl bg-yellow-500 text-black font-black shadow-lg shadow-yellow-500/20 hover:bg-yellow-400 transition-all duration-300 active:scale-95"
-            >
-              + Nova Avaliação
-            </button>
-            {!isIosNativeApp ? (
-              <button
-                onClick={handleScanClick}
-                disabled={importing || !studentId}
-                className={
-                  importing || !studentId
-                    ? "w-full min-h-[44px] px-4 py-2 rounded-xl bg-neutral-900 text-neutral-500 border border-dashed border-neutral-800 cursor-not-allowed font-bold"
-                    : "w-full min-h-[44px] px-4 py-2 rounded-xl bg-neutral-900 border border-dashed border-neutral-700 text-neutral-200 font-bold hover:bg-neutral-800 hover:border-yellow-500 hover:text-yellow-500 transition-all duration-300 active:scale-95"
-                }
-              >
-                <span className="inline-flex items-center justify-center gap-2">
-                  <Upload className="w-4 h-4" />
-                  {importing ? "Importando..." : "Importar Foto/PDF"}
-                </span>
-              </button>
-            ) : null}
-            {!isIosNativeApp ? (
-              <input
-                ref={scanInputRef}
-                type="file"
-                accept="image/*,application/pdf"
-                multiple
-                className="hidden"
-                onChange={handleScanFileChange}
-              />
-            ) : null}
+        <div
+          className="rounded-2xl border p-8 text-center"
+          style={{
+            background: 'linear-gradient(160deg, rgba(20,18,10,0.8) 0%, rgba(12,12,12,0.95) 50%)',
+            borderColor: 'rgba(255,255,255,0.06)',
+          }}
+        >
+          <div className="w-16 h-16 mx-auto mb-4 rounded-2xl flex items-center justify-center" style={{ background: 'rgba(234,179,8,0.08)', border: '1px solid rgba(234,179,8,0.15)' }}>
+            <TrendingUp className="w-8 h-8 text-yellow-500/60" />
           </div>
-        </div>
-
-        <div className="bg-neutral-800 rounded-xl border border-neutral-700 p-8 text-center">
-          <TrendingUp className="w-16 h-16 text-neutral-500 mx-auto mb-4" />
-          <h2 className="text-xl font-bold text-white mb-2">Nenhuma avaliação encontrada</h2>
-          <p className="text-neutral-400">Este aluno ainda não possui avaliações físicas registradas.</p>
+          <h2 className="text-xl font-black text-white mb-2">Nenhuma avaliação encontrada</h2>
+          <p className="text-neutral-500 text-sm">Este aluno ainda não possui avaliações físicas registradas.</p>
         </div>
       </div>
     );
@@ -743,7 +707,7 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
   return (
     <DialogProvider>
       <GlobalDialog />
-      <div className="p-4 bg-neutral-900 text-white">
+      <div className="p-4 text-white">
         <AssessmentHeader
           onCreate={() => setShowForm(true)}
           onShowHistory={() => setShowHistory(true)}
@@ -767,9 +731,15 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
         )}
 
         {/* Gráficos escuros */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-          <div className="bg-neutral-800 rounded-xl border border-neutral-700 p-6">
-            <h3 className="text-lg font-bold text-white mb-4">Evolução da Composição Corporal</h3>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+          <div
+            className="rounded-2xl border p-5"
+            style={{
+              background: 'linear-gradient(160deg, rgba(20,18,10,0.8) 0%, rgba(12,12,12,0.95) 50%)',
+              borderColor: 'rgba(255,255,255,0.06)',
+            }}
+          >
+            <h3 className="text-sm font-black uppercase tracking-widest text-yellow-500/80 mb-4">Evolução da Composição Corporal</h3>
             <div className="h-64">
               {chartHasData.bodyComposition ? (
                 <Line data={chartData.bodyComposition} options={chartOptions} />
@@ -780,8 +750,14 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
               )}
             </div>
           </div>
-          <div className="bg-neutral-800 rounded-xl border border-neutral-700 p-6">
-            <h3 className="text-lg font-bold text-white mb-4">Evolução do Peso</h3>
+          <div
+            className="rounded-2xl border p-5"
+            style={{
+              background: 'linear-gradient(160deg, rgba(20,18,10,0.8) 0%, rgba(12,12,12,0.95) 50%)',
+              borderColor: 'rgba(255,255,255,0.06)',
+            }}
+          >
+            <h3 className="text-sm font-black uppercase tracking-widest text-yellow-500/80 mb-4">Evolução do Peso</h3>
             <div className="h-64">
               {chartHasData.weightProgress ? (
                 <Line data={chartData.weightProgress} options={chartOptions} />
@@ -794,8 +770,14 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
           </div>
         </div>
 
-        <div className="bg-neutral-800 rounded-xl border border-neutral-700 p-6 mb-6">
-          <h3 className="text-lg font-bold text-white mb-4">Evolução das Circunferências</h3>
+        <div
+          className="rounded-2xl border p-5 mb-6"
+          style={{
+            background: 'linear-gradient(160deg, rgba(20,18,10,0.8) 0%, rgba(12,12,12,0.95) 50%)',
+            borderColor: 'rgba(255,255,255,0.06)',
+          }}
+        >
+          <h3 className="text-sm font-black uppercase tracking-widest text-yellow-500/80 mb-4">Evolução das Circunferências</h3>
           <div className="h-64">
             {chartHasData.measurements ? (
               <Bar data={chartData.measurements} options={chartOptions} />
@@ -808,20 +790,26 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
         </div>
 
         {/* Lista escura */}
-        <div className="bg-neutral-800 rounded-xl border border-neutral-700">
-          <div className="p-6 border-b border-neutral-700">
-            <h3 className="text-lg font-bold text-white flex items-center">
-              <Calendar className="w-5 h-5 mr-2" />
+        <div
+          className="rounded-2xl border overflow-hidden"
+          style={{
+            background: 'linear-gradient(160deg, rgba(20,18,10,0.8) 0%, rgba(12,12,12,0.95) 50%)',
+            borderColor: 'rgba(255,255,255,0.06)',
+          }}
+        >
+          <div className="p-5 border-b" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>
+            <h3 className="text-sm font-black uppercase tracking-widest text-yellow-500/80 flex items-center">
+              <Calendar className="w-4 h-4 mr-2" />
               Histórico Completo
             </h3>
           </div>
-          <div id="assessments-history" className="divide-y divide-neutral-700">
+          <div id="assessments-history" className="divide-y" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
             {sortedAssessments.map((assessment, idx) => {
               const assessmentId = String(assessment?.id ?? idx)
               const photos = Array.isArray(assessment?.photos) ? assessment.photos : []
               const ageLabel = String(assessment?.age ?? '-')
               return (
-                <div key={assessmentId} className="p-6 hover:bg-neutral-900 transition-colors">
+                <div key={assessmentId} className="p-5 hover:bg-white/[0.02] transition-colors" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
                   <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
                     <div className="flex-1 min-w-0">
                       <div className="flex items-start justify-between gap-3">
@@ -888,7 +876,8 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
                     <div className="flex flex-row flex-wrap items-center gap-2 md:justify-end">
                       <button
                         onClick={() => setSelectedAssessment(selectedAssessment === assessmentId ? null : assessmentId)}
-                        className="min-h-[44px] px-4 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-yellow-500 hover:text-yellow-400 font-black hover:bg-neutral-800 transition-all duration-300 active:scale-95"
+                        className="min-h-[44px] px-4 py-2 rounded-xl border text-yellow-500 hover:text-yellow-400 font-black hover:border-yellow-500/40 transition-all duration-300 active:scale-95"
+                        style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }}
                         type="button"
                       >
                         {selectedAssessment === assessmentId ? 'Ocultar' : 'Detalhes'}

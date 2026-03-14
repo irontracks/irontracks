@@ -22,102 +22,50 @@ export const AssessmentSummaryCards = <T,>({
   getProgress,
 }: AssessmentSummaryCardsProps<T>) => {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-      <div className="rounded-lg p-4 bg-neutral-900 border border-neutral-700">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-xs text-neutral-400 font-bold uppercase">Peso</span>
-          <TrendingUp className="w-4 h-4 text-yellow-500" />
-        </div>
-        <div className="text-2xl font-bold">
-          {(() => {
-            const v = getWeightKg(latestAssessment)
-            return v ? `${v.toFixed(1)} kg` : '-'
-          })()}
-        </div>
-        {(() => {
-          const progress = getProgress(getWeightKg(latestAssessment), getWeightKg(previousAssessment))
-          return (
-            progress && (
-              <div className={`text-sm ${progress.change > 0 ? 'text-green-400' : 'text-red-400'}`}>
-                {progress.change > 0 ? '+' : ''}
-                {progress.change.toFixed(1)} kg ({progress.percentage.toFixed(1)}%)
+    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+      {[
+        { label: 'Peso', icon: <TrendingUp className="w-4 h-4" />, getValue: getWeightKg, unit: 'kg', color: '#f59e0b', invertProgress: false },
+        { label: '% Gordura', icon: <Calculator className="w-4 h-4" />, getValue: getBodyFatPercent, unit: '%', color: '#ef4444', invertProgress: true },
+        { label: 'Massa Magra', icon: <TrendingUp className="w-4 h-4" />, getValue: getLeanMassKg, unit: 'kg', color: '#10b981', invertProgress: false },
+        { label: 'BMR', icon: <Calculator className="w-4 h-4" />, getValue: getBmrKcal, unit: 'kcal', color: '#6366f1', invertProgress: false },
+      ].map(({ label, icon, getValue, unit, color, invertProgress }) => {
+        const current = getValue(latestAssessment)
+        const previous = getValue(previousAssessment)
+        const progress = getProgress(current, previous)
+        const isPositive = invertProgress ? (progress?.change ?? 0) < 0 : (progress?.change ?? 0) > 0
+
+        return (
+          <div
+            key={label}
+            className="rounded-xl p-4 relative overflow-hidden border"
+            style={{
+              background: 'linear-gradient(160deg, rgba(20,18,10,0.8) 0%, rgba(12,12,12,0.95) 50%)',
+              borderColor: 'rgba(255,255,255,0.06)',
+              borderLeftColor: `${color}40`,
+              borderLeftWidth: 3,
+            }}
+          >
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] text-neutral-500 font-black uppercase tracking-widest">{label}</span>
+              <span style={{ color }} className="opacity-60">{icon}</span>
+            </div>
+            <div className="text-2xl font-black text-white">
+              {current != null ? (unit === 'kcal' ? current.toFixed(0) : current.toFixed(1)) : '-'}
+              <span className="text-sm font-bold text-neutral-500 ml-1">{current != null ? unit : ''}</span>
+            </div>
+            {progress && (
+              <div className={`text-xs font-bold mt-1 ${isPositive ? 'text-emerald-400' : 'text-red-400'}`}>
+                {progress.change > 0 ? '+' : ''}{unit === 'kcal' ? progress.change.toFixed(0) : progress.change.toFixed(1)} {unit} ({progress.percentage.toFixed(1)}%)
               </div>
-            )
-          )
-        })()}
-      </div>
-      <div className="rounded-lg p-4 bg-neutral-900 border border-neutral-700">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-xs text-neutral-400 font-bold uppercase">% Gordura</span>
-          <Calculator className="w-4 h-4 text-yellow-500" />
-        </div>
-        <div className="text-2xl font-bold">
-          {(() => {
-            const bf = getBodyFatPercent(latestAssessment)
-            return bf ? `${bf.toFixed(1)}%` : '-'
-          })()}
-        </div>
-        {(() => {
-          const progress = getProgress(getBodyFatPercent(latestAssessment), getBodyFatPercent(previousAssessment))
-          return (
-            progress && (
-              <div className={`text-sm ${progress.change < 0 ? 'text-green-400' : 'text-red-400'}`}>
-                {progress.change > 0 ? '+' : ''}
-                {progress.change.toFixed(1)}% ({progress.percentage.toFixed(1)}%)
-              </div>
-            )
-          )
-        })()}
-      </div>
-      <div className="rounded-lg p-4 bg-neutral-900 border border-neutral-700">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-xs text-neutral-400 font-bold uppercase">Massa Magra</span>
-          <TrendingUp className="w-4 h-4 text-yellow-500" />
-        </div>
-        <div className="text-2xl font-bold">
-          {(() => {
-            const lm = getLeanMassKg(latestAssessment)
-            return lm ? `${lm.toFixed(1)} kg` : '-'
-          })()}
-        </div>
-        {(() => {
-          const currentLm = getLeanMassKg(latestAssessment)
-          const previousLm = getLeanMassKg(previousAssessment)
-          const progress = getProgress(currentLm, previousLm)
-          return (
-            progress && (
-              <div className={`text-sm ${progress.change > 0 ? 'text-green-400' : 'text-red-400'}`}>
-                {progress.change > 0 ? '+' : ''}
-                {progress.change.toFixed(1)} kg ({progress.percentage.toFixed(1)}%)
-              </div>
-            )
-          )
-        })()}
-      </div>
-      <div className="rounded-lg p-4 bg-neutral-900 border border-neutral-700">
-        <div className="flex items-center justify-between mb-2">
-          <span className="text-xs text-neutral-400 font-bold uppercase">BMR</span>
-          <Calculator className="w-4 h-4 text-yellow-500" />
-        </div>
-        <div className="text-2xl font-bold">
-          {(() => {
-            const v = getBmrKcal(latestAssessment)
-            return v ? v.toFixed(0) : '-'
-          })()}{' '}
-          kcal
-        </div>
-        {(() => {
-          const progress = getProgress(getBmrKcal(latestAssessment), getBmrKcal(previousAssessment))
-          return (
-            progress && (
-              <div className={`text-sm ${progress.change > 0 ? 'text-green-400' : 'text-red-400'}`}>
-                {progress.change > 0 ? '+' : ''}
-                {progress.change.toFixed(0)} kcal ({progress.percentage.toFixed(1)}%)
-              </div>
-            )
-          )
-        })()}
-      </div>
+            )}
+            {/* Subtle shimmer */}
+            <div
+              className="absolute top-0 right-0 w-16 h-full pointer-events-none opacity-[0.03]"
+              style={{ background: `linear-gradient(180deg, ${color}, transparent)` }}
+            />
+          </div>
+        )
+      })}
     </div>
   )
 }
