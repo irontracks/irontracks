@@ -1,6 +1,6 @@
 'use client'
 import React from 'react'
-import { Sparkles, Loader2, Check, MessageSquare } from 'lucide-react'
+import { Sparkles, Loader2, Check } from 'lucide-react'
 
 type AnyObj = Record<string, unknown>
 
@@ -17,7 +17,7 @@ interface ReportAiSectionProps {
     applyState: ApplyState
     onGenerateAi: () => void
     onApplyProgression: () => void
-    onOpenChat: () => void
+
     renderAiRating: () => React.ReactNode
 }
 
@@ -31,7 +31,7 @@ export const ReportAiSection = ({
     applyState,
     onGenerateAi,
     onApplyProgression,
-    onOpenChat,
+
     renderAiRating,
 }: ReportAiSectionProps) => {
     return (
@@ -66,14 +66,7 @@ export const ReportAiSection = ({
                             </span>
                         )}
                     </button>
-                    <button
-                        type="button"
-                        onClick={onOpenChat}
-                        className="min-h-[44px] flex-1 md:flex-none px-4 py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-white font-black flex items-center justify-center gap-2 border border-neutral-700"
-                    >
-                        <MessageSquare size={18} />
-                        Conversar
-                    </button>
+
                 </div>
             </div>
 
