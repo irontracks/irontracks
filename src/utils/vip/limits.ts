@@ -284,21 +284,12 @@ export async function checkVipFeatureAccess(
 ): Promise<{ allowed: boolean, currentUsage: number, limit: number | null, tier: string }> {
   const { tier, limits } = await getVipPlanLimits(supabase, userId)
   const normalizedTier = normalizePlanId(tier)
-  if (feature === 'chef_ai' && normalizedTier !== 'vip_elite') {
-    return { allowed: false, currentUsage: 0, limit: 0, tier }
-  }
-  if (feature === 'analytics' && normalizedTier !== 'vip_elite') {
-    return { allowed: false, currentUsage: 0, limit: 0, tier }
-  }
-  if (feature === 'nutrition_macros' && normalizedTier !== 'vip_pro' && normalizedTier !== 'vip_elite') {
-    return { allowed: false, currentUsage: 0, limit: 0, tier }
-  }
-  if (feature === 'offline' && normalizedTier !== 'vip_pro' && normalizedTier !== 'vip_elite') {
-    return { allowed: false, currentUsage: 0, limit: 0, tier }
-  }
+
+  // Fix #7: Check limits object first (respects limits_override from admin)
+  // Only fall back to tier-based denial if the limit is explicitly false/0
   const limit = limits[feature]
 
-  // Boolean features (macros, offline, chef_ai)
+  // Boolean features — respect the limits object (includes overrides)
   if (typeof limit === 'boolean') {
     return { allowed: limit, currentUsage: 0, limit: limit ? 1 : 0, tier }
   }

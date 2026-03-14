@@ -5,6 +5,7 @@ import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { sendPushToUsers } from '@/lib/push/apns'
 import { logInfo, logError } from '@/lib/logger'
+import { requireUser } from '@/utils/auth/route'
 
 export const dynamic = 'force-dynamic'
 
@@ -20,11 +21,20 @@ const BodySchema = z
 
 export async function POST(req: Request) {
   try {
+    // Auth: require authenticated user
+    const auth = await requireUser()
+    if (!auth.ok) return auth.response
+
     const ip = getRequestIp(req)
 
     const parsedBody = await parseJsonBody(req, BodySchema)
     if (parsedBody.response) return parsedBody.response
     const { sessionId, senderId, senderName, senderPhoto, text } = parsedBody.data!
+
+    // Validate senderId matches authenticated user — prevents impersonation
+    if (senderId !== auth.user.id) {
+      return NextResponse.json({ ok: false, error: 'sender_mismatch' }, { status: 403 })
+    }
 
     const admin = createAdminClient()
 

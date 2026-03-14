@@ -32,11 +32,30 @@ export async function GET(req: Request) {
     const limit = Math.min(200, Math.max(1, Number(url.searchParams.get('limit') || 50) || 50))
     if (!storyId) return NextResponse.json({ ok: false, error: 'story_id required' }, { status: 400 })
 
+    const admin = createAdminClient()
+
+    // Security: verify follow relationship before exposing comments
+    const { data: story } = await admin
+      .from('social_stories')
+      .select('author_id')
+      .eq('id', storyId)
+      .maybeSingle()
+    const authorId = String(story?.author_id || '').trim()
+    if (authorId && authorId !== auth.user.id) {
+      const { data: follow } = await admin
+        .from('social_follows')
+        .select('id')
+        .eq('follower_id', auth.user.id)
+        .eq('following_id', authorId)
+        .eq('status', 'accepted')
+        .maybeSingle()
+      if (!follow) return NextResponse.json({ ok: false, error: 'forbidden' }, { status: 403 })
+    }
+
     const cacheKey = `social:stories:comments:${auth.user.id}:${storyId}:${limit}`
     const cached = await cacheGet<Record<string, unknown>>(cacheKey, (v) => (v && typeof v === 'object' ? (v as Record<string, unknown>) : null))
     if (cached) return NextResponse.json(cached)
 
-    const admin = createAdminClient()
     const { data: commentsRaw, error } = await admin
       .from('social_story_comments')
       .select('id, story_id, user_id, body, created_at')

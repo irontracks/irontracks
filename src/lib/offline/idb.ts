@@ -15,8 +15,24 @@ const hasIndexedDb = (): boolean => {
   }
 }
 
-const openDb = (): Promise<IDBDatabase> =>
-  new Promise((resolve, reject) => {
+// Fix #11: Singleton connection cache — prevents concurrent onupgradeneeded
+let cachedDb: IDBDatabase | null = null
+let openingPromise: Promise<IDBDatabase> | null = null
+
+const openDb = (): Promise<IDBDatabase> => {
+  // Return cached connection if still open
+  if (cachedDb) {
+    try {
+      // Verify connection is still alive by checking objectStoreNames
+      cachedDb.objectStoreNames
+      return Promise.resolve(cachedDb)
+    } catch {
+      cachedDb = null
+    }
+  }
+  // Deduplicate concurrent open calls
+  if (openingPromise) return openingPromise
+  openingPromise = new Promise<IDBDatabase>((resolve, reject) => {
     try {
       const req = indexedDB.open(DB_NAME, DB_VERSION)
       req.onupgradeneeded = () => {
@@ -24,12 +40,23 @@ const openDb = (): Promise<IDBDatabase> =>
         if (!db.objectStoreNames.contains(STORE_KV)) db.createObjectStore(STORE_KV)
         if (!db.objectStoreNames.contains(STORE_QUEUE)) db.createObjectStore(STORE_QUEUE, { keyPath: 'id' })
       }
-      req.onsuccess = () => resolve(req.result as IDBDatabase)
-      req.onerror = () => reject(req.error)
+      req.onsuccess = () => {
+        cachedDb = req.result as IDBDatabase
+        cachedDb.onclose = () => { cachedDb = null }
+        openingPromise = null
+        resolve(cachedDb)
+      }
+      req.onerror = () => {
+        openingPromise = null
+        reject(req.error)
+      }
     } catch (e) {
+      openingPromise = null
       reject(e)
     }
   })
+  return openingPromise
+}
 
 const txDone = (tx: IDBTransaction): Promise<null> =>
   new Promise<null>((resolve, reject) => {

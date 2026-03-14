@@ -54,9 +54,10 @@ export function useWorkoutFetch({
         }
         // 2. Synchronously read from localStorage so workouts are visible on first render,
         //    before auth and network requests complete (zero-latency perceived startup).
+        //    Fix #9: Use per-user cache key to prevent cross-user data leak
         try {
-            if (typeof window !== 'undefined') {
-                const raw = localStorage.getItem('it_workouts_cache_v1')
+            if (typeof window !== 'undefined' && user?.id) {
+                const raw = localStorage.getItem(`it_workouts_cache_v1_${user.id}`)
                 if (raw) {
                     const parsed: unknown = JSON.parse(raw)
                     if (Array.isArray(parsed) && parsed.length > 0) {
@@ -352,7 +353,7 @@ export function useWorkoutFetch({
                 } catch (e) { logWarn('useWorkoutFetch', 'silenced error', e) }
                 // Persist to localStorage for synchronous startup hydration on next open
                 try {
-                    localStorage.setItem('it_workouts_cache_v1', JSON.stringify(mapped))
+                    localStorage.setItem(`it_workouts_cache_v1_${currentUser.id}`, JSON.stringify(mapped))
                 } catch (e) { logWarn('useWorkoutFetch', 'silenced error', e) }
 
                 if (role === 'admin' || role === 'teacher') {
