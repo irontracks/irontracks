@@ -192,6 +192,11 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
       const exIdx = parseInt(exIdxStr, 10);
       const sIdx = parseInt(sIdxStr, 10);
 
+      // Haptic feedback when completing a set
+      if (patchObj.done === true) {
+        try { navigator?.vibrate?.(50) } catch { /* not supported */ }
+      }
+
       // If weight changes and this exercise has linked weights enabled, update all sets
       if (linkedWeightExercises.has(exIdx) && 'weight' in patchObj) {
         const ex = exercises[exIdx];
@@ -398,6 +403,24 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     return `${m}:${r < 10 ? '0' : ''}${r}`;
   };
 
+  // ── Centralized progress calculation (single source of truth) ───────────
+  const { completedSets, totalSets, progressPct, remainingSets } = useMemo(() => {
+    let total = 0;
+    let done = 0;
+    exercises.forEach((ex, exIdx) => {
+      const setsHeader = Math.max(0, parseInt(String(ex?.sets ?? '0'), 10) || 0);
+      const sdArr = Array.isArray(ex?.setDetails) ? ex.setDetails : Array.isArray((ex as Record<string, unknown>)?.set_details) ? (ex as Record<string, unknown>).set_details as unknown[] : [];
+      const count = Math.max(setsHeader, Array.isArray(sdArr) ? sdArr.length : 0);
+      total += count;
+      for (let i = 0; i < count; i++) {
+        const log = (logs as Record<string, Record<string, unknown>>)[`${exIdx}-${i}`];
+        if (log?.done) done++;
+      }
+    });
+    const pct = total > 0 ? Math.round((done / total) * 100) : 0;
+    return { completedSets: done, totalSets: total, progressPct: pct, remainingSets: total - done };
+  }, [exercises, logs]);
+
   return {
     session,
     workout,
@@ -528,5 +551,9 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     formatElapsed,
     onFinish: props.onFinish,
     sendInvite,
+    completedSets,
+    totalSets,
+    progressPct,
+    remainingSets,
   };
 }

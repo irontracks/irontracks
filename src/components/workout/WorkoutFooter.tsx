@@ -20,6 +20,9 @@ export default function WorkoutFooter() {
     onFinish,
     exercises,
     logs,
+    completedSets,
+    totalSets,
+    remainingSets,
   } = useWorkoutContext();
 
   // Team pause/resume — gracefully degrades if no team session
@@ -32,19 +35,8 @@ export default function WorkoutFooter() {
   const inTeamSession = !!teamCtx?.teamSession?.id
   const isPaused = inTeamSession && !!teamCtx?.sessionPaused
 
-  // Count done/total for mini-timer
-  const { doneSets, totalSets: allSets } = React.useMemo(() => {
-    let total = 0; let done = 0;
-    (exercises || []).forEach((ex, exIdx) => {
-      const count = Math.max(0, parseInt(String(ex?.sets ?? '0'), 10) || 0);
-      total += count;
-      for (let i = 0; i < count; i++) {
-        const log = (logs as Record<string, Record<string, unknown>>)[`${exIdx}-${i}`];
-        if (log?.done) done++;
-      }
-    });
-    return { doneSets: done, totalSets: total };
-  }, [exercises, logs]);
+  const doneSets = completedSets;
+  const allSets = totalSets;
   const allDone = allSets > 0 && doneSets >= allSets;
 
   const isRecord = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v)
@@ -170,7 +162,7 @@ export default function WorkoutFooter() {
             ].join(' ')}
           >
             <Save size={16} />
-            <span>{finishing ? 'Salvando...' : allDone ? 'FINALIZAR ⚡' : 'Finalizar'}</span>
+            <span>{finishing ? 'Salvando...' : allDone ? 'FINALIZAR ⚡' : remainingSets <= 3 && remainingSets > 0 ? `Finalizar (${remainingSets})` : 'Finalizar'}</span>
           </button>
         </div>
       </div>

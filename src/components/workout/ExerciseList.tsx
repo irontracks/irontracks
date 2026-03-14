@@ -11,8 +11,9 @@ const TeamProgressPanel = dynamic(
 );
 
 export default function ExerciseList() {
-  const { exercises, session } = useWorkoutContext();
+  const { exercises, session, logs } = useWorkoutContext();
   const containerRef = React.useRef<HTMLDivElement | null>(null);
+  const prevCompletedRef = React.useRef<Set<number>>(new Set());
 
   React.useEffect(() => {
     const scrollToTop = () => {
@@ -28,6 +29,42 @@ export default function ExerciseList() {
     const raf = requestAnimationFrame(scrollToTop);
     return () => cancelAnimationFrame(raf);
   }, [session?.id, exercises.length]);
+
+  // Auto-scroll to next incomplete exercise when one finishes
+  React.useEffect(() => {
+    const completedNow = new Set<number>();
+    exercises.forEach((ex, exIdx) => {
+      const setsHeader = Math.max(0, parseInt(String(ex?.sets ?? '0'), 10) || 0);
+      const sdArr = Array.isArray(ex?.setDetails) ? ex.setDetails : Array.isArray((ex as Record<string, unknown>)?.set_details) ? (ex as Record<string, unknown>).set_details as unknown[] : [];
+      const count = Math.max(setsHeader, Array.isArray(sdArr) ? sdArr.length : 0);
+      if (count === 0) return;
+      let done = 0;
+      for (let i = 0; i < count; i++) {
+        const log = (logs as Record<string, Record<string, unknown>>)[`${exIdx}-${i}`];
+        if (log?.done) done++;
+      }
+      if (done >= count) completedNow.add(exIdx);
+    });
+
+    // Detect newly completed exercises
+    const prev = prevCompletedRef.current;
+    let newlyCompleted = -1;
+    completedNow.forEach(idx => { if (!prev.has(idx)) newlyCompleted = idx; });
+    prevCompletedRef.current = completedNow;
+
+    if (newlyCompleted >= 0) {
+      // Find next incomplete exercise after the completed one
+      const nextIdx = exercises.findIndex((_, idx) => idx > newlyCompleted && !completedNow.has(idx));
+      if (nextIdx >= 0) {
+        requestAnimationFrame(() => {
+          try {
+            const el = document.querySelector(`[data-exercise-idx="${nextIdx}"]`);
+            el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          } catch { }
+        });
+      }
+    }
+  }, [exercises, logs]);
 
   const exerciseList = Array.isArray(exercises) ? exercises as Array<{ name?: string }> : [];
 

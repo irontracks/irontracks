@@ -9,7 +9,6 @@ import ExerciseList from './workout/ExerciseList';
 import WorkoutFooter from './workout/WorkoutFooter';
 import Modals from './workout/Modals';
 import { ActiveWorkoutProps } from './workout/types';
-import { buildFinishWorkoutPayload } from '@/lib/finishWorkoutPayload';
 import dynamic from 'next/dynamic';
 import { useTeamWorkout } from '@/contexts/TeamWorkoutContext';
 
@@ -33,22 +32,6 @@ export default function ActiveWorkout(props: ActiveWorkoutProps) {
     pendingWorkoutEdit: { id: string; fromName: string; workout: Record<string, unknown> } | null
     dismissWorkoutEdit: () => void
   }
-
-  const finishPayload = React.useMemo(() => {
-    if (!session || !workout) return null;
-    try {
-      return buildFinishWorkoutPayload({
-        workout,
-        elapsedSeconds: 0,
-        logs: (session?.logs ?? {}) as Record<string, unknown>,
-        ui: (session?.ui ?? {}) as Record<string, unknown>,
-        postCheckin: null,
-      });
-    } catch {
-      return null;
-    }
-  }, [session, workout]);
-  void finishPayload;
 
   // Accept incoming workout edit from a teammate
   const handleAcceptWorkoutEdit = React.useCallback(() => {
