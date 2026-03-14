@@ -80,6 +80,7 @@ export async function insertNotifications(rows: unknown): Promise<{ ok: boolean;
           lower.includes('is_read'))
       if (!schemaMismatch) return { ok: false, error: msg, inserted }
 
+      // R6#1: Fallback must use is_read (not read) and preserve core columns
       const fallback = (part as unknown[]).map((r) => {
         const row = r && typeof r === 'object' ? (r as Record<string, unknown>) : ({} as Record<string, unknown>)
         return {
@@ -87,7 +88,7 @@ export async function insertNotifications(rows: unknown): Promise<{ ok: boolean;
           title: row.title,
           message: row.message,
           type: row.type,
-          read: row.read,
+          is_read: false,
         }
       })
       const { error: fallbackError } = await admin.from('notifications').insert(fallback)
