@@ -224,15 +224,25 @@ export default function AssessmentButton({
 
   if (showForm) {
     return (
-      <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4 pt-20" onClick={() => setShowForm(false)}>
-        <div className="bg-neutral-900 rounded-xl border border-neutral-800 max-w-4xl w-full max-h-[90vh] overflow-y-auto relative custom-scrollbar" onClick={(e) => e.stopPropagation()}>
+      <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 pt-20" onClick={() => setShowForm(false)}>
+        <div
+          className="max-w-4xl w-full max-h-[90vh] overflow-y-auto relative custom-scrollbar rounded-2xl border shadow-2xl"
+          style={{
+            background: 'linear-gradient(160deg, rgba(20,18,10,0.98) 0%, rgba(10,10,10,0.99) 40%)',
+            borderColor: 'rgba(234,179,8,0.12)',
+            boxShadow: '0 32px 64px -16px rgba(0,0,0,0.8), inset 0 1px 0 rgba(234,179,8,0.1)',
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-yellow-500/40 to-transparent" />
           <div className="absolute top-3 right-3 z-10">
             <button
               onClick={() => setShowForm(false)}
-              className="p-2 rounded-full bg-neutral-800 hover:bg-neutral-700 text-neutral-400 hover:text-white transition-colors"
+              className="w-9 h-9 rounded-xl border flex items-center justify-center text-neutral-500 hover:text-white hover:border-yellow-500/40 transition-all"
+              style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }}
               aria-label="Fechar"
             >
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4" />
             </button>
           </div>
           <AssessmentForm
@@ -248,32 +258,43 @@ export default function AssessmentButton({
 
   if (variant === 'card') {
     return (
-      <div className={`bg-neutral-800 rounded-xl border border-neutral-700 p-6 ${className}`}>
+      <div
+        className={`rounded-2xl border p-6 relative overflow-hidden ${className}`}
+        style={{
+          background: 'linear-gradient(160deg, rgba(20,18,10,0.8) 0%, rgba(12,12,12,0.95) 50%)',
+          borderColor: 'rgba(255,255,255,0.06)',
+        }}
+      >
+        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-yellow-500/30 to-transparent" />
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-bold text-white">Avaliações Físicas</h3>
-          <TrendingUp className="w-6 h-6 text-yellow-500" />
+          <h3 className="text-sm font-black uppercase tracking-widest text-yellow-500/80">Avaliações Físicas</h3>
+          <div className="w-8 h-8 rounded-xl flex items-center justify-center" style={{ background: 'rgba(234,179,8,0.1)', border: '1px solid rgba(234,179,8,0.2)' }}>
+            <TrendingUp className="w-4 h-4 text-yellow-500" />
+          </div>
         </div>
-        <p className="text-neutral-400 mb-4">
+        <p className="text-neutral-500 text-sm mb-4">
           Gerencie as avaliações físicas e acompanhe a evolução do aluno
         </p>
         <div className="flex flex-wrap gap-3">
           <button
             onClick={handleNewAssessment}
-            className="flex-1 inline-flex items-center justify-center px-4 py-2 bg-yellow-500 text-black font-bold rounded-xl hover:bg-yellow-400 transition-colors"
+            className="flex-1 inline-flex items-center justify-center px-4 py-2.5 font-black rounded-xl transition-all active:scale-95 btn-gold-animated"
           >
             <Plus className="w-4 h-4 mr-2" />
             Nova Avaliação
           </button>
           <button
             onClick={handleViewHistory}
-            className="flex-1 inline-flex items-center justify-center px-4 py-2 bg-neutral-900 text-neutral-300 rounded-xl border border-neutral-700 hover:bg-neutral-800 transition-colors"
+            className="flex-1 inline-flex items-center justify-center px-4 py-2.5 rounded-xl border text-neutral-300 font-bold hover:text-white hover:border-yellow-500/30 transition-all active:scale-95"
+            style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }}
           >
             <FileText className="w-4 h-4 mr-2" />
             Ver Histórico
           </button>
           <button
             onClick={handleImportClick}
-            className="flex-1 inline-flex items-center justify-center px-4 py-2 bg-neutral-900 text-neutral-200 rounded-xl border border-dashed border-neutral-600 hover:border-yellow-500 hover:text-yellow-500 transition-colors"
+            className="flex-1 inline-flex items-center justify-center px-4 py-2.5 rounded-xl border border-dashed text-neutral-400 hover:border-yellow-500/40 hover:text-yellow-500 transition-all active:scale-95"
+            style={{ borderColor: 'rgba(255,255,255,0.1)' }}
           >
             <Upload className="w-4 h-4 mr-2" />
             Importar JSON
@@ -284,9 +305,10 @@ export default function AssessmentButton({
               disabled={importing}
               className={
                 importing
-                  ? "flex-1 inline-flex items-center justify-center px-4 py-2 bg-neutral-900 text-neutral-500 rounded-xl border border-dashed border-neutral-800 cursor-not-allowed"
-                  : "flex-1 inline-flex items-center justify-center px-4 py-2 bg-neutral-900 text-neutral-200 rounded-xl border border-dashed border-neutral-600 hover:border-yellow-500 hover:text-yellow-500 transition-colors"
+                  ? "flex-1 inline-flex items-center justify-center px-4 py-2.5 rounded-xl border border-dashed text-neutral-500 cursor-not-allowed"
+                  : "flex-1 inline-flex items-center justify-center px-4 py-2.5 rounded-xl border border-dashed text-neutral-400 hover:border-yellow-500/40 hover:text-yellow-500 transition-all active:scale-95"
               }
+              style={{ borderColor: importing ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.1)' }}
             >
               <Upload className="w-4 h-4 mr-2" />
               {importing ? "Importando..." : "Importar Foto/PDF"}
@@ -319,14 +341,15 @@ export default function AssessmentButton({
       <div className={`flex gap-2 ${className}`}>
         <button
           onClick={handleNewAssessment}
-          className="p-2 bg-yellow-500 text-black rounded-xl hover:bg-yellow-400 transition-colors"
+          className="p-2 rounded-xl transition-all active:scale-95 btn-gold-animated"
           title="Nova Avaliação"
         >
           <Plus className="w-4 h-4" />
         </button>
         <button
           onClick={handleViewHistory}
-          className="p-2 bg-neutral-900 text-neutral-300 rounded-xl border border-neutral-700 hover:bg-neutral-800 transition-colors"
+          className="p-2 rounded-xl border text-neutral-400 hover:text-white hover:border-yellow-500/30 transition-all active:scale-95"
+          style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }}
           title="Ver Histórico"
         >
           <FileText className="w-4 h-4" />
@@ -339,14 +362,15 @@ export default function AssessmentButton({
     <div className={`flex gap-3 ${className}`}>
       <button
         onClick={handleNewAssessment}
-        className="inline-flex items-center px-4 py-2 bg-yellow-500 text-black font-bold rounded-xl hover:bg-yellow-400 transition-colors"
+        className="inline-flex items-center px-4 py-2.5 font-black rounded-xl transition-all active:scale-95 btn-gold-animated"
       >
         <Plus className="w-4 h-4 mr-2" />
         Nova Avaliação
       </button>
       <button
         onClick={handleViewHistory}
-        className="inline-flex items-center px-4 py-2 bg-neutral-900 text-neutral-300 rounded-xl border border-neutral-700 hover:bg-neutral-800 transition-colors"
+        className="inline-flex items-center px-4 py-2.5 rounded-xl border text-neutral-300 font-bold hover:text-white hover:border-yellow-500/30 transition-all active:scale-95"
+        style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }}
       >
         <FileText className="w-4 h-4 mr-2" />
         Histórico
@@ -357,8 +381,8 @@ export default function AssessmentButton({
           disabled={importing}
           className={
             importing
-              ? "inline-flex items-center px-4 py-2 bg-neutral-900 text-neutral-500 rounded-xl border border-dashed border-neutral-800 cursor-not-allowed"
-              : "inline-flex items-center px-4 py-2 bg-neutral-900 text-neutral-200 rounded-xl border border-dashed border-neutral-600 hover:border-yellow-500 hover:text-yellow-500 transition-colors"
+              ? "inline-flex items-center px-4 py-2.5 rounded-xl border border-dashed text-neutral-500 cursor-not-allowed"
+              : "inline-flex items-center px-4 py-2.5 rounded-xl border border-dashed text-neutral-400 hover:border-yellow-500/40 hover:text-yellow-500 transition-all active:scale-95"
           }
         >
           <Upload className="w-4 h-4 mr-2" />
