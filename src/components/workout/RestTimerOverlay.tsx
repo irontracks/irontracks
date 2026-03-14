@@ -435,7 +435,8 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
                                         if (typeof onClose === 'function') onClose();
                                     } catch { }
                                 }}
-                                className="px-3 py-2 bg-neutral-800 rounded-xl text-neutral-400 border border-neutral-700 hover:text-white hover:bg-neutral-700 text-xs font-bold active:scale-95"
+                                className="px-3 py-2 rounded-xl text-neutral-400 border hover:text-white hover:border-yellow-500/30 text-xs font-bold active:scale-95 transition-all"
+                                style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }}
                             >
                                 Ocultar
                             </button>
