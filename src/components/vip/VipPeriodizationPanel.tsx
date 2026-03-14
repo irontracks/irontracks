@@ -387,57 +387,102 @@ export default function VipPeriodizationPanel({
             <button
               type="button"
               onClick={() => setCalendarOpen((v) => !v)}
-              className="inline-flex items-center justify-center rounded-xl bg-neutral-800 border border-neutral-700 px-3 py-2 text-xs font-black text-white hover:bg-neutral-700"
+              className="inline-flex items-center justify-center rounded-xl px-3 py-2 text-xs font-black text-white transition-all active:scale-95"
+              style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
             >
               {calendarOpen ? 'Esconder' : 'Mostrar'}
             </button>
             <button type="button" onClick={loadActive} className="inline-flex items-center gap-2 text-xs font-black text-neutral-300 hover:text-white">
               <RefreshCw size={14} />
-              Atualizar
             </button>
           </div>
         </div>
 
         {!program?.id ? <div className="mt-2 text-sm text-neutral-400">Crie um programa para ver o calendário.</div> : null}
 
-        {program?.id && schedule.length && calendarOpen ? (
-          <div className="mt-3 space-y-2">
-            {(schedule as Record<string, unknown>[]).map((w) => {
-              const week = Number(w?.week_number || 0)
-              const day = Number(w?.day_number || 0)
-              const phase = safeString(w?.phase) || '-'
-              const date = safeString(w?.scheduled_date) || ''
-              const title = safeString(w?.workout_name) || `VIP • W${week} D${day}`
-              const workoutId = safeString(w?.workout_id)
-              return (
-                <div key={safeString(w?.id) || `${week}-${day}`} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 rounded-xl border border-neutral-800 bg-black/30 px-3 py-3">
-                  <div className="min-w-0">
-                    <div className="text-xs text-neutral-500 font-black uppercase tracking-widest">
-                      Semana {week} • Dia {day} • {phase}{date ? ` • ${date}` : ''}
+        {program?.id && schedule.length && calendarOpen ? (() => {
+          // Group schedule by week_number
+          const weeks = new Map<number, Record<string, unknown>[]>()
+          for (const w of schedule as Record<string, unknown>[]) {
+            const wn = Number(w?.week_number || 0)
+            if (!weeks.has(wn)) weeks.set(wn, [])
+            weeks.get(wn)!.push(w)
+          }
+          const weekEntries = Array.from(weeks.entries()).sort(([a], [b]) => a - b)
+          // Detect current week (first week with future dates or most recent)
+          const now = new Date()
+          const currentWeek = weekEntries.find(([, items]) =>
+            items.some(w => {
+              const d = new Date(String(w?.scheduled_date || ''))
+              return !Number.isNaN(d.getTime()) && d >= now
+            })
+          )?.[0] ?? weekEntries[0]?.[0] ?? 0
+
+          return (
+            <div className="mt-3 space-y-2">
+              {weekEntries.map(([weekNum, items]) => {
+                const isCurrent = weekNum === currentWeek
+                const phase = safeString(items[0]?.phase) || '-'
+                return (
+                  <details key={weekNum} open={isCurrent} className="group rounded-xl overflow-hidden" style={{ border: isCurrent ? '1px solid rgba(234,179,8,0.2)' : '1px solid rgba(255,255,255,0.06)' }}>
+                    <summary className="cursor-pointer select-none flex items-center justify-between px-3 py-2.5 transition-all" style={{ background: isCurrent ? 'rgba(234,179,8,0.06)' : 'rgba(255,255,255,0.02)' }}>
+                      <div className="flex items-center gap-2">
+                        <div className={`text-xs font-black uppercase tracking-wider ${isCurrent ? 'text-yellow-400' : 'text-neutral-400'}`}>
+                          Semana {weekNum}
+                        </div>
+                        <div className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${isCurrent ? 'bg-yellow-500/10 text-yellow-400' : 'bg-neutral-800 text-neutral-500'}`}>
+                          {phase}
+                        </div>
+                        {isCurrent && (
+                          <div className="text-[9px] font-black uppercase tracking-widest px-1.5 py-0.5 rounded bg-yellow-500/15 text-yellow-500 border border-yellow-500/25">
+                            Atual
+                          </div>
+                        )}
+                      </div>
+                      <div className="text-[10px] text-neutral-500 font-bold">{items.length} treino{items.length !== 1 ? 's' : ''}</div>
+                    </summary>
+                    <div className="px-2 pb-2 space-y-1.5">
+                      {items.map((w) => {
+                        const day = Number(w?.day_number || 0)
+                        const date = safeString(w?.scheduled_date) || ''
+                        const title = safeString(w?.workout_name) || `VIP • W${weekNum} D${day}`
+                        const workoutId = safeString(w?.workout_id)
+                        return (
+                          <div key={safeString(w?.id) || `${weekNum}-${day}`} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 rounded-lg px-3 py-2.5" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
+                            <div className="min-w-0">
+                              <div className="text-[10px] text-neutral-500 font-bold">
+                                Dia {day}{date ? ` • ${date}` : ''}
+                              </div>
+                              <div className="text-sm text-white font-bold truncate">{title}</div>
+                            </div>
+                            <div className="flex items-center gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() => startWorkoutById(workoutId)}
+                                className="inline-flex items-center justify-center rounded-lg px-2.5 py-1.5 text-[11px] font-black text-black transition-all active:scale-95"
+                                style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}
+                              >
+                                Iniciar
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => editWorkoutById(workoutId)}
+                                className="inline-flex items-center justify-center rounded-lg px-2.5 py-1.5 text-[11px] font-black text-neutral-300 transition-all active:scale-95"
+                                style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
+                              >
+                                Editar
+                              </button>
+                            </div>
+                          </div>
+                        )
+                      })}
                     </div>
-                    <div className="text-sm text-white font-black truncate">{title}</div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      type="button"
-                      onClick={() => startWorkoutById(workoutId)}
-                      className="inline-flex items-center justify-center rounded-xl bg-yellow-500 px-3 py-2 text-xs font-black text-black hover:bg-yellow-400"
-                    >
-                      Iniciar
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => editWorkoutById(workoutId)}
-                      className="inline-flex items-center justify-center rounded-xl bg-neutral-800 border border-neutral-700 px-3 py-2 text-xs font-black text-white hover:bg-neutral-700"
-                    >
-                      Editar
-                    </button>
-                  </div>
-                </div>
-              )
-            })}
-          </div>
-        ) : null}
+                  </details>
+                )
+              })}
+            </div>
+          )
+        })() : null}
       </div>
 
       {createOpen ? (

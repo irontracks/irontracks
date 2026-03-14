@@ -158,26 +158,30 @@ export default function VipInsightsPanel(props: { onOpenReport?: (session: unkno
   }
 
   return (
-    <div className="rounded-2xl border border-neutral-800 bg-neutral-950/60 p-4">
+    <div className="rounded-2xl p-[1px]" style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.2) 0%, rgba(255,255,255,0.03) 50%, rgba(139,92,246,0.08) 100%)' }}>
+      <div className="rounded-[15px] p-4" style={{ background: 'rgba(12,12,12,0.99)' }}>
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Insights</div>
+          <div className="text-[10px] font-black uppercase tracking-widest" style={{ color: '#a78bfa' }}>Insights</div>
           <div className="text-white font-black text-sm">Pós-treino e progressão</div>
         </div>
-        {credits?.insights ? (
-          <div className={`text-[10px] px-2 py-1 rounded font-mono ${credits.insights.limit !== null && credits.insights.used >= credits.insights.limit ? 'bg-red-500/20 text-red-300' : 'bg-neutral-800 text-neutral-300'}`}>
-            {credits.insights.used}/{credits.insights.limit == null ? '∞' : credits.insights.limit}
-          </div>
-        ) : null}
-        <button
-          type="button"
-          onClick={load}
-          disabled={loading}
-          className="inline-flex items-center gap-2 rounded-xl bg-neutral-800 border border-neutral-700 px-3 py-2 text-xs font-black text-white hover:bg-neutral-700 disabled:opacity-60"
-        >
-          <RefreshCw size={14} />
-          {loading ? 'Atualizando...' : 'Atualizar'}
-        </button>
+        <div className="flex items-center gap-2">
+          {credits?.insights ? (
+            <div className={`text-[10px] px-2 py-1 rounded-lg font-mono font-bold ${credits.insights.limit !== null && credits.insights.used >= credits.insights.limit ? 'bg-red-500/20 text-red-300 border border-red-500/30' : 'bg-neutral-900 text-neutral-300 border border-neutral-800'}`}>
+              {credits.insights.used}/{credits.insights.limit == null ? '∞' : credits.insights.limit}
+            </div>
+          ) : null}
+          <button
+            type="button"
+            onClick={load}
+            disabled={loading}
+            className="inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-black text-neutral-300 hover:text-white disabled:opacity-60 transition-all active:scale-95"
+            style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
+          >
+            <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
+            {loading ? 'Carregando' : 'Atualizar'}
+          </button>
+        </div>
       </div>
 
       {error ? (
@@ -212,30 +216,46 @@ export default function VipInsightsPanel(props: { onOpenReport?: (session: unkno
           <div className="text-sm text-neutral-400">Finalize um treino para gerar insights.</div>
         ) : (
           items.map((r) => (
-            <div key={r.id} className="rounded-xl border border-neutral-800 bg-black/30 px-3 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-              <div className="min-w-0">
-                <div className="text-[10px] font-black uppercase tracking-widest text-neutral-500">{r.dateLabel || '—'}</div>
-                <div className="text-sm font-black text-white truncate">{String(r.name || 'Treino')}</div>
+            <div
+              key={r.id}
+              className="rounded-xl px-3 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 transition-all"
+              style={r.hasAi
+                ? { background: 'rgba(139,92,246,0.04)', border: '1px solid rgba(139,92,246,0.15)' }
+                : { background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }
+              }
+            >
+              <div className="min-w-0 flex items-center gap-2">
+                {r.hasAi && (
+                  <div className="shrink-0 w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.25)' }}>
+                    <Sparkles size={12} className="text-purple-400" />
+                  </div>
+                )}
+                <div className="min-w-0">
+                  <div className="text-[10px] font-black uppercase tracking-widest text-neutral-500">{r.dateLabel || '—'}</div>
+                  <div className="text-sm font-black text-white truncate">{String(r.name || 'Treino')}</div>
+                </div>
               </div>
               <div className="flex items-center gap-2">
                 {r.hasAi ? (
                   <button
                     type="button"
                     onClick={() => openReport(r.id)}
-                    className="inline-flex items-center justify-center rounded-xl bg-neutral-800 border border-neutral-700 px-3 py-2 text-xs font-black text-white hover:bg-neutral-700"
+                    className="inline-flex items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-xs font-black text-purple-300 hover:text-purple-200 transition-all active:scale-95"
+                    style={{ background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.2)' }}
                   >
                     <FileText size={14} />
-                    <span className="ml-2">Ver relatório</span>
+                    Ver relatório
                   </button>
                 ) : (
                   <button
                     type="button"
                     onClick={() => generate(r.id)}
                     disabled={busyId === r.id}
-                    className="inline-flex items-center justify-center rounded-xl bg-yellow-500 px-3 py-2 text-xs font-black text-black hover:bg-yellow-400 disabled:opacity-60"
+                    className="inline-flex items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-xs font-black text-black disabled:opacity-60 transition-all active:scale-95"
+                    style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)', boxShadow: busyId === r.id ? 'none' : '0 2px 8px rgba(234,179,8,0.25)' }}
                   >
                     <Sparkles size={14} />
-                    <span className="ml-2">{busyId === r.id ? 'Gerando...' : 'Gerar insights'}</span>
+                    {busyId === r.id ? 'Gerando...' : 'Gerar insights'}
                   </button>
                 )}
               </div>
@@ -248,10 +268,11 @@ export default function VipInsightsPanel(props: { onOpenReport?: (session: unkno
         <button
           type="button"
           onClick={() => props.onOpenHistory?.()}
-          className="inline-flex items-center gap-2 text-xs font-black text-neutral-300 hover:text-white"
+          className="inline-flex items-center gap-2 text-xs font-black text-neutral-400 hover:text-white transition-colors"
         >
           Abrir histórico completo <ArrowRight size={14} />
         </button>
+      </div>
       </div>
     </div>
   )

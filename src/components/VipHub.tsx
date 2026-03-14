@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import NextImage from 'next/image'
-import { Crown, Sparkles, ArrowRight, Lock, MessageSquare, CalendarDays, TrendingUp, Trash2, Zap, BarChart3, ChefHat, FileText } from 'lucide-react'
+import { Crown, Sparkles, MessageSquare, Trash2, Zap, BarChart3, ChefHat } from 'lucide-react'
 import { isIosNative } from '@/utils/platform'
 import dynamic from 'next/dynamic'
 import VipWeeklySummaryCard from '@/components/vip/VipWeeklySummaryCard'
@@ -72,7 +72,7 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
   const { confirm } = useDialog()
   const router = useRouter()
   const chatRef = useRef<HTMLDivElement | null>(null)
-  const [weeklyOpen, setWeeklyOpen] = useState(false)
+
   const [insightsOpen, setInsightsOpen] = useState(false)
 
   // Load VIP Status
@@ -302,51 +302,7 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
     return () => { cancelled = true }
   }, [chatLoaded, chatLoading, isLocked])
 
-  const renderLimitBar = () => {
-    if (!vipStatus) return null
-    const { limits, usage } = vipStatus
-    const limit = limits?.chat_daily
-    const current = usage?.chat_daily || 0
 
-    if (!limit || limit > 9000) return (
-      <div className="flex items-center gap-2 text-xs font-bold text-purple-400 bg-purple-500/10 px-3 py-1.5 rounded-full border border-purple-500/20">
-        <Sparkles size={12} />
-        <span>Acesso Ilimitado</span>
-      </div>
-    )
-
-    const pct = Math.min(100, (current / limit) * 100)
-    const isClose = pct > 80
-
-    return (
-      <div className="flex items-center gap-3 bg-neutral-900/50 px-3 py-1.5 rounded-full border border-neutral-800">
-        <div className="text-xs font-bold text-neutral-400">
-          IA Diária: <span className={isClose ? 'text-red-400' : 'text-white'}>{current}/{limit}</span>
-        </div>
-        <div className="w-16 h-1.5">
-          <svg className="w-full h-1.5" viewBox="0 0 100 6" preserveAspectRatio="none">
-            <rect x="0" y="0" width="100" height="6" rx="3" fill="#27272a" />
-            <rect
-              x="0"
-              y="0"
-              width={pct}
-              height="6"
-              rx="3"
-              fill={isClose ? '#ef4444' : '#22c55e'}
-            />
-          </svg>
-        </div>
-        {isClose && !hideVipCtas && (
-          <button
-            onClick={() => window.location.href = '/marketplace'}
-            className="text-[10px] font-black uppercase text-yellow-500 hover:text-yellow-400"
-          >
-            Upgrade
-          </button>
-        )}
-      </div>
-    )
-  }
 
   if (isLocked) {
     return (
@@ -417,20 +373,12 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
         ? 'Membro Pro'
         : 'Membro Start'
 
-  const historyDays = vipStatus?.limits?.history_days
-  const historySubtitle = historyDays == null ? 'Histórico ilimitado' : `Histórico: ${Number(historyDays) || 0} dias`
   const macrosEnabled = !!vipStatus?.limits?.nutrition_macros
   const nutritionSubtitle = macrosEnabled ? 'Macros liberado' : 'Macros (Pro+)'
 
   const openNutrition = () => {
     try {
       window.location.href = '/dashboard/nutrition'
-    } catch { }
-  }
-
-  const openChat = () => {
-    try {
-      if (chatRef.current) chatRef.current.scrollIntoView({ behavior: 'smooth', block: 'start' })
     } catch { }
   }
 
@@ -461,25 +409,20 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
                 <div className="text-white font-bold text-sm">Dashboard VIP</div>
               </div>
             </div>
-            {renderLimitBar()}
           </div>
 
           <div className="mt-4 flex flex-wrap items-center gap-2">
-            {credits?.chat ? chip('Chat', credits.chat.used, credits.chat.limit) : null}
+            {credits?.chat ? chip('Coach IA', credits.chat.used, credits.chat.limit) : null}
             {credits?.wizard ? chip('Wizard', credits.wizard.used, credits.wizard.limit) : null}
             {credits?.insights ? chip('Insights', credits.insights.used, credits.insights.limit) : null}
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-4">
             {[
-              { onClick: openChat, icon: <MessageSquare size={18} className="text-blue-400" />, label: 'Coach IA', sub: 'Pergunte e ajuste hoje' },
               { onClick: () => onOpenWizard?.(), icon: <Zap size={18} className="text-yellow-400" />, label: 'Wizard', sub: 'Gere treino rápido' },
               { onClick: () => setInsightsOpen((v) => !v), icon: <Sparkles size={18} className="text-purple-300" />, label: 'Insights', sub: 'Relatórios e PRs' },
-              { onClick: () => onOpenHistory?.(), icon: <BarChart3 size={18} className="text-purple-400" />, label: 'Histórico', sub: historySubtitle },
-              { onClick: () => setWeeklyOpen((v) => !v), icon: <TrendingUp size={18} className="text-green-400" />, label: 'Resumo', sub: 'Últimos 7 dias' },
+              { onClick: () => onOpenHistory?.(), icon: <BarChart3 size={18} className="text-purple-400" />, label: 'Histórico', sub: 'Todos os treinos' },
               { onClick: openNutrition, icon: <ChefHat size={18} className="text-green-400" />, label: 'Nutrição', sub: nutritionSubtitle },
-              { onClick: () => setWeeklyOpen(true), icon: <FileText size={18} className="text-neutral-200" />, label: 'Relatório', sub: 'Atalhos e dados' },
-              { onClick: () => { try { const el = document.getElementById('vip-periodization'); if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' }) } catch { } }, icon: <CalendarDays size={18} className="text-yellow-400" />, label: 'Periodização', sub: 'Programa completo' },
             ].map(({ onClick, icon, label, sub }, i) => (
               <button
                 key={i}
@@ -499,45 +442,11 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
         </div>
       </div>
 
-      {weeklyOpen ? <VipWeeklySummaryCard /> : null}
+      <VipWeeklySummaryCard />
 
       {insightsOpen ? <VipInsightsPanel onOpenHistory={() => onOpenHistory?.()} onOpenReport={(s) => onOpenReport?.(s as Record<string, unknown>)} /> : null}
 
-      {/* VIP Features Card */}
-      <div className="rounded-2xl p-[1px]" style={{ background: 'linear-gradient(135deg, rgba(234,179,8,0.2) 0%, rgba(255,255,255,0.03) 50%, rgba(234,179,8,0.08) 100%)' }}>
-        <div className="rounded-[15px] p-4" style={{ background: 'rgba(12,12,12,0.99)' }}>
-          <div className="flex items-center justify-between gap-3">
-            <div className="min-w-0">
-              <div className="text-[10px] font-black uppercase tracking-[0.18em]" style={{ color: '#f59e0b' }}>Recursos VIP</div>
-              <div className="text-white font-black text-sm">Ferramentas avançadas</div>
-            </div>
-            <button type="button" onClick={() => (window.location.href = '/marketplace')} className="inline-flex items-center gap-2 text-xs font-black text-neutral-400 hover:text-yellow-400 transition-colors">
-              Ver detalhes <ArrowRight size={14} />
-            </button>
-          </div>
-          <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-2">
-            {[
-              { href: '/dashboard/vip/chef-ia', title: 'Chef IA', sub: 'Planos e receitas', badge: 'Elite' },
-              { href: '/dashboard/vip/offline', title: 'Modo offline', sub: 'Sync inteligente', badge: 'Pro+' },
-              { href: '/dashboard/vip/analytics', title: 'Analytics avançado', sub: 'Dash de performance', badge: 'Elite' },
-            ].map(({ href, title, sub, badge }) => (
-              <button
-                key={href}
-                type="button"
-                onClick={() => (window.location.href = href)}
-                className="rounded-xl px-3 py-3 text-left transition-all hover:bg-white/5 active:scale-[0.97]"
-                style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}
-              >
-                <div className="text-xs font-black text-white">{title}</div>
-                <div className="text-[11px] text-neutral-500">{sub}</div>
-                <div className="mt-2 inline-flex items-center rounded-full px-2 py-1 text-[10px] font-black uppercase tracking-widest" style={{ background: 'rgba(234,179,8,0.1)', color: '#f59e0b', border: '1px solid rgba(234,179,8,0.2)' }}>
-                  {badge}
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
-      </div>
+
 
       <div id="vip-periodization">
         <VipPeriodizationPanel locked={isLocked} onStartSession={(w) => onStartSession?.(w as Workout)} onOpenWorkoutEditor={(w) => onOpenWorkoutEditor?.(w as Workout)} />
