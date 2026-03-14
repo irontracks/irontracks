@@ -229,11 +229,21 @@ export async function POST(request: Request) {
       })
     } catch { }
 
+    // R3#2: Clamp date to prevent backdated streak/badge manipulation
+    // Allow up to 30 days in the past (for late-logged workouts) and no future dates
+    const rawDate = new Date(String(sessionObj?.date ?? new Date().toISOString()))
+    const now = new Date()
+    const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000)
+    const clampedDate = isNaN(rawDate.getTime()) ? now
+      : rawDate > now ? now
+      : rawDate < thirtyDaysAgo ? thirtyDaysAgo
+      : rawDate
+
     const baseInsert = {
       user_id: user.id,
       created_by: user.id,
       name: normalizeWorkoutTitle(String(sessionObj.workoutTitle || 'Treino Realizado')),
-      date: new Date(String(sessionObj?.date ?? new Date().toISOString())),
+      date: clampedDate,
       completed_at: new Date().toISOString(),
       is_template: false,
       notes: JSON.stringify(session),

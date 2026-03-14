@@ -1,13 +1,13 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { createHash } from 'crypto'
+import { createHash, randomUUID } from 'crypto'
 import { requireUser } from '@/utils/auth/route'
 import { parseJsonBody } from '@/utils/zod'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 
+// R3#1: Client no longer controls folder or publicId — they are built server-side
 const BodySchema = z.object({
-  publicId: z.string().min(1),
-  folder: z.string().optional().default('irontracks/stories'),
+  purpose: z.enum(['story', 'profile', 'chat', 'assessment']).optional().default('story'),
 })
 
 export async function POST(req: Request) {
@@ -20,7 +20,7 @@ export async function POST(req: Request) {
 
   const parsed = await parseJsonBody(req, BodySchema)
   if (parsed.response) return parsed.response
-  const { publicId, folder } = parsed.data!
+  const { purpose } = parsed.data!
 
   const cloudName = process.env.CLOUDINARY_CLOUD_NAME
   const apiKey = process.env.CLOUDINARY_API_KEY
@@ -29,6 +29,9 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: 'Cloudinary not configured' }, { status: 503 })
   }
 
+  // Server-controlled folder and publicId — prevents upload to arbitrary paths
+  const folder = `irontracks/user-uploads/${purpose}`
+  const publicId = `${auth.user.id}/${randomUUID()}`
   const timestamp = Math.round(Date.now() / 1000)
 
   // Signature: sorted params concatenated + secret (Cloudinary v1 spec)

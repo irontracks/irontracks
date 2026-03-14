@@ -53,9 +53,11 @@ export async function GET() {
       .gt('weight', 0)
       .not('reps', 'is', null)
 
-    const recentWorkoutsRes = await admin
+    // R3#3: Scope to current user only — was fetching ALL users' workouts via admin client
+    const recentWorkoutsRes = await supabase
       .from('workouts')
-      .select('id, user_id, notes, created_at, date, is_template')
+      .select('id, notes, created_at, date, is_template')
+      .eq('user_id', user.id)
       .eq('is_template', false)
       .order('date', { ascending: false })
       .limit(20)
@@ -74,7 +76,6 @@ export async function GET() {
         })
         return {
           id: w?.id ?? null,
-          user_id: w?.user_id ?? null,
           has_notes: !!w?.notes,
           notes_type: typeof w?.notes,
           parsed_notes: !!notes,

@@ -27,12 +27,12 @@ const normalizeMessages = (messages: unknown) => {
 
 const MessageSchema = z.object({
   role: z.enum(['user', 'assistant', 'system']),
-  content: z.string().min(1),
+  content: z.string().min(1).max(2000),  // R3#7: Limit content size to prevent DoS
 })
 
 const BodySchema = z
   .object({
-    messages: z.array(MessageSchema).default([]),
+    messages: z.array(MessageSchema).max(20).default([]),  // R3#7: Limit array size
     context: z.record(z.unknown()).nullable().optional(),
   })
   .strict()
