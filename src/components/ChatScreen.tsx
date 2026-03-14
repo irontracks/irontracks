@@ -278,7 +278,7 @@ const ChatScreen = ({ user, onClose }: ChatScreenProps) => {
         const poll = setInterval(() => {
             if (!visibilityRef.current) return;
             loadMessages();
-        }, 5000);
+        }, 8000);
         return () => { abortCtrl.abort(); supabase.removeChannel(channel); clearInterval(poll); };
     }, [activeChannel, formatMessage, supabase]);
 
@@ -359,7 +359,22 @@ const ChatScreen = ({ user, onClose }: ChatScreenProps) => {
     const handleAddGif = async () => {
         const url = await promptRef.current('Cole a URL do GIF (GIPHY/Tenor):', 'GIF')
         if (!url || !activeChannel) return
-        const payload = { type: 'gif', media_url: url }
+        // R12#1: Validate URL — reject non-HTTPS and restrict to known GIF providers
+        const trimmedUrl = String(url).trim()
+        let parsed: URL | null = null
+        try { parsed = new URL(trimmedUrl) } catch { /* invalid URL */ }
+        if (!parsed || !['https:', 'http:'].includes(parsed.protocol)) {
+            await alertRef.current('URL inválida. Use uma URL HTTPS de um serviço de GIF (GIPHY, Tenor, etc).')
+            return
+        }
+        const allowedHosts = ['giphy.com', 'media.giphy.com', 'tenor.com', 'media.tenor.com', 'c.tenor.com', 'gfycat.com', 'thumbs.gfycat.com', 'i.imgur.com', 'imgur.com']
+        const host = parsed.hostname.toLowerCase()
+        const isAllowed = allowedHosts.some(h => host === h || host.endsWith('.' + h))
+        if (!isAllowed) {
+            await alertRef.current('Apenas GIFs de GIPHY, Tenor, Gfycat ou Imgur são permitidos.')
+            return
+        }
+        const payload = { type: 'gif', media_url: trimmedUrl }
         await apiChat.sendMessage({ channel_id: activeChannel.id, content: JSON.stringify(payload) })
     }
 
