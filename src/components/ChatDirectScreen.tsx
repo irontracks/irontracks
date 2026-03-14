@@ -461,7 +461,22 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
             if (!safeUserId) await alert('Sessão inválida. Faça login novamente.');
             return
         }
-        const payload = { type: 'gif', media_url: url }
+        // R11#1: Validate URL — reject non-HTTPS and restrict to known GIF providers
+        const trimmedUrl = String(url).trim()
+        let parsed: URL | null = null
+        try { parsed = new URL(trimmedUrl) } catch { /* invalid URL */ }
+        if (!parsed || !['https:', 'http:'].includes(parsed.protocol)) {
+            await alert('URL inválida. Use uma URL HTTPS de um serviço de GIF (GIPHY, Tenor, etc).')
+            return
+        }
+        const allowedHosts = ['giphy.com', 'media.giphy.com', 'tenor.com', 'media.tenor.com', 'c.tenor.com', 'gfycat.com', 'thumbs.gfycat.com', 'i.imgur.com', 'imgur.com']
+        const host = parsed.hostname.toLowerCase()
+        const isAllowed = allowedHosts.some(h => host === h || host.endsWith('.' + h))
+        if (!isAllowed) {
+            await alert('Apenas GIFs de GIPHY, Tenor, Gfycat ou Imgur são permitidos.')
+            return
+        }
+        const payload = { type: 'gif', media_url: trimmedUrl }
         await supabase.from('direct_messages').insert({
             channel_id: channelId,
             sender_id: safeUserId,
