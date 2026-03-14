@@ -769,7 +769,7 @@ const MuscleMapCard = memo(function MuscleMapCard(props: Props) {
                     <div className="text-[11px] font-black uppercase tracking-widest text-neutral-400">{m.label}</div>
                     <div className="mt-1 flex items-center justify-between gap-2">
                       <div className="text-sm font-black text-neutral-100">{Number(state.data?.muscles?.[m.id]?.sets || 0).toLocaleString('pt-BR')}</div>
-                      <svg className="w-3 h-3" viewBox="0 0 12 12">
+                      <svg className="w-3 h-3" viewBox="0 0 12 12" style={{ animation: 'aurora-pulse 2.5s ease-in-out infinite' }}>
                         <circle cx="6" cy="6" r="6" fill={state.data?.muscles?.[m.id]?.color || '#111827'} />
                       </svg>
                     </div>

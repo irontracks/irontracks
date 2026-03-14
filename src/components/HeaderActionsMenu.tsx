@@ -254,9 +254,12 @@ export default function HeaderActionsMenu({
           </div>
         </div>
 
-        {/* Notification badge */}
+        {/* Notification badge — pop-in animation */}
         {!open && (hasUnreadChat || hasUnreadNotification) && (
-          <span className="pointer-events-none absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-red-500 rounded-full border-2 border-neutral-950 shadow-lg shadow-red-900/60 animate-pulse" />
+          <span
+            className="pointer-events-none absolute -top-0.5 -right-0.5 w-3.5 h-3.5 bg-red-500 rounded-full border-2 border-neutral-950 shadow-lg shadow-red-900/60 badge-glow"
+            style={{ animation: 'prBadgeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1)' }}
+          />
         )}
       </button>
 
@@ -311,8 +314,8 @@ export default function HeaderActionsMenu({
               </div>
             </div>
 
-            {/* Menu items */}
-            <div className="p-2 space-y-0.5">
+            {/* Menu items — staggered entrance */}
+            <div className="p-2 space-y-0.5 stagger-children">
 
               {/* Coach tools group */}
               {isCoach && (

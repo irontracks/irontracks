@@ -992,7 +992,7 @@ export default function StudentDashboard(props: Props) {
                             }}
                             data-tour="workout-start"
                             disabled={isWorkoutBusy(getWorkoutKey(w, idx)) || (Boolean(w?.archived_at) && typeof props.onRestoreWorkout !== 'function')}
-                            className="relative z-30 flex-1 bg-neutral-900 hover:bg-neutral-800 py-2.5 rounded-xl flex items-center justify-center gap-2 text-yellow-400 hover:text-yellow-300 font-black text-sm transition-all border border-yellow-500/40 hover:border-yellow-500/70 active:scale-95 touch-manipulation disabled:opacity-60"
+                            className="relative z-30 flex-1 py-2.5 rounded-xl flex items-center justify-center gap-2 text-yellow-400 hover:text-yellow-300 font-black text-sm transition-all border border-yellow-500/40 hover:border-yellow-500/70 active:scale-95 touch-manipulation disabled:opacity-60 btn-gold-animated !text-black"
                           >
                             {w?.archived_at ? (
                               isActionBusy(getWorkoutKey(w, idx), 'restore') ? (

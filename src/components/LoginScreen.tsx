@@ -1,11 +1,84 @@
 'use client'
 
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { Dumbbell, X, CheckCircle2, AlertCircle, Loader2, Mail, ArrowLeft, Lock, User, Phone, Calendar, ShieldAlert, Eye, EyeOff } from 'lucide-react';
 import LoadingScreen from '@/components/LoadingScreen';
 import { useNativeAppSetup } from '@/hooks/useNativeAppSetup'
 import { useLoginScreen } from '@/hooks/useLoginScreen'
+
+// ── Floating Gold Particles Background ──────────────────────────────────────
+
+type GoldDot = { x: number; y: number; r: number; vy: number; vx: number; opacity: number; phase: number }
+
+function GoldParticles() {
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+  const animRef = useRef<number>(0)
+
+  useEffect(() => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    const resize = () => {
+      const dpr = window.devicePixelRatio || 1
+      canvas.width = window.innerWidth * dpr
+      canvas.height = window.innerHeight * dpr
+      ctx.scale(dpr, dpr)
+    }
+    resize()
+    window.addEventListener('resize', resize)
+
+    const w = () => window.innerWidth
+    const h = () => window.innerHeight
+
+    const dots: GoldDot[] = Array.from({ length: 18 }, () => ({
+      x: Math.random() * w(),
+      y: Math.random() * h(),
+      r: 1 + Math.random() * 2.5,
+      vy: -(0.15 + Math.random() * 0.4),
+      vx: (Math.random() - 0.5) * 0.3,
+      opacity: 0.15 + Math.random() * 0.4,
+      phase: Math.random() * Math.PI * 2,
+    }))
+
+    let t = 0
+    const animate = () => {
+      t += 0.01
+      ctx.clearRect(0, 0, w(), h())
+      dots.forEach(d => {
+        d.y += d.vy
+        d.x += d.vx + Math.sin(t + d.phase) * 0.15
+        if (d.y < -10) { d.y = h() + 10; d.x = Math.random() * w() }
+        const pulse = 0.7 + 0.3 * Math.sin(t * 2 + d.phase)
+        ctx.beginPath()
+        ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2)
+        ctx.fillStyle = `rgba(251, 191, 36, ${d.opacity * pulse})`
+        ctx.shadowBlur = d.r * 4
+        ctx.shadowColor = 'rgba(251, 191, 36, 0.3)'
+        ctx.fill()
+        ctx.shadowBlur = 0
+      })
+      animRef.current = requestAnimationFrame(animate)
+    }
+    animRef.current = requestAnimationFrame(animate)
+
+    return () => {
+      cancelAnimationFrame(animRef.current)
+      window.removeEventListener('resize', resize)
+    }
+  }, [])
+
+  return (
+    <canvas
+      ref={canvasRef}
+      className="absolute inset-0 pointer-events-none z-0"
+      style={{ width: '100%', height: '100%' }}
+      aria-hidden="true"
+    />
+  )
+}
 
 
 const LoginScreen = () => {
@@ -45,6 +118,9 @@ const LoginScreen = () => {
                 <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-amber-500/8 rounded-full blur-[100px]" />
                 <div className="absolute inset-0 bg-[url('data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjAwIDIwMCIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48ZmlsdGVyIGlkPSJub2lzZUZpbHRlciI+PGZlVHVyYnVsZW5jZSB0eXBlPSJmcmFjdGFsTm9pc2UiIGJhc2VGcmVxdWVuY3k9IjAuNjUiIG51bU9jdGF2ZXM9IjMiIHN0aXRjaFRpbGVzPSJzdGl0Y2giLz48L2ZpbHRlcj48cmVjdCB3aWR0aD0iMTAwJSIgaGVpZ2h0PSIxMDAlIiBmaWx0ZXI9InVybCgjbm9pc2VGaWx0ZXIpIiBvcGFjaXR5PSIwLjUiLz48L3N2Zz4=')] opacity-15 mix-blend-overlay" />
             </div>
+
+            {/* ✨ Floating gold particles */}
+            <GoldParticles />
 
             {/* Card with integrated hero */}
             <div className="relative z-10 w-full max-w-sm rounded-[2rem] border border-white/5 bg-neutral-900/60 backdrop-blur-xl shadow-2xl shadow-black/50 flex flex-col items-center transition-all duration-500 overflow-hidden">
@@ -341,7 +417,7 @@ const LoginScreen = () => {
                                         authMode === 'recover_code' ? 'Redefinir senha' : 'Enviar link de recuperação'
                             }
                             aria-busy={isLoading}
-                            className="w-full bg-gradient-to-r from-yellow-500 to-amber-600 text-black px-6 py-3.5 rounded-xl font-black text-lg shadow-lg hover:shadow-yellow-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="w-full bg-gradient-to-r from-yellow-500 via-amber-400 to-yellow-500 text-black px-6 py-3.5 rounded-xl font-black text-lg shadow-lg hover:shadow-yellow-500/20 hover:scale-[1.02] active:scale-[0.98] transition-all disabled:opacity-50 disabled:cursor-not-allowed btn-gold-animated"
                         >
                             {isLoading ? <Loader2 className="animate-spin mx-auto" /> : (
                                 authMode === 'login' ? 'ENTRAR' :

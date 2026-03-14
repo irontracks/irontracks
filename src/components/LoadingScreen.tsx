@@ -26,16 +26,27 @@ const LoadingScreen = () => (
             className="relative z-10 flex flex-col items-center"
             style={{ animation: 'splash-in 0.9s cubic-bezier(0.16, 1, 0.3, 1) forwards', opacity: 0 }}
         >
-            {/* IRONTRACKS wordmark */}
-            <div className="mb-3">
+            {/* IRONTRACKS wordmark — with shimmer sweep */}
+            <div className="mb-3 relative overflow-hidden">
                 <h1 className="text-5xl font-black tracking-wide text-center leading-none">
                     <span className="text-white">IRON</span>
                     <span className="text-transparent bg-clip-text bg-gradient-to-b from-yellow-300 to-amber-500">TRACKS</span>
                 </h1>
+                {/* Gold shimmer sweep across the logo */}
+                <div
+                    className="absolute inset-0 pointer-events-none"
+                    style={{
+                        background: 'linear-gradient(90deg, transparent 0%, rgba(251,191,36,0.15) 45%, rgba(251,191,36,0.3) 50%, rgba(251,191,36,0.15) 55%, transparent 100%)',
+                        animation: 'logo-shimmer 2.5s ease-in-out 0.5s infinite',
+                    }}
+                />
             </div>
 
-            {/* Amber divider line */}
-            <div className="w-12 h-[2px] bg-gradient-to-r from-transparent via-amber-400 to-transparent mb-3 rounded-full" />
+            {/* Amber divider line — breathing glow */}
+            <div
+                className="w-12 h-[2px] bg-gradient-to-r from-transparent via-amber-400 to-transparent mb-3 rounded-full"
+                style={{ animation: 'divider-breathe 2s ease-in-out infinite' }}
+            />
 
             {/* Tagline */}
             <p className="text-[10px] font-bold text-neutral-500 uppercase tracking-[0.35em]">
@@ -43,21 +54,28 @@ const LoadingScreen = () => (
             </p>
         </div>
 
-        {/* Progress bar — bottom of screen */}
+        {/* Progress bar — bottom of screen, premium gold animated */}
         <div
-            className="absolute bottom-12 left-1/2 -translate-x-1/2 w-20 h-[1.5px] bg-neutral-800 rounded-full overflow-hidden"
+            className="absolute bottom-12 left-1/2 -translate-x-1/2 w-20 h-[2px] bg-neutral-800 rounded-full overflow-hidden"
             style={{ animation: 'fade-in 0.4s ease-out 0.5s forwards', opacity: 0 }}
         >
             <div
-                className="h-full bg-gradient-to-r from-amber-500 to-yellow-300 rounded-full"
-                style={{ animation: 'progress 1.8s cubic-bezier(0.4, 0, 0.2, 1) 0.4s forwards', width: '0%' }}
-            />
+                className="h-full rounded-full relative overflow-hidden"
+                style={{
+                    background: 'linear-gradient(90deg, #92400e, #d97706, #fbbf24, #fde68a)',
+                    animation: 'progress 1.8s cubic-bezier(0.4, 0, 0.2, 1) 0.4s forwards',
+                    width: '0%',
+                    boxShadow: '0 0 8px rgba(251,191,36,0.4)',
+                }}
+            >
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent" style={{ animation: 'shimmer 1.5s ease-in-out infinite' }} />
+            </div>
         </div>
 
         <style>{`
             @keyframes splash-in {
-                0%   { opacity: 0; transform: translateY(12px); }
-                100% { opacity: 1; transform: translateY(0); }
+                0%   { opacity: 0; transform: translateY(12px) scale(0.97); }
+                100% { opacity: 1; transform: translateY(0) scale(1); }
             }
             @keyframes fade-in {
                 to { opacity: 1; }
@@ -67,6 +85,14 @@ const LoadingScreen = () => (
                 60%  { width: 70%; }
                 85%  { width: 88%; }
                 100% { width: 100%; }
+            }
+            @keyframes logo-shimmer {
+                0%   { transform: translateX(-100%); }
+                100% { transform: translateX(200%); }
+            }
+            @keyframes divider-breathe {
+                0%, 100% { opacity: 0.6; width: 48px; }
+                50%      { opacity: 1; width: 56px; }
             }
         `}</style>
     </div>
