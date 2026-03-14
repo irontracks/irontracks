@@ -85,9 +85,42 @@ export default function WorkoutHeader() {
           <div className="min-w-0 flex-1">
             <div className="font-black text-white truncate text-right">{String(workout?.title || 'Treino')}</div>
             <div className="text-xs text-neutral-400 flex items-center justify-end gap-2 mt-1">
+              {/* Progress Ring SVG */}
+              {totalSets > 0 && (() => {
+                const size = 28
+                const stroke = 3
+                const radius = (size - stroke) / 2
+                const circumference = 2 * Math.PI * radius
+                const offset = circumference - (progressPct / 100) * circumference
+                const ringColor = progressPct >= 90 ? '#10b981' : progressPct >= 50 ? '#f59e0b' : '#d97706'
+                return (
+                  <div className="relative flex-shrink-0" style={{ width: size, height: size }}>
+                    {/* Track */}
+                    <svg width={size} height={size} className="rotate-[-90deg]">
+                      <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth={stroke} />
+                      <circle
+                        cx={size / 2} cy={size / 2} r={radius} fill="none"
+                        stroke={ringColor}
+                        strokeWidth={stroke}
+                        strokeLinecap="round"
+                        strokeDasharray={circumference}
+                        strokeDashoffset={offset}
+                        style={{
+                          transition: 'stroke-dashoffset 0.5s ease-out, stroke 0.3s',
+                          filter: progressPct >= 80 ? `drop-shadow(0 0 4px ${ringColor}80)` : 'none',
+                        }}
+                      />
+                    </svg>
+                    {/* Center percentage */}
+                    <span className="absolute inset-0 flex items-center justify-center text-[8px] font-black tabular-nums" style={{ color: ringColor }}>
+                      {progressPct}
+                    </span>
+                  </div>
+                )
+              })()}
               {totalSets > 0 && (
                 <span className="font-mono text-neutral-500">
-                  {completedSets}/{totalSets} séries
+                  {completedSets}/{totalSets}
                 </span>
               )}
               <Clock size={14} className="text-yellow-500" />
