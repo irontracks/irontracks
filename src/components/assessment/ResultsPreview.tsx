@@ -239,31 +239,31 @@ export default function ResultsPreview({ formData, onBack, studentName }: Result
           </div>
         </div>
 
-        {/* Dobra Cutâneas */}
+        {/* Dobras Cutâneas */}
         <div className="bg-neutral-900 rounded-xl p-4">
-          <h4 className="font-bold text-white mb-3">Dobras Cutâneas (mm)</h4>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 text-sm">
+          <h4 className="font-bold text-white mb-3 text-sm">Dobras Cutâneas (mm)</h4>
+          <div className="grid grid-cols-3 md:grid-cols-4 gap-2">
             {[
-              ['Tricipital', formData.triceps_skinfold],
-              ['Bicipital', formData.biceps_skinfold],
-              ['Subescapular', formData.subscapular_skinfold],
-              ['Suprailíaca', formData.suprailiac_skinfold],
-              ['Abdominal', formData.abdominal_skinfold],
+              ['Tríceps', formData.triceps_skinfold],
+              ['Bíceps', formData.biceps_skinfold],
+              ['Subesc.', formData.subscapular_skinfold],
+              ['Supraíl.', formData.suprailiac_skinfold],
+              ['Abdom.', formData.abdominal_skinfold],
               ['Coxa', formData.thigh_skinfold],
-              ['Panturrilha', formData.calf_skinfold]
+              ['Pantur.', formData.calf_skinfold]
             ].filter(([_, v]) => !!v).map(([label, value]) => (
-              <div key={String(label)} className="flex justify-between">
-                <span className="text-neutral-400 capitalize">{label}:</span>
-                <span className="font-medium text-white">{value} mm</span>
+              <div key={String(label)} className="text-center p-2 bg-neutral-800/60 rounded-lg">
+                <p className="text-[10px] text-neutral-500 uppercase tracking-wide font-bold truncate">{label}</p>
+                <p className="text-base font-black text-white mt-0.5">{value}</p>
               </div>
             ))}
           </div>
-          <div className="mt-3 pt-3 border-t border-neutral-700">
-            <p className="text-sm text-neutral-400">
-              Soma das dobras: <span className="font-medium text-white">{results.bodyComposition.sumOfSkinfolds.toFixed(1)} mm</span>
+          <div className="mt-3 pt-3 border-t border-neutral-700 flex items-center justify-between">
+            <p className="text-xs text-neutral-400">
+              Soma das dobras: <span className="font-black text-white">{results.bodyComposition.sumOfSkinfolds.toFixed(1)} mm</span>
             </p>
-            <p className="text-xs text-neutral-500 mt-1">
-              Calculado usando fórmula de Pollock para 7 dobras cutâneas
+            <p className="text-[10px] text-neutral-600">
+              Pollock 7 dobras
             </p>
           </div>
         </div>
