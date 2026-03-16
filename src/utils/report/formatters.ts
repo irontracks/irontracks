@@ -68,7 +68,54 @@ export const normalizeExerciseKey = (v: unknown): string => {
     }
 }
 
-// ─── Volume calculation ──────────────────────────────────────────────────────
+// ── Volume calculation ──────────────────────────────────────────────────────
+
+/**
+ * Parse reps value that may be in "done/planned" format (e.g. "8/10" → 8).
+ * Also handles comma decimals and plain numbers.
+ */
+const parseRepsValue = (raw: unknown): number => {
+    const s = String(raw ?? '').replace(',', '.').trim()
+    if (!s) return 0
+    // Handle "done/planned" format: "8/10" → take the first number (done reps)
+    if (s.includes('/')) {
+        const first = s.split('/')[0].trim()
+        const n = Number(first)
+        return Number.isFinite(n) && n > 0 ? n : 0
+    }
+    const n = Number(s)
+    return Number.isFinite(n) && n > 0 ? n : 0
+}
+
+/**
+ * Parse weight value (handles comma decimals).
+ */
+const parseWeightValue = (raw: unknown): number => {
+    const s = String(raw ?? '').replace(',', '.').trim()
+    const n = Number(s)
+    return Number.isFinite(n) && n > 0 ? n : 0
+}
+
+/**
+ * Calculate volume from cluster blocks (each block has its own weight × reps).
+ */
+const calculateClusterVolume = (cluster: unknown): number => {
+    if (!isRecord(cluster)) return 0
+    const blocksDetailed = Array.isArray(cluster.blocksDetailed) ? cluster.blocksDetailed : null
+    const blocks = Array.isArray(cluster.blocks) ? cluster.blocks : null
+    const source = blocksDetailed || blocks
+    if (!source || source.length === 0) return 0
+
+    let vol = 0
+    for (const block of source) {
+        if (!block || typeof block !== 'object') continue
+        const b = block as Record<string, unknown>
+        const w = parseWeightValue(b.weight)
+        const r = parseRepsValue(b.reps)
+        if (w > 0 && r > 0) vol += w * r
+    }
+    return vol
+}
 
 export const calculateTotalVolume = (logs: unknown): number => {
     try {
@@ -76,14 +123,22 @@ export const calculateTotalVolume = (logs: unknown): number => {
         const safeLogs: Record<string, unknown> = isRecord(logs) ? logs : {}
         Object.values(safeLogs).forEach((log: unknown) => {
             if (!isRecord(log)) return
-            const w = Number(String(log.weight ?? '').replace(',', '.'))
-            const r = Number(String(log.reps ?? '').replace(',', '.'))
-            if (!Number.isFinite(w) || !Number.isFinite(r)) return
-            if (w <= 0 || r <= 0) return
-            volume += w * r
+
+            // Check for cluster data first (each block may have different weight)
+            const clusterVol = calculateClusterVolume(log.cluster)
+            if (clusterVol > 0) {
+                volume += clusterVol
+                return
+            }
+
+            // Standard set: weight × reps
+            const w = parseWeightValue(log.weight)
+            const r = parseRepsValue(log.reps)
+            if (w > 0 && r > 0) volume += w * r
         })
         return volume
     } catch {
         return 0
     }
 }
+
