@@ -52,13 +52,18 @@ export const ClusterSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: 
 
   const total = blocks.reduce<number>((acc, v) => acc + (typeof v === 'number' ? v : 0), 0);
   const done = !!log.done;
-  // canDone when either: (1) blocks have values from inline inputs, or (2) log already has saved blocks from modal
-  const canDone =
+  // canDone: habilitado quando há dados suficientes para registrar a série.
+  // Caminhos possíveis:
+  //  (A) modal path: blocksRaw vem do saveClusterModal → basta ter ≥1 bloco válido
+  //  (B) inline path: usuário preencheu os inputs diretamente → cada bloco tem valor
+  const blocksSavedFromModal =
+    blocksRaw.length > 0 &&
+    blocksRaw.every((v) => { const n = parseTrainingNumber(v); return typeof n === 'number' && Number.isFinite(n) && n > 0; });
+  const blocksFilledInline =
     plannedBlocks.length > 0 &&
-    (
-      blocks.every((v) => typeof v === 'number' && Number.isFinite(v) && v > 0) ||
-      (blocksRaw.length > 0 && blocksRaw.every((v) => { const n = parseTrainingNumber(v); return typeof n === 'number' && Number.isFinite(n) && n > 0; }))
-    );
+    blocks.every((v) => typeof v === 'number' && Number.isFinite(v) && v > 0);
+  const canDone = blocksSavedFromModal || blocksFilledInline;
+
 
   const lastRestAfterBlock = Number(cluster.last_rest_after_block);
   const lastRest = Number.isFinite(lastRestAfterBlock) ? lastRestAfterBlock : -1;
