@@ -138,103 +138,104 @@ export default function ResultsPreview({ formData, onBack, studentName }: Result
       initial={{ opacity: 0, x: 20 }}
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: -20 }}
-      className="space-y-6"
+      className="space-y-4"
     >
-      <div className="text-center mb-8">
-        <h2 className="text-2xl font-bold text-white mb-2">Resultados da Avaliação</h2>
-        <p className="text-neutral-400">Confira os resultados antes de salvar</p>
+      <div className="text-center mb-4">
+        <h2 className="text-xl font-bold text-white mb-1">Resultados da Avaliação</h2>
+        <p className="text-neutral-400 text-sm">Confira os resultados antes de salvar</p>
       </div>
 
       {/* Informações Básicas */}
-      <div className="rounded-2xl border p-6 relative overflow-hidden" style={{ background: 'linear-gradient(160deg, rgba(20,18,10,0.8) 0%, rgba(12,12,12,0.95) 50%)', borderColor: 'rgba(255,255,255,0.06)' }}>
+      <div className="rounded-2xl border p-5 relative overflow-hidden" style={{ background: 'linear-gradient(160deg, rgba(20,18,10,0.8) 0%, rgba(12,12,12,0.95) 50%)', borderColor: 'rgba(255,255,255,0.06)' }}>
         <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-yellow-500/20 to-transparent" />
-        <div className="flex items-center mb-4">
-          <User className="w-5 h-5 text-yellow-500 mr-2" />
+        <div className="flex items-center gap-2 mb-3">
+          <User className="w-5 h-5 text-yellow-500 shrink-0" />
           <h3 className="text-lg font-bold text-white">Informações do Aluno</h3>
         </div>
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid grid-cols-2 gap-3">
           <div>
-            <p className="text-sm text-neutral-400">Nome</p>
-            <p className="font-medium text-white">{studentName}</p>
+            <p className="text-xs text-neutral-500 uppercase tracking-wide font-bold">Nome</p>
+            <p className="font-semibold text-white text-sm mt-0.5 truncate">{studentName}</p>
           </div>
           <div>
-            <p className="text-sm text-neutral-400">Data da Avaliação</p>
-            <p className="font-medium text-white">{formatDate(new Date())}</p>
+            <p className="text-xs text-neutral-500 uppercase tracking-wide font-bold">Data</p>
+            <p className="font-semibold text-white text-sm mt-0.5">{formatDate(new Date())}</p>
           </div>
           <div>
-            <p className="text-sm text-neutral-400">Idade</p>
-            <p className="font-medium text-white">{formData.age} anos</p>
+            <p className="text-xs text-neutral-500 uppercase tracking-wide font-bold">Idade</p>
+            <p className="font-semibold text-white text-sm mt-0.5">{formData.age} anos</p>
           </div>
           <div>
-            <p className="text-sm text-neutral-400">Gênero</p>
-            <p className="font-medium text-white">{formData.gender === 'M' ? 'Masculino' : 'Feminino'}</p>
+            <p className="text-xs text-neutral-500 uppercase tracking-wide font-bold">Gênero</p>
+            <p className="font-semibold text-white text-sm mt-0.5">{formData.gender === 'M' ? 'Masculino' : 'Feminino'}</p>
           </div>
         </div>
       </div>
 
       {/* Medidas Antropométricas */}
-      <div className="rounded-2xl border p-6 relative overflow-hidden" style={{ background: 'linear-gradient(160deg, rgba(20,18,10,0.8) 0%, rgba(12,12,12,0.95) 50%)', borderColor: 'rgba(255,255,255,0.06)' }}>
+      <div className="rounded-2xl border p-5 relative overflow-hidden" style={{ background: 'linear-gradient(160deg, rgba(20,18,10,0.8) 0%, rgba(12,12,12,0.95) 50%)', borderColor: 'rgba(255,255,255,0.06)' }}>
         <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-yellow-500/20 to-transparent" />
-        <div className="flex items-center mb-4">
-          <Ruler className="w-5 h-5 text-yellow-500 mr-2" />
+        <div className="flex items-center gap-2 mb-3">
+          <Ruler className="w-5 h-5 text-yellow-500 shrink-0" />
           <h3 className="text-lg font-bold text-white">Medidas Antropométricas</h3>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="text-center p-3 bg-neutral-900 rounded-lg">
-            <p className="text-sm text-neutral-400">Peso</p>
-            <p className="text-xl font-bold text-white">{formData.weight} kg</p>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+          <div className="text-center p-3 bg-neutral-900 rounded-xl min-h-[88px] flex flex-col items-center justify-center">
+            <p className="text-xs text-neutral-500 uppercase tracking-wide font-bold">Peso</p>
+            <p className="text-xl font-black text-white mt-1 whitespace-nowrap">{formData.weight} <span className="text-sm font-bold text-neutral-400">kg</span></p>
           </div>
-          <div className="text-center p-3 bg-neutral-900 rounded-lg">
-            <p className="text-sm text-neutral-400">Altura</p>
-            <p className="text-xl font-bold text-white">{formData.height} cm</p>
+          <div className="text-center p-3 bg-neutral-900 rounded-xl min-h-[88px] flex flex-col items-center justify-center">
+            <p className="text-xs text-neutral-500 uppercase tracking-wide font-bold">Altura</p>
+            <p className="text-xl font-black text-white mt-1 whitespace-nowrap">{formData.height} <span className="text-sm font-bold text-neutral-400">cm</span></p>
           </div>
-          <div className="text-center p-3 bg-neutral-900 rounded-lg">
-            <p className="text-sm text-neutral-400">IMC</p>
-            <p className="text-xl font-bold text-white">{results.bmi.toFixed(1)}</p>
-            <p className={`text-xs font-medium ${getClassificationColor(results.bmiClassification)}`}>
+          <div className="text-center p-3 bg-neutral-900 rounded-xl min-h-[88px] flex flex-col items-center justify-center">
+            <p className="text-xs text-neutral-500 uppercase tracking-wide font-bold">IMC</p>
+            <p className="text-xl font-black text-white mt-1">{results.bmi.toFixed(1)}</p>
+            <p className={`text-[11px] font-bold mt-0.5 ${getClassificationColor(results.bmiClassification)}`}>
               {results.bmiClassification}
             </p>
           </div>
-          <div className="text-center p-3 bg-neutral-900 rounded-lg">
-            <p className="text-sm text-neutral-400">Circunferências</p>
-            <p className="text-xs text-neutral-500">{[
+          <div className="text-center p-3 bg-neutral-900 rounded-xl min-h-[88px] flex flex-col items-center justify-center">
+            <p className="text-xs text-neutral-500 uppercase tracking-wide font-bold">Circunf.</p>
+            <p className="text-xl font-black text-white mt-1">{[
               formData.arm_circ,
               formData.chest_circ,
               formData.waist_circ,
               formData.hip_circ,
               formData.thigh_circ,
               formData.calf_circ
-            ].filter(Boolean).length} medidas</p>
+            ].filter(Boolean).length}</p>
+            <p className="text-[11px] text-neutral-500 font-bold">medidas</p>
           </div>
         </div>
       </div>
 
       {/* Composição Corporal */}
-      <div className="rounded-2xl border p-6 relative overflow-hidden" style={{ background: 'linear-gradient(160deg, rgba(20,18,10,0.8) 0%, rgba(12,12,12,0.95) 50%)', borderColor: 'rgba(255,255,255,0.06)' }}>
+      <div className="rounded-2xl border p-5 relative overflow-hidden" style={{ background: 'linear-gradient(160deg, rgba(20,18,10,0.8) 0%, rgba(12,12,12,0.95) 50%)', borderColor: 'rgba(255,255,255,0.06)' }}>
         <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-yellow-500/20 to-transparent" />
-        <div className="flex items-center mb-4">
-          <Calculator className="w-5 h-5 text-yellow-500 mr-2" />
+        <div className="flex items-center gap-2 mb-3">
+          <Calculator className="w-5 h-5 text-yellow-500 shrink-0" />
           <h3 className="text-lg font-bold text-white">Composição Corporal</h3>
         </div>
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-          <div className="text-center p-3 bg-neutral-900 rounded-lg border border-neutral-800">
-            <p className="text-sm text-neutral-400">% Gordura</p>
-            <p className="text-2xl font-bold text-white">{results.bodyComposition.bodyFatPercentage.toFixed(1)}%</p>
-            <p className={`text-xs font-medium ${getClassificationColor(results.bodyFatClassification)}`}>
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+          <div className="text-center p-3 bg-neutral-900 rounded-xl border border-neutral-800 min-h-[88px] flex flex-col items-center justify-center">
+            <p className="text-xs text-neutral-500 uppercase tracking-wide font-bold">% Gordura</p>
+            <p className="text-xl font-black text-white mt-1">{results.bodyComposition.bodyFatPercentage.toFixed(1)}%</p>
+            <p className={`text-[11px] font-bold mt-0.5 ${getClassificationColor(results.bodyFatClassification)}`}>
               {results.bodyFatClassification}
             </p>
           </div>
-          <div className="text-center p-3 bg-neutral-900 rounded-lg border border-neutral-800">
-            <p className="text-sm text-neutral-400">Massa Magra</p>
-            <p className="text-2xl font-bold text-green-400">{results.leanMass.toFixed(1)} kg</p>
+          <div className="text-center p-3 bg-neutral-900 rounded-xl border border-neutral-800 min-h-[88px] flex flex-col items-center justify-center">
+            <p className="text-xs text-neutral-500 uppercase tracking-wide font-bold">Massa Magra</p>
+            <p className="text-xl font-black text-emerald-400 mt-1 whitespace-nowrap">{results.leanMass.toFixed(1)} <span className="text-sm font-bold">kg</span></p>
           </div>
-          <div className="text-center p-3 bg-neutral-900 rounded-lg border border-neutral-800">
-            <p className="text-sm text-neutral-400">Massa Gorda</p>
-            <p className="text-2xl font-bold text-red-400">{results.fatMass.toFixed(1)} kg</p>
+          <div className="text-center p-3 bg-neutral-900 rounded-xl border border-neutral-800 min-h-[88px] flex flex-col items-center justify-center">
+            <p className="text-xs text-neutral-500 uppercase tracking-wide font-bold">Massa Gorda</p>
+            <p className="text-xl font-black text-red-400 mt-1 whitespace-nowrap">{results.fatMass.toFixed(1)} <span className="text-sm font-bold">kg</span></p>
           </div>
-          <div className="text-center p-3 bg-neutral-900 rounded-lg border border-neutral-800">
-            <p className="text-sm text-neutral-400">Taxa Metabólica Basal</p>
-            <p className="text-xl font-bold text-yellow-400">{results.bmr.toFixed(0)} kcal</p>
+          <div className="text-center p-3 bg-neutral-900 rounded-xl border border-neutral-800 min-h-[88px] flex flex-col items-center justify-center">
+            <p className="text-xs text-neutral-500 uppercase tracking-wide font-bold">TMB</p>
+            <p className="text-xl font-black text-yellow-400 mt-1 whitespace-nowrap">{results.bmr.toFixed(0)} <span className="text-sm font-bold">kcal</span></p>
           </div>
         </div>
 
@@ -277,10 +278,10 @@ export default function ResultsPreview({ formData, onBack, studentName }: Result
         formData.thigh_circ,
         formData.calf_circ
       ].some(Boolean) && (
-          <div className="rounded-2xl border p-6 relative overflow-hidden" style={{ background: 'linear-gradient(160deg, rgba(20,18,10,0.8) 0%, rgba(12,12,12,0.95) 50%)', borderColor: 'rgba(255,255,255,0.06)' }}>
+          <div className="rounded-2xl border p-5 relative overflow-hidden" style={{ background: 'linear-gradient(160deg, rgba(20,18,10,0.8) 0%, rgba(12,12,12,0.95) 50%)', borderColor: 'rgba(255,255,255,0.06)' }}>
         <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-yellow-500/20 to-transparent" />
-            <div className="flex items-center mb-4">
-              <TrendingUp className="w-5 h-5 text-yellow-500 mr-2" />
+            <div className="flex items-center gap-2 mb-3">
+              <TrendingUp className="w-5 h-5 text-yellow-500 shrink-0" />
               <h3 className="text-lg font-bold text-white">Circunferências (cm)</h3>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
