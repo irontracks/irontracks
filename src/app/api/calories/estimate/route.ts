@@ -2,16 +2,11 @@
  * POST /api/calories/estimate
  *
  * Estimates calories burned for a workout session using a deterministic
- * physics-based MET formula. Gemini AI was intentionally removed from this
- * endpoint because:
- *  1. Non-deterministic: each call returned a different MET value.
- *  2. Volume-blind: it received exercise names but not actual load/volume data.
- *  3. Caused oscillation: the page would show one value on load, then another
- *     after the API response arrived, then yet another when postCheckin loaded.
+ * multi-factor MET formula. V3 — properly calibrated to produce
+ * 200–700 kcal for resistance training sessions.
  *
- * The formula is fully deterministic:
- *   kcal = MET(load, density) × complexity × bodyWeight × activeHours × rpe
- *        + MET_REST × bodyWeight × restHours
+ * Factors: duration, body weight, sex, volume density, training style,
+ * exercise complexity, RPE, EPOC.
  */
 import { NextResponse } from 'next/server'
 import { parseJsonBody } from '@/utils/zod'
@@ -20,12 +15,13 @@ import { createClient } from '@/utils/supabase/server'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import {
   estimateCaloriesMet,
+  estimateDurationFromLogs,
+  selectBaseMet,
   getExerciseComplexityFactor,
-  selectMet,
   getRpeMultiplier,
   getEpocFactor,
-  computeVolumeFloor,
-  estimateDurationFromLogs,
+  getStyleFactor,
+  detectTrainingStyle,
   MET_REST,
   DEFAULT_BODY_WEIGHT_KG,
 } from '@/utils/calories/metEstimate'
@@ -57,17 +53,6 @@ const calculateTotalVolume = (logs: Record<string, unknown>) => {
     })
     return volume
   } catch { return 0 }
-}
-
-const computeRestSecondsFromLogs = (logs: Record<string, unknown>): number => {
-  let total = 0
-  for (const v of Object.values(logs)) {
-    if (!v || typeof v !== 'object') continue
-    const obj = v as Record<string, unknown>
-    const rs = Number(obj?.restSeconds)
-    if (Number.isFinite(rs) && rs > 0 && rs < 600) total += rs
-  }
-  return total
 }
 
 // ── Weight from DB assessment (fallback when preCheckin has no weight) ─────────
@@ -123,39 +108,7 @@ export async function POST(request: Request) {
     const logs = session?.logs && typeof session.logs === 'object' ? (session.logs as Record<string, unknown>) : {}
     const volume = calculateTotalVolume(logs)
 
-    // ── Timing ────────────────────────────────────────────────────────────────
-    const totalTimeSeconds = Number(session?.totalTime) || 0
-    const execSeconds = Number(session?.executionTotalSeconds ?? session?.execution_total_seconds ?? 0) || 0
-    const restSecondsSession = Number(session?.restTotalSeconds ?? session?.rest_total_seconds ?? 0) || 0
-    const restSeconds = restSecondsSession > 0 ? restSecondsSession : computeRestSecondsFromLogs(logs)
-
-    const execMinutes = execSeconds > 0 ? execSeconds / 60 : 0
-    const restMinutes = restSeconds > 0 ? restSeconds / 60 : 0
-    let totalMinutes = execMinutes + restMinutes > 0
-      ? execMinutes + restMinutes
-      : totalTimeSeconds > 0 ? totalTimeSeconds / 60 : 0
-
-    // Duration fallback from log timestamps when explicit timing is missing
-    const startedAtMs = (() => {
-      const raw = session?.startedAt ?? session?.startedAtMs ?? session?.started_at
-      const n = Number(raw)
-      return Number.isFinite(n) && n > 0 ? n : null
-    })()
-    if (totalMinutes <= 0) {
-      const fromLogs = estimateDurationFromLogs(logs, startedAtMs)
-      if (fromLogs && fromLogs > 0) totalMinutes = fromLogs
-    }
-
-    // Active minutes: prefer explicit exec time, else total – rest (min 35% of total)
-    const activeMinutes = execMinutes > 0 ? execMinutes
-      : totalMinutes > 0 ? Math.max(totalMinutes - restMinutes, totalMinutes * 0.35)
-      : 0
-
-    // ── Body weight priority chain ────────────────────────────────────────────
-    // 1. preCheckin weight (client payload — most accurate, entered right before session)
-    // 2. session.preCheckin (saved in session object when started)
-    // 3. Latest DB assessment (historical)
-    // 4. Default 75 kg
+    // ── Body weight priority chain ──────────────────────────────────────────
     const preCheckinWeight = (() => {
       if (clientWeightKg && Number.isFinite(clientWeightKg) && clientWeightKg >= 20 && clientWeightKg <= 300)
         return clientWeightKg
@@ -173,9 +126,17 @@ export async function POST(request: Request) {
     const bodyWeightKg = preCheckinWeight ?? assessmentWeight ?? DEFAULT_BODY_WEIGHT_KG
     const weightSource = preCheckinWeight != null ? 'pre_checkin'
       : assessmentWeight != null ? 'assessment'
-      : 'default_75kg'
+      : 'default'
 
-    // ── Exercise names and per-exercise volumes (for weighted complexity) ────
+    // ── Timing ──────────────────────────────────────────────────────────────
+    const totalTimeSeconds = Number(session?.totalTime) || 0
+    const execSeconds = Number(session?.executionTotalSeconds ?? session?.execution_total_seconds ?? 0) || 0
+    const restSecondsSession = Number(session?.restTotalSeconds ?? session?.rest_total_seconds ?? 0) || 0
+    const totalMinutes = totalTimeSeconds > 0 ? totalTimeSeconds / 60 : 0
+    const execMinutesOverride = execSeconds > 0 ? execSeconds / 60 : null
+    const restMinutesOverride = restSecondsSession > 0 ? restSecondsSession / 60 : null
+
+    // ── Exercise names ──────────────────────────────────────────────────────
     const exerciseNames = Array.isArray(session?.exercises)
       ? (session.exercises as unknown[]).map((ex) => {
         const e = ex && typeof ex === 'object' ? (ex as Record<string, unknown>) : null
@@ -183,8 +144,7 @@ export async function POST(request: Request) {
       }).filter(Boolean) as string[]
       : []
 
-    // Volume per exercise: sum(w × r) for all sets of that exercise
-    // Logs are keyed by "exerciseIdx-setIdx"
+    // Volume per exercise
     const exerciseVolumes: number[] = exerciseNames.map((_, exIdx) => {
       let vol = 0
       for (const [key, log] of Object.entries(logs)) {
@@ -199,79 +159,34 @@ export async function POST(request: Request) {
       return vol
     })
 
-    // Volume-weighted complexity factor (heavy compounds get proportional weight)
-    const totalExVol = exerciseVolumes.reduce((a, b) => a + b, 0)
-    const complexityFactor = exerciseNames.length > 0
-      ? (() => {
-          if (totalExVol > 0) {
-            return exerciseNames.reduce((acc, name, i) =>
-              acc + getExerciseComplexityFactor(name) * exerciseVolumes[i], 0) / totalExVol
-          }
-          return exerciseNames.map(getExerciseComplexityFactor).reduce((a, b) => a + b, 0) / exerciseNames.length
-        })()
-      : 1.0
+    // ── Started at (for timestamp fallback) ─────────────────────────────────
+    const startedAtMs = (() => {
+      const raw = session?.startedAt ?? session?.startedAtMs ?? session?.started_at
+      const n = Number(raw)
+      return Number.isFinite(n) && n > 0 ? n : null
+    })()
 
-    // ── MET: two-factor (load AND density) ───────────────────────────────────
-    let avgLoadPerRep = 0
-    let totalWeightedReps = 0
-    let totalReps = 0
-    for (const v of Object.values(logs)) {
-      if (!v || typeof v !== 'object') continue
-      const obj = v as Record<string, unknown>
-      const w = Number(safeString(obj?.weight as unknown).replace(',', '.'))
-      const r = Number(safeString(obj?.reps as unknown).replace(',', '.'))
-      if (w > 0 && r > 0) { totalWeightedReps += w * r; totalReps += r }
-    }
-    avgLoadPerRep = totalReps > 0 ? totalWeightedReps / totalReps : 0
-
-    const met = selectMet(avgLoadPerRep, volume, activeMinutes)
-
-    // ── RPE multiplier ────────────────────────────────────────────────────────
-    const rpeVal = clientRpe != null && Number.isFinite(clientRpe) ? clientRpe : null
-    const rpeMultiplier = getRpeMultiplier(rpeVal)
-
-    // ── EPOC factor ────────────────────────────────────────────────────────────
-    const epocFactor = getEpocFactor(met, totalMinutes)
-
-    // If we have no timing data, return volume-based floor instead of 0
-    if (totalMinutes <= 0) {
-      const floor = computeVolumeFloor(volume, bodyWeightKg)
-      if (floor > 0) {
-        return NextResponse.json({
-          ok: true,
-          kcal: Math.round(floor),
-          source: 'volume_floor',
-          weightSource,
-        })
-      }
-      return NextResponse.json({
-        ok: true,
-        kcal: 0,
-        source: 'no_duration',
-        weightSource,
-      })
-    }
-
-    const activeHours = activeMinutes / 60
-    const restHours = Math.max(0, totalMinutes - activeMinutes) / 60
-    const kcalBase = met * complexityFactor * bodyWeightKg * activeHours * rpeMultiplier
-      + MET_REST * bodyWeightKg * restHours
-    const kcalRaw = kcalBase * epocFactor
-    // Apply volume-based floor
-    const volumeFloor = computeVolumeFloor(volume, bodyWeightKg)
-    const kcal = Math.round(Math.max(kcalRaw, volumeFloor))
+    // ── Delegate to estimateCaloriesMet (handles all multi-factor logic) ───
+    const kcal = estimateCaloriesMet(
+      logs,
+      totalMinutes,
+      bodyWeightKg,
+      exerciseNames.length > 0 ? exerciseNames : null,
+      clientRpe,
+      execMinutesOverride,
+      restMinutesOverride,
+      null, // biologicalSex — not available in API context
+      exerciseVolumes.length > 0 ? exerciseVolumes : null,
+      startedAtMs,
+    )
 
     return NextResponse.json({
       ok: true,
-      kcal: Math.max(0, kcal),
-      met: Math.round(met * 10) / 10,
-      complexityFactor: Math.round(complexityFactor * 100) / 100,
+      kcal,
+      volume,
       bodyWeightKg,
-      activeMinutes: Math.round(activeMinutes * 10) / 10,
-      restMinutes: Math.round(restMinutes * 10) / 10,
-      rpeMultiplier,
-      epocFactor,
-      source: 'deterministic-met',
+      durationMinutes: Math.round(totalMinutes * 10) / 10,
+      source: 'v3-multi-factor',
       weightSource,
     })
   } catch (e: unknown) {
