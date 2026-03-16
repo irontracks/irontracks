@@ -92,16 +92,8 @@ export default function ResultsPreview({ formData, onBack, studentName }: Result
 
   const handleExportPdf = async () => {
     try {
-      const blob = await generateAssessmentPdf(formData, results, studentName);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      const date = formData.assessment_date || new Date().toISOString().split('T')[0];
-      a.href = url;
-      a.download = `avaliacao_${studentName?.replace(/\s+/g, '_') || 'aluno'}_${date}.pdf`;
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      URL.revokeObjectURL(url);
+      // generateAssessmentPdf now opens the printable page internally
+      await generateAssessmentPdf(formData, results, studentName);
     } catch (e) {
       logError('error', 'Erro ao gerar PDF da avaliação', e);
     } finally {
