@@ -31,6 +31,20 @@
 
 type AnyObj = Record<string, unknown>
 
+/**
+ * Parse reps value that may be in "done/planned" format (e.g. "8/10" → 8).
+ */
+const parseReps = (raw: string): number => {
+  const s = raw.replace(',', '.').trim()
+  if (!s) return 0
+  if (s.includes('/')) {
+    const n = Number(s.split('/')[0].trim())
+    return Number.isFinite(n) && n > 0 ? n : 0
+  }
+  const n = Number(s)
+  return Number.isFinite(n) && n > 0 ? n : 0
+}
+
 // ── MET constants (Compendium of Physical Activities 2011) ─────────────────
 /** Light resistance training (stretching, warm-up sets, bodyweight) */
 export const MET_LIGHT = 3.5
@@ -350,13 +364,34 @@ export const estimateCaloriesMet = (
   for (const v of Object.values(sessionLogs)) {
     if (!v || typeof v !== 'object') continue
     const obj = v as AnyObj
+
+    // Cluster blocks: each block has its own weight × reps
+    const cluster = obj?.cluster
+    if (cluster && typeof cluster === 'object') {
+      const cObj = cluster as AnyObj
+      const source = Array.isArray(cObj.blocksDetailed) ? cObj.blocksDetailed
+        : Array.isArray(cObj.blocks) ? cObj.blocks : null
+      if (source && source.length > 0) {
+        for (const block of source) {
+          if (!block || typeof block !== 'object') continue
+          const b = block as AnyObj
+          const bw = Number(String(b?.weight ?? '').replace(',', '.'))
+          const br = parseReps(String(b?.reps ?? ''))
+          if (bw > 0 && br > 0) { totalVolume += bw * br; totalReps += br }
+        }
+        continue
+      }
+    }
+
+    // Standard set — handle "8/10" done/planned format
     const w = Number(String(obj?.weight ?? '').replace(',', '.'))
-    const r = Number(String(obj?.reps ?? '').replace(',', '.'))
+    const r = parseReps(String(obj?.reps ?? ''))
     if (w > 0 && r > 0) {
       totalVolume += w * r
       totalReps += r
     }
   }
+
 
   // ── 2. Body weight ───────────────────────────────────────────────────────
   const bw = bodyWeightKg != null && Number.isFinite(bodyWeightKg)

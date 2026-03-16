@@ -39,21 +39,57 @@ const safeString = (v: unknown): string => {
   try { return String(v ?? '').trim() } catch { return '' }
 }
 
+const parseRepsValue = (raw: unknown): number => {
+  const s = safeString(raw).replace(',', '.')
+  if (!s) return 0
+  if (s.includes('/')) {
+    const n = Number(s.split('/')[0].trim())
+    return Number.isFinite(n) && n > 0 ? n : 0
+  }
+  const n = Number(s)
+  return Number.isFinite(n) && n > 0 ? n : 0
+}
+
+const parseWeightValue = (raw: unknown): number => {
+  const n = Number(safeString(raw).replace(',', '.'))
+  return Number.isFinite(n) && n > 0 ? n : 0
+}
+
+const calculateClusterVolume = (cluster: unknown): number => {
+  if (!cluster || typeof cluster !== 'object') return 0
+  const c = cluster as Record<string, unknown>
+  const source = Array.isArray(c.blocksDetailed) ? c.blocksDetailed
+    : Array.isArray(c.blocks) ? c.blocks : null
+  if (!source || source.length === 0) return 0
+  let vol = 0
+  for (const block of source) {
+    if (!block || typeof block !== 'object') continue
+    const b = block as Record<string, unknown>
+    const w = parseWeightValue(b.weight)
+    const r = parseRepsValue(b.reps)
+    if (w > 0 && r > 0) vol += w * r
+  }
+  return vol
+}
+
 const calculateTotalVolume = (logs: Record<string, unknown>) => {
   try {
     let volume = 0
     Object.values(logs).forEach((log: unknown) => {
       if (!log || typeof log !== 'object') return
       const row = log as Record<string, unknown>
-      const w = Number(safeString(row.weight).replace(',', '.'))
-      const r = Number(safeString(row.reps).replace(',', '.'))
-      if (!Number.isFinite(w) || !Number.isFinite(r)) return
-      if (w <= 0 || r <= 0) return
-      volume += w * r
+      // Cluster: each block may have different weight
+      const clusterVol = calculateClusterVolume(row.cluster)
+      if (clusterVol > 0) { volume += clusterVol; return }
+      // Standard set
+      const w = parseWeightValue(row.weight)
+      const r = parseRepsValue(row.reps)
+      if (w > 0 && r > 0) volume += w * r
     })
     return volume
   } catch { return 0 }
 }
+
 
 // ── Weight from DB assessment (fallback when preCheckin has no weight) ─────────
 const getLatestWeightKg = async ({ supabase, targetUserId }: { supabase: SupabaseClient; targetUserId: string }) => {

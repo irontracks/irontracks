@@ -164,8 +164,30 @@ export const calculateTotalVolume = (logs: Record<string, unknown>): number => {
         let total = 0;
         Object.values(logs).forEach((log: unknown) => {
             const l = log && typeof log === 'object' ? (log as Record<string, unknown>) : {};
+
+            // Cluster: each block may have different weight × reps
+            const cluster = l?.cluster;
+            if (cluster && typeof cluster === 'object') {
+                const c = cluster as Record<string, unknown>;
+                const source = Array.isArray(c.blocksDetailed) ? c.blocksDetailed
+                    : Array.isArray(c.blocks) ? c.blocks : null;
+                if (source && source.length > 0) {
+                    for (const block of source) {
+                        if (!block || typeof block !== 'object') continue;
+                        const b = block as Record<string, unknown>;
+                        const bw = Number(String(b?.weight ?? '').replace(',', '.'));
+                        const brRaw = String(b?.reps ?? '').replace(',', '.');
+                        const br = brRaw.includes('/') ? Number(brRaw.split('/')[0].trim()) : Number(brRaw);
+                        if (Number.isFinite(bw) && bw > 0 && Number.isFinite(br) && br > 0) total += bw * br;
+                    }
+                    return;
+                }
+            }
+
+            // Standard set — handle "8/10" done/planned format
             const w = Number(String(l?.weight ?? '').replace(',', '.'));
-            const r = Number(String(l?.reps ?? '').replace(',', '.'));
+            const rRaw = String(l?.reps ?? '').replace(',', '.');
+            const r = rRaw.includes('/') ? Number(rRaw.split('/')[0].trim()) : Number(rRaw);
             if (Number.isFinite(w) && w > 0 && Number.isFinite(r) && r > 0) {
                 total += w * r;
             }
@@ -175,6 +197,7 @@ export const calculateTotalVolume = (logs: Record<string, unknown>): number => {
         return 0;
     }
 };
+
 
 export const computeKcal = ({
     session,
