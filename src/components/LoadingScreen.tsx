@@ -1,7 +1,42 @@
 'use client'
 import Image from 'next/image'
+import { useEffect, useState } from 'react'
 
-const LoadingScreen = () => (
+const LoadingScreen = () => {
+    // Safety valve: if still mounted after 8 s, it means we are stuck in a
+    // redirect loop (e.g. failed Apple Sign-In left an inconsistent localStorage).
+    // Show a soft offline / retry hint instead of looping indefinitely.
+    const [stuck, setStuck] = useState(false)
+
+    useEffect(() => {
+        const t = setTimeout(() => setStuck(true), 8000)
+        return () => clearTimeout(t)
+    }, [])
+
+    if (stuck) {
+        return (
+            <div className="fixed inset-0 z-50 bg-neutral-950 flex flex-col items-center justify-center gap-4 px-8">
+                <p className="text-neutral-400 text-sm text-center">
+                    Não foi possível carregar o app.<br />
+                    Verifique sua conexão e tente novamente.
+                </p>
+                <button
+                    className="mt-2 px-6 py-2 rounded-full bg-amber-500 text-black text-sm font-bold"
+                    onClick={() => {
+                        try {
+                            localStorage.removeItem('it.logged_in')
+                            localStorage.removeItem('it.session.backup')
+                        } catch { }
+                        window.location.replace('/')
+                    }}
+                >
+                    Voltar ao início
+                </button>
+            </div>
+        )
+    }
+
+    return (
     <div className="fixed inset-0 z-50 bg-neutral-950 flex flex-col items-center justify-center pt-safe pb-safe overflow-hidden">
 
         {/* Full-screen hero background */}
@@ -90,12 +125,17 @@ const LoadingScreen = () => (
                 0%   { transform: translateX(-100%); }
                 100% { transform: translateX(200%); }
             }
+            @keyframes shimmer {
+                0%   { transform: translateX(-100%); }
+                100% { transform: translateX(100%); }
+            }
             @keyframes divider-breathe {
                 0%, 100% { opacity: 0.6; width: 48px; }
                 50%      { opacity: 1; width: 56px; }
             }
         `}</style>
     </div>
-)
+    )
+}
 
 export default LoadingScreen

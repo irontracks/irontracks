@@ -37,10 +37,38 @@ Gere um artifact `code_review_report.md` com score e categorias. Use o template:
 ## Baixo (Score 25)
 ...
 
+## Análise de Impacto das Correções
+
+| # | Fix | Breaking? | Risco de regressão | Impacto para o usuário |
+|---|---|---|---|---|
+| 1 | [Título] | Sim/Não | Baixo/Médio/Alto | [descrição curta] |
+| 2 | ... | ... | ... | ... |
+
+### Detalhes de Impacto
+Para cada fix, detalhar:
+- **O que muda** para o usuário final
+- **O que quebra** (se algo) — e se é intencional
+- **Risco de regressão** — quais fluxos podem ser afetados
+- **Dependências** — se o fix depende de outro
+
 ## Resumo
 - X críticos, Y altos, Z médios, W baixos
 - Áreas mais problemáticas: [lista]
 ```
+
+---
+
+## ⚠️ REGRA OBRIGATÓRIA: Confirmação do Usuário
+
+**NUNCA comece a codar correções automaticamente.**
+
+Após gerar o relatório com a análise de impacto:
+
+1. **Apresente** o relatório completo ao usuário via `notify_user` com `BlockedOnUser: true`
+2. **Pergunte explicitamente:** _"Quer que eu corrija todos? Ou deseja selecionar quais corrigir?"_
+3. **Aguarde** a resposta do usuário antes de qualquer edição de código
+4. Se o usuário aprovar tudo → corrija na ordem de prioridade (Crítico → Alto → Médio → Baixo)
+5. Se o usuário selecionar itens específicos → corrija apenas os selecionados
 
 ---
 
@@ -185,3 +213,5 @@ Verificar CADA endpoint e server action para:
 3. **Compare schemas Zod com colunas reais do DB**
 4. **Verifique se client-side pode controlar server-side values** (paths, IDs, dates)
 5. **Não reportar falsos positivos** — confirme cada achado lendo o código ao redor
+6. **SEMPRE inclua a tabela de Análise de Impacto** no relatório
+7. **SEMPRE pergunte ao usuário** antes de começar a codar qualquer correção
