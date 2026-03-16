@@ -4,31 +4,25 @@ import Capacitor
 @UIApplicationMain
 class AppDelegate: UIResponder, UIApplicationDelegate {
 
-    var window: UIWindow?
-    private var ionicPluginRegistered = false
-
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         return true
     }
 
-    func applicationDidBecomeActive(_ application: UIApplication) {
-        guard !ionicPluginRegistered else { return }
-        if let vc = window?.rootViewController as? CAPBridgeViewController,
-           let bridge = vc.bridge {
-            bridge.registerPluginInstance(IronTracksNativePlugin())
-            ionicPluginRegistered = true
-            print("⚡ [IronTracks] IronTracksNativePlugin registered via AppDelegate")
-        }
+    // MARK: – UIScene lifecycle delegation
+    // With UIApplicationSceneManifest in Info.plist, UIKit calls these to provide
+    // the configuration for each new scene session. Window management and plugin
+    // registration are handled by SceneDelegate.
+
+    func application(_ application: UIApplication,
+                     configurationForConnecting connectingSceneSession: UISceneSession,
+                     options: UIScene.ConnectionOptions) -> UISceneConfiguration {
+        return UISceneConfiguration(name: "Default Configuration", sessionRole: connectingSceneSession.role)
     }
 
-    func applicationWillResignActive(_ application: UIApplication) {}
+    func application(_ application: UIApplication,
+                     didDiscardSceneSessions sceneSessions: Set<UISceneSession>) {}
 
-    func applicationDidEnterBackground(_ application: UIApplication) {}
-
-    func applicationWillEnterForeground(_ application: UIApplication) {}
-
-    func applicationWillTerminate(_ application: UIApplication) {}
-
+    // MARK: – URL / Universal Links (remain here per Apple guidelines)
     func application(_ app: UIApplication, open url: URL, options: [UIApplication.OpenURLOptionsKey: Any] = [:]) -> Bool {
         return ApplicationDelegateProxy.shared.application(app, open: url, options: options)
     }

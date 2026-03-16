@@ -45,6 +45,11 @@ const hashSha256 = async (value: string) => {
     } catch { return '' }
 }
 
+const isWhitelistError = (raw: string): boolean => {
+    const m = raw.toLowerCase()
+    return m.includes('database error saving new user') || m.includes('database error saving') || (m.includes('database error') && m.includes('user'))
+}
+
 const friendlyAuthError = (raw: string): string => {
     const m = raw.toLowerCase()
     if (m.includes('authorizationerror') || m.includes('1000') || m.includes('authorization')) return 'Não foi possível continuar com a Apple. Tente novamente ou use e-mail e senha.'
@@ -53,6 +58,8 @@ const friendlyAuthError = (raw: string): string => {
     if (m.includes('email rate limit')) return 'Muitas tentativas. Aguarde alguns minutos e tente novamente.'
     if (m.includes('error sending recovery') || m.includes('smtp')) return 'Não foi possível enviar o e-mail. Tente novamente em instantes.'
     if (m.includes('network') || m.includes('fetch') || m.includes('conexão')) return 'Sem conexão com a internet. Verifique sua rede e tente novamente.'
+    // Postgres whitelist trigger: "Database error saving new user" — account not pre-registered
+    if (isWhitelistError(m)) return 'Seu acesso ainda não foi liberado. Solicite acesso ao seu professor ou personal trainer.'
     if (m.includes('token') || m.includes('session')) return 'Sua sessão expirou. Faça login novamente.'
     if (m.includes('user not found') || m.includes('no account')) return 'Não encontramos uma conta com este e-mail.'
     if (m.includes('weak password') || m.includes('password')) return 'A senha precisa ter pelo menos 6 caracteres.'
@@ -234,8 +241,21 @@ export function useLoginScreen() {
             }
             window.location.assign(getOAuthHref('apple'))
         } catch (error: unknown) {
-            logError('error', 'Login Error:', error); setIsLoading(false)
-            setErrorMsg(friendlyAuthError(error instanceof Error ? error.message : 'Falha ao fazer login.'))
+            logError('error', 'Login Error:', error)
+            // Always clean up the logged_in flag to prevent a redirect loop between
+            // the root page and the dashboard when authentication fails.
+            try { localStorage.removeItem('it.logged_in') } catch { }
+            try { localStorage.removeItem('it.session.backup') } catch { }
+            const rawMsg = error instanceof Error ? error.message : 'Falha ao fazer login.'
+            // If the error is the Postgres whitelist trigger (account not pre-registered),
+            // show the "No Account" modal instead of a raw red error banner.
+            if (isWhitelistError(rawMsg)) {
+                setIsLoading(false)
+                setShowNoAccountModal(true)
+                return
+            }
+            setIsLoading(false)
+            setErrorMsg(friendlyAuthError(rawMsg))
         }
     }, [router])
 

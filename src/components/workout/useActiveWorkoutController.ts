@@ -118,6 +118,13 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
   const exercises = useMemo<WorkoutExercise[]>(() => (Array.isArray(workoutExercises) ? workoutExercises : []), [workoutExercises]);
 
   const logs: Record<string, unknown> = (session?.logs ?? {}) as Record<string, unknown>;
+  // ── logsRef: always reflects the LATEST logs, even before React re-renders.
+  // This prevents the stale-closure race condition where a rapid sequence of
+  // updateLog calls (e.g., RPE input → OK click) causes the second call to
+  // read a stale `prev` that was captured before the first update propagated,
+  // erasing the user's typed values.
+  const logsRef = useRef<Record<string, unknown>>(logs);
+  logsRef.current = logs; // synchronous — always current
   const ui: UnknownRecord = (session?.ui ?? {}) as UnknownRecord;
   const settings = props.settings ?? null;
 
@@ -179,7 +186,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
 
 
   const getLog = (key: string): UnknownRecord => {
-    const v = logs[key];
+    const v = logsRef.current[key];
     return isObject(v) ? v : {};
   };
 
