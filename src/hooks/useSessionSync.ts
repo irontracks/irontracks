@@ -66,6 +66,9 @@ export function useSessionSync({
 }: UseSessionSyncParams) {
     const serverSessionSyncRef = useRef<{ timer: ReturnType<typeof setTimeout> | null; lastKey: string }>({ timer: null, lastKey: '' })
     const serverSessionSyncWarnedRef = useRef(false)
+    // Tracks the _savedAt timestamp of the last upsert we wrote to the server.
+    // Used by the Realtime handler to discard echoes of our own writes.
+    const lastLocalUpsertAtRef = useRef<number>(0)
 
     const notifyMigrationWarning = useCallback(() => {
         if (serverSessionSyncWarnedRef.current) return
@@ -210,7 +213,17 @@ export function useSessionSync({
                                     logWarn('useSessionSync', 'ignoring partial realtime UPDATE — missing startedAt or workout')
                                     return
                                 }
-                                // R2#8: Apply valid state from the other device
+                                // ── Self-echo guard ─────────────────────────────────────────
+                                // Supabase Realtime echoes every UPDATE back to the device that
+                                // triggered it. We track the exact _savedAt we last wrote
+                                // (lastLocalUpsertAtRef). If the incoming event's _savedAt is ≤
+                                // that value it must be our own echo (or an older write) — discard
+                                // it to avoid reverting user actions (e.g. done=true → done=false).
+                                const incomingSavedAt = Number((state as Record<string, unknown>)._savedAt ?? 0) || 0
+                                if (incomingSavedAt <= lastLocalUpsertAtRef.current) {
+                                    return
+                                }
+                                // R2#8: Apply valid state from a different device (genuinely newer)
                                 setActiveSession(state as unknown as ActiveWorkoutSession)
                                 setView('active')
                                 try { localStorage.setItem(`irontracks.activeSession.v2.${uid}`, JSON.stringify(state)) } catch { }
@@ -261,7 +274,8 @@ export function useSessionSync({
                 if (!Number.isFinite(startedAtMs) || startedAtMs <= 0) return
                 if (!activeSession?.workout) return
 
-                const state = { ...(activeSession || {}), _savedAt: Date.now() }
+                const savedAt = Date.now()
+                const state = { ...(activeSession || {}), _savedAt: savedAt }
 
                 const { error } = await supabase
                     .from('active_workout_sessions')
@@ -275,6 +289,11 @@ export function useSessionSync({
                         { onConflict: 'user_id' }
                     )
                 if (error && isMissingTable(error)) notifyMigrationWarning()
+                else if (!error) {
+                    // Record the exact timestamp we just wrote so the Realtime
+                    // handler can identify and discard the echo of this upsert.
+                    lastLocalUpsertAtRef.current = savedAt
+                }
             } catch (err) { logWarn('useSessionSync', 'sync upsert failed: ' + String(err)) }
         }
 
