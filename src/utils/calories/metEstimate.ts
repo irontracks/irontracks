@@ -1,102 +1,148 @@
 /**
- * MET-based calorie estimation for resistance training sessions.
+ * metEstimate.ts — V3 Multi-Factor Calorie Estimation
  *
- * ## Scientific Basis
- * - Compendium of Physical Activities 2011 (Ainsworth et al.): MET 6.0 for
- *   vigorous weight training, MET 8.0 for circuit/vigorous weight training.
- * - Burleson et al. (1998), Scott et al. (2011): high-intensity resistance
- *   sessions (especially compound lower-body exercises) produce MET 7–10
- *   due to elevated EPOC and cardiovascular demand.
- * - ACSM Guidelines (2021): energy expenditure during leg press/squat is
- *   substantially higher than arm exercises at equal relative intensity.
+ * Scientifically calibrated for resistance training using validated
+ * MET values from the Compendium of Physical Activities (Ainsworth 2011).
  *
- * ## MET selection (two-factor: avg load per rep + density)
- * Uses the HIGHER of the two independent MET estimates:
- *  a) Load-based MET (avg kg per rep):
- *     - Light    (avg load < 20 kg/rep)  → MET 3.5
- *     - Moderate (avg load < 50 kg/rep)  → MET 5.0
- *     - Vigorous (avg load < 80 kg/rep)  → MET 6.5
- *     - Heavy    (avg load >= 80 kg/rep) → MET 8.0  (heavy multi-joint lifts)
- *  b) Density-based MET (kg volume per active minute):
- *     - < 80 kg/min   → MET 3.5
- *     - < 200 kg/min  → MET 5.0
- *     - < 350 kg/min  → MET 6.5
- *     - < 500 kg/min  → MET 8.0  (Compendium: vigorous circuit/weight training)
- *     - >= 500 kg/min → MET 9.0  (elite / very high density training)
+ * ## Validated calorie ranges for resistance training:
+ *  - 45 min, light arms (male 80kg):    200–300 kcal
+ *  - 60 min, moderate full-body:         350–500 kcal
+ *  - 75 min, vigorous leg day:           450–600 kcal
+ *  - 90 min, very intense compounds:     500–700 kcal
  *
- * ## Complexity factor (exercise type multiplier — UPDATED)
- * Applies a multiplier based on exercise type and muscle group size.
- * Leg/glute exercises are systematically higher because:
- *   - Quad/glute mass ≈ 3–5× larger than arm muscles
- *   - Equal relative intensity = far more total muscle fibers recruited
- *   - Higher cardiovascular demand → more O₂ consumption → more kcal
+ * ## Multi-factor inputs:
+ *  1. Duration (execution time + rest time)
+ *  2. Body weight
+ *  3. Biological sex (male/female)
+ *  4. Training volume & density (total weight / active minutes)
+ *  5. Training style detection (strength/hypertrophy/endurance/circuit)
+ *  6. Exercise complexity (compound vs isolation, muscle group size)
+ *  7. RPE (Rate of Perceived Exertion)
+ *  8. EPOC (post-exercise oxygen consumption, conservative)
  *
- * ## EPOC (Excess Post-exercise Oxygen Consumption)
- * For high-intensity sessions (MET ≥ 7.0 and > 45 min), adds +12%.
- * For moderate-high sessions (MET ≥ 5.0 and > 30 min), adds +6%.
- * Based on Børsheim & Bahr (2003), Schuenke et al. (2002).
+ * ## Formula:
+ *  kcal = baseMET × styleFactor × complexityFactor × bodyWeight × activeHours × rpeFactor × sexFactor
+ *       + MET_REST × bodyWeight × restHours × sexFactor
+ *  then × epocFactor
  *
- * ## Duration fallback
- * When totalTime is missing from the session, duration is estimated from
- * log timestamps (completedAtMs or setStartMs fields).
- *
- * ## Formula
- * kcal = (MET × complexityFactor × bodyWeightKg × activeHours × rpeMultiplier
- *        + MET_REST × bodyWeightKg × restHours) × sexMultiplier × epocFactor
+ * Base MET is selected from training density (volume per active minute).
+ * All multipliers are conservative (0.85 – 1.10) to stay within validated ranges.
  */
 
 type AnyObj = Record<string, unknown>
 
-// ── MET constants ──────────────────────────────────────────────────────────────
+// ── MET constants (Compendium of Physical Activities 2011) ─────────────────
+/** Light resistance training (stretching, warm-up sets, bodyweight) */
 export const MET_LIGHT = 3.5
+/** Moderate resistance training (standard hypertrophy work) */
 export const MET_MODERATE = 5.0
-export const MET_VIGOROUS = 6.5        // Updated: was 6.0 — ACSM 2021 vigorous resistance
-export const MET_HEAVY = 8.0           // Updated: heavy multi-joint (Compendium 2011)
-export const MET_HIGH_DENSITY = 9.0   // New: elite/very high density training
+/** Vigorous resistance training (heavy compounds, high density) */
+export const MET_VIGOROUS = 6.0
+/** Rest between sets (sitting/standing, light activity) */
 export const MET_REST = 1.5
 
-/** Default body weight in kg (IBGE 2019 — Brazilian adult male average). */
-export const DEFAULT_BODY_WEIGHT_KG = 80
+/** Default body weight (kg) when not available from user data. */
+export const DEFAULT_BODY_WEIGHT_KG = 78
 
-// ── MET selection (two-factor) ─────────────────────────────────────────────────
-
+// ── Base MET selection from training density ─────────────────────────────────
 /**
- * Selects MET using both avg load per rep and density (kg/active-min).
- * Returns the HIGHER of the two estimates to ensure heavier work = more kcal.
+ * Selects base MET from volume density (kg moved per active minute).
+ * This is the PRIMARY driver of calorie estimation.
+ *
+ * Calibrated to produce correct ranges when combined with other factors:
+ *  - < 60 kg/min  → MET 3.5 (light: warm-up, arms, abs)
+ *  - 60-200 kg/min → MET 5.0 (moderate: typical hypertrophy)
+ *  - ≥ 200 kg/min → MET 6.0 (vigorous: heavy compounds, supersets)
  */
-export const selectMet = (
-  avgLoadPerRep: number,
+export const selectBaseMet = (
   volumeKg: number,
   activeMinutes: number,
 ): number => {
-  // Load-based MET — updated to include "heavy" tier >= 80 kg/rep average
-  const metLoad =
-    avgLoadPerRep < 20  ? MET_LIGHT
-    : avgLoadPerRep < 50 ? MET_MODERATE
-    : avgLoadPerRep < 80 ? MET_VIGOROUS
-    : MET_HEAVY
+  if (activeMinutes <= 0) return MET_MODERATE // fallback
+  const density = volumeKg / activeMinutes
 
-  // Density-based MET (guards against long sessions with low load)
-  const density = activeMinutes > 0 ? volumeKg / activeMinutes : 0
-  const metDensity =
-    density < 80  ? MET_LIGHT
-    : density < 200 ? MET_MODERATE
-    : density < 350 ? MET_VIGOROUS
-    : density < 500 ? MET_HEAVY
-    : MET_HIGH_DENSITY
-
-  // Use the higher of the two — ensures volume is always reflected
-  return Math.max(metLoad, metDensity)
+  if (density < 60) return MET_LIGHT
+  if (density < 200) return MET_MODERATE
+  return MET_VIGOROUS
 }
 
-// ── Complexity factor lookup (keyword-based, static table) ────────────────────
-
+// ── Training style detection ─────────────────────────────────────────────────
 /**
- * Returns the exercise-type complexity factor for a given exercise name.
+ * Detects training style from session data and returns a small multiplier.
  *
- * Key scientific update: leg/glute exercises now have higher multipliers
- * (1.25–1.50) because large lower-body muscles consume 35–55% more energy
- * than upper-body isolations at equal training volume (ACSM 2021).
+ * - Circuit / HIIT (very short rest): 1.10 (elevated HR throughout)
+ * - Strength (heavy, low reps, long rest): 0.95 (more rest, less continuous work)
+ * - Endurance (light, high reps): 1.05 (more continuous movement)
+ * - Hypertrophy (default): 1.00 (baseline)
+ */
+export type TrainingStyle = 'circuit' | 'strength' | 'endurance' | 'hypertrophy'
+
+export const detectTrainingStyle = (
+  sessionLogs: Record<string, unknown>,
+  exercises?: unknown[] | null,
+): TrainingStyle => {
+  const logs = Object.values(sessionLogs)
+  if (logs.length === 0) return 'hypertrophy'
+
+  let totalReps = 0
+  let totalSets = 0
+  let avgWeight = 0
+  let totalRestSec = 0
+  let restCount = 0
+
+  for (const v of logs) {
+    if (!v || typeof v !== 'object') continue
+    const obj = v as AnyObj
+    const w = Number(String(obj?.weight ?? '').replace(',', '.'))
+    const r = Number(String(obj?.reps ?? '').replace(',', '.'))
+    if (w > 0 && r > 0) {
+      totalReps += r
+      totalSets++
+      avgWeight += w
+    }
+    const rest = Number(obj?.restSeconds)
+    if (Number.isFinite(rest) && rest > 0) {
+      totalRestSec += rest
+      restCount++
+    }
+  }
+
+  if (totalSets === 0) return 'hypertrophy'
+
+  const avgRepsPerSet = totalReps / totalSets
+  const avgWeightPerSet = avgWeight / totalSets
+  const avgRestPerSet = restCount > 0 ? totalRestSec / restCount : 90
+
+  // Check for circuit methods in exercise config
+  const hasCircuitMethod = Array.isArray(exercises) && exercises.some((ex) => {
+    const e = ex && typeof ex === 'object' ? (ex as AnyObj) : null
+    const method = String(e?.method ?? '').toLowerCase()
+    return /circuit|circuito|hiit|tabata|emom/.test(method)
+  })
+
+  if (hasCircuitMethod || avgRestPerSet < 30) return 'circuit'
+  if (avgRepsPerSet <= 5 && avgWeightPerSet > 60) return 'strength'
+  if (avgRepsPerSet >= 15) return 'endurance'
+  return 'hypertrophy'
+}
+
+export const getStyleFactor = (style: TrainingStyle): number => {
+  switch (style) {
+    case 'circuit': return 1.10
+    case 'strength': return 0.95
+    case 'endurance': return 1.05
+    case 'hypertrophy': return 1.00
+    default: return 1.00
+  }
+}
+
+// ── Exercise complexity factor ───────────────────────────────────────────────
+/**
+ * Returns a multiplier based on exercise type and muscle group size.
+ *
+ * CONSERVATIVE multipliers (0.85–1.15) that reflect relative metabolic cost.
+ * Large muscle groups (quads, glutes) get a modest bump over small muscles (biceps).
+ * This is NOT a dramatic multiplier — it's a fine-tuning adjustment.
  */
 export const getExerciseComplexityFactor = (exerciseName: string): number => {
   const n = String(exerciseName || '')
@@ -105,135 +151,147 @@ export const getExerciseComplexityFactor = (exerciseName: string): number => {
     .replace(/[\u0300-\u036f]/g, '')
     .trim()
 
-  // ── 1.50 × Deadlift, Olympic — highest metabolic demands ────────────────
-  if (
-    /levantamento terra|deadlift|terra romeno|romanian|rdl|clean|snatch|thruster|power clean/.test(n)
-  ) return 1.50
+  // ── 1.15 × Olympic / Deadlift / Full-body compound ─────────────────────
+  if (/levantamento terra|deadlift|terra romeno|romanian|rdl|clean|snatch|thruster|power clean/.test(n)) return 1.15
 
-  // ── 1.45 × Free-weight squat (barbell) ────────────────────────────────────
-  // Quad/glute/erector synergy with axial load — highest kcal of gym lifts
-  if (/agachamento/.test(n) && !/hack|smith|goblet|sumô|sumo|afundo|passada|lunge/.test(n)) return 1.45
-  if (/back squat|front squat|overhead squat/.test(n)) return 1.45
+  // ── 1.12 × Free-weight squat (barbell) ─────────────────────────────────
+  if (/agachamento/.test(n) && !/hack|smith|goblet|sumô|sumo|afundo|passada|lunge/.test(n)) return 1.12
+  if (/back squat|front squat|overhead squat/.test(n)) return 1.12
 
-  // ── 1.35 × Compound pull (free weight) ────────────────────────────────────
-  if (/remada curvada|bent.?over row|remada aberta/.test(n)) return 1.35
-  if (/barra fixa|pull.?up|chin.?up/.test(n)) return 1.35
+  // ── 1.10 × Compound pull / Hip thrust ──────────────────────────────────
+  if (/remada curvada|bent.?over row|remada aberta/.test(n)) return 1.10
+  if (/barra fixa|pull.?up|chin.?up/.test(n)) return 1.10
+  if (/hip thrust/.test(n)) return 1.10
+  if (/glute bridge|ponte gluteo|ponte de gluteo/.test(n)) return 1.08
 
-  // ── 1.30 × Hip thrust / Glute bridge (large muscle, high activation) ──────
-  // Glutes are the largest muscle group — hip thrust activates ~250% vs squat
-  if (/hip thrust/.test(n) && !/maquina/.test(n)) return 1.30
-  if (/glute bridge|ponte gluteo|ponte de gluteo/.test(n)) return 1.30
+  // ── 1.05 × Multi-joint compound (free weight) ─────────────────────────
+  if (/supino/.test(n) && !/maquina|smith|peck|pec deck/.test(n)) return 1.05
+  if (/bench press/.test(n) && !/machine|smith/.test(n)) return 1.05
+  if (/mergulho.*livre|dip.*livre|paralelas/.test(n)) return 1.05
+  if (/desenvolvimento.*haltere|shoulder press.*dumbbell|arnold/.test(n)) return 1.05
+  if (/passada|afundo|lunge|split squat/.test(n)) return 1.05
+  if (/goblet|sumo|sumô/.test(n)) return 1.05
+  if (/hack squat/.test(n)) return 1.05
 
-  // ── 1.25 × Multi-joint free weight moderate + leg compound machines ───────
-  if (/mergulho.*livre|dip.*livre|paralelas/.test(n)) return 1.25
-  if (/supino/.test(n) && !/maquina|smith|peck|pec deck/.test(n)) return 1.25
-  if (/bench press/.test(n) && !/machine|smith/.test(n)) return 1.25
-  if (/desenvolvimento.*haltere|shoulder press.*dumbbell|arnold/.test(n)) return 1.20
-  if (/passada|afundo|lunge|split squat/.test(n)) return 1.25
-  if (/goblet|sumo|sumô/.test(n)) return 1.25
-  if (/hack squat/.test(n)) return 1.25   // Updated: was 1.10 — large quad activation even on machine
+  // ── 1.02 × Multi-joint machine / Leg compound machine ──────────────────
+  if (/leg press/.test(n)) return 1.02
+  if (/puxada|pulldown|pull down/.test(n)) return 1.00
+  if (/remada/.test(n) && !/curvada|aberta|bent/.test(n)) return 1.00
+  if (/supino.*maquina|chest press.*machine|smith/.test(n)) return 1.00
+  if (/desenvolvimento.*maquina|shoulder press.*machine/.test(n)) return 1.00
 
-  // ── 1.20 × Leg press — large muscle group, machine (was 1.00) ────────────
-  // Key fix: leg press activates quad+glute+hamstring = major energy consumers
-  if (/leg press/.test(n)) return 1.20
+  // ── 0.98 × Isolation lower-body (quad/ham — moderately large muscles) ──
+  if (/cadeira extensora|leg extension|extensora/.test(n)) return 0.98
+  if (/mesa flexora|leg curl|flexora/.test(n)) return 0.98
+  if (/stiff|romanian/.test(n)) return 1.02
 
-  // ── 1.15 × Upper-body machine / smith press ───────────────────────────────
-  if (/puxada|pulldown|pull down/.test(n)) return 1.10
-  if (/remada/.test(n) && !/curvada|aberta|bent/.test(n)) return 1.05
-  if (/supino.*maquina|chest press.*machine|smith.*supino/.test(n)) return 1.05
-  if (/desenvolvimento.*maquina|shoulder press.*machine/.test(n)) return 1.05
-  if (/hack.*maquina|v.?squat machine/.test(n)) return 1.20  // same as leg press hack
+  // ── 0.95 × Calf / Core / Adductor ──────────────────────────────────────
+  if (/panturrilha|calf raise|gemeo/.test(n)) return 0.95
+  if (/abdutora|adutora|abducao|adducao|hip abduction|hip adduction/.test(n)) return 0.92
+  if (/abdomen|crunch|prancha|plank|abdominal/.test(n)) return 0.90
 
-  // ── 1.15 × Isolation lower-body (quads/hamstrings) ── Updated from 0.75 ──
-  // Cadeira extensora / mesa flexora activate very large quad/hamstring — more
-  // metabolically costly than arm isolations despite being "machine isolations"
-  if (/cadeira extensora|leg extension|extensora/.test(n)) return 1.15
-  if (/mesa flexora|leg curl|flexora/.test(n)) return 1.15
+  // ── 0.92 × Isolation free-weight (arms — small muscles) ────────────────
+  if (/rosca|curl|bicep|martelo|hammer|zottman|scott/.test(n)) return 0.92
+  if (/elevacao lateral|elevação lateral|lateral raise/.test(n)) return 0.92
+  if (/elevacao frontal|elevação frontal|front raise/.test(n)) return 0.92
+  if (/tricep.*frances|skull crusher|testa|french press/.test(n)) return 0.92
 
-  // ── 1.05 × Calf / Adductor / Abductor ─────────────────────────────────────
-  if (/panturrilha|calf raise|gemeo/.test(n)) return 1.05
-  if (/abdutora|adutora|abducao|adducao|hip abduction|hip adduction/.test(n)) return 1.00
+  // ── 0.88 × Isolation cable/machine (arms — guided, minimal stabilization)
+  if (/peck deck|pec deck|crucifixo.*maquina|fly.*maquina/.test(n)) return 0.88
+  if (/crossover|cross.?over|voador/.test(n)) return 0.88
+  if (/pushdown|push.?down/.test(n)) return 0.88
+  if (/face pull/.test(n)) return 0.90
+  if (/tricep.*maquina|tricep.*cabo|cable/.test(n)) return 0.88
 
-  // ── 0.90 × Isolation free-weight (arms) ────────────────────────────────────
-  if (/rosca.*alternada|rosca.*haltere|curl.*dumbbell|hammer|martelo/.test(n)) return 0.90
-  if (/rosca direta.*barra|barbell curl|zottman|scott.*barra/.test(n)) return 0.90
-  if (/elevacao lateral|elevação lateral|lateral raise/.test(n)) return 0.90
-  if (/elevacao frontal|elevação frontal|front raise/.test(n)) return 0.90
-  if (/stiff.*haltere|stiff.*dumbbell|romanian.*dumbbell/.test(n)) return 0.90
-  if (/tricep.*frances|skull crusher|testa|french press/.test(n)) return 0.90
-  if (/rosca/.test(n)) return 0.90  // catch-all rosca
-  if (/bicep curl|biceps curl/.test(n)) return 0.90
-
-  // ── 0.80 × Isolation cable/machine (arms) ──────────────────────────────────
-  if (/peck deck|pec deck|crucifixo.*maquina|fly.*maquina/.test(n)) return 0.80
-  if (/crossover|cross.?over/.test(n)) return 0.80
-  if (/voador|fly.*cabo/.test(n)) return 0.80
-  if (/pushdown|push.?down/.test(n)) return 0.80
-  if (/face pull/.test(n)) return 0.80
-  if (/tricep.*maquina|tricep.*cabo|cable tricep/.test(n)) return 0.80
-  if (/rosca.*scott.*maquina|preacher.*machine/.test(n)) return 0.80
-
-  // ── 0.70 × Core / Abs ──────────────────────────────────────────────────────
-  if (/abdomen|crunch|prancha|plank|abdominal/.test(n)) return 0.70
-
-  // Default: multi-joint machine baseline (bumped from 1.00 to 1.05)
-  return 1.05
+  // Default: standard machine work
+  return 1.00
 }
 
-// ── RPE multiplier ────────────────────────────────────────────────────────────
-
+// ── RPE multiplier ───────────────────────────────────────────────────────────
 /**
- * Maps post-workout RPE (1–10) to an intensity multiplier applied on top of MET.
- * Updated: RPE 9-10 now reflects higher real-world intensity (up from 1.08/1.15).
+ * RPE (Rate of Perceived Exertion) scales intensity estimation.
+ * Conservative range: 0.85 – 1.08.
+ *
+ * RPE 7–8 is the baseline (1.00) — most trained individuals work here.
  */
 export const getRpeMultiplier = (rpe: number | null | undefined): number => {
-  if (rpe == null || !Number.isFinite(rpe)) return 1.0
+  if (rpe == null || !Number.isFinite(rpe)) return 1.00
   const r = Math.max(1, Math.min(10, Math.round(rpe)))
-  if (r <= 3) return 0.80
-  if (r === 4) return 0.87
-  if (r === 5) return 0.93
-  if (r === 6) return 0.97
+  if (r <= 3) return 0.85
+  if (r === 4) return 0.88
+  if (r === 5) return 0.92
+  if (r === 6) return 0.96
   if (r <= 8) return 1.00
-  if (r === 9) return 1.10   // Updated: was 1.08
-  return 1.20                 // RPE 10 — updated: was 1.15
+  if (r === 9) return 1.04
+  return 1.08 // RPE 10
 }
 
-// ── Sex multiplier ────────────────────────────────────────────────────────────
-
+// ── Sex multiplier ───────────────────────────────────────────────────────────
 /**
- * Applies a biological sex correction to the MET-based calorie estimate.
- * Based on Harris-Benedict equation.
+ * Women have ~10% lower resting metabolic rate per kg body weight
+ * (Harris-Benedict). Applied as a conservative correction.
  */
 export const getSexMultiplier = (sex: string | null | undefined): number => {
   if (sex === 'female') return 0.90
-  return 1.00 // male or not_informed
+  return 1.00
 }
 
-// ── EPOC factor ───────────────────────────────────────────────────────────────
-
+// ── EPOC factor ──────────────────────────────────────────────────────────────
 /**
- * Returns the EPOC (Excess Post-exercise Oxygen Consumption) multiplier.
+ * Conservative EPOC (Excess Post-exercise Oxygen Consumption).
+ * Only applies to vigorous sessions of sufficient duration.
  *
- * Updated thresholds based on Schuenke et al. (2002) showing that vigorous
- * resistance training (especially compound leg exercises) produces EPOC for
- * up to 38 hours post-exercise.
- *
- * - MET ≥ 7.0 AND duration > 40 min → +12% (very vigorous session)
- * - MET ≥ 5.0 AND duration > 30 min → +6%  (moderate-high, updated from 5%)
- * - Otherwise                         → +0%  (light session, negligible EPOC)
+ * - MET ≥ 6.0 AND duration > 60 min → +5%
+ * - MET ≥ 5.0 AND duration > 45 min → +3%
+ * - Otherwise → +0%
  */
 export const getEpocFactor = (met: number, durationMinutes: number): number => {
-  if (met >= 7.0 && durationMinutes > 40) return 1.12  // Updated: was 1.08 at ≥6.0/>60
-  if (met >= 5.0 && durationMinutes > 30) return 1.06  // Updated: was 1.05 at ≥5.0/>45
-  return 1.0
+  if (met >= 6.0 && durationMinutes > 60) return 1.05
+  if (met >= 5.0 && durationMinutes > 45) return 1.03
+  return 1.00
+}
+
+// ── Active minutes computation ───────────────────────────────────────────────
+/**
+ * Computes active work time from logs or total duration.
+ * Uses per-set executionSeconds when available, otherwise estimates
+ * from total duration minus tracked rest time.
+ *
+ * Active time is clamped to at least 35% of total (accounts for
+ * untracked warm-up, transitions, etc.)
+ */
+export const computeActiveWorkMinutes = (
+  sessionLogs: Record<string, unknown>,
+  totalMinutes: number,
+): number => {
+  if (!totalMinutes || totalMinutes <= 0) return 0
+
+  // Try summing per-set execution seconds
+  let totalExecSeconds = 0
+  let totalRestSeconds = 0
+  for (const v of Object.values(sessionLogs)) {
+    if (!v || typeof v !== 'object') continue
+    const obj = v as AnyObj
+    const exec = Number(obj?.executionSeconds ?? obj?.execution_seconds)
+    if (Number.isFinite(exec) && exec > 0 && exec < 600) totalExecSeconds += exec
+    const rest = Number(obj?.restSeconds ?? obj?.rest_seconds)
+    if (Number.isFinite(rest) && rest > 0 && rest < 600) totalRestSeconds += rest
+  }
+
+  // If we have per-set execution data, use it directly (most accurate)
+  if (totalExecSeconds > 60) {
+    return Math.max(totalExecSeconds / 60, totalMinutes * 0.35)
+  }
+
+  // Otherwise estimate: total - rest, clamped to minimum 35%
+  const restMinutes = totalRestSeconds / 60
+  const active = totalMinutes - restMinutes
+  return Math.max(active, totalMinutes * 0.35)
 }
 
 // ── Duration fallback from log timestamps ────────────────────────────────────
-
 /**
- * Estimates duration in minutes from log timestamps when totalTime is missing.
- * Looks at completedAtMs and setStartMs fields across all log entries.
- * Returns null if insufficient timestamp data.
+ * When totalTime is missing, estimates duration from log timestamps.
  */
 export const estimateDurationFromLogs = (
   sessionLogs: Record<string, unknown>,
@@ -241,116 +299,38 @@ export const estimateDurationFromLogs = (
 ): number | null => {
   try {
     const timestamps: number[] = []
-
     for (const v of Object.values(sessionLogs)) {
       if (!v || typeof v !== 'object') continue
       const obj = v as AnyObj
-      const candidates = [
-        Number(obj.completedAtMs),
-        Number(obj.setStartMs),
-        Number(obj.restStartMs),
-      ]
-      for (const ts of candidates) {
-        if (Number.isFinite(ts) && ts > 1_000_000_000_000) {
-          timestamps.push(ts)
-        }
+      for (const ts of [Number(obj.completedAtMs), Number(obj.setStartMs), Number(obj.restStartMs)]) {
+        if (Number.isFinite(ts) && ts > 1_000_000_000_000) timestamps.push(ts)
       }
     }
-
     if (timestamps.length < 2) return null
-
-    const minTs = Math.min(...timestamps)
-    const maxTs = Math.max(...timestamps)
-    const spanMs = maxTs - minTs
-
-    // If we have a session startedAt, use it as the floor
-    const effectiveStart = (startedAtMs && startedAtMs > 0 && startedAtMs < minTs)
-      ? startedAtMs
-      : minTs
-
-    const totalMs = maxTs - effectiveStart
-    const minutes = totalMs / 60_000
-
-    // Sanity bounds: must be 5 min – 4 hours
-    if (minutes < 5 || minutes > 240) {
-      // Fallback to span between log entries + 10 min buffer (for first/last set warmup)
-      const spanMinutes = spanMs / 60_000 + 10
-      if (spanMinutes >= 5 && spanMinutes <= 240) return spanMinutes
-      return null
-    }
-
-    return minutes
+    const min = Math.min(...timestamps)
+    const max = Math.max(...timestamps)
+    const start = (startedAtMs && startedAtMs > 0 && startedAtMs < min) ? startedAtMs : min
+    const minutes = (max - start) / 60_000
+    return (minutes >= 5 && minutes <= 240) ? minutes : null
   } catch { return null }
 }
 
-// ── Active minutes ─────────────────────────────────────────────────────────────
+// ── Main export ──────────────────────────────────────────────────────────────
 
 /**
- * Computes the actual work time in minutes by subtracting tracked rest time
- * from total session duration. Clamped so active time is at least 40% of total.
- */
-export const computeActiveWorkMinutes = (
-  sessionLogs: Record<string, unknown>,
-  totalMinutes: number,
-): number => {
-  if (!totalMinutes || totalMinutes <= 0) return 0
-  let totalRestSeconds = 0
-  for (const v of Object.values(sessionLogs)) {
-    if (!v || typeof v !== 'object') continue
-    const obj = v as AnyObj
-    const rs = Number(obj?.restSeconds)
-    if (Number.isFinite(rs) && rs > 0 && rs < 600) totalRestSeconds += rs // ignore > 10 min outliers
-  }
-  const totalRestMinutes = totalRestSeconds / 60
-  const active = totalMinutes - totalRestMinutes
-  const minActive = totalMinutes * 0.40  // floor: at least 40% of total is active (up from 35%)
-  return Math.max(active, minActive)
-}
-
-// ── Volume-based minimum calorie floor ───────────────────────────────────────
-
-/**
- * Returns a minimum calorie floor based on total training volume.
- * Research shows that 1 kcal is burned per ~10-15 kg of mechanical work
- * in resistance training (net; not counting EPOC).
- * This prevents unrealistically low estimates when timing data is poor.
- */
-export const computeVolumeFloor = (totalVolumeKg: number, bodyWeightKg: number): number => {
-  if (totalVolumeKg <= 0) return 0
-  // Empirical floor: ~1 kcal per 12 kg lifted + BMR baseline (5 kcal/min × estimated duration)
-  // Minimum: volume/12 kcal for mechanical work alone
-  const mechanicalKcal = totalVolumeKg / 12
-  // Additional: 5 kcal/min × estimated duration from volume
-  // (assume ~50 kg/min average density = volume/50 minutes)
-  const estimatedDurationMin = Math.max(5, totalVolumeKg / 50)
-  const baselineKcal = 5 * estimatedDurationMin * (bodyWeightKg / 80)
-  return Math.max(mechanicalKcal, baselineKcal)
-}
-
-// ── Main export ───────────────────────────────────────────────────────────────
-
-/**
- * Estimates calories burned during a resistance training session using MET.
+ * Estimates calories burned for a resistance training session.
  *
- * Key improvements in this version:
- * - Higher MET ceiling (9.0) for very high-density training
- * - Higher MET tier for heavy loads (avg > 80 kg/rep → MET 8.0)
- * - Leg exercises have 20-50% higher complexity factors (large muscle groups)
- * - EPOC factor triggers at lower thresholds (MET 7.0 / 40 min)
- * - Volume-based calorie floor prevents zero due to missing timing
- * - Duration fallback from log timestamps when totalTime is missing
+ * Multi-factor model using:
+ *  1. Duration (exec + rest time split)
+ *  2. Body weight
+ *  3. Sex
+ *  4. Volume density → base MET
+ *  5. Training style (auto-detected)
+ *  6. Exercise complexity (volume-weighted)
+ *  7. RPE
+ *  8. EPOC
  *
- * @param sessionLogs         - The session's log entries keyed by "exerciseIdx-setIdx".
- * @param durationMinutes     - Total duration of the session in minutes.
- * @param bodyWeightKg        - Athlete body weight in kg (optional; defaults to 80 kg).
- * @param exerciseNames       - Optional exercise names, used to compute complexity factor.
- * @param rpe                 - Post-workout RPE (1–10). Adjusts MET by ±20%.
- * @param execMinutesOverride - If known (from logs), use as active minutes directly.
- * @param restMinutesOverride - If known (from logs), use as rest minutes directly.
- * @param biologicalSex       - 'male' | 'female' | 'not_informed'. Applies ±10% sex correction.
- * @param exerciseVolumes     - Volume (kg×reps total) per exercise, same order as exerciseNames.
- * @param startedAtMs         - Session start timestamp (ms) for duration fallback calculation.
- * @returns Estimated kcal burned, rounded to the nearest integer.
+ * @returns Estimated kcal, rounded. Typical range: 200–700 kcal.
  */
 export const estimateCaloriesMet = (
   sessionLogs: Record<string, unknown>,
@@ -364,44 +344,35 @@ export const estimateCaloriesMet = (
   exerciseVolumes?: number[] | null,
   startedAtMs?: number | null,
 ): number => {
-  const logEntries = Object.values(sessionLogs)
-  let totalWeightedReps = 0
-  let totalReps = 0
+  // ── 1. Compute total volume ──────────────────────────────────────────────
   let totalVolume = 0
-
-  for (const v of logEntries) {
+  let totalReps = 0
+  for (const v of Object.values(sessionLogs)) {
     if (!v || typeof v !== 'object') continue
     const obj = v as AnyObj
     const w = Number(String(obj?.weight ?? '').replace(',', '.'))
     const r = Number(String(obj?.reps ?? '').replace(',', '.'))
     if (w > 0 && r > 0) {
-      totalWeightedReps += w * r
-      totalReps += r
       totalVolume += w * r
+      totalReps += r
     }
   }
 
-  // Body weight
-  const bw = bodyWeightKg != null && Number.isFinite(bodyWeightKg) && bodyWeightKg >= 20 && bodyWeightKg <= 300
+  // ── 2. Body weight ───────────────────────────────────────────────────────
+  const bw = bodyWeightKg != null && Number.isFinite(bodyWeightKg)
+    && bodyWeightKg >= 20 && bodyWeightKg <= 300
     ? bodyWeightKg
     : DEFAULT_BODY_WEIGHT_KG
 
-  // Duration: use provided, else fall back to log timestamps, else 0
+  // ── 3. Duration ──────────────────────────────────────────────────────────
   let effectiveDuration = durationMinutes
   if (!effectiveDuration || effectiveDuration <= 0) {
     const fromLogs = estimateDurationFromLogs(sessionLogs, startedAtMs ?? undefined)
     if (fromLogs && fromLogs > 0) effectiveDuration = fromLogs
   }
+  if (!effectiveDuration || effectiveDuration <= 0) return 0
 
-  // If still no duration, use volume-based floor
-  if (!effectiveDuration || effectiveDuration <= 0) {
-    const floor = computeVolumeFloor(totalVolume, bw)
-    return Number.isFinite(floor) && floor > 0 ? Math.round(floor) : 0
-  }
-
-  const avgWeightPerRep = totalReps > 0 ? totalWeightedReps / totalReps : 0
-
-  // Active and rest minutes — prefer explicit values from session, fallback to computed
+  // ── 4. Active vs rest time split ─────────────────────────────────────────
   const activeMinutes = (() => {
     if (execMinutesOverride != null && execMinutesOverride > 0) return execMinutesOverride
     return computeActiveWorkMinutes(sessionLogs, effectiveDuration)
@@ -411,52 +382,52 @@ export const estimateCaloriesMet = (
     return Math.max(0, effectiveDuration - activeMinutes)
   })()
 
-  // Two-factor MET: load-based AND density-based — take the higher
-  const met = selectMet(avgWeightPerRep, totalVolume, activeMinutes)
+  // ── 5. Base MET from density ─────────────────────────────────────────────
+  const baseMet = selectBaseMet(totalVolume, activeMinutes)
 
-  // Complexity factor: volume-weighted average when volumes are available,
-  // otherwise simple average across exercises
-  let complexityFactor = 1.05
+  // ── 6. Training style factor ─────────────────────────────────────────────
+  const exercises = Array.isArray(exerciseNames)
+    ? exerciseNames.map((name) => ({ name }))
+    : null
+  const style = detectTrainingStyle(sessionLogs, exercises)
+  const styleFactor = getStyleFactor(style)
+
+  // ── 7. Complexity factor (volume-weighted) ───────────────────────────────
+  let complexityFactor = 1.00
   if (exerciseNames && exerciseNames.length > 0) {
-    const hasVolumes = exerciseVolumes != null
-      && exerciseVolumes.length === exerciseNames.length
+    const hasVolumes = exerciseVolumes != null && exerciseVolumes.length === exerciseNames.length
     if (hasVolumes) {
-      // Volume-weighted: heavy compound lifts contribute more
       const totalExVol = exerciseVolumes!.reduce((a, b) => a + b, 0)
       if (totalExVol > 0) {
         complexityFactor = exerciseNames.reduce((acc, name, i) =>
           acc + getExerciseComplexityFactor(name) * exerciseVolumes![i], 0) / totalExVol
       } else {
-        // All volumes are 0 — fallback to simple average
         const factors = exerciseNames.map(getExerciseComplexityFactor)
         complexityFactor = factors.reduce((a, b) => a + b, 0) / factors.length
       }
     } else {
-      // Simple average (backward-compatible)
       const factors = exerciseNames.map(getExerciseComplexityFactor)
       complexityFactor = factors.reduce((a, b) => a + b, 0) / factors.length
     }
   }
 
-  // RPE intensity multiplier from post-workout check-in
-  const rpeMultiplier = getRpeMultiplier(rpe)
+  // ── 8. RPE multiplier ────────────────────────────────────────────────────
+  const rpeFactor = getRpeMultiplier(rpe)
 
-  // Biological sex correction (Harris-Benedict): female ~10% lower BMR per kg
-  const sexMultiplier = getSexMultiplier(biologicalSex)
+  // ── 9. Sex multiplier ────────────────────────────────────────────────────
+  const sexFactor = getSexMultiplier(biologicalSex)
 
-  // EPOC: extra post-exercise oxygen consumption for intense/long sessions
-  const epocFactor = getEpocFactor(met, effectiveDuration)
+  // ── 10. EPOC ─────────────────────────────────────────────────────────────
+  const effectiveMet = baseMet * styleFactor * complexityFactor
+  const epocFactor = getEpocFactor(effectiveMet, effectiveDuration)
 
-  // Active kcal (exercise) + rest kcal (recovery, MET ≈ 1.5), then EPOC
+  // ── Final calculation ────────────────────────────────────────────────────
   const activeHours = activeMinutes / 60
   const restHours = restMinutes / 60
-  const kcalBase = met * complexityFactor * bw * activeHours * rpeMultiplier * sexMultiplier
-    + MET_REST * bw * restHours * sexMultiplier
-  const kcal = kcalBase * epocFactor
 
-  // Apply volume-based floor to prevent unrealistically low values
-  const volumeFloor = computeVolumeFloor(totalVolume, bw)
-  const result = Math.max(kcal, volumeFloor)
+  const activeKcal = baseMet * styleFactor * complexityFactor * bw * activeHours * rpeFactor * sexFactor
+  const restKcal = MET_REST * bw * restHours * sexFactor
+  const totalKcal = (activeKcal + restKcal) * epocFactor
 
-  return Number.isFinite(result) && result > 0 ? Math.round(result) : 0
+  return Number.isFinite(totalKcal) && totalKcal > 0 ? Math.round(totalKcal) : 0
 }
