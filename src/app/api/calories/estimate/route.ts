@@ -24,6 +24,8 @@ import {
   selectMet,
   getRpeMultiplier,
   getEpocFactor,
+  computeVolumeFloor,
+  estimateDurationFromLogs,
   MET_REST,
   DEFAULT_BODY_WEIGHT_KG,
 } from '@/utils/calories/metEstimate'
@@ -129,9 +131,20 @@ export async function POST(request: Request) {
 
     const execMinutes = execSeconds > 0 ? execSeconds / 60 : 0
     const restMinutes = restSeconds > 0 ? restSeconds / 60 : 0
-    const totalMinutes = execMinutes + restMinutes > 0
+    let totalMinutes = execMinutes + restMinutes > 0
       ? execMinutes + restMinutes
       : totalTimeSeconds > 0 ? totalTimeSeconds / 60 : 0
+
+    // Duration fallback from log timestamps when explicit timing is missing
+    const startedAtMs = (() => {
+      const raw = session?.startedAt ?? session?.startedAtMs ?? session?.started_at
+      const n = Number(raw)
+      return Number.isFinite(n) && n > 0 ? n : null
+    })()
+    if (totalMinutes <= 0) {
+      const fromLogs = estimateDurationFromLogs(logs, startedAtMs)
+      if (fromLogs && fromLogs > 0) totalMinutes = fromLogs
+    }
 
     // Active minutes: prefer explicit exec time, else total – rest (min 35% of total)
     const activeMinutes = execMinutes > 0 ? execMinutes
@@ -220,9 +233,17 @@ export async function POST(request: Request) {
     // ── EPOC factor ────────────────────────────────────────────────────────────
     const epocFactor = getEpocFactor(met, totalMinutes)
 
-    // ── Final kcal (deterministic) ────────────────────────────────────────────
-    // If we have no timing data, use the convenience wrapper
+    // If we have no timing data, return volume-based floor instead of 0
     if (totalMinutes <= 0) {
+      const floor = computeVolumeFloor(volume, bodyWeightKg)
+      if (floor > 0) {
+        return NextResponse.json({
+          ok: true,
+          kcal: Math.round(floor),
+          source: 'volume_floor',
+          weightSource,
+        })
+      }
       return NextResponse.json({
         ok: true,
         kcal: 0,
@@ -232,10 +253,13 @@ export async function POST(request: Request) {
     }
 
     const activeHours = activeMinutes / 60
-    const restHours = restMinutes / 60
+    const restHours = Math.max(0, totalMinutes - activeMinutes) / 60
     const kcalBase = met * complexityFactor * bodyWeightKg * activeHours * rpeMultiplier
       + MET_REST * bodyWeightKg * restHours
-    const kcal = Math.round(kcalBase * epocFactor)
+    const kcalRaw = kcalBase * epocFactor
+    // Apply volume-based floor
+    const volumeFloor = computeVolumeFloor(volume, bodyWeightKg)
+    const kcal = Math.round(Math.max(kcalRaw, volumeFloor))
 
     return NextResponse.json({
       ok: true,

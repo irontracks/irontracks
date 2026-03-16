@@ -396,8 +396,10 @@ export const useReportData = ({ session, previousSession, user, settings }: UseR
       restMinutesOverride,
       biologicalSex,
       exerciseVolumes,
+      Number(safeSession?.startedAt ?? safeSession?.started_at ?? 0) || null,
     )
-  }, [sessionLogs, durationInMinutes, checkinBodyWeightKg, sessionExerciseNames, exerciseVolumes, postCheckinRpe, outdoorBike, safeSession?.executionTotalSeconds, safeSession?.restTotalSeconds, safeSession?.totalTime, settings?.biologicalSex, settings?.bodyWeightKg])
+  }, [sessionLogs, durationInMinutes, checkinBodyWeightKg, sessionExerciseNames, exerciseVolumes, postCheckinRpe, outdoorBike, safeSession?.executionTotalSeconds, safeSession?.restTotalSeconds, safeSession?.totalTime, safeSession?.startedAt, safeSession?.started_at, settings?.biologicalSex, settings?.bodyWeightKg])
+
 
   const reportMeta = safeSession?.reportMeta && typeof safeSession.reportMeta === 'object' ? (safeSession.reportMeta as AnyObj) : null
   const reportTotals = reportMeta?.totals && typeof reportMeta.totals === 'object' ? (reportMeta.totals as AnyObj) : null
