@@ -99,24 +99,16 @@ export default function AssessmentPDFGenerator({
         ? assessmentDate
         : new Date();
 
-      const pdfBlob = await generateAssessmentPDF({
+      // generateAssessmentPDF -> generateAssessmentPdf now handles
+      // opening the printable page internally (window.print on desktop,
+      // in-app view on Capacitor)
+      await generateAssessmentPDF({
         formData,
         studentName: safeStudentName,
         trainerName,
         assessmentDate: safeDate,
         photos
       });
-
-      // Criar link de download
-      const url = URL.createObjectURL(pdfBlob);
-      const link = document.createElement('a');
-      link.href = url;
-      const fileDate = safeDate.toISOString().split('T')[0];
-      link.download = `avaliacao_fisica_${safeStudentName.replace(/\s+/g, '_')}_${fileDate}.pdf`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
 
       return { success: true };
     } catch (error) {
