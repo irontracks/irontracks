@@ -15,7 +15,7 @@ export async function POST() {
     const { error } = await admin
       .from('teachers')
       .update({ status: 'active', user_id: user.id })
-      .or(`email.ilike.${String(user.email || '').toLowerCase().trim()},user_id.eq.${user.id}`)
+      .or(`email.ilike.${String(user.email || '').toLowerCase().trim().replace(/[,()\\]/g, '')},user_id.eq.${user.id}`)
       .eq('status', 'pending')
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
     return NextResponse.json({ ok: true })

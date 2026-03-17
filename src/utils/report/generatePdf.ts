@@ -48,8 +48,8 @@ interface AssessmentResults {
 const isNativeApp = (): boolean => {
   try {
     if (typeof window === 'undefined') return false
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return !!(window as any).Capacitor?.isNativePlatform?.()
+    const win = window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }
+    return !!win.Capacitor?.isNativePlatform?.()
   } catch { return false }
 }
 
@@ -261,10 +261,9 @@ function buildAssessmentHtml(
 /**
  * Opens the assessment as a printable page for PDF export.
  *
- * On iOS/Android (Capacitor), `window.print()` triggers the native
- * print dialog which allows "Save as PDF" or sharing.
- *
- * On desktop, it opens a new tab with the assessment and auto-triggers print.
+ * On iOS/Android (Capacitor), opens in the Capacitor Browser or iframe fallback.
+ * On desktop, opens a new tab and triggers the print dialog.
+ * If popups are blocked, uses a full-screen iframe overlay as fallback.
  */
 export async function generateAssessmentPdf(
   formData: AssessmentFormData,
@@ -273,60 +272,90 @@ export async function generateAssessmentPdf(
 ): Promise<Blob> {
   try {
     const html = buildAssessmentHtml(formData, results, studentName)
+    const blob = new Blob([html], { type: 'text/html' })
 
     if (isNativeApp()) {
-      // In Capacitor WebView: write to a blob URL and open in a new window
-      // The user can then use the "Salvar como PDF" button or iOS share
-      const blob = new Blob([html], { type: 'text/html' })
       const url = URL.createObjectURL(blob)
 
-      // Try using Capacitor Browser plugin if available
+      // Try Capacitor Browser plugin first
       try {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { Browser } = await import('@capacitor/browser' as any)
         await Browser.open({ url })
-      } catch {
-        // Fallback: open in new window (works in most WebViews)
-        const w = window.open(url, '_blank')
-        if (!w) {
-          // If popup blocked, replace current page content
-          const iframe = document.createElement('iframe')
-          iframe.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;border:none;z-index:99999;background:#fff'
-          iframe.srcdoc = html
-          document.body.appendChild(iframe)
+        return blob
+      } catch { /* plugin not available — try fallback */ }
 
-          // Add close button
-          const closeBtn = document.createElement('button')
-          closeBtn.textContent = '✕ Fechar'
-          closeBtn.style.cssText = 'position:fixed;top:12px;right:12px;z-index:100000;padding:10px 20px;background:#111;color:#fff;border:none;border-radius:8px;font-weight:700;font-size:14px;cursor:pointer'
-          closeBtn.onclick = () => {
-            iframe.remove()
-            closeBtn.remove()
-          }
-          document.body.appendChild(closeBtn)
-        }
-      }
+      // Fallback: open in new window
+      const w = window.open(url, '_blank')
+      if (w) return blob
 
+      // Last resort: inline iframe
+      showPdfIframe(html)
       return blob
     }
 
-    // Desktop: open in new tab and auto-print
+    // Desktop: try opening a new tab
     const printWindow = window.open('', '_blank')
     if (printWindow) {
       printWindow.document.write(html)
       printWindow.document.close()
-      // Wait for content to render, then trigger print
       setTimeout(() => {
         try { printWindow.print() } catch { /* user cancelled */ }
       }, 500)
+      return blob
     }
 
-    return new Blob([html], { type: 'text/html' })
+    // Popup blocked — use iframe fallback so the user still gets the PDF
+    showPdfIframe(html)
+    return blob
   } catch (error) {
     logError('error', 'Erro ao gerar PDF da avaliação', error)
-    const fallback = '<!doctype html><html><body><p>Não foi possível gerar o PDF da avaliação.</p></body></html>'
-    return new Blob([fallback], { type: 'text/html' })
+    throw error
   }
+}
+
+/** Full-screen iframe overlay with close + print buttons — used when popups are blocked */
+function showPdfIframe(html: string) {
+  // Backdrop
+  const backdrop = document.createElement('div')
+  backdrop.style.cssText = 'position:fixed;inset:0;z-index:99998;background:rgba(0,0,0,0.6)'
+
+  // Iframe
+  const iframe = document.createElement('iframe')
+  iframe.style.cssText = 'position:fixed;top:48px;left:0;right:0;bottom:0;width:100%;height:calc(100% - 48px);border:none;z-index:99999;background:#fff'
+  iframe.srcdoc = html
+
+  // Toolbar
+  const toolbar = document.createElement('div')
+  toolbar.style.cssText = 'position:fixed;top:0;left:0;right:0;height:48px;z-index:100000;background:#111;display:flex;align-items:center;justify-content:space-between;padding:0 12px'
+
+  const printBtn = document.createElement('button')
+  printBtn.textContent = '📄 Salvar como PDF'
+  printBtn.style.cssText = 'padding:8px 16px;background:#d4a017;color:#000;border:none;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer'
+  printBtn.onclick = () => {
+    try {
+      const iframeWindow = iframe.contentWindow
+      if (iframeWindow) iframeWindow.print()
+    } catch { /* cross-origin — open in new tab instead */ }
+  }
+
+  const closeBtn = document.createElement('button')
+  closeBtn.textContent = '✕ Fechar'
+  closeBtn.style.cssText = 'padding:8px 16px;background:transparent;color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:8px;font-weight:700;font-size:13px;cursor:pointer'
+  closeBtn.onclick = () => {
+    backdrop.remove()
+    iframe.remove()
+    toolbar.remove()
+  }
+
+  toolbar.appendChild(printBtn)
+  toolbar.appendChild(closeBtn)
+
+  document.body.appendChild(backdrop)
+  document.body.appendChild(iframe)
+  document.body.appendChild(toolbar)
+
+  backdrop.onclick = closeBtn.onclick
 }
 
 /**

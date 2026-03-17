@@ -6,6 +6,7 @@ import { parseJsonBody } from '@/utils/zod'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { logWarn } from '@/lib/logger'
 import { cacheDelete } from '@/utils/cache'
+import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 
 const GrantSchema = z
   .object({
@@ -29,6 +30,11 @@ export async function POST(req: Request) {
       auth = await requireRoleWithBearer(req, ['admin'])
       if (!auth.ok) return auth.response
     }
+
+    const ip = getRequestIp(req)
+    const rlKey = `admin:vip:grant:${auth.user.id}:${ip}`
+    const rl = await checkRateLimitAsync(rlKey, 10, 60_000)
+    if (!rl.allowed) return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 })
 
     const parsedBody = await parseJsonBody(req, BodySchema)
     if (parsedBody.response) return parsedBody.response

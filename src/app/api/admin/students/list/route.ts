@@ -4,6 +4,7 @@ import { jsonError, requireRole, resolveRoleByUser } from '@/utils/auth/route'
 import { z } from 'zod'
 import { parseSearchParams } from '@/utils/zod'
 import { cacheGet, cacheSet } from '@/utils/cache'
+import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 
 export const dynamic = 'force-dynamic'
 
@@ -27,6 +28,11 @@ export async function GET(req: Request) {
       const { role } = await resolveRoleByUser({ id: user.id, email: user.email })
       if (role !== 'admin') return jsonError(403, 'forbidden')
     }
+
+    const ip = getRequestIp(req)
+    const rlKey = `admin:students:list:${auth.ok ? auth.user.id : 'anon'}:${ip}`
+    const rl = await checkRateLimitAsync(rlKey, 30, 60_000)
+    if (!rl.allowed) return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 })
 
     const { data: q, response } = parseSearchParams(req, QuerySchema)
     if (response) return response
