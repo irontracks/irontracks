@@ -7,19 +7,34 @@ interface AssessmentFormData {
   age?: number | string | null
   gender?: string | null
   arm_circ?: number | string | null
+  arm_circ_left?: number | string | null
+  arm_circ_right?: number | string | null
   chest_circ?: number | string | null
   waist_circ?: number | string | null
   hip_circ?: number | string | null
   thigh_circ?: number | string | null
+  thigh_circ_left?: number | string | null
+  thigh_circ_right?: number | string | null
   calf_circ?: number | string | null
+  calf_circ_left?: number | string | null
+  calf_circ_right?: number | string | null
   triceps_skinfold?: number | string | null
+  triceps_skinfold_left?: number | string | null
+  triceps_skinfold_right?: number | string | null
   biceps_skinfold?: number | string | null
+  biceps_skinfold_left?: number | string | null
+  biceps_skinfold_right?: number | string | null
   subscapular_skinfold?: number | string | null
   suprailiac_skinfold?: number | string | null
   abdominal_skinfold?: number | string | null
   thigh_skinfold?: number | string | null
+  thigh_skinfold_left?: number | string | null
+  thigh_skinfold_right?: number | string | null
   calf_skinfold?: number | string | null
+  calf_skinfold_left?: number | string | null
+  calf_skinfold_right?: number | string | null
   observations?: string | null
+  [key: string]: unknown
 }
 
 interface BodyComposition {
@@ -87,19 +102,64 @@ function buildAssessmentHtml(
 
   const observations = String(data?.observations || '')
 
-  // Circumferences
-  const circs = [
-    ['Braço', data?.arm_circ],
-    ['Tórax', data?.chest_circ],
-    ['Cintura', data?.waist_circ],
-    ['Quadril', data?.hip_circ],
-    ['Coxa', data?.thigh_circ],
-    ['Panturrilha', data?.calf_circ],
-  ].filter(([_, v]) => v != null && v !== '' && v !== '0' && Number(v) > 0)
+  // Helper: resolve bilateral average or direct value
+  const avgField = (direct: string, left: string, right: string): number => {
+    const d = data as Record<string, unknown>
+    const toNum = (v: unknown) => {
+      if (v == null || v === '') return 0
+      return Number.parseFloat(String(v).replace(',', '.')) || 0
+    }
+    const l = toNum(d[left])
+    const r = toNum(d[right])
+    if (l > 0 && r > 0) return Math.round(((l + r) / 2) * 10) / 10
+    if (l > 0) return l
+    if (r > 0) return r
+    return toNum(d[direct])
+  }
 
-  const circRows = circs.map(([label, value]) =>
-    `<tr><td>${label}</td><td>${value} cm</td></tr>`
-  ).join('')
+  const dToNum = (v: unknown) => {
+    if (v == null || v === '') return 0
+    return Number.parseFloat(String(v).replace(',', '.')) || 0
+  }
+
+  // Skinfold bilateral helper for display
+  const buildSkinfoldRow = (label: string, direct: string, left?: string, right?: string): string => {
+    const d = data as Record<string, unknown>
+    const avg = left && right ? avgField(direct, left, right) : dToNum(d[direct])
+    if (avg <= 0) return ''
+    const hasLR = left && right && dToNum(d[left]) > 0 && dToNum(d[right]) > 0
+    const detail = hasLR ? ` <span style="color:#999;font-size:11px">(E:${dToNum(d[left!])} D:${dToNum(d[right!])})</span>` : ''
+    return `<tr><td>${label}</td><td>${avg.toFixed(1)} mm${detail}</td></tr>`
+  }
+
+  // Circumference bilateral helper for display
+  const buildCircRow = (label: string, direct: string, left?: string, right?: string): string => {
+    const d = data as Record<string, unknown>
+    const avg = left && right ? avgField(direct, left, right) : dToNum(d[direct])
+    if (avg <= 0) return ''
+    const hasLR = left && right && dToNum(d[left]) > 0 && dToNum(d[right]) > 0
+    const detail = hasLR ? ` <span style="color:#999;font-size:11px">(E:${dToNum(d[left!])} D:${dToNum(d[right!])})</span>` : ''
+    return `<tr><td>${label}</td><td>${avg.toFixed(1)} cm${detail}</td></tr>`
+  }
+
+  const circRows = [
+    buildCircRow('Braço', 'arm_circ', 'arm_circ_left', 'arm_circ_right'),
+    buildCircRow('Tórax', 'chest_circ'),
+    buildCircRow('Cintura', 'waist_circ'),
+    buildCircRow('Quadril', 'hip_circ'),
+    buildCircRow('Coxa', 'thigh_circ', 'thigh_circ_left', 'thigh_circ_right'),
+    buildCircRow('Panturrilha', 'calf_circ', 'calf_circ_left', 'calf_circ_right'),
+  ].filter(Boolean).join('')
+
+  const skinfoldRows = [
+    buildSkinfoldRow('Tríceps', 'triceps_skinfold', 'triceps_skinfold_left', 'triceps_skinfold_right'),
+    buildSkinfoldRow('Bíceps', 'biceps_skinfold', 'biceps_skinfold_left', 'biceps_skinfold_right'),
+    buildSkinfoldRow('Subescapular', 'subscapular_skinfold'),
+    buildSkinfoldRow('Supra-ilíaca', 'suprailiac_skinfold'),
+    buildSkinfoldRow('Abdominal', 'abdominal_skinfold'),
+    buildSkinfoldRow('Coxa', 'thigh_skinfold', 'thigh_skinfold_left', 'thigh_skinfold_right'),
+    buildSkinfoldRow('Panturrilha', 'calf_skinfold', 'calf_skinfold_left', 'calf_skinfold_right'),
+  ].filter(Boolean).join('')
 
   return `<!doctype html>
 <html lang="pt-BR">
@@ -225,18 +285,12 @@ function buildAssessmentHtml(
         <table>
           <thead><tr><th>Região</th><th>Valor</th></tr></thead>
           <tbody>
-            ${data?.triceps_skinfold ? `<tr><td>Tríceps</td><td>${data.triceps_skinfold} mm</td></tr>` : ''}
-            ${data?.biceps_skinfold ? `<tr><td>Bíceps</td><td>${data.biceps_skinfold} mm</td></tr>` : ''}
-            ${data?.subscapular_skinfold ? `<tr><td>Subescapular</td><td>${data.subscapular_skinfold} mm</td></tr>` : ''}
-            ${data?.suprailiac_skinfold ? `<tr><td>Supra-ilíaca</td><td>${data.suprailiac_skinfold} mm</td></tr>` : ''}
-            ${data?.abdominal_skinfold ? `<tr><td>Abdominal</td><td>${data.abdominal_skinfold} mm</td></tr>` : ''}
-            ${data?.thigh_skinfold ? `<tr><td>Coxa</td><td>${data.thigh_skinfold} mm</td></tr>` : ''}
-            ${data?.calf_skinfold ? `<tr><td>Panturrilha</td><td>${data.calf_skinfold} mm</td></tr>` : ''}
+            ${skinfoldRows}
           </tbody>
         </table>
       </div>
 
-      ${circs.length > 0 ? `
+      ${circRows ? `
       <div class="section">
         <h2>Circunferências (cm)</h2>
         <table>
@@ -343,34 +397,39 @@ function showPdfIframe(html: string) {
   printBtn.textContent = '📄 Salvar como PDF'
   printBtn.style.cssText = 'padding:8px 16px;background:#d4a017;color:#000;border:none;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer'
   printBtn.onclick = async () => {
-    // Strategy 1: try printing the iframe content directly
+    const dataUrl = 'data:text/html;base64,' + btoa(unescape(encodeURIComponent(html)))
+
+    // Strategy 1 (iOS native): open in Capacitor Browser (SFSafariViewController) where print works
+    if (isNativeApp()) {
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { Browser } = await import('@capacitor/browser' as any)
+        await Browser.open({ url: dataUrl })
+        cleanup()
+        return
+      } catch { /* plugin not installed */ }
+    }
+
+    // Strategy 2: open in new window/tab (desktop or fallback)
+    try {
+      const w = window.open('', '_blank')
+      if (w) {
+        w.document.write(html)
+        w.document.close()
+        setTimeout(() => { try { w.print() } catch { /* ok */ } }, 500)
+        cleanup()
+        return
+      }
+    } catch { /* popup blocked */ }
+
+    // Strategy 3: try iframe print (works on desktop with srcdoc)
     try {
       const iframeWin = iframe.contentWindow
       if (iframeWin) {
+        iframeWin.focus()
         iframeWin.print()
-        return
       }
-    } catch { /* cross-origin or WKWebView restriction — try next strategy */ }
-
-    // Strategy 2: try Capacitor Share plugin to share the HTML as a file
-    try {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const { Share } = await import('@capacitor/share' as any)
-      const dataUrl = 'data:text/html;base64,' + btoa(unescape(encodeURIComponent(html)))
-      await Share.share({
-        title: 'Avaliação Física',
-        text: 'Avaliação Física - IronTracks',
-        url: dataUrl,
-        dialogTitle: 'Compartilhar Avaliação',
-      })
-      return
-    } catch { /* Share plugin not available */ }
-
-    // Strategy 3: open in a new tab (browser will handle print)
-    try {
-      const dataUrl = 'data:text/html;base64,' + btoa(unescape(encodeURIComponent(html)))
-      window.open(dataUrl, '_blank')
-    } catch { /* nothing more we can do */ }
+    } catch { /* WKWebView restriction */ }
   }
 
   const closeBtn = document.createElement('button')
