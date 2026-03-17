@@ -74,10 +74,11 @@ export const apiAdmin = {
     }),
 
   /** POST assign a teacher to a student */
-  assignTeacher: (studentUserId: string, teacherUserId: string | null, authHeaders?: Record<string, string>) =>
-    apiPost<{ ok: boolean }>('/api/admin/students/assign-teacher', {
+  assignTeacher: (studentUserId: string, teacherUserId: string | null, authHeaders?: Record<string, string>, email?: string) =>
+    apiPost<{ ok: boolean; student_id?: string }>('/api/admin/students/assign-teacher', {
       student_user_id: studentUserId,
       teacher_user_id: teacherUserId,
+      ...(email ? { email } : {}),
     }, { headers: { 'Content-Type': 'application/json', ...authHeaders } }),
 
   /** POST delete a user's auth record */

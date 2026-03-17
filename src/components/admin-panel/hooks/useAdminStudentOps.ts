@@ -212,10 +212,12 @@ export const useAdminStudentOps = ({
     const approvePendingProfile = useCallback(async (profile: UnknownRecord) => {
         try {
             const authHeaders = await getAdminAuthHeaders();
+            const profileEmail = String(profile.email || '').trim();
             const json = await apiAdmin.assignTeacher(
                 String(profile.user_id || ''),
                 null,
-                authHeaders
+                authHeaders,
+                profileEmail || undefined
             ).catch((e: unknown) => { throw e }) as Record<string, unknown>;
             if (!json?.ok) throw new Error(String(json?.error || 'Falha'));
             const newStudent: UnknownRecord = {
