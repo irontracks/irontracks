@@ -378,7 +378,7 @@ function showPdfIframe(html: string) {
   // Toolbar height = 48px + safe area top
   const safeTop = 'env(safe-area-inset-top, 0px)'
 
-  // Iframe
+  // Iframe for preview
   const iframe = document.createElement('iframe')
   iframe.style.cssText = `position:fixed;top:calc(48px + ${safeTop});left:0;right:0;bottom:0;width:100%;height:calc(100% - 48px - ${safeTop});border:none;z-index:99999;background:#fff`
   iframe.srcdoc = html
@@ -396,40 +396,53 @@ function showPdfIframe(html: string) {
   const printBtn = document.createElement('button')
   printBtn.textContent = '📄 Salvar como PDF'
   printBtn.style.cssText = 'padding:8px 16px;background:#d4a017;color:#000;border:none;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer'
-  printBtn.onclick = async () => {
-    const dataUrl = 'data:text/html;base64,' + btoa(unescape(encodeURIComponent(html)))
+  printBtn.onclick = () => {
+    // === @media print injection approach ===
+    // This is the ONLY approach that works reliably on iOS WKWebView.
+    // We inject the assessment HTML into the main DOM inside a hidden container,
+    // add @media print CSS to hide everything else, call window.print(), then clean up.
 
-    // Strategy 1 (iOS native): open in Capacitor Browser (SFSafariViewController) where print works
-    if (isNativeApp()) {
-      try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { Browser } = await import('@capacitor/browser' as any)
-        await Browser.open({ url: dataUrl })
-        cleanup()
-        return
-      } catch { /* plugin not installed */ }
-    }
+    // 1. Create print container (hidden on screen, visible only when printing)
+    const printContainer = document.createElement('div')
+    printContainer.id = '__irontracks_print__'
+    printContainer.style.cssText = 'position:fixed;top:0;left:0;width:0;height:0;overflow:hidden;z-index:-1'
+    printContainer.innerHTML = html
 
-    // Strategy 2: open in new window/tab (desktop or fallback)
-    try {
-      const w = window.open('', '_blank')
-      if (w) {
-        w.document.write(html)
-        w.document.close()
-        setTimeout(() => { try { w.print() } catch { /* ok */ } }, 500)
-        cleanup()
-        return
+    // 2. Add @media print stylesheet
+    const printStyle = document.createElement('style')
+    printStyle.id = '__irontracks_print_style__'
+    printStyle.textContent = `
+      @media print {
+        /* Hide everything */
+        body > * { display: none !important; }
+        /* Show only our print container */
+        body > #__irontracks_print__ {
+          display: block !important;
+          position: static !important;
+          width: auto !important;
+          height: auto !important;
+          overflow: visible !important;
+          z-index: auto !important;
+        }
+        /* Also hide the print button inside the HTML */
+        .no-print { display: none !important; }
       }
-    } catch { /* popup blocked */ }
+    `
 
-    // Strategy 3: try iframe print (works on desktop with srcdoc)
-    try {
-      const iframeWin = iframe.contentWindow
-      if (iframeWin) {
-        iframeWin.focus()
-        iframeWin.print()
-      }
-    } catch { /* WKWebView restriction */ }
+    // 3. Inject into DOM
+    document.body.appendChild(printContainer)
+    document.head.appendChild(printStyle)
+
+    // 4. Small delay to ensure DOM is rendered, then print
+    setTimeout(() => {
+      window.print()
+
+      // 5. Clean up after print dialog closes
+      setTimeout(() => {
+        printContainer.remove()
+        printStyle.remove()
+      }, 500)
+    }, 100)
   }
 
   const closeBtn = document.createElement('button')

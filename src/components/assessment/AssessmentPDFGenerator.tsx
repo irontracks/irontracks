@@ -11,7 +11,7 @@ import {
   classifyBodyFat
 } from '@/utils/calculations/bodyComposition';
 import { generateAssessmentPdf } from '@/utils/report/generatePdf';
-import { logError, logWarn, logInfo } from '@/lib/logger'
+import { logError } from '@/lib/logger'
 
 interface AssessmentPDFGeneratorProps {
   formData: AssessmentFormData;
@@ -21,30 +21,59 @@ interface AssessmentPDFGeneratorProps {
   photos?: string[]; // Base64 encoded photos
 }
 
+/** Resolve bilateral average: if both left+right exist, average. Otherwise single side or legacy field. */
+function avgBilateral(formData: AssessmentFormData, direct: keyof AssessmentFormData, left: keyof AssessmentFormData, right: keyof AssessmentFormData): number {
+  const l = Number(formData[left] || 0)
+  const r = Number(formData[right] || 0)
+  if (l > 0 && r > 0) return Math.round(((l + r) / 2) * 100) / 100
+  if (l > 0) return l
+  if (r > 0) return r
+  return Number(formData[direct] || 0)
+}
+
 export async function generateAssessmentPDF({
   formData,
   studentName,
-  trainerName,
   assessmentDate,
-  photos = []
 }: AssessmentPDFGeneratorProps): Promise<Blob> {
-  const tr = Number(formData.triceps_skinfold || 0)
-  const ch = 0
-  const mx = 0
-  const sc = Number(formData.subscapular_skinfold || 0)
-  const ab = Number(formData.abdominal_skinfold || 0)
-  const si = Number(formData.suprailiac_skinfold || 0)
-  const th = Number(formData.thigh_skinfold || 0)
+  // All 7 Pollock skinfolds — with bilateral averaging
+  const triceps = avgBilateral(formData, 'triceps_skinfold', 'triceps_skinfold_left', 'triceps_skinfold_right')
+  const biceps = avgBilateral(formData, 'biceps_skinfold', 'biceps_skinfold_left', 'biceps_skinfold_right')
+  const subscapular = Number(formData.subscapular_skinfold || 0)
+  const suprailiac = Number(formData.suprailiac_skinfold || 0)
+  const abdominal = Number(formData.abdominal_skinfold || 0)
+  const thigh = avgBilateral(formData, 'thigh_skinfold', 'thigh_skinfold_left', 'thigh_skinfold_right')
+  const calf = avgBilateral(formData, 'calf_skinfold', 'calf_skinfold_left', 'calf_skinfold_right')
 
-  const sum = tr + ch + mx + sc + ab + si + th
-  const density = (sum > 0 && Number(formData.age) > 0) ? calculateBodyDensity(sum, Number(formData.age), formData.gender) : 1.05
+  // Correct sum of ALL 7 skinfolds
+  const sum = calculateSumSkinfolds({
+    triceps_skinfold: triceps || undefined,
+    biceps_skinfold: biceps || undefined,
+    subscapular_skinfold: subscapular || undefined,
+    suprailiac_skinfold: suprailiac || undefined,
+    abdominal_skinfold: abdominal || undefined,
+    thigh_skinfold: thigh || undefined,
+    calf_skinfold: calf || undefined,
+  })
+
+  const age = Number(formData.age) || 0
+  const weight = Number(formData.weight) || 0
+  const height = Number(formData.height) || 0
+  const gender = formData.gender
+
+  const density = (sum > 0 && age > 0) ? calculateBodyDensity(sum, age, gender) : 1.05
   const bfp = calculateBodyFatPercentage(density)
-  const bmr = calculateBMR(Number(formData.weight), Number(formData.height), Number(formData.age), formData.gender)
-  const bmi = calculateBMI(Number(formData.weight), Number(formData.height))
-  const bmiClassification = classifyBMI(bmi)
-  const bodyFatClassification = classifyBodyFat(bfp, formData.gender, Number(formData.age))
-  const leanMass = Number(formData.weight) * (1 - bfp / 100)
-  const fatMass = Number(formData.weight) * (bfp / 100)
+  const bmr = (weight > 0 && height > 0 && age > 0) ? calculateBMR(weight, height, age, gender) : 0
+  const bmi = (weight > 0 && height > 0) ? calculateBMI(weight, height) : 0
+  const bmiClassification = bmi ? classifyBMI(bmi) : ''
+  const bodyFatClassification = classifyBodyFat(bfp, gender, age || 18)
+  const leanMass = weight > 0 ? weight * (1 - bfp / 100) : 0
+  const fatMass = weight > 0 ? weight * (bfp / 100) : 0
+
+  // Circumference bilateral averages
+  const armCirc = avgBilateral(formData, 'arm_circ', 'arm_circ_left', 'arm_circ_right')
+  const thighCirc = avgBilateral(formData, 'thigh_circ', 'thigh_circ_left', 'thigh_circ_right')
+  const calfCirc = avgBilateral(formData, 'calf_circ', 'calf_circ_left', 'calf_circ_right')
 
   const results = {
     bodyComposition: { bodyFatPercentage: bfp, sumOfSkinfolds: sum },
@@ -58,24 +87,40 @@ export async function generateAssessmentPDF({
 
   return await generateAssessmentPdf({
     assessment_date: assessmentDate.toISOString().split('T')[0],
-    weight: String(formData.weight),
-    height: String(formData.height),
-    age: String(formData.age),
-    gender: formData.gender,
-    arm_circ: null,
-    chest_circ: null,
-    waist_circ: null,
-    hip_circ: null,
-    thigh_circ: null,
-    calf_circ: null,
-    triceps_skinfold: tr,
-    biceps_skinfold: Number(formData.biceps_skinfold || 0),
-    subscapular_skinfold: sc,
-    suprailiac_skinfold: si,
-    abdominal_skinfold: ab,
-    thigh_skinfold: th,
-    calf_skinfold: Number(formData.calf_skinfold || 0),
-    observations: ''
+    weight: String(weight),
+    height: String(height),
+    age: String(age),
+    gender,
+    // Circumferences — pass bilateral + computed average
+    arm_circ: armCirc || null,
+    arm_circ_left: Number(formData.arm_circ_left) || null,
+    arm_circ_right: Number(formData.arm_circ_right) || null,
+    chest_circ: Number(formData.chest_circ) || null,
+    waist_circ: Number(formData.waist_circ) || null,
+    hip_circ: Number(formData.hip_circ) || null,
+    thigh_circ: thighCirc || null,
+    thigh_circ_left: Number(formData.thigh_circ_left) || null,
+    thigh_circ_right: Number(formData.thigh_circ_right) || null,
+    calf_circ: calfCirc || null,
+    calf_circ_left: Number(formData.calf_circ_left) || null,
+    calf_circ_right: Number(formData.calf_circ_right) || null,
+    // Skinfolds — pass bilateral + computed average
+    triceps_skinfold: triceps,
+    triceps_skinfold_left: Number(formData.triceps_skinfold_left) || null,
+    triceps_skinfold_right: Number(formData.triceps_skinfold_right) || null,
+    biceps_skinfold: biceps,
+    biceps_skinfold_left: Number(formData.biceps_skinfold_left) || null,
+    biceps_skinfold_right: Number(formData.biceps_skinfold_right) || null,
+    subscapular_skinfold: subscapular,
+    suprailiac_skinfold: suprailiac,
+    abdominal_skinfold: abdominal,
+    thigh_skinfold: thigh,
+    thigh_skinfold_left: Number(formData.thigh_skinfold_left) || null,
+    thigh_skinfold_right: Number(formData.thigh_skinfold_right) || null,
+    calf_skinfold: calf,
+    calf_skinfold_left: Number(formData.calf_skinfold_left) || null,
+    calf_skinfold_right: Number(formData.calf_skinfold_right) || null,
+    observations: formData.observations || ''
   }, results, studentName)
 }
 
@@ -99,9 +144,6 @@ export default function AssessmentPDFGenerator({
         ? assessmentDate
         : new Date();
 
-      // generateAssessmentPDF -> generateAssessmentPdf now handles
-      // opening the printable page internally (window.print on desktop,
-      // in-app view on Capacitor)
       await generateAssessmentPDF({
         formData,
         studentName: safeStudentName,
