@@ -329,22 +329,8 @@ export async function generateAssessmentPdf(
     const blob = new Blob([html], { type: 'text/html' })
 
     if (isNativeApp()) {
-      // Convert HTML to data URL (blob URLs don't work with Capacitor Browser / SFSafariViewController)
-      const dataUrl = 'data:text/html;base64,' + btoa(unescape(encodeURIComponent(html)))
-
-      // Try Capacitor Browser plugin first — opens SFSafariViewController where print() works
-      try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const { Browser } = await import('@capacitor/browser' as any)
-        await Browser.open({ url: dataUrl })
-        return blob
-      } catch { /* plugin not available — try fallback */ }
-
-      // Fallback: open data URL in new window
-      const w = window.open(dataUrl, '_blank')
-      if (w) return blob
-
-      // Last resort: inline iframe with full-page print fallback
+      // On iOS/Android WKWebView: use full-screen iframe overlay.
+      // The print button inside uses @media print CSS injection + synchronous window.print().
       showPdfIframe(html)
       return blob
     }
@@ -397,25 +383,51 @@ function showPdfIframe(html: string) {
   printBtn.textContent = '📄 Salvar como PDF'
   printBtn.style.cssText = 'padding:8px 16px;background:#d4a017;color:#000;border:none;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer'
   printBtn.onclick = () => {
-    // === @media print injection approach ===
-    // This is the ONLY approach that works reliably on iOS WKWebView.
-    // We inject the assessment HTML into the main DOM inside a hidden container,
-    // add @media print CSS to hide everything else, call window.print(), then clean up.
+    // Parse the full HTML document to extract styles and body separately.
+    // Using innerHTML with a full <!DOCTYPE> document loses <style> from <head>.
+    const parser = new DOMParser()
+    const doc = parser.parseFromString(html, 'text/html')
+    const bodyContent = doc.body?.innerHTML || ''
+    const headStyles = Array.from(doc.querySelectorAll('style'))
+      .map(s => s.textContent || '')
+      .join('\n')
 
-    // 1. Create print container (hidden on screen, visible only when printing)
+    // Create hidden print container
     const printContainer = document.createElement('div')
     printContainer.id = '__irontracks_print__'
     printContainer.style.cssText = 'position:fixed;top:0;left:0;width:0;height:0;overflow:hidden;z-index:-1'
-    printContainer.innerHTML = html
+    printContainer.innerHTML = bodyContent
 
-    // 2. Add @media print stylesheet
+    // Inject the assessment's own styles + @media print overrides
     const printStyle = document.createElement('style')
     printStyle.id = '__irontracks_print_style__'
     printStyle.textContent = `
+      #__irontracks_print__ { font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; line-height: 1.5; color: #111; }
+      #__irontracks_print__ .container { max-width: 800px; margin: 0 auto; padding: 24px; }
+      #__irontracks_print__ .header { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 3px solid #111; padding-bottom: 12px; margin-bottom: 20px; }
+      #__irontracks_print__ .brand { font-weight: 900; font-size: 28px; letter-spacing: -1px; }
+      #__irontracks_print__ .brand .highlight { color: #d4a017; font-style: italic; }
+      #__irontracks_print__ .subtitle { font-size: 11px; text-transform: uppercase; color: #666; font-weight: 700; letter-spacing: 2px; }
+      #__irontracks_print__ .title { font-size: 18px; font-weight: 800; }
+      #__irontracks_print__ .date { font-size: 12px; color: #666; }
+      #__irontracks_print__ .section { margin-bottom: 20px; }
+      #__irontracks_print__ .section h2 { font-size: 13px; margin: 0 0 8px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: #333; border-bottom: 1px solid #e0e0e0; padding-bottom: 4px; }
+      #__irontracks_print__ .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; }
+      #__irontracks_print__ .card { background: #f7f7f7; border: 1px solid #e0e0e0; border-radius: 8px; padding: 10px; }
+      #__irontracks_print__ .label { font-size: 10px; text-transform: uppercase; color: #888; font-weight: 700; letter-spacing: 1px; margin-bottom: 2px; }
+      #__irontracks_print__ .value { font-size: 16px; font-weight: 800; }
+      #__irontracks_print__ .value.green { color: #059669; }
+      #__irontracks_print__ .value.red { color: #dc2626; }
+      #__irontracks_print__ .value.gold { color: #d4a017; }
+      #__irontracks_print__ .class-label { font-size: 11px; color: #666; margin-top: 2px; }
+      #__irontracks_print__ table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 6px; }
+      #__irontracks_print__ th, #__irontracks_print__ td { border-bottom: 1px solid #eee; padding: 5px 4px; text-align: left; }
+      #__irontracks_print__ th { color: #888; text-transform: uppercase; font-weight: 700; font-size: 10px; }
+      #__irontracks_print__ .footer { margin-top: 24px; padding-top: 8px; border-top: 1px solid #ddd; text-align: center; font-size: 10px; color: #999; text-transform: uppercase; letter-spacing: 2px; }
+      #__irontracks_print__ .print-btn { display: none; }
+      ${headStyles}
       @media print {
-        /* Hide everything */
         body > * { display: none !important; }
-        /* Show only our print container */
         body > #__irontracks_print__ {
           display: block !important;
           position: static !important;
@@ -424,25 +436,34 @@ function showPdfIframe(html: string) {
           overflow: visible !important;
           z-index: auto !important;
         }
-        /* Also hide the print button inside the HTML */
-        .no-print { display: none !important; }
+        #__irontracks_print__ .no-print { display: none !important; }
+        #__irontracks_print__ .print-btn { display: none !important; }
       }
     `
 
-    // 3. Inject into DOM
     document.body.appendChild(printContainer)
     document.head.appendChild(printStyle)
 
-    // 4. Small delay to ensure DOM is rendered, then print
-    setTimeout(() => {
-      window.print()
+    // Cleanup after print
+    const printCleanup = () => {
+      printContainer.remove()
+      printStyle.remove()
+    }
+    const afterPrintHandler = () => {
+      window.removeEventListener('afterprint', afterPrintHandler)
+      printCleanup()
+    }
+    window.addEventListener('afterprint', afterPrintHandler)
 
-      // 5. Clean up after print dialog closes
-      setTimeout(() => {
-        printContainer.remove()
-        printStyle.remove()
-      }, 500)
-    }, 100)
+    // CRITICAL: call window.print() SYNCHRONOUSLY — no setTimeout!
+    // iOS WKWebView requires this to be in the user gesture call stack.
+    window.print()
+
+    // Fallback cleanup if afterprint doesn't fire
+    setTimeout(() => {
+      window.removeEventListener('afterprint', afterPrintHandler)
+      printCleanup()
+    }, 10000)
   }
 
   const closeBtn = document.createElement('button')
