@@ -82,21 +82,35 @@ export async function GET(req: Request) {
 
     // Bug 1 fix: also find profiles that self-registered (have no linked student row)
     // These show up as pending "Solicitações de Cadastro" in the admin panel.
+    // IMPORTANT: profiles requesting teacher role must NOT appear here — they go
+    // to the SOLICITAÇÕES tab (RequestsTab) via access_requests instead.
     const existingEmails = new Set(filtered.map(s => (s.email || '').toLowerCase()).filter(Boolean))
     const existingUserIds = new Set(filtered.map(s => s.user_id).filter(Boolean))
 
     const { data: allProfiles } = await admin
       .from('profiles')
-      .select('id, display_name, email, photo_url, role')
+      .select('id, display_name, email, photo_url, role, role_requested')
       .not('role', 'eq', 'teacher')
       .order('display_name')
+
+    // Cross-reference access_requests: exclude emails that requested teacher role
+    const { data: teacherAccessRequests } = await admin
+      .from('access_requests')
+      .select('email')
+      .eq('role_requested', 'teacher')
+    const teacherRequestEmails = new Set(
+      (teacherAccessRequests || []).map(r => String(r.email || '').toLowerCase()).filter(Boolean)
+    )
 
     const pendingProfiles = (allProfiles || [])
       .filter(p => {
         if (!p.id) return false
-        // skip teachers
+        // skip teachers (by role or by reference in teachers table)
         if (teacherEmails.has((p.email || '').toLowerCase())) return false
         if (teacherIds.has(p.id)) return false
+        // skip profiles that requested teacher role (they go to SOLICITAÇÕES tab)
+        if (String((p as Record<string, unknown>).role_requested || '').toLowerCase() === 'teacher') return false
+        if (p.email && teacherRequestEmails.has(p.email.toLowerCase())) return false
         // skip those already linked to a student row
         if (p.email && existingEmails.has(p.email.toLowerCase())) return false
         if (existingUserIds.has(p.id)) return false
