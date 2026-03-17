@@ -13,7 +13,7 @@ import {
   Legend,
   Filler
 } from 'chart.js';
-import { Calendar, TrendingUp, Upload, User, X } from 'lucide-react';
+import { Calendar, TrendingUp, Upload, User, X, Trash2, Edit3, FileText, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
 import { isIosNative } from '@/utils/platform';
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
@@ -91,7 +91,7 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
   const studentId = propStudentId;
   const router = useRouter();
   const supabase = useMemo(() => createClient(), []);
-  const { getStudentAssessments } = useAssessment();
+  const { getStudentAssessments, deleteAssessment } = useAssessment();
   const [assessments, setAssessments] = useState<AssessmentRow[]>([]);
   const [loading, setLoading] = useState(!!studentId);
   const [error, setError] = useState<string | null>(null);
@@ -119,6 +119,25 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
   const scanInputRef = useRef<HTMLInputElement | null>(null);
   const planAnchorRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const isIosNativeApp = isIosNative();
+  const [editAssessmentId, setEditAssessmentId] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
+  const handleDeleteAssessment = async (assessmentId: string) => {
+    try {
+      setDeletingId(assessmentId);
+      const result = await deleteAssessment(assessmentId);
+      if (result.success) {
+        setAssessments(prev => prev.filter(a => String(a?.id) !== assessmentId));
+        setConfirmDeleteId(null);
+        setSelectedAssessment(null);
+      }
+    } catch (e) {
+      logError('error', 'Erro ao excluir avaliação', e);
+    } finally {
+      setDeletingId(null);
+    }
+  };
 
   const mergeImportedFormData = (base: Record<string, unknown>, incoming: Record<string, unknown>) => {
     const out: Record<string, unknown> = { ...(base && typeof base === 'object' ? base : {}) };
@@ -873,53 +892,105 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
                       </div>
                     </div>
 
-                    <div className="flex flex-row flex-wrap items-center gap-2 md:justify-end">
-                      <button
-                        onClick={() => setSelectedAssessment(selectedAssessment === assessmentId ? null : assessmentId)}
-                        className="min-h-[44px] px-4 py-2 rounded-xl border text-yellow-500 hover:text-yellow-400 font-black hover:border-yellow-500/40 transition-all duration-300 active:scale-95"
-                        style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }}
-                        type="button"
-                      >
-                        {selectedAssessment === assessmentId ? 'Ocultar' : 'Detalhes'}
-                      </button>
-                      <AssessmentPDFGenerator
-                        formData={{
-                          assessment_date: String(assessment.assessment_date ?? ''),
-                          weight: String(assessment.weight || ''),
-                          height: String(assessment.height || ''),
-                          age: String(assessment.age || ''),
-                          gender: safeGender(assessment.gender),
-                          arm_circ: String(getMeasurementCm(assessment, 'arm') || ''),
-                          chest_circ: String(getMeasurementCm(assessment, 'chest') || ''),
-                          waist_circ: String(getMeasurementCm(assessment, 'waist') || ''),
-                          hip_circ: String(getMeasurementCm(assessment, 'hip') || ''),
-                          thigh_circ: String(getMeasurementCm(assessment, 'thigh') || ''),
-                          calf_circ: String(getMeasurementCm(assessment, 'calf') || ''),
-                          triceps_skinfold: String(getSkinfoldMm(assessment, 'triceps') || ''),
-                          biceps_skinfold: String(getSkinfoldMm(assessment, 'biceps') || ''),
-                          subscapular_skinfold: String(getSkinfoldMm(assessment, 'subscapular') || ''),
-                          suprailiac_skinfold: String(getSkinfoldMm(assessment, 'suprailiac') || ''),
-                          abdominal_skinfold: String(getSkinfoldMm(assessment, 'abdominal') || ''),
-                          thigh_skinfold: String(getSkinfoldMm(assessment, 'thigh') || ''),
-                          calf_skinfold: String(getSkinfoldMm(assessment, 'calf') || ''),
-                          observations: ''
-                        }}
-                        studentName={String(assessment.student_name ?? '')}
-                        trainerName={String(assessment.trainer_name ?? '')}
-                        assessmentDate={new Date(
-                          typeof assessment.assessment_date === 'string' || typeof assessment.assessment_date === 'number' || assessment.assessment_date instanceof Date
-                            ? assessment.assessment_date
-                            : String(assessment.assessment_date ?? Date.now()),
+                    <div className="flex flex-col gap-2 mt-1">
+                      {/* Row 1: Main actions */}
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => setSelectedAssessment(selectedAssessment === assessmentId ? null : assessmentId)}
+                          className="min-h-[40px] px-3 py-2 rounded-xl border text-sm font-bold transition-all duration-200 active:scale-95 flex items-center gap-1.5"
+                          style={{
+                            background: selectedAssessment === assessmentId ? 'rgba(234,179,8,0.15)' : 'rgba(255,255,255,0.03)',
+                            borderColor: selectedAssessment === assessmentId ? 'rgba(234,179,8,0.3)' : 'rgba(255,255,255,0.08)',
+                            color: selectedAssessment === assessmentId ? '#facc15' : '#a3a3a3'
+                          }}
+                          type="button"
+                        >
+                          {selectedAssessment === assessmentId ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                          {selectedAssessment === assessmentId ? 'Ocultar' : 'Detalhes'}
+                        </button>
+                        <AssessmentPDFGenerator
+                          formData={{
+                            assessment_date: String(assessment.assessment_date ?? ''),
+                            weight: String(assessment.weight || ''),
+                            height: String(assessment.height || ''),
+                            age: String(assessment.age || ''),
+                            gender: safeGender(assessment.gender),
+                            arm_circ: String(getMeasurementCm(assessment, 'arm') || ''),
+                            chest_circ: String(getMeasurementCm(assessment, 'chest') || ''),
+                            waist_circ: String(getMeasurementCm(assessment, 'waist') || ''),
+                            hip_circ: String(getMeasurementCm(assessment, 'hip') || ''),
+                            thigh_circ: String(getMeasurementCm(assessment, 'thigh') || ''),
+                            calf_circ: String(getMeasurementCm(assessment, 'calf') || ''),
+                            triceps_skinfold: String(getSkinfoldMm(assessment, 'triceps') || ''),
+                            biceps_skinfold: String(getSkinfoldMm(assessment, 'biceps') || ''),
+                            subscapular_skinfold: String(getSkinfoldMm(assessment, 'subscapular') || ''),
+                            suprailiac_skinfold: String(getSkinfoldMm(assessment, 'suprailiac') || ''),
+                            abdominal_skinfold: String(getSkinfoldMm(assessment, 'abdominal') || ''),
+                            thigh_skinfold: String(getSkinfoldMm(assessment, 'thigh') || ''),
+                            calf_skinfold: String(getSkinfoldMm(assessment, 'calf') || ''),
+                            observations: ''
+                          }}
+                          studentName={String(assessment.student_name ?? '')}
+                          trainerName={String(assessment.trainer_name ?? '')}
+                          assessmentDate={new Date(
+                            typeof assessment.assessment_date === 'string' || typeof assessment.assessment_date === 'number' || assessment.assessment_date instanceof Date
+                              ? assessment.assessment_date
+                              : String(assessment.assessment_date ?? Date.now()),
+                          )}
+                        />
+                      </div>
+                      {/* Row 2: AI + Edit + Delete */}
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleOpenAssessmentPlanModal(assessment)}
+                          disabled={!!aiPlanByAssessmentId[String(assessment.id)]?.loading}
+                          className="min-h-[40px] flex-1 px-3 py-2 rounded-xl bg-yellow-500 text-black text-sm font-bold hover:bg-yellow-400 transition-all duration-200 active:scale-95 flex items-center justify-center gap-1.5 disabled:opacity-60"
+                        >
+                          <Sparkles className="w-4 h-4" />
+                          {aiPlanByAssessmentId[String(assessment.id)]?.loading ? 'Gerando…' : 'Plano IA'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditAssessmentId(assessmentId);
+                            setShowForm(true);
+                          }}
+                          className="min-h-[40px] px-3 py-2 rounded-xl border text-sm font-bold text-neutral-300 hover:text-white hover:border-yellow-500/40 transition-all duration-200 active:scale-95 flex items-center gap-1.5"
+                          style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }}
+                        >
+                          <Edit3 className="w-4 h-4" />
+                          Editar
+                        </button>
+                        {confirmDeleteId === assessmentId ? (
+                          <div className="flex items-center gap-1">
+                            <button
+                              type="button"
+                              onClick={() => handleDeleteAssessment(assessmentId)}
+                              disabled={deletingId === assessmentId}
+                              className="min-h-[40px] px-3 py-2 rounded-xl bg-red-600 text-white text-sm font-bold hover:bg-red-500 transition-all duration-200 active:scale-95 disabled:opacity-60"
+                            >
+                              {deletingId === assessmentId ? '...' : 'Sim'}
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => setConfirmDeleteId(null)}
+                              className="min-h-[40px] px-3 py-2 rounded-xl border border-neutral-700 text-neutral-400 text-sm font-bold hover:text-white transition-all duration-200 active:scale-95"
+                            >
+                              Não
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setConfirmDeleteId(assessmentId)}
+                            className="min-h-[40px] px-3 py-2 rounded-xl border text-sm font-bold text-red-400 hover:text-red-300 hover:border-red-500/40 transition-all duration-200 active:scale-95 flex items-center gap-1.5"
+                            style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         )}
-                      />
-                      <button
-                        type="button"
-                        onClick={() => handleOpenAssessmentPlanModal(assessment)}
-                        disabled={!!aiPlanByAssessmentId[String(assessment.id)]?.loading}
-                        className="min-h-[44px] px-4 py-2 rounded-xl bg-yellow-500 text-black font-black hover:bg-yellow-400 transition-all duration-300 active:scale-95"
-                      >
-                        {aiPlanByAssessmentId[String(assessment.id)]?.loading ? 'Gerando plano…' : 'Plano Tático (AI)'}
-                      </button>
+                      </div>
                     </div>
                   </div>
                   {selectedAssessment === assessmentId && (
@@ -1234,24 +1305,55 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
         ) : null}
 
         {/* Modal do Formulário */}
-        {showForm && (
-          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowForm(false)}>
-            <div className="bg-neutral-900 w-full max-w-3xl rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
-              <div className="p-4 border-b border-neutral-800 flex justify-between items-center">
-                <h3 className="font-bold text-white">Nova Avaliação</h3>
-                <button onClick={() => setShowForm(false)} className="p-2 hover:bg-neutral-800 rounded-full"><X className="w-5 h-5 text-neutral-400" /></button>
-              </div>
-              <div className="p-4 max-h-[80vh] overflow-y-auto bg-neutral-900">
-                <AssessmentForm
-                  studentId={studentId!}
-                  studentName={studentName}
-                  onSuccess={() => { setShowForm(false); location.reload(); }}
-                  onCancel={() => setShowForm(false)}
-                />
+        {showForm && (() => {
+          // Build initialData from editAssessmentId if set
+          const editData = (() => {
+            if (!editAssessmentId) return null;
+            const a = sortedAssessments.find(x => String(x?.id) === editAssessmentId);
+            if (!a) return null;
+            return {
+              assessment_date: String(a.assessment_date ?? ''),
+              weight: String(a.weight || ''),
+              height: String(a.height || ''),
+              age: String(a.age || ''),
+              gender: safeGender(a.gender),
+              arm_circ: String(getMeasurementCm(a, 'arm') || ''),
+              chest_circ: String(getMeasurementCm(a, 'chest') || ''),
+              waist_circ: String(getMeasurementCm(a, 'waist') || ''),
+              hip_circ: String(getMeasurementCm(a, 'hip') || ''),
+              thigh_circ: String(getMeasurementCm(a, 'thigh') || ''),
+              calf_circ: String(getMeasurementCm(a, 'calf') || ''),
+              triceps_skinfold: String(getSkinfoldMm(a, 'triceps') || ''),
+              biceps_skinfold: String(getSkinfoldMm(a, 'biceps') || ''),
+              subscapular_skinfold: String(getSkinfoldMm(a, 'subscapular') || ''),
+              suprailiac_skinfold: String(getSkinfoldMm(a, 'suprailiac') || ''),
+              abdominal_skinfold: String(getSkinfoldMm(a, 'abdominal') || ''),
+              thigh_skinfold: String(getSkinfoldMm(a, 'thigh') || ''),
+              calf_skinfold: String(getSkinfoldMm(a, 'calf') || ''),
+              observations: ''
+            };
+          })();
+
+          return (
+            <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => { setShowForm(false); setEditAssessmentId(null); }}>
+              <div className="bg-neutral-900 w-full max-w-3xl rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                <div className="p-4 border-b border-neutral-800 flex justify-between items-center">
+                  <h3 className="font-bold text-white">{editAssessmentId ? 'Editar Avaliação' : 'Nova Avaliação'}</h3>
+                  <button onClick={() => { setShowForm(false); setEditAssessmentId(null); }} className="p-2 hover:bg-neutral-800 rounded-full"><X className="w-5 h-5 text-neutral-400" /></button>
+                </div>
+                <div className="p-4 max-h-[80vh] overflow-y-auto bg-neutral-900">
+                  <AssessmentForm
+                    studentId={studentId!}
+                    studentName={studentName}
+                    initialData={editData}
+                    onSuccess={() => { setShowForm(false); setEditAssessmentId(null); location.reload(); }}
+                    onCancel={() => { setShowForm(false); setEditAssessmentId(null); }}
+                  />
+                </div>
               </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
 
 
         {showHistory && (
