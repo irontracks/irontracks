@@ -5,6 +5,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { requireRole, requireRoleWithBearer } from '@/utils/auth/route'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { logError, logWarn, logInfo } from '@/lib/logger'
+import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 
 export const dynamic = 'force-dynamic'
 
@@ -56,6 +57,11 @@ export async function POST(req: Request) {
       if (!auth.ok) return auth.response
     }
 
+    const ip = getRequestIp(req)
+    const rlKey = `admin:access-action:${auth.user.id}:${ip}`
+    const rl = await checkRateLimitAsync(rlKey, 10, 60_000)
+    if (!rl.allowed) return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 })
+
     const parsedBody = await parseJsonBody(req, ZodBodySchema)
     if (parsedBody.response) return parsedBody.response
     const body: Record<string, unknown> = parsedBody.data!
@@ -72,7 +78,7 @@ export async function POST(req: Request) {
     } catch (adminErr) {
       const msg = adminErr instanceof Error ? adminErr.message : String(adminErr)
       logError('access-requests/action', 'Admin client creation failed:', msg)
-      return NextResponse.json({ ok: false, error: `Erro interno: ${msg}` }, { status: 500 })
+      return NextResponse.json({ ok: false, error: 'internal_error' }, { status: 500 })
     }
 
     // Fetch request details — use select('*') to avoid column-not-found errors
@@ -85,7 +91,7 @@ export async function POST(req: Request) {
     if (fetchError) {
       logError('access-requests/action', `Fetch error for requestId ${requestId}: ${fetchError.message}`)
       // Expose real error to help diagnose
-      return NextResponse.json({ ok: false, error: `Erro ao buscar solicitação: ${fetchError.message}` }, { status: 500 })
+      return NextResponse.json({ ok: false, error: 'Erro ao buscar solicitação.' }, { status: 500 })
     }
 
     if (!request) {

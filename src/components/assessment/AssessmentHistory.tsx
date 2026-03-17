@@ -661,6 +661,7 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
     return out;
   }, [sortedAssessments, workoutSessions]);
 
+  // Chart.js dataset types are loosely typed in assessmentChartData — cast needed to satisfy react-chartjs-2 generics
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const chartData = useMemo(() => buildAssessmentChartData(sortedAssessments) as any, [sortedAssessments]);
 

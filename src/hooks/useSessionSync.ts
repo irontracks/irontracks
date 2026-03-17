@@ -238,7 +238,7 @@ export function useSessionSync({
             mounted = false
             try {
                 if (channel) supabase.removeChannel(channel)
-            } catch { /* channel cleanup failed — let it expire naturally */ }
+            } catch (e) { logWarn('useSessionSync', 'channel cleanup failed', { error: String(e) }) }
         }
     }, [supabase, userId, inAppNotify, setActiveSession, setView, suppressForeignFinishToastUntilRef])
 

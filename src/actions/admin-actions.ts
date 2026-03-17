@@ -554,16 +554,26 @@ export async function importAllData(json: Record<string, unknown>): Promise<Admi
         await checkAdmin()
         const adminDb = createAdminClient()
 
-        const profiles = Array.isArray(json?.profiles) ? json.profiles : []
-        const teachers = Array.isArray(json?.teachers) ? json.teachers : []
-        const students = Array.isArray(json?.students) ? json.students : []
-        const assessments = Array.isArray(json?.assessments) ? json.assessments : []
-        const notifications = Array.isArray(json?.notifications) ? json.notifications : []
-        const chat_channels = Array.isArray(json?.chat_channels) ? json.chat_channels : []
-        const messages = Array.isArray(json?.messages) ? json.messages : []
-        const invites = Array.isArray(json?.invites) ? json.invites : []
-        const team_sessions = Array.isArray(json?.team_sessions) ? json.team_sessions : []
-        const workouts = Array.isArray(json?.workouts) ? json.workouts : []
+        // Validate top-level structure before importing — filter out records without an id
+        type AnyRow = Record<string, unknown>
+        const toRows = (v: unknown): AnyRow[] => {
+            if (!Array.isArray(v)) return []
+            return v.filter((r): r is AnyRow => r !== null && typeof r === 'object' && typeof (r as AnyRow).id === 'string' && (r as AnyRow).id !== '')
+        }
+
+        const profiles = toRows(json?.profiles)
+        const teachers = toRows(json?.teachers)
+        const students = toRows(json?.students)
+        const assessments = toRows(json?.assessments)
+        const notifications = toRows(json?.notifications)
+        const chat_channels = toRows(json?.chat_channels)
+        const messages = toRows(json?.messages)
+        const invites = toRows(json?.invites)
+        const team_sessions = toRows(json?.team_sessions)
+        const workouts = Array.isArray(json?.workouts) ? (json.workouts as AnyRow[]) : []
+
+        const totalRecords = profiles.length + teachers.length + students.length + assessments.length + workouts.length
+        if (totalRecords === 0) return { error: 'Nenhum dado válido encontrado no arquivo de importação.' }
 
         if (chat_channels.length) {
             const batchSize = 500
@@ -725,6 +735,11 @@ export async function importAllData(json: Record<string, unknown>): Promise<Admi
         }
 
         if (assessments.length) {
+            const clampNum = (v: unknown, min: number, max: number): number | null => {
+                const n = Number(v)
+                if (!Number.isFinite(n)) return null
+                return n < min || n > max ? null : n
+            }
             const batchSize = 200
             for (let i = 0; i < assessments.length; i += batchSize) {
                 const batch = assessments.slice(i, i + batchSize).map(a => ({
@@ -732,9 +747,9 @@ export async function importAllData(json: Record<string, unknown>): Promise<Admi
                     student_id: a.student_id,
                     trainer_id: a.trainer_id,
                     assessment_date: a.assessment_date,
-                    weight: a.weight,
-                    height: a.height,
-                    age: a.age,
+                    weight: clampNum(a.weight, 20, 400),
+                    height: clampNum(a.height, 50, 280),
+                    age: clampNum(a.age, 5, 120),
                     gender: a.gender,
                     arm_circ: a.arm_circ,
                     chest_circ: a.chest_circ,

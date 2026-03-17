@@ -35,8 +35,8 @@ const BodySchema = z
   .object({
     planId: z.string().min(1),
     billingType: z.preprocess((v) => (typeof v === 'string' ? v.trim().toUpperCase() : 'PIX'), z.string().default('PIX')),
-    cpfCnpj: z.preprocess((v) => onlyDigits(v), z.string().min(1)),
-    mobilePhone: z.preprocess((v) => onlyDigits(v), z.string().min(1)),
+    cpfCnpj: z.preprocess((v) => onlyDigits(v), z.string().refine((s) => s.length === 11 || s.length === 14, 'CPF deve ter 11 dígitos ou CNPJ 14')),
+    mobilePhone: z.preprocess((v) => onlyDigits(v), z.string().regex(/^\d{10,11}$/, 'Telefone deve ter 10 ou 11 dígitos')),
     name: z.preprocess((v) => (typeof v === 'string' ? v.trim() : ''), z.string().optional().default('')),
   })
   .strip()
@@ -139,9 +139,10 @@ export async function POST(req: Request) {
     if (subErr || !subRow) {
       const msg = String(subErr?.message || '')
       if (msg.toLowerCase().includes('column') && msg.toLowerCase().includes('provider')) {
-        return NextResponse.json({ ok: false, error: 'db_migration_required' }, { status: 500 })
+        logError('checkout', 'Missing provider column — run pending migrations', { userId: user.id })
+        return NextResponse.json({ ok: false, error: 'internal_error' }, { status: 500 })
       }
-      return NextResponse.json({ ok: false, error: subErr?.message || 'failed_to_store_subscription' }, { status: 400 })
+      return NextResponse.json({ ok: false, error: 'failed_to_store_subscription' }, { status: 400 })
     }
 
     const baseUrl = resolveBaseUrl(req)
@@ -222,9 +223,10 @@ export async function POST(req: Request) {
     if (payErr) {
       const msg = String(payErr?.message || '')
       if (msg.toLowerCase().includes('column') && msg.toLowerCase().includes('provider')) {
-        return NextResponse.json({ ok: false, error: 'db_migration_required' }, { status: 500 })
+        logError('checkout', 'Missing provider column in app_payments — run pending migrations', { userId: user.id })
+        return NextResponse.json({ ok: false, error: 'internal_error' }, { status: 500 })
       }
-      return NextResponse.json({ ok: false, error: payErr.message }, { status: 400 })
+      return NextResponse.json({ ok: false, error: 'payment_storage_failed' }, { status: 400 })
     }
 
     await admin

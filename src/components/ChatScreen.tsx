@@ -53,6 +53,61 @@ const isRecord = (v: unknown): v is Record<string, unknown> => v !== null && typ
 
 const CHAT_MEDIA_PREVIEW_SIZE = 800;
 
+const CHAT_POLL_INTERVAL_MS = 8_000;
+
+/** Memoized message bubble — avoids re-renders when sibling messages change */
+const ChatMessage = React.memo(function ChatMessage({ msg, isMe, showAvatar, channelType, onDelete }: {
+    msg: FormattedMessage; isMe: boolean; showAvatar: boolean; channelType?: string; onDelete: (msg: FormattedMessage) => void;
+}) {
+    const displayName = String(msg?.displayName || '').trim();
+    const initial = displayName ? displayName[0] : '?';
+    const avatarAlt = displayName || 'avatar';
+    const timeLabel = (() => {
+        try {
+            const raw = msg?.createdAt;
+            const d = raw instanceof Date ? raw : new Date(raw);
+            if (!Number.isFinite(d.getTime())) return '';
+            return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        } catch { return ''; }
+    })();
+
+    return (
+        <div className={`flex gap-3 ${isMe ? 'flex-row-reverse' : ''} ${!showAvatar && !isMe ? 'ml-11' : ''}`}>
+            {!isMe && showAvatar && (
+                msg.photoURL ? (
+                    <Image src={msg.photoURL} width={32} height={32} className="w-8 h-8 rounded-full bg-neutral-700 object-cover self-end mb-1" alt={avatarAlt} />
+                ) : (
+                    <div className="w-8 h-8 rounded-full bg-neutral-700 flex items-center justify-center font-bold text-[10px] self-end mb-1">{initial}</div>
+                )
+            )}
+            <div className={`max-w-[75%] rounded-2xl p-3 shadow-sm break-words ${isMe ? 'bg-yellow-500 text-black rounded-br-none' : 'bg-neutral-800 text-white rounded-bl-none'}`}>
+                {!isMe && channelType === 'global' && <p className="text-[10px] font-bold opacity-50 mb-1">{displayName || 'Usuário'}</p>}
+                {msg.kind === 'image' && (
+                    <Image
+                        src={msg.thumbUrl || msg.mediaUrl || ''}
+                        alt="imagem"
+                        width={CHAT_MEDIA_PREVIEW_SIZE}
+                        height={CHAT_MEDIA_PREVIEW_SIZE}
+                        className="rounded-lg max-h-64 w-full object-cover cursor-pointer"
+                        onClick={() => { try { const url = msg?.mediaUrl ? String(msg.mediaUrl) : ''; if (url) window.open(url, '_blank'); } catch {} }}
+                    />
+                )}
+                {msg.kind === 'video' && (<video src={msg.mediaUrl} controls playsInline className="rounded-lg max-h-64 w-full" />)}
+                {msg.kind === 'gif' && (
+                    <Image src={msg.mediaUrl || ''} alt="gif" width={CHAT_MEDIA_PREVIEW_SIZE} height={CHAT_MEDIA_PREVIEW_SIZE} className="rounded-lg max-h-64 w-full object-cover" unoptimized />
+                )}
+                {(!msg.kind || msg.kind === 'text') && (<p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{msg.text}</p>)}
+                <div className="flex items-center justify-between gap-2 mt-1">
+                    {isMe ? (
+                        <button type="button" onClick={() => onDelete(msg)} className={`p-1 rounded-md ${isMe ? 'text-black/60 hover:text-black' : 'text-neutral-400 hover:text-white'}`} aria-label="Deletar mensagem"><Trash2 size={14} /></button>
+                    ) : (<span />)}
+                    <p className={`text-[9px] text-right ${isMe ? 'text-black/50' : 'text-neutral-500'}`}>{timeLabel}</p>
+                </div>
+            </div>
+        </div>
+    );
+});
+
 const ChatScreen = ({ user, onClose }: ChatScreenProps) => {
     const [view, setView] = useState('list');
     const [activeChannel, setActiveChannel] = useState<ChannelRow | null>(null);
@@ -278,7 +333,7 @@ const ChatScreen = ({ user, onClose }: ChatScreenProps) => {
         const poll = setInterval(() => {
             if (!visibilityRef.current) return;
             loadMessages();
-        }, 8000);
+        }, CHAT_POLL_INTERVAL_MS);
         return () => { abortCtrl.abort(); supabase.removeChannel(channel); clearInterval(poll); };
     }, [activeChannel, formatMessage, supabase]);
 
@@ -522,81 +577,16 @@ const ChatScreen = ({ user, onClose }: ChatScreenProps) => {
                             const isMe = !!myId && msgUid === myId;
                             const prevUid = messages?.[idx - 1]?.uid ? String(messages[idx - 1].uid) : '';
                             const showAvatar = !isMe && (idx === 0 || prevUid !== msgUid);
-                            const displayName = String(msg?.displayName || '').trim();
-                            const initial = displayName ? displayName[0] : '?';
-                            const avatarAlt = displayName || 'avatar';
-                            const timeLabel = (() => {
-                                try {
-                                    const raw = msg?.createdAt;
-                                    const d = raw instanceof Date ? raw : new Date(raw);
-                                    if (!Number.isFinite(d.getTime())) return '';
-                                    return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-                                } catch {
-                                    return '';
-                                }
-                            })();
-                            
                             return (
-                                <div key={msg.id} className={`flex gap-3 ${isMe ? 'flex-row-reverse' : ''} ${!showAvatar && !isMe ? 'ml-11' : ''}`}>
-                                    {!isMe && showAvatar && (
-                                        msg.photoURL ? (
-                                            <Image src={msg.photoURL} width={32} height={32} className="w-8 h-8 rounded-full bg-neutral-700 object-cover self-end mb-1" alt={avatarAlt} />
-                                        ) : (
-                                            <div className="w-8 h-8 rounded-full bg-neutral-700 flex items-center justify-center font-bold text-[10px] self-end mb-1">{initial}</div>
-                                        )
-                                    )}
-                                    <div className={`max-w-[75%] rounded-2xl p-3 shadow-sm break-words ${isMe ? 'bg-yellow-500 text-black rounded-br-none' : 'bg-neutral-800 text-white rounded-bl-none'}`}>
-                                        {!isMe && activeChannel.type === 'global' && <p className="text-[10px] font-bold opacity-50 mb-1">{displayName || 'Usuário'}</p>}
-                                        {msg.kind === 'image' && (
-                                            <Image
-                                                src={msg.thumbUrl || msg.mediaUrl || ''}
-                                                alt="imagem"
-                                                width={CHAT_MEDIA_PREVIEW_SIZE}
-                                                height={CHAT_MEDIA_PREVIEW_SIZE}
-                                                className="rounded-lg max-h-64 w-full object-cover cursor-pointer"
-                                                onClick={() => {
-                                                    try {
-                                                        const url = msg?.mediaUrl ? String(msg.mediaUrl) : '';
-                                                        if (!url) return;
-                                                        window.open(url, '_blank');
-                                                    } catch {}
-                                                }}
-                                            />
-                                        )}
-                                        {msg.kind === 'video' && (
-                                            <video src={msg.mediaUrl} controls playsInline className="rounded-lg max-h-64 w-full" />
-                                        )}
-                                        {msg.kind === 'gif' && (
-                                            <Image
-                                                src={msg.mediaUrl || ''}
-                                                alt="gif"
-                                                width={CHAT_MEDIA_PREVIEW_SIZE}
-                                                height={CHAT_MEDIA_PREVIEW_SIZE}
-                                                className="rounded-lg max-h-64 w-full object-cover"
-                                                unoptimized
-                                            />
-                                        )}
-                                        {(!msg.kind || msg.kind === 'text') && (
-                                            <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{msg.text}</p>
-                                        )}
-                                        <div className="flex items-center justify-between gap-2 mt-1">
-                                            {isMe ? (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => handleDeleteMessage(msg)}
-                                                    className={`p-1 rounded-md ${isMe ? 'text-black/60 hover:text-black' : 'text-neutral-400 hover:text-white'}`}
-                                                    aria-label="Deletar mensagem"
-                                                >
-                                                    <Trash2 size={14} />
-                                                </button>
-                                            ) : (
-                                                <span />
-                                            )}
-                                            <p className={`text-[9px] text-right ${isMe ? 'text-black/50' : 'text-neutral-500'}`}>{timeLabel}</p>
-                                        </div>
-                                    </div>
-                                </div>
-                            )
+                                <ChatMessage
+                                    key={msg.id}
+                                    msg={msg}
+                                    isMe={isMe}
+                                    showAvatar={showAvatar}
+                                    channelType={activeChannel?.type as string | undefined}
+                                    onDelete={handleDeleteMessage}
+                                />
+                            );
                         })}
                         <div ref={dummy}></div>
                     </div>
@@ -613,7 +603,7 @@ const ChatScreen = ({ user, onClose }: ChatScreenProps) => {
                         {showEmoji && (
                             <div className="absolute bottom-20 right-6 bg-neutral-900 border border-neutral-700 rounded-xl p-2 grid grid-cols-8 gap-1 shadow-xl">
                                 {['😀','😁','😂','😉','😊','😍','👍','💪','🔥','🙏','🥳','🤝','🤩','🤔','👏','🙌'].map(e => (
-                                    <button type="button" key={e} className="text-xl" onClick={() => insertEmoji(e)}>{e}</button>
+                                    <button type="button" key={e} className="text-xl" onClick={() => insertEmoji(e)} aria-label={`Inserir emoji ${e}`}>{e}</button>
                                 ))}
                             </div>
                         )}

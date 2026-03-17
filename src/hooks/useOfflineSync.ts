@@ -102,6 +102,8 @@ export function useOfflineSync({ userId, settings }: UseOfflineSyncOptions = {})
       window.addEventListener('offline', onOffline);
     } catch { /* SSR guard */ }
     return () => {
+      // Reset mutex on unmount so subsequent mounts can flush again
+      flushingRef.current = false
       try {
         window.removeEventListener('irontracks.offlineQueueChanged', onChanged);
         window.removeEventListener('online', onOnline);

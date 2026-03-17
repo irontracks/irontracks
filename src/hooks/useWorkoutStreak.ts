@@ -11,7 +11,7 @@
  */
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { computeWorkoutStreakAndStats } from '@/actions/workout-actions';
 import type { WorkoutStreak } from '@/types/app';
 import { logError } from '@/lib/logger';
@@ -23,11 +23,19 @@ export function useWorkoutStreak(userId?: string | null) {
   const [streakStats, setStreakStats] = useState<WorkoutStreak | null>(null);
   // Track whether the async fetch has completed (set only inside async callbacks)
   const [resolved, setResolved] = useState(false);
+  // Track the userId that triggered the last fetch so we can detect changes
+  // without calling setState synchronously inside the effect body.
+  const prevUserIdRef = useRef<string | null | undefined>(undefined);
+
+  // Reset resolved state when userId changes (outside effect, in render phase)
+  if (userId !== prevUserIdRef.current) {
+    prevUserIdRef.current = userId;
+    if (resolved) setResolved(false);
+  }
 
   useEffect(() => {
     if (!userId) return;
 
-    setResolved(false);  // Reset on userId change to show loading for new user
     let cancelled = false;
 
     computeWorkoutStreakAndStats()
