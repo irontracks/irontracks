@@ -342,27 +342,35 @@ function showPdfIframe(html: string) {
   const printBtn = document.createElement('button')
   printBtn.textContent = '📄 Salvar como PDF'
   printBtn.style.cssText = 'padding:8px 16px;background:#d4a017;color:#000;border:none;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer'
-  printBtn.onclick = () => {
-    // iframe.contentWindow.print() does NOT work in iOS WKWebView.
-    // Instead: save current page, replace with assessment HTML, call window.print(), then restore.
-    const savedHtml = document.documentElement.outerHTML
-    cleanup()
+  printBtn.onclick = async () => {
+    // Strategy 1: try printing the iframe content directly
+    try {
+      const iframeWin = iframe.contentWindow
+      if (iframeWin) {
+        iframeWin.print()
+        return
+      }
+    } catch { /* cross-origin or WKWebView restriction — try next strategy */ }
 
-    document.open()
-    document.write(html)
-    document.close()
+    // Strategy 2: try Capacitor Share plugin to share the HTML as a file
+    try {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const { Share } = await import('@capacitor/share' as any)
+      const dataUrl = 'data:text/html;base64,' + btoa(unescape(encodeURIComponent(html)))
+      await Share.share({
+        title: 'Avaliação Física',
+        text: 'Avaliação Física - IronTracks',
+        url: dataUrl,
+        dialogTitle: 'Compartilhar Avaliação',
+      })
+      return
+    } catch { /* Share plugin not available */ }
 
-    setTimeout(() => {
-      window.print()
-      // Restore original page after print dialog closes
-      setTimeout(() => {
-        document.open()
-        document.write(savedHtml)
-        document.close()
-        // Re-run scripts won't work after document.write, so reload the page
-        window.location.reload()
-      }, 300)
-    }, 300)
+    // Strategy 3: open in a new tab (browser will handle print)
+    try {
+      const dataUrl = 'data:text/html;base64,' + btoa(unescape(encodeURIComponent(html)))
+      window.open(dataUrl, '_blank')
+    } catch { /* nothing more we can do */ }
   }
 
   const closeBtn = document.createElement('button')
