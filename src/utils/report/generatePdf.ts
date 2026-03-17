@@ -329,9 +329,9 @@ export async function generateAssessmentPdf(
     const blob = new Blob([html], { type: 'text/html' })
 
     if (isNativeApp()) {
-      // On iOS/Android WKWebView: use full-screen iframe overlay.
-      // The print button inside uses @media print CSS injection + synchronous window.print().
-      showPdfIframe(html)
+      // On iOS WKWebView, window.print() is NOT supported.
+      // Use Web Share API or @capacitor/filesystem as fallback.
+      await shareOrSaveHtml(html, studentName)
       return blob
     }
 
@@ -346,8 +346,8 @@ export async function generateAssessmentPdf(
       return blob
     }
 
-    // Popup blocked — use iframe fallback so the user still gets the PDF
-    showPdfIframe(html)
+    // Popup blocked — use iframe fallback with share button
+    showPdfIframe(html, studentName)
     return blob
   } catch (error) {
     logError('error', 'Erro ao gerar PDF da avaliação', error)
@@ -355,8 +355,71 @@ export async function generateAssessmentPdf(
   }
 }
 
-/** Full-screen iframe overlay with close + print buttons — used when popups are blocked */
-function showPdfIframe(html: string) {
+/**
+ * Share the assessment HTML via native share sheet (iOS/Android).
+ * Strategy 1: Web Share API with file (opens native share sheet with Print option)
+ * Strategy 2: @capacitor/filesystem save + alert
+ */
+async function shareOrSaveHtml(html: string, studentName: string): Promise<void> {
+  const fileName = `Avaliacao_${studentName.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.html`
+
+  // Strategy 1: Web Share API with File (iOS 15+ WKWebView supports this)
+  if (typeof navigator !== 'undefined' && navigator.share && navigator.canShare) {
+    try {
+      const blob = new Blob([html], { type: 'text/html' })
+      const file = new File([blob], fileName, { type: 'text/html' })
+
+      if (navigator.canShare({ files: [file] })) {
+        await navigator.share({
+          title: 'Avaliação Física - IronTracks',
+          files: [file],
+        })
+        return
+      }
+    } catch (e) {
+      // User cancelled or share failed — try next strategy
+      if (e instanceof Error && e.name === 'AbortError') return // user cancelled, that's OK
+    }
+  }
+
+  // Strategy 2: Save via @capacitor/filesystem
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { Filesystem, Directory, Encoding } = await import('@capacitor/filesystem' as any)
+    await Filesystem.writeFile({
+      path: `IronTracks/${fileName}`,
+      data: html,
+      directory: Directory.Documents,
+      encoding: Encoding.UTF8,
+      recursive: true,
+    })
+    alert(`✅ Avaliação salva!\n\nAbra o app "Arquivos" → "No Meu iPhone" → "IronTracks" para encontrar o arquivo.\n\nDe lá você pode compartilhar ou imprimir.`)
+    return
+  } catch {
+    // Filesystem not available
+  }
+
+  // Strategy 3: Blob download link (last resort)
+  try {
+    const blob = new Blob([html], { type: 'text/html' })
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = fileName
+    a.style.display = 'none'
+    document.body.appendChild(a)
+    a.click()
+    setTimeout(() => {
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    }, 1000)
+  } catch {
+    alert('Não foi possível salvar a avaliação. Tente novamente.')
+  }
+}
+
+/** Full-screen iframe overlay with close + share buttons */
+function showPdfIframe(html: string, studentName: string) {
   // Backdrop
   const backdrop = document.createElement('div')
   backdrop.style.cssText = 'position:fixed;inset:0;z-index:99998;background:rgba(0,0,0,0.6)'
@@ -382,88 +445,29 @@ function showPdfIframe(html: string) {
   const printBtn = document.createElement('button')
   printBtn.textContent = '📄 Salvar como PDF'
   printBtn.style.cssText = 'padding:8px 16px;background:#d4a017;color:#000;border:none;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer'
-  printBtn.onclick = () => {
-    // Parse the full HTML document to extract styles and body separately.
-    // Using innerHTML with a full <!DOCTYPE> document loses <style> from <head>.
-    const parser = new DOMParser()
-    const doc = parser.parseFromString(html, 'text/html')
-    const bodyContent = doc.body?.innerHTML || ''
-    const headStyles = Array.from(doc.querySelectorAll('style'))
-      .map(s => s.textContent || '')
-      .join('\n')
-
-    // Create hidden print container
-    const printContainer = document.createElement('div')
-    printContainer.id = '__irontracks_print__'
-    printContainer.style.cssText = 'position:fixed;top:0;left:0;width:0;height:0;overflow:hidden;z-index:-1'
-    printContainer.innerHTML = bodyContent
-
-    // Inject the assessment's own styles + @media print overrides
-    const printStyle = document.createElement('style')
-    printStyle.id = '__irontracks_print_style__'
-    printStyle.textContent = `
-      #__irontracks_print__ { font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; font-size: 14px; line-height: 1.5; color: #111; }
-      #__irontracks_print__ .container { max-width: 800px; margin: 0 auto; padding: 24px; }
-      #__irontracks_print__ .header { display: flex; justify-content: space-between; align-items: flex-end; border-bottom: 3px solid #111; padding-bottom: 12px; margin-bottom: 20px; }
-      #__irontracks_print__ .brand { font-weight: 900; font-size: 28px; letter-spacing: -1px; }
-      #__irontracks_print__ .brand .highlight { color: #d4a017; font-style: italic; }
-      #__irontracks_print__ .subtitle { font-size: 11px; text-transform: uppercase; color: #666; font-weight: 700; letter-spacing: 2px; }
-      #__irontracks_print__ .title { font-size: 18px; font-weight: 800; }
-      #__irontracks_print__ .date { font-size: 12px; color: #666; }
-      #__irontracks_print__ .section { margin-bottom: 20px; }
-      #__irontracks_print__ .section h2 { font-size: 13px; margin: 0 0 8px; font-weight: 800; text-transform: uppercase; letter-spacing: 1px; color: #333; border-bottom: 1px solid #e0e0e0; padding-bottom: 4px; }
-      #__irontracks_print__ .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 8px; }
-      #__irontracks_print__ .card { background: #f7f7f7; border: 1px solid #e0e0e0; border-radius: 8px; padding: 10px; }
-      #__irontracks_print__ .label { font-size: 10px; text-transform: uppercase; color: #888; font-weight: 700; letter-spacing: 1px; margin-bottom: 2px; }
-      #__irontracks_print__ .value { font-size: 16px; font-weight: 800; }
-      #__irontracks_print__ .value.green { color: #059669; }
-      #__irontracks_print__ .value.red { color: #dc2626; }
-      #__irontracks_print__ .value.gold { color: #d4a017; }
-      #__irontracks_print__ .class-label { font-size: 11px; color: #666; margin-top: 2px; }
-      #__irontracks_print__ table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 6px; }
-      #__irontracks_print__ th, #__irontracks_print__ td { border-bottom: 1px solid #eee; padding: 5px 4px; text-align: left; }
-      #__irontracks_print__ th { color: #888; text-transform: uppercase; font-weight: 700; font-size: 10px; }
-      #__irontracks_print__ .footer { margin-top: 24px; padding-top: 8px; border-top: 1px solid #ddd; text-align: center; font-size: 10px; color: #999; text-transform: uppercase; letter-spacing: 2px; }
-      #__irontracks_print__ .print-btn { display: none; }
-      ${headStyles}
-      @media print {
-        body > * { display: none !important; }
-        body > #__irontracks_print__ {
-          display: block !important;
-          position: static !important;
-          width: auto !important;
-          height: auto !important;
-          overflow: visible !important;
-          z-index: auto !important;
+  printBtn.onclick = async () => {
+    if (isNativeApp()) {
+      // Use Web Share API or Filesystem save
+      await shareOrSaveHtml(html, studentName)
+    } else {
+      // Desktop fallback: try to print from iframe or open new tab
+      try {
+        const iframeWin = iframe.contentWindow
+        if (iframeWin) {
+          iframeWin.focus()
+          iframeWin.print()
+          return
         }
-        #__irontracks_print__ .no-print { display: none !important; }
-        #__irontracks_print__ .print-btn { display: none !important; }
+      } catch { /* cross-origin */ }
+
+      // Open in new tab
+      const w = window.open('', '_blank')
+      if (w) {
+        w.document.write(html)
+        w.document.close()
+        setTimeout(() => { try { w.print() } catch { /* ok */ } }, 500)
       }
-    `
-
-    document.body.appendChild(printContainer)
-    document.head.appendChild(printStyle)
-
-    // Cleanup after print
-    const printCleanup = () => {
-      printContainer.remove()
-      printStyle.remove()
     }
-    const afterPrintHandler = () => {
-      window.removeEventListener('afterprint', afterPrintHandler)
-      printCleanup()
-    }
-    window.addEventListener('afterprint', afterPrintHandler)
-
-    // CRITICAL: call window.print() SYNCHRONOUSLY — no setTimeout!
-    // iOS WKWebView requires this to be in the user gesture call stack.
-    window.print()
-
-    // Fallback cleanup if afterprint doesn't fire
-    setTimeout(() => {
-      window.removeEventListener('afterprint', afterPrintHandler)
-      printCleanup()
-    }, 10000)
   }
 
   const closeBtn = document.createElement('button')
