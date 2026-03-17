@@ -298,14 +298,34 @@ export const useAssessment = (): UseAssessmentReturn => {
     const age = parseInt(data.age) || 0;
     const gender = data.gender;
 
-    // Dobras
-    const triceps = parseNumberInput(data.triceps_skinfold);
-    const biceps = parseNumberInput(data.biceps_skinfold);
+    // Helper: average of left+right, or single side, or direct field
+    const dataRec = data as unknown as Record<string, string>;
+    const avgOrDirect = (
+      directField: string,
+      leftField: string,
+      rightField: string
+    ): number | null => {
+      const l = parseNumberInput(dataRec[leftField] ?? '');
+      const r = parseNumberInput(dataRec[rightField] ?? '');
+      if (l != null && l > 0 && r != null && r > 0) return Math.round(((l + r) / 2) * 100) / 100;
+      if (l != null && l > 0) return l;
+      if (r != null && r > 0) return r;
+      return parseNumberInput(dataRec[directField] ?? '');
+    };
+
+    // Dobras — bilateral fields averaged
+    const triceps = avgOrDirect('triceps_skinfold', 'triceps_skinfold_left', 'triceps_skinfold_right');
+    const biceps = avgOrDirect('biceps_skinfold', 'biceps_skinfold_left', 'biceps_skinfold_right');
     const subscapular = parseNumberInput(data.subscapular_skinfold);
     const suprailiac = parseNumberInput(data.suprailiac_skinfold);
     const abdominal = parseNumberInput(data.abdominal_skinfold);
-    const thigh = parseNumberInput(data.thigh_skinfold);
-    const calf = parseNumberInput(data.calf_skinfold);
+    const thighSkin = avgOrDirect('thigh_skinfold', 'thigh_skinfold_left', 'thigh_skinfold_right');
+    const calfSkin = avgOrDirect('calf_skinfold', 'calf_skinfold_left', 'calf_skinfold_right');
+
+    // Circunferências — bilateral fields averaged
+    const armCirc = avgOrDirect('arm_circ', 'arm_circ_left', 'arm_circ_right');
+    const thighCirc = avgOrDirect('thigh_circ', 'thigh_circ_left', 'thigh_circ_right');
+    const calfCirc = avgOrDirect('calf_circ', 'calf_circ_left', 'calf_circ_right');
 
     // Calcular métricas
     const sumSkinfolds = calculateSumSkinfolds({
@@ -314,8 +334,8 @@ export const useAssessment = (): UseAssessmentReturn => {
       subscapular_skinfold: subscapular ?? undefined,
       suprailiac_skinfold: suprailiac ?? undefined,
       abdominal_skinfold: abdominal ?? undefined,
-      thigh_skinfold: thigh ?? undefined,
-      calf_skinfold: calf ?? undefined,
+      thigh_skinfold: thighSkin ?? undefined,
+      calf_skinfold: calfSkin ?? undefined,
     });
 
     const bodyDensity = calculateBodyDensity(sumSkinfolds, age, gender);
@@ -327,29 +347,43 @@ export const useAssessment = (): UseAssessmentReturn => {
 
     return {
       student_id: studentId,
-      trainer_id: user?.id || '', // Será preenchido pelo hook ou backend
+      trainer_id: user?.id || '',
       assessment_date: data.assessment_date,
       weight,
       height,
       age,
       gender,
 
-      // Circunferências
-      arm_circ: parseNumberInput(data.arm_circ) ?? undefined,
+      // Circunferências (médias bilaterais)
+      arm_circ: armCirc ?? undefined,
+      arm_circ_left: parseNumberInput(data.arm_circ_left) ?? undefined,
+      arm_circ_right: parseNumberInput(data.arm_circ_right) ?? undefined,
       chest_circ: parseNumberInput(data.chest_circ) ?? undefined,
       waist_circ: parseNumberInput(data.waist_circ) ?? undefined,
       hip_circ: parseNumberInput(data.hip_circ) ?? undefined,
-      thigh_circ: parseNumberInput(data.thigh_circ) ?? undefined,
-      calf_circ: parseNumberInput(data.calf_circ) ?? undefined,
+      thigh_circ: thighCirc ?? undefined,
+      thigh_circ_left: parseNumberInput(data.thigh_circ_left) ?? undefined,
+      thigh_circ_right: parseNumberInput(data.thigh_circ_right) ?? undefined,
+      calf_circ: calfCirc ?? undefined,
+      calf_circ_left: parseNumberInput(data.calf_circ_left) ?? undefined,
+      calf_circ_right: parseNumberInput(data.calf_circ_right) ?? undefined,
 
-      // Dobras
+      // Dobras (médias bilaterais)
       triceps_skinfold: triceps ?? undefined,
+      triceps_skinfold_left: parseNumberInput(data.triceps_skinfold_left) ?? undefined,
+      triceps_skinfold_right: parseNumberInput(data.triceps_skinfold_right) ?? undefined,
       biceps_skinfold: biceps ?? undefined,
+      biceps_skinfold_left: parseNumberInput(data.biceps_skinfold_left) ?? undefined,
+      biceps_skinfold_right: parseNumberInput(data.biceps_skinfold_right) ?? undefined,
       subscapular_skinfold: subscapular ?? undefined,
       suprailiac_skinfold: suprailiac ?? undefined,
       abdominal_skinfold: abdominal ?? undefined,
-      thigh_skinfold: thigh ?? undefined,
-      calf_skinfold: calf ?? undefined,
+      thigh_skinfold: thighSkin ?? undefined,
+      thigh_skinfold_left: parseNumberInput(data.thigh_skinfold_left) ?? undefined,
+      thigh_skinfold_right: parseNumberInput(data.thigh_skinfold_right) ?? undefined,
+      calf_skinfold: calfSkin ?? undefined,
+      calf_skinfold_left: parseNumberInput(data.calf_skinfold_left) ?? undefined,
+      calf_skinfold_right: parseNumberInput(data.calf_skinfold_right) ?? undefined,
 
       // Calculados
       body_fat_percentage: bodyFat,
