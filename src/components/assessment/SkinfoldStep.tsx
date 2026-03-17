@@ -1,4 +1,4 @@
-// Componente das 7 dobras cutâneas
+// Componente das 7 dobras cutâneas — com suporte bilateral (esq/dir)
 
 import React from 'react';
 import { Ruler, Info, AlertTriangle } from 'lucide-react';
@@ -11,67 +11,81 @@ interface SkinfoldStepProps {
   studentName: string;
 }
 
+type SkinField = keyof AssessmentFormData;
+
+interface SkinfoldDef {
+  field: SkinField;
+  label: string;
+  description: string;
+  location: string;
+  placeholder: string;
+  bilateral?: { left: SkinField; right: SkinField };
+}
+
 export const SkinfoldStep: React.FC<SkinfoldStepProps> = ({
   formData,
   updateFormData,
   errors,
   studentName
 }) => {
-  const handleNumberInput = (field: keyof AssessmentFormData, value: string) => {
-    // Permitir apenas números e vírgula/ponto para decimais
+  const handleNumberInput = (field: SkinField, value: string) => {
     const cleanedValue = value.replace(/[^0-9.,]/g, '').replace(',', '.');
     updateFormData({ [field]: cleanedValue });
   };
 
-  const skinfolds = [
+  const skinfolds: SkinfoldDef[] = [
     {
-      field: 'triceps_skinfold' as keyof AssessmentFormData,
+      field: 'triceps_skinfold',
       label: 'Tricipital',
       description: 'Dobra vertical na parte posterior do braço, no ponto médio entre o acrômio e o olécrano',
       location: 'Braço',
-      placeholder: 'Ex: 12.5'
+      placeholder: 'Ex: 12.5',
+      bilateral: { left: 'triceps_skinfold_left', right: 'triceps_skinfold_right' },
     },
     {
-      field: 'biceps_skinfold' as keyof AssessmentFormData,
+      field: 'biceps_skinfold',
       label: 'Bicipital',
       description: 'Dobra vertical na parte anterior do braço, sobre o músculo bíceps',
       location: 'Braço',
-      placeholder: 'Ex: 8.0'
+      placeholder: 'Ex: 8.0',
+      bilateral: { left: 'biceps_skinfold_left', right: 'biceps_skinfold_right' },
     },
     {
-      field: 'subscapular_skinfold' as keyof AssessmentFormData,
+      field: 'subscapular_skinfold',
       label: 'Subescapular',
       description: 'Dobra oblíqua sob a escápula, 2 cm abaixo da extremidade inferior',
       location: 'Costas',
-      placeholder: 'Ex: 15.0'
+      placeholder: 'Ex: 15.0',
     },
     {
-      field: 'suprailiac_skinfold' as keyof AssessmentFormData,
+      field: 'suprailiac_skinfold',
       label: 'Suprailíaca',
       description: 'Dobra oblíqua acima da crista ilíaca, na linha axilar média',
       location: 'Quadril',
-      placeholder: 'Ex: 18.5'
+      placeholder: 'Ex: 18.5',
     },
     {
-      field: 'abdominal_skinfold' as keyof AssessmentFormData,
+      field: 'abdominal_skinfold',
       label: 'Abdominal',
       description: 'Dobra vertical a 5 cm lateralmente do umbigo',
       location: 'Abdômen',
-      placeholder: 'Ex: 22.0'
+      placeholder: 'Ex: 22.0',
     },
     {
-      field: 'thigh_skinfold' as keyof AssessmentFormData,
+      field: 'thigh_skinfold',
       label: 'Coxa',
       description: 'Dobra vertical na coxa, no ponto médio entre a virilha e a patela',
       location: 'Coxa',
-      placeholder: 'Ex: 25.0'
+      placeholder: 'Ex: 25.0',
+      bilateral: { left: 'thigh_skinfold_left', right: 'thigh_skinfold_right' },
     },
     {
-      field: 'calf_skinfold' as keyof AssessmentFormData,
+      field: 'calf_skinfold',
       label: 'Panturrilha',
       description: 'Dobra vertical na panturrilha, no ponto de maior circunferência',
       location: 'Panturrilha',
-      placeholder: 'Ex: 15.5'
+      placeholder: 'Ex: 15.5',
+      bilateral: { left: 'calf_skinfold_left', right: 'calf_skinfold_right' },
     }
   ];
 
@@ -85,17 +99,6 @@ export const SkinfoldStep: React.FC<SkinfoldStepProps> = ({
     return 'normal';
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'very-low': return 'border-red-500 bg-red-50';
-      case 'low': return 'border-yellow-500 bg-yellow-50';
-      case 'normal': return 'border-green-500 bg-green-50';
-      case 'high': return 'border-yellow-500 bg-yellow-50';
-      case 'very-high': return 'border-red-500 bg-red-50';
-      default: return 'border-gray-300';
-    }
-  };
-
   const getStatusText = (status: string) => {
     switch (status) {
       case 'very-low': return 'Muito baixa - verificar medição';
@@ -105,6 +108,164 @@ export const SkinfoldStep: React.FC<SkinfoldStepProps> = ({
       case 'very-high': return 'Muito elevada - verificar medição';
       default: return '';
     }
+  };
+
+  const statusBorder = (status: string) => {
+    if (status === 'normal') return 'border-green-500/30 bg-green-900/10';
+    if (status === 'low' || status === 'high') return 'border-yellow-500/30 bg-yellow-900/10';
+    if (status === 'very-low' || status === 'very-high') return 'border-red-500/30 bg-red-900/10';
+    return 'border-neutral-700 bg-neutral-800';
+  };
+
+  const statusDot = (status: string) => {
+    if (status === 'normal') return 'bg-green-500';
+    if (status === 'low' || status === 'high') return 'bg-yellow-500';
+    return 'bg-red-500';
+  };
+
+  const statusTextColor = (status: string) => {
+    if (status === 'normal') return 'text-green-400';
+    if (status === 'low' || status === 'high') return 'text-yellow-400';
+    return 'text-red-400';
+  };
+
+  /** Compute the effective value (average of left+right or single field) for status indicator */
+  const effectiveValue = (s: SkinfoldDef): string => {
+    if (!s.bilateral) return String(formData[s.field] || '');
+    const l = parseFloat(String(formData[s.bilateral.left] || '').replace(',', '.'));
+    const r = parseFloat(String(formData[s.bilateral.right] || '').replace(',', '.'));
+    if (!isNaN(l) && l > 0 && !isNaN(r) && r > 0) return ((l + r) / 2).toFixed(1);
+    if (!isNaN(l) && l > 0) return String(l);
+    if (!isNaN(r) && r > 0) return String(r);
+    return '';
+  };
+
+  const renderBilateral = (s: SkinfoldDef) => {
+    const { bilateral } = s;
+    if (!bilateral) return null;
+
+    const leftVal = formData[bilateral.left] || '';
+    const rightVal = formData[bilateral.right] || '';
+    const leftNum = parseFloat(String(leftVal).replace(',', '.'));
+    const rightNum = parseFloat(String(rightVal).replace(',', '.'));
+    const avg = !isNaN(leftNum) && leftNum > 0 && !isNaN(rightNum) && rightNum > 0
+      ? ((leftNum + rightNum) / 2).toFixed(1)
+      : null;
+
+    const eff = effectiveValue(s);
+    const status = getSkinfoldStatus(eff);
+
+    return (
+      <div className={`p-4 rounded-xl border transition-all duration-200 ${statusBorder(status)}`}>
+        <div className="space-y-3">
+          {/* Header */}
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <Ruler className="w-4 h-4 text-neutral-400 mr-2" />
+              <label className="block text-sm font-bold text-neutral-300">{s.label}</label>
+            </div>
+            <span className="text-xs font-medium px-2 py-1 rounded bg-neutral-700 text-neutral-300">{s.location}</span>
+          </div>
+
+          {/* Bilateral inputs */}
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs text-neutral-500 mb-1">Esquerdo</label>
+              <div className="relative">
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={String(leftVal)}
+                  onChange={(e) => handleNumberInput(bilateral.left, e.target.value)}
+                  placeholder={s.placeholder}
+                  className={`w-full px-3 py-3 pr-12 border rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 placeholder:text-neutral-600 text-white bg-neutral-900 ${
+                    errors[bilateral.left] ? 'border-red-500' : 'border-neutral-700'
+                  }`}
+                />
+                <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-neutral-500 text-sm">mm</span>
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs text-neutral-500 mb-1">Direito</label>
+              <div className="relative">
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  value={String(rightVal)}
+                  onChange={(e) => handleNumberInput(bilateral.right, e.target.value)}
+                  placeholder={s.placeholder}
+                  className={`w-full px-3 py-3 pr-12 border rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 placeholder:text-neutral-600 text-white bg-neutral-900 ${
+                    errors[bilateral.right] ? 'border-red-500' : 'border-neutral-700'
+                  }`}
+                />
+                <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-neutral-500 text-sm">mm</span>
+              </div>
+            </div>
+          </div>
+
+          {avg && (
+            <div className="flex items-center bg-neutral-900/60 rounded-lg px-3 py-1.5">
+              <span className="text-xs text-neutral-400">Média:</span>
+              <span className="ml-1 text-xs font-bold text-yellow-500">{avg} mm</span>
+            </div>
+          )}
+
+          <p className="text-xs text-neutral-500">{s.description}</p>
+
+          {status !== 'empty' && (
+            <div className="flex items-center">
+              <div className={`w-2 h-2 rounded-full mr-2 ${statusDot(status)}`} />
+              <span className={`text-xs font-bold ${statusTextColor(status)}`}>{getStatusText(status)}</span>
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  };
+
+  const renderSingle = (s: SkinfoldDef) => {
+    const status = getSkinfoldStatus(String(formData[s.field] || ''));
+
+    return (
+      <div className={`p-4 rounded-xl border transition-all duration-200 ${statusBorder(status)}`}>
+        <div className="space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center">
+              <Ruler className="w-4 h-4 text-neutral-400 mr-2" />
+              <label className="block text-sm font-bold text-neutral-300">{s.label}</label>
+            </div>
+            <span className="text-xs font-medium px-2 py-1 rounded bg-neutral-700 text-neutral-300">{s.location}</span>
+          </div>
+
+          <div className="relative">
+            <input
+              type="text"
+              inputMode="decimal"
+              value={formData[s.field]}
+              onChange={(e) => handleNumberInput(s.field, e.target.value)}
+              placeholder={s.placeholder}
+              className={`w-full px-3 py-3 pr-12 border rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 placeholder:text-neutral-600 text-white bg-neutral-900 ${
+                errors[s.field] ? 'border-red-500' : 'border-neutral-700'
+              }`}
+            />
+            <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-neutral-500 text-sm">mm</span>
+          </div>
+
+          <p className="text-xs text-neutral-500">{s.description}</p>
+
+          {status !== 'empty' && (
+            <div className="flex items-center">
+              <div className={`w-2 h-2 rounded-full mr-2 ${statusDot(status)}`} />
+              <span className={`text-xs font-bold ${statusTextColor(status)}`}>{getStatusText(status)}</span>
+            </div>
+          )}
+
+          {errors[s.field] && (
+            <p className="text-sm text-red-500">{errors[s.field]}</p>
+          )}
+        </div>
+      </div>
+    );
   };
 
   return (
@@ -126,7 +287,7 @@ export const SkinfoldStep: React.FC<SkinfoldStepProps> = ({
             <ul className="space-y-1">
               <li>• Use um adipômetro calibrado e em bom estado</li>
               <li>• Pegue a dobra com o polegar e indicador, 1 cm acima do local de medição</li>
-              <li>• Meça no lado direito do corpo (padrão internacional)</li>
+              <li>• <strong className="text-red-200">Meça ambos os lados</strong> para tríceps, bíceps, coxa e panturrilha</li>
               <li>• Faça 3 medições e anote a média</li>
               <li>• A peça deve ser perpendicular ao músculo subjacente</li>
             </ul>
@@ -153,68 +314,11 @@ export const SkinfoldStep: React.FC<SkinfoldStepProps> = ({
 
       {/* Form Fields */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {skinfolds.map((skinfold, index) => {
-          const status = getSkinfoldStatus(formData[skinfold.field]);
-          return (
-            <div key={skinfold.field} className={`p-4 rounded-xl border transition-all duration-200 ${status === 'normal' ? 'border-green-500/30 bg-green-900/10' :
-                status === 'low' || status === 'high' ? 'border-yellow-500/30 bg-yellow-900/10' :
-                  status === 'very-low' || status === 'very-high' ? 'border-red-500/30 bg-red-900/10' :
-                    'border-neutral-700 bg-neutral-800'
-              }`}>
-              <div className="space-y-3">
-                {/* Header da dobra */}
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center">
-                    <Ruler className="w-4 h-4 text-neutral-400 mr-2" />
-                    <label className="block text-sm font-bold text-neutral-300">
-                      {skinfold.label}
-                    </label>
-                  </div>
-                  <span className="text-xs font-medium px-2 py-1 rounded bg-neutral-700 text-neutral-300">
-                    {skinfold.location}
-                  </span>
-                </div>
-
-                {/* Campo de entrada */}
-                <div className="relative">
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    value={formData[skinfold.field]}
-                    onChange={(e) => handleNumberInput(skinfold.field, e.target.value)}
-                    placeholder={skinfold.placeholder}
-                    className={`w-full px-3 py-3 pr-12 border rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 placeholder:text-neutral-600 text-white bg-neutral-900 ${errors[skinfold.field] ? 'border-red-500' : 'border-neutral-700'
-                      }`}
-                  />
-                  <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-neutral-500 text-sm">mm</span>
-                </div>
-
-                {/* Descrição */}
-                <p className="text-xs text-neutral-500">{skinfold.description}</p>
-
-                {/* Status */}
-                {status !== 'empty' && (
-                  <div className="flex items-center">
-                    <div className={`w-2 h-2 rounded-full mr-2 ${status === 'normal' ? 'bg-green-500' :
-                        status === 'low' || status === 'high' ? 'bg-yellow-500' :
-                          'bg-red-500'
-                      }`} />
-                    <span className={`text-xs font-bold ${status === 'normal' ? 'text-green-400' :
-                        status === 'low' || status === 'high' ? 'text-yellow-400' :
-                          'text-red-400'
-                      }`}>
-                      {getStatusText(status)}
-                    </span>
-                  </div>
-                )}
-
-                {errors[skinfold.field] && (
-                  <p className="text-sm text-red-500">{errors[skinfold.field]}</p>
-                )}
-              </div>
-            </div>
-          );
-        })}
+        {skinfolds.map((s) => (
+          <div key={s.field}>
+            {s.bilateral ? renderBilateral(s) : renderSingle(s)}
+          </div>
+        ))}
       </div>
 
       {/* Valores de Referência */}

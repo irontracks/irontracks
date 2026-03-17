@@ -13,21 +13,35 @@ export interface Assessment {
   gender: 'M' | 'F';
 
   // Circunferências (cm)
-  arm_circ?: number; // braço
+  arm_circ?: number; // braço (média dos lados)
+  arm_circ_left?: number;
+  arm_circ_right?: number;
   chest_circ?: number; // peito
   waist_circ?: number; // cintura
   hip_circ?: number; // quadril
-  thigh_circ?: number; // coxa
-  calf_circ?: number; // panturrilha
+  thigh_circ?: number; // coxa (média dos lados)
+  thigh_circ_left?: number;
+  thigh_circ_right?: number;
+  calf_circ?: number; // panturrilha (média dos lados)
+  calf_circ_left?: number;
+  calf_circ_right?: number;
 
   // 7 Dobras Cutâneas (mm)
-  triceps_skinfold?: number; // tricipital
-  biceps_skinfold?: number; // bicipital
+  triceps_skinfold?: number; // tricipital (média dos lados)
+  triceps_skinfold_left?: number;
+  triceps_skinfold_right?: number;
+  biceps_skinfold?: number; // bicipital (média dos lados)
+  biceps_skinfold_left?: number;
+  biceps_skinfold_right?: number;
   subscapular_skinfold?: number; // subescapular
   suprailiac_skinfold?: number; // suprailíaca
   abdominal_skinfold?: number; // abdominal
-  thigh_skinfold?: number; // coxa
-  calf_skinfold?: number; // panturrilha
+  thigh_skinfold?: number; // coxa (média dos lados)
+  thigh_skinfold_left?: number;
+  thigh_skinfold_right?: number;
+  calf_skinfold?: number; // panturrilha (média dos lados)
+  calf_skinfold_left?: number;
+  calf_skinfold_right?: number;
 
   // Cálculos (gerados automaticamente)
   body_fat_percentage?: number; // % gordura
@@ -71,20 +85,34 @@ export interface AssessmentFormData {
 
   // Circunferências (cm)
   arm_circ: string;
+  arm_circ_left: string;
+  arm_circ_right: string;
   chest_circ: string;
   waist_circ: string;
   hip_circ: string;
   thigh_circ: string;
+  thigh_circ_left: string;
+  thigh_circ_right: string;
   calf_circ: string;
+  calf_circ_left: string;
+  calf_circ_right: string;
 
   // 7 Dobras Cutâneas (mm)
   triceps_skinfold: string;
+  triceps_skinfold_left: string;
+  triceps_skinfold_right: string;
   biceps_skinfold: string;
+  biceps_skinfold_left: string;
+  biceps_skinfold_right: string;
   subscapular_skinfold: string;
   suprailiac_skinfold: string;
   abdominal_skinfold: string;
   thigh_skinfold: string;
+  thigh_skinfold_left: string;
+  thigh_skinfold_right: string;
   calf_skinfold: string;
+  calf_skinfold_left: string;
+  calf_skinfold_right: string;
 
   // Metadados
   observations: string;
@@ -285,8 +313,11 @@ export const validateAssessmentForm = (data: AssessmentFormData): Record<string,
 
   // Validação de dobras cutâneas
   const skinfoldFields: (keyof AssessmentFormData)[] = [
-    'triceps_skinfold', 'biceps_skinfold', 'subscapular_skinfold',
-    'suprailiac_skinfold', 'abdominal_skinfold', 'thigh_skinfold', 'calf_skinfold'
+    'triceps_skinfold', 'triceps_skinfold_left', 'triceps_skinfold_right',
+    'biceps_skinfold', 'biceps_skinfold_left', 'biceps_skinfold_right',
+    'subscapular_skinfold', 'suprailiac_skinfold', 'abdominal_skinfold',
+    'thigh_skinfold', 'thigh_skinfold_left', 'thigh_skinfold_right',
+    'calf_skinfold', 'calf_skinfold_left', 'calf_skinfold_right'
   ];
 
   skinfoldFields.forEach(field => {
@@ -300,7 +331,10 @@ export const validateAssessmentForm = (data: AssessmentFormData): Record<string,
 
   // Validação de circunferências
   const circumferenceFields: (keyof AssessmentFormData)[] = [
-    'arm_circ', 'chest_circ', 'waist_circ', 'hip_circ', 'thigh_circ', 'calf_circ'
+    'arm_circ', 'arm_circ_left', 'arm_circ_right',
+    'chest_circ', 'waist_circ', 'hip_circ',
+    'thigh_circ', 'thigh_circ_left', 'thigh_circ_right',
+    'calf_circ', 'calf_circ_left', 'calf_circ_right'
   ];
 
   circumferenceFields.forEach(field => {

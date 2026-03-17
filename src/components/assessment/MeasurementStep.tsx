@@ -1,4 +1,4 @@
-// Componente de medidas corporais (circunferências)
+// Componente de medidas corporais (circunferências) — com suporte bilateral (esq/dir)
 
 import React from 'react';
 import { Ruler, Info } from 'lucide-react';
@@ -11,56 +11,180 @@ interface MeasurementStepProps {
   studentName: string;
 }
 
+type CircField = keyof AssessmentFormData;
+
+interface MeasurementDef {
+  label: string;
+  description: string;
+  placeholder: string;
+  /** If bilateral, contains left/right field keys. */
+  bilateral?: { left: CircField; right: CircField };
+  /** Single field key (used for non-bilateral or as legacy average field). */
+  field: CircField;
+}
+
 export const MeasurementStep: React.FC<MeasurementStepProps> = ({
   formData,
   updateFormData,
   errors,
   studentName
 }) => {
-  const handleNumberInput = (field: keyof AssessmentFormData, value: string) => {
-    // Permitir apenas números e vírgula/ponto para decimais
+  const handleNumberInput = (field: CircField, value: string) => {
     const cleanedValue = value.replace(/[^0-9.,]/g, '').replace(',', '.');
     updateFormData({ [field]: cleanedValue });
   };
 
-  const measurements = [
+  const measurements: MeasurementDef[] = [
     {
-      field: 'arm_circ' as keyof AssessmentFormData,
+      field: 'arm_circ',
       label: 'Braço',
       description: 'Circunferência do braço relaxado, no ponto médio entre ombro e cotovelo',
-      placeholder: 'Ex: 32.5'
+      placeholder: 'Ex: 32.5',
+      bilateral: { left: 'arm_circ_left', right: 'arm_circ_right' },
     },
     {
-      field: 'chest_circ' as keyof AssessmentFormData,
+      field: 'chest_circ',
       label: 'Tórax',
       description: 'Circunferência do tórax na linha dos mamilos',
-      placeholder: 'Ex: 95.0'
+      placeholder: 'Ex: 95.0',
     },
     {
-      field: 'waist_circ' as keyof AssessmentFormData,
+      field: 'waist_circ',
       label: 'Cintura',
       description: 'Circunferência da cintura no ponto mais estreito entre costelas e quadril',
-      placeholder: 'Ex: 78.5'
+      placeholder: 'Ex: 78.5',
     },
     {
-      field: 'hip_circ' as keyof AssessmentFormData,
+      field: 'hip_circ',
       label: 'Quadril',
       description: 'Circunferência do quadril no ponto mais largo',
-      placeholder: 'Ex: 95.0'
+      placeholder: 'Ex: 95.0',
     },
     {
-      field: 'thigh_circ' as keyof AssessmentFormData,
+      field: 'thigh_circ',
       label: 'Coxa',
       description: 'Circunferência da coxa 1 cm abaixo da virilha',
-      placeholder: 'Ex: 55.0'
+      placeholder: 'Ex: 55.0',
+      bilateral: { left: 'thigh_circ_left', right: 'thigh_circ_right' },
     },
     {
-      field: 'calf_circ' as keyof AssessmentFormData,
+      field: 'calf_circ',
       label: 'Panturrilha',
       description: 'Circunferência da panturrilha no ponto de maior perímetro',
-      placeholder: 'Ex: 36.5'
+      placeholder: 'Ex: 36.5',
+      bilateral: { left: 'calf_circ_left', right: 'calf_circ_right' },
     }
   ];
+
+  const renderBilateralInput = (m: MeasurementDef) => {
+    const { bilateral } = m;
+    if (!bilateral) return null;
+
+    const leftVal = formData[bilateral.left] || '';
+    const rightVal = formData[bilateral.right] || '';
+    const leftNum = parseFloat(String(leftVal).replace(',', '.'));
+    const rightNum = parseFloat(String(rightVal).replace(',', '.'));
+    const avg = !isNaN(leftNum) && leftNum > 0 && !isNaN(rightNum) && rightNum > 0
+      ? ((leftNum + rightNum) / 2).toFixed(1)
+      : null;
+
+    return (
+      <div className="space-y-3">
+        <div className="flex items-center">
+          <Ruler className="w-4 h-4 text-yellow-500 mr-2" />
+          <label className="block text-sm font-bold text-neutral-300">
+            {m.label}
+          </label>
+          <span className="ml-2 text-xs text-neutral-500">(cm)</span>
+        </div>
+
+        <div className="grid grid-cols-2 gap-3">
+          {/* Esquerdo */}
+          <div>
+            <label className="block text-xs text-neutral-500 mb-1">Esquerdo</label>
+            <div className="relative">
+              <input
+                type="text"
+                inputMode="decimal"
+                value={String(leftVal)}
+                onChange={(e) => handleNumberInput(bilateral.left, e.target.value)}
+                placeholder={m.placeholder}
+                className={`w-full px-3 py-3 pr-12 border rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 placeholder:text-neutral-600 text-white bg-neutral-800 ${
+                  errors[bilateral.left] ? 'border-red-500' : 'border-neutral-700'
+                }`}
+              />
+              <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-neutral-500 text-sm">cm</span>
+            </div>
+            {errors[bilateral.left] && (
+              <p className="text-sm text-red-500 mt-1">{errors[bilateral.left]}</p>
+            )}
+          </div>
+
+          {/* Direito */}
+          <div>
+            <label className="block text-xs text-neutral-500 mb-1">Direito</label>
+            <div className="relative">
+              <input
+                type="text"
+                inputMode="decimal"
+                value={String(rightVal)}
+                onChange={(e) => handleNumberInput(bilateral.right, e.target.value)}
+                placeholder={m.placeholder}
+                className={`w-full px-3 py-3 pr-12 border rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 placeholder:text-neutral-600 text-white bg-neutral-800 ${
+                  errors[bilateral.right] ? 'border-red-500' : 'border-neutral-700'
+                }`}
+              />
+              <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-neutral-500 text-sm">cm</span>
+            </div>
+            {errors[bilateral.right] && (
+              <p className="text-sm text-red-500 mt-1">{errors[bilateral.right]}</p>
+            )}
+          </div>
+        </div>
+
+        {avg && (
+          <div className="flex items-center bg-neutral-900/60 rounded-lg px-3 py-1.5">
+            <span className="text-xs text-neutral-400">Média:</span>
+            <span className="ml-1 text-xs font-bold text-yellow-500">{avg} cm</span>
+          </div>
+        )}
+
+        <p className="text-xs text-neutral-500">{m.description}</p>
+      </div>
+    );
+  };
+
+  const renderSingleInput = (m: MeasurementDef) => (
+    <div className="space-y-3">
+      <div className="flex items-center">
+        <Ruler className="w-4 h-4 text-yellow-500 mr-2" />
+        <label className="block text-sm font-bold text-neutral-300">
+          {m.label}
+        </label>
+        <span className="ml-2 text-xs text-neutral-500">(cm)</span>
+      </div>
+
+      <div className="relative">
+        <input
+          type="text"
+          inputMode="decimal"
+          value={formData[m.field]}
+          onChange={(e) => handleNumberInput(m.field, e.target.value)}
+          placeholder={m.placeholder}
+          className={`w-full px-3 py-3 pr-12 border rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 placeholder:text-neutral-600 text-white bg-neutral-800 ${
+            errors[m.field] ? 'border-red-500' : 'border-neutral-700'
+          }`}
+        />
+        <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-neutral-500 text-sm">cm</span>
+      </div>
+
+      <p className="text-xs text-neutral-500">{m.description}</p>
+
+      {errors[m.field] && (
+        <p className="text-sm text-red-500">{errors[m.field]}</p>
+      )}
+    </div>
+  );
 
   return (
     <div className="space-y-6">
@@ -83,6 +207,7 @@ export const MeasurementStep: React.FC<MeasurementStepProps> = ({
               <li>• O aluno deve estar em pé, relaxado, com respiração normal</li>
               <li>• A fita deve estar paralela ao solo e sem comprimir a pele</li>
               <li>• Faça 3 medições e anote a média</li>
+              <li>• <strong className="text-yellow-500">Meça os dois lados</strong> para braço, coxa e panturrilha</li>
             </ul>
           </div>
         </div>
@@ -90,34 +215,9 @@ export const MeasurementStep: React.FC<MeasurementStepProps> = ({
 
       {/* Form Fields */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {measurements.map((measurement, index) => (
-          <div key={measurement.field} className="space-y-3">
-            <div className="flex items-center">
-              <Ruler className="w-4 h-4 text-yellow-500 mr-2" />
-              <label className="block text-sm font-bold text-neutral-300">
-                {measurement.label}
-              </label>
-              <span className="ml-2 text-xs text-neutral-500">(cm)</span>
-            </div>
-
-            <div className="relative">
-              <input
-                type="text"
-                inputMode="decimal"
-                value={formData[measurement.field]}
-                onChange={(e) => handleNumberInput(measurement.field, e.target.value)}
-                placeholder={measurement.placeholder}
-                className={`w-full px-3 py-3 pr-12 border rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 placeholder:text-neutral-600 text-white bg-neutral-800 ${errors[measurement.field] ? 'border-red-500' : 'border-neutral-700'
-                  }`}
-              />
-              <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-neutral-500 text-sm">cm</span>
-            </div>
-
-            <p className="text-xs text-neutral-500">{measurement.description}</p>
-
-            {errors[measurement.field] && (
-              <p className="text-sm text-red-500">{errors[measurement.field]}</p>
-            )}
+        {measurements.map((m) => (
+          <div key={m.field}>
+            {m.bilateral ? renderBilateralInput(m) : renderSingleInput(m)}
           </div>
         ))}
       </div>
@@ -158,7 +258,7 @@ export const MeasurementStep: React.FC<MeasurementStepProps> = ({
       <div className="bg-yellow-900/20 border border-yellow-500/30 rounded-xl p-4">
         <h3 className="text-sm font-bold text-yellow-500 mb-2">Dicas para maior precisão:</h3>
         <ul className="text-sm text-yellow-400/80 space-y-1">
-          <li>• Sempre meça do mesmo lado do corpo (preferencialmente lado direito)</li>
+          <li>• Meça ambos os lados (esquerdo e direito) para braço, coxa e panturrilha</li>
           <li>• Para cintura, meça no ponto médio entre a última costela e a crista ilíaca</li>
           <li>• Para quadril, meça no ponto de maior protuberância dos glúteos</li>
           <li>• Anote o horário da medição (manhã costuma ser mais consistente)</li>

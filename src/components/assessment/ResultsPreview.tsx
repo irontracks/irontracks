@@ -28,14 +28,30 @@ export default function ResultsPreview({ formData, onBack, studentName }: Result
     const age = parseInt(formData.age || '0');
     const gender = formData.gender; // 'M' | 'F'
 
+    // Helper: bilateral average or direct value
+    const avgBilateral = (direct: string, left: string, right: string): number => {
+      const d = formData as unknown as Record<string, string>;
+      const l = parseFloat(d[left] || '0');
+      const r = parseFloat(d[right] || '0');
+      if (l > 0 && r > 0) return (l + r) / 2;
+      if (l > 0) return l;
+      if (r > 0) return r;
+      return parseFloat(d[direct] || '0');
+    };
+
+    const tricepsAvg = avgBilateral('triceps_skinfold', 'triceps_skinfold_left', 'triceps_skinfold_right');
+    const bicepsAvg = avgBilateral('biceps_skinfold', 'biceps_skinfold_left', 'biceps_skinfold_right');
+    const thighSkinAvg = avgBilateral('thigh_skinfold', 'thigh_skinfold_left', 'thigh_skinfold_right');
+    const calfSkinAvg = avgBilateral('calf_skinfold', 'calf_skinfold_left', 'calf_skinfold_right');
+
     const sumOfSkinfolds = calculateSumSkinfolds({
-      triceps_skinfold: parseFloat(formData.triceps_skinfold || '0'),
-      biceps_skinfold: parseFloat(formData.biceps_skinfold || '0'),
+      triceps_skinfold: tricepsAvg,
+      biceps_skinfold: bicepsAvg,
       subscapular_skinfold: parseFloat(formData.subscapular_skinfold || '0'),
       suprailiac_skinfold: parseFloat(formData.suprailiac_skinfold || '0'),
       abdominal_skinfold: parseFloat(formData.abdominal_skinfold || '0'),
-      thigh_skinfold: parseFloat(formData.thigh_skinfold || '0'),
-      calf_skinfold: parseFloat(formData.calf_skinfold || '0')
+      thigh_skinfold: thighSkinAvg,
+      calf_skinfold: calfSkinAvg
     } as unknown as Parameters<typeof calculateSumSkinfolds>[0]);
 
     const bodyDensity = (sumOfSkinfolds > 0 && age > 0) ? calculateBodyDensity(sumOfSkinfolds, age, gender) : 1.05;
@@ -235,20 +251,28 @@ export default function ResultsPreview({ formData, onBack, studentName }: Result
         <div className="bg-neutral-900 rounded-xl p-4">
           <h4 className="font-bold text-white mb-3 text-sm">Dobras Cutâneas (mm)</h4>
           <div className="grid grid-cols-3 md:grid-cols-4 gap-2">
-            {[
-              ['Tríceps', formData.triceps_skinfold],
-              ['Bíceps', formData.biceps_skinfold],
-              ['Subesc.', formData.subscapular_skinfold],
-              ['Supraíl.', formData.suprailiac_skinfold],
-              ['Abdom.', formData.abdominal_skinfold],
-              ['Coxa', formData.thigh_skinfold],
-              ['Pantur.', formData.calf_skinfold]
-            ].filter(([_, v]) => !!v).map(([label, value]) => (
-              <div key={String(label)} className="text-center p-2 bg-neutral-800/60 rounded-lg">
-                <p className="text-[10px] text-neutral-500 uppercase tracking-wide font-bold truncate">{label}</p>
-                <p className="text-base font-black text-white mt-0.5">{value}</p>
-              </div>
-            ))}
+            {([
+              { label: 'Tríceps', left: formData.triceps_skinfold_left, right: formData.triceps_skinfold_right, single: formData.triceps_skinfold },
+              { label: 'Bíceps', left: formData.biceps_skinfold_left, right: formData.biceps_skinfold_right, single: formData.biceps_skinfold },
+              { label: 'Subesc.', single: formData.subscapular_skinfold },
+              { label: 'Supraíl.', single: formData.suprailiac_skinfold },
+              { label: 'Abdom.', single: formData.abdominal_skinfold },
+              { label: 'Coxa', left: formData.thigh_skinfold_left, right: formData.thigh_skinfold_right, single: formData.thigh_skinfold },
+              { label: 'Pantur.', left: formData.calf_skinfold_left, right: formData.calf_skinfold_right, single: formData.calf_skinfold },
+            ] as { label: string; left?: string; right?: string; single?: string }[]).filter(s => !!(s.left || s.right || s.single)).map((s) => {
+              const hasLR = !!(s.left && s.right);
+              const l = parseFloat(s.left || '0');
+              const r = parseFloat(s.right || '0');
+              const avg = (l > 0 && r > 0) ? ((l + r) / 2).toFixed(1) : null;
+              const display = avg || s.single || (l > 0 ? String(l) : String(r));
+              return (
+                <div key={s.label} className="text-center p-2 bg-neutral-800/60 rounded-lg">
+                  <p className="text-[10px] text-neutral-500 uppercase tracking-wide font-bold truncate">{s.label}</p>
+                  <p className="text-base font-black text-white mt-0.5">{display}</p>
+                  {hasLR && <p className="text-[9px] text-neutral-600 mt-0.5">E:{s.left} D:{s.right}</p>}
+                </div>
+              );
+            })}
           </div>
           <div className="mt-3 pt-3 border-t border-neutral-700 flex items-center justify-between">
             <p className="text-xs text-neutral-400">
@@ -277,19 +301,27 @@ export default function ResultsPreview({ formData, onBack, studentName }: Result
               <h3 className="text-lg font-bold text-white">Circunferências (cm)</h3>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              {[
-                ['Braço', formData.arm_circ],
-                ['Tórax', formData.chest_circ],
-                ['Cintura', formData.waist_circ],
-                ['Quadril', formData.hip_circ],
-                ['Coxa', formData.thigh_circ],
-                ['Panturrilha', formData.calf_circ]
-              ].filter(([_, v]) => !!v).map(([label, value]) => (
-                <div key={String(label)} className="text-center p-3 bg-neutral-900 rounded-lg">
-                  <p className="text-sm text-neutral-400 capitalize">{label}</p>
-                  <p className="text-lg font-bold text-white">{value} cm</p>
-                </div>
-              ))}
+              {([
+                { label: 'Braço', left: formData.arm_circ_left, right: formData.arm_circ_right, single: formData.arm_circ },
+                { label: 'Tórax', single: formData.chest_circ },
+                { label: 'Cintura', single: formData.waist_circ },
+                { label: 'Quadril', single: formData.hip_circ },
+                { label: 'Coxa', left: formData.thigh_circ_left, right: formData.thigh_circ_right, single: formData.thigh_circ },
+                { label: 'Panturrilha', left: formData.calf_circ_left, right: formData.calf_circ_right, single: formData.calf_circ },
+              ] as { label: string; left?: string; right?: string; single?: string }[]).filter(c => !!(c.left || c.right || c.single)).map((c) => {
+                const hasLR = !!(c.left && c.right);
+                const l = parseFloat(c.left || '0');
+                const r = parseFloat(c.right || '0');
+                const avg = (l > 0 && r > 0) ? ((l + r) / 2).toFixed(1) : null;
+                const display = avg || c.single || (l > 0 ? String(l) : String(r));
+                return (
+                  <div key={c.label} className="text-center p-3 bg-neutral-900 rounded-lg">
+                    <p className="text-sm text-neutral-400 capitalize">{c.label}</p>
+                    <p className="text-lg font-bold text-white">{display} cm</p>
+                    {hasLR && <p className="text-[10px] text-neutral-600 mt-0.5">E:{c.left} D:{c.right}</p>}
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
