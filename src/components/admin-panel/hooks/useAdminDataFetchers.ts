@@ -648,14 +648,25 @@ export function useAdminDataFetchers(deps: AdminDataFetchersDeps) {
                 setTemplates((dedupTemplates || []) as AdminWorkoutTemplate[]);
             }
             if (targetUserId) {
-                const assessmentOrParts: unknown[] = [];
-                if (student?.id) assessmentOrParts.push(`student_id.eq.${student.id}`);
-                if (targetUserId) assessmentOrParts.push(`user_id.eq.${targetUserId}`);
-                if (assessmentOrParts.length > 0) {
+                // Build all possible IDs that could match assessments
+                const orParts = new Set<string>();
+                // student.id = students table PK
+                if (student?.id) orParts.add(`student_id.eq.${student.id}`);
+                // targetUserId = auth UUID (profile id) — this is what resolveStudentRecordId stores
+                if (targetUserId) {
+                    orParts.add(`student_id.eq.${targetUserId}`);
+                    orParts.add(`user_id.eq.${targetUserId}`);
+                }
+                // Also check by user_id from the students table row
+                if (student?.user_id && student.user_id !== targetUserId) {
+                    orParts.add(`student_id.eq.${student.user_id}`);
+                    orParts.add(`user_id.eq.${student.user_id}`);
+                }
+                if (orParts.size > 0) {
                     const { data: aData } = await supabase
                         .from('assessments')
                         .select('*')
-                        .or(assessmentOrParts.join(','))
+                        .or(Array.from(orParts).join(','))
                         .order('date', { ascending: false });
                     setAssessments(aData || []);
                 } else {
