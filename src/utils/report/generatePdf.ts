@@ -320,14 +320,17 @@ function showPdfIframe(html: string) {
   const backdrop = document.createElement('div')
   backdrop.style.cssText = 'position:fixed;inset:0;z-index:99998;background:rgba(0,0,0,0.6)'
 
+  // Toolbar height = 48px + safe area top
+  const safeTop = 'env(safe-area-inset-top, 0px)'
+
   // Iframe
   const iframe = document.createElement('iframe')
-  iframe.style.cssText = 'position:fixed;top:48px;left:0;right:0;bottom:0;width:100%;height:calc(100% - 48px);border:none;z-index:99999;background:#fff'
+  iframe.style.cssText = `position:fixed;top:calc(48px + ${safeTop});left:0;right:0;bottom:0;width:100%;height:calc(100% - 48px - ${safeTop});border:none;z-index:99999;background:#fff`
   iframe.srcdoc = html
 
-  // Toolbar
+  // Toolbar — respects iOS safe area (notch / dynamic island)
   const toolbar = document.createElement('div')
-  toolbar.style.cssText = 'position:fixed;top:0;left:0;right:0;height:48px;z-index:100000;background:#111;display:flex;align-items:center;justify-content:space-between;padding:0 12px'
+  toolbar.style.cssText = `position:fixed;top:0;left:0;right:0;height:calc(48px + ${safeTop});z-index:100000;background:#111;display:flex;align-items:flex-end;justify-content:space-between;padding:0 12px 8px 12px;padding-top:${safeTop}`
 
   const printBtn = document.createElement('button')
   printBtn.textContent = '📄 Salvar como PDF'

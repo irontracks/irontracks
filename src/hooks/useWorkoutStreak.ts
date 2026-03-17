@@ -11,7 +11,7 @@
  */
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import { computeWorkoutStreakAndStats } from '@/actions/workout-actions';
 import type { WorkoutStreak } from '@/types/app';
 import { logError } from '@/lib/logger';
@@ -21,17 +21,10 @@ const isRecord = (v: unknown): v is Record<string, unknown> =>
 
 export function useWorkoutStreak(userId?: string | null) {
   const [streakStats, setStreakStats] = useState<WorkoutStreak | null>(null);
-  // Track whether the async fetch has completed (set only inside async callbacks)
-  const [resolved, setResolved] = useState(false);
-  // Track the userId that triggered the last fetch so we can detect changes
-  // without calling setState synchronously inside the effect body.
-  const prevUserIdRef = useRef<string | null | undefined>(undefined);
-
-  // Reset resolved state when userId changes (outside effect, in render phase)
-  if (userId !== prevUserIdRef.current) {
-    prevUserIdRef.current = userId;
-    if (resolved) setResolved(false);
-  }
+  // Track which userId the last successful fetch was for.
+  // Loading is derived: true when userId exists but doesn't match lastFetchedUserId.
+  // This avoids both setState-in-effect (sync) and refs-during-render lint errors.
+  const [lastFetchedUserId, setLastFetchedUserId] = useState<string | null>(null);
 
   useEffect(() => {
     if (!userId) return;
@@ -72,13 +65,13 @@ export function useWorkoutStreak(userId?: string | null) {
         setStreakStats(streak);
       })
       .catch((err) => logError('useWorkoutStreak', err))
-      .finally(() => { if (!cancelled) setResolved(true); });
+      .finally(() => { if (!cancelled) setLastFetchedUserId(userId); });
 
     return () => { cancelled = true; };
   }, [userId]);
 
-  // Loading when userId exists but the async fetch hasn't resolved yet
-  const streakLoading = !!userId && !resolved;
+  // Loading when userId exists but the fetch for this userId hasn't completed yet
+  const streakLoading = !!userId && userId !== lastFetchedUserId;
 
   return { streakStats, setStreakStats, streakLoading };
 }
