@@ -1,7 +1,7 @@
 // Componente principal do formulário de avaliação física
 'use client';
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
   User, 
@@ -34,6 +34,7 @@ interface AssessmentFormProps {
   studentName: string;
   onSuccess?: () => void;
   onCancel?: () => void;
+  initialData?: Record<string, unknown> | null;
 }
 
 type AssessmentStepComponent = React.ComponentType<AssessmentStepProps>;
@@ -99,25 +100,66 @@ export const AssessmentForm: React.FC<AssessmentFormProps> = ({
   studentId,
   studentName,
   onSuccess,
-  onCancel
+  onCancel,
+  initialData
 }) => {
   const { createAssessment, loading, error } = useAssessment();
-  const { alert } = useDialog();
+  const { alert, confirm } = useDialog();
+  const AUTOSAVE_KEY = `assessment_draft_${studentId}`;
   
   const [currentStep, setCurrentStep] = useState(0);
   const [formData, setFormData] = useState<AssessmentFormData>(() => {
     const base = buildDefaultFormData();
 
-    if (typeof window === 'undefined') {
-      return base;
+    if (typeof window === 'undefined') return base;
+
+    // Priority 1: initialData (edit mode)
+    if (initialData && typeof initialData === 'object') {
+      const merged: AssessmentFormData = { ...base };
+      (Object.keys(base) as (keyof AssessmentFormData)[]).forEach((field) => {
+        const value = (initialData as Record<string, unknown>)[field];
+        if (value !== undefined && value !== null && value !== '') {
+          if (field === 'gender') {
+            if (isValidGender(value)) merged.gender = value;
+            return;
+          }
+          merged[field as Exclude<keyof AssessmentFormData, 'gender'>] = String(value);
+        }
+      });
+      return merged;
     }
 
+    // Priority 2: auto-saved draft from localStorage
+    try {
+      const draftRaw = window.localStorage.getItem(AUTOSAVE_KEY);
+      if (draftRaw) {
+        const draft = JSON.parse(draftRaw);
+        if (draft?.formData && typeof draft.formData === 'object') {
+          const merged: AssessmentFormData = { ...base };
+          (Object.keys(base) as (keyof AssessmentFormData)[]).forEach((field) => {
+            const value = (draft.formData as Record<string, unknown>)[field];
+            if (value !== undefined && value !== null && value !== '') {
+              if (field === 'gender') {
+                if (isValidGender(value)) merged.gender = value;
+                return;
+              }
+              merged[field as Exclude<keyof AssessmentFormData, 'gender'>] = String(value);
+            }
+          });
+          // Also restore step
+          if (typeof draft.step === 'number' && draft.step >= 0) {
+            setTimeout(() => setCurrentStep(draft.step), 0);
+          }
+          return merged;
+        }
+      }
+    } catch { }
+
+    // Priority 3: session import data
     try {
       const storageKey = `assessment_import_${studentId}`;
       const raw = window.sessionStorage.getItem(storageKey);
-      if (!raw) {
-        return base;
-      }
+      if (!raw) return base;
 
       const parsed = parseJsonWithSchema(raw, z.record(z.unknown()));
       const parsedObj = parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : {};
@@ -125,25 +167,19 @@ export const AssessmentForm: React.FC<AssessmentFormProps> = ({
         ? (parsedObj.formData as Record<string, unknown>)
         : parsedObj;
 
-      if (!source || typeof source !== 'object') {
-        return base;
-      }
+      if (!source || typeof source !== 'object') return base;
 
       const merged: AssessmentFormData = { ...base };
       (Object.keys(base) as (keyof AssessmentFormData)[]).forEach((field) => {
         const value = (source as Record<string, unknown>)[field];
         if (value !== undefined && value !== null && value !== '') {
           if (field === 'gender') {
-            if (isValidGender(value)) {
-              merged.gender = value;
-            }
+            if (isValidGender(value)) merged.gender = value;
             return;
           }
-
           merged[field as Exclude<keyof AssessmentFormData, 'gender'>] = String(value);
         }
       });
-
       return merged;
     } catch (error) {
       logError('error', 'Erro ao aplicar dados de avaliação importados', error);
@@ -152,11 +188,28 @@ export const AssessmentForm: React.FC<AssessmentFormProps> = ({
   });
 
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+  const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  React.useEffect(() => {
-    if (typeof window === 'undefined') {
-      return;
-    }
+  // ── Auto-save to localStorage on every change ──────────────────────────────
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    setAutoSaveStatus('saving');
+    autoSaveTimerRef.current = setTimeout(() => {
+      try {
+        const draft = JSON.stringify({ formData, step: currentStep, ts: Date.now() });
+        window.localStorage.setItem(AUTOSAVE_KEY, draft);
+        setAutoSaveStatus('saved');
+        setTimeout(() => setAutoSaveStatus('idle'), 2000);
+      } catch { setAutoSaveStatus('idle'); }
+    }, 800); // debounce 800ms
+    return () => { if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current); };
+  }, [formData, currentStep, AUTOSAVE_KEY]);
+
+  // ── Clear session import on mount ──────────────────────────────────────────
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
     try {
       const storageKey = `assessment_import_${studentId}`;
       if (window.sessionStorage.getItem(storageKey)) {
@@ -284,6 +337,8 @@ export const AssessmentForm: React.FC<AssessmentFormProps> = ({
       const response = await createAssessment(formData, studentId);
       
       if (response.success) {
+        // Clear auto-saved draft on success
+        try { window.localStorage.removeItem(AUTOSAVE_KEY); } catch { }
         await alert('Avaliação salva com sucesso!','Sucesso');
         onSuccess?.();
       } else {
@@ -409,8 +464,10 @@ export const AssessmentForm: React.FC<AssessmentFormProps> = ({
             <span className="hidden sm:inline">Anterior</span>
           </button>
 
-          <div className="text-xs text-neutral-500 whitespace-nowrap">
-            Passo {currentStep + 1} de {steps.length}
+          <div className="text-xs text-neutral-500 whitespace-nowrap flex items-center gap-2">
+            <span>Passo {currentStep + 1} de {steps.length}</span>
+            {autoSaveStatus === 'saving' && <span className="text-yellow-500/60 animate-pulse">salvando…</span>}
+            {autoSaveStatus === 'saved' && <span className="text-green-500/60">✓ salvo</span>}
           </div>
 
           {currentStep === steps.length - 1 ? (
@@ -436,7 +493,13 @@ export const AssessmentForm: React.FC<AssessmentFormProps> = ({
 
       <div className="mt-6 text-center">
         <button
-          onClick={onCancel}
+          onClick={async () => {
+            const shouldCancel = await confirm('Deseja cancelar? O progresso salvo será perdido.', 'Cancelar avaliação');
+            if (shouldCancel) {
+              try { window.localStorage.removeItem(AUTOSAVE_KEY); } catch { }
+              onCancel?.();
+            }
+          }}
           className="text-sm text-neutral-500 hover:text-neutral-300 transition-colors"
         >
           Cancelar avaliação
