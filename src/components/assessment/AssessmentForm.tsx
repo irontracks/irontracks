@@ -195,9 +195,9 @@ export const AssessmentForm: React.FC<AssessmentFormProps> = ({
   useEffect(() => {
     if (typeof window === 'undefined') return;
     if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
-    setAutoSaveStatus('saving');
     autoSaveTimerRef.current = setTimeout(() => {
       try {
+        setAutoSaveStatus('saving');
         const draft = JSON.stringify({ formData, step: currentStep, ts: Date.now() });
         window.localStorage.setItem(AUTOSAVE_KEY, draft);
         setAutoSaveStatus('saved');

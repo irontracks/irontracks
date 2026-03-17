@@ -275,21 +275,22 @@ export async function generateAssessmentPdf(
     const blob = new Blob([html], { type: 'text/html' })
 
     if (isNativeApp()) {
-      const url = URL.createObjectURL(blob)
+      // Convert HTML to data URL (blob URLs don't work with Capacitor Browser / SFSafariViewController)
+      const dataUrl = 'data:text/html;base64,' + btoa(unescape(encodeURIComponent(html)))
 
-      // Try Capacitor Browser plugin first
+      // Try Capacitor Browser plugin first — opens SFSafariViewController where print() works
       try {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const { Browser } = await import('@capacitor/browser' as any)
-        await Browser.open({ url })
+        await Browser.open({ url: dataUrl })
         return blob
       } catch { /* plugin not available — try fallback */ }
 
-      // Fallback: open in new window
-      const w = window.open(url, '_blank')
+      // Fallback: open data URL in new window
+      const w = window.open(dataUrl, '_blank')
       if (w) return blob
 
-      // Last resort: inline iframe
+      // Last resort: inline iframe with full-page print fallback
       showPdfIframe(html)
       return blob
     }
@@ -332,24 +333,42 @@ function showPdfIframe(html: string) {
   const toolbar = document.createElement('div')
   toolbar.style.cssText = `position:fixed;top:0;left:0;right:0;height:calc(48px + ${safeTop});z-index:100000;background:#111;display:flex;align-items:flex-end;justify-content:space-between;padding:0 12px 8px 12px;padding-top:${safeTop}`
 
+  const cleanup = () => {
+    backdrop.remove()
+    iframe.remove()
+    toolbar.remove()
+  }
+
   const printBtn = document.createElement('button')
   printBtn.textContent = '📄 Salvar como PDF'
   printBtn.style.cssText = 'padding:8px 16px;background:#d4a017;color:#000;border:none;border-radius:8px;font-weight:700;font-size:13px;cursor:pointer'
   printBtn.onclick = () => {
-    try {
-      const iframeWindow = iframe.contentWindow
-      if (iframeWindow) iframeWindow.print()
-    } catch { /* cross-origin — open in new tab instead */ }
+    // iframe.contentWindow.print() does NOT work in iOS WKWebView.
+    // Instead: save current page, replace with assessment HTML, call window.print(), then restore.
+    const savedHtml = document.documentElement.outerHTML
+    cleanup()
+
+    document.open()
+    document.write(html)
+    document.close()
+
+    setTimeout(() => {
+      window.print()
+      // Restore original page after print dialog closes
+      setTimeout(() => {
+        document.open()
+        document.write(savedHtml)
+        document.close()
+        // Re-run scripts won't work after document.write, so reload the page
+        window.location.reload()
+      }, 300)
+    }, 300)
   }
 
   const closeBtn = document.createElement('button')
   closeBtn.textContent = '✕ Fechar'
   closeBtn.style.cssText = 'padding:8px 16px;background:transparent;color:#fff;border:1px solid rgba(255,255,255,0.2);border-radius:8px;font-weight:700;font-size:13px;cursor:pointer'
-  closeBtn.onclick = () => {
-    backdrop.remove()
-    iframe.remove()
-    toolbar.remove()
-  }
+  closeBtn.onclick = cleanup
 
   toolbar.appendChild(printBtn)
   toolbar.appendChild(closeBtn)
@@ -358,7 +377,7 @@ function showPdfIframe(html: string) {
   document.body.appendChild(iframe)
   document.body.appendChild(toolbar)
 
-  backdrop.onclick = closeBtn.onclick
+  backdrop.onclick = cleanup
 }
 
 /**
