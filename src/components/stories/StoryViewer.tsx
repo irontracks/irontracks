@@ -103,6 +103,7 @@ export default function StoryViewer({
   const [durationMs, setDurationMs] = useState(5000)
   const [muted, setMuted] = useState(true)
   const [videoError, setVideoError] = useState('')
+  const [reactedEmoji, setReactedEmoji] = useState<string | null>(null)
 
   // Use a single "paused" state that controls CSS animation-play-state
   // This avoids tearing down useEffect loops on every touch
@@ -668,6 +669,37 @@ export default function StoryViewer({
               </div>
             </div>
           </div>
+
+          {/* Emoji Reaction Bar */}
+          {!isMine && (
+            <div className="flex items-center justify-center gap-3 mt-2">
+              {['🔥', '💪', '👏', '🫡', '❤️'].map((emoji) => (
+                <button
+                  key={emoji}
+                  type="button"
+                  onClick={async () => {
+                    setReactedEmoji(emoji)
+                    setTimeout(() => setReactedEmoji(null), 1200)
+                    try {
+                      await fetch('/api/social/stories/react', {
+                        method: 'POST',
+                        headers: { 'content-type': 'application/json' },
+                        body: JSON.stringify({ storyId: story.id, emoji }),
+                      })
+                    } catch { }
+                  }}
+                  className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg transition-all duration-200 active:scale-125 ${
+                    reactedEmoji === emoji ? 'scale-125 bg-yellow-500/20 border-yellow-500/50' : 'bg-neutral-900/80 hover:bg-neutral-800/80 border-neutral-800'
+                  } border`}
+                >
+                  {emoji}
+                </button>
+              ))}
+            </div>
+          )}
+          {reactedEmoji && (
+            <div className="text-center mt-1 text-[11px] text-yellow-500 font-bold animate-pulse">Reação enviada!</div>
+          )}
 
           {/* Modal de Comentários / Views */}
           {(commentsOpen || viewersOpen) && (
