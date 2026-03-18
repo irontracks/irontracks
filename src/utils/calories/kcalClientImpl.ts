@@ -80,10 +80,12 @@ export const computeFallbackKcal = ({
   session,
   volume,
   weightKg,
+  biologicalSex,
 }: {
   session: unknown
   volume: number
   weightKg?: number | null
+  biologicalSex?: string | null
 }) => {
   try {
     const s = session && typeof session === 'object' ? (session as UnknownRecord) : {}
@@ -105,8 +107,8 @@ export const computeFallbackKcal = ({
       }).filter(Boolean) as string[]
       : null
 
-    // Use the proper MET estimator (handles weight, complexity, active time)
-    const kcal = estimateCaloriesMet(logs, durationMinutes, weightKg, exerciseNames)
+    // Use the proper MET estimator (handles weight, complexity, active time, sex)
+    const kcal = estimateCaloriesMet(logs, durationMinutes, weightKg, exerciseNames, null, null, null, biologicalSex ?? null)
     if (kcal > 0) return kcal
 
     // Dead-last resort (no logs at all)
@@ -137,17 +139,19 @@ export const getKcalEstimate = async ({
   session,
   workoutId,
   rpe,
+  biologicalSex,
 }: {
   session: unknown
   workoutId?: unknown
   rpe?: number | null
+  biologicalSex?: string | null
 }) => {
   try {
     const s = session && typeof session === 'object' ? (session as UnknownRecord) : {}
     const logs = s.logs && typeof s.logs === 'object' ? (s.logs as LogsMap) : {}
     const volume = calculateTotalVolume(logs)
     const preCheckinWeightKg = extractPreCheckinWeight(s)
-    const fallback = computeFallbackKcal({ session: s, volume, weightKg: preCheckinWeightKg })
+    const fallback = computeFallbackKcal({ session: s, volume, weightKg: preCheckinWeightKg, biologicalSex })
 
     const resp = await fetch('/api/calories/estimate', {
       method: 'POST',
@@ -171,6 +175,6 @@ export const getKcalEstimate = async ({
     const logs = s.logs && typeof s.logs === 'object' ? (s.logs as LogsMap) : {}
     const volume = calculateTotalVolume(logs)
     const preCheckinWeightKg = extractPreCheckinWeight(s)
-    return computeFallbackKcal({ session: s, volume, weightKg: preCheckinWeightKg })
+    return computeFallbackKcal({ session: s, volume, weightKg: preCheckinWeightKg, biologicalSex })
   }
 }

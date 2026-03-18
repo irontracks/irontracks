@@ -164,6 +164,21 @@ export async function POST(request: Request) {
       : assessmentWeight != null ? 'assessment'
       : 'default'
 
+    // ── Biological sex from user settings ───────────────────────────────────
+    const biologicalSex = await (async () => {
+      try {
+        const { data: row } = await supabase
+          .from('user_settings')
+          .select('preferences')
+          .eq('user_id', targetUserId)
+          .maybeSingle()
+        const prefs = row?.preferences && typeof row.preferences === 'object'
+          ? (row.preferences as Record<string, unknown>) : null
+        const sex = safeString(prefs?.biologicalSex)
+        return sex === 'male' || sex === 'female' ? sex : null
+      } catch { return null }
+    })()
+
     // ── Timing ──────────────────────────────────────────────────────────────
     const totalTimeSeconds = Number(session?.totalTime) || 0
     const execSeconds = Number(session?.executionTotalSeconds ?? session?.execution_total_seconds ?? 0) || 0
@@ -180,7 +195,7 @@ export async function POST(request: Request) {
       }).filter(Boolean) as string[]
       : []
 
-    // Volume per exercise
+    // Volume per exercise (handles "done/planned" reps like "8/10" and cluster blocks)
     const exerciseVolumes: number[] = exerciseNames.map((_, exIdx) => {
       let vol = 0
       for (const [key, log] of Object.entries(logs)) {
@@ -188,8 +203,10 @@ export async function POST(request: Request) {
         if (Number(parts[0]) !== exIdx) continue
         if (!log || typeof log !== 'object') continue
         const obj = log as Record<string, unknown>
-        const w = Number(safeString(obj?.weight as unknown).replace(',', '.'))
-        const r = Number(safeString(obj?.reps as unknown).replace(',', '.'))
+        const clusterVol = calculateClusterVolume(obj.cluster)
+        if (clusterVol > 0) { vol += clusterVol; continue }
+        const w = parseWeightValue(obj?.weight)
+        const r = parseRepsValue(obj?.reps)
         if (w > 0 && r > 0) vol += w * r
       }
       return vol
@@ -211,7 +228,7 @@ export async function POST(request: Request) {
       clientRpe,
       execMinutesOverride,
       restMinutesOverride,
-      null, // biologicalSex — not available in API context
+      biologicalSex,
       exerciseVolumes.length > 0 ? exerciseVolumes : null,
       startedAtMs,
     )
