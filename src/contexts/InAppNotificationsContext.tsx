@@ -5,6 +5,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 import { useRouter } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import { useUserSettings } from '@/hooks/useUserSettings';
+import { logError } from '@/lib/logger'
 import RealtimeNotificationBridge from '@/components/RealtimeNotificationBridge';
 import NotificationToast from '@/components/NotificationToast';
 
@@ -97,7 +98,7 @@ export function InAppNotificationsProvider(props: InAppNotificationsProviderProp
         const { data } = await supabase.auth.getUser();
         const id = data?.user?.id ? String(data.user.id) : '';
         if (!cancelled && id) setAuthUserId(id);
-      } catch { }
+      } catch (e) { logError('InAppNotifications.getUser', e) }
     })();
     return () => {
       cancelled = true;

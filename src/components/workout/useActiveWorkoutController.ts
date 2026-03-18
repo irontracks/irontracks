@@ -1,5 +1,6 @@
 
 import { useCallback, useMemo, useRef } from 'react';
+import { logError } from '@/lib/logger';
 import { useWorkoutTicker } from './hooks/useWorkoutTicker';
 import { useWorkoutModals } from './hooks/useWorkoutModals';
 import { useWorkoutDeload } from './hooks/useWorkoutDeload';
@@ -238,7 +239,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
           if (w || r) broadcastMyLog(exIdx, sIdx, w, r)
         }
       } catch { }
-    } catch { }
+    } catch (e) { logError('hook:useActiveWorkoutController.updateLog', e) }
   };
 
 

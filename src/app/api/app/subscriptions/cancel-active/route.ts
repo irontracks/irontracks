@@ -6,6 +6,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { asaasRequest } from '@/lib/asaas'
 import { mercadopagoRequest } from '@/lib/mercadopago'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { logError } from '@/lib/logger'
 
 export const dynamic = 'force-dynamic'
 
@@ -52,7 +53,7 @@ export async function POST(req: Request) {
           path: `/preapproval/${encodeURIComponent(providerSubId)}`,
           body: { status: 'cancelled' },
         })
-      } catch {}
+      } catch (e) { logError('api:subscriptions:cancel-active:mercadopago', e) }
     }
 
     if (provider === 'asaas' && (providerSubId || asaasSubId)) {
@@ -63,7 +64,7 @@ export async function POST(req: Request) {
           path: `/subscriptions/${encodeURIComponent(target)}`,
           body: { status: 'INACTIVE' },
         })
-      } catch {}
+      } catch (e) { logError('api:subscriptions:cancel-active:asaas', e) }
     }
 
     await admin
@@ -86,7 +87,7 @@ export async function POST(req: Request) {
         .update({ status: 'cancelled', valid_until: new Date().toISOString() })
         .eq('user_id', user.id)
         .in('status', ['active', 'trialing', 'past_due'])
-    } catch { }
+    } catch (e) { logError('api:subscriptions:cancel-active:revoke-entitlements', e) }
 
     return NextResponse.json({ ok: true, cancelled: true, id: sub.id })
   } catch (e: unknown) {

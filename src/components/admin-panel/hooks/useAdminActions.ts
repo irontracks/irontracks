@@ -10,6 +10,7 @@ import { sendBroadcastMessage, addTeacher, updateTeacher } from '@/actions/admin
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { UnknownRecord } from '@/types/app'
 import { apiAdmin } from '@/lib/api'
+import { logError } from '@/lib/logger'
 
 type AlertFn = (msg: string, title?: string) => Promise<unknown>;
 type ConfirmFn = (msg: string, title?: string) => Promise<boolean>;
@@ -209,12 +210,12 @@ export function useAdminActions({
             try {
                 const { data } = await supabase.from('teachers').select('id, user_id, email').eq('id', teacherId).maybeSingle();
                 if (data?.id) teacherRow = { id: String(data.id), user_id: data.user_id ? String(data.user_id) : null, email: data.email ? String(data.email) : null };
-            } catch { }
+            } catch (e) { logError('useAdminActions.resolveTeacherById', e) }
             if (!teacherRow) {
                 try {
                     const { data } = await supabase.from('teachers').select('id, user_id, email').eq('user_id', teacherId).maybeSingle();
                     if (data?.id) teacherRow = { id: String(data.id), user_id: data.user_id ? String(data.user_id) : null, email: data.email ? String(data.email) : null };
-                } catch { }
+                } catch (e) { logError('useAdminActions.resolveTeacherByUserId', e) }
             }
             if (!teacherRow) throw new Error('Professor não encontrado');
 
@@ -230,14 +231,14 @@ export function useAdminActions({
                         studentIds = students.map((s: { id: string }) => String(s.id));
                         studentUserIds = students.filter((s: { user_id?: string | null }) => s.user_id).map((s: { user_id: string }) => String(s.user_id));
                     }
-                } catch { }
+                } catch (e) { logError('useAdminActions.fetchTeacherStudents', e) }
             }
 
             // Cascade delete student data (each wrapped in try/catch for missing tables)
             if (studentUserIds.length > 0) {
                 for (const uid of studentUserIds) {
-                    try { await supabase.from('workout_checkins').delete().eq('user_id', uid); } catch { }
-                    try { await supabase.from('exercise_execution_submissions').delete().eq('student_user_id', uid); } catch { }
+                    try { await supabase.from('workout_checkins').delete().eq('user_id', uid); } catch (e) { logError('useAdminActions.deleteCheckins', e) }
+                    try { await supabase.from('exercise_execution_submissions').delete().eq('student_user_id', uid); } catch (e) { logError('useAdminActions.deleteSubmissions', e) }
                 }
 
                 // Assessments (assessment_photos may not exist)
@@ -245,10 +246,10 @@ export function useAdminActions({
                     const { data: assessments } = await supabase.from('assessments').select('id').in('student_id', studentUserIds);
                     if (Array.isArray(assessments) && assessments.length > 0) {
                         const aIds = assessments.map((a: { id: string }) => a.id);
-                        try { await supabase.from('assessment_photos').delete().in('assessment_id', aIds); } catch { }
+                        try { await supabase.from('assessment_photos').delete().in('assessment_id', aIds); } catch (e) { logError('useAdminActions.deleteAssessmentPhotos', e) }
                     }
-                } catch { }
-                try { await supabase.from('assessments').delete().in('student_id', studentUserIds); } catch { }
+                } catch (e) { logError('useAdminActions.fetchStudentAssessments', e) }
+                try { await supabase.from('assessments').delete().in('student_id', studentUserIds); } catch (e) { logError('useAdminActions.deleteStudentAssessments', e) }
             }
 
             // Teacher's own assessments
@@ -257,18 +258,18 @@ export function useAdminActions({
                     const { data: tAssessments } = await supabase.from('assessments').select('id').eq('trainer_id', tUserId);
                     if (Array.isArray(tAssessments) && tAssessments.length > 0) {
                         const aIds = tAssessments.map((a: { id: string }) => a.id);
-                        try { await supabase.from('assessment_photos').delete().in('assessment_id', aIds); } catch { }
+                        try { await supabase.from('assessment_photos').delete().in('assessment_id', aIds); } catch (e) { logError('useAdminActions.deleteTrainerAssessmentPhotos', e) }
                     }
-                } catch { }
-                try { await supabase.from('assessments').delete().eq('trainer_id', tUserId); } catch { }
+                } catch (e) { logError('useAdminActions.fetchTrainerAssessments', e) }
+                try { await supabase.from('assessments').delete().eq('trainer_id', tUserId); } catch (e) { logError('useAdminActions.deleteTrainerAssessments', e) }
             }
 
             // Appointments
             if (tUserId) {
-                try { await supabase.from('appointments').delete().eq('coach_id', tUserId); } catch { }
+                try { await supabase.from('appointments').delete().eq('coach_id', tUserId); } catch (e) { logError('useAdminActions.deleteCoachAppointments', e) }
             }
             if (studentIds.length > 0) {
-                try { await supabase.from('appointments').delete().in('student_id', studentIds); } catch { }
+                try { await supabase.from('appointments').delete().in('student_id', studentIds); } catch (e) { logError('useAdminActions.deleteStudentAppointments', e) }
             }
 
             // Workouts → exercises → sets (teacher + students)
@@ -279,7 +280,7 @@ export function useAdminActions({
                     try {
                         const { data: wks } = await supabase.from('workouts').select('id').eq('user_id', uid);
                         if (Array.isArray(wks)) workoutIds.push(...wks.map((w: { id: string }) => w.id));
-                    } catch { }
+                    } catch (e) { logError('useAdminActions.fetchWorkoutsByUser', e) }
                 }
                 // Also workouts created by teacher
                 if (tUserId) {
@@ -288,7 +289,7 @@ export function useAdminActions({
                         if (Array.isArray(createdWks)) {
                             for (const w of createdWks) { if (!workoutIds.includes(w.id)) workoutIds.push(w.id); }
                         }
-                    } catch { }
+                    } catch (e) { logError('useAdminActions.fetchCreatedWorkouts', e) }
                 }
 
                 if (workoutIds.length > 0) {
@@ -296,41 +297,41 @@ export function useAdminActions({
                     try {
                         const { data: exs } = await supabase.from('exercises').select('id').in('workout_id', workoutIds);
                         if (Array.isArray(exs)) exerciseIds.push(...exs.map((e: { id: string }) => e.id));
-                    } catch { }
+                    } catch (e) { logError('useAdminActions.fetchExercises', e) }
                     if (exerciseIds.length > 0) {
-                        try { await supabase.from('sets').delete().in('exercise_id', exerciseIds); } catch { }
-                        try { await supabase.from('exercises').delete().in('id', exerciseIds); } catch { }
+                        try { await supabase.from('sets').delete().in('exercise_id', exerciseIds); } catch (e) { logError('useAdminActions.deleteSets', e) }
+                        try { await supabase.from('exercises').delete().in('id', exerciseIds); } catch (e) { logError('useAdminActions.deleteExercises', e) }
                     }
-                    try { await supabase.from('workouts').delete().in('id', workoutIds); } catch { }
+                    try { await supabase.from('workouts').delete().in('id', workoutIds); } catch (e) { logError('useAdminActions.deleteWorkouts', e) }
                 }
             }
 
             // Teacher's own data
             if (tUserId) {
-                try { await supabase.from('active_workout_sessions').delete().eq('user_id', tUserId); } catch { }
-                try { await supabase.from('user_settings').delete().eq('user_id', tUserId); } catch { }
-                try { await supabase.from('notifications').delete().eq('user_id', tUserId); } catch { }
-                try { await supabase.from('messages').delete().eq('user_id', tUserId); } catch { }
-                try { await supabase.from('invites').delete().or(`from_uid.eq.${tUserId},to_uid.eq.${tUserId}`); } catch { }
+                try { await supabase.from('active_workout_sessions').delete().eq('user_id', tUserId); } catch (e) { logError('useAdminActions.deleteActiveSessions', e) }
+                try { await supabase.from('user_settings').delete().eq('user_id', tUserId); } catch (e) { logError('useAdminActions.deleteUserSettings', e) }
+                try { await supabase.from('notifications').delete().eq('user_id', tUserId); } catch (e) { logError('useAdminActions.deleteNotifications', e) }
+                try { await supabase.from('messages').delete().eq('user_id', tUserId); } catch (e) { logError('useAdminActions.deleteMessages', e) }
+                try { await supabase.from('invites').delete().or(`from_uid.eq.${tUserId},to_uid.eq.${tUserId}`); } catch (e) { logError('useAdminActions.deleteInvites', e) }
 
                 // DMs
                 try {
                     const { data: channels } = await supabase.from('direct_channels').select('id').or(`user1_id.eq.${tUserId},user2_id.eq.${tUserId}`);
                     if (Array.isArray(channels) && channels.length > 0) {
                         const cIds = channels.map((c: { id: string }) => c.id);
-                        try { await supabase.from('direct_messages').delete().in('channel_id', cIds); } catch { }
-                        try { await supabase.from('direct_channels').delete().in('id', cIds); } catch { }
+                        try { await supabase.from('direct_messages').delete().in('channel_id', cIds); } catch (e) { logError('useAdminActions.deleteDirectMessages', e) }
+                        try { await supabase.from('direct_channels').delete().in('id', cIds); } catch (e) { logError('useAdminActions.deleteDirectChannels', e) }
                     }
-                } catch { }
+                } catch (e) { logError('useAdminActions.fetchDirectChannels', e) }
 
-                try { await supabase.from('marketplace_subscriptions').delete().eq('teacher_user_id', tUserId); } catch { }
-                try { await supabase.from('teacher_plans').delete().eq('teacher_user_id', tUserId); } catch { }
-                try { await supabase.from('asaas_customers').delete().eq('user_id', tUserId); } catch { }
+                try { await supabase.from('marketplace_subscriptions').delete().eq('teacher_user_id', tUserId); } catch (e) { logError('useAdminActions.deleteSubscriptions', e) }
+                try { await supabase.from('teacher_plans').delete().eq('teacher_user_id', tUserId); } catch (e) { logError('useAdminActions.deleteTeacherPlans', e) }
+                try { await supabase.from('asaas_customers').delete().eq('user_id', tUserId); } catch (e) { logError('useAdminActions.deleteAsaasCustomers', e) }
             }
 
             // Delete students
             if (studentIds.length > 0) {
-                try { await supabase.from('students').delete().in('id', studentIds); } catch { }
+                try { await supabase.from('students').delete().in('id', studentIds); } catch (e) { logError('useAdminActions.deleteStudents', e) }
             }
 
             // Delete teacher row
@@ -339,7 +340,7 @@ export function useAdminActions({
 
             // Update profile role
             if (tUserId) {
-                try { await supabase.from('profiles').update({ role: 'user' }).eq('id', tUserId).eq('role', 'teacher'); } catch { }
+                try { await supabase.from('profiles').update({ role: 'user' }).eq('id', tUserId).eq('role', 'teacher'); } catch (e) { logError('useAdminActions.updateProfileRole', e) }
             }
 
             if (tUserId) {
@@ -347,7 +348,7 @@ export function useAdminActions({
                     const { data: sessionData } = await supabase.auth.getSession();
                     const token = sessionData?.session?.access_token || '';
                     if (token) await apiAdmin.deleteAuthUserWithToken(tUserId, token).catch(() => null);
-                } catch { }
+                } catch (e) { logError('useAdminActions.deleteTeacherAuthUser', e) }
             }
 
             // Also delete auth.users for students
@@ -356,7 +357,7 @@ export function useAdminActions({
                     const { data: sessionData } = await supabase.auth.getSession();
                     const token = sessionData?.session?.access_token || '';
                     if (token) await apiAdmin.deleteAuthUserWithToken(suid, token).catch(() => null);
-                } catch { }
+                } catch (e) { logError('useAdminActions.deleteStudentAuthUser', e) }
             }
 
             setTeachersList((prev) => prev.filter((t) => t.id !== teacherId && t.user_id !== teacherId));

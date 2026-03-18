@@ -19,7 +19,7 @@ import { useEffect, useRef, useCallback } from 'react'
 import { z } from 'zod'
 import type { SupabaseClient, RealtimeChannel } from '@supabase/supabase-js'
 import type { ActiveWorkoutSession } from '@/types/app'
-import { logWarn } from '@/lib/logger'
+import { logError, logWarn } from '@/lib/logger'
 
 const isRecord = (v: unknown): v is Record<string, unknown> =>
     v !== null && typeof v === 'object' && !Array.isArray(v)
@@ -112,11 +112,12 @@ export function useSessionSync({
                         try {
                             localStorage.setItem(scopedKey, JSON.stringify(parsed))
                             localStorage.removeItem('activeSession')
-                        } catch { }
+                        } catch (e) { logError('hook:useSessionSync.migrateLocalStorage', e) }
                     }
                 }
             }
-        } catch {
+        } catch (e) {
+            logError('hook:useSessionSync.restoreLocalStorage', e)
             try {
                 localStorage.removeItem(scopedKey)
                 localStorage.removeItem('activeSession')
@@ -152,8 +153,8 @@ export function useSessionSync({
                 setView('active')
                 try {
                     localStorage.setItem(scopedKey, JSON.stringify(state))
-                } catch { }
-            } catch { }
+                } catch (e) { logError('hook:useSessionSync.persistServerState', e) }
+            } catch (e) { logError('hook:useSessionSync.loadServer', e) }
         }
 
         loadServer()
@@ -228,11 +229,11 @@ export function useSessionSync({
                                 setView('active')
                                 try { localStorage.setItem(`irontracks.activeSession.v2.${uid}`, JSON.stringify(state)) } catch { }
                             }
-                        } catch { }
+                        } catch (e) { logError('hook:useSessionSync.realtimeHandler', e) }
                     }
                 )
                 .subscribe()
-        } catch { }
+        } catch (e) { logError('hook:useSessionSync.realtimeSubscribe', e) }
 
         return () => {
             mounted = false
@@ -299,7 +300,7 @@ export function useSessionSync({
 
         let timerId: ReturnType<typeof setTimeout> | null = null
         try {
-            timerId = setTimeout(() => { try { run() } catch { } }, 900)
+            timerId = setTimeout(() => { try { run() } catch (e) { logError('hook:useSessionSync.debouncedRun', e) } }, 900)
             serverSessionSyncRef.current.timer = timerId
         } catch { }
 
@@ -360,7 +361,7 @@ export function useSessionSync({
                         { onConflict: 'user_id' }
                     )
                 if (error && isMissingTable(error)) notifyMigrationWarning()
-            } catch { /* silent — best effort */ }
+            } catch (e) { logError('hook:useSessionSync.heartbeat', e) }
         }
 
         const intervalId = setInterval(heartbeat, HEARTBEAT_MS)

@@ -9,6 +9,7 @@
  */
 
 import { parseTrainingNumber } from '@/utils/trainingNumber';
+import { logError } from '@/lib/logger';
 import { isObject } from '../utils';
 import type { UnknownRecord } from '../types';
 
@@ -154,7 +155,7 @@ export function useWorkoutMethodSavers({
                 advanced_config: baseAdvanced,
             });
             setClusterModal(null);
-        } catch { }
+        } catch (e) { logError('hook:useWorkoutMethodSavers.saveCluster', e) }
     };
 
     // ─── Rest-Pause ───────────────────────────────────────────────────────────
@@ -204,7 +205,7 @@ export function useWorkoutMethodSavers({
                 advanced_config: cfg,
             });
             setRestPauseModal(null);
-        } catch { }
+        } catch (e) { logError('hook:useWorkoutMethodSavers.saveRestPause', e) }
     };
 
     // ─── Drop Set ─────────────────────────────────────────────────────────────
@@ -246,7 +247,7 @@ export function useWorkoutMethodSavers({
                 drop_set: { stages },
             });
             setDropSetModal(null);
-        } catch { }
+        } catch (e) { logError('hook:useWorkoutMethodSavers.saveDropSet', e) }
     };
 
     // ─── Stripping ────────────────────────────────────────────────────────────
@@ -288,7 +289,7 @@ export function useWorkoutMethodSavers({
                 stripping: { stages },
             });
             setStrippingModal(null);
-        } catch { }
+        } catch (e) { logError('hook:useWorkoutMethodSavers.saveStripping', e) }
     };
 
     // ─── FST-7 ────────────────────────────────────────────────────────────────
@@ -331,7 +332,7 @@ export function useWorkoutMethodSavers({
                 fst7: { blocks, intra_sec },
             });
             setFst7Modal(null);
-        } catch { }
+        } catch (e) { logError('hook:useWorkoutMethodSavers.saveFst7', e) }
     };
 
     // ─── Heavy Duty ───────────────────────────────────────────────────────────
@@ -369,7 +370,7 @@ export function useWorkoutMethodSavers({
                 heavy_duty,
             });
             setHeavyDutyModal(null);
-        } catch { }
+        } catch (e) { logError('hook:useWorkoutMethodSavers.saveHeavyDuty', e) }
     };
 
     // ─── Ponto Zero ───────────────────────────────────────────────────────────
@@ -402,7 +403,7 @@ export function useWorkoutMethodSavers({
                 ponto_zero: { weight, reps, hold_sec, rpe },
             });
             setPontoZeroModal(null);
-        } catch { }
+        } catch (e) { logError('hook:useWorkoutMethodSavers.savePontoZero', e) }
     };
 
     // ─── Forced Reps ─────────────────────────────────────────────────────────
@@ -438,7 +439,7 @@ export function useWorkoutMethodSavers({
                 forced_reps: { weight, reps_failure, forced_count, rpe },
             });
             setForcedRepsModal(null);
-        } catch { }
+        } catch (e) { logError('hook:useWorkoutMethodSavers.saveForcedReps', e) }
     };
 
     // ─── Negative Reps ────────────────────────────────────────────────────────
@@ -474,7 +475,7 @@ export function useWorkoutMethodSavers({
                 negative_reps: { weight, reps, eccentric_sec, rpe },
             });
             setNegativeRepsModal(null);
-        } catch { }
+        } catch (e) { logError('hook:useWorkoutMethodSavers.saveNegativeReps', e) }
     };
 
     // ─── Partial Reps ─────────────────────────────────────────────────────────
@@ -511,7 +512,7 @@ export function useWorkoutMethodSavers({
                 partial_reps: { weight, full_reps, partial_count, rpe },
             });
             setPartialRepsModal(null);
-        } catch { }
+        } catch (e) { logError('hook:useWorkoutMethodSavers.savePartialReps', e) }
     };
 
     // ─── Sistema 21 ───────────────────────────────────────────────────────────
@@ -545,7 +546,7 @@ export function useWorkoutMethodSavers({
                 sistema21: { weight, phase1, phase2, phase3, rpe },
             });
             setSistema21Modal(null);
-        } catch { }
+        } catch (e) { logError('hook:useWorkoutMethodSavers.saveSistema21', e) }
     };
 
     // ─── Wave Loading ─────────────────────────────────────────────────────────
@@ -590,7 +591,7 @@ export function useWorkoutMethodSavers({
                 wave: { weight, waves, rpe },
             });
             setWaveModal(null);
-        } catch { }
+        } catch (e) { logError('hook:useWorkoutMethodSavers.saveWave', e) }
     };
 
     // ─── Group Method ─────────────────────────────────────────────────────────
@@ -620,7 +621,7 @@ export function useWorkoutMethodSavers({
                 rpe,
             });
             setGroupMethodModal(null);
-        } catch { }
+        } catch (e) { logError('hook:useWorkoutMethodSavers.saveGroupMethod', e) }
     };
 
     // ─── Return ───────────────────────────────────────────────────────────────

@@ -6,6 +6,7 @@ import {
   Layers, Mail, MessageCircle, ChevronRight, ExternalLink,
   HelpCircle, Database, Smartphone,
 } from 'lucide-react'
+import { logError } from '@/lib/logger'
 import { useDialog } from '@/contexts/DialogContext'
 import { DEFAULT_SETTINGS } from '@/hooks/useUserSettings'
 import { createClient } from '@/utils/supabase/client'
@@ -94,7 +95,7 @@ export default function SettingsModal(props: SettingsModalProps) {
           const res = await checkNativeNotificationPermission()
           if (!alive) return
           setIosNotifStatus(String((res as Record<string, unknown>)?.status ?? 'unknown'))
-        } catch { if (!alive) return; setIosNotifStatus('unknown') }
+        } catch (e) { logError('component:SettingsModal.checkNotifPermission', e); if (!alive) return; setIosNotifStatus('unknown') }
       })()
     return () => { alive = false }
   }, [isOpen])
@@ -118,7 +119,7 @@ export default function SettingsModal(props: SettingsModalProps) {
       const healthAvailable = await isHealthKitAvailable()
       const notif = await checkNativeNotificationPermission()
       setIosDiag({ capacitorPresent, platform, pluginNames, app: appInfo || null, device: deviceInfo || null, push: pushPerm || null, biometrics: biom || null, notifications: notif || null, healthKitAvailable: healthAvailable })
-    } catch { setIosDiag(null) } finally { setIosDiagBusy(false) }
+    } catch (e) { logError('component:SettingsModal.loadIosDiag', e); setIosDiag(null) } finally { setIosDiagBusy(false) }
   }
   useEffect(() => { if (isOpen && isIosNative()) { loadIosDiag() } }, [isOpen])
 
@@ -136,7 +137,7 @@ export default function SettingsModal(props: SettingsModalProps) {
       await requestNativeNotifications()
       const res = await checkNativeNotificationPermission()
       setIosNotifStatus(String((res as Record<string, unknown>)?.status ?? 'unknown'))
-    } catch { setIosNotifStatus('unknown') } finally { setIosNotifBusy(false) }
+    } catch (e) { logError('component:SettingsModal.requestNotifPermission', e); setIosNotifStatus('unknown') } finally { setIosNotifBusy(false) }
   }
 
   const handleRequestHealthKitPermission = async () => {
@@ -144,7 +145,7 @@ export default function SettingsModal(props: SettingsModalProps) {
       setHealthKitBusy(true)
       const res = await requestHealthKitPermission()
       setHealthKitGranted(!!res?.granted)
-    } catch { setHealthKitGranted(false) } finally { setHealthKitBusy(false) }
+    } catch (e) { logError('component:SettingsModal.requestHealthKit', e); setHealthKitGranted(false) } finally { setHealthKitBusy(false) }
   }
 
   const handleOpenAppSettings = async () => {

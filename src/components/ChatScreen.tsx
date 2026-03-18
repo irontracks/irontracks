@@ -183,7 +183,7 @@ const ChatScreen = ({ user, onClose }: ChatScreenProps) => {
     const ensureBucket = useCallback(async () => {
         try {
             await apiStorage.ensureBucket('chat-media')
-        } catch {}
+        } catch (e) { logError('component:ChatScreen.ensureBucket', e) }
     }, [])
 
     const formatMessage = useCallback((m: Record<string, unknown>): FormattedMessage => {

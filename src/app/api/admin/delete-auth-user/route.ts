@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { logError } from '@/lib/logger'
 
 const BodySchema = z.object({
     user_id: z.string().trim().min(1, 'user_id required'),
@@ -49,7 +50,7 @@ export async function POST(req: Request) {
                 const { data: profile } = await admin.from('profiles').select('role').eq('id', callerId).maybeSingle()
                 const role = String(profile?.role || '').toLowerCase()
                 if (role === 'admin' || role === 'teacher') isAllowed = true
-            } catch { }
+            } catch (e) { logError('api:admin:delete-auth-user:check-profile-role', e) }
         }
 
         // Check teachers table
@@ -57,7 +58,7 @@ export async function POST(req: Request) {
             try {
                 const { data: t } = await admin.from('teachers').select('id').eq('user_id', callerId).maybeSingle()
                 if (t?.id) isAllowed = true
-            } catch { }
+            } catch (e) { logError('api:admin:delete-auth-user:check-teachers', e) }
         }
 
         if (!isAllowed) {

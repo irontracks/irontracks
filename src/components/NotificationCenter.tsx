@@ -9,6 +9,7 @@ import { useTeamWorkout } from '@/contexts/TeamWorkoutContext';
 import { useDialog } from '@/contexts/DialogContext';
 import { createClient } from '@/utils/supabase/client';
 import { RealtimeChannel } from '@supabase/supabase-js';
+import { logError } from '@/lib/logger'
 import { getErrorMessage } from '@/utils/errorMessage'
 import type { AppNotification } from '@/types/social'
 
@@ -142,7 +143,7 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded, open:
                     .order('created_at', { ascending: false })
                     .limit(50);
                 if (isMounted) setSystemNotifications((data as NotificationItem[]) || []);
-            } catch { if (isMounted) setSystemNotifications([]); }
+            } catch (e) { logError('component:NotificationCenter.fetchNotifications', e); if (isMounted) setSystemNotifications([]); }
         };
 
         fetchNotifications();
@@ -180,7 +181,7 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded, open:
                 setSystemNotifications(prev =>
                     (Array.isArray(prev) ? prev : []).map(n => ({ ...n, read: true, is_read: true }))
                 );
-            } catch { return; }
+            } catch (e) { logError('component:NotificationCenter.markRead', e); return; }
         };
         markRead();
         return () => { cancelled = true; };
@@ -191,7 +192,7 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded, open:
         try { e?.stopPropagation?.(); } catch { }
         if (!id || !supabase) return;
         setSystemNotifications(prev => (Array.isArray(prev) ? prev.filter(n => n?.id !== id) : []));
-        try { await supabase.from('notifications').delete().eq('id', id); } catch { return; }
+        try { await supabase.from('notifications').delete().eq('id', id); } catch (e) { logError('component:NotificationCenter.deleteNotification', e); return; }
     };
 
     const handleClearAll = async () => {
@@ -202,7 +203,7 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded, open:
             if (!currentUser) return;
             await supabase.from('notifications').delete().eq('user_id', currentUser.id);
             setSystemNotifications([]);
-        } catch { return; }
+        } catch (e) { logError('component:NotificationCenter.clearAll', e); return; }
     };
 
     const handleAccept = async (item: { data?: unknown;[key: string]: unknown }) => {
@@ -217,7 +218,7 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded, open:
     };
 
     const handleReject = async (item: { id?: unknown;[key: string]: unknown }) => {
-        try { if (typeof rejectInvite === 'function') await rejectInvite(item?.id as string); } catch { return; }
+        try { if (typeof rejectInvite === 'function') await rejectInvite(item?.id as string); } catch (e) { logError('component:NotificationCenter.rejectInvite', e); return; }
     };
 
     // ─── Data assembly ────────────────────────────────────────────────────────

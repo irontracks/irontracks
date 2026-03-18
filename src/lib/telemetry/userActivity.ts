@@ -1,6 +1,7 @@
 import { getRawVersion } from '@/lib/version'
 import { parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
+import { logError } from '@/lib/logger'
 
 export type UserActivityEvent = {
   name: string
@@ -62,7 +63,7 @@ const writeStored = (items: unknown[]) => {
   try {
     if (typeof window === 'undefined') return
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(items.slice(-MAX_QUEUE)))
-  } catch { }
+  } catch (e) { logError('userActivity.writeStored', e) }
 }
 
 const mergeQueueFromStorage = () => {
@@ -128,7 +129,7 @@ export function trackUserEvent(eventName: string, data?: Omit<UserActivityEvent,
     if (queue.length > MAX_QUEUE) queue = queue.slice(-MAX_QUEUE)
     writeStored(queue)
     scheduleFlush()
-  } catch { }
+  } catch (e) { logError('trackUserEvent', e) }
 }
 
 export function trackScreen(screen: string, extra?: Record<string, unknown>) {
@@ -183,7 +184,7 @@ async function flush({ preferBeacon }: { preferBeacon: boolean }) {
       queue = queue.slice(batch.length)
       writeStored(queue)
     }
-  } catch { } finally {
+  } catch (e) { logError('userActivity.flush', e) } finally {
     flushing = false
   }
 }

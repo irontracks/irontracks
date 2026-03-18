@@ -100,7 +100,7 @@ export function useLoginScreen() {
                 const backup = JSON.parse(raw) as Record<string, unknown>
                 if (backup?.access_token && backup?.refresh_token) return true
             }
-        } catch { }
+        } catch (e) { logError('hook:useLoginScreen.initLoadingState', e) }
         return false
     })
 
@@ -178,7 +178,7 @@ export function useLoginScreen() {
                     }).catch(() => setIsLoading(false))
                 }
             }
-        } catch { }
+        } catch (e) { logError('hook:useLoginScreen.sessionRestore', e) }
     }, [])
 
     // Cooldown ticker

@@ -1,5 +1,6 @@
 'use client'
 import { useState, useCallback } from 'react'
+import { logError } from '@/lib/logger'
 import {
     generatePostWorkoutInsights,
     applyProgressionToNextTemplate,
@@ -96,7 +97,7 @@ export function useWorkoutReportHandlers({
                     const json = await resp.json().catch((): unknown => null)
                     if (resp.ok && json?.ok && json?.map && typeof json.map === 'object') canonicalMap = json.map as Record<string, unknown>
                 }
-            } catch { }
+            } catch (e) { logError('hook:useWorkoutReportHandlers.canonicalize', e) }
 
             const sessionForReport = applyCanonicalNamesToSession(session, canonicalMap)
             const prevForReport = applyCanonicalNamesToSession(prev, canonicalMap)
@@ -111,7 +112,7 @@ export function useWorkoutReportHandlers({
                         aiToUse = res.ai
                         setAiState({ loading: false, error: null, result: res.ai && typeof res.ai === 'object' ? (res.ai as Record<string, unknown>) : null, cached: !!res.saved })
                     }
-                } catch { }
+                } catch (e) { logError('hook:useWorkoutReportHandlers.generateAiForPdf', e) }
             }
 
             const logoDataUrl = await fetchLogoDataUrl().catch(() => null)
@@ -191,7 +192,7 @@ export function useWorkoutReportHandlers({
                 const a = document.createElement('a'); a.href = url; a.download = file.name
                 document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url)
             }
-        } catch { }
+        } catch (e) { logError('hook:useWorkoutReportHandlers.partnerPlan', e) }
     }, [session])
 
     const handleDownloadJson = useCallback(() => {
@@ -202,7 +203,7 @@ export function useWorkoutReportHandlers({
             const title = String(session?.workoutTitle || 'Treino').trim() || 'Treino'
             const a = document.createElement('a'); a.href = url; a.download = `${title.replace(/\s+/g, '_')}_irontracks.json`
             document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url)
-        } catch { }
+        } catch (e) { logError('hook:useWorkoutReportHandlers.downloadJson', e) }
     }, [session])
 
     const handleShare = useCallback(async () => {

@@ -1,4 +1,5 @@
 import { createAdminClient } from '@/utils/supabase/admin'
+import { logError } from '@/lib/logger'
 
 type SyncResult = { created: number; updated: number; failed: number }
 
@@ -107,7 +108,8 @@ const templateSignature = (tpl: WorkoutTemplate): string => {
 const getAdmin = (): SupabaseAdmin | null => {
   try {
     return createAdminClient()
-  } catch {
+  } catch (e) {
+    logError('workoutSync.getAdmin', e)
     return null
   }
 }
@@ -124,7 +126,8 @@ const detectSupports = async (admin: SupabaseAdmin): Promise<void> => {
     try {
       const { error } = await admin.from('workouts').select('id, source_workout_id').limit(1)
       supportsSourceWorkoutId = !error
-    } catch {
+    } catch (e) {
+      logError('workoutSync.detectSupports.sourceWorkoutId', e)
       supportsSourceWorkoutId = false
     }
   }
@@ -133,7 +136,8 @@ const detectSupports = async (admin: SupabaseAdmin): Promise<void> => {
     try {
       const { error } = await admin.from('workout_sync_subscriptions').select('id').limit(1)
       supportsSubscriptions = !error
-    } catch {
+    } catch (e) {
+      logError('workoutSync.detectSupports.subscriptions', e)
       supportsSubscriptions = false
     }
   }
@@ -361,7 +365,8 @@ export async function syncAllTemplatesToSubscriber({
       await replaceExercisesAndSets({ admin, targetWorkoutId: up.workoutId, template: t })
       if (up.created) created++
       else updated++
-    } catch {
+    } catch (e) {
+      logError('syncAllTemplatesToSubscriber', e)
       failed++
     }
   }
@@ -406,7 +411,7 @@ export async function syncTemplateToSubscribers({
         const tid = String(s?.target_user_id || '').trim()
         if (tid) targetsSet.add(tid)
       }
-    } catch { }
+    } catch (e) { logError('syncTemplateToSubscribers.fetchSubscriptions', e) }
   }
 
   if (supportsSourceWorkoutId) {
@@ -422,7 +427,7 @@ export async function syncTemplateToSubscribers({
         const tid = String(r?.user_id || '').trim()
         if (tid && tid !== String(sourceUserId)) targetsSet.add(tid)
       }
-    } catch { }
+    } catch (e) { logError('syncTemplateToSubscribers.fetchDirectTargets', e) }
 
     const sig = templateSignature(tpl)
     try {
@@ -442,9 +447,9 @@ export async function syncTemplateToSubscribers({
         try {
           await admin.from('workouts').update({ source_workout_id: sourceWorkoutId }).eq('id', wid)
           targetsSet.add(tid)
-        } catch { }
+        } catch (e) { logError('syncTemplateToSubscribers.backfillSourceId', e) }
       }
-    } catch { }
+    } catch (e) { logError('syncTemplateToSubscribers.fetchCandidates', e) }
   }
 
   const targets = Array.from(targetsSet.values()).filter(Boolean)
@@ -503,7 +508,8 @@ export async function syncTemplateToSubscribers({
       await replaceExercisesAndSets({ admin, targetWorkoutId: up.workoutId, template: tpl })
       if (up.created) created++
       else updated++
-    } catch {
+    } catch (e) {
+      logError('syncTemplateToSubscribers.perTarget', e)
       failed++
     }
   }

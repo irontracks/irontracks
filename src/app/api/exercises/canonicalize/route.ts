@@ -7,6 +7,7 @@ import { requireUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { normalizeExerciseName } from '@/utils/normalizeExerciseName'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { logError } from '@/lib/logger'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -237,7 +238,8 @@ export async function POST(req: Request) {
           canonical: String(it?.canonical || '').trim(),
           confidence: Number(it?.confidence),
         })).filter((it) => it.normalized && it.canonical)
-      } catch {
+      } catch (e) {
+        logError('api:exercises:canonicalize:gemini', e)
         geminiResolved = []
       }
     }
@@ -251,7 +253,7 @@ export async function POST(req: Request) {
           status: 'pending',
         }))
         await admin.from('exercise_alias_jobs').upsert(jobs, { onConflict: 'user_id,normalized_alias' })
-      } catch {}
+      } catch (e) { logError('api:exercises:canonicalize:prefetch-jobs', e) }
     }
 
     for (const it of geminiResolved) {
@@ -312,7 +314,7 @@ export async function POST(req: Request) {
             },
             { onConflict: 'user_id,normalized_alias' },
           )
-      } catch {}
+      } catch (e) { logError('api:exercises:canonicalize:deterministic-upsert', e) }
     }
 
     for (const n of normalizedList) {

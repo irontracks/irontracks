@@ -6,6 +6,7 @@ import { filterRecipientsByPreference, insertNotifications } from '@/lib/social/
 import { parseJsonBody } from '@/utils/zod'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { logError } from '@/lib/logger'
 
 export const dynamic = 'force-dynamic'
 
@@ -43,7 +44,7 @@ export async function POST(req: Request) {
       if (prefs && prefs.allowSocialFollows === false) {
         return NextResponse.json({ ok: false, error: 'user_not_accepting_follows' }, { status: 403 })
       }
-    } catch { }
+    } catch (e) { logError('api:social:follow:check-settings', e) }
 
     const { error } = await auth.supabase
       .from('social_follows')
@@ -78,7 +79,7 @@ export async function POST(req: Request) {
                 .eq('user_id', followingId)
                 .eq('type', 'follow_request')
                 .eq('sender_id', followerId)
-            } catch { }
+            } catch (e) { logError('api:social:follow:delete-old-notification', e) }
 
             const inserted = await insertNotifications([
               {
@@ -122,7 +123,7 @@ export async function POST(req: Request) {
           .eq('user_id', followingId)
           .eq('type', 'follow_request')
           .eq('sender_id', followerId)
-      } catch { }
+      } catch (e) { logError('api:social:follow:delete-old-notification', e) }
 
       const inserted = await insertNotifications([
         {

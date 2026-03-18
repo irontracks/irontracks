@@ -9,6 +9,7 @@ import VipWeeklySummaryCard from '@/components/vip/VipWeeklySummaryCard'
 
 const VipPeriodizationPanel = dynamic(() => import('@/components/vip/VipPeriodizationPanel'), { ssr: false })
 import VipInsightsPanel from '@/components/vip/VipInsightsPanel'
+import { logError } from '@/lib/logger'
 import { useVipCredits } from '@/hooks/useVipCredits'
 import { useDialog } from '@/contexts/DialogContext'
 import { useRouter } from 'next/navigation'
@@ -84,7 +85,8 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
           const data = await apiVip.getStatus()
           if (cancelled) return
           if (data?.ok) setVipStatus(data as unknown as VipStatus)
-        } catch {
+        } catch (e) {
+          logError('component:VipHub.loadVipStatus', e)
         }
       })()
     return () => {
@@ -227,7 +229,8 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
         })
       }
 
-    } catch {
+    } catch (e) {
+      logError('component:VipHub.sendChat', e)
       setMessages((prev) => [...(Array.isArray(prev) ? prev : []), { id: `${id}-a`, role: 'assistant', text: 'Falha ao consultar a IA.' }].slice(-60))
     } finally {
       setBusy(false)
@@ -291,7 +294,8 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
             } as ChatMessage
           })
           setMessages(parsed.slice(-60))
-        } catch {
+        } catch (e) {
+          logError('component:VipHub.loadChatHistory', e)
         } finally {
           if (!cancelled) {
             setChatLoading(false)

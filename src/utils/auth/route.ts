@@ -3,6 +3,7 @@ import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { User } from '@supabase/supabase-js'
+import { logError } from '@/lib/logger'
 
 export type IrontracksRole = 'admin' | 'teacher' | 'user'
 export type RouteAuthFail = { ok: false; response: NextResponse<{ ok: false; error: string }>; supabase?: undefined; user?: undefined; role?: undefined }
@@ -37,7 +38,8 @@ export async function requireUser() {
       return { ok: false as const, response: jsonError(401, 'unauthorized') }
     }
     return { ok: true as const, supabase, user }
-  } catch {
+  } catch (e) {
+    logError('requireUser', e)
     return { ok: false as const, response: jsonError(401, 'unauthorized') }
   }
 }
@@ -54,19 +56,19 @@ export async function resolveRoleByUser(user: { id?: string | null; email?: stri
     const { data: profile } = await admin.from('profiles').select('role').eq('id', userId).maybeSingle()
     const role = String(profile?.role || '').toLowerCase()
     if (role === 'admin' || role === 'teacher') return { role: role as IrontracksRole }
-  } catch {}
+  } catch (e) { logError('resolveRoleByUser.profileRole', e) }
 
   try {
     const { data: teacherById } = await admin.from('teachers').select('id').eq('user_id', userId).maybeSingle()
     if (teacherById?.id) return { role: 'teacher' as IrontracksRole }
-  } catch {}
+  } catch (e) { logError('resolveRoleByUser.teacherById', e) }
 
   try {
     if (email) {
       const { data: teacherByEmail } = await admin.from('teachers').select('id').ilike('email', email).maybeSingle()
       if (teacherByEmail?.id) return { role: 'teacher' as IrontracksRole }
     }
-  } catch {}
+  } catch (e) { logError('resolveRoleByUser.teacherByEmail', e) }
 
   return { role: 'user' as IrontracksRole }
 }
@@ -106,7 +108,8 @@ export async function requireRoleWithBearer(req: Request, allowed: IrontracksRol
     // The admin client was only needed to validate the Bearer token and resolve the role.
     const userScoped = await createClient()
     return { ok: true as const, supabase: userScoped, user, role }
-  } catch {
+  } catch (e) {
+    logError('requireRoleWithBearer', e)
     return { ok: false as const, response: jsonError(401, 'unauthorized') }
   }
 }
@@ -140,12 +143,12 @@ export async function canUploadToChatMediaPath(userId: string, channelId: string
       .or(`user1_id.eq.${uid},user2_id.eq.${uid}`)
       .maybeSingle()
     if (direct?.id) return true
-  } catch {}
+  } catch (e) { logError('canUploadToChatMediaPath.directChannel', e) }
 
   try {
     const { data: member } = await admin.from('chat_members').select('id').eq('channel_id', cid).eq('user_id', uid).maybeSingle()
     if (member?.id) return true
-  } catch {}
+  } catch (e) { logError('canUploadToChatMediaPath.chatMember', e) }
 
   return false
 }

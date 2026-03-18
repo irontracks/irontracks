@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { requireRole, requireRoleWithBearer, jsonError } from '@/utils/auth/route'
 import { parseSearchParams } from '@/utils/zod'
+import { logError } from '@/lib/logger'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -103,7 +104,7 @@ export async function GET(req: Request) {
         const prefsObj = prefs as Record<string, unknown>
         cfg = normalizeCoachInboxSettings(prefsObj?.coachInbox)
       }
-    } catch {}
+    } catch (e) { logError('api:admin:teachers:inbox:load-settings', e) }
 
     const { data: students, error: stErr } = await admin
       .from('students')
@@ -243,7 +244,7 @@ export async function GET(req: Request) {
 
         checkinsAggByUser.set(uid, prev)
       }
-    } catch {}
+    } catch (e) { logError('api:admin:teachers:inbox:checkins-agg', e) }
 
     const { data: states, error: stStateErr } = await admin
       .from('coach_inbox_states')

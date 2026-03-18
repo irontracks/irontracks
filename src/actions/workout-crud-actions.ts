@@ -5,6 +5,7 @@ import type { ActionResult } from '@/types/actions'
 import { parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
 import { cacheDeletePattern } from '@/utils/cache'
+import { logError } from '@/lib/logger'
 
 // ─── Private helpers ─────────────────────────────────────────────────────────
 
@@ -16,7 +17,7 @@ export const invalidateWorkoutCaches = async (userId: string) => {
             cacheDeletePattern(`workouts:history:${userId}:*`),
             cacheDeletePattern(`dashboard:bootstrap:${userId}`),
         ])
-    } catch { }
+    } catch (e) { logError('invalidateWorkoutCaches', e) }
 }
 
 export const safeString = (v: unknown): string => String(v ?? '').trim()
@@ -89,7 +90,7 @@ export async function createWorkout(workout: Record<string, unknown>): Promise<A
         const title = safeString(workout?.title ?? workout?.name ?? 'Treino')
         const exercisesPayload = buildExercisesPayload(workout)
         const notes = workout?.notes != null ? safeString(workout.notes) : ''
-        try { trackUserEvent('workout_create', { type: 'workout', metadata: { title, exercisesCount: exercisesPayload.length } }) } catch { }
+        try { trackUserEvent('workout_create', { type: 'workout', metadata: { title, exercisesCount: exercisesPayload.length } }) } catch (e) { logError('createWorkout.track', e) }
 
         const { data: workoutId, error } = await supabase.rpc('save_workout_atomic', {
             p_workout_id: null,
@@ -102,12 +103,12 @@ export async function createWorkout(workout: Record<string, unknown>): Promise<A
         })
         if (error) return { ok: false, error: error.message }
         if (!workoutId) return { ok: false, error: 'Falha ao criar treino' }
-        try { trackUserEvent('workout_create_ok', { type: 'workout', metadata: { id: workoutId, title } }) } catch { }
+        try { trackUserEvent('workout_create_ok', { type: 'workout', metadata: { id: workoutId, title } }) } catch (e) { logError('createWorkout.trackOk', e) }
         await invalidateWorkoutCaches(user.id)
         return { ok: true, data: { id: String(workoutId) } }
     } catch (e) {
         const message = e instanceof Error ? e.message : String(e)
-        try { trackUserEvent('workout_create_error', { type: 'workout', metadata: { message } }) } catch { }
+        try { trackUserEvent('workout_create_error', { type: 'workout', metadata: { message } }) } catch (e) { logError('createWorkout.trackError', e) }
         return { ok: false, error: message }
     }
 }
@@ -124,7 +125,7 @@ export async function updateWorkout(id: string, workout: Record<string, unknown>
         const title = safeString(workout?.title ?? workout?.name ?? 'Treino')
         const exercisesPayload = buildExercisesPayload(workout)
         const notes = workout?.notes != null ? safeString(workout.notes) : ''
-        try { trackUserEvent('workout_update', { type: 'workout', metadata: { id: workoutId, title, exercisesCount: exercisesPayload.length } }) } catch { }
+        try { trackUserEvent('workout_update', { type: 'workout', metadata: { id: workoutId, title, exercisesCount: exercisesPayload.length } }) } catch (e) { logError('updateWorkout.track', e) }
 
         const { data: savedId, error } = await supabase.rpc('save_workout_atomic', {
             p_workout_id: workoutId,
@@ -136,12 +137,12 @@ export async function updateWorkout(id: string, workout: Record<string, unknown>
             p_exercises: exercisesPayload,
         })
         if (error) return { ok: false, error: error.message }
-        try { trackUserEvent('workout_update_ok', { type: 'workout', metadata: { id: savedId || workoutId, title } }) } catch { }
+        try { trackUserEvent('workout_update_ok', { type: 'workout', metadata: { id: savedId || workoutId, title } }) } catch (e) { logError('updateWorkout.trackOk', e) }
         await invalidateWorkoutCaches(user.id)
         return { ok: true, data: { id: String(savedId || workoutId) } }
     } catch (e) {
         const message = e instanceof Error ? e.message : String(e)
-        try { trackUserEvent('workout_update_error', { type: 'workout', metadata: { message } }) } catch { }
+        try { trackUserEvent('workout_update_error', { type: 'workout', metadata: { message } }) } catch (e) { logError('updateWorkout.trackError', e) }
         return { ok: false, error: message }
     }
 }
@@ -153,15 +154,15 @@ export async function deleteWorkout(id: string): Promise<ActionResult> {
         const workoutId = safeString(id)
         if (!workoutId) return { ok: false, error: 'missing id' }
         if (!user?.id) return { ok: false, error: 'unauthorized' }
-        try { trackUserEvent('workout_delete', { type: 'workout', metadata: { id: workoutId } }) } catch { }
+        try { trackUserEvent('workout_delete', { type: 'workout', metadata: { id: workoutId } }) } catch (e) { logError('deleteWorkout.track', e) }
         const { error } = await supabase.from('workouts').delete().eq('id', workoutId).eq('user_id', user.id)
         if (error) return { ok: false, error: error.message }
-        try { trackUserEvent('workout_delete_ok', { type: 'workout', metadata: { id: workoutId } }) } catch { }
+        try { trackUserEvent('workout_delete_ok', { type: 'workout', metadata: { id: workoutId } }) } catch (e) { logError('deleteWorkout.trackOk', e) }
         if (user?.id) await invalidateWorkoutCaches(user.id)
         return { ok: true, data: undefined }
     } catch (e) {
         const message = e instanceof Error ? e.message : String(e)
-        try { trackUserEvent('workout_delete_error', { type: 'workout', metadata: { message } }) } catch { }
+        try { trackUserEvent('workout_delete_error', { type: 'workout', metadata: { message } }) } catch (e) { logError('deleteWorkout.trackError', e) }
         return { ok: false, error: message }
     }
 }

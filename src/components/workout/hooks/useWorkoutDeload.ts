@@ -52,6 +52,7 @@ import {
   getDeloadReason,
 } from '../helpers/deloadHelpers';
 import { generatePostWorkoutInsights } from '@/actions/workout-actions';
+import { logError } from '@/lib/logger';
 import { useStableSupabaseClient } from '@/hooks/useStableSupabaseClient';
 
 interface UseWorkoutDeloadProps {
@@ -185,7 +186,8 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
           setReps: setReps.length > 0 ? setReps : null,
           setRpes: setRpes.length > 0 ? setRpes : null,
         };
-      } catch {
+      } catch (e) {
+        logError('hook:useWorkoutDeload.buildHistoryEntry', e);
         return null;
       }
     },
@@ -227,7 +229,8 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
           next.exercises[key] = { ...ex, items: ordered };
         });
         return next;
-      } catch {
+      } catch (e) {
+        logError('hook:useWorkoutDeload.buildReportHistory', e);
         return { version: 1, exercises: {} };
       }
     },
@@ -293,7 +296,8 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
           setReportHistoryStatus({ status: 'ready', error: '', source: 'network' });
           writeReportCache(next);
         }
-      } catch {
+      } catch (e) {
+        logError('hook:useWorkoutDeload.fetchReportHistory', e);
         if (!cancelled) {
           setReportHistoryStatus((prev) => ({ status: 'error', error: 'Falha ao carregar relatórios', source: prev?.source || '' }));
           setReportHistoryUpdatedAt((prev) => (prev ? prev : Date.now()));
@@ -392,7 +396,7 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
       if (Object.keys(patch).length > 0) {
         setDeloadSuggestions((prev) => ({ ...(isObject(prev) ? prev : {}), ...patch }));
       }
-    } catch { }
+    } catch (e) { logError('hook:useWorkoutDeload.populateDeloadSuggestions', e) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reportHistory, exercises]);
 
@@ -440,7 +444,7 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
         next.exercises[key] = { name, items: updated };
       });
       saveDeloadHistory(next);
-    } catch { }
+    } catch (e) { logError('hook:useWorkoutDeload.persistDeloadHistory', e) }
   };
 
 
@@ -526,6 +530,7 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
       deloadAiCacheRef.current = { ...cache, [key]: ai } as Record<string, unknown>;
       return ai;
     } catch (err: unknown) {
+      logError('hook:useWorkoutDeload.resolveAiSuggestion', err);
       return null;
     }
   };

@@ -6,6 +6,7 @@ import { checkVipFeatureAccess, incrementVipUsage } from '@/utils/vip/limits'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { parseJsonBody, parseJsonWithSchema } from '@/utils/zod'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { logError } from '@/lib/logger'
 import { applyWizardConsistency, buildProgressionTargets } from '@/utils/workoutWizardGenerator'
 
 export const dynamic = 'force-dynamic'
@@ -354,8 +355,8 @@ export async function POST(req: Request) {
         const { error: prefError } = await supabase
           .from('user_settings')
           .upsert({ user_id: userId, preferences: nextPrefs, updated_at: new Date().toISOString() }, { onConflict: 'user_id' })
-        if (prefError) { }
-      } catch { }
+        if (prefError) { logError('api:ai:workout-wizard:save-progression-program', prefError) }
+      } catch (e) { logError('api:ai:workout-wizard:save-progression-program', e) }
       await incrementVipUsage(supabase, userId, 'wizard')
       return NextResponse.json({ ok: true, drafts: validated.data })
     }
@@ -373,8 +374,8 @@ export async function POST(req: Request) {
       const { error: prefError } = await supabase
         .from('user_settings')
         .upsert({ user_id: userId, preferences: nextPrefs, updated_at: new Date().toISOString() }, { onConflict: 'user_id' })
-      if (prefError) { }
-    } catch { }
+      if (prefError) { logError('api:ai:workout-wizard:save-progression-single', prefError) }
+    } catch (e) { logError('api:ai:workout-wizard:save-progression-single', e) }
     await incrementVipUsage(supabase, userId, 'wizard')
     return NextResponse.json({ ok: true, draft: draftValidated.data })
   } catch (e: unknown) {

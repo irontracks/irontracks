@@ -9,6 +9,7 @@ import { workoutPlanHtml } from '@/utils/report/templates';
 import { generatePostWorkoutInsights, applyProgressionToNextTemplate } from '@/actions/workout-actions';
 import { useVipCredits } from '@/hooks/useVipCredits';
 import { FEATURE_KEYS, isFeatureEnabled } from '@/utils/featureFlags';
+import { logError } from '@/lib/logger'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { escapeHtml } from '@/utils/escapeHtml'
 import {
@@ -183,7 +184,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                         canonicalMap = json.map as Record<string, unknown>;
                     }
                 }
-            } catch { }
+            } catch (e) { logError('component:WorkoutReport.canonicalize', e) }
 
             const sessionForReport = applyCanonicalNamesToSession(session, canonicalMap);
             const prevForReport = applyCanonicalNamesToSession(prev, canonicalMap);
@@ -200,7 +201,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                         aiToUse = res.ai;
                         setAiState({ loading: false, error: null, result: (res.ai && typeof res.ai === 'object' ? (res.ai as Record<string, unknown>) : null), cached: !!res.saved });
                     }
-                } catch { }
+                } catch (e) { logError('component:WorkoutReport.generateAiForPdf', e) }
             }
             const logoDataUrl = await fetchLogoDataUrl().catch(() => null)
             const html = buildReportHTML(sessionForReport, prevForReport, String(user?.displayName || user?.email || ''), calories, {

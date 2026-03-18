@@ -468,12 +468,13 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                             .catch(() => { })
                         return
                     }
-                } catch { }
+                } catch (e) { logError('IronTracksApp.authStateChange', e) }
             })
             return () => {
                 try { sub?.subscription?.unsubscribe?.() } catch { }
             }
-        } catch {
+        } catch (e) {
+            logError('IronTracksApp.authSubscribe', e)
             return
         }
     }, [supabase, clearClientSessionState])
@@ -996,7 +997,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                         }
                                         try {
                                             await fetchWorkouts()
-                                        } catch { }
+                                        } catch (e) { logError('IronTracksApp.refetchAfterSaveDrafts', e) }
                                         setCreateWizardOpen(false)
                                         await alert(`Plano salvo: ${list.length} treinos criados.`)
                                     } catch (e: unknown) {
@@ -1132,7 +1133,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                                     const saveFn = userSettingsApi?.save as ((v: unknown) => Promise<{ ok: boolean; error?: string }>) | undefined
                                                     const res = await saveFn?.(merged)
                                                     return !!res?.ok
-                                                } catch { return false }
+                                                } catch (e) { logError('IronTracksApp.saveSettings', e); return false }
                                             }}
                                         />
                                     </SectionErrorBoundary>
