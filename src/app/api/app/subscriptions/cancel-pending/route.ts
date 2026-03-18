@@ -6,6 +6,7 @@ import { asaasRequest } from '@/lib/asaas'
 import { mercadopagoRequest } from '@/lib/mercadopago'
 import { parseJsonBody } from '@/utils/zod'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { logError } from '@/lib/logger'
 
 export const dynamic = 'force-dynamic'
 
@@ -52,7 +53,7 @@ export async function POST(req: Request) {
           path: `/preapproval/${encodeURIComponent(providerSubId)}`,
           body: { status: 'cancelled' },
         })
-      } catch {}
+      } catch (e) { logError('api:subscriptions:cancel-pending:mercadopago', e) }
     }
 
     if (provider === 'asaas' && (providerSubId || asaasSubId)) {
@@ -63,7 +64,7 @@ export async function POST(req: Request) {
           path: `/subscriptions/${encodeURIComponent(target)}`,
           body: { status: 'INACTIVE' },
         })
-      } catch {}
+      } catch (e) { logError('api:subscriptions:cancel-pending:asaas', e) }
     }
 
     await admin

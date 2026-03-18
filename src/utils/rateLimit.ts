@@ -1,3 +1,5 @@
+import { logError } from '@/lib/logger'
+
 export type RateLimitResult = {
   allowed: boolean
   remaining: number
@@ -161,7 +163,8 @@ export const checkRateLimitAsync = async (key: string, max: number, windowMs: nu
       return normalizeRateLimit(json[0], json[1], max, windowMs)
     }
     return checkRateLimit(key, max, windowMs)
-  } catch {
+  } catch (e) {
+    logError('checkRateLimitAsync.redis', e)
     return checkRateLimit(key, max, windowMs)
   }
 }

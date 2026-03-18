@@ -55,6 +55,7 @@ export const UserSettingsSchema = z
     restTimerRepeatMaxCount: z.number().default(60),
     restTimerContinuousAlarm: z.boolean().default(false),
     restTimerTickCountdown: z.boolean().default(true),
+    restTimerAutoStart: z.boolean().default(false),
     restTimerDefaultSeconds: z.number().default(90),
     autoRestTimerWhenMissing: z.boolean().default(false),
     programTitleStartDay: z.enum(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']).default('monday'),

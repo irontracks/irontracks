@@ -10,7 +10,7 @@ import { parseJsonWithSchema } from '@/utils/zod'
 import { safeRecord } from '@/utils/guards'
 import { cacheSetNx, cacheDeletePattern } from '@/utils/cache'
 import { buildReportMetrics, buildWeeklyVolumeStats, buildTrainingLoadFlags } from '@/utils/report/reportMetrics'
-import { logWarn } from '@/lib/logger'
+import { logWarn, logError } from '@/lib/logger'
 
 const parseTrainingNumberOrZero = (v: unknown) => {
   const n = typeof v === 'number' ? v : Number(String(v || '').replace(',', '.'))
@@ -172,10 +172,10 @@ export async function POST(request: Request) {
         const parsed = parseJsonWithSchema(prevRow.notes, z.record(z.unknown()))
         if (parsed && typeof parsed === 'object') previousSessionObj = parsed
       }
-    } catch { }
+    } catch (e) { logError('api:workouts:finish:prev-session', e) }
     try {
       sessionObj.reportMeta = buildReportMetrics(sessionObj, previousSessionObj)
-    } catch { }
+    } catch (e) { logError('api:workouts:finish:report-metrics', e) }
     try {
       const baseDate = new Date(String(sessionObj?.date ?? new Date().toISOString()))
       const start = new Date(baseDate)
@@ -200,7 +200,7 @@ export async function POST(request: Request) {
       const weekly = buildWeeklyVolumeStats(sessionObj, historySessions)
       const loadFlags = buildTrainingLoadFlags(sessionObj, historySessions, weekly)
       sessionObj.reportMeta = { ...reportMeta, weekly, loadFlags }
-    } catch { }
+    } catch (e) { logError('api:workouts:finish:weekly-volume', e) }
     if (!Object.keys(sessionObj).length) return NextResponse.json({ ok: false, error: 'missing session' }, { status: 400 })
     const idempotencyKey = String((body as Record<string, unknown>)?.idempotencyKey || sessionObj?.idempotencyKey || sessionObj?.finishIdempotencyKey || '').trim()
     const reqId =
@@ -227,7 +227,7 @@ export async function POST(request: Request) {
         client_ts: sessionObj?.date ? new Date(String(sessionObj.date)).toISOString() : null,
         user_agent: request.headers.get('user-agent') || null,
       })
-    } catch { }
+    } catch (e) { logError('api:workouts:finish:activity-event-start', e) }
 
     // R3#2: Clamp date to prevent backdated streak/badge manipulation
     // Allow up to 30 days in the past (for late-logged workouts) and no future dates
@@ -293,7 +293,8 @@ export async function POST(request: Request) {
           // No existing workout found: previous request died before saving.
           // Fall through to allow this request to save the workout.
           lookupSucceeded = true
-        } catch {
+        } catch (e) {
+          logError('api:workouts:finish:idempotency-lookup', e)
           lookupSucceeded = false
         }
         // If lookup failed (DB error), reject to prevent duplicate saves
@@ -329,7 +330,7 @@ export async function POST(request: Request) {
             idempotent = true
             insertRes = { data: existing, error: null } as unknown as typeof insertRes
           }
-        } catch { }
+        } catch (e) { logError('api:workouts:finish:duplicate-key-lookup', e) }
       } else if (msg.toLowerCase().includes('finish_idempotency_key') && msg.toLowerCase().includes('does not exist')) {
         insertRes = await tryInsert(false)
       }
@@ -400,7 +401,7 @@ export async function POST(request: Request) {
             }
           }
         }
-      } catch { }
+      } catch (e) { logError('api:workouts:finish:notify-streak', e) }
 
       try {
         const throttleGoals = await shouldThrottleBySenderType(user.id, 'friend_goal', 12 * 60)
@@ -429,7 +430,7 @@ export async function POST(request: Request) {
             }
           }
         }
-      } catch { }
+      } catch (e) { logError('api:workouts:finish:notify-goal', e) }
 
       try {
         const throttlePr = await shouldThrottleBySenderType(user.id, 'friend_pr', 60)
@@ -520,8 +521,8 @@ export async function POST(request: Request) {
             }
           }
         }
-      } catch { }
-    } catch { }
+      } catch (e) { logError('api:workouts:finish:notify-pr', e) }
+    } catch (e) { logError('api:workouts:finish:social-notifications', e) }
 
     // Limpar os caches de listagem de histórico e dashboard ao finalizar o treino
     try {
@@ -547,7 +548,7 @@ export async function POST(request: Request) {
         },
         user_agent: request.headers.get('user-agent') || null,
       })
-    } catch { }
+    } catch (e) { logError('api:workouts:finish:activity-event-success', e) }
 
     return NextResponse.json({ ok: true, saved, idempotent })
   } catch (e: unknown) {

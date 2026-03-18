@@ -3,6 +3,7 @@ import { requireUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { z } from 'zod'
+import { logError } from '@/lib/logger'
 
 export const dynamic = 'force-dynamic'
 
@@ -115,7 +116,7 @@ export async function GET(req: Request) {
           }
         })
         volumeByUser.set(uid, (volumeByUser.get(uid) || 0) + vol)
-      } catch { }
+      } catch (e) { logError('api:social:leaderboard:volume-calc', e) }
     }
 
     // Calculate streak for all users

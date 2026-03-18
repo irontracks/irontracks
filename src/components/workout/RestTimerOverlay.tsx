@@ -25,6 +25,7 @@ interface RestTimerSettings {
     restTimerRepeatMaxCount?: number;
     restTimerContinuousAlarm?: boolean;
     restTimerTickCountdown?: boolean;
+    restTimerAutoStart?: boolean;
 }
 
 interface RestTimerOverlayProps {
@@ -34,9 +35,11 @@ interface RestTimerOverlayProps {
     onStart?: (context?: RestTimerContext | null) => void;
     onClose: () => void;
     settings: RestTimerSettings | null;
+    autoStartEnabled?: boolean;
+    onToggleAutoStart?: () => void;
 }
 
-const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context, onFinish, onStart, onClose, settings }) => {
+const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context, onFinish, onStart, onClose, settings, autoStartEnabled, onToggleAutoStart }) => {
     const [timeLeft, setTimeLeft] = useState(0);
     const [isFinished, setIsFinished] = useState(false);
     const warnedRef = useRef(false);
@@ -44,6 +47,7 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
     const soundIntervalRef = useRef<NodeJS.Timeout | null>(null);
     const vibrateIntervalRef = useRef<NodeJS.Timeout | null>(null);
     const alarmActiveRef = useRef(false);
+    const autoStartFiredRef = useRef(false);
     const wakeLockRef = useRef<{ release: () => Promise<void> } | null>(null);
     // Capture total rest seconds on mount so the ring can compute % remaining
     const totalSecondsRef = useRef<number>(0);
@@ -310,6 +314,33 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
         };
     }, [targetTime]);
 
+    // ── Auto-Start: automatically trigger START when timer finishes ──────────
+    useEffect(() => {
+        if (!isFinished) {
+            autoStartFiredRef.current = false;
+            return;
+        }
+        if (!autoStartEnabled) return;
+        if (autoStartFiredRef.current) return;
+        autoStartFiredRef.current = true;
+        // Small delay so the "BORA!" flash is visible before advancing
+        const timeout = setTimeout(() => {
+            try {
+                if (notifyIdRef.current) {
+                    endRestLiveActivity(notifyIdRef.current);
+                }
+                stopAlarm(true);
+                if (typeof onStart === 'function') onStart(context);
+                else if (typeof onFinish === 'function') onFinish(context);
+            } catch {
+                try {
+                    if (typeof onFinish === 'function') onFinish(context);
+                } catch { }
+            }
+        }, 500);
+        return () => clearTimeout(timeout);
+    }, [isFinished, autoStartEnabled, context, onStart, onFinish]);
+
     if (!targetTime) return null;
 
     const handleStart = () => {
@@ -431,14 +462,18 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
                             <button
                                 onClick={() => {
                                     try {
-                                        stopAlarm(true);
-                                        if (typeof onClose === 'function') onClose();
+                                        if (typeof onToggleAutoStart === 'function') onToggleAutoStart();
                                     } catch { }
                                 }}
-                                className="px-3 py-2 rounded-xl text-neutral-400 border hover:text-white hover:border-yellow-500/30 text-xs font-bold active:scale-95 transition-all"
-                                style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }}
+                                className={`px-3 py-2 rounded-xl text-xs font-black active:scale-95 transition-all border ${
+                                    autoStartEnabled
+                                        ? 'bg-gradient-to-r from-yellow-500/20 to-amber-500/20 border-yellow-500/50 text-yellow-400 shadow-sm shadow-yellow-500/10'
+                                        : 'text-neutral-400 hover:text-white hover:border-yellow-500/30'
+                                }`}
+                                style={!autoStartEnabled ? { background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' } : undefined}
+                                aria-label={autoStartEnabled ? 'Desativar auto-start' : 'Ativar auto-start'}
                             >
-                                Ocultar
+                                {autoStartEnabled ? 'AUTO ▶' : 'AUTO'}
                             </button>
                         </div>
                     </div>

@@ -6,6 +6,7 @@ import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { cacheSetNx } from '@/utils/cache'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { insertNotifications } from '@/lib/social/notifyFollowers'
+import { logError } from '@/lib/logger'
 
 export const dynamic = 'force-dynamic'
 
@@ -62,7 +63,7 @@ export async function POST(req: Request) {
             }])
           }
         }
-      } catch { }
+      } catch (e) { logError('api:social:stories:like:notify', e) }
 
       return NextResponse.json({ ok: true, liked: true })
     }
@@ -113,7 +114,7 @@ export async function POST(req: Request) {
           }])
         }
       }
-    } catch { }
+    } catch (e) { logError('api:social:stories:like:notify-toggle', e) }
 
     return NextResponse.json({ ok: true, liked: true })
   } catch (e: unknown) {

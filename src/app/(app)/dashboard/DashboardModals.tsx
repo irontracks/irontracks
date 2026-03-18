@@ -461,6 +461,14 @@ export default function DashboardModals(props: DashboardModalsProps) {
                     onClose={handleCloseTimer}
                     onFinish={(ctx) => { handleTimerFinish(ctx); handleCloseTimer(); }}
                     onStart={handleStartFromRestTimer}
+                    autoStartEnabled={Boolean((settings as Record<string, unknown> | null)?.restTimerAutoStart)}
+                    onToggleAutoStart={() => {
+                        try {
+                            const s = (settings as Record<string, unknown> | null) ?? {}
+                            const next = { ...s, restTimerAutoStart: !s.restTimerAutoStart }
+                            saveFn?.(next)
+                        } catch { }
+                    }}
                 />
             )}
 

@@ -134,7 +134,7 @@ export function useAdminDataFetchers(deps: AdminDataFetchersDeps) {
                         try {
                             const tJson = await adminFetchJson(supabase, '/api/admin/teachers/list') as UnknownRecord;
                             if (tJson?.ok) teacherEmails = new Set(((tJson.teachers as UnknownRecord[]) || []).map((t: UnknownRecord) => String(t.email || '').toLowerCase()));
-                        } catch { }
+                        } catch (e) { logError('useAdminDataFetchers.fetchTeacherEmails', e) }
                         list = (profiles || [])
                             .filter((p: UnknownRecord) => !p.email || !teacherEmails.has(String(p.email).toLowerCase()))
                             .map((p: UnknownRecord) => ({ id: p.id, name: p.display_name, email: p.email, teacher_id: null as string | null, user_id: p.id }));
@@ -168,7 +168,7 @@ export function useAdminDataFetchers(deps: AdminDataFetchersDeps) {
                         let jsonT = null;
                         try {
                             jsonT = await adminFetchJson(supabase, '/api/admin/teachers/list') as UnknownRecord;
-                        } catch { }
+                        } catch (e) { logError('useAdminDataFetchers.fetchTeachersList', e) }
                         if (jsonT?.ok) {
                             const base = (jsonT.teachers as UnknownRecord[]) || [];
                             try {
@@ -235,7 +235,7 @@ export function useAdminDataFetchers(deps: AdminDataFetchersDeps) {
                 try {
                     const raw = await apiAdmin.listTeachers(authHeaders);
                     json = raw as Record<string, unknown>;
-                } catch { }
+                } catch (e) { logError('useAdminDataFetchers.listTeachers', e) }
                 if (json?.ok) {
                     const list = Array.isArray((json as Record<string, unknown>)?.teachers)
                         ? ((json as Record<string, unknown>).teachers as Record<string, unknown>[])
@@ -336,7 +336,7 @@ export function useAdminDataFetchers(deps: AdminDataFetchersDeps) {
                         const legacy = ((jsonLegacy.rows as UnknownRecord[] | undefined) || []).map((w: UnknownRecord) => ({ id: w.id || w.uuid, name: w.name, exercises: [] as WorkoutExercise[] }));
                         list = [...list, ...legacy];
                     }
-                } catch { }
+                } catch (e) { logError('useAdminDataFetchers.fetchLegacyTemplates', e) }
                 const score = (w: UnknownRecord) => {
                     const exs = Array.isArray(w.exercises) ? w.exercises : [];
                     return exs.length;
@@ -556,9 +556,9 @@ export function useAdminDataFetchers(deps: AdminDataFetchersDeps) {
                             }
                             loadedStudentInfo.current[key] = true;
                         }
-                    } catch { }
+                    } catch (e) { logError('useAdminDataFetchers.fetchStudentDetails', e) }
                 }
-            } catch { }
+            } catch (e) { logError('useAdminDataFetchers.resolveStudentInfo', e) }
             try {
                 if (!student.teacher_id && student.email) {
                     const cached = localStorage.getItem('student_teacher_' + String(student.email));
@@ -641,7 +641,7 @@ export function useAdminDataFetchers(deps: AdminDataFetchersDeps) {
                             if (!prev || prevExs.length < 1) tMap.set(key, candidate);
                         }
                     }
-                } catch { }
+                } catch (e) { logError('useAdminDataFetchers.fetchLegacyWorkoutsDetail', e) }
                 const dedupTemplates = Array.from(tMap.values())
                     .map((w) => ({ ...w, name: normalizeWorkoutTitle(w?.name as string || '') }))
                     .sort((a, b) => (a.name as string || '').localeCompare(b.name as string || ''));

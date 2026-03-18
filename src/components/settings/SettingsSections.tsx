@@ -294,10 +294,15 @@ export function SettingsTimerSection({ draft, setValue }: SettingsSectionProps) 
     const restTimerRepeatIntervalMs = Math.max(600, Math.min(6000, Number(draft?.restTimerRepeatIntervalMs ?? 1500) || 1500))
     const restTimerRepeatMaxSeconds = Math.max(10, Math.min(900, Number(draft?.restTimerRepeatMaxSeconds ?? 180) || 180))
     const restTimerRepeatMaxCount = Math.max(1, Math.min(120, Number(draft?.restTimerRepeatMaxCount ?? 60) || 60))
+    const restTimerAutoStart = Boolean(draft?.restTimerAutoStart ?? false)
     return (
         <SectionCard>
             <SectionHeader icon={Timer} label="Timer" color="#6366f1" />
             <div className="space-y-3">
+                <div className="flex items-center justify-between gap-3">
+                    <div><div className="text-sm font-bold text-white">START automático</div><div className="text-xs text-neutral-400">Inicia a próxima série ao terminar o descanso.</div></div>
+                    <ToggleSwitch checked={restTimerAutoStart} onChange={() => setValue('restTimerAutoStart', !restTimerAutoStart)} />
+                </div>
                 <div className="flex items-center justify-between gap-3">
                     <div><div className="text-sm font-bold text-white">Notificar ao terminar</div><div className="text-xs text-neutral-400">Mostra notificação do navegador (se permitido).</div></div>
                     <ToggleSwitch checked={restTimerNotify} onChange={() => setValue('restTimerNotify', !restTimerNotify)} />

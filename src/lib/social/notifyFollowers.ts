@@ -1,6 +1,7 @@
 import { createAdminClient } from '@/utils/supabase/admin'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { sendPushToUsers } from '@/lib/push/apns'
+import { logError } from '@/lib/logger'
 
 const chunk = (arr: unknown, size: unknown): unknown[][] => {
   const out: unknown[][] = []
@@ -109,7 +110,7 @@ export async function insertNotifications(rows: unknown): Promise<{ ok: boolean;
     if (recipientIds.length && title && message) {
       void sendPushToUsers(recipientIds, title, message).catch(() => { })
     }
-  } catch { }
+  } catch (e) { logError('insertNotifications.sendPush', e) }
 
   return { ok: true, inserted }
 }
