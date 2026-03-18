@@ -5,6 +5,9 @@ import { X, Dumbbell, Timer } from 'lucide-react'
 import type { ExerciseSharePayload } from '@/contexts/team/types'
 import ExerciseCard from './ExerciseCard'
 import { WorkoutProvider } from './WorkoutContext'
+import { ModalsComplexMethods } from './ModalsComplexMethods'
+import { ModalsSimpleMethods } from './ModalsSimpleMethods'
+import { useWorkoutMethodSavers } from './hooks/useWorkoutMethodSavers'
 import type { WorkoutExercise, UnknownRecord } from './types'
 
 interface PartnerExerciseOverlayProps {
@@ -23,7 +26,7 @@ export default function PartnerExerciseOverlay({ share, onSendUpdate, onEnd }: P
     const setsCount = Math.max(setsHeader, sdArr.length)
     const restTime = Number(exercise.restTime ?? exercise.rest_time ?? 0) || 0
 
-    // Local logs state — initialized from shared logs
+    // ── Local logs state (initialized from shared logs) ─────────────────────
     const [localLogs, setLocalLogs] = useState<Record<string, Record<string, unknown>>>(() => {
         const init: Record<string, Record<string, unknown>> = {}
         const logs = share.logs || {}
@@ -35,7 +38,7 @@ export default function PartnerExerciseOverlay({ share, onSendUpdate, onEnd }: P
         return init
     })
 
-    // Rest timer
+    // ── Rest timer ──────────────────────────────────────────────────────────
     const [restActive, setRestActive] = useState(false)
     const [restTimeLeft, setRestTimeLeft] = useState(0)
     const restEndRef = useRef(0)
@@ -61,12 +64,11 @@ export default function PartnerExerciseOverlay({ share, onSendUpdate, onEnd }: P
         setRestActive(true)
     }, [])
 
-    // getLog — returns the local log for a key
+    // ── Core context functions ──────────────────────────────────────────────
     const getLog = useCallback((key: string): Record<string, unknown> => {
         return (localLogs[key] || {}) as Record<string, unknown>
     }, [localLogs])
 
-    // updateLog — updates local state AND sends the patch to the partner
     const updateLog = useCallback((key: string, patch: unknown) => {
         const patchObj = patch && typeof patch === 'object' ? patch as Record<string, unknown> : {}
         setLocalLogs(prev => {
@@ -74,27 +76,23 @@ export default function PartnerExerciseOverlay({ share, onSendUpdate, onEnd }: P
             const merged = { ...prevLog, ...patchObj }
             return { ...prev, [key]: merged }
         })
-        // Parse key to get exerciseIdx and setIdx
         const [exIdxStr, setIdxStr] = key.split('-')
         const exIdx = parseInt(exIdxStr, 10)
         const sIdx = parseInt(setIdxStr, 10)
         if (Number.isFinite(exIdx) && Number.isFinite(sIdx)) {
             onSendUpdate(exIdx, sIdx, patchObj)
         }
-        // Auto-start rest timer when marking set as done
         if (patchObj.done === true && restTime > 0) {
             startTimer(restTime)
         }
     }, [onSendUpdate, restTime, startTimer])
 
-    // getPlannedSet — returns the planned set data from the exercise
     const getPlannedSet = useCallback((ex: WorkoutExercise, setIdx: number) => {
         const sd = Array.isArray(ex?.setDetails) ? ex.setDetails : Array.isArray(ex?.set_details) ? ex.set_details : []
         if (setIdx >= 0 && setIdx < sd.length) return sd[setIdx] as Record<string, unknown>
         return null
     }, [])
 
-    // getPlanConfig — returns advanced config for a set
     const getPlanConfig = useCallback((ex: WorkoutExercise, setIdx: number) => {
         const planned = getPlannedSet(ex, setIdx)
         if (!planned) return null
@@ -102,7 +100,7 @@ export default function PartnerExerciseOverlay({ share, onSendUpdate, onEnd }: P
         return cfg && typeof cfg === 'object' ? cfg as Record<string, unknown> : null
     }, [getPlannedSet])
 
-    // Notes state
+    // ── Notes state ─────────────────────────────────────────────────────────
     const [openNotesKeys, setOpenNotesKeys] = useState<Set<string>>(new Set())
     const toggleNotes = useCallback((key: string) => {
         setOpenNotesKeys(prev => {
@@ -113,45 +111,72 @@ export default function PartnerExerciseOverlay({ share, onSendUpdate, onEnd }: P
         })
     }, [])
 
-    // Refs for cluster/rest-pause
+    // ── Refs ─────────────────────────────────────────────────────────────────
     const clusterRefs = useRef<Record<string, Array<HTMLInputElement | null>>>({})
     const restPauseRefs = useRef<Record<string, Array<HTMLInputElement | null>>>({})
 
-    // Progress tracking
+    // ── Real modal state hooks (for all 13 training methods) ────────────────
+    const [clusterModal, setClusterModal] = useState<UnknownRecord | null>(null)
+    const [restPauseModal, setRestPauseModal] = useState<UnknownRecord | null>(null)
+    const [dropSetModal, setDropSetModal] = useState<UnknownRecord | null>(null)
+    const [strippingModal, setStrippingModal] = useState<UnknownRecord | null>(null)
+    const [fst7Modal, setFst7Modal] = useState<UnknownRecord | null>(null)
+    const [heavyDutyModal, setHeavyDutyModal] = useState<UnknownRecord | null>(null)
+    const [pontoZeroModal, setPontoZeroModal] = useState<UnknownRecord | null>(null)
+    const [forcedRepsModal, setForcedRepsModal] = useState<UnknownRecord | null>(null)
+    const [negativeRepsModal, setNegativeRepsModal] = useState<UnknownRecord | null>(null)
+    const [partialRepsModal, setPartialRepsModal] = useState<UnknownRecord | null>(null)
+    const [sistema21Modal, setSistema21Modal] = useState<UnknownRecord | null>(null)
+    const [waveModal, setWaveModal] = useState<UnknownRecord | null>(null)
+    const [groupMethodModal, setGroupMethodModal] = useState<UnknownRecord | null>(null)
+
+    // ── Save functions (from the real hook) ──────────────────────────────────
+    const savers = useWorkoutMethodSavers({
+        clusterModal, setClusterModal: setClusterModal as never,
+        restPauseModal, setRestPauseModal: setRestPauseModal as never,
+        dropSetModal, setDropSetModal: setDropSetModal as never,
+        strippingModal, setStrippingModal: setStrippingModal as never,
+        fst7Modal, setFst7Modal: setFst7Modal as never,
+        heavyDutyModal, setHeavyDutyModal: setHeavyDutyModal as never,
+        pontoZeroModal, setPontoZeroModal: setPontoZeroModal as never,
+        forcedRepsModal, setForcedRepsModal: setForcedRepsModal as never,
+        negativeRepsModal, setNegativeRepsModal: setNegativeRepsModal as never,
+        partialRepsModal, setPartialRepsModal: setPartialRepsModal as never,
+        sistema21Modal, setSistema21Modal: setSistema21Modal as never,
+        waveModal, setWaveModal: setWaveModal as never,
+        groupMethodModal, setGroupMethodModal: setGroupMethodModal as never,
+        getLog: getLog as (key: string) => UnknownRecord,
+        updateLog,
+    })
+
+    // ── Progress tracking ───────────────────────────────────────────────────
     const doneSets = Object.values(localLogs).filter(l => Boolean(l?.done)).length
     const progressPct = setsCount > 0 ? Math.round((doneSets / setsCount) * 100) : 0
 
-    // Build a fake workout object containing just this one exercise
+    // ── Build fake workout ──────────────────────────────────────────────────
     const fakeWorkout = useMemo(() => ({
         id: `partner-${share.id}`,
         title: 'Modo Spotter',
         exercises: [exercise],
     }), [share.id, exercise])
 
-    // No-op functions for features we don't need in spotter mode
+    // ── No-op stubs ─────────────────────────────────────────────────────────
     const noop = useCallback(() => {}, [])
     const noopAsync = useCallback(async () => {}, [])
     const noopWithArg = useCallback((_: unknown) => {}, [])
     const noopWithTwoArgs = useCallback((_a: unknown, _b: unknown) => {}, [])
 
-    // Build the minimal WorkoutContext value
+    // ── Full WorkoutContext value ────────────────────────────────────────────
     const contextValue = useMemo(() => ({
-        // Core data
         session: { workout: fakeWorkout, logs: localLogs, ui: {} },
         workout: fakeWorkout,
         exercises: [exercise] as WorkoutExercise[],
         logs: localLogs,
-
-        // Core functions
         getLog,
         updateLog,
         getPlanConfig,
         getPlannedSet,
-        startTimer: (seconds: number, ctx?: unknown) => {
-            startTimer(seconds)
-        },
-
-        // UI state
+        startTimer: (seconds: number) => { startTimer(seconds) },
         collapsed: new Set<number>(),
         toggleCollapse: noop,
         setCurrentExerciseIdx: noopWithArg,
@@ -159,7 +184,7 @@ export default function PartnerExerciseOverlay({ share, onSendUpdate, onEnd }: P
         toggleNotes,
         setCollapsed: noopWithArg,
 
-        // Reports / Deload (not needed)
+        // Reports / Deload
         reportHistoryStatus: null,
         reportHistoryLoadingRef: { current: false },
         reportHistory: null,
@@ -176,92 +201,57 @@ export default function PartnerExerciseOverlay({ share, onSendUpdate, onEnd }: P
         setDeloadModal: noopWithArg,
         deloadAiCacheRef: { current: {} },
 
-        // Exercise editing (not needed in spotter)
+        // Exercise editing
         openEditExercise: noopAsync,
         addExtraSetToExercise: noopWithArg,
         removeExtraSetFromExercise: noopWithArg,
         linkedWeightExercises: new Set<number>(),
         toggleLinkWeights: noopWithArg,
 
-        // Method-specific modal setters (all no-op in spotter)
-        clusterModal: null,
-        setClusterModal: noopWithArg,
-        restPauseModal: null,
-        setRestPauseModal: noopWithArg,
-        dropSetModal: null,
-        setDropSetModal: noopWithArg,
-        strippingModal: null,
-        setStrippingModal: noopWithArg,
-        fst7Modal: null,
-        setFst7Modal: noopWithArg,
-        heavyDutyModal: null,
-        setHeavyDutyModal: noopWithArg,
-        pontoZeroModal: null,
-        setPontoZeroModal: noopWithArg,
-        forcedRepsModal: null,
-        setForcedRepsModal: noopWithArg,
-        negativeRepsModal: null,
-        setNegativeRepsModal: noopWithArg,
-        partialRepsModal: null,
-        setPartialRepsModal: noopWithArg,
-        sistema21Modal: null,
-        setSistema21Modal: noopWithArg,
-        waveModal: null,
-        setWaveModal: noopWithArg,
-        groupMethodModal: null,
-        setGroupMethodModal: noopWithArg,
+        // Real modal state (not no-ops!)
+        clusterModal, setClusterModal: setClusterModal as never,
+        restPauseModal, setRestPauseModal: setRestPauseModal as never,
+        dropSetModal, setDropSetModal: setDropSetModal as never,
+        strippingModal, setStrippingModal: setStrippingModal as never,
+        fst7Modal, setFst7Modal: setFst7Modal as never,
+        heavyDutyModal, setHeavyDutyModal: setHeavyDutyModal as never,
+        pontoZeroModal, setPontoZeroModal: setPontoZeroModal as never,
+        forcedRepsModal, setForcedRepsModal: setForcedRepsModal as never,
+        negativeRepsModal, setNegativeRepsModal: setNegativeRepsModal as never,
+        partialRepsModal, setPartialRepsModal: setPartialRepsModal as never,
+        sistema21Modal, setSistema21Modal: setSistema21Modal as never,
+        waveModal, setWaveModal: setWaveModal as never,
+        groupMethodModal, setGroupMethodModal: setGroupMethodModal as never,
+
+        // Real save functions
+        ...savers,
 
         // Refs
         clusterRefs,
         restPauseRefs,
         organizeBaseKeysRef: { current: [] },
 
-        // More no-ops for remaining controller fields
+        // Remaining no-ops
         currentExerciseIdx: 0,
-        editExerciseOpen: false,
-        setEditExerciseOpen: noopWithArg,
-        editExerciseIdx: null,
-        setEditExerciseIdx: noopWithArg,
-        editExerciseDraft: null,
-        setEditExerciseDraft: noopWithArg,
+        editExerciseOpen: false, setEditExerciseOpen: noopWithArg,
+        editExerciseIdx: null, setEditExerciseIdx: noopWithArg,
+        editExerciseDraft: null, setEditExerciseDraft: noopWithArg,
         saveEditExercise: noopAsync,
         addExtraExerciseToWorkout: noopAsync,
         openOrganizeModal: noop,
         requestCloseOrganize: noop,
         saveOrganize: noop,
-        organizeOpen: false,
-        setOrganizeOpen: noopWithArg,
-        organizeDraft: null,
-        setOrganizeDraft: noopWithArg,
-        organizeSaving: false,
-        organizeDirty: false,
-        organizeError: '',
-        setOrganizeError: noopWithArg,
+        organizeOpen: false, setOrganizeOpen: noopWithArg,
+        organizeDraft: null, setOrganizeDraft: noopWithArg,
+        organizeSaving: false, organizeDirty: false,
+        organizeError: '', setOrganizeError: noopWithArg,
         finishWorkout: noopAsync,
-        timerMinimized: false,
-        setTimerMinimized: noopWithArg,
-        postCheckinOpen: false,
-        setPostCheckinOpen: noopWithArg,
-        postCheckinDraft: null,
-        setPostCheckinDraft: noopWithArg,
+        timerMinimized: false, setTimerMinimized: noopWithArg,
+        postCheckinOpen: false, setPostCheckinOpen: noopWithArg,
+        postCheckinDraft: null, setPostCheckinDraft: noopWithArg,
         postCheckinResolveRef: { current: null },
-        addExerciseDraft: null,
-        setAddExerciseDraft: noopWithArg,
-
-        // Save modal functions
-        saveClusterModal: noop,
-        saveRestPauseModal: noop,
-        saveDropSetModal: noop,
-        saveStrippingModal: noop,
-        saveFst7Modal: noop,
-        saveHeavyDutyModal: noop,
-        savePontoZeroModal: noop,
-        saveForcedRepsModal: noop,
-        saveNegativeRepsModal: noop,
-        savePartialRepsModal: noop,
-        saveSistema21Modal: noop,
-        saveWaveModal: noop,
-        saveGroupMethodModal: noop,
+        addExerciseOpen: false, setAddExerciseOpen: noopWithArg,
+        addExerciseDraft: null, setAddExerciseDraft: noopWithArg,
 
         // UI helpers
         handleTimerFinish: noop,
@@ -278,7 +268,15 @@ export default function PartnerExerciseOverlay({ share, onSendUpdate, onEnd }: P
         progressPct,
         remainingSets: setsCount - doneSets,
         ui: {} as UnknownRecord,
-    }), [exercise, fakeWorkout, localLogs, getLog, updateLog, getPlanConfig, getPlannedSet, startTimer, openNotesKeys, toggleNotes, noop, noopAsync, noopWithArg, noopWithTwoArgs, doneSets, setsCount, progressPct])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }), [
+        exercise, fakeWorkout, localLogs, getLog, updateLog, getPlanConfig, getPlannedSet,
+        startTimer, openNotesKeys, toggleNotes, noop, noopAsync, noopWithArg, noopWithTwoArgs,
+        doneSets, setsCount, progressPct, savers,
+        clusterModal, restPauseModal, dropSetModal, strippingModal, fst7Modal,
+        heavyDutyModal, pontoZeroModal, forcedRepsModal, negativeRepsModal,
+        partialRepsModal, sistema21Modal, waveModal, groupMethodModal,
+    ])
 
     const formatTime = (s: number) => {
         const m = Math.floor(s / 60)
@@ -334,15 +332,18 @@ export default function PartnerExerciseOverlay({ share, onSendUpdate, onEnd }: P
                 </div>
             )}
 
-            {/* Exercise card — full rendering with all training methods */}
-            <div className="flex-1 overflow-y-auto px-4 py-3">
-                <WorkoutProvider value={contextValue as never}>
+            {/* Exercise card + method modals — all inside WorkoutProvider */}
+            <WorkoutProvider value={contextValue as never}>
+                <div className="flex-1 overflow-y-auto px-4 py-3">
                     <ExerciseCard
                         ex={exercise as WorkoutExercise}
                         exIdx={exerciseIdx}
                     />
-                </WorkoutProvider>
-            </div>
+                </div>
+                {/* Method modals — rendered at z-[1400], above the overlay z-[1500] content area */}
+                <ModalsComplexMethods />
+                <ModalsSimpleMethods />
+            </WorkoutProvider>
 
             {/* Footer */}
             <div className="px-4 py-3 pb-[max(env(safe-area-inset-bottom),12px)] border-t border-indigo-500/20 bg-neutral-950/80">
