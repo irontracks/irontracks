@@ -316,6 +316,14 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
     }, [targetTime]);
 
     // ── Auto-Start: automatically trigger START when timer finishes ──────────
+    // Use refs for callbacks/context to avoid dependency churn cancelling the timeout
+    const onStartRef = useRef(onStart);
+    const onFinishRef = useRef(onFinish);
+    const contextRef = useRef(context);
+    onStartRef.current = onStart;
+    onFinishRef.current = onFinish;
+    contextRef.current = context;
+
     useEffect(() => {
         if (!isFinished) {
             autoStartFiredRef.current = false;
@@ -331,16 +339,17 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
                     endRestLiveActivity(notifyIdRef.current);
                 }
                 stopAlarm(true);
-                if (typeof onStart === 'function') onStart(context);
-                else if (typeof onFinish === 'function') onFinish(context);
+                if (typeof onStartRef.current === 'function') onStartRef.current(contextRef.current);
+                else if (typeof onFinishRef.current === 'function') onFinishRef.current(contextRef.current);
             } catch {
                 try {
-                    if (typeof onFinish === 'function') onFinish(context);
+                    if (typeof onFinishRef.current === 'function') onFinishRef.current(contextRef.current);
                 } catch { }
             }
         }, 500);
         return () => clearTimeout(timeout);
-    }, [isFinished, autoStartLocal, context, onStart, onFinish]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isFinished, autoStartLocal]);
 
     if (!targetTime) return null;
 

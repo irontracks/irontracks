@@ -261,7 +261,7 @@ export const useReportData = ({ session, previousSession, user, settings }: UseR
   useEffect(() => {
     if (!session || kcalApiCalledRef.current) return
     kcalApiCalledRef.current = true
-    getKcalEstimate({ session, workoutId: session?.id ?? null, rpe: null }).catch(
+    getKcalEstimate({ session, workoutId: session?.id ?? null, rpe: null, biologicalSex: String(settings?.biologicalSex ?? '') || null }).catch(
       (e) => logWarn('useReportData', 'kcal api log failed', e)
     )
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -351,7 +351,7 @@ export const useReportData = ({ session, previousSession, user, settings }: UseR
   })()
 
   // ── Per-exercise volumes for volume-weighted complexity factor ───────────
-  // Logs keyed by "exerciseIdx-setIdx"
+  // Logs keyed by "exerciseIdx-setIdx". Handles "done/planned" reps ("8/10") and cluster blocks.
   const exerciseVolumes = useMemo(() => {
     if (!sessionExerciseNames || sessionExerciseNames.length === 0) return null
     return sessionExerciseNames.map((_, exIdx) => {
@@ -361,9 +361,29 @@ export const useReportData = ({ session, previousSession, user, settings }: UseR
         if (Number(parts[0]) !== exIdx) return
         const obj = log && typeof log === 'object' ? (log as AnyObj) : null
         if (!obj) return
+        // Cluster blocks
+        const cluster = obj.cluster
+        if (cluster && typeof cluster === 'object') {
+          const cObj = cluster as AnyObj
+          const source = Array.isArray(cObj.blocksDetailed) ? cObj.blocksDetailed
+            : Array.isArray(cObj.blocks) ? cObj.blocks : null
+          if (source && source.length > 0) {
+            for (const block of source) {
+              if (!block || typeof block !== 'object') continue
+              const b = block as AnyObj
+              const bw = Number(String(b?.weight ?? '').replace(',', '.'))
+              const brRaw = String(b?.reps ?? '').replace(',', '.').trim()
+              const br = brRaw.includes('/') ? Number(brRaw.split('/')[0].trim()) : Number(brRaw)
+              if (Number.isFinite(bw) && bw > 0 && Number.isFinite(br) && br > 0) vol += bw * br
+            }
+            return
+          }
+        }
+        // Standard set — handle "done/planned" reps like "8/10"
         const w = Number(String(obj.weight ?? '').replace(',', '.'))
-        const r = Number(String(obj.reps ?? '').replace(',', '.'))
-        if (w > 0 && r > 0) vol += w * r
+        const rRaw = String(obj.reps ?? '').replace(',', '.').trim()
+        const r = rRaw.includes('/') ? Number(rRaw.split('/')[0].trim()) : Number(rRaw)
+        if (Number.isFinite(w) && w > 0 && Number.isFinite(r) && r > 0) vol += w * r
       })
       return vol
     })
@@ -379,7 +399,6 @@ export const useReportData = ({ session, previousSession, user, settings }: UseR
     // Prefer explicit exec/rest seconds from session over total duration
     const execSeconds = Number(safeSession?.executionTotalSeconds ?? safeSession?.execution_total_seconds ?? 0) || 0
     const restSecondsSession = Number(safeSession?.restTotalSeconds ?? safeSession?.rest_total_seconds ?? 0) || 0
-    const totalTimeSeconds = Number(safeSession?.totalTime) || 0
     const execMinutesOverride = execSeconds > 0 ? execSeconds / 60 : null
     const restMinutesOverride = restSecondsSession > 0 ? restSecondsSession / 60 : null
 
@@ -388,7 +407,7 @@ export const useReportData = ({ session, previousSession, user, settings }: UseR
 
     return estimateCaloriesMet(
       sessionLogs,
-      durationInMinutes || (totalTimeSeconds / 60),
+      durationInMinutes,
       checkinBodyWeightKg,
       sessionExerciseNames,
       postCheckinRpe,
