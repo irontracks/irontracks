@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useMemo, useState, useEffect } from 'react';
-import { ArrowDown, CheckCircle2, ChevronDown, ChevronUp, Dumbbell, Link, Loader2, Pencil, Play, Plus, Trash2, Trophy } from 'lucide-react';
+import { ArrowDown, CheckCircle2, ChevronDown, ChevronUp, Dumbbell, Link, Loader2, Pencil, Play, Plus, Share2, Trash2, Trophy } from 'lucide-react';
 import { useWorkoutContext } from './WorkoutContext';
 import { ExerciseAIChat } from '@/components/ExerciseAIChat';
 import {
@@ -27,6 +27,16 @@ import { isObject, isClusterConfig, isRestPauseConfig } from './utils';
 import { WorkoutExercise, UnknownRecord } from './types';
 import ExecutionVideoCapture from '@/components/ExecutionVideoCapture';
 import { logError, logWarn, logInfo } from '@/lib/logger'
+import { useTeamWorkout } from '@/contexts/TeamWorkoutContext'
+
+function useSafeTeamWorkout() {
+  try {
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    return useTeamWorkout()
+  } catch {
+    return null
+  }
+}
 
 function ExerciseCardInner({ ex, exIdx }: { ex: WorkoutExercise; exIdx: number }) {
   const {
@@ -48,6 +58,8 @@ function ExerciseCardInner({ ex, exIdx }: { ex: WorkoutExercise; exIdx: number }
     linkedWeightExercises,
     toggleLinkWeights,
   } = useWorkoutContext();
+
+  const teamCtx = useSafeTeamWorkout();
 
   const name = String(ex?.name || '').trim() || `Exercício ${exIdx + 1}`;
   const observation = String(ex?.notes || '').trim();
@@ -415,6 +427,34 @@ function ExerciseCardInner({ ex, exIdx }: { ex: WorkoutExercise; exIdx: number }
           >
             <Pencil size={14} />
           </button>
+          {/* Share with partner — only when team session is active */}
+          {teamCtx?.teamSession && (
+            <button
+              type="button"
+              onClick={(e) => {
+                try {
+                  e.preventDefault();
+                  e.stopPropagation();
+                } catch { }
+                try {
+                  // Collect current logs for this exercise
+                  const exerciseLogs: Record<string, unknown> = {}
+                  for (let i = 0; i < setsCount; i++) {
+                    const key = `${exIdx}-${i}`
+                    exerciseLogs[key] = getLog(key)
+                  }
+                  teamCtx.shareExerciseWithPartner(exIdx, ex as Record<string, unknown>, exerciseLogs, null)
+                } catch (err) {
+                  logError('ExerciseCard', 'Failed to share exercise', { exIdx, err })
+                }
+              }}
+              className="h-9 w-9 inline-flex items-center justify-center rounded-xl bg-indigo-500/15 border border-indigo-500/30 text-indigo-400 hover:bg-indigo-500/25 transition-colors active:scale-95 flex-shrink-0"
+              title="Compartilhar com parceiro"
+              aria-label="Compartilhar exercício com parceiro"
+            >
+              <Share2 size={14} />
+            </button>
+          )}
         </div>
       </div>
 

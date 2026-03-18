@@ -105,6 +105,25 @@ export interface WorkoutEditPayload {
     ts: number
 }
 
+export interface ExerciseSharePayload {
+    id: string
+    fromUserId: string
+    fromName: string
+    exerciseIdx: number
+    exercise: Record<string, unknown>
+    logs: Record<string, unknown>
+    context?: Record<string, unknown> | null
+    ts: number
+}
+
+export interface ExerciseControlUpdate {
+    fromUserId: string
+    exerciseIdx: number
+    setIdx: number
+    patch: Record<string, unknown>
+    ts: number
+}
+
 export interface TeamWorkoutProviderProps {
     children: React.ReactNode
     user: { id: string; email?: string | null } | null
@@ -147,4 +166,11 @@ export interface TeamWorkoutContextValue {
     pendingWorkoutEdit: WorkoutEditPayload | null
     broadcastWorkoutEdit: (workout: Record<string, unknown>) => void
     dismissWorkoutEdit: () => void
+    // ─ Partner Exercise Control ───────────────────────────────────────
+    incomingExerciseShare: ExerciseSharePayload | null
+    exerciseControlUpdates: ExerciseControlUpdate[]
+    shareExerciseWithPartner: (exerciseIdx: number, exercise: Record<string, unknown>, logs: Record<string, unknown>, context?: Record<string, unknown> | null) => void
+    sendExerciseControlUpdate: (exerciseIdx: number, setIdx: number, patch: Record<string, unknown>) => void
+    endExerciseShare: () => void
+    dismissExerciseShare: () => void
 }

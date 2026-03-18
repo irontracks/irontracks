@@ -16,6 +16,9 @@ const RestTimerOverlay = dynamic(() => import('@/components/workout/RestTimerOve
 const WhatsNewModal = dynamic(() => import('@/components/WhatsNewModal'), { ssr: false })
 const OfflineSyncModal = dynamic(() => import('@/components/OfflineSyncModal'), { ssr: false })
 const WelcomeFloatingWindow = dynamic(() => import('@/components/WelcomeFloatingWindow'), { ssr: false })
+const PartnerExerciseOverlay = dynamic(() => import('@/components/workout/PartnerExerciseOverlay'), { ssr: false })
+
+import { useTeamWorkout } from '@/contexts/TeamWorkoutContext'
 
 // Helper
 const isRecord = (v: unknown): v is Record<string, unknown> =>
@@ -134,6 +137,13 @@ export default function DashboardModals(props: DashboardModalsProps) {
         openStudent, setOpenStudent, showExportModal, setShowExportModal, exportWorkout,
         handleExportPdf, handleExportJson, vipAccess, openVipView, alert,
     } = props
+
+    // Partner exercise share — use hook directly since we're inside TeamWorkoutProvider
+    let teamWorkoutCtx: ReturnType<typeof useTeamWorkout> | null = null
+    try {
+        // eslint-disable-next-line react-hooks/rules-of-hooks
+        teamWorkoutCtx = useTeamWorkout()
+    } catch { /* not inside TeamWorkoutProvider */ }
 
     const settings = userSettingsApi && typeof userSettingsApi === 'object'
         ? (userSettingsApi as Record<string, unknown>).settings ?? null
@@ -469,6 +479,15 @@ export default function DashboardModals(props: DashboardModalsProps) {
                             saveFn?.(next)
                         } catch { }
                     }}
+                />
+            )}
+
+            {/* Partner Exercise Control Overlay */}
+            {teamWorkoutCtx?.incomingExerciseShare && (
+                <PartnerExerciseOverlay
+                    share={teamWorkoutCtx.incomingExerciseShare}
+                    onSendUpdate={teamWorkoutCtx.sendExerciseControlUpdate}
+                    onEnd={teamWorkoutCtx.endExerciseShare}
                 />
             )}
 

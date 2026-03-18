@@ -221,6 +221,49 @@ export const getExerciseComplexityFactor = (exerciseName: string): number => {
   return 1.00
 }
 
+// ── Bodyweight exercise detection ────────────────────────────────────────────
+/**
+ * Detects bodyweight exercises by name and returns the fraction of body weight
+ * used as equivalent load. Returns 0 for weighted exercises (no adjustment needed).
+ *
+ * Values based on biomechanical research:
+ *  - Pull-up / Chin-up: ~100% BW (full suspension)
+ *  - Dip: ~90% BW (legs free)
+ *  - Push-up: ~65% BW (partial load on feet)
+ *  - Pistol squat: ~85% BW (single leg)
+ *  - Muscle-up: ~100% BW
+ *  - Inverted row / Australian: ~60% BW
+ *  - Burpee: ~70% BW (average across movement)
+ *  - Bodyweight squat / Lunge (no weight): ~70% BW
+ */
+export const getBodyweightFraction = (exerciseName: string): number => {
+  const n = String(exerciseName || '')
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .trim()
+
+  // 1.00 — Full suspension
+  if (/barra fixa|pull.?up|chin.?up|muscle.?up/.test(n)) return 1.00
+
+  // 0.90 — Dip
+  if (/mergulho|dip|paralelas/.test(n)) return 0.90
+
+  // 0.85 — Single-leg bodyweight
+  if (/pistol|pistol squat/.test(n)) return 0.85
+
+  // 0.70 — Partial bodyweight
+  if (/burpee/.test(n)) return 0.70
+
+  // 0.65 — Push-up variants
+  if (/flexao|flexão|push.?up|apoio/.test(n)) return 0.65
+
+  // 0.60 — Inverted / Australian row
+  if (/australiana|inverted.?row|remada.*corpo|body.?row/.test(n)) return 0.60
+
+  return 0
+}
+
 // ── RPE multiplier ───────────────────────────────────────────────────────────
 /**
  * RPE (Rate of Perceived Exertion) scales intensity estimation.
@@ -358,12 +401,28 @@ export const estimateCaloriesMet = (
   exerciseVolumes?: number[] | null,
   startedAtMs?: number | null,
 ): number => {
-  // ── 1. Compute total volume ──────────────────────────────────────────────
+  // Resolve body weight early (needed for bodyweight exercise volume)
+  const bw = bodyWeightKg != null && Number.isFinite(bodyWeightKg)
+    && bodyWeightKg >= 20 && bodyWeightKg <= 300
+    ? bodyWeightKg
+    : DEFAULT_BODY_WEIGHT_KG
+
+  // Build exercise name lookup: log key "exIdx-setIdx" → exercise name
+  const exerciseNameByIdx: Record<number, string> = {}
+  if (exerciseNames) {
+    exerciseNames.forEach((name, i) => { exerciseNameByIdx[i] = name })
+  }
+
+  // ── 1. Compute total volume (with bodyweight equivalent) ─────────────────
   let totalVolume = 0
   let totalReps = 0
-  for (const v of Object.values(sessionLogs)) {
+  for (const [logKey, v] of Object.entries(sessionLogs)) {
     if (!v || typeof v !== 'object') continue
     const obj = v as AnyObj
+
+    // Resolve exercise name for this log entry
+    const exIdx = Number(logKey.split('-')[0])
+    const exName = Number.isFinite(exIdx) ? (exerciseNameByIdx[exIdx] ?? '') : ''
 
     // Cluster blocks: each block has its own weight × reps
     const cluster = obj?.cluster
@@ -375,17 +434,24 @@ export const estimateCaloriesMet = (
         for (const block of source) {
           if (!block || typeof block !== 'object') continue
           const b = block as AnyObj
-          const bw = Number(String(b?.weight ?? '').replace(',', '.'))
+          const blockW = Number(String(b?.weight ?? '').replace(',', '.'))
           const br = parseReps(String(b?.reps ?? ''))
-          if (bw > 0 && br > 0) { totalVolume += bw * br; totalReps += br }
+          if (blockW > 0 && br > 0) { totalVolume += blockW * br; totalReps += br }
         }
         continue
       }
     }
 
     // Standard set — handle "8/10" done/planned format
-    const w = Number(String(obj?.weight ?? '').replace(',', '.'))
+    let w = Number(String(obj?.weight ?? '').replace(',', '.'))
     const r = parseReps(String(obj?.reps ?? ''))
+
+    // Bodyweight exercise: if weight is 0 but reps > 0, use equivalent BW
+    if ((!w || w <= 0) && r > 0 && exName) {
+      const bwFraction = getBodyweightFraction(exName)
+      if (bwFraction > 0) w = bw * bwFraction
+    }
+
     if (w > 0 && r > 0) {
       totalVolume += w * r
       totalReps += r
@@ -393,13 +459,7 @@ export const estimateCaloriesMet = (
   }
 
 
-  // ── 2. Body weight ───────────────────────────────────────────────────────
-  const bw = bodyWeightKg != null && Number.isFinite(bodyWeightKg)
-    && bodyWeightKg >= 20 && bodyWeightKg <= 300
-    ? bodyWeightKg
-    : DEFAULT_BODY_WEIGHT_KG
-
-  // ── 3. Duration ──────────────────────────────────────────────────────────
+  // ── 2. Duration ──────────────────────────────────────────────────────────
   let effectiveDuration = durationMinutes
   if (!effectiveDuration || effectiveDuration <= 0) {
     const fromLogs = estimateDurationFromLogs(sessionLogs, startedAtMs ?? undefined)

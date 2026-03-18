@@ -1,5 +1,5 @@
 
-import { useCallback, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { logError } from '@/lib/logger';
 import { useWorkoutTicker } from './hooks/useWorkoutTicker';
 import { useWorkoutModals } from './hooks/useWorkoutModals';
@@ -107,6 +107,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     broadcastWorkoutEdit: (workout: UnknownRecord) => void
     teamSession: { id: string; isHost: boolean; participants: unknown[] } | null
     sharedLogs: Record<string, Record<string, { exIdx: number; sIdx: number; weight: string; reps: string; ts: number }>>
+    exerciseControlUpdates: Array<{ fromUserId: string; exerciseIdx: number; setIdx: number; patch: Record<string, unknown>; ts: number }>
   };
   const sendInvite = teamWorkout.sendInvite;
   const broadcastMyLog = teamWorkout.broadcastMyLog
@@ -241,6 +242,25 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
       } catch { }
     } catch (e) { logError('hook:useActiveWorkoutController.updateLog', e) }
   };
+
+  // ── Apply partner exercise control updates ───────────────────────────────
+  const exerciseControlUpdates = teamWorkout.exerciseControlUpdates
+  const lastAppliedUpdateTs = useRef(0)
+  useEffect(() => {
+    if (!exerciseControlUpdates?.length) return
+    for (const update of exerciseControlUpdates) {
+      if (update.ts <= lastAppliedUpdateTs.current) continue
+      lastAppliedUpdateTs.current = update.ts
+      const key = `${update.exerciseIdx}-${update.setIdx}`
+      try {
+        const prev = getLog(key)
+        const merged = { ...prev, ...update.patch }
+        if (typeof props?.onUpdateLog === 'function') {
+          props.onUpdateLog(key, merged)
+        }
+      } catch (e) { logError('hook:useActiveWorkoutController.applyPartnerUpdate', e) }
+    }
+  }, [exerciseControlUpdates, getLog, props])
 
 
   // ── Deload + report history (extracted to useWorkoutDeload) ──────────────

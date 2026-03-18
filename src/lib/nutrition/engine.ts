@@ -13,6 +13,20 @@ export interface UserStats {
 
 export type Goal = 'CUT' | 'MAINTAIN' | 'BULK'
 
+// ── Activity level multipliers (Harris-Benedict / Mifflin extension) ─────────
+const ACTIVITY_MULTIPLIER: Record<ActivityLevel, number> = {
+  SEDENTARY: 1.2,
+  LIGHT: 1.375,
+  MODERATE: 1.55,
+  VERY_ACTIVE: 1.725,
+  EXTRA_ACTIVE: 1.9,
+}
+
+export function getActivityMultiplier(level: ActivityLevel | string | null | undefined): number {
+  const key = String(level ?? '').toUpperCase() as ActivityLevel
+  return ACTIVITY_MULTIPLIER[key] ?? ACTIVITY_MULTIPLIER.MODERATE
+}
+
 export function calculateBMR(stats: UserStats): number {
   const weight = Number(stats?.weight)
   const height = Number(stats?.height)
@@ -33,6 +47,16 @@ export function calculateBMR(stats: UserStats): number {
   return Math.round(bmr)
 }
 
+/**
+ * Calculates TDEE (Total Daily Energy Expenditure) = BMR × activity multiplier.
+ * This is the actual calorie need per day before goal adjustment.
+ */
+export function calculateTDEE(stats: UserStats): number {
+  const bmr = calculateBMR(stats)
+  const multiplier = getActivityMultiplier(stats.activityLevel)
+  return Math.round(bmr * multiplier)
+}
+
 const CALORIES_PER_GRAM = {
   protein: 4,
   carbs: 4,
@@ -51,8 +75,12 @@ const GOAL_MACRO_SPLIT: Record<Goal, { protein: number; carbs: number; fat: numb
   BULK: { protein: 0.25, carbs: 0.5, fat: 0.25 },
 }
 
-export function calculateMacros(bmr: number, goal: Goal): { protein: number; carbs: number; fat: number } {
-  const baseCalories = Number(bmr)
+/**
+ * Calculates macro targets from a TDEE (or BMR) base and a goal.
+ * For accurate results, pass TDEE (not raw BMR) as the first parameter.
+ */
+export function calculateMacros(tdee: number, goal: Goal): { protein: number; carbs: number; fat: number } {
+  const baseCalories = Number(tdee)
   if (!Number.isFinite(baseCalories) || baseCalories <= 0) throw new Error('nutrition_invalid_calories')
   if (goal !== 'CUT' && goal !== 'MAINTAIN' && goal !== 'BULK') throw new Error('nutrition_invalid_goal')
 
@@ -66,6 +94,19 @@ export function calculateMacros(bmr: number, goal: Goal): { protein: number; car
   const carbs = Math.max(0, Math.round(remainingCalories / CALORIES_PER_GRAM.carbs))
 
   return { protein, carbs, fat }
+}
+
+/**
+ * Convenience: calculates full nutrition goals (calories + macros) from user stats + goal.
+ * Uses TDEE (not raw BMR) as the base.
+ */
+export function calculateNutritionGoals(stats: UserStats, goal: Goal): {
+  calories: number; protein: number; carbs: number; fat: number
+} {
+  const tdee = calculateTDEE(stats)
+  const targetCalories = Math.round(tdee * (GOAL_CALORIE_MULTIPLIER[goal] ?? 1))
+  const macros = calculateMacros(tdee, goal)
+  return { calories: targetCalories, ...macros }
 }
 
 export interface MealLog {

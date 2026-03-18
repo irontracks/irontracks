@@ -17,7 +17,7 @@ import { getKcalEstimate } from '@/utils/calories/kcalClient'
 import { parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
 import { normalizeExerciseKey, calculateTotalVolume } from '@/utils/report/formatters'
-import { estimateCaloriesMet } from '@/utils/calories/metEstimate'
+import { estimateCaloriesMet, getBodyweightFraction, DEFAULT_BODY_WEIGHT_KG } from '@/utils/calories/metEstimate'
 import { useCheckins } from './useCheckins'
 import { usePreviousSessionData } from './usePreviousSessionData'
 import { useMuscleTrends } from './useMuscleTrends'
@@ -351,10 +351,11 @@ export const useReportData = ({ session, previousSession, user, settings }: UseR
   })()
 
   // ── Per-exercise volumes for volume-weighted complexity factor ───────────
-  // Logs keyed by "exerciseIdx-setIdx". Handles "done/planned" reps ("8/10") and cluster blocks.
+  // Handles "done/planned" reps ("8/10"), cluster blocks, and bodyweight exercises.
+  const effectiveBodyWeight = checkinBodyWeightKg ?? DEFAULT_BODY_WEIGHT_KG
   const exerciseVolumes = useMemo(() => {
     if (!sessionExerciseNames || sessionExerciseNames.length === 0) return null
-    return sessionExerciseNames.map((_, exIdx) => {
+    return sessionExerciseNames.map((exName, exIdx) => {
       let vol = 0
       Object.entries(sessionLogs).forEach(([key, log]) => {
         const parts = key.split('-')
@@ -380,14 +381,19 @@ export const useReportData = ({ session, previousSession, user, settings }: UseR
           }
         }
         // Standard set — handle "done/planned" reps like "8/10"
-        const w = Number(String(obj.weight ?? '').replace(',', '.'))
+        let w = Number(String(obj.weight ?? '').replace(',', '.'))
         const rRaw = String(obj.reps ?? '').replace(',', '.').trim()
         const r = rRaw.includes('/') ? Number(rRaw.split('/')[0].trim()) : Number(rRaw)
+        // Bodyweight exercise: use equivalent body weight when weight is 0
+        if ((!Number.isFinite(w) || w <= 0) && Number.isFinite(r) && r > 0) {
+          const bwFrac = getBodyweightFraction(exName)
+          if (bwFrac > 0) w = effectiveBodyWeight * bwFrac
+        }
         if (Number.isFinite(w) && w > 0 && Number.isFinite(r) && r > 0) vol += w * r
       })
       return vol
     })
-  }, [sessionLogs, sessionExerciseNames])
+  }, [sessionLogs, sessionExerciseNames, effectiveBodyWeight])
 
   // ── Calories: deterministic useMemo ────────────────────────────────────
   // Uses two-factor MET (avg load + density), volume-weighted complexity,
