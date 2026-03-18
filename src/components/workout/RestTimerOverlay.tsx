@@ -42,6 +42,7 @@ interface RestTimerOverlayProps {
 const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context, onFinish, onStart, onClose, settings, autoStartEnabled, onToggleAutoStart }) => {
     const [timeLeft, setTimeLeft] = useState(0);
     const [isFinished, setIsFinished] = useState(false);
+    const [autoStartLocal, setAutoStartLocal] = useState(Boolean(autoStartEnabled));
     const warnedRef = useRef(false);
     const notifyIdRef = useRef('');
     const soundIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -320,7 +321,7 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
             autoStartFiredRef.current = false;
             return;
         }
-        if (!autoStartEnabled) return;
+        if (!autoStartLocal) return;
         if (autoStartFiredRef.current) return;
         autoStartFiredRef.current = true;
         // Small delay so the "BORA!" flash is visible before advancing
@@ -339,7 +340,7 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
             }
         }, 500);
         return () => clearTimeout(timeout);
-    }, [isFinished, autoStartEnabled, context, onStart, onFinish]);
+    }, [isFinished, autoStartLocal, context, onStart, onFinish]);
 
     if (!targetTime) return null;
 
@@ -462,18 +463,19 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
                             <button
                                 onClick={() => {
                                     try {
+                                        setAutoStartLocal(prev => !prev);
                                         if (typeof onToggleAutoStart === 'function') onToggleAutoStart();
                                     } catch { }
                                 }}
                                 className={`px-3 py-2 rounded-xl text-xs font-black active:scale-95 transition-all border ${
-                                    autoStartEnabled
+                                    autoStartLocal
                                         ? 'bg-gradient-to-r from-yellow-500/20 to-amber-500/20 border-yellow-500/50 text-yellow-400 shadow-sm shadow-yellow-500/10'
                                         : 'text-neutral-400 hover:text-white hover:border-yellow-500/30'
                                 }`}
-                                style={!autoStartEnabled ? { background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' } : undefined}
-                                aria-label={autoStartEnabled ? 'Desativar auto-start' : 'Ativar auto-start'}
+                                style={!autoStartLocal ? { background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' } : undefined}
+                                aria-label={autoStartLocal ? 'Desativar auto-start' : 'Ativar auto-start'}
                             >
-                                {autoStartEnabled ? 'AUTO ▶' : 'AUTO'}
+                                {autoStartLocal ? 'AUTO ▶' : 'AUTO'}
                             </button>
                         </div>
                     </div>
