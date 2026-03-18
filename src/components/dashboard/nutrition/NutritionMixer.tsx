@@ -94,12 +94,16 @@ export default function NutritionMixer({
   goals,
   schemaMissing,
   canViewMacros,
+  workoutCaloriesToday,
+  goalsSource,
 }: {
   dateKey: string
   initialTotals: Totals
   goals: Totals
   schemaMissing?: boolean
   canViewMacros?: boolean
+  workoutCaloriesToday?: number
+  goalsSource?: 'saved' | 'profile' | 'default'
 }) {
   const supabase = useMemo(() => createClient(), [])
   const [totals, setTotals] = useState<Totals>({
@@ -453,6 +457,24 @@ export default function NutritionMixer({
             </svg>
           </div>
         </div>
+
+        {/* Workout burn + net balance */}
+        {safeNumber(workoutCaloriesToday) > 0 ? (
+          <div className="mt-4 flex items-center gap-2.5">
+            <div className="flex-1 rounded-2xl bg-orange-500/8 border border-orange-500/15 p-3 ring-1 ring-orange-500/10">
+              <div className="text-[10px] uppercase tracking-[0.18em] text-orange-400/70">Treino</div>
+              <div className="mt-1 text-sm font-semibold text-orange-200">-{Math.round(safeNumber(workoutCaloriesToday))} kcal</div>
+            </div>
+            <div className="flex-1 rounded-2xl bg-blue-500/8 border border-blue-500/15 p-3 ring-1 ring-blue-500/10">
+              <div className="text-[10px] uppercase tracking-[0.18em] text-blue-400/70">Saldo líquido</div>
+              <div className="mt-1 text-sm font-semibold text-blue-200">{Math.round(safeNumber(totals?.calories) - safeNumber(workoutCaloriesToday))} kcal</div>
+            </div>
+          </div>
+        ) : null}
+
+        {goalsSource === 'profile' ? (
+          <div className="mt-3 text-[11px] text-neutral-500 text-center">Meta calculada a partir do seu perfil (TDEE). Ajuste em Metas.</div>
+        ) : null}
 
         <div className="mt-4 grid grid-cols-3 gap-2.5">
           {canViewMacros ? (

@@ -14,7 +14,7 @@ import { useTeamPresence } from './team/useTeamPresence'
 import type { TeamWorkoutContextValue, TeamWorkoutProviderProps, JoinResult, TeamParticipant } from './team/types'
 
 // Re-export types and constants so existing consumers don't break
-export type { SharedLogsMap, SharedLogEntry, ChatMessage, SetChallengePayload, WorkoutEditPayload } from './team/types'
+export type { SharedLogsMap, SharedLogEntry, ChatMessage, SetChallengePayload, WorkoutEditPayload, ExerciseSharePayload, ExerciseControlUpdate } from './team/types'
 export { MAX_TEAM_PARTICIPANTS, MAX_CHAT_MESSAGES } from './team/types'
 
 const TeamWorkoutContext = createContext<TeamWorkoutContextValue | null>(null);
@@ -272,6 +272,13 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
             pendingWorkoutEdit: broadcast.pendingWorkoutEdit,
             broadcastWorkoutEdit: broadcast.broadcastWorkoutEdit,
             dismissWorkoutEdit: broadcast.dismissWorkoutEdit,
+            // Partner exercise control
+            incomingExerciseShare: broadcast.incomingExerciseShare,
+            exerciseControlUpdates: broadcast.exerciseControlUpdates,
+            shareExerciseWithPartner: broadcast.shareExerciseWithPartner,
+            sendExerciseControlUpdate: broadcast.sendExerciseControlUpdate,
+            endExerciseShare: broadcast.endExerciseShare,
+            dismissExerciseShare: broadcast.dismissExerciseShare,
         }}>
             {children}
         </TeamWorkoutContext.Provider>

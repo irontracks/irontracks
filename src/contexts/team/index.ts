@@ -15,6 +15,8 @@ export type {
     ActionOkResult,
     SetChallengePayload,
     WorkoutEditPayload,
+    ExerciseSharePayload,
+    ExerciseControlUpdate,
     TeamWorkoutProviderProps,
     TeamWorkoutContextValue,
 } from './types'

@@ -24,6 +24,7 @@ import {
   detectTrainingStyle,
   MET_REST,
   DEFAULT_BODY_WEIGHT_KG,
+  getBodyweightFraction,
 } from '@/utils/calories/metEstimate'
 
 const ZodBodySchema = z
@@ -195,8 +196,8 @@ export async function POST(request: Request) {
       }).filter(Boolean) as string[]
       : []
 
-    // Volume per exercise (handles "done/planned" reps like "8/10" and cluster blocks)
-    const exerciseVolumes: number[] = exerciseNames.map((_, exIdx) => {
+    // Volume per exercise (handles "done/planned" reps, cluster blocks, bodyweight exercises)
+    const exerciseVolumes: number[] = exerciseNames.map((exName, exIdx) => {
       let vol = 0
       for (const [key, log] of Object.entries(logs)) {
         const parts = key.split('-')
@@ -205,8 +206,13 @@ export async function POST(request: Request) {
         const obj = log as Record<string, unknown>
         const clusterVol = calculateClusterVolume(obj.cluster)
         if (clusterVol > 0) { vol += clusterVol; continue }
-        const w = parseWeightValue(obj?.weight)
+        let w = parseWeightValue(obj?.weight)
         const r = parseRepsValue(obj?.reps)
+        // Bodyweight exercise: use equivalent body weight when weight is 0
+        if (w <= 0 && r > 0) {
+          const bwFrac = getBodyweightFraction(exName)
+          if (bwFrac > 0) w = bodyWeightKg * bwFrac
+        }
         if (w > 0 && r > 0) vol += w * r
       }
       return vol

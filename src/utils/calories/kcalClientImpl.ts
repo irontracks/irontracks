@@ -111,8 +111,11 @@ export const computeFallbackKcal = ({
     const kcal = estimateCaloriesMet(logs, durationMinutes, weightKg, exerciseNames, null, null, null, biologicalSex ?? null)
     if (kcal > 0) return kcal
 
-    // Dead-last resort (no logs at all)
-    return Math.round(volume * 0.02 + durationMinutes * 4)
+    // Dead-last resort (no logs at all) — use MET_LIGHT × default weight × duration
+    const DEFAULT_BW = 78
+    const MET_LIGHT_FALLBACK = 3.5
+    if (durationMinutes > 0) return Math.round(MET_LIGHT_FALLBACK * DEFAULT_BW * (durationMinutes / 60))
+    return 0
   } catch {
     return 0
   }

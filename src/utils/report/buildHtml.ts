@@ -7,6 +7,7 @@ import {
   normalizeExerciseKey,
   calculateTotalVolume,
 } from '@/utils/report/formatters'
+import { estimateCaloriesMet, MET_LIGHT, DEFAULT_BODY_WEIGHT_KG } from '@/utils/calories/metEstimate'
 
 
 const getSetTag = (log: unknown): string | null => {
@@ -86,8 +87,30 @@ export function buildReportData(
     if (Number.isFinite(ov) && ov > 0) return Math.round(ov)
     const bikeKcal = Number(outdoorBike?.caloriesKcal)
     if (Number.isFinite(bikeKcal) && bikeKcal > 0) return Math.round(bikeKcal)
-    const durationInMinutes = totalTimeSeconds / 60
-    return Math.round((currentVolume * 0.02) + (durationInMinutes * 4))
+    // Fallback: use the full MET V3 model with all available session data
+    const exerciseNames = Array.isArray(sessionObj?.exercises)
+      ? (sessionObj.exercises as unknown[]).map((ex) => {
+        const e = isRecord(ex) ? ex : null
+        return String(e?.name || '').trim()
+      }).filter(Boolean) as string[]
+      : null
+    // Extract body weight from preCheckin if available
+    const pcRaw = isRecord(sessionObj?.preCheckin) ? (sessionObj.preCheckin as Record<string, unknown>) : null
+    const bwCandidates = [pcRaw?.weight, pcRaw?.body_weight_kg, isRecord(pcRaw?.answers) ? (pcRaw.answers as Record<string, unknown>).body_weight_kg : null]
+    const bodyWeightKg = bwCandidates.reduce<number | null>((acc, c) => {
+      if (acc !== null) return acc
+      const n = Number(c)
+      return Number.isFinite(n) && n >= 20 && n <= 300 ? n : null
+    }, null)
+    const execSec = Number(sessionObj?.executionTotalSeconds ?? sessionObj?.execution_total_seconds ?? 0) || 0
+    const restSec = Number(sessionObj?.restTotalSeconds ?? sessionObj?.rest_total_seconds ?? 0) || 0
+    const sexRaw = String(sessionObj?.biologicalSex ?? '').toLowerCase()
+    const bioSex = sexRaw === 'male' || sexRaw === 'female' ? sexRaw : null
+    const kcal = estimateCaloriesMet(
+      sessionLogs, totalTimeSeconds / 60, bodyWeightKg, exerciseNames,
+      null, execSec > 0 ? execSec / 60 : null, restSec > 0 ? restSec / 60 : null, bioSex,
+    )
+    return kcal > 0 ? kcal : 0
   })()
 
   const prevLogsMap: Record<string, Array<Record<string, unknown> | null>> = {}

@@ -6,6 +6,7 @@
  */
 
 import { safeString } from '@/utils/guards'
+import { estimateCaloriesMet, MET_LIGHT, DEFAULT_BODY_WEIGHT_KG } from '@/utils/calories/metEstimate'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -210,14 +211,37 @@ export const computeKcal = ({
         const existing = Number(session?.calories) || Number(session?.kcal);
         if (Number.isFinite(existing) && existing > 0) return Math.round(existing);
 
-        const durationMin = (Number(session?.totalTime) || 0) / 60;
-        if (durationMin <= 0) return 0;
+        const s = session as Record<string, unknown>
+        const logs = s?.logs && typeof s.logs === 'object' ? (s.logs as Record<string, unknown>) : {}
+        const durationMin = (Number(s?.totalTime) || 0) / 60
+        const exerciseNames = Array.isArray(s?.exercises)
+            ? (s.exercises as unknown[]).map((ex) => {
+                const e = ex && typeof ex === 'object' ? (ex as Record<string, unknown>) : null
+                return String(e?.name || '').trim()
+            }).filter(Boolean) as string[]
+            : null
+        // Extract available session data for a richer estimate
+        const pcRaw = s?.preCheckin && typeof s.preCheckin === 'object' ? (s.preCheckin as Record<string, unknown>) : null
+        const bwCandidates = [pcRaw?.weight, pcRaw?.body_weight_kg, pcRaw?.answers && typeof pcRaw.answers === 'object' ? (pcRaw.answers as Record<string, unknown>).body_weight_kg : null]
+        const bodyWeightKg = bwCandidates.reduce<number | null>((acc, c) => {
+            if (acc !== null) return acc
+            const n = Number(c)
+            return Number.isFinite(n) && n >= 20 && n <= 300 ? n : null
+        }, null)
+        const execSec = Number(s?.executionTotalSeconds ?? s?.execution_total_seconds ?? 0) || 0
+        const restSec = Number(s?.restTotalSeconds ?? s?.rest_total_seconds ?? 0) || 0
+        const sexRaw = String(s?.biologicalSex ?? '').toLowerCase()
+        const bioSex = sexRaw === 'male' || sexRaw === 'female' ? sexRaw : null
 
-        let k = durationMin * 4;
-        if (volume > 0) {
-            k += volume * 0.01;
-        }
-        return Math.round(k);
+        const kcal = estimateCaloriesMet(
+            logs, durationMin, bodyWeightKg, exerciseNames,
+            null, execSec > 0 ? execSec / 60 : null, restSec > 0 ? restSec / 60 : null, bioSex,
+        )
+        if (kcal > 0) return kcal
+
+        // Dead-last fallback when MET model returns 0 (no logs/duration)
+        if (durationMin > 0) return Math.round(MET_LIGHT * DEFAULT_BODY_WEIGHT_KG * (durationMin / 60))
+        return 0;
     } catch {
         return 0;
     }

@@ -10,6 +10,8 @@ import type {
     ChatMessage,
     SetChallengePayload,
     WorkoutEditPayload,
+    ExerciseSharePayload,
+    ExerciseControlUpdate,
 } from './types'
 import { MAX_CHAT_MESSAGES } from './types'
 
@@ -47,6 +49,9 @@ export function useTeamBroadcast({
     const [pendingChallenge, setPendingChallenge] = useState<SetChallengePayload | null>(null)
     // Workout edit sync
     const [pendingWorkoutEdit, setPendingWorkoutEdit] = useState<WorkoutEditPayload | null>(null)
+    // Partner exercise control
+    const [incomingExerciseShare, setIncomingExerciseShare] = useState<ExerciseSharePayload | null>(null)
+    const [exerciseControlUpdates, setExerciseControlUpdates] = useState<ExerciseControlUpdate[]>([])
 
     // ── Broadcast channel for real-time log sharing between teammates ─────────
     useEffect(() => {
@@ -163,6 +168,53 @@ export function useTeamBroadcast({
                 } catch { }
                 try { playStartSound(soundOpts); } catch { }
             })
+            // ─ Partner exercise share ───────────────────────────────────────
+            .on('broadcast', { event: 'exercise_share_request' }, (msg) => {
+                const payload = msg?.payload && typeof msg.payload === 'object' ? msg.payload as Record<string, unknown> : null
+                if (!payload) return
+                const fromUid = String(payload.fromUserId || '').trim()
+                if (!fromUid || fromUid === String(user?.id || '').trim()) return
+                const share: ExerciseSharePayload = {
+                    id: String(payload.id || `${fromUid}:${Date.now()}`),
+                    fromUserId: fromUid,
+                    fromName: String(payload.fromName || 'Parceiro'),
+                    exerciseIdx: Number(payload.exerciseIdx ?? 0),
+                    exercise: payload.exercise && typeof payload.exercise === 'object' ? payload.exercise as Record<string, unknown> : {},
+                    logs: payload.logs && typeof payload.logs === 'object' ? payload.logs as Record<string, unknown> : {},
+                    context: payload.context && typeof payload.context === 'object' ? payload.context as Record<string, unknown> : null,
+                    ts: Number(payload.ts || Date.now()),
+                }
+                setIncomingExerciseShare(share)
+                try {
+                    notify({ id: `exercise_share:${fromUid}:${Date.now()}`, type: 'team_exercise_share', senderName: share.fromName, displayName: share.fromName, photoURL: null, text: `${share.fromName} compartilhou ${String(share.exercise?.name || 'exercício')} com você! 🏋️` })
+                } catch { }
+                try { playStartSound(soundOpts) } catch { }
+            })
+            .on('broadcast', { event: 'exercise_control_update' }, (msg) => {
+                const payload = msg?.payload && typeof msg.payload === 'object' ? msg.payload as Record<string, unknown> : null
+                if (!payload) return
+                const fromUid = String(payload.fromUserId || '').trim()
+                if (!fromUid || fromUid === String(user?.id || '').trim()) return
+                const update: ExerciseControlUpdate = {
+                    fromUserId: fromUid,
+                    exerciseIdx: Number(payload.exerciseIdx ?? 0),
+                    setIdx: Number(payload.setIdx ?? 0),
+                    patch: payload.patch && typeof payload.patch === 'object' ? payload.patch as Record<string, unknown> : {},
+                    ts: Number(payload.ts || Date.now()),
+                }
+                setExerciseControlUpdates(prev => [...prev, update])
+            })
+            .on('broadcast', { event: 'exercise_share_end' }, (msg) => {
+                const payload = msg?.payload && typeof msg.payload === 'object' ? msg.payload as Record<string, unknown> : null
+                if (!payload) return
+                const fromUid = String(payload.fromUserId || '').trim()
+                if (!fromUid || fromUid === String(user?.id || '').trim()) return
+                const name = String(payload.fromName || 'Parceiro')
+                try {
+                    notify({ id: `exercise_share_end:${fromUid}:${Date.now()}`, type: 'team_exercise_share_end', senderName: name, displayName: name, photoURL: null, text: `${name} finalizou o controle do exercício ✅` })
+                } catch { }
+                setExerciseControlUpdates([])
+            })
             .subscribe()
         teamBroadcastChannelRef.current = ch
         return () => {
@@ -216,6 +268,45 @@ export function useTeamBroadcast({
     }, [user?.id, myDisplayNameRef])
 
     const dismissWorkoutEdit = useCallback(() => setPendingWorkoutEdit(null), [])
+
+    // ── Partner exercise control ─────────────────────────────────────────────────────
+    const shareExerciseWithPartner = useCallback((exerciseIdx: number, exercise: Record<string, unknown>, logs: Record<string, unknown>, context?: Record<string, unknown> | null) => {
+        const ch = teamBroadcastChannelRef.current
+        if (!ch || !user?.id) return
+        const id = `${user.id}:${Date.now()}`
+        const payload: ExerciseSharePayload = {
+            id,
+            fromUserId: user.id,
+            fromName: myDisplayNameRef.current || 'Parceiro',
+            exerciseIdx,
+            exercise,
+            logs,
+            context: context || null,
+            ts: Date.now(),
+        }
+        try {
+            ch.send({ type: 'broadcast', event: 'exercise_share_request', payload })
+        } catch (e) { logError('useTeamBroadcast.shareExerciseWithPartner', e) }
+    }, [user?.id, myDisplayNameRef])
+
+    const sendExerciseControlUpdate = useCallback((exerciseIdx: number, setIdx: number, patch: Record<string, unknown>) => {
+        const ch = teamBroadcastChannelRef.current
+        if (!ch || !user?.id) return
+        try {
+            ch.send({ type: 'broadcast', event: 'exercise_control_update', payload: { fromUserId: user.id, exerciseIdx, setIdx, patch, ts: Date.now() } })
+        } catch (e) { logError('useTeamBroadcast.sendExerciseControlUpdate', e) }
+    }, [user?.id])
+
+    const endExerciseShare = useCallback(() => {
+        const ch = teamBroadcastChannelRef.current
+        if (!ch || !user?.id) return
+        try {
+            ch.send({ type: 'broadcast', event: 'exercise_share_end', payload: { fromUserId: user.id, fromName: myDisplayNameRef.current || 'Parceiro', ts: Date.now() } })
+        } catch (e) { logError('useTeamBroadcast.endExerciseShare', e) }
+        setIncomingExerciseShare(null)
+    }, [user?.id, myDisplayNameRef])
+
+    const dismissExerciseShare = useCallback(() => setIncomingExerciseShare(null), [])
 
     const sendChatMessage = useCallback((text: string) => {
         if (!user?.id || !teamSession?.id) return
@@ -362,6 +453,13 @@ export function useTeamBroadcast({
         pendingWorkoutEdit,
         broadcastWorkoutEdit,
         dismissWorkoutEdit,
+        // Partner exercise control
+        incomingExerciseShare,
+        exerciseControlUpdates,
+        shareExerciseWithPartner,
+        sendExerciseControlUpdate,
+        endExerciseShare,
+        dismissExerciseShare,
         teamBroadcastChannelRef,
         clearSharedLogs,
     }
