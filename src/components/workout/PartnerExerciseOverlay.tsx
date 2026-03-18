@@ -340,9 +340,11 @@ export default function PartnerExerciseOverlay({ share, onSendUpdate, onEnd }: P
                         exIdx={exerciseIdx}
                     />
                 </div>
-                {/* Method modals — rendered at z-[1400], above the overlay z-[1500] content area */}
-                <ModalsComplexMethods />
-                <ModalsSimpleMethods />
+                {/* Method modals — wrap in z-[2000] so they render ABOVE the z-[1500] overlay */}
+                <div className="fixed inset-0 z-[2000] pointer-events-none [&>*]:pointer-events-auto">
+                    <ModalsComplexMethods />
+                    <ModalsSimpleMethods />
+                </div>
             </WorkoutProvider>
 
             {/* Footer */}
