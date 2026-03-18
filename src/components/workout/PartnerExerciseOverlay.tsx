@@ -1,8 +1,11 @@
 'use client'
 
-import React, { useState, useEffect, useRef, useCallback } from 'react'
-import { X, Check, Dumbbell, Timer, Send } from 'lucide-react'
+import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { X, Dumbbell, Timer } from 'lucide-react'
 import type { ExerciseSharePayload } from '@/contexts/team/types'
+import ExerciseCard from './ExerciseCard'
+import { WorkoutProvider } from './WorkoutContext'
+import type { WorkoutExercise, UnknownRecord } from './types'
 
 interface PartnerExerciseOverlayProps {
     share: ExerciseSharePayload
@@ -19,21 +22,15 @@ export default function PartnerExerciseOverlay({ share, onSendUpdate, onEnd }: P
     const sdArr: unknown[] = Array.isArray(exercise.setDetails) ? exercise.setDetails as unknown[] : Array.isArray(exercise.set_details) ? exercise.set_details as unknown[] : []
     const setsCount = Math.max(setsHeader, sdArr.length)
     const restTime = Number(exercise.restTime ?? exercise.rest_time ?? 0) || 0
-    const notes = String(exercise.notes || '').trim()
-    const repsPlanned = String(exercise.reps ?? '')
 
     // Local logs state — initialized from shared logs
-    const [localLogs, setLocalLogs] = useState<Record<string, { weight: string; reps: string; done: boolean }>>(() => {
-        const init: Record<string, { weight: string; reps: string; done: boolean }> = {}
+    const [localLogs, setLocalLogs] = useState<Record<string, Record<string, unknown>>>(() => {
+        const init: Record<string, Record<string, unknown>> = {}
         const logs = share.logs || {}
         for (let i = 0; i < setsCount; i++) {
             const key = `${exerciseIdx}-${i}`
             const log = logs[key] && typeof logs[key] === 'object' ? logs[key] as Record<string, unknown> : {}
-            init[key] = {
-                weight: String(log.weight ?? ''),
-                reps: String(log.reps ?? ''),
-                done: Boolean(log.done),
-            }
+            init[key] = { ...log }
         }
         return init
     })
@@ -51,53 +48,237 @@ export default function PartnerExerciseOverlay({ share, onSendUpdate, onEnd }: P
             if (left <= 0) {
                 setRestActive(false)
                 clearInterval(tick)
-                try {
-                    if (typeof navigator !== 'undefined' && navigator.vibrate) navigator.vibrate(300)
-                } catch { }
+                try { navigator?.vibrate?.(300) } catch { }
             }
         }, 200)
         return () => clearInterval(tick)
     }, [restActive])
 
-    const startRest = useCallback(() => {
-        if (restTime <= 0) return
-        restEndRef.current = Date.now() + restTime * 1000
-        setRestTimeLeft(restTime)
+    const startTimer = useCallback((seconds: number) => {
+        if (seconds <= 0) return
+        restEndRef.current = Date.now() + seconds * 1000
+        setRestTimeLeft(seconds)
         setRestActive(true)
-    }, [restTime])
+    }, [])
 
-    const handleSetDone = useCallback((setIdx: number) => {
-        const key = `${exerciseIdx}-${setIdx}`
+    // getLog — returns the local log for a key
+    const getLog = useCallback((key: string): Record<string, unknown> => {
+        return (localLogs[key] || {}) as Record<string, unknown>
+    }, [localLogs])
+
+    // updateLog — updates local state AND sends the patch to the partner
+    const updateLog = useCallback((key: string, patch: unknown) => {
+        const patchObj = patch && typeof patch === 'object' ? patch as Record<string, unknown> : {}
         setLocalLogs(prev => {
-            const current = prev[key] || { weight: '', reps: '', done: false }
-            const updated = { ...current, done: !current.done }
-            // Send update to partner
-            onSendUpdate(exerciseIdx, setIdx, { weight: updated.weight, reps: updated.reps, done: updated.done })
-            // Start rest timer if marking as done
-            if (updated.done && restTime > 0) startRest()
-            return { ...prev, [key]: updated }
+            const prevLog = prev[key] || {}
+            const merged = { ...prevLog, ...patchObj }
+            return { ...prev, [key]: merged }
         })
-    }, [exerciseIdx, onSendUpdate, restTime, startRest])
-
-    const handleFieldChange = useCallback((setIdx: number, field: 'weight' | 'reps', value: string) => {
-        const key = `${exerciseIdx}-${setIdx}`
-        setLocalLogs(prev => {
-            const current = prev[key] || { weight: '', reps: '', done: false }
-            const updated = { ...current, [field]: value }
-            return { ...prev, [key]: updated }
-        })
-    }, [exerciseIdx])
-
-    const handleFieldBlur = useCallback((setIdx: number) => {
-        const key = `${exerciseIdx}-${setIdx}`
-        const log = localLogs[key]
-        if (log) {
-            onSendUpdate(exerciseIdx, setIdx, { weight: log.weight, reps: log.reps, done: log.done })
+        // Parse key to get exerciseIdx and setIdx
+        const [exIdxStr, setIdxStr] = key.split('-')
+        const exIdx = parseInt(exIdxStr, 10)
+        const sIdx = parseInt(setIdxStr, 10)
+        if (Number.isFinite(exIdx) && Number.isFinite(sIdx)) {
+            onSendUpdate(exIdx, sIdx, patchObj)
         }
-    }, [exerciseIdx, localLogs, onSendUpdate])
+        // Auto-start rest timer when marking set as done
+        if (patchObj.done === true && restTime > 0) {
+            startTimer(restTime)
+        }
+    }, [onSendUpdate, restTime, startTimer])
 
-    const doneSets = Object.values(localLogs).filter(l => l.done).length
+    // getPlannedSet — returns the planned set data from the exercise
+    const getPlannedSet = useCallback((ex: WorkoutExercise, setIdx: number) => {
+        const sd = Array.isArray(ex?.setDetails) ? ex.setDetails : Array.isArray(ex?.set_details) ? ex.set_details : []
+        if (setIdx >= 0 && setIdx < sd.length) return sd[setIdx] as Record<string, unknown>
+        return null
+    }, [])
+
+    // getPlanConfig — returns advanced config for a set
+    const getPlanConfig = useCallback((ex: WorkoutExercise, setIdx: number) => {
+        const planned = getPlannedSet(ex, setIdx)
+        if (!planned) return null
+        const cfg = (planned as Record<string, unknown>)?.advanced_config ?? (planned as Record<string, unknown>)?.advancedConfig ?? null
+        return cfg && typeof cfg === 'object' ? cfg as Record<string, unknown> : null
+    }, [getPlannedSet])
+
+    // Notes state
+    const [openNotesKeys, setOpenNotesKeys] = useState<Set<string>>(new Set())
+    const toggleNotes = useCallback((key: string) => {
+        setOpenNotesKeys(prev => {
+            const next = new Set(prev)
+            if (next.has(key)) next.delete(key)
+            else next.add(key)
+            return next
+        })
+    }, [])
+
+    // Refs for cluster/rest-pause
+    const clusterRefs = useRef<Record<string, Array<HTMLInputElement | null>>>({})
+    const restPauseRefs = useRef<Record<string, Array<HTMLInputElement | null>>>({})
+
+    // Progress tracking
+    const doneSets = Object.values(localLogs).filter(l => Boolean(l?.done)).length
     const progressPct = setsCount > 0 ? Math.round((doneSets / setsCount) * 100) : 0
+
+    // Build a fake workout object containing just this one exercise
+    const fakeWorkout = useMemo(() => ({
+        id: `partner-${share.id}`,
+        title: 'Modo Spotter',
+        exercises: [exercise],
+    }), [share.id, exercise])
+
+    // No-op functions for features we don't need in spotter mode
+    const noop = useCallback(() => {}, [])
+    const noopAsync = useCallback(async () => {}, [])
+    const noopWithArg = useCallback((_: unknown) => {}, [])
+    const noopWithTwoArgs = useCallback((_a: unknown, _b: unknown) => {}, [])
+
+    // Build the minimal WorkoutContext value
+    const contextValue = useMemo(() => ({
+        // Core data
+        session: { workout: fakeWorkout, logs: localLogs, ui: {} },
+        workout: fakeWorkout,
+        exercises: [exercise] as WorkoutExercise[],
+        logs: localLogs,
+
+        // Core functions
+        getLog,
+        updateLog,
+        getPlanConfig,
+        getPlannedSet,
+        startTimer: (seconds: number, ctx?: unknown) => {
+            startTimer(seconds)
+        },
+
+        // UI state
+        collapsed: new Set<number>(),
+        toggleCollapse: noop,
+        setCurrentExerciseIdx: noopWithArg,
+        openNotesKeys,
+        toggleNotes,
+        setCollapsed: noopWithArg,
+
+        // Reports / Deload (not needed)
+        reportHistoryStatus: null,
+        reportHistoryLoadingRef: { current: false },
+        reportHistory: null,
+        reportHistoryUpdatedAt: null,
+        reportHistoryStatusRef: { current: null },
+        reportHistoryUpdatedAtRef: { current: null },
+        reportHistoryLoadingSinceRef: { current: null },
+        deloadSuggestions: {} as Record<string, unknown>,
+        openDeloadModal: noopAsync,
+        applyDeloadToExercise: noop,
+        updateDeloadModalFromPercent: noop,
+        updateDeloadModalFromWeight: noop,
+        deloadModal: null,
+        setDeloadModal: noopWithArg,
+        deloadAiCacheRef: { current: {} },
+
+        // Exercise editing (not needed in spotter)
+        openEditExercise: noopAsync,
+        addExtraSetToExercise: noopWithArg,
+        removeExtraSetFromExercise: noopWithArg,
+        linkedWeightExercises: new Set<number>(),
+        toggleLinkWeights: noopWithArg,
+
+        // Method-specific modal setters (all no-op in spotter)
+        clusterModal: null,
+        setClusterModal: noopWithArg,
+        restPauseModal: null,
+        setRestPauseModal: noopWithArg,
+        dropSetModal: null,
+        setDropSetModal: noopWithArg,
+        strippingModal: null,
+        setStrippingModal: noopWithArg,
+        fst7Modal: null,
+        setFst7Modal: noopWithArg,
+        heavyDutyModal: null,
+        setHeavyDutyModal: noopWithArg,
+        pontoZeroModal: null,
+        setPontoZeroModal: noopWithArg,
+        forcedRepsModal: null,
+        setForcedRepsModal: noopWithArg,
+        negativeRepsModal: null,
+        setNegativeRepsModal: noopWithArg,
+        partialRepsModal: null,
+        setPartialRepsModal: noopWithArg,
+        sistema21Modal: null,
+        setSistema21Modal: noopWithArg,
+        waveModal: null,
+        setWaveModal: noopWithArg,
+        groupMethodModal: null,
+        setGroupMethodModal: noopWithArg,
+
+        // Refs
+        clusterRefs,
+        restPauseRefs,
+        organizeBaseKeysRef: { current: [] },
+
+        // More no-ops for remaining controller fields
+        currentExerciseIdx: 0,
+        editExerciseOpen: false,
+        setEditExerciseOpen: noopWithArg,
+        editExerciseIdx: null,
+        setEditExerciseIdx: noopWithArg,
+        editExerciseDraft: null,
+        setEditExerciseDraft: noopWithArg,
+        saveEditExercise: noopAsync,
+        addExtraExerciseToWorkout: noopAsync,
+        openOrganizeModal: noop,
+        requestCloseOrganize: noop,
+        saveOrganize: noop,
+        organizeOpen: false,
+        setOrganizeOpen: noopWithArg,
+        organizeDraft: null,
+        setOrganizeDraft: noopWithArg,
+        organizeSaving: false,
+        organizeDirty: false,
+        organizeError: '',
+        setOrganizeError: noopWithArg,
+        finishWorkout: noopAsync,
+        timerMinimized: false,
+        setTimerMinimized: noopWithArg,
+        postCheckinOpen: false,
+        setPostCheckinOpen: noopWithArg,
+        postCheckinDraft: null,
+        setPostCheckinDraft: noopWithArg,
+        postCheckinResolveRef: { current: null },
+        addExerciseDraft: null,
+        setAddExerciseDraft: noopWithArg,
+
+        // Save modal functions
+        saveClusterModal: noop,
+        saveRestPauseModal: noop,
+        saveDropSetModal: noop,
+        saveStrippingModal: noop,
+        saveFst7Modal: noop,
+        saveHeavyDutyModal: noop,
+        savePontoZeroModal: noop,
+        saveForcedRepsModal: noop,
+        saveNegativeRepsModal: noop,
+        savePartialRepsModal: noop,
+        saveSistema21Modal: noop,
+        saveWaveModal: noop,
+        saveGroupMethodModal: noop,
+
+        // UI helpers
+        handleTimerFinish: noop,
+        alert: async (msg: string) => { try { window.alert(msg) } catch {} },
+        confirm: async () => true,
+        HELP_TERMS: {},
+        currentExercise: exercise,
+        elapsedSeconds: 0,
+        formatElapsed: () => '0:00',
+        onFinish: noop,
+        sendInvite: noopWithTwoArgs,
+        completedSets: doneSets,
+        totalSets: setsCount,
+        progressPct,
+        remainingSets: setsCount - doneSets,
+        ui: {} as UnknownRecord,
+    }), [exercise, fakeWorkout, localLogs, getLog, updateLog, getPlanConfig, getPlannedSet, startTimer, openNotesKeys, toggleNotes, noop, noopAsync, noopWithArg, noopWithTwoArgs, doneSets, setsCount, progressPct])
 
     const formatTime = (s: number) => {
         const m = Math.floor(s / 60)
@@ -140,7 +321,7 @@ export default function PartnerExerciseOverlay({ share, onSendUpdate, onEnd }: P
                 </div>
                 <div className="mt-1 flex items-center justify-between text-[10px] text-neutral-500 font-bold">
                     <span>{doneSets}/{setsCount} séries</span>
-                    <span>{method} • {repsPlanned || '—'} reps • {restTime ? `${restTime}s` : '—'}</span>
+                    <span>{method}</span>
                 </div>
             </div>
 
@@ -153,86 +334,14 @@ export default function PartnerExerciseOverlay({ share, onSendUpdate, onEnd }: P
                 </div>
             )}
 
-            {/* Exercise notes */}
-            {notes && (
-                <div className="mx-4 mt-3 px-3 py-2 rounded-xl bg-neutral-900/50 border border-yellow-500/20">
-                    <p className="text-sm text-neutral-300 whitespace-pre-wrap leading-snug">{notes}</p>
-                </div>
-            )}
-
-            {/* Sets list */}
-            <div className="flex-1 overflow-y-auto px-4 py-3 space-y-2">
-                {Array.from({ length: setsCount }).map((_, setIdx) => {
-                    const key = `${exerciseIdx}-${setIdx}`
-                    const log = localLogs[key] || { weight: '', reps: '', done: false }
-                    const isDone = log.done
-                    return (
-                        <div
-                            key={key}
-                            className={[
-                                'rounded-2xl border p-4 transition-all duration-200',
-                                isDone
-                                    ? 'bg-emerald-500/[0.06] border-emerald-500/30'
-                                    : 'bg-white/[0.02] border-white/[0.07]',
-                            ].join(' ')}
-                        >
-                            <div className="flex items-center gap-3">
-                                {/* Set number */}
-                                <span className={[
-                                    'flex-shrink-0 w-8 h-8 rounded-xl flex items-center justify-center text-xs font-black border',
-                                    isDone
-                                        ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400'
-                                        : 'bg-indigo-500/15 border-indigo-500/25 text-indigo-400',
-                                ].join(' ')}>
-                                    {isDone ? <Check size={14} /> : setIdx + 1}
-                                </span>
-
-                                {/* Weight input */}
-                                <div className="flex-1">
-                                    <label className="block text-[9px] font-black uppercase tracking-widest text-neutral-500 mb-0.5">Peso (kg)</label>
-                                    <input
-                                        type="number"
-                                        step="0.5"
-                                        value={log.weight}
-                                        onChange={(e) => handleFieldChange(setIdx, 'weight', e.target.value)}
-                                        onBlur={() => handleFieldBlur(setIdx)}
-                                        placeholder="—"
-                                        className="w-full bg-neutral-800/80 border border-neutral-700/50 rounded-lg px-3 py-2 text-white text-sm font-mono text-center focus:outline-none focus:border-indigo-500/50 transition-colors"
-                                        disabled={isDone}
-                                    />
-                                </div>
-
-                                {/* Reps input */}
-                                <div className="flex-1">
-                                    <label className="block text-[9px] font-black uppercase tracking-widest text-neutral-500 mb-0.5">Reps</label>
-                                    <input
-                                        type="number"
-                                        value={log.reps}
-                                        onChange={(e) => handleFieldChange(setIdx, 'reps', e.target.value)}
-                                        onBlur={() => handleFieldBlur(setIdx)}
-                                        placeholder={repsPlanned || '—'}
-                                        className="w-full bg-neutral-800/80 border border-neutral-700/50 rounded-lg px-3 py-2 text-white text-sm font-mono text-center focus:outline-none focus:border-indigo-500/50 transition-colors"
-                                        disabled={isDone}
-                                    />
-                                </div>
-
-                                {/* Done button */}
-                                <button
-                                    onClick={() => handleSetDone(setIdx)}
-                                    className={[
-                                        'flex-shrink-0 w-12 h-12 rounded-xl flex items-center justify-center font-black text-sm transition-all active:scale-95 border',
-                                        isDone
-                                            ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-400'
-                                            : 'bg-indigo-500/15 border-indigo-500/30 text-indigo-300 hover:bg-indigo-500/25',
-                                    ].join(' ')}
-                                    aria-label={isDone ? 'Desmarcar série' : 'Marcar série como feita'}
-                                >
-                                    {isDone ? <Check size={18} /> : <Send size={14} />}
-                                </button>
-                            </div>
-                        </div>
-                    )
-                })}
+            {/* Exercise card — full rendering with all training methods */}
+            <div className="flex-1 overflow-y-auto px-4 py-3">
+                <WorkoutProvider value={contextValue as never}>
+                    <ExerciseCard
+                        ex={exercise as WorkoutExercise}
+                        exIdx={exerciseIdx}
+                    />
+                </WorkoutProvider>
             </div>
 
             {/* Footer */}
