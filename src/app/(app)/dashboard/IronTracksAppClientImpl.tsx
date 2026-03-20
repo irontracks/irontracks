@@ -338,11 +338,14 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
     useEffect(() => {
         if (authLoading) return;
         if (user) return;
+        // Give hydration enough time before concluding there's no user.
+        // On WKWebView (iPad/Capacitor) the initial mount can be slower,
+        // so using a short timeout like 150ms would redirect prematurely.
         const t = setTimeout(() => {
             try {
-                router.replace('/?next=/dashboard');
+                window.location.replace('/?next=/dashboard');
             } catch { }
-        }, 150);
+        }, 3000);
         return () => {
             clearTimeout(t);
         };

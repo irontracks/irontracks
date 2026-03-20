@@ -234,9 +234,16 @@ export function useLoginScreen() {
                 const session = data?.session
                 if (session?.access_token && session?.refresh_token) {
                     await apiAuth.persistSession(session.access_token, session.refresh_token)
+                    // Backup session for restore on WKWebView cookie failures
+                    try { localStorage.setItem('it.session.backup', JSON.stringify({ access_token: session.access_token, refresh_token: session.refresh_token })) } catch { }
                 }
                 try { localStorage.setItem('it.logged_in', '1') } catch { }
-                router.replace('/dashboard'); try { router.refresh() } catch { }
+                // CRITICAL: Use full page reload instead of client-side navigation.
+                // router.replace causes a soft-nav where the SSR request may not
+                // carry the HTTP-only cookie just set by persistSession, especially
+                // on WKWebView (Capacitor/iPad). This causes the SSR to redirect
+                // back to login → infinite loop → black screen.
+                window.location.replace('/dashboard')
                 return
             }
             window.location.assign(getOAuthHref('apple'))
@@ -273,9 +280,12 @@ export function useLoginScreen() {
                 if (error) throw error
                 if (rememberMe) localStorage.setItem('it_remembered_email', email); else localStorage.removeItem('it_remembered_email')
                 const session = data?.session
-                if (session?.access_token && session?.refresh_token) await apiAuth.persistSession(session.access_token, session.refresh_token)
+                if (session?.access_token && session?.refresh_token) {
+                    await apiAuth.persistSession(session.access_token, session.refresh_token)
+                    try { localStorage.setItem('it.session.backup', JSON.stringify({ access_token: session.access_token, refresh_token: session.refresh_token })) } catch { }
+                }
                 holdLoading = true; try { localStorage.setItem('it.logged_in', '1') } catch { }
-                router.replace('/dashboard'); try { router.refresh() } catch { }
+                window.location.replace('/dashboard')
             } else if (authMode === 'signup') {
                 if (password !== emailData.confirmPassword) throw new Error('As senhas não coincidem.')
                 const isTeacher = emailData.isTeacher === true
@@ -290,7 +300,7 @@ export function useLoginScreen() {
                 const { error } = await supabase.auth.signUp({ email, password, options: { data: { full_name: emailData.fullName, display_name: emailData.fullName, phone: emailData.phone, birth_date: emailData.birthDate, role_requested: isTeacher ? 'teacher' : 'student', cref: isTeacher ? cref : null } } })
                 if (error) throw error
                 if (rememberMe) localStorage.setItem('it_remembered_email', email)
-                holdLoading = true; router.replace('/wait-approval'); try { router.refresh() } catch { }
+                holdLoading = true; window.location.replace('/wait-approval')
             } else if (authMode === 'recover') {
                 const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin + '/auth/recovery' })
                 if (error) throw error
@@ -308,9 +318,12 @@ export function useLoginScreen() {
                 const { data, error } = await supabase.auth.signInWithPassword({ email, password })
                 if (error) throw error
                 const session = data?.session
-                if (session?.access_token && session?.refresh_token) await apiAuth.persistSession(session.access_token, session.refresh_token)
+                if (session?.access_token && session?.refresh_token) {
+                    await apiAuth.persistSession(session.access_token, session.refresh_token)
+                    try { localStorage.setItem('it.session.backup', JSON.stringify({ access_token: session.access_token, refresh_token: session.refresh_token })) } catch { }
+                }
                 holdLoading = true; try { localStorage.setItem('it.logged_in', '1') } catch { }
-                router.replace('/dashboard'); try { router.refresh() } catch { }
+                window.location.replace('/dashboard')
             }
         } catch (err: unknown) {
             logError('error', 'Auth Error:', err)
