@@ -1,11 +1,29 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState, useTransition } from 'react'
+import { useEffect, useMemo, useRef, useState, useTransition, useCallback } from 'react'
 import { logMealAction } from '@/app/(app)/dashboard/nutrition/actions'
 import type { MealLog } from '@/lib/nutrition/engine'
 import { isIosNative } from '@/utils/platform'
 import { createClient } from '@/utils/supabase/client'
 import { getErrorMessage } from '@/utils/errorMessage'
+import dynamic from 'next/dynamic'
+
+// ── Lazy-load new sub-components to keep initial bundle lean ────────────────────
+const CalorieTimeline = dynamic(() => import('./CalorieTimeline'), { ssr: false })
+const MacroPieChart = dynamic(() => import('./MacroPieChart'), { ssr: false })
+const NutritionDayScore = dynamic(() => import('./NutritionDayScore'), { ssr: false })
+const NutritionEntryCard = dynamic(() => import('./NutritionEntryCard'), { ssr: false })
+const WaterTracker = dynamic(() => import('./WaterTracker'), { ssr: false })
+const FavoriteMeals = dynamic(() => import('./FavoriteMeals'), { ssr: false })
+const NutritionGoalsEditor = dynamic(() => import('./NutritionGoalsEditor'), { ssr: false })
+const WeeklyChart = dynamic(() => import('./WeeklyChart'), { ssr: false })
+const SmartSuggestions = dynamic(() => import('./SmartSuggestions'), { ssr: false })
+const SuggestionChips = dynamic(() => import('./SuggestionChips'), { ssr: false })
+const DateNavigator = dynamic(() => import('./DateNavigator'), { ssr: false })
+
+// ── Custom hooks ───────────────────────────────────────────────────────────────
+import { useFavoriteMeals } from './useFavoriteMeals'
+import { useNutritionGoals } from './useNutritionGoals'
 
 type Totals = { calories: number; protein: number; carbs: number; fat: number }
 
@@ -106,6 +124,13 @@ export default function NutritionMixer({
   goalsSource?: 'saved' | 'profile' | 'default'
 }) {
   const supabase = useMemo(() => createClient(), [])
+  // ── Get userId for hooks that need it ────────────────────────────────────
+  const [userId, setUserId] = useState<string | undefined>(undefined)
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      if (data?.user?.id) setUserId(data.user.id)
+    }).catch(() => {})
+  }, [supabase])
   const [totals, setTotals] = useState<Totals>({
     calories: safeNumber(initialTotals?.calories),
     protein: safeNumber(initialTotals?.protein),
@@ -148,6 +173,26 @@ export default function NutritionMixer({
   const [aiBusy, setAiBusy] = useState(false)
   const [aiUpgrade, setAiUpgrade] = useState(false)
   const [entriesLoading, setEntriesLoading] = useState(false)
+
+  // ── New: Expandable entry state ──────────────────────────────────────────
+  const [expandedEntryId, setExpandedEntryId] = useState<string | null>(null)
+  const [editingEntryId, setEditingEntryId] = useState<string | null>(null)
+  const [editDraft, setEditDraft] = useState<{ food_name: string; calories: number; protein: number; carbs: number; fat: number } | null>(null)
+  const [editBusy, setEditBusy] = useState(false)
+  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
+
+  // ── New: Date navigation ─────────────────────────────────────────────────
+  const [currentDateKey, setCurrentDateKey] = useState(dateKey)
+  const todayDate = useMemo(() => {
+    try {
+      return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
+    } catch { return new Date().toISOString().slice(0, 10) }
+  }, [])
+
+  // ── New: Favorites hook ──────────────────────────────────────────────────
+  const { favorites, loading: favoritesLoading, deleteFavorite, saveFavorite } = useFavoriteMeals(userId)
+
+  // Derived
   const safeEntries = Array.isArray(entries) ? entries : []
   const hasEntries = safeEntries.length > 0
   const shouldShowBottomCta = Boolean(input.trim()) || hasEntries || isPending
@@ -180,6 +225,23 @@ export default function NutritionMixer({
     setGoalsDraft(next)
   }, [goals?.calories, goals?.protein, goals?.carbs, goals?.fat])
 
+  // ── Midnight auto-reset (60s interval) ────────────────────────────────────
+  useEffect(() => {
+    const iv = setInterval(() => {
+      try {
+        const now = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
+        if (now !== currentDateKey) {
+          setCurrentDateKey(now)
+          setEntries([])
+          setTotals({ calories: 0, protein: 0, carbs: 0, fat: 0 })
+          setEntriesTick((v) => v + 1)
+        }
+      } catch {}
+    }, 60_000)
+    return () => clearInterval(iv)
+  }, [currentDateKey])
+
+  // ── Fetch entries ─────────────────────────────────────────────────────────
   useEffect(() => {
     if (schemaMissing) {
       setEntries([])
@@ -193,7 +255,7 @@ export default function NutritionMixer({
         const { data, error } = await supabase
           .from('nutrition_meal_entries')
           .select('id, created_at, food_name, calories, protein, carbs, fat')
-          .eq('date', dateKey)
+          .eq('date', currentDateKey)
           .order('created_at', { ascending: false })
           .limit(20)
         if (cancelled) return
@@ -211,6 +273,20 @@ export default function NutritionMixer({
           }))
           .filter((r: MealEntry) => Boolean(r.id))
         setEntries(mapped)
+
+        // Recalculate totals from entries
+        if (mapped.length > 0) {
+          const recalc = mapped.reduce(
+            (acc, e) => ({
+              calories: acc.calories + e.calories,
+              protein: acc.protein + e.protein,
+              carbs: acc.carbs + e.carbs,
+              fat: acc.fat + e.fat,
+            }),
+            { calories: 0, protein: 0, carbs: 0, fat: 0 },
+          )
+          setTotals(recalc)
+        }
       } catch {
         if (!cancelled) setEntriesError('Falha ao carregar lançamentos.')
       } finally {
@@ -220,7 +296,7 @@ export default function NutritionMixer({
     return () => {
       cancelled = true
     }
-  }, [dateKey, entriesTick, schemaMissing, supabase])
+  }, [currentDateKey, entriesTick, schemaMissing, supabase])
 
   const saveGoals = async () => {
     if (goalsSaving) return
@@ -276,7 +352,7 @@ export default function NutritionMixer({
     setError(null)
     startTransition(async () => {
       try {
-        const res = await logMealAction(text, dateKey)
+        const res = await logMealAction(text, currentDateKey)
         if (!res?.ok) {
           setError(String((res as Record<string, unknown>)?.error || 'Falha ao processar a refeição.'))
           return
@@ -384,7 +460,7 @@ export default function NutritionMixer({
       const res = await fetch('/api/ai/nutrition-estimate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text, dateKey }),
+        body: JSON.stringify({ text, dateKey: currentDateKey }),
       })
       const json = await res.json().catch((): null => null)
       if (!json?.ok) {
@@ -423,13 +499,33 @@ export default function NutritionMixer({
     }
   }
 
+  // ── Favorite select handler ────────────────────────────────────────────────
+  const handleFavoriteSelect = useCallback((mealText: string) => {
+    setInput(mealText)
+    try { inputRef.current?.focus() } catch {}
+  }, [])
+
+  // ── Date change handler ────────────────────────────────────────────────────
+  const handleDateChange = useCallback((newDate: string) => {
+    setCurrentDateKey(newDate)
+    setEntries([])
+    setTotals({ calories: 0, protein: 0, carbs: 0, fat: 0 })
+    setEntriesTick((v) => v + 1)
+  }, [])
+
   return (
     <div className="space-y-6">
+      {/* ── Date Navigator ──────────────────────────────────────────────────── */}
+      <DateNavigator currentDate={currentDateKey} todayDate={todayDate} onDateChange={handleDateChange} />
+
+      {/* ── Calorie Summary Card ────────────────────────────────────────────── */}
       <div className="rounded-3xl bg-neutral-900/90 border border-neutral-800 shadow-[0_22px_60px_rgba(0,0,0,0.55)] p-5 relative overflow-hidden ring-1 ring-neutral-800/70">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(234,179,8,0.12),transparent_60%)] opacity-60" />
         <div className="relative flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <div className="text-[10px] uppercase tracking-[0.24em] text-neutral-400">Hoje</div>
+            <div className="text-[10px] uppercase tracking-[0.24em] text-neutral-400">
+              {currentDateKey === todayDate ? 'Hoje' : currentDateKey}
+            </div>
             <div className="mt-2 text-4xl font-semibold tracking-tight">
               <span className={calorieClipping ? 'text-red-200' : 'text-white'}>{Math.round(totals.calories)}</span>
               <span className="text-neutral-500"> kcal</span>
@@ -501,6 +597,37 @@ export default function NutritionMixer({
         </div>
       </div>
 
+      {/* ── NEW: Day Score + Macro Pie + Timeline ───────────────────────────── */}
+      {canViewMacros && safeEntries.length > 0 ? (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <NutritionDayScore totals={totals} goals={safeGoals} />
+          <MacroPieChart protein={totals.protein} carbs={totals.carbs} fat={totals.fat} />
+        </div>
+      ) : null}
+
+      {safeEntries.length > 0 ? (
+        <CalorieTimeline entries={safeEntries} />
+      ) : null}
+
+      {/* ── NEW: Water Tracker ──────────────────────────────────────────────── */}
+      <WaterTracker initialMl={0} onUpdate={() => {}} />
+
+      {/* ── NEW: Smart Suggestions ──────────────────────────────────────────── */}
+      {safeGoals.calories > 0 ? (
+        <SmartSuggestions goals={safeGoals} consumed={totals} onSelect={handleFavoriteSelect} />
+      ) : null}
+
+      {/* ── NEW: Favorite Meals ─────────────────────────────────────────────── */}
+      <FavoriteMeals
+        favorites={favorites}
+        loading={favoritesLoading}
+        onSelect={handleFavoriteSelect}
+        onDelete={deleteFavorite}
+        onSave={saveFavorite}
+        currentInput={input}
+      />
+
+      {/* ── Add Meal Input ──────────────────────────────────────────────────── */}
       <div className="rounded-3xl bg-neutral-900/85 border border-neutral-800 shadow-[0_18px_45px_rgba(0,0,0,0.5)] p-5 relative overflow-hidden ring-1 ring-neutral-800/70">
         <div className="absolute inset-x-6 top-0 h-px bg-gradient-to-r from-transparent via-yellow-500/30 to-transparent" />
         <div className="text-[10px] uppercase tracking-[0.24em] text-neutral-400">Adicionar refeição</div>
@@ -524,6 +651,8 @@ export default function NutritionMixer({
             placeholder={schemaMissing ? 'Nutrição não configurada no banco.' : 'Digite sua refeição...'}
           />
         </div>
+
+
 
         {schemaMissing ? (
           <div className="mt-3 rounded-2xl border border-yellow-500/25 bg-yellow-500/10 p-4 text-sm text-yellow-100">
@@ -563,6 +692,7 @@ export default function NutritionMixer({
         ) : null}
       </div>
 
+      {/* ── Entries List ────────────────────────────────────────────────────── */}
       <div className="rounded-3xl bg-neutral-900/85 border border-neutral-800 shadow-[0_18px_45px_rgba(0,0,0,0.5)] p-5 ring-1 ring-neutral-800/70">
         <div className="flex items-center justify-between gap-3">
           <div className="text-[10px] uppercase tracking-[0.24em] text-neutral-400">Lançamentos</div>
@@ -667,45 +797,74 @@ export default function NutritionMixer({
             </div>
           ) : safeEntries.length === 0 ? (
             <div className="rounded-2xl bg-neutral-950/70 border border-neutral-800 p-5 text-center ring-1 ring-neutral-800/70">
-              <div className="text-sm font-semibold text-white">Sem refeições hoje</div>
+              <div className="text-sm font-semibold text-white">Sem refeições {currentDateKey === todayDate ? 'hoje' : 'neste dia'}</div>
               <div className="mt-1 text-xs text-neutral-400">Adicione um lançamento para começar.</div>
-              <button
-                type="button"
-                onClick={submitOrFocus}
-                className="mt-4 inline-flex items-center justify-center rounded-2xl bg-neutral-900/80 border border-neutral-800 text-white font-semibold px-4 py-2 hover:bg-neutral-900 active:scale-95 transition duration-300"
-              >
-                Adicionar refeição
-              </button>
+              {currentDateKey === todayDate ? (
+                <button
+                  type="button"
+                  onClick={submitOrFocus}
+                  className="mt-4 inline-flex items-center justify-center rounded-2xl bg-neutral-900/80 border border-neutral-800 text-white font-semibold px-4 py-2 hover:bg-neutral-900 active:scale-95 transition duration-300"
+                >
+                  Adicionar refeição
+                </button>
+              ) : null}
             </div>
           ) : (
             safeEntries.map((item) => (
-              <div key={item.id} className="rounded-2xl bg-neutral-950/70 border border-neutral-800 p-4 ring-1 ring-neutral-800/70">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="text-sm font-semibold text-white truncate">{item.food_name}</div>
-                    <div className="mt-1 text-xs text-neutral-400">
-                      {formatClock(item.created_at)} · P {Math.round(item.protein)}g · C {Math.round(item.carbs)}g · G {Math.round(item.fat)}g
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="text-sm font-semibold text-neutral-200 whitespace-nowrap">{Math.round(item.calories)} kcal</div>
-                    <button
-                      type="button"
-                      disabled={entryBusyId === item.id}
-                      onClick={() => deleteEntry(item.id)}
-                      className="h-9 px-3 rounded-xl bg-neutral-900/90 border border-neutral-800 text-xs font-semibold text-neutral-200 hover:bg-neutral-900 disabled:opacity-60"
-                    >
-                      {entryBusyId === item.id ? '...' : 'Remover'}
-                    </button>
-                  </div>
-                </div>
-              </div>
+              <NutritionEntryCard
+                key={item.id}
+                item={item}
+                isExpanded={expandedEntryId === item.id}
+                onToggleExpand={(id: string) => setExpandedEntryId(id || null)}
+                editingId={editingEntryId || ''}
+                editDraft={editDraft || { food_name: '', calories: 0, protein: 0, carbs: 0, fat: 0 }}
+                editBusy={editBusy}
+                onStartEdit={(entry) => {
+                  setEditingEntryId(entry.id)
+                  setEditDraft({ food_name: entry.food_name, calories: entry.calories, protein: entry.protein, carbs: entry.carbs, fat: entry.fat })
+                }}
+                onCancelEdit={() => { setEditingEntryId(null); setEditDraft(null) }}
+                onSaveEdit={async () => {
+                  if (!editingEntryId || !editDraft) return
+                  setEditBusy(true)
+                  try {
+                    const { error } = await supabase
+                      .from('nutrition_meal_entries')
+                      .update({
+                        food_name: editDraft.food_name,
+                        calories: editDraft.calories,
+                        protein: editDraft.protein,
+                        carbs: editDraft.carbs,
+                        fat: editDraft.fat,
+                      })
+                      .eq('id', editingEntryId)
+                    if (error) throw error
+                    setEditingEntryId(null)
+                    setEditDraft(null)
+                    setEntriesTick((v) => v + 1)
+                  } catch (e: unknown) {
+                    setError(getErrorMessage(e) || 'Falha ao editar.')
+                  } finally {
+                    setEditBusy(false)
+                  }
+                }}
+                onEditDraftChange={(updater) => setEditDraft((prev) => {
+                  if (!prev) return prev
+                  return updater(prev)
+                })}
+                confirmDeleteId={confirmDeleteId || ''}
+                entryBusyId={entryBusyId}
+                onConfirmDelete={(id: string) => setConfirmDeleteId(id)}
+                onCancelDelete={() => setConfirmDeleteId(null)}
+                onDelete={(id: string) => { setConfirmDeleteId(null); deleteEntry(id) }}
+              />
             ))
           )}
         </div>
       </div>
 
-      {shouldShowBottomCta ? (
+      {/* ── Bottom CTA ──────────────────────────────────────────────────────── */}
+      {shouldShowBottomCta && currentDateKey === todayDate ? (
         <div className="fixed bottom-0 left-0 right-0 z-40 bg-neutral-950/85 backdrop-blur border-t border-neutral-800/60">
           <div className="mx-auto max-w-md px-4 py-3">
             <button
