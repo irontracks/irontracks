@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { parseJsonBody } from '@/utils/zod'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { createAdminClient } from '@/utils/supabase/admin'
-import { sendPushToUsers } from '@/lib/push/apns'
+import { sendPushToAllPlatforms as sendPushToUsers } from '@/lib/push/sender'
 import { logInfo, logError } from '@/lib/logger'
 import { requireUser } from '@/utils/auth/route'
 

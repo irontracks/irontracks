@@ -6,7 +6,7 @@ import { mercadopagoRequest } from '@/lib/mercadopago'
 import { parseJsonBody } from '@/utils/zod'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
-import { logError } from '@/lib/logger'
+import { logError, logWarn } from '@/lib/logger'
 
 export const dynamic = 'force-dynamic'
 
@@ -183,7 +183,7 @@ export async function POST(req: Request) {
       // Rollback: cancel the subscription so the user can retry without hitting 'pending_subscription_exists'
       try {
         await admin.from('app_subscriptions').update({ status: 'cancelled', updated_at: new Date().toISOString() }).eq('id', subRow.id)
-      } catch { }
+      } catch (rollbackErr) { logWarn('checkout:rollback', 'Failed to cancel pending subscription after MP error', { subId: subRow.id, error: rollbackErr }) }
       logError('checkout', 'MercadoPago payment creation failed', { userId: user.id, planId: plan.id, error: getErrorMessage(mpErr) })
       return NextResponse.json({ ok: false, error: getErrorMessage(mpErr) || 'mercadopago_payment_failed' }, { status: 502 })
     }

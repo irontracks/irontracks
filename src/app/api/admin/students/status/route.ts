@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { requireRole, requireRoleWithBearer } from '@/utils/auth/route'
 import { getErrorMessage } from '@/utils/errorMessage'
-import { sendPushToUsers } from '@/lib/push/apns'
+import { sendPushToAllPlatforms as sendPushToUsers } from '@/lib/push/sender'
 
 const ZodBodySchema = z
   .object({

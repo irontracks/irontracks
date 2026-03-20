@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { hasValidInternalSecret, requireRole, requireRoleWithBearer } from '@/utils/auth/route'
 import { syncAllTemplatesToSubscriber } from '@/lib/workoutSync'
+import { logWarn } from '@/lib/logger'
 
 export const dynamic = 'force-dynamic'
 
@@ -195,7 +196,7 @@ export async function POST(req: Request) {
       const { data: raw, error: pErr } = await admin.from('workouts').select(selectTpl).in('id', templateIds)
       if (pErr) {
         return NextResponse.json(
-          { ok: false, error: pErr.message, debug: { sourceUserId, templateIdsCount: templateIds.length } },
+          { ok: false, error: pErr.message, ...(process.env.NODE_ENV === 'development' ? { debug: { sourceUserId, templateIdsCount: templateIds.length } } : {}) },
           { status: 400 },
         )
       }
@@ -208,7 +209,7 @@ export async function POST(req: Request) {
       .eq('user_id', sourceUserId)
       .eq('is_template', true)
     if (ownerErr) {
-      return NextResponse.json({ ok: false, error: ownerErr.message, debug: { sourceUserId } }, { status: 400 })
+      return NextResponse.json({ ok: false, error: ownerErr.message, ...(process.env.NODE_ENV === 'development' ? { debug: { sourceUserId } } : {}) }, { status: 400 })
     }
 
     const isOwnedSyncable = (t: Record<string, unknown>): boolean => {
@@ -234,24 +235,26 @@ export async function POST(req: Request) {
             syncMode === 'all'
               ? 'Nenhum template seu encontrado para sincronizar.'
               : 'Nenhum template seu encontrado no padrão (Treino A/B/C...).',
-          debug: {
-            sourceUserId,
-            authUserId: auth.user.id,
-            source_mode: sourceMode,
-            owner_raw_count: Array.isArray(ownerTemplatesRaw) ? ownerTemplatesRaw.length : 0,
-            owner_owned_count: ownerOwned.length,
-            owner_matched_count: ownerMatched.length,
-            provided_raw_count: (providedTemplatesRaw || []).length,
-            provided_owned_count: providedOwned.length,
-            provided_matched_count: providedMatched.length,
-            owner_sample_names: (Array.isArray(ownerTemplatesRaw) ? ownerTemplatesRaw : [])
-              .filter(isRecord)
-              .map((t) => String(t?.name ?? ''))
-              .filter(Boolean)
-              .slice(0, 5),
-            letters,
-            syncMode,
-          },
+          ...(process.env.NODE_ENV === 'development' ? {
+            debug: {
+              sourceUserId,
+              authUserId: auth.user.id,
+              source_mode: sourceMode,
+              owner_raw_count: Array.isArray(ownerTemplatesRaw) ? ownerTemplatesRaw.length : 0,
+              owner_owned_count: ownerOwned.length,
+              owner_matched_count: ownerMatched.length,
+              provided_raw_count: (providedTemplatesRaw || []).length,
+              provided_owned_count: providedOwned.length,
+              provided_matched_count: providedMatched.length,
+              owner_sample_names: (Array.isArray(ownerTemplatesRaw) ? ownerTemplatesRaw : [])
+                .filter(isRecord)
+                .map((t) => String(t?.name ?? ''))
+                .filter(Boolean)
+                .slice(0, 5),
+              letters,
+              syncMode,
+            },
+          } : {}),
         },
         { status: 400 },
       )
@@ -263,7 +266,7 @@ export async function POST(req: Request) {
       .eq('user_id', targetUserId)
       .eq('is_template', true)
     if (existingErr) {
-      return NextResponse.json({ ok: false, error: existingErr.message, debug: { targetUserId } }, { status: 400 })
+      return NextResponse.json({ ok: false, error: existingErr.message, ...(process.env.NODE_ENV === 'development' ? { debug: { targetUserId } } : {}) }, { status: 400 })
     }
 
     const syncedExisting = (Array.isArray(existing) ? existing : []).filter((w) => String((w as Record<string, unknown>)?.created_by ?? '') === auth.user.id)
@@ -305,7 +308,8 @@ export async function POST(req: Request) {
           await admin.from('exercises').delete().eq('workout_id', wid)
           await admin.from('workouts').delete().eq('id', wid)
           dedup_deleted++
-        } catch {
+        } catch (e) {
+          logWarn('sync-templates:dedup-delete', `Failed to delete duplicate workout ${wid}`, e)
           continue
         }
       }
@@ -339,7 +343,7 @@ export async function POST(req: Request) {
           { source_user_id: sourceUserId, target_user_id: targetUserId, active: true },
           { onConflict: 'source_user_id,target_user_id' },
         )
-    } catch {}
+    } catch (e) { logWarn('sync-templates:upsert-subscription', 'Failed to upsert sync subscription', e) }
 
     let created = 0
     let updated = 0
@@ -459,7 +463,8 @@ export async function POST(req: Request) {
               }
             }
           }
-        } catch {
+        } catch (e) {
+          logWarn('sync-templates:sync-workout', `Failed to sync workout template: ${String((t as Record<string, unknown>)?.name ?? '')}`, e)
           failed++
         }
       }
@@ -499,7 +504,7 @@ export async function POST(req: Request) {
       picked_names: (syncMode === 'all' ? sourceRows : teacherTemplatesList).map((t) => String(t?.name ?? '')).filter(Boolean),
     }
 
-    return NextResponse.json({ ok: true, created_count: created, updated_count: updated, rows: rows || [], debug })
+    return NextResponse.json({ ok: true, created_count: created, updated_count: updated, rows: rows || [], ...(process.env.NODE_ENV === 'development' ? { debug } : {}) })
   } catch (e: unknown) {
     const msg = (e as Record<string, unknown>)?.message
     return NextResponse.json({ ok: false, error: typeof msg === 'string' ? msg : String(e) }, { status: 500 })

@@ -87,28 +87,54 @@ export function buildReportData(
     if (Number.isFinite(ov) && ov > 0) return Math.round(ov)
     const bikeKcal = Number(outdoorBike?.caloriesKcal)
     if (Number.isFinite(bikeKcal) && bikeKcal > 0) return Math.round(bikeKcal)
-    // Fallback: use the full MET V3 model with all available session data
+    // Full MET V9 model with all available session data
     const exerciseNames = Array.isArray(sessionObj?.exercises)
       ? (sessionObj.exercises as unknown[]).map((ex) => {
         const e = isRecord(ex) ? ex : null
         return String(e?.name || '').trim()
       }).filter(Boolean) as string[]
       : null
-    // Extract body weight from preCheckin if available
+
+    // Cadence / rep tempo from exercise config
+    const cadenceNames = Array.isArray(sessionObj?.exercises)
+      ? (sessionObj.exercises as unknown[]).map((ex) => {
+        const e = isRecord(ex) ? ex : null
+        return String(e?.cadence || e?.tempo || '').trim()
+      }).filter(Boolean) as string[]
+      : null
+
+    // Body weight priority: 1. opts.bodyWeightKg (user profile), 2. preCheckin answers, 3. null (uses 78kg default)
+    const profileBw = Number(isRecord(opts.bodyWeightKg) ? null : opts.bodyWeightKg)
+    const profileBwValid = Number.isFinite(profileBw) && profileBw >= 20 && profileBw <= 300
     const pcRaw = isRecord(sessionObj?.preCheckin) ? (sessionObj.preCheckin as Record<string, unknown>) : null
-    const bwCandidates = [pcRaw?.weight, pcRaw?.body_weight_kg, isRecord(pcRaw?.answers) ? (pcRaw.answers as Record<string, unknown>).body_weight_kg : null]
+    const bwCandidates = [
+      profileBwValid ? profileBw : null,
+      pcRaw?.weight,
+      pcRaw?.body_weight_kg,
+      isRecord(pcRaw?.answers) ? (pcRaw.answers as Record<string, unknown>).body_weight_kg : null
+    ]
     const bodyWeightKg = bwCandidates.reduce<number | null>((acc, c) => {
       if (acc !== null) return acc
       const n = Number(c)
       return Number.isFinite(n) && n >= 20 && n <= 300 ? n : null
     }, null)
+
+    // Biological sex: opts.biologicalSex first (user profile), then session
+    const sexFromOpts = String(opts.biologicalSex ?? '').toLowerCase()
+    const sexFromSession = String(sessionObj?.biologicalSex ?? '').toLowerCase()
+    const sexRaw = sexFromOpts || sexFromSession
+    const bioSex = sexRaw === 'male' || sexRaw === 'female' ? sexRaw : null
+
+    // RPE from opts (post-checkin) if available
+    const rpeFromOpts = Number(opts.rpe)
+    const rpeValue = Number.isFinite(rpeFromOpts) && rpeFromOpts >= 1 && rpeFromOpts <= 10 ? rpeFromOpts : null
+
     const execSec = Number(sessionObj?.executionTotalSeconds ?? sessionObj?.execution_total_seconds ?? 0) || 0
     const restSec = Number(sessionObj?.restTotalSeconds ?? sessionObj?.rest_total_seconds ?? 0) || 0
-    const sexRaw = String(sessionObj?.biologicalSex ?? '').toLowerCase()
-    const bioSex = sexRaw === 'male' || sexRaw === 'female' ? sexRaw : null
     const kcal = estimateCaloriesMet(
       sessionLogs, totalTimeSeconds / 60, bodyWeightKg, exerciseNames,
-      null, execSec > 0 ? execSec / 60 : null, restSec > 0 ? restSec / 60 : null, bioSex,
+      rpeValue, execSec > 0 ? execSec / 60 : null, restSec > 0 ? restSec / 60 : null,
+      bioSex, null, null, cadenceNames && cadenceNames.length > 0 ? cadenceNames : null,
     )
     return kcal > 0 ? kcal : 0
   })()
@@ -794,6 +820,20 @@ export function buildReportHTML(
       .header-right { text-align: left; }
       .stats-main, .stats-sub, .ai-grid { grid-template-columns: repeat(2, 1fr); }
     }
+    /* ── Print button (visible on screen, hidden when printing) ── */
+    .print-fab {
+      position: fixed; bottom: 24px; right: 24px; z-index: 999;
+      background: #f59e0b; color: #000;
+      border: none; border-radius: 14px;
+      padding: 14px 22px;
+      font-size: 14px; font-weight: 900; cursor: pointer;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+      display: flex; align-items: center; gap: 8px;
+    }
+    .print-fab:active { opacity: 0.8; }
+    @media print {
+      .print-fab { display: none !important; }
+    }
   </style>
 </head>
 <body>
@@ -895,6 +935,11 @@ export function buildReportHTML(
   </div>
 
 </div><!-- /page -->
+
+<button class="print-fab" onclick="window.print()">
+  📄 Salvar como PDF
+</button>
+
 </body>
 </html>`
 }

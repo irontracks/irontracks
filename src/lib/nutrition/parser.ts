@@ -12,14 +12,29 @@ function normalizeFoodText(input: string): string {
     .toLowerCase()
 }
 
+/** Pre-computed entries from the static food database. */
 const normalizedFoodEntries = Object.entries(foodDatabase).map(([key, item]) => {
   const normalizedKey = normalizeFoodText(key)
   return { key, normalizedKey, item, normalizedKeyLength: normalizedKey.length }
 })
 
+/**
+ * Build the combined food entries list, merging the static database
+ * with optional extra foods (e.g. AI-learned foods from Supabase).
+ * Extra foods are checked AFTER static entries, so static always wins.
+ */
+function buildFoodEntries(extraFoods?: Record<string, FoodItem>) {
+  if (!extraFoods || Object.keys(extraFoods).length === 0) return normalizedFoodEntries
+  const extras = Object.entries(extraFoods).map(([key, item]) => {
+    const normalizedKey = normalizeFoodText(key)
+    return { key, normalizedKey, item, normalizedKeyLength: normalizedKey.length }
+  })
+  return [...normalizedFoodEntries, ...extras]
+}
+
 type MacroTotals = { p: number; c: number; f: number; kcal: number }
 
-export function parseInput(text: string): MealLog {
+export function parseInput(text: string, extraFoods?: Record<string, FoodItem>): MealLog {
   const rawText = typeof text === 'string' ? text : ''
   if (!rawText.trim()) throw new Error('nutrition_parser_empty_input')
 
@@ -106,9 +121,10 @@ export function parseInput(text: string): MealLog {
       continue
     }
 
+    const allFoodEntries = buildFoodEntries(extraFoods)
     let matchedItem: FoodItem | null = null
     let dbKeyMatched = ''
-    for (const entry of normalizedFoodEntries) {
+    for (const entry of allFoodEntries) {
       if (!entry.normalizedKey) continue
       if (foodName.includes(entry.normalizedKey)) {
         if (!dbKeyMatched || entry.normalizedKeyLength > dbKeyMatched.length) {

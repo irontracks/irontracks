@@ -4,7 +4,7 @@ import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { requireRole } from '@/utils/auth/route'
 import { parseJsonBody } from '@/utils/zod'
-import { sendPushToUsers } from '@/lib/push/apns'
+import { sendPushToAllPlatforms as sendPushToUsers } from '@/lib/push/sender'
 
 export const dynamic = 'force-dynamic'
 

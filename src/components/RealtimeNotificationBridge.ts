@@ -58,10 +58,15 @@ const RealtimeNotificationBridge = ({ userId, setNotification }: RealtimeNotific
                 const n = payload?.new && typeof payload.new === 'object' ? payload.new : null
                 if (!n) return
 
-                const rawType = String((n as Record<string, unknown>)?.type ?? '').toLowerCase()
-                const title = String((n as Record<string, unknown>)?.title ?? '').trim()
-                const message = String((n as Record<string, unknown>)?.message ?? '').trim()
-                if (!title || !message) return
+                // Validate required fields — guards against malformed/partial Realtime payloads
+                const row = n as Record<string, unknown>
+                const rawType = String(row?.type ?? '').toLowerCase().trim()
+                const title = String(row?.title ?? '').trim()
+                const message = String(row?.message ?? '').trim()
+                const id = row?.id ? String(row.id) : null
+
+                if (!title || !message) return // skip incomplete rows
+                if (typeof row?.user_id !== 'string') return // guard against cross-user leaks
 
                 if (rawType === 'story_posted') {
                   try {
@@ -70,7 +75,7 @@ const RealtimeNotificationBridge = ({ userId, setNotification }: RealtimeNotific
                 }
 
                 safeSetNotification({
-                  id: (n as Record<string, unknown>)?.id ? String((n as Record<string, unknown>).id) : null,
+                  id,
                   text: message,
                   displayName: title,
                   photoURL: null,

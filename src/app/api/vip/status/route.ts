@@ -28,7 +28,7 @@ export async function GET(req: Request) {
       ok: true,
       tier,
       source,
-      debug: debug || null,
+      ...(process.env.NODE_ENV === 'development' ? { debug: debug || null } : {}),
       limits,
       usage: {
         chat_daily: chatUsage.currentUsage,

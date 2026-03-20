@@ -188,6 +188,7 @@ export default function StoryComposer({ open, session, onClose, calories }: Stor
     <AnimatePresence>
       {open && (
         <motion.div
+          key="story-composer"
           initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
           className="fixed inset-0 z-[2500] bg-black/95 backdrop-blur-md flex flex-col items-center justify-center sm:p-4 pt-safe pb-safe"
         >
@@ -398,7 +399,7 @@ export default function StoryComposer({ open, session, onClose, calories }: Stor
         </motion.div>
       )}
 
-      <StoryComposerIosSavePanel saveImageUrl={saveImageUrl} onClose={() => setSaveImageUrl(null)} />
+      <StoryComposerIosSavePanel key="ios-save-panel" saveImageUrl={saveImageUrl} onClose={() => setSaveImageUrl(null)} />
     </AnimatePresence>
   )
 }

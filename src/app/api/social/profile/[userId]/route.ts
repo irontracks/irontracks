@@ -59,14 +59,17 @@ export async function GET(req: Request, { params }: { params: Promise<{ userId: 
       .eq('user_id', targetId)
       .eq('is_template', false)
 
-    // Fetch recent workouts for streak calculation
+    // Fetch recent workouts for streak calculation (90-day window)
+    const streakWindowStart = new Date()
+    streakWindowStart.setDate(streakWindowStart.getDate() - 90)
     const { data: recentWorkouts } = await admin
       .from('workouts')
       .select('date')
       .eq('user_id', targetId)
       .eq('is_template', false)
+      .gte('date', streakWindowStart.toISOString())
       .order('date', { ascending: false })
-      .limit(370)
+      .limit(200)
 
     // Calculate streak
     const daySet = new Set<string>()

@@ -10,7 +10,7 @@
 import { logWarn } from '@/lib/logger'
 
 import { useEffect } from 'react'
-import { isIosNative } from '@/utils/platform'
+import { isNativePlatform } from '@/utils/platform'
 
 type ListenerHandle = { remove: () => void }
 type PushPermission = { receive: string }
@@ -19,7 +19,7 @@ type DeviceId = { identifier: string }
 
 export function usePushNotifications(userId?: string | null) {
   useEffect(() => {
-    if (!isIosNative()) return
+    if (!isNativePlatform()) return
     if (!userId) return
     let alive = true
     const handles: ListenerHandle[] = []
@@ -77,8 +77,31 @@ export function usePushNotifications(userId?: string | null) {
           })
           if (registration?.remove) handles.push(registration)
 
-          const regError = await PushNotifications.addListener('registrationError', () => { })
+          const regError = await PushNotifications.addListener('registrationError', (err: unknown) => {
+            logWarn('usePushNotifications', '[APNs] Token registration failed', err)
+          })
           if (regError?.remove) handles.push(regError)
+
+          // Deep link: navigate when user taps a push notification
+          const tapHandler = await PushNotifications.addListener('pushNotificationActionPerformed', (action: unknown) => {
+            try {
+              if (!alive) return
+              const act = action && typeof action === 'object' ? (action as Record<string, unknown>) : null
+              const notification = act?.notification && typeof act.notification === 'object'
+                ? (act.notification as Record<string, unknown>) : null
+              const data = notification?.data && typeof notification.data === 'object'
+                ? (notification.data as Record<string, unknown>) : null
+              const link = data ? String(data.link || '').trim() : ''
+              const type = data ? String(data.type || '').trim() : ''
+              if (link || type) {
+                // Dispatch event so the app shell can navigate without a direct router dependency here
+                try {
+                  window.dispatchEvent(new CustomEvent('irontracks:push:navigate', { detail: { link, type } }))
+                } catch { /* not in browser context */ }
+              }
+            } catch (e) { logWarn('usePushNotifications', 'pushNotificationActionPerformed error', e) }
+          }).catch(() => null)
+          if (tapHandler?.remove) handles.push(tapHandler)
 
           await PushNotifications.register().catch(() => { })
         } catch (e) { logWarn('usePushNotifications', 'silenced error', e) }

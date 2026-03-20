@@ -293,6 +293,43 @@ export const getSexMultiplier = (sex: string | null | undefined): number => {
   return 1.00
 }
 
+// ── Cadence factor ─────────────────────────────────────────────────────────────
+/**
+ * Cadence (rep tempo) affects metabolic demand per rep.
+ * Faster cadences = more reps/min = higher HR and kcal (+5%).
+ * Slow TUT tempos = less reps/min = slightly lower kcal rate (-5%).
+ *
+ * Format: "E-P-C" (eccentric-pause-concentric), e.g. "2-0-2", "4-1-4".
+ * Also supports 4-digit format: "3030". "X" = explosive (counts as 1s).
+ * Conservative range: 0.95 – 1.05.
+ */
+export const getCadenceFactor = (cadences: string[] | null | undefined): number => {
+  if (!cadences || cadences.length === 0) return 1.00
+  let totalPhaseSum = 0
+  let counted = 0
+  for (const raw of cadences) {
+    if (!raw) continue
+    const str = String(raw).trim()
+    // Normalize: "2-0-2", "4030" → split into numeric parts
+    const normalized = str.replace(/[^0-9X.]/gi, '-').replace(/-+/g, '-').replace(/^-|-$/g, '')
+    const parts = normalized.split('-').filter(Boolean)
+    if (parts.length >= 2) {
+      let total = 0
+      for (const p of parts) {
+        if (/^x$/i.test(p)) total += 1  // X = explosive = ~1s
+        else total += Number(p) || 0
+      }
+      if (total > 0) { totalPhaseSum += total; counted++ }
+    }
+  }
+  if (counted === 0) return 1.00
+  const avgTempo = totalPhaseSum / counted
+  if (avgTempo < 4) return 1.05   // fast/explosive cadence
+  if (avgTempo <= 7) return 1.00  // normal hypertrophy tempo
+  return 0.95                     // super-slow TUT
+}
+
+
 // ── EPOC factor ──────────────────────────────────────────────────────────────
 /**
  * Conservative EPOC (Excess Post-exercise Oxygen Consumption).
@@ -379,13 +416,14 @@ export const estimateDurationFromLogs = (
  *
  * Multi-factor model using:
  *  1. Duration (exec + rest time split)
- *  2. Body weight
- *  3. Sex
+ *  2. Body weight (from profile preferred)
+ *  3. Biological sex
  *  4. Volume density → base MET
- *  5. Training style (auto-detected)
+ *  5. Training style (auto-detected from logs)
  *  6. Exercise complexity (volume-weighted)
  *  7. RPE
- *  8. EPOC
+ *  8. Cadence / rep tempo
+ *  9. EPOC
  *
  * @returns Estimated kcal, rounded. Typical range: 200–700 kcal.
  */
@@ -400,6 +438,7 @@ export const estimateCaloriesMet = (
   biologicalSex?: string | null,
   exerciseVolumes?: number[] | null,
   startedAtMs?: number | null,
+  cadenceNames?: string[] | null,
 ): number => {
   // Resolve body weight early (needed for bodyweight exercise volume)
   const bw = bodyWeightKg != null && Number.isFinite(bodyWeightKg)
@@ -468,12 +507,19 @@ export const estimateCaloriesMet = (
   if (!effectiveDuration || effectiveDuration <= 0) return 0
 
   // ── 4. Active vs rest time split ─────────────────────────────────────────
+  // IMPORTANT: activeMinutes must be clamped to at least 35% of total duration.
+  // Without this, sessions with very short logged execution time (e.g. 3 min of
+  // actual muscle contraction in an 80-min session) produce near-zero active kcal
+  // while rest kcal (MET 1.5) dominate — severely underestimating total burn.
+  const minActiveMinutes = effectiveDuration * 0.35
   const activeMinutes = (() => {
-    if (execMinutesOverride != null && execMinutesOverride > 0) return execMinutesOverride
+    if (execMinutesOverride != null && execMinutesOverride > 0)
+      return Math.max(execMinutesOverride, minActiveMinutes)
     return computeActiveWorkMinutes(sessionLogs, effectiveDuration)
   })()
   const restMinutes = (() => {
-    if (restMinutesOverride != null && restMinutesOverride >= 0) return restMinutesOverride
+    if (restMinutesOverride != null && restMinutesOverride >= 0)
+      return Math.min(restMinutesOverride, effectiveDuration - minActiveMinutes)
     return Math.max(0, effectiveDuration - activeMinutes)
   })()
 
@@ -512,7 +558,10 @@ export const estimateCaloriesMet = (
   // ── 9. Sex multiplier ────────────────────────────────────────────────────
   const sexFactor = getSexMultiplier(biologicalSex)
 
-  // ── 10. EPOC ─────────────────────────────────────────────────────────────
+  // ── 10. Cadence factor ────────────────────────────────────────────────────
+  const cadenceFactor = getCadenceFactor(cadenceNames)
+
+  // ── 11. EPOC ─────────────────────────────────────────────────────────────
   const effectiveMet = baseMet * styleFactor * complexityFactor
   const epocFactor = getEpocFactor(effectiveMet, effectiveDuration)
 
@@ -520,7 +569,7 @@ export const estimateCaloriesMet = (
   const activeHours = activeMinutes / 60
   const restHours = restMinutes / 60
 
-  const activeKcal = baseMet * styleFactor * complexityFactor * bw * activeHours * rpeFactor * sexFactor
+  const activeKcal = baseMet * styleFactor * complexityFactor * bw * activeHours * rpeFactor * sexFactor * cadenceFactor
   const restKcal = MET_REST * bw * restHours * sexFactor
   const totalKcal = (activeKcal + restKcal) * epocFactor
 

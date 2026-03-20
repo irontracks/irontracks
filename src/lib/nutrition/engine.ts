@@ -144,18 +144,74 @@ export async function trackMeal(userId: string, meal: MealLog, dateKey?: string)
     const { createClient } = await import('../../utils/supabase/server')
     const supabase = await createClient()
 
-    const { data, error } = await supabase.rpc('nutrition_add_meal_entry', {
-      p_date: resolvedDateKey,
-      p_food_name: foodName,
-      p_calories: calories,
-      p_protein: protein,
-      p_carbs: carbs,
-      p_fat: fat,
-    })
+    // 1. Insert the meal entry directly (bypassing broken RPC)
+    const { data: insertedEntry, error: insertError } = await supabase
+      .from('nutrition_meal_entries')
+      .insert({
+        user_id: safeUserId,
+        date: resolvedDateKey,
+        food_name: foodName,
+        calories,
+        protein,
+        carbs,
+        fat,
+      })
+      .select('id, created_at, food_name, calories, protein, carbs, fat')
+      .single()
 
-    if (error) throw new Error(error.message || 'nutrition_log_upsert_failed')
-    const row = Array.isArray(data) ? data[0] : null
-    return row && typeof row === 'object' ? (row as Record<string, unknown>) : null
+    if (insertError) throw new Error(insertError.message || 'nutrition_insert_entry_failed')
+
+    // 2. Recalculate daily totals from all entries for this date
+    const { data: allEntries, error: sumError } = await supabase
+      .from('nutrition_meal_entries')
+      .select('calories, protein, carbs, fat')
+      .eq('user_id', safeUserId)
+      .eq('date', resolvedDateKey)
+
+    if (sumError) throw new Error(sumError.message || 'nutrition_sum_entries_failed')
+
+    const entriesList = Array.isArray(allEntries) ? allEntries : []
+    const totalCalories = entriesList.reduce((sum, e) => sum + (Number((e as Record<string, unknown>)?.calories) || 0), 0)
+    const totalProtein = entriesList.reduce((sum, e) => sum + (Number((e as Record<string, unknown>)?.protein) || 0), 0)
+    const totalCarbs = entriesList.reduce((sum, e) => sum + (Number((e as Record<string, unknown>)?.carbs) || 0), 0)
+    const totalFat = entriesList.reduce((sum, e) => sum + (Number((e as Record<string, unknown>)?.fat) || 0), 0)
+
+    // 3. Upsert daily_nutrition_logs with new totals
+    const { error: upsertError } = await supabase
+      .from('daily_nutrition_logs')
+      .upsert(
+        {
+          user_id: safeUserId,
+          date: resolvedDateKey,
+          calories: Math.round(totalCalories),
+          protein: Math.round(totalProtein),
+          carbs: Math.round(totalCarbs),
+          fat: Math.round(totalFat),
+        },
+        { onConflict: 'user_id,date' }
+      )
+
+    if (upsertError) {
+      // Non-fatal: entry was saved, daily log update failed
+      // Log but don't throw — the entry is already persisted
+      console.warn('[nutrition] daily_nutrition_logs upsert failed:', upsertError.message)
+    }
+
+    // Return shape matching what NutritionMixer expects
+    return {
+      entry_id: insertedEntry?.id ?? '',
+      id: insertedEntry?.id ?? '',
+      created_at: insertedEntry?.created_at ?? new Date().toISOString(),
+      food_name: insertedEntry?.food_name ?? foodName,
+      calories,
+      protein,
+      carbs,
+      fat,
+      totals_calories: Math.round(totalCalories),
+      totals_protein: Math.round(totalProtein),
+      totals_carbs: Math.round(totalCarbs),
+      totals_fat: Math.round(totalFat),
+    }
   } catch (e: unknown) {
     throw new Error(getErrorMessage(e) || 'nutrition_track_meal_failed')
   }

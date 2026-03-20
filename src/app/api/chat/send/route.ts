@@ -4,7 +4,7 @@ import { createClient } from '@/utils/supabase/server'
 import { parseJsonBody } from '@/utils/zod'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { createAdminClient } from '@/utils/supabase/admin'
-import { sendPushToUsers } from '@/lib/push/apns'
+import { sendPushToAllPlatforms as sendPushToUsers } from '@/lib/push/sender'
 
 export const dynamic = 'force-dynamic'
 

@@ -4,7 +4,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { createClient } from '@/utils/supabase/server'
 import { requireRole } from '@/utils/auth/route'
 import { logError, logWarn, logInfo } from '@/lib/logger'
-import { sendPushToUsers } from '@/lib/push/apns'
+import { sendPushToAllPlatforms as sendPushToUsers } from '@/lib/push/sender'
 
 type AdminResult = { success: true;[key: string]: unknown } | { success?: never; error: string;[key: string]: unknown }
 

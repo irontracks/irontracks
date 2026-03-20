@@ -56,9 +56,14 @@ class SectionErrorBoundary extends React.Component<Props, State> {
     if (fullScreen) {
       return (
         <div className="min-h-screen bg-neutral-900 flex flex-col items-center justify-center p-6 text-center">
-          <div className="w-16 h-16 bg-red-500/20 rounded-full flex items-center justify-center mb-4 animate-pulse">
-            <AlertCircle size={32} className="text-red-500" />
-          </div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src="/illustrations/error-state.png"
+            alt=""
+            width={140}
+            height={140}
+            className="mb-4 opacity-90 drop-shadow-lg"
+          />
           <h2 className="text-xl font-black text-white mb-1 uppercase tracking-tight">
             Erro em {section}
           </h2>

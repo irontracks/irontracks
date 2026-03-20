@@ -18,6 +18,18 @@ export async function GET() {
         const { data: { user } } = await supabase.auth.getUser()
         if (!user) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
 
+        // ── Admin-only guard ───────────────────────────────────────────────────
+        // This endpoint sends real push notifications and exposes device tokens.
+        // Only admins are allowed to call it.
+        const { data: profile } = await supabase
+            .from('profiles')
+            .select('role')
+            .eq('id', user.id)
+            .single()
+        if (profile?.role !== 'admin') {
+            return NextResponse.json({ ok: false, error: 'Forbidden — admin only' }, { status: 403 })
+        }
+
         // ── 1. Check env vars ──────────────────────────────────────────────────
         const cfg = {
             APNS_KEY_ID: Boolean(process.env.APNS_KEY_ID?.trim()),

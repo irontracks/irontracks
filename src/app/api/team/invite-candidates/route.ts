@@ -24,7 +24,7 @@ export async function GET(req: Request) {
     const { data: qParams, response } = parseSearchParams(req, QuerySchema)
     if (response) return response
 
-    const search = qParams?.q?.trim() ?? ''
+    const search = (qParams?.q?.trim() ?? '').replace(/[,()\\]/g, '')
     const limit = qParams?.limit ?? 20
 
     let items: unknown[] = []

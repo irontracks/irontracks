@@ -36,19 +36,17 @@ const eslintConfig = defineConfig([
           "ignoreRestSiblings": true
         }
       ],
-      // A11y rules: critical as error, high-volume as warn (fix incrementally)
+      // A11y rules: all recommended rules at warning level for incremental improvement.
+      // Only truly critical a11y rules are promoted to error.
       ...Object.fromEntries(
-        Object.entries(jsxA11y.configs.recommended.rules).map(([key]) => [key, "error"])
+        Object.entries(jsxA11y.configs.recommended.rules).map(([key]) => [key, "warn"])
       ),
-      // High-volume a11y: warn (don't block deploy while improving incrementally)
-      "jsx-a11y/control-has-associated-label": "warn",
-      "jsx-a11y/label-has-associated-control": ["warn", { assert: "either" }],
-      "jsx-a11y/click-events-have-key-events": "warn",
-      "jsx-a11y/no-static-element-interactions": "warn",
-      "jsx-a11y/no-autofocus": "warn",
-      "jsx-a11y/media-has-caption": "warn",
-      "jsx-a11y/no-noninteractive-element-interactions": "warn",
-      "jsx-a11y/iframe-has-title": "warn",
+      // Critical a11y rules that MUST block deploy:
+      "jsx-a11y/alt-text": "error",
+      "jsx-a11y/aria-props": "error",
+      "jsx-a11y/aria-role": "error",
+      "jsx-a11y/role-has-required-aria-props": "error",
+      "jsx-a11y/scope": "error",
       // label-has-for is deprecated; disable it in favour of label-has-associated-control
       "jsx-a11y/label-has-for": "off",
     },

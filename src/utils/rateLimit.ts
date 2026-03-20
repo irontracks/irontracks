@@ -1,4 +1,4 @@
-import { logError } from '@/lib/logger'
+import { logError, logWarn } from '@/lib/logger'
 
 export type RateLimitResult = {
   allowed: boolean
@@ -76,12 +76,7 @@ export const checkRateLimit = (key: string, max: number, windowMs: number): Rate
       '[rateLimit] Running in in-memory mode (no Upstash). ' +
       'Rate limits are per-instance and will not protect against distributed abuse. ' +
       'Set UPSTASH_REDIS_REST_URL + UPSTASH_REDIS_REST_TOKEN to enable distributed rate limiting.'
-    if (process.env.NODE_ENV === 'production') {
-      // Use console.warn directly — logger may not be available at module level
-      console.warn(msg)
-    } else {
-      console.warn(msg)
-    }
+    logWarn('rateLimit', msg)
   }
 
   const now = Date.now()

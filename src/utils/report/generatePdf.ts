@@ -384,8 +384,9 @@ async function shareOrSaveHtml(html: string, studentName: string): Promise<void>
 
   // Strategy 2: Save via @capacitor/filesystem
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const { Filesystem, Directory, Encoding } = await import('@capacitor/filesystem' as any)
+    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+    // @ts-ignore optional Capacitor dependency, may not have types installed
+    const { Filesystem, Directory, Encoding } = await import('@capacitor/filesystem')
     await Filesystem.writeFile({
       path: `IronTracks/${fileName}`,
       data: html,
