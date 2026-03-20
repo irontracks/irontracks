@@ -1,5 +1,5 @@
 "use client";
-import React, { useState, useMemo, useRef } from 'react';
+import React from 'react';
 import { Line, Bar } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -13,24 +13,32 @@ import {
   Legend,
   Filler
 } from 'chart.js';
-import { Calendar, TrendingUp, Upload, User, X, Trash2, Edit3, FileText, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
-import { isIosNative } from '@/utils/platform';
+import { Calendar, TrendingUp } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { createClient } from '@/utils/supabase/client';
 import { AssessmentForm } from '@/components/assessment/AssessmentForm';
 import { DialogProvider } from '@/contexts/DialogContext';
 import GlobalDialog from '@/components/GlobalDialog';
-import { useAssessment } from '@/hooks/useAssessment';
-import dynamic from 'next/dynamic';
 import { AssessmentHeader } from '@/components/assessment/AssessmentHeader';
 import { AssessmentSummaryCards } from '@/components/assessment/AssessmentSummaryCards';
-import { generateAssessmentPlanAi } from '@/actions/workout-actions';
-import { getErrorMessage } from '@/utils/errorMessage'
-import { logError, logWarn, logInfo } from '@/lib/logger'
-import { parseJsonWithSchema } from '@/utils/zod'
-import { z } from 'zod'
+import { AssessmentListItem, measurementFields, skinfoldFields } from '@/components/assessment/AssessmentListItem';
+import { AssessmentPlanModal } from '@/components/assessment/AssessmentPlanModal';
+import { AssessmentHistoryModal } from './AssessmentHistoryModal';
+import { useAssessmentHistoryData } from '@/hooks/useAssessmentHistoryData';
+import { X } from 'lucide-react';
 
-const AssessmentPDFGenerator = dynamic(() => import('@/components/assessment/AssessmentPDFGenerator'), { ssr: false })
+import {
+  getWeightKg,
+  getBodyFatPercent,
+  getLeanMassKg,
+  getBmrKcal,
+  getMeasurementCm,
+  getSkinfoldMm,
+} from './assessmentUtils';
+import {
+  formatDateCompact,
+  safeGender,
+  getProgress,
+} from './assessmentChartData';
 
 ChartJS.register(
   CategoryScale,
@@ -44,44 +52,6 @@ ChartJS.register(
   Filler
 );
 
-const LOOKBACK_DAYS = 28;
-const BASE_ACTIVITY_FACTOR = 1.2;
-const TEF_FACTOR = 0.1;
-const MAX_SESSION_SECONDS = 4 * 60 * 60;
-
-import {
-  AssessmentRow,
-  isRecord,
-  toPositiveNumberOrNull,
-  getWeightKg,
-  getBodyFatPercent,
-  getFatMassKg,
-  getLeanMassKg,
-  getBmrKcal,
-  getMeasurementCm,
-  getSkinfoldMm,
-  getSum7Mm,
-  safeJsonParse,
-  safeDateMs,
-  safeDateMsStartOfDay,
-  safeDateMsEndOfDay,
-  countSessionSets,
-  estimateStrengthTrainingMet,
-  uniqueStrings,
-} from './assessmentUtils';
-import { AssessmentHistoryModal } from './AssessmentHistoryModal';
-import {
-  formatAssessmentDate,
-  formatDateCompact,
-  formatWeekdayCompact,
-  safeGender,
-  getProgress,
-  buildAssessmentChartData,
-  checkChartHasData,
-  CHART_OPTIONS,
-} from './assessmentChartData';
-
-
 interface AssessmentHistoryProps {
   studentId?: string;
   onClose?: () => void;
@@ -90,587 +60,57 @@ interface AssessmentHistoryProps {
 export default function AssessmentHistory({ studentId: propStudentId, onClose }: AssessmentHistoryProps) {
   const studentId = propStudentId;
   const router = useRouter();
-  const supabase = useMemo(() => createClient(), []);
-  const { getStudentAssessments, deleteAssessment } = useAssessment();
-  const [assessments, setAssessments] = useState<AssessmentRow[]>([]);
-  const [loading, setLoading] = useState(!!studentId);
-  const [error, setError] = useState<string | null>(null);
-  const [workoutSessions, setWorkoutSessions] = useState<{ dateMs: number; metHours: number }[]>([]);
-  const [workoutSessionsLoading, setWorkoutSessionsLoading] = useState(false);
-  const [showForm, setShowForm] = useState(false);
-  const [showHistory, setShowHistory] = useState(false);
-  const [studentName, setStudentName] = useState<string>('Aluno');
-  const [selectedAssessment, setSelectedAssessment] = useState<string | null>(null);
-  const [aiPlanByAssessmentId, setAiPlanByAssessmentId] = useState<
-    Record<
-      string,
-      {
-        loading: boolean
-        error: string | null
-        plan: Record<string, unknown> | null
-        usedAi: boolean
-        reason?: string
-      }
-    >
-  >({});
-  const [planModalOpen, setPlanModalOpen] = useState(false);
-  const [planModalAssessment, setPlanModalAssessment] = useState<AssessmentRow | null>(null);
-  const [importing, setImporting] = useState(false);
-  const scanInputRef = useRef<HTMLInputElement | null>(null);
-  const planAnchorRefs = useRef<Record<string, HTMLDivElement | null>>({});
-  const isIosNativeApp = isIosNative();
-  const [editAssessmentId, setEditAssessmentId] = useState<string | null>(null);
-  const [deletingId, setDeletingId] = useState<string | null>(null);
-  const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
 
-  const handleDeleteAssessment = async (assessmentId: string) => {
-    try {
-      setDeletingId(assessmentId);
-      const result = await deleteAssessment(assessmentId);
-      if (result.success) {
-        setAssessments(prev => prev.filter(a => String(a?.id) !== assessmentId));
-        setConfirmDeleteId(null);
-        setSelectedAssessment(null);
-      }
-    } catch (e) {
-      logError('error', 'Erro ao excluir avaliação', e);
-    } finally {
-      setDeletingId(null);
-    }
-  };
+  const {
+    // Core data
+    loading,
+    error,
+    studentName,
+    sortedAssessments,
+    latestAssessment,
+    previousAssessment,
+    assessments,
 
-  const mergeImportedFormData = (base: Record<string, unknown>, incoming: Record<string, unknown>) => {
-    const out: Record<string, unknown> = { ...(base && typeof base === 'object' ? base : {}) };
-    const keys = [
-      'assessment_date',
-      'weight',
-      'height',
-      'age',
-      'gender',
-      'arm_circ',
-      'chest_circ',
-      'waist_circ',
-      'hip_circ',
-      'thigh_circ',
-      'calf_circ',
-      'triceps_skinfold',
-      'biceps_skinfold',
-      'subscapular_skinfold',
-      'suprailiac_skinfold',
-      'abdominal_skinfold',
-      'thigh_skinfold',
-      'calf_skinfold',
-      'observations',
-    ];
-    keys.forEach((k) => {
-      const nextVal = incoming?.[k];
-      if (nextVal === undefined || nextVal === null || nextVal === '') return;
-      const prevVal = out?.[k];
-      if (prevVal === undefined || prevVal === null || prevVal === '') {
-        out[k] = nextVal;
-      }
-    });
-    return out;
-  };
+    // Workout sessions / TDEE
+    workoutSessionsLoading,
+    tdeeByAssessmentId,
 
-  const handleScanClick = () => {
-    if (!studentId) return;
-    if (!scanInputRef.current) return;
-    scanInputRef.current.click();
-  };
+    // Chart data
+    chartData,
+    chartHasData,
+    chartOptions,
 
-  const handleScanFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    try {
-      const files = event.target.files ? Array.from(event.target.files) : [];
-      if (!files.length) return;
-      if (!studentId) return;
-      if (importing) return;
+    // UI state
+    showForm,
+    setShowForm,
+    showHistory,
+    setShowHistory,
+    selectedAssessment,
+    setSelectedAssessment,
+    editAssessmentId,
+    setEditAssessmentId,
+    deletingId,
+    confirmDeleteId,
+    setConfirmDeleteId,
+    importing,
 
-      setImporting(true);
+    // AI plan
+    aiPlanByAssessmentId,
+    planModalOpen,
+    setPlanModalOpen,
+    planModalAssessment,
 
-      let mergedFormData: Record<string, unknown> = {};
+    // Refs
+    scanInputRef,
+    planAnchorRefs,
 
-      for (const file of files) {
-        const form = new FormData();
-        form.append('file', file);
-
-        const res = await fetch('/api/assessment-scanner', {
-          method: 'POST',
-          body: form,
-        });
-
-        const data = await res.json().catch((): null => null);
-        if (!data || !data.ok) {
-          const msg = String(data?.error || 'Falha ao processar arquivo');
-          if (typeof window !== 'undefined') window.alert(msg);
-          return;
-        }
-
-        const nextForm = data?.formData && typeof data.formData === 'object' ? (data.formData as Record<string, unknown>) : null;
-        if (nextForm) mergedFormData = mergeImportedFormData(mergedFormData, nextForm);
-      }
-
-      const hasCoreField =
-        mergedFormData &&
-        typeof mergedFormData === 'object' &&
-        ('weight' in mergedFormData || 'height' in mergedFormData || 'assessment_date' in mergedFormData);
-
-      if (!hasCoreField) {
-        if (typeof window !== 'undefined') {
-          window.alert('Não foi possível extrair dados suficientes da avaliação.');
-        }
-        return;
-      }
-
-      if (typeof window !== 'undefined') {
-        try {
-          const storageKey = `assessment_import_${studentId}`;
-          window.sessionStorage.setItem(storageKey, JSON.stringify({ formData: mergedFormData }));
-        } catch (error) {
-          logError('error', 'Erro ao salvar avaliação importada na sessão', error);
-          window.alert('Não foi possível preparar os dados importados. Tente novamente.');
-          return;
-        }
-      }
-
-      router.push(`/assessments/new/${studentId}`);
-    } catch (error) {
-      logError('error', 'Erro ao importar avaliação por imagem/PDF', error);
-      if (typeof window !== 'undefined') {
-        window.alert('Falha ao importar avaliação por imagem/PDF.');
-      }
-    } finally {
-      setImporting(false);
-      if (event.target) {
-        event.target.value = '';
-      }
-    }
-  };
-
-  const measurementFields = [
-    { key: 'arm', label: 'Braço' },
-    { key: 'chest', label: 'Peito' },
-    { key: 'waist', label: 'Cintura' },
-    { key: 'hip', label: 'Quadril' },
-    { key: 'thigh', label: 'Coxa' },
-    { key: 'calf', label: 'Panturrilha' }
-  ] as const;
-
-  const skinfoldFields = [
-    { key: 'triceps', label: 'Tríceps' },
-    { key: 'biceps', label: 'Bíceps' },
-    { key: 'subscapular', label: 'Subescapular' },
-    { key: 'suprailiac', label: 'Suprailíaca' },
-    { key: 'abdominal', label: 'Abdominal' },
-    { key: 'thigh', label: 'Coxa' },
-    { key: 'calf', label: 'Panturrilha' }
-  ] as const;
-
-  React.useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        if (!studentId) {
-          if (mounted) setError('ID do aluno não fornecido.');
-          return;
-        }
-        if (mounted) {
-          setError(null);
-          setLoading(true);
-        }
-        const listRaw = await getStudentAssessments(studentId!);
-        const list = Array.isArray(listRaw) ? (listRaw as unknown as AssessmentRow[]) : [];
-        if (mounted) setAssessments(list);
-        if (mounted) {
-          setError(null);
-          const latest = list?.[0];
-          if (latest?.student_name) {
-            setStudentName(String(latest.student_name || 'Aluno'));
-          } else {
-            let resolvedName = 'Aluno';
-            try {
-              const { data: studentRow } = await supabase
-                .from('students')
-                .select('name, email, user_id')
-                .eq('id', studentId!)
-                .maybeSingle();
-
-              if (studentRow) {
-                resolvedName = studentRow.name || studentRow.email || resolvedName;
-              } else {
-                const { data: profile } = await supabase
-                  .from('profiles')
-                  .select('display_name, email')
-                  .eq('id', studentId!)
-                  .maybeSingle();
-                if (profile) {
-                  resolvedName = profile.display_name || profile.email || resolvedName;
-                }
-              }
-            } catch (e) {
-              logError('error', 'Erro ao resolver nome do aluno para histórico de avaliações', e);
-            }
-
-            setStudentName(resolvedName);
-          }
-        }
-      } catch (e: unknown) {
-        if (mounted) setError(getErrorMessage(e) || 'Erro ao carregar avaliações');
-      } finally {
-        if (mounted) setLoading(false);
-      }
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, [studentId, getStudentAssessments, supabase]);
-
-  const handleGenerateAssessmentPlan = async (assessment: AssessmentRow, opts?: { openDetails?: boolean }) => {
-    try {
-      const id = String(assessment?.id || '');
-      if (!id) return;
-      if (opts?.openDetails) setSelectedAssessment(id);
-
-      setAiPlanByAssessmentId((prev) => ({
-        ...prev,
-        [id]: {
-          loading: true,
-          error: null,
-          plan: prev[id]?.plan ?? null,
-          usedAi: prev[id]?.usedAi ?? false,
-          reason: prev[id]?.reason,
-        },
-      }));
-
-      const res = await generateAssessmentPlanAi({
-        assessment,
-        studentName,
-        trainerName: String(assessment?.trainer_name ?? ''),
-        goal: String(assessment?.goal ?? assessment?.observations ?? ''),
-      });
-
-      if (!res || !res.ok) {
-        setAiPlanByAssessmentId((prev) => ({
-          ...prev,
-          [id]: {
-            loading: false,
-            error: res?.error ? String(res.error) : 'Falha ao gerar plano tático',
-            plan: prev[id]?.plan ?? null,
-            usedAi: false,
-            reason: res?.reason ? String(res.reason) : 'ai_failed',
-          },
-        }));
-        return;
-      }
-
-      setAiPlanByAssessmentId((prev) => ({
-        ...prev,
-        [id]: {
-          loading: false,
-          error: null,
-          plan: res.plan ?? null,
-          usedAi: !!res.usedAi,
-          reason: res?.reason ? String(res.reason) : (res?.usedAi ? 'ai' : 'fallback'),
-        },
-      }));
-      setTimeout(() => {
-        try {
-          planAnchorRefs.current[id]?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        } catch { }
-      }, 50);
-    } catch (e) {
-      const id = String(assessment?.id || '');
-      if (!id) return;
-      setAiPlanByAssessmentId((prev) => ({
-        ...prev,
-        [id]: {
-          loading: false,
-          error: (e as Record<string, unknown>)?.message ? String((e as Record<string, unknown>).message) : 'Erro inesperado ao gerar plano tático',
-          plan: prev[id]?.plan ?? null,
-          usedAi: false,
-          reason: 'ai_failed',
-        },
-      }));
-    }
-  };
-
-  const handleOpenAssessmentPlanModal = async (assessment: AssessmentRow) => {
-    try {
-      const id = String(assessment?.id || '');
-      if (!id) return;
-      setPlanModalAssessment(assessment);
-      setPlanModalOpen(true);
-      await handleGenerateAssessmentPlan(assessment, { openDetails: false });
-    } catch { }
-  };
-
-  const sortedAssessments = useMemo(() => {
-    const safeTime = (raw: unknown): number => {
-      const date = new Date(typeof raw === 'string' || typeof raw === 'number' || raw instanceof Date ? raw : String(raw ?? ''));
-      const time = date.getTime();
-      return Number.isFinite(time) ? time : 0;
-    };
-
-    return [...(assessments || [])].sort((a, b) => {
-      const aTime = safeTime(a?.date ?? a?.assessment_date);
-      const bTime = safeTime(b?.date ?? b?.assessment_date);
-      return aTime - bTime;
-    });
-  }, [assessments]);
-
-  const workoutWindow = useMemo(() => {
-    if (!Array.isArray(sortedAssessments) || sortedAssessments.length === 0) return null;
-    const minTimes = sortedAssessments
-      .map(a => safeDateMsStartOfDay(a?.date ?? a?.assessment_date))
-      .filter((t): t is number => typeof t === 'number' && Number.isFinite(t) && t > 0);
-    const maxTimes = sortedAssessments
-      .map(a => safeDateMsEndOfDay(a?.date ?? a?.assessment_date))
-      .filter((t): t is number => typeof t === 'number' && Number.isFinite(t) && t > 0);
-    if (minTimes.length === 0 || maxTimes.length === 0) return null;
-    const minTime = Math.min(...minTimes);
-    const maxTime = Math.max(...maxTimes);
-    const lookbackMs = LOOKBACK_DAYS * 24 * 60 * 60 * 1000;
-    return {
-      from: new Date(minTime - lookbackMs),
-      to: new Date(maxTime)
-    };
-  }, [sortedAssessments]);
-
-  const workoutWindowFromIso = workoutWindow?.from ? workoutWindow.from.toISOString() : null;
-  const workoutWindowToIso = workoutWindow?.to ? workoutWindow.to.toISOString() : null;
-
-  React.useEffect(() => {
-    let mounted = true;
-    (async () => {
-      try {
-        if (!studentId || !workoutWindowFromIso || !workoutWindowToIso) {
-          if (mounted) setWorkoutSessions([]);
-          return;
-        }
-        if (mounted) setWorkoutSessionsLoading(true);
-
-        const candidateId = String(studentId || '').trim();
-        const candidateIds: string[] = [];
-
-        try {
-          const { data: directProfile } = await supabase
-            .from('profiles')
-            .select('id')
-            .eq('id', candidateId)
-            .maybeSingle();
-
-          if (directProfile?.id) {
-            candidateIds.push(directProfile.id as string);
-          } else {
-            const { data: studentRow } = await supabase
-              .from('students')
-              .select('id, user_id, email')
-              .or(`id.eq.${candidateId},user_id.eq.${candidateId}`)
-              .maybeSingle();
-
-            if (studentRow?.user_id) candidateIds.push(studentRow.user_id as string);
-            if (!studentRow?.user_id && studentRow?.email) {
-              const { data: profileByEmail } = await supabase
-                .from('profiles')
-                .select('id')
-                .ilike('email', studentRow.email)
-                .maybeSingle();
-              if (profileByEmail?.id) candidateIds.push(profileByEmail.id as string);
-            }
-          }
-        } catch {
-          candidateIds.push(candidateId);
-        }
-
-        const ids = uniqueStrings([candidateId, ...candidateIds]);
-        if (ids.length === 0) {
-          if (mounted) setWorkoutSessions([]);
-          return;
-        }
-
-        const baseSelect = 'id, user_id, student_id, date, created_at, completed_at, is_template, notes';
-        const fromIso = workoutWindowFromIso;
-        const toIso = workoutWindowToIso;
-        const fromDay = typeof fromIso === 'string' ? fromIso.split('T')[0] : null;
-        const toDay = typeof toIso === 'string' ? toIso.split('T')[0] : null;
-
-        const rows: AssessmentRow[] = [];
-        try {
-          const { data, error: wErr } = await supabase
-            .from('workouts')
-            .select(baseSelect)
-            .eq('is_template', false)
-            .in('user_id', ids)
-            .gte('completed_at', fromIso)
-            .lte('completed_at', toIso)
-            .order('completed_at', { ascending: true });
-          if (!wErr && Array.isArray(data)) rows.push(...data);
-        } catch { }
-
-        try {
-          const { data, error: wErr } = await supabase
-            .from('workouts')
-            .select(baseSelect)
-            .eq('is_template', false)
-            .in('student_id', ids)
-            .gte('completed_at', fromIso)
-            .lte('completed_at', toIso)
-            .order('completed_at', { ascending: true });
-          if (!wErr && Array.isArray(data)) rows.push(...data);
-        } catch { }
-
-        if (fromDay && toDay) {
-          try {
-            const { data, error: wErr } = await supabase
-              .from('workouts')
-              .select(baseSelect)
-              .eq('is_template', false)
-              .in('user_id', ids)
-              .gte('date', fromDay)
-              .lte('date', toDay)
-              .order('date', { ascending: true });
-            if (!wErr && Array.isArray(data)) rows.push(...data);
-          } catch { }
-
-          try {
-            const { data, error: wErr } = await supabase
-              .from('workouts')
-              .select(baseSelect)
-              .eq('is_template', false)
-              .in('student_id', ids)
-              .gte('date', fromDay)
-              .lte('date', toDay)
-              .order('date', { ascending: true });
-            if (!wErr && Array.isArray(data)) rows.push(...data);
-          } catch { }
-        }
-
-        const byId = new Map<string, AssessmentRow>();
-        for (const r of rows) {
-          if (r?.id) byId.set(String(r.id), r);
-        }
-
-        const sessions: { dateMs: number; metHours: number }[] = [];
-        byId.forEach((r) => {
-          const dateMs = safeDateMs(r?.completed_at ?? r?.date ?? r?.created_at);
-          if (!dateMs) return;
-          const parsed = safeJsonParse(r?.notes);
-          const totalTime = toPositiveNumberOrNull(parsed?.totalTime);
-          const realTime = toPositiveNumberOrNull(parsed?.realTotalTime);
-          let rawSeconds = totalTime || realTime || null;
-          if (!rawSeconds) {
-            try {
-              const exerciseDurations = Array.isArray(parsed?.exerciseDurations)
-                ? (parsed.exerciseDurations as unknown[])
-                : (Array.isArray(parsed?.exercisesDurations) ? (parsed.exercisesDurations as unknown[]) : null);
-              if (exerciseDurations && exerciseDurations.length > 0) {
-                const sum = exerciseDurations.reduce<number>((acc: number, v: unknown) => acc + (Number(v) || 0), 0);
-                if (Number.isFinite(sum) && sum > 0) rawSeconds = sum;
-              }
-            } catch { }
-          }
-          if (!rawSeconds) return;
-          const seconds = Math.min(rawSeconds, MAX_SESSION_SECONDS);
-          if (!Number.isFinite(seconds) || seconds <= 0) return;
-          const setsCount = countSessionSets(parsed || {});
-          const met = estimateStrengthTrainingMet(seconds, setsCount);
-          const metHours = (met * seconds) / 3600;
-          if (!Number.isFinite(metHours) || metHours <= 0) return;
-          sessions.push({ dateMs, metHours });
-        });
-
-        sessions.sort((a, b) => a.dateMs - b.dateMs);
-
-        if (mounted) setWorkoutSessions(sessions);
-      } catch {
-        if (mounted) setWorkoutSessions([]);
-      } finally {
-        if (mounted) setWorkoutSessionsLoading(false);
-      }
-    })();
-
-    return () => {
-      mounted = false;
-    };
-  }, [studentId, supabase, workoutWindowFromIso, workoutWindowToIso]);
-
-  const tdeeByAssessmentId = useMemo(() => {
-    const out = new Map<string, number>();
-    if (!Array.isArray(sortedAssessments) || sortedAssessments.length === 0) return out;
-
-    const sessions = Array.isArray(workoutSessions) ? workoutSessions : [];
-
-    const dates = sessions.map(s => s.dateMs);
-    const prefix: number[] = new Array(sessions.length + 1);
-    prefix[0] = 0;
-    for (let i = 0; i < sessions.length; i++) {
-      prefix[i + 1] = prefix[i] + (Number(sessions[i]?.metHours) || 0);
-    }
-
-    const lowerBound = (arr: number[], x: number): number => {
-      let lo = 0;
-      let hi = arr.length;
-      while (lo < hi) {
-        const mid = (lo + hi) >> 1;
-        if (arr[mid] < x) lo = mid + 1;
-        else hi = mid;
-      }
-      return lo;
-    };
-
-    const upperBound = (arr: number[], x: number): number => {
-      let lo = 0;
-      let hi = arr.length;
-      while (lo < hi) {
-        const mid = (lo + hi) >> 1;
-        if (arr[mid] <= x) lo = mid + 1;
-        else hi = mid;
-      }
-      return lo;
-    };
-
-    const lookbackMs = LOOKBACK_DAYS * 24 * 60 * 60 * 1000;
-    for (const assessment of sortedAssessments) {
-      const id = assessment?.id ? String(assessment.id) : '';
-      if (!id) continue;
-      const dateMs = safeDateMsEndOfDay(assessment?.date ?? assessment?.assessment_date);
-      if (!dateMs) continue;
-
-      const bmr = getBmrKcal(assessment);
-      const weightKg = getWeightKg(assessment);
-      if (!bmr || !weightKg) continue;
-
-      let eatPerDay = 0;
-      if (sessions.length > 0) {
-        const start = dateMs - lookbackMs;
-        const l = lowerBound(dates, start);
-        const r = upperBound(dates, dateMs);
-        const sumMetHours = prefix[r] - prefix[l];
-        const eatTotal = weightKg * sumMetHours;
-        eatPerDay = eatTotal / LOOKBACK_DAYS;
-        if (!Number.isFinite(eatPerDay) || eatPerDay < 0) eatPerDay = 0;
-      }
-
-      const baseline = bmr * BASE_ACTIVITY_FACTOR;
-      const totalBeforeTef = baseline + eatPerDay;
-      const tdee = totalBeforeTef * (1 + TEF_FACTOR);
-
-      if (Number.isFinite(tdee) && tdee > 0) out.set(id, tdee);
-    }
-
-    return out;
-  }, [sortedAssessments, workoutSessions]);
-
-  // Chart.js dataset types are loosely typed in assessmentChartData — cast needed to satisfy react-chartjs-2 generics
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const chartData = useMemo(() => buildAssessmentChartData(sortedAssessments) as any, [sortedAssessments]);
-
-  const chartHasData = useMemo(() => checkChartHasData(chartData), [chartData]);
-
-  const chartOptions = CHART_OPTIONS;
-
-  const latestAssessment = sortedAssessments[sortedAssessments.length - 1];
-  const previousAssessment = sortedAssessments[sortedAssessments.length - 2];
+    // Handlers
+    handleDeleteAssessment,
+    handleScanClick,
+    handleScanFileChange,
+    handleGenerateAssessmentPlan,
+    handleOpenAssessmentPlanModal,
+  } = useAssessmentHistoryData(studentId);
 
   if (loading) {
     return (
@@ -750,8 +190,9 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
           />
         )}
 
-        {/* Gráficos escuros */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+        {/* Charts — Separated for clarity */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-4">
+          {/* Weight × Lean Mass */}
           <div
             className="rounded-2xl border p-5"
             style={{
@@ -759,28 +200,10 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
               borderColor: 'rgba(255,255,255,0.06)',
             }}
           >
-            <h3 className="text-sm font-black uppercase tracking-widest text-yellow-500/80 mb-4">Evolução da Composição Corporal</h3>
+            <h3 className="text-sm font-black uppercase tracking-widest text-yellow-500/80 mb-4">Peso × Massa Magra</h3>
             <div className="h-64">
-              {chartHasData.bodyComposition ? (
-                <Line data={chartData.bodyComposition} options={chartOptions} />
-              ) : (
-                <div className="h-full flex items-center justify-center text-neutral-400 text-sm text-center px-6">
-                  Sem dados de composição corporal suficientes.
-                </div>
-              )}
-            </div>
-          </div>
-          <div
-            className="rounded-2xl border p-5"
-            style={{
-              background: 'linear-gradient(160deg, rgba(20,18,10,0.8) 0%, rgba(12,12,12,0.95) 50%)',
-              borderColor: 'rgba(255,255,255,0.06)',
-            }}
-          >
-            <h3 className="text-sm font-black uppercase tracking-widest text-yellow-500/80 mb-4">Evolução do Peso</h3>
-            <div className="h-64">
-              {chartHasData.weightProgress ? (
-                <Line data={chartData.weightProgress} options={chartOptions} />
+              {chartHasData.weightLeanMass ? (
+                <Line data={chartData.weightLeanMass} options={chartOptions.weightLeanMass as never} />
               ) : (
                 <div className="h-full flex items-center justify-center text-neutral-400 text-sm text-center px-6">
                   Sem dados de peso suficientes.
@@ -788,28 +211,72 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
               )}
             </div>
           </div>
-        </div>
 
-        <div
-          className="rounded-2xl border p-5 mb-6"
-          style={{
-            background: 'linear-gradient(160deg, rgba(20,18,10,0.8) 0%, rgba(12,12,12,0.95) 50%)',
-            borderColor: 'rgba(255,255,255,0.06)',
-          }}
-        >
-          <h3 className="text-sm font-black uppercase tracking-widest text-yellow-500/80 mb-4">Evolução das Circunferências</h3>
-          <div className="h-64">
-            {chartHasData.measurements ? (
-              <Bar data={chartData.measurements} options={chartOptions} />
-            ) : (
-              <div className="h-full flex items-center justify-center text-neutral-400 text-sm text-center px-6">
-                Sem dados de circunferências suficientes.
-              </div>
-            )}
+          {/* Body Fat % */}
+          <div
+            className="rounded-2xl border p-5"
+            style={{
+              background: 'linear-gradient(160deg, rgba(20,18,10,0.8) 0%, rgba(12,12,12,0.95) 50%)',
+              borderColor: 'rgba(255,255,255,0.06)',
+            }}
+          >
+            <h3 className="text-sm font-black uppercase tracking-widest text-yellow-500/80 mb-4">Gordura Corporal</h3>
+            <div className="h-64">
+              {chartHasData.bodyFatPercent ? (
+                <Line data={chartData.bodyFatPercent} options={chartOptions.bodyFatPercent as never} />
+              ) : (
+                <div className="h-full flex items-center justify-center text-neutral-400 text-sm text-center px-6">
+                  Sem dados de gordura corporal suficientes.
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
-        {/* Lista escura */}
+        {/* Measurements — Split into Trunk and Limbs */}
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
+          {/* Trunk */}
+          <div
+            className="rounded-2xl border p-5"
+            style={{
+              background: 'linear-gradient(160deg, rgba(20,18,10,0.8) 0%, rgba(12,12,12,0.95) 50%)',
+              borderColor: 'rgba(255,255,255,0.06)',
+            }}
+          >
+            <h3 className="text-sm font-black uppercase tracking-widest text-yellow-500/80 mb-4">Circunferências — Tronco</h3>
+            <div className="h-64">
+              {chartHasData.trunkMeasurements ? (
+                <Bar data={chartData.trunkMeasurements} options={chartOptions.trunkMeasurements as never} />
+              ) : (
+                <div className="h-full flex items-center justify-center text-neutral-400 text-sm text-center px-6">
+                  Sem dados de circunferências de tronco.
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Limbs */}
+          <div
+            className="rounded-2xl border p-5"
+            style={{
+              background: 'linear-gradient(160deg, rgba(20,18,10,0.8) 0%, rgba(12,12,12,0.95) 50%)',
+              borderColor: 'rgba(255,255,255,0.06)',
+            }}
+          >
+            <h3 className="text-sm font-black uppercase tracking-widest text-yellow-500/80 mb-4">Circunferências — Membros</h3>
+            <div className="h-64">
+              {chartHasData.limbMeasurements ? (
+                <Bar data={chartData.limbMeasurements} options={chartOptions.limbMeasurements as never} />
+              ) : (
+                <div className="h-full flex items-center justify-center text-neutral-400 text-sm text-center px-6">
+                  Sem dados de circunferências de membros.
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Assessment List */}
         <div
           className="rounded-2xl border overflow-hidden"
           style={{
@@ -824,490 +291,40 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
             </h3>
           </div>
           <div id="assessments-history" className="divide-y" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
-            {sortedAssessments.map((assessment, idx) => {
-              const assessmentId = String(assessment?.id ?? idx)
-              const photos = Array.isArray(assessment?.photos) ? assessment.photos : []
-              const ageLabel = String(assessment?.age ?? '-')
-              return (
-                <div key={assessmentId} className="p-5 hover:bg-white/[0.02] transition-colors" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
-                  <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-4">
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
-                          <div className="font-black text-white text-sm sm:text-base truncate">
-                            {formatDateCompact(assessment.date || assessment.assessment_date)}
-                          </div>
-                          <div className="text-xs text-neutral-500 mt-0.5 truncate">
-                            {formatWeekdayCompact(assessment.date || assessment.assessment_date)}
-                          </div>
-                        </div>
-                        <div className="shrink-0 flex items-center gap-2">
-                          <span className="px-2.5 py-1 bg-yellow-500/15 text-yellow-400 text-xs rounded-full border border-yellow-500/20 font-bold">
-                            {ageLabel} anos
-                          </span>
-                          {photos.length > 0 && (
-                            <span className="px-2.5 py-1 bg-green-500/15 text-green-400 text-xs rounded-full border border-green-500/20 font-bold">
-                              Com fotos
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 md:grid-cols-5 gap-3 mt-4 text-sm">
-                        <div className="bg-neutral-900/40 border border-neutral-800 rounded-xl p-3">
-                          <div className="text-[10px] text-neutral-500 font-bold uppercase tracking-wider">Peso</div>
-                          <div className="text-white font-black mt-1">{(() => {
-                            const w = getWeightKg(assessment);
-                            return w ? `${w.toFixed(1)} kg` : '-';
-                          })()}</div>
-                        </div>
-                        <div className="bg-neutral-900/40 border border-neutral-800 rounded-xl p-3">
-                          <div className="text-[10px] text-neutral-500 font-bold uppercase tracking-wider">% Gordura</div>
-                          <div className="text-white font-black mt-1">{(() => {
-                            const bf = getBodyFatPercent(assessment);
-                            return bf ? `${bf.toFixed(1)}%` : '-';
-                          })()}</div>
-                        </div>
-                        <div className="bg-neutral-900/40 border border-neutral-800 rounded-xl p-3">
-                          <div className="text-[10px] text-neutral-500 font-bold uppercase tracking-wider">Massa Magra</div>
-                          <div className="text-white font-black mt-1">{(() => {
-                            const lm = getLeanMassKg(assessment);
-                            return lm ? `${lm.toFixed(1)} kg` : '-';
-                          })()}</div>
-                        </div>
-                        <div className="bg-neutral-900/40 border border-neutral-800 rounded-xl p-3">
-                          <div className="text-[10px] text-neutral-500 font-bold uppercase tracking-wider">BMR</div>
-                          <div className="text-white font-black mt-1">{(() => {
-                            const v = getBmrKcal(assessment);
-                            return v ? `${v.toFixed(0)} kcal` : '-';
-                          })()}</div>
-                        </div>
-                        <div className="bg-neutral-900/40 border border-neutral-800 rounded-xl p-3">
-                          <div className="text-[10px] text-neutral-500 font-bold uppercase tracking-wider">TDEE</div>
-                          <div className="text-white font-black mt-1">{(() => {
-                            if (workoutSessionsLoading) return '...';
-                            const v = tdeeByAssessmentId.get(String(assessment.id));
-                            return v ? `${v.toFixed(0)} kcal` : '-';
-                          })()}</div>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex flex-col gap-2 mt-1">
-                      {/* Row 1: Main actions */}
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => setSelectedAssessment(selectedAssessment === assessmentId ? null : assessmentId)}
-                          className="min-h-[40px] px-3 py-2 rounded-xl border text-sm font-bold transition-all duration-200 active:scale-95 flex items-center gap-1.5"
-                          style={{
-                            background: selectedAssessment === assessmentId ? 'rgba(234,179,8,0.15)' : 'rgba(255,255,255,0.03)',
-                            borderColor: selectedAssessment === assessmentId ? 'rgba(234,179,8,0.3)' : 'rgba(255,255,255,0.08)',
-                            color: selectedAssessment === assessmentId ? '#facc15' : '#a3a3a3'
-                          }}
-                          type="button"
-                        >
-                          {selectedAssessment === assessmentId ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                          {selectedAssessment === assessmentId ? 'Ocultar' : 'Detalhes'}
-                        </button>
-                        <AssessmentPDFGenerator
-                          formData={{
-                            assessment_date: String(assessment.assessment_date ?? ''),
-                            weight: String(assessment.weight || ''),
-                            height: String(assessment.height || ''),
-                            age: String(assessment.age || ''),
-                            gender: safeGender(assessment.gender),
-                            arm_circ: String(getMeasurementCm(assessment, 'arm') || ''),
-                            chest_circ: String(getMeasurementCm(assessment, 'chest') || ''),
-                            waist_circ: String(getMeasurementCm(assessment, 'waist') || ''),
-                            hip_circ: String(getMeasurementCm(assessment, 'hip') || ''),
-                            thigh_circ: String(getMeasurementCm(assessment, 'thigh') || ''),
-                            calf_circ: String(getMeasurementCm(assessment, 'calf') || ''),
-                            triceps_skinfold: String(getSkinfoldMm(assessment, 'triceps') || ''),
-                            biceps_skinfold: String(getSkinfoldMm(assessment, 'biceps') || ''),
-                            subscapular_skinfold: String(getSkinfoldMm(assessment, 'subscapular') || ''),
-                            suprailiac_skinfold: String(getSkinfoldMm(assessment, 'suprailiac') || ''),
-                            abdominal_skinfold: String(getSkinfoldMm(assessment, 'abdominal') || ''),
-                            thigh_skinfold: String(getSkinfoldMm(assessment, 'thigh') || ''),
-                            calf_skinfold: String(getSkinfoldMm(assessment, 'calf') || ''),
-                            observations: ''
-                          }}
-                          studentName={String(assessment.student_name ?? '')}
-                          trainerName={String(assessment.trainer_name ?? '')}
-                          assessmentDate={new Date(
-                            typeof assessment.assessment_date === 'string' || typeof assessment.assessment_date === 'number' || assessment.assessment_date instanceof Date
-                              ? assessment.assessment_date
-                              : String(assessment.assessment_date ?? Date.now()),
-                          )}
-                        />
-                      </div>
-                      {/* Row 2: AI + Edit + Delete */}
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={() => handleOpenAssessmentPlanModal(assessment)}
-                          disabled={!!aiPlanByAssessmentId[String(assessment.id)]?.loading}
-                          className="min-h-[40px] flex-1 px-3 py-2 rounded-xl bg-yellow-500 text-black text-sm font-bold hover:bg-yellow-400 transition-all duration-200 active:scale-95 flex items-center justify-center gap-1.5 disabled:opacity-60"
-                        >
-                          <Sparkles className="w-4 h-4" />
-                          {aiPlanByAssessmentId[String(assessment.id)]?.loading ? 'Gerando…' : 'Plano IA'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setEditAssessmentId(assessmentId);
-                            setShowForm(true);
-                          }}
-                          className="min-h-[40px] px-3 py-2 rounded-xl border text-sm font-bold text-neutral-300 hover:text-white hover:border-yellow-500/40 transition-all duration-200 active:scale-95 flex items-center gap-1.5"
-                          style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }}
-                        >
-                          <Edit3 className="w-4 h-4" />
-                          Editar
-                        </button>
-                        {confirmDeleteId === assessmentId ? (
-                          <div className="flex items-center gap-1">
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteAssessment(assessmentId)}
-                              disabled={deletingId === assessmentId}
-                              className="min-h-[40px] px-3 py-2 rounded-xl bg-red-600 text-white text-sm font-bold hover:bg-red-500 transition-all duration-200 active:scale-95 disabled:opacity-60"
-                            >
-                              {deletingId === assessmentId ? '...' : 'Sim'}
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => setConfirmDeleteId(null)}
-                              className="min-h-[40px] px-3 py-2 rounded-xl border border-neutral-700 text-neutral-400 text-sm font-bold hover:text-white transition-all duration-200 active:scale-95"
-                            >
-                              Não
-                            </button>
-                          </div>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={() => setConfirmDeleteId(assessmentId)}
-                            className="min-h-[40px] px-3 py-2 rounded-xl border text-sm font-bold text-red-400 hover:text-red-300 hover:border-red-500/40 transition-all duration-200 active:scale-95 flex items-center gap-1.5"
-                            style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }}
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  {selectedAssessment === assessmentId && (
-                    <div className="mt-4 pt-4 border-t border-neutral-700">
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <h4 className="font-bold text-white mb-2">Dobras Cutâneas (mm)</h4>
-                          <div className="grid grid-cols-2 gap-2 text-sm">
-                            {skinfoldFields.map(({ key, label }) => {
-                              const value = getSkinfoldMm(assessment, key);
-                              return (
-                                <div key={key} className="flex justify-between">
-                                  <span className="text-neutral-400">{label}:</span>
-                                  <span className="font-medium text-white">{value == null ? '-' : String(value)}</span>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                        <div>
-                          <h4 className="font-bold text-white mb-2">Circunferências (cm)</h4>
-                          <div className="grid grid-cols-2 gap-2 text-sm">
-                            {measurementFields.map(({ key, label }) => {
-                              const value = getMeasurementCm(assessment, key);
-                              return (
-                                <div key={key} className="flex justify-between">
-                                  <span className="text-neutral-400">{label}:</span>
-                                  <span className="font-medium text-white">{value == null ? '-' : String(value)}</span>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      </div>
-                      {(() => {
-                        const s = aiPlanByAssessmentId[String(assessment.id)];
-                        if (!s) return null;
-                        const plan = s.plan && typeof s.plan === 'object' ? s.plan : null;
-                        if (!plan && !s.loading && !s.error) return null;
-                        const badge = (() => {
-                          if (s.loading) return null;
-                          if (s.error) return null;
-                          if (s.usedAi) return { text: 'IA', tone: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/25' };
-                          if (s.reason === 'missing_api_key') return { text: 'Sem IA (config)', tone: 'bg-neutral-800 text-neutral-200 border-neutral-700' };
-                          if (s.reason === 'insufficient_data') return { text: 'Dados insuf.', tone: 'bg-neutral-800 text-neutral-200 border-neutral-700' };
-                          if (s.reason === 'ai_failed') return { text: 'Fallback', tone: 'bg-neutral-800 text-neutral-200 border-neutral-700' };
-                          return { text: 'Plano base', tone: 'bg-neutral-800 text-neutral-200 border-neutral-700' };
-                        })();
-                        return (
-                          <div
-                            className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4"
-                            ref={(el) => {
-                              try {
-                                planAnchorRefs.current[String(assessment.id)] = el;
-                              } catch { }
-                            }}
-                          >
-                            <div className="bg-neutral-900/70 border border-neutral-700 rounded-xl p-4">
-                              <div className="flex items-center justify-between gap-2 mb-2">
-                                <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Resumo Tático</div>
-                                {badge ? (
-                                  <div className={`px-2 py-1 rounded-full border text-[10px] font-black uppercase tracking-widest ${badge.tone}`}>
-                                    {badge.text}
-                                  </div>
-                                ) : null}
-                              </div>
-                              {s.loading ? (
-                                <div className="text-sm text-neutral-300">Gerando plano tático personalizado…</div>
-                              ) : s.error ? (
-                                <div className="text-sm text-red-400">{s.error}</div>
-                              ) : plan ? (
-                                <ul className="text-sm text-neutral-200 space-y-1 list-disc list-inside">
-                                  {(() => {
-                                    const raw = plan.summary
-                                    const items = Array.isArray(raw) ? raw : []
-                                    return items.length
-                                      ? items.map((item: unknown, idx: number) => <li key={idx}>{String(item ?? '')}</li>)
-                                      : null
-                                  })()}
-                                </ul>
-                              ) : null}
-                            </div>
-                            {plan ? (
-                              <div className="bg-neutral-900/70 border border-neutral-700 rounded-xl p-4 space-y-3">
-                                {(() => {
-                                  const raw = plan.training
-                                  const items = Array.isArray(raw) ? raw : []
-                                  if (!items.length) return null
-                                  return (
-                                    <div>
-                                      <div className="text-xs font-black uppercase tracking-widest text-yellow-500 mb-1">Treino</div>
-                                      <ul className="text-sm text-neutral-200 space-y-1 list-disc list-inside">
-                                        {items.map((item: unknown, idx: number) => (
-                                          <li key={idx}>{String(item ?? '')}</li>
-                                        ))}
-                                      </ul>
-                                    </div>
-                                  )
-                                })()}
-                                {(() => {
-                                  const raw = plan.nutrition
-                                  const items = Array.isArray(raw) ? raw : []
-                                  if (!items.length) return null
-                                  return (
-                                    <div>
-                                      <div className="text-xs font-black uppercase tracking-widest text-yellow-500 mb-1">Nutrição</div>
-                                      <ul className="text-sm text-neutral-200 space-y-1 list-disc list-inside">
-                                        {items.map((item: unknown, idx: number) => (
-                                          <li key={idx}>{String(item ?? '')}</li>
-                                        ))}
-                                      </ul>
-                                    </div>
-                                  )
-                                })()}
-                                {(() => {
-                                  const raw = plan.habits
-                                  const items = Array.isArray(raw) ? raw : []
-                                  if (!items.length) return null
-                                  return (
-                                    <div>
-                                      <div className="text-xs font-black uppercase tracking-widest text-yellow-500 mb-1">Hábitos</div>
-                                      <ul className="text-sm text-neutral-200 space-y-1 list-disc list-inside">
-                                        {items.map((item: unknown, idx: number) => (
-                                          <li key={idx}>{String(item ?? '')}</li>
-                                        ))}
-                                      </ul>
-                                    </div>
-                                  )
-                                })()}
-                                {(() => {
-                                  const raw = plan.warnings
-                                  const items = Array.isArray(raw) ? raw : []
-                                  if (!items.length) return null
-                                  return (
-                                    <div>
-                                      <div className="text-xs font-black uppercase tracking-widest text-yellow-500 mb-1">Alertas</div>
-                                      <ul className="text-sm text-neutral-300 space-y-1 list-disc list-inside">
-                                        {items.map((item: unknown, idx: number) => (
-                                          <li key={idx}>{String(item ?? '')}</li>
-                                        ))}
-                                      </ul>
-                                    </div>
-                                  )
-                                })()}
-                              </div>
-                            ) : null}
-                          </div>
-                        );
-                      })()}
-                    </div>
-                  )}
-                </div>
-              )
-            })}
+            {sortedAssessments.map((assessment, idx) => (
+              <AssessmentListItem
+                key={String(assessment?.id ?? idx)}
+                assessment={assessment}
+                idx={idx}
+                isSelected={selectedAssessment === String(assessment?.id ?? idx)}
+                aiPlanState={aiPlanByAssessmentId[String(assessment.id)]}
+                workoutSessionsLoading={workoutSessionsLoading}
+                tdee={tdeeByAssessmentId.get(String(assessment.id))}
+                deletingId={deletingId}
+                confirmDeleteId={confirmDeleteId}
+                onToggleDetails={(id) => setSelectedAssessment(selectedAssessment === id ? null : id)}
+                onEdit={(id) => { setEditAssessmentId(id); setShowForm(true); }}
+                onDelete={handleDeleteAssessment}
+                onConfirmDelete={setConfirmDeleteId}
+                onOpenPlanModal={handleOpenAssessmentPlanModal}
+                setPlanAnchorRef={(id, el) => { try { planAnchorRefs.current[id] = el } catch {} }}
+              />
+            ))}
           </div>
         </div>
 
+        {/* AI Plan Modal */}
         {planModalOpen && planModalAssessment ? (
-          <div className="fixed inset-0 z-[80] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setPlanModalOpen(false)}>
-            <div className="bg-neutral-900 w-full max-w-3xl rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
-              <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
-                <div className="min-w-0">
-                  <div className="text-[11px] uppercase tracking-widest text-neutral-500 font-bold truncate">Plano Tático</div>
-                  <div className="text-white font-black truncate">
-                    {formatDateCompact(planModalAssessment?.date || planModalAssessment?.assessment_date)}
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setPlanModalOpen(false)}
-                  className="w-10 h-10 rounded-full bg-neutral-900/70 border border-neutral-800 hover:bg-neutral-900 text-neutral-300 hover:text-white flex items-center justify-center transition-all duration-300 active:scale-95"
-                  aria-label="Fechar"
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
-              <div className="p-4 max-h-[80vh] overflow-y-auto space-y-3">
-                {(() => {
-                  const id = String(planModalAssessment?.id || '');
-                  const s = id ? aiPlanByAssessmentId[id] : null;
-                  const plan = s?.plan && typeof s.plan === 'object' ? s.plan : null;
-                  const badge = (() => {
-                    if (!s || s.loading) return null;
-                    if (s.error) return null;
-                    if (s.usedAi) return { text: 'IA', tone: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/25' };
-                    if (s.reason === 'missing_api_key') return { text: 'Sem IA (config)', tone: 'bg-neutral-800 text-neutral-200 border-neutral-700' };
-                    if (s.reason === 'insufficient_data') return { text: 'Dados insuf.', tone: 'bg-neutral-800 text-neutral-200 border-neutral-700' };
-                    if (s.reason === 'ai_failed') return { text: 'Fallback', tone: 'bg-neutral-800 text-neutral-200 border-neutral-700' };
-                    return { text: 'Plano base', tone: 'bg-neutral-800 text-neutral-200 border-neutral-700' };
-                  })();
-
-                  return (
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Resumo Tático</div>
-                        {badge ? (
-                          <div className={`px-2 py-1 rounded-full border text-[10px] font-black uppercase tracking-widest ${badge.tone}`}>
-                            {badge.text}
-                          </div>
-                        ) : null}
-                      </div>
-                      {s?.loading ? (
-                        <div className="text-sm text-neutral-300">Gerando plano tático personalizado…</div>
-                      ) : s?.error ? (
-                        <div className="text-sm text-red-400">{s.error}</div>
-                      ) : plan ? (
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                          <div className="bg-neutral-900/70 border border-neutral-700 rounded-xl p-4">
-                            <ul className="text-sm text-neutral-200 space-y-1 list-disc list-inside">
-                              {(() => {
-                                const raw = plan.summary
-                                const items = Array.isArray(raw) ? raw : []
-                                return items.length
-                                  ? items.map((item: unknown, idx: number) => <li key={idx}>{String(item ?? '')}</li>)
-                                  : null
-                              })()}
-                            </ul>
-                          </div>
-                          <div className="bg-neutral-900/70 border border-neutral-700 rounded-xl p-4 space-y-3">
-                            {(() => {
-                              const raw = plan.training
-                              const items = Array.isArray(raw) ? raw : []
-                              if (!items.length) return null
-                              return (
-                                <div>
-                                  <div className="text-xs font-black uppercase tracking-widest text-yellow-500 mb-1">Treino</div>
-                                  <ul className="text-sm text-neutral-200 space-y-1 list-disc list-inside">
-                                    {items.map((item: unknown, idx: number) => (
-                                      <li key={idx}>{String(item ?? '')}</li>
-                                    ))}
-                                  </ul>
-                                </div>
-                              )
-                            })()}
-                            {(() => {
-                              const raw = plan.nutrition
-                              const items = Array.isArray(raw) ? raw : []
-                              if (!items.length) return null
-                              return (
-                                <div>
-                                  <div className="text-xs font-black uppercase tracking-widest text-yellow-500 mb-1">Nutrição</div>
-                                  <ul className="text-sm text-neutral-200 space-y-1 list-disc list-inside">
-                                    {items.map((item: unknown, idx: number) => (
-                                      <li key={idx}>{String(item ?? '')}</li>
-                                    ))}
-                                  </ul>
-                                </div>
-                              )
-                            })()}
-                            {(() => {
-                              const raw = plan.habits
-                              const items = Array.isArray(raw) ? raw : []
-                              if (!items.length) return null
-                              return (
-                                <div>
-                                  <div className="text-xs font-black uppercase tracking-widest text-yellow-500 mb-1">Hábitos</div>
-                                  <ul className="text-sm text-neutral-200 space-y-1 list-disc list-inside">
-                                    {items.map((item: unknown, idx: number) => (
-                                      <li key={idx}>{String(item ?? '')}</li>
-                                    ))}
-                                  </ul>
-                                </div>
-                              )
-                            })()}
-                            {(() => {
-                              const raw = plan.warnings
-                              const items = Array.isArray(raw) ? raw : []
-                              if (!items.length) return null
-                              return (
-                                <div>
-                                  <div className="text-xs font-black uppercase tracking-widest text-yellow-500 mb-1">Alertas</div>
-                                  <ul className="text-sm text-neutral-300 space-y-1 list-disc list-inside">
-                                    {items.map((item: unknown, idx: number) => (
-                                      <li key={idx}>{String(item ?? '')}</li>
-                                    ))}
-                                  </ul>
-                                </div>
-                              )
-                            })()}
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="text-sm text-neutral-400">Nenhum plano disponível.</div>
-                      )}
-                      <div className="flex flex-col sm:flex-row gap-2">
-                        <button
-                          type="button"
-                          onClick={async () => {
-                            try {
-                              await handleGenerateAssessmentPlan(planModalAssessment, { openDetails: false });
-                            } catch { }
-                          }}
-                          disabled={!!s?.loading}
-                          className="flex-1 min-h-[44px] px-4 py-2 rounded-xl bg-yellow-500 text-black font-black hover:bg-yellow-400 transition-all duration-300 active:scale-95 disabled:opacity-60"
-                        >
-                          {s?.loading ? 'Gerando…' : 'Gerar novamente'}
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setPlanModalOpen(false)}
-                          className="flex-1 min-h-[44px] px-4 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black hover:bg-neutral-800 transition-all duration-300 active:scale-95"
-                        >
-                          Fechar
-                        </button>
-                      </div>
-                    </div>
-                  );
-                })()}
-              </div>
-            </div>
-          </div>
+          <AssessmentPlanModal
+            assessment={planModalAssessment}
+            planState={aiPlanByAssessmentId[String(planModalAssessment?.id || '')]}
+            onClose={() => setPlanModalOpen(false)}
+            onRegenerate={(a) => handleGenerateAssessmentPlan(a, { openDetails: false })}
+          />
         ) : null}
 
-        {/* Modal do Formulário */}
+        {/* Form Modal */}
         {showForm && (() => {
-          // Build initialData from editAssessmentId if set
           const editData = (() => {
             if (!editAssessmentId) return null;
             const a = sortedAssessments.find(x => String(x?.id) === editAssessmentId);
@@ -1355,7 +372,6 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
             </div>
           );
         })()}
-
 
         {showHistory && (
           <AssessmentHistoryModal

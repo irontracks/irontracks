@@ -1,6 +1,6 @@
 import { createAdminClient } from '@/utils/supabase/admin'
 import { getErrorMessage } from '@/utils/errorMessage'
-import { sendPushToUsers } from '@/lib/push/apns'
+import { sendPushToAllPlatforms as sendPushToUsers } from '@/lib/push/sender'
 import { logError } from '@/lib/logger'
 
 const chunk = (arr: unknown, size: unknown): unknown[][] => {
@@ -97,18 +97,40 @@ export async function insertNotifications(rows: unknown): Promise<{ ok: boolean;
     }
     inserted += (part as unknown[]).length
   }
-  // Fire-and-forget: send APNs remote push to all recipient devices
+  // Fire-and-forget: send remote push to all recipient devices, grouped by notification type.
+  // Grouping ensures each recipient hears the right message, not always the first row's title.
+  // Fan-out is capped at PUSH_FAN_OUT_LIMIT to prevent Lambda timeouts on popular profiles.
   try {
-    const recipientIds = [...new Set(
-      safeRows
-        .map((r) => String(r.user_id || r.recipient_id || '').trim())
-        .filter(Boolean)
-    )]
-    const firstRow = safeRows[0] || {}
-    const title = String(firstRow.title || '').trim()
-    const message = String(firstRow.message || '').trim()
-    if (recipientIds.length && title && message) {
-      void sendPushToUsers(recipientIds, title, message).catch(() => { })
+    const PUSH_FAN_OUT_LIMIT = 1000
+
+    // Group rows by type+title+message so every distinct notification body is delivered correctly
+    const groups = new Map<string, { title: string; message: string; type: string; link?: string; recipientIds: string[] }>()
+    for (const r of safeRows) {
+      const title = String(r.title || '').trim()
+      const message = String(r.message || '').trim()
+      const type = String(r.type || '').trim()
+      const link = String(r.link || r.action_url || '').trim()
+      if (!title || !message) continue
+      const key = `${type}|${title}|${message}`
+      if (!groups.has(key)) groups.set(key, { title, message, type, link: link || undefined, recipientIds: [] })
+      const recipientId = String(r.user_id || r.recipient_id || '').trim()
+      if (recipientId) groups.get(key)!.recipientIds.push(recipientId)
+    }
+
+    for (const [, group] of groups) {
+      const uniqueIds = [...new Set(group.recipientIds)]
+      // Throttle: send to at most PUSH_FAN_OUT_LIMIT devices per batch to avoid Lambda timeout
+      const batch = uniqueIds.slice(0, PUSH_FAN_OUT_LIMIT)
+      if (uniqueIds.length > PUSH_FAN_OUT_LIMIT) {
+        logError('insertNotifications.sendPush', `Fan-out throttled: ${uniqueIds.length} recipients, sending to first ${PUSH_FAN_OUT_LIMIT} only`)
+      }
+      if (!batch.length) continue
+
+      // Deep link payload: type, link and notificationId allow the iOS app to navigate on tap
+      const extra: Record<string, string> = { type: group.type }
+      if (group.link) extra.link = group.link
+
+      void sendPushToUsers(batch, group.title, group.message, extra).catch(() => { })
     }
   } catch (e) { logError('insertNotifications.sendPush', e) }
 

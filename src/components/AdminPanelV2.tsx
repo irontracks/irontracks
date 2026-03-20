@@ -12,7 +12,7 @@
 // ============================================================
 'use client';
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAdminPanelController } from '@/components/admin-panel/useAdminPanelController';
 import { AdminPanelProvider } from '@/components/admin-panel/AdminPanelContext';
 import { AdminPanelHeader } from '@/components/admin-panel/AdminPanelHeader';
@@ -20,6 +20,7 @@ import { DashboardTab } from '@/components/admin-panel/DashboardTab';
 import { StudentsTab } from '@/components/admin-panel/StudentsTab';
 import { PrioritiesTab } from '@/components/admin-panel/PrioritiesTab';
 import dynamic from 'next/dynamic';
+import { X, Crown, Loader2 } from 'lucide-react';
 
 // Lazy-load heavier tabs that are only used by admins
 const TeachersTab = dynamic(() => import('@/components/admin-panel/TeachersTab').then(m => ({ default: m.TeachersTab })), { ssr: false });
@@ -71,7 +72,54 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
         supabase, debugError,
     } = ctrl;
 
-    if (!isAdmin && !isTeacher) return null;
+    // Deferred auth check: wait up to 3s for role to be populated before showing fallback
+    const hasAccess = isAdmin || isTeacher;
+    const [waited, setWaited] = useState(false);
+    useEffect(() => {
+        if (hasAccess) return;
+        const timer = setTimeout(() => setWaited(true), 3000);
+        return () => clearTimeout(timer);
+    }, [hasAccess]);
+
+    // While waiting for role to populate, show loading
+    if (!hasAccess && !waited) {
+        return (
+            <div data-tour="adminpanel.root" className="fixed inset-0 z-50 bg-neutral-950 text-white flex flex-col items-center justify-center gap-4">
+                <Loader2 size={32} className="text-yellow-500 animate-spin" />
+                <p className="text-sm text-neutral-400 font-medium">Carregando Painel de Controle...</p>
+                <button
+                    type="button"
+                    onClick={() => onClose?.()}
+                    className="mt-4 px-5 py-2.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-300 hover:text-white text-sm font-bold transition-colors border border-neutral-700"
+                >
+                    Voltar ao Dashboard
+                </button>
+            </div>
+        );
+    }
+
+    // If role still not valid after timeout, show permission denied with close button
+    if (!hasAccess) {
+        return (
+            <div data-tour="adminpanel.root" className="fixed inset-0 z-50 bg-neutral-950 text-white flex flex-col items-center justify-center gap-4 p-6">
+                <div className="w-16 h-16 rounded-3xl bg-yellow-500/10 border border-yellow-500/20 flex items-center justify-center">
+                    <Crown size={28} className="text-yellow-500" />
+                </div>
+                <h2 className="text-lg font-black text-white">Acesso Restrito</h2>
+                <p className="text-sm text-neutral-400 text-center max-w-sm">
+                    Seu perfil não tem permissão de Coach ou Admin. Verifique com o administrador.
+                </p>
+                <button
+                    type="button"
+                    onClick={() => onClose?.()}
+                    className="mt-4 px-6 py-3 rounded-2xl bg-yellow-500 hover:bg-yellow-400 text-black font-black text-sm transition-colors"
+                >
+                    Voltar ao Dashboard
+                </button>
+            </div>
+        );
+    }
+
 
     let TAB_LABELS: Record<string, string> = { dashboard: 'VISÃO GERAL', students: 'ALUNOS', templates: 'TREINOS' };
     if (isAdmin) {

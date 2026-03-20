@@ -95,10 +95,11 @@ export function InAppNotificationsProvider(props: InAppNotificationsProviderProp
     let cancelled = false;
     (async () => {
       try {
-        const { data } = await supabase.auth.getUser();
-        const id = data?.user?.id ? String(data.user.id) : '';
+        // getSession() reads from local storage — no network round-trip unlike getUser()
+        const { data } = await supabase.auth.getSession();
+        const id = data?.session?.user?.id ? String(data.session.user.id) : '';
         if (!cancelled && id) setAuthUserId(id);
-      } catch (e) { logError('InAppNotifications.getUser', e) }
+      } catch (e) { logError('InAppNotifications.getSession', e) }
     })();
     return () => {
       cancelled = true;

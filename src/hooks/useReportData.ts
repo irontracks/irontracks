@@ -396,8 +396,7 @@ export const useReportData = ({ session, previousSession, user, settings }: UseR
   }, [sessionLogs, sessionExerciseNames, effectiveBodyWeight])
 
   // ── Calories: deterministic useMemo ────────────────────────────────────
-  // Uses two-factor MET (avg load + density), volume-weighted complexity,
-  // body weight, active vs rest time split, RPE multiplier, and EPOC.
+  // Uses MET V9 model with: density, volume, body weight, sex, RPE, cadence, EPOC.
   const calories = useMemo(() => {
     const bikeKcal = Number(outdoorBike?.caloriesKcal)
     if (Number.isFinite(bikeKcal) && bikeKcal > 0) return Math.round(bikeKcal)
@@ -411,6 +410,16 @@ export const useReportData = ({ session, previousSession, user, settings }: UseR
     // Biological sex from user settings (improves calorie precision by ±10%)
     const biologicalSex = String(settings?.biologicalSex ?? 'not_informed') || 'not_informed'
 
+    // Cadence / rep tempo from exercise config (e.g. "2-0-2", "4-1-4")
+    const cadenceNames = Array.isArray(safeSession?.exercises)
+      ? (safeSession.exercises as unknown[])
+          .map((ex) => {
+            const e = ex && typeof ex === 'object' ? (ex as AnyObj) : null
+            return String(e?.cadence || e?.tempo || '').trim()
+          })
+          .filter(Boolean) as string[]
+      : null
+
     return estimateCaloriesMet(
       sessionLogs,
       durationInMinutes,
@@ -422,8 +431,9 @@ export const useReportData = ({ session, previousSession, user, settings }: UseR
       biologicalSex,
       exerciseVolumes,
       Number(safeSession?.startedAt ?? safeSession?.started_at ?? 0) || null,
+      cadenceNames && cadenceNames.length > 0 ? cadenceNames : null,
     )
-  }, [sessionLogs, durationInMinutes, checkinBodyWeightKg, sessionExerciseNames, exerciseVolumes, postCheckinRpe, outdoorBike, safeSession?.executionTotalSeconds, safeSession?.restTotalSeconds, safeSession?.totalTime, safeSession?.startedAt, safeSession?.started_at, settings?.biologicalSex, settings?.bodyWeightKg])
+  }, [sessionLogs, durationInMinutes, checkinBodyWeightKg, sessionExerciseNames, exerciseVolumes, postCheckinRpe, outdoorBike, safeSession?.executionTotalSeconds, safeSession?.restTotalSeconds, safeSession?.totalTime, safeSession?.startedAt, safeSession?.started_at, settings?.biologicalSex, settings?.bodyWeightKg, safeSession?.exercises])
 
 
   const reportMeta = safeSession?.reportMeta && typeof safeSession.reportMeta === 'object' ? (safeSession.reportMeta as AnyObj) : null

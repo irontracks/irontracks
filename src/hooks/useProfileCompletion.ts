@@ -12,8 +12,9 @@
  */
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback } from 'react'
 import { getProfileCompletenessScore } from '@/schemas/settings'
+import { createClient } from '@/utils/supabase/client'
 import type { UserSettings } from '@/schemas/settings'
 
 interface UseProfileCompletionOptions {
@@ -21,6 +22,8 @@ interface UseProfileCompletionOptions {
   displayName?: string | null
   initialProfile?: unknown
   settings?: UserSettings | null
+  user?: { id?: string; photoURL?: string | null } | null
+  alert?: (msg: string, title?: string) => Promise<unknown>
 }
 
 interface UseProfileCompletionReturn {
@@ -34,6 +37,7 @@ interface UseProfileCompletionReturn {
   setSavingProfile: (v: boolean) => void
   showCompleteProfile: boolean
   setShowCompleteProfile: (v: boolean) => void
+  handleSaveProfile: () => Promise<void>
 }
 
 /**
@@ -46,7 +50,10 @@ export function useProfileCompletion({
   displayName,
   initialProfile,
   settings,
+  user,
+  alert: alertFn,
 }: UseProfileCompletionOptions): UseProfileCompletionReturn {
+  const supabase = createClient()
   const [profileDraftName, setProfileDraftName] = useState('')
   const [savingProfile, setSavingProfile] = useState(false)
   const [showCompleteProfile, setShowCompleteProfile] = useState(false)
@@ -101,16 +108,50 @@ export function useProfileCompletion({
   // Profile is incomplete if score < 90 OR no display name
   const profileIncomplete = !isComplete || !hasName
 
+  const handleSaveProfile = useCallback(async () => {
+    if (!userId) return
+    const nextName = String(profileDraftName || '').trim()
+    if (!nextName) {
+      if (alertFn) await alertFn('Informe seu nome para completar o perfil.', 'Perfil incompleto')
+      return
+    }
+    setSavingProfile(true)
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .update({
+          display_name: nextName,
+          photo_url: user?.photoURL ?? null,
+          last_seen: new Date().toISOString(),
+        })
+        .eq('id', userId)
+        .select('id')
+        .maybeSingle()
+      if (error) throw error
+      if (!data?.id) {
+        if (alertFn) await alertFn('Não foi possível salvar seu perfil (registro não encontrado).', 'Perfil')
+        return
+      }
+      setShowCompleteProfile(false)
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e || '')
+      if (alertFn) await alertFn('Erro ao salvar perfil: ' + message)
+    } finally {
+      setSavingProfile(false)
+    }
+  }, [userId, profileDraftName, user?.photoURL, alertFn, supabase])
+
   return {
     profileIncomplete,
     completionScore: score,
     missingFields,
-    setProfileIncomplete: () => {}, // kept for backward compat
+    setProfileIncomplete: () => {},
     profileDraftName,
     setProfileDraftName,
     savingProfile,
     setSavingProfile,
     showCompleteProfile,
     setShowCompleteProfile,
+    handleSaveProfile,
   }
 }

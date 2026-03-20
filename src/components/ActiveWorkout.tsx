@@ -33,15 +33,53 @@ export default function ActiveWorkout(props: ActiveWorkoutProps) {
     dismissWorkoutEdit: () => void
   }
 
-  // Accept incoming workout edit from a teammate
+  // Accept incoming workout edit from a teammate.
+  // Instead of replacing the entire workout (which erases B's exercises),
+  // we do a smart merge: keep all of B's current exercises and append
+  // any NEW exercises from A that don't already exist in B's list.
   const handleAcceptWorkoutEdit = React.useCallback(() => {
     const edit = teamCtx.pendingWorkoutEdit
     if (!edit?.workout || !props.onUpdateSession) return
     try {
-      props.onUpdateSession({ workout: edit.workout })
+      const incomingExercises: Array<Record<string, unknown>> = Array.isArray(
+        (edit.workout as Record<string, unknown>).exercises
+      )
+        ? (edit.workout as Record<string, unknown>).exercises as Array<Record<string, unknown>>
+        : []
+
+      // Current exercises of this user (B)
+      const currentWorkout = props.session?.workout as Record<string, unknown> | null | undefined
+      const currentExercises: Array<Record<string, unknown>> = Array.isArray(
+        (currentWorkout as Record<string, unknown> | null)?.exercises
+      )
+        ? (currentWorkout as Record<string, unknown>).exercises as Array<Record<string, unknown>>
+        : []
+
+      const normalise = (s: unknown) => String(s ?? '').toLowerCase().trim()
+      const existingNames = new Set(currentExercises.map(ex => normalise(ex.name)))
+
+      // Only add exercises that B doesn't already have
+      const newExercises = incomingExercises.filter(
+        ex => !existingNames.has(normalise(ex.name))
+      )
+
+      if (newExercises.length === 0) {
+        // No new exercises — nothing to merge; just dismiss
+        teamCtx.dismissWorkoutEdit()
+        return
+      }
+
+      // Merge: B's exercises first, then new ones from A
+      const mergedWorkout = {
+        ...(currentWorkout ?? {}),
+        exercises: [...currentExercises, ...newExercises],
+      }
+
+      props.onUpdateSession({ workout: mergedWorkout })
     } catch { }
     teamCtx.dismissWorkoutEdit()
   }, [teamCtx, props])
+
 
   if (!session || !workout) {
     return (

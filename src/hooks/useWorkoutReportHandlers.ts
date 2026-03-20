@@ -121,6 +121,10 @@ export function useWorkoutReportHandlers({
                 prevBaseMsByExercise: prevBaseForReport,
                 ai: aiToUse || null,
                 logoDataUrl: logoDataUrl || undefined,
+                // User profile data for accurate calorie calculation
+                bodyWeightKg: Number(user?.bodyWeightKg ?? (session?.preCheckin as AnyObj)?.weight) || undefined,
+                biologicalSex: String(user?.biologicalSex || session?.biologicalSex || '').toLowerCase() || undefined,
+                rpe: Number((session?.postCheckin as AnyObj)?.rpe) || undefined,
             })
             const title = String(session?.workoutTitle || 'Treino').trim() || 'Treino'
             const fileName = `${title.replace(/\s+/g, '_')}_irontracks.html`

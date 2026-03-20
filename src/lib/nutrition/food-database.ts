@@ -12,6 +12,7 @@ export type FoodItem = {
  */
 export const foodDatabase: Record<string, FoodItem> = {
   // ── Proteínas ──────────────────────────────────────────────────────────────
+  'frango': { kcal: 165, p: 31, c: 0, f: 4, approx: { unidade: 100, bife: 120, posta: 120, colher: 30 } },
   'frango grelhado': { kcal: 165, p: 31, c: 0, f: 4, approx: { unidade: 100, bife: 120, posta: 120, colher: 30 } },
   'peito de frango': { kcal: 165, p: 31, c: 0, f: 4, approx: { unidade: 100, bife: 120, posta: 120 } },
   'frango desfiado': { kcal: 165, p: 31, c: 0, f: 4, approx: { colher: 25, concha: 80 } },

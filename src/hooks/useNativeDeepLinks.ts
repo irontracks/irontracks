@@ -4,6 +4,8 @@
  * Listens for deep links forwarded by the iOS native shell and routes
  * them to the correct internal page via Next.js router. Converts
  * `irontracks://` URLs to internal paths and handles universal links.
+ * Also handles push notification tap deep links via the
+ * `irontracks:push:navigate` custom event dispatched by usePushNotifications.
  * Only active inside the iOS WKWebView wrapper.
  */
 'use client'
@@ -32,6 +34,24 @@ const toInternalPath = (rawUrl: string) => {
 
 export function useNativeDeepLinks() {
   const router = useRouter()
+
+  // ── Push notification deep link ──────────────────────────────────────────
+  // usePushNotifications dispatches this event when the user taps a push
+  // notification that carries an `extra.link` payload.
+  useEffect(() => {
+    const onPushNavigate = (e: Event) => {
+      try {
+        const detail = (e as CustomEvent<{ link?: string; type?: string }>).detail
+        const link = String(detail?.link || '').trim()
+        if (link) {
+          const path = toInternalPath(link) ?? link
+          router.push(path)
+        }
+      } catch (err) { logWarn('useNativeDeepLinks', 'push navigate error', err) }
+    }
+    window.addEventListener('irontracks:push:navigate', onPushNavigate)
+    return () => window.removeEventListener('irontracks:push:navigate', onPushNavigate)
+  }, [router])
 
   useEffect(() => {
     if (!isIosNative()) return

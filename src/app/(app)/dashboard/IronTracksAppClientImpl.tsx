@@ -730,8 +730,13 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
     // to show. In that case, render the dashboard immediately (workouts will be
     // refreshed silently in the background once auth completes).
     const hasCachedWorkouts = Array.isArray(workouts) && workouts.length > 0
-    const isDashboardReady = !streakLoading && userSettingsApi.loaded;
-    const isAppLoading = (authLoading && !hasCachedWorkouts) || (!user?.id && !hasCachedWorkouts) || !isDashboardReady;
+    const isDashboardReady = userSettingsApi.loaded; // streakLoading intentionally excluded (secondary data, must not block app)
+    // Three-layer guard: (1) view is not 'active', (2) no active session exists yet,
+    // (3) normal auth + settings loading conditions.
+    // This guarantees the LoadingScreen overlay NEVER covers an active workout.
+    const isAppLoading = view !== 'active' && !activeSession && (
+        (authLoading && !hasCachedWorkouts) || (!user?.id && !hasCachedWorkouts) || !isDashboardReady
+    );
 
     const currentWorkoutId = activeSession?.workout?.id;
     let nextWorkout = null;

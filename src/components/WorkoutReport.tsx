@@ -20,6 +20,9 @@ import {
 import { ReportMetricsPanel } from '@/components/workout-report/ReportMetricsPanel'
 import { ReportSummaryCards } from '@/components/workout-report/ReportSummaryCards'
 import { ReportExerciseCard } from '@/components/workout-report/ReportExerciseCard'
+import { ReportHighlightsPanel } from '@/components/workout-report/ReportHighlightsPanel'
+import { ReportExerciseTable } from '@/components/workout-report/ReportExerciseTable'
+import { ReportTeamSection } from '@/components/workout-report/ReportTeamSection'
 
 /** Skeleton placeholder for lazy-loaded report sections */
 const SectionSkeleton = () => (
@@ -209,6 +212,10 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                 prevBaseMsByExercise: prevBaseForReport,
                 ai: aiToUse || null,
                 logoDataUrl: logoDataUrl || undefined,
+                // User profile data for accurate calorie calculation
+                bodyWeightKg: Number(settings?.bodyWeightKg) || undefined,
+                biologicalSex: String(settings?.biologicalSex || '').toLowerCase() || undefined,
+                rpe: Number(postCheckin?.rpe) || undefined,
             });
 
             const title = String(session?.workoutTitle || 'Treino').trim() || 'Treino'
@@ -659,70 +666,17 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                 </div>
 
                 {/* ─── HITEK Highlights Panel ───────────────────────────────────────── */}
-                {(prCount > 0 || (volumeDeltaAbs !== 0 && currentVolume > 0) || setCompletionPct > 0) && (
-                    <div className="mb-8 p-4 rounded-2xl border border-yellow-500/25 bg-gradient-to-br from-yellow-500/10 via-amber-500/5 to-neutral-900/80">
-                        <div className="text-[10px] font-black uppercase tracking-widest text-yellow-400 mb-3">⚡ Destaques da sessão</div>
-                        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                            {prCount > 0 && (
-                                <div className="relative overflow-hidden border border-yellow-500/40 rounded-xl flex flex-col"
-                                    style={{ background: 'linear-gradient(135deg, rgba(234,179,8,0.14), rgba(180,83,9,0.10))', boxShadow: '0 0 18px rgba(234,179,8,0.18), inset 0 0 12px rgba(234,179,8,0.06)' }}>
-                                    {/* PR explosion background — upgraded to 30% */}
-                                    <div className="absolute inset-0 opacity-30">
-                                        <NextImage src="/report-pr.png" alt="" fill unoptimized className="object-cover object-center" />
-                                    </div>
-                                    <div className="relative z-10 p-3 flex flex-col gap-1">
-                                        <div className="text-2xl font-black text-yellow-400">{prCount}</div>
-                                        <div className="text-[10px] font-black uppercase tracking-widest text-yellow-300">
-                                            {prCount === 1 ? 'PR alcançado' : 'PRs alcançados'}
-                                        </div>
-                                        {allTimePrCount > 0 && (
-                                            <div className="text-[10px] text-amber-300 font-black">★ {allTimePrCount} recorde{allTimePrCount > 1 ? 's' : ''} histórico{allTimePrCount > 1 ? 's' : ''}!</div>
-                                        )}
-                                        {detectedPrs[0] && (
-                                            <div className="text-[10px] text-yellow-200 opacity-80 truncate">
-                                                {detectedPrs[0].isAllTimePr ? '★ ' : ''}{detectedPrs[0].exerciseName}: {detectedPrs[0].e1rm.toFixed(1)} kg 1RM
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
-                            {volumeDeltaAbs !== 0 && currentVolume > 0 && (
-                                <div className={`border rounded-xl p-3 flex flex-col gap-1 ${volumeDeltaAbs > 0
-                                    ? 'bg-green-500/10 border-green-500/30'
-                                    : 'bg-red-500/10 border-red-500/30'
-                                    }`}>
-                                    <div className={`text-2xl font-black ${volumeDeltaAbs > 0 ? 'text-green-400' : 'text-red-400'}`}>
-                                        {volumeDeltaAbs > 0 ? '+' : ''}{volumeDeltaAbs.toLocaleString('pt-BR')} kg
-                                    </div>
-                                    <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Volume vs anterior</div>
-                                    {Math.abs(volumeDelta) > 0 && (
-                                        <div className={`text-[10px] font-mono ${volumeDelta > 0 ? 'text-green-300' : 'text-red-300'}`}>
-                                            {volumeDelta > 0 ? '+' : ''}{volumeDelta.toFixed(1)}%
-                                        </div>
-                                    )}
-                                </div>
-                            )}
-                            {currentVolume > 0 && (
-                                <div className="bg-neutral-800/60 border border-neutral-700/60 rounded-xl p-3 flex flex-col gap-1">
-                                    <div className="text-2xl font-black text-white">{currentVolume.toLocaleString('pt-BR')} kg</div>
-                                    <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Volume total</div>
-                                </div>
-                            )}
-                            {setCompletionPct > 0 && (
-                                <div className={`border rounded-xl p-3 flex flex-col gap-1 ${setCompletionPct >= 90 ? 'bg-green-500/10 border-green-500/30' :
-                                    setCompletionPct >= 70 ? 'bg-yellow-500/10 border-yellow-500/30' :
-                                        'bg-red-500/10 border-red-500/30'
-                                    }`}>
-                                    <div className={`text-2xl font-black ${setCompletionPct >= 90 ? 'text-green-400' :
-                                        setCompletionPct >= 70 ? 'text-yellow-400' : 'text-red-400'
-                                        }`}>{setCompletionPct}%</div>
-                                    <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Séries completas</div>
-                                    <div className="text-[10px] text-neutral-500 font-mono">{setsCompleted}/{setsPlanned}</div>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                )}
+                <ReportHighlightsPanel
+                    prCount={prCount}
+                    allTimePrCount={allTimePrCount}
+                    detectedPrs={detectedPrs}
+                    volumeDeltaAbs={volumeDeltaAbs}
+                    volumeDelta={volumeDelta}
+                    currentVolume={currentVolume}
+                    setCompletionPct={setCompletionPct}
+                    setsCompleted={setsCompleted}
+                    setsPlanned={setsPlanned}
+                />
 
                 {reportMeta && (
                     <ReportMetricsPanel
@@ -756,95 +710,10 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                     )}
                 </Suspense>
 
-                {reportMeta && Array.isArray(reportMeta.exercises) && reportMeta.exercises.length > 0 && (
-                    <div className="mb-8 p-4 rounded-xl border border-neutral-800 bg-neutral-900/60">
-                        <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
-                            <div className="min-w-0">
-                                <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Ordem e execução</div>
-                                <div className="text-lg font-black text-white">Detalhe por exercício</div>
-                                <div className="text-xs text-neutral-300">Ordem, descanso e volume executado.</div>
-                            </div>
-                        </div>
-                        <div className="mt-4 overflow-x-auto">
-                            <table className="w-full text-sm text-left">
-                                <thead className="bg-neutral-950 text-neutral-400 uppercase text-[10px] font-bold">
-                                    <tr>
-                                        <th className="px-3 py-2">#</th>
-                                        <th className="px-3 py-2">Exercício</th>
-                                        <th className="px-3 py-2 text-center">Séries</th>
-                                        <th className="px-3 py-2 text-center">Reps</th>
-                                        <th className="px-3 py-2 text-center">Execução</th>
-                                        <th className="px-3 py-2 text-center">Descanso (real)</th>
-                                        <th className="px-3 py-2 text-center">Descanso (plan)</th>
-                                        <th className="px-3 py-2 text-right">Peso médio</th>
-                                        <th className="px-3 py-2 text-right">Volume</th>
-                                        <th className="px-3 py-2 text-right">Δ Volume</th>
-                                        <th className="px-3 py-2 text-right">Δ Reps</th>
-                                        <th className="px-3 py-2 text-right">Δ Peso</th>
-                                        <th className="px-3 py-2 text-right">Δ 1RM</th>
-                                    </tr>
-                                </thead>
-                                <tbody className="divide-y divide-neutral-800">
-                                    {(reportMeta.exercises as unknown[]).map((raw, idx) => {
-                                        const ex = raw && typeof raw === 'object' ? (raw as AnyObj) : null
-                                        if (!ex) return null
-                                        const name = String(ex.name || '').trim() || '—'
-                                        const order = Number(ex.order || idx + 1)
-                                        const setsDone = Number(ex.setsDone || 0)
-                                        const repsDone = Number(ex.repsDone || 0)
-                                        const executionMinutes = Number(ex.executionMinutes || 0)
-                                        const restMinutes = Number(ex.restMinutes || 0)
-                                        const rest = Number(ex.restTimePlannedSec || 0)
-                                        const avgWeight = Number(ex.avgWeightKg || 0)
-                                        const volume = Number(ex.volumeKg || 0)
-                                        const deltaVolume = ex.delta && typeof ex.delta === 'object' ? Number((ex.delta as AnyObj).volumeKg) : NaN
-                                        const deltaReps = ex.delta && typeof ex.delta === 'object' ? Number((ex.delta as AnyObj).reps) : NaN
-                                        const deltaWeight = ex.delta && typeof ex.delta === 'object' ? Number((ex.delta as AnyObj).avgWeightKg) : NaN
-                                        const deltaVolumeLabel = Number.isFinite(deltaVolume) ? `${deltaVolume > 0 ? '+' : ''}${deltaVolume.toFixed(1)} kg` : '—'
-                                        const deltaRepsLabel = Number.isFinite(deltaReps) ? `${deltaReps > 0 ? '+' : ''}${Math.round(deltaReps)}` : '—'
-                                        const deltaWeightLabel = Number.isFinite(deltaWeight) ? `${deltaWeight > 0 ? '+' : ''}${deltaWeight.toFixed(1)} kg` : '—'
-                                        const deltaVolumeClass = Number.isFinite(deltaVolume) && deltaVolume < 0 ? 'text-red-300' : 'text-emerald-300'
-                                        const deltaRepsClass = Number.isFinite(deltaReps) && deltaReps < 0 ? 'text-red-300' : 'text-emerald-300'
-                                        const deltaWeightClass = Number.isFinite(deltaWeight) && deltaWeight < 0 ? 'text-red-300' : 'text-emerald-300'
-                                        return (
-                                            <tr key={`${name}-${idx}`} className="hover:bg-neutral-800/40">
-                                                <td className="px-3 py-2 font-mono text-neutral-300">{Number.isFinite(order) ? order : idx + 1}</td>
-                                                <td className="px-3 py-2 font-semibold text-white">{name}</td>
-                                                <td className="px-3 py-2 text-center font-mono text-neutral-300">{Number.isFinite(setsDone) && setsDone > 0 ? setsDone : '—'}</td>
-                                                <td className="px-3 py-2 text-center font-mono text-neutral-300">{Number.isFinite(repsDone) && repsDone > 0 ? repsDone : '—'}</td>
-                                                <td className="px-3 py-2 text-center font-mono text-neutral-300">{Number.isFinite(executionMinutes) && executionMinutes > 0 ? `${executionMinutes.toFixed(1)} min` : '—'}</td>
-                                                <td className="px-3 py-2 text-center font-mono text-neutral-300">{Number.isFinite(restMinutes) && restMinutes > 0 ? `${restMinutes.toFixed(1)} min` : '—'}</td>
-                                                <td className="px-3 py-2 text-center font-mono text-neutral-300">{Number.isFinite(rest) && rest > 0 ? `${Math.round(rest)}s` : '—'}</td>
-                                                <td className="px-3 py-2 text-right font-mono text-neutral-200">{Number.isFinite(avgWeight) && avgWeight > 0 ? `${avgWeight.toFixed(1)} kg` : '—'}</td>
-                                                <td className="px-3 py-2 text-right font-mono text-neutral-200">{Number.isFinite(volume) && volume > 0 ? `${volume.toLocaleString('pt-BR')} kg` : '—'}</td>
-                                                <td className={`px-3 py-2 text-right font-mono ${Number.isFinite(deltaVolume) ? deltaVolumeClass : 'text-neutral-500'}`}>{deltaVolumeLabel}</td>
-                                                <td className={`px-3 py-2 text-right font-mono ${Number.isFinite(deltaReps) ? deltaRepsClass : 'text-neutral-500'}`}>{deltaRepsLabel}</td>
-                                                <td className={`px-3 py-2 text-right font-mono ${Number.isFinite(deltaWeight) ? deltaWeightClass : 'text-neutral-500'}`}>{deltaWeightLabel}</td>
-                                                <td className="px-3 py-2 text-right font-mono text-blue-300 text-xs">
-                                                    {(() => {
-                                                        // Compute Δ1RM from historicalBestE1rm if available
-                                                        const key = String(name || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim()
-                                                        const hist = historicalBestE1rm[key]
-                                                        if (!hist || hist <= 0) return '—'
-                                                        // avg weight × (1 + avg reps/30) as rough e1RM for overall exercise
-                                                        const avgW = Number(ex.avgWeightKg || 0)
-                                                        const avgR = Number(ex.repsDone || 0) / Math.max(1, Number(ex.setsDone || 1))
-                                                        const curE1rm = avgW > 0 && avgR > 0 ? avgW * (1 + avgR / 30) : 0
-                                                        if (curE1rm <= 0) return '—'
-                                                        const delta = curE1rm - hist
-                                                        if (!Number.isFinite(delta)) return '—'
-                                                        const cls = delta > 0 ? 'text-green-300' : delta < 0 ? 'text-red-300' : 'text-neutral-500'
-                                                        return <span className={cls}>{delta > 0 ? '+' : ''}{delta.toFixed(1)} kg</span>
-                                                    })()}
-                                                </td>
-                                            </tr>
-                                        )
-                                    })}
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                )}
+                <ReportExerciseTable
+                    exercises={reportMeta?.exercises as unknown[] || []}
+                    historicalBestE1rm={historicalBestE1rm}
+                />
 
                 <ReportCheckinPanel
                     preCheckin={preCheckin}
@@ -874,38 +743,11 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                     renderAiRating={renderAiRating}
                 />
 
-                {isTeamSession && (
-                    <div className="mb-8 p-4 rounded-xl border border-amber-500/20 bg-gradient-to-br from-amber-500/8 to-neutral-900/80 flex flex-col md:flex-row md:items-center md:justify-between gap-3"
-                        style={{ boxShadow: '0 0 20px rgba(245,158,11,0.08)' }}>
-                        <div className="flex items-center gap-3">
-                            {/* Team duo athletes illustration */}
-                            <div className="w-16 h-12 rounded-xl overflow-hidden shrink-0"
-                                style={{ background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(245,158,11,0.2)' }}>
-                                <NextImage src="/report-team-duo.png" alt="" width={64} height={48} unoptimized className="w-full h-full object-cover object-top" />
-                            </div>
-                            <div>
-                                <p className="text-xs font-bold uppercase tracking-widest text-amber-400">Treino em Equipe</p>
-                                <p className="text-sm font-semibold text-neutral-100">
-                                    {partners.length === 1 ? '1 parceiro treinando com você' : `${partners.length} parceiros treinando com você`}
-                                </p>
-                            </div>
-                        </div>
-                        <div className="flex flex-wrap gap-2">
-                            {partners.map((p: unknown, idx: number) => {
-                                const part = p && typeof p === 'object' ? (p as AnyObj) : ({} as AnyObj)
-                                return (
-                                    <button
-                                        key={String(part.uid || part.id || idx)}
-                                        onClick={() => handlePartnerPlan(part)}
-                                        className="px-3 py-2 rounded-full bg-black text-white text-xs font-bold uppercase tracking-wide hover:bg-neutral-900"
-                                    >
-                                        Ver PDF de {String(part.name || 'Parceiro')}
-                                    </button>
-                                )
-                            })}
-                        </div>
-                    </div>
-                )}
+                <ReportTeamSection
+                    isTeamSession={isTeamSession}
+                    partners={partners}
+                    onPartnerPlan={handlePartnerPlan}
+                />
 
                 <ReportSummaryCards
                     session={safeSession}

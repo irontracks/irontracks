@@ -5,6 +5,7 @@ import { User, Scale, Ruler, Calendar, MapPin, Building2, Dumbbell, Target, BarC
 import { useAdminPanel } from './AdminPanelContext'
 import { getProfileCompletenessScore } from '@/schemas/settings'
 import type { UserSettings } from '@/schemas/settings'
+import { logInfo, logWarn } from '@/lib/logger'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -89,7 +90,7 @@ export const StudentProfileTab: React.FC = () => {
             const body = await resp.json()
             detail += `: ${body?.error || resp.statusText}`
           } catch { detail += `: ${resp.statusText}` }
-          console.warn('[StudentProfileTab] settings fetch failed:', detail, { userId, authHeaders })
+          logWarn('StudentProfileTab', `settings fetch failed: ${detail}`, { userId, authHeaders })
           setError(`Erro ao carregar perfil (${detail})`)
           return
         }
@@ -97,7 +98,7 @@ export const StudentProfileTab: React.FC = () => {
         const json = await resp.json()
         if (cancelled) return
 
-        console.log('[StudentProfileTab] settings OK:', json)
+        logInfo('admin:student-profile-tab', 'settings OK', json)
 
         if (json.ok && json.settings && typeof json.settings === 'object') {
           setSettings(json.settings as UserSettings)

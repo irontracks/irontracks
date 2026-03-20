@@ -279,6 +279,15 @@ function ExerciseCardInner({ ex, exIdx }: { ex: WorkoutExercise; exIdx: number }
       >
         <div className="min-w-0 text-left flex-1">
           <div className="flex items-center gap-2 min-w-0">
+            {/* Exercise number badge */}
+            <span className={[
+              'flex-shrink-0 inline-flex items-center justify-center rounded-lg text-[11px] font-black tabular-nums min-w-[22px] h-[22px] px-1',
+              allSetsDone
+                ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                : 'bg-yellow-500/15 text-yellow-400 border border-yellow-500/25',
+            ].join(' ')}>
+              {String(exIdx + 1).padStart(2, '0')}
+            </span>
             {allSetsDone ? (
               <div className="relative flex-shrink-0">
                 <CheckCircle2 size={18} className="text-emerald-400 drop-shadow-[0_0_6px_rgba(52,211,153,0.7)]" />
