@@ -1,0 +1,646 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>F - ombro e tríceps · IronTracks</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
+    body {
+      background: #0d0d0d !important;
+      color: #f5f5f5;
+      font-family: 'Inter', ui-sans-serif, system-ui, -apple-system, sans-serif;
+      font-size: 14px;
+      line-height: 1.5;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    img { max-width: 100%; display: block; }
+
+    /* ── Layout ─────────────────────────────────── */
+    .page { max-width: 900px; margin: 0 auto; }
+
+    /* ── Header Banner ──────────────────────────── */
+    .header-banner {
+      background: linear-gradient(135deg, #111111 0%, #1a1508 60%, #0d0d0d 100%) !important;
+      border-bottom: 3px solid #f59e0b;
+      padding: 28px 36px 22px;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      gap: 20px;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    .header-brand-row { display: flex; align-items: center; gap: 14px; }
+    .header-logo { width: 44px; height: 44px; border-radius: 12px; border: 1.5px solid rgba(245,158,11,0.55); background: #000; object-fit: contain; }
+    .header-wordmark { font-size: 32px; font-weight: 900; font-style: italic; letter-spacing: -0.04em; line-height: 1; }
+    .header-wordmark span { color: #f59e0b; }
+    .header-sub { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.22em; color: #a3a3a3; margin-top: 3px; }
+    .header-right { text-align: right; }
+    .header-workout { font-size: 22px; font-weight: 900; color: #ffffff; line-height: 1.15; max-width: 340px; }
+    .header-date { font-size: 12px; color: #a3a3a3; margin-top: 4px; }
+    .header-athlete { font-size: 11px; text-transform: uppercase; letter-spacing: 0.08em; color: #6b7280; margin-top: 2px; }
+    .header-athlete strong { color: #d4d4d4; }
+
+    /* ── Gold accent stripe under header ─────────── */
+    .accent-stripe {
+      background: linear-gradient(90deg, #f59e0b, #d97706, rgba(245,158,11,0)) !important;
+      height: 3px;
+      margin-bottom: 28px;
+      -webkit-print-color-adjust: exact !important;
+    }
+
+    /* ── Container ── */
+    .container { padding: 0 36px 36px; }
+
+    /* ── Section ──────────────────────────────────── */
+    .section-block { margin-bottom: 32px; }
+    .section-title {
+      font-size: 10px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.22em;
+      color: #a3a3a3;
+      margin-bottom: 12px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .section-dot {
+      display: inline-block;
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #f59e0b !important;
+      -webkit-print-color-adjust: exact !important;
+      flex-shrink: 0;
+    }
+
+    /* ── Stats Grid ───────────────────────────────── */
+    .stats-grid {
+      display: grid;
+      gap: 12px;
+      margin-bottom: 0;
+    }
+    .stats-main { grid-template-columns: repeat(4, 1fr); }
+    .stats-sub  { grid-template-columns: repeat(4, 1fr); }
+    .stats-4    { grid-template-columns: repeat(4, 1fr); }
+    .stat-card {
+      background: #161616 !important;
+      border: 1px solid #2a2a2a;
+      border-radius: 14px;
+      padding: 16px;
+      page-break-inside: avoid;
+      -webkit-print-color-adjust: exact !important;
+      print-color-adjust: exact !important;
+    }
+    .stat-card-accent {
+      background: linear-gradient(135deg, rgba(245,158,11,0.12), rgba(180,83,9,0.08)) !important;
+      border-color: rgba(245,158,11,0.4) !important;
+    }
+    .stat-label { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.18em; color: #6b7280; margin-bottom: 6px; }
+    .stat-value { font-size: 26px; font-weight: 900; color: #ffffff; line-height: 1.05; font-variant-numeric: tabular-nums; }
+    .stat-value-gold { color: #f59e0b !important; }
+    .stat-unit  { font-size: 11px; font-weight: 700; color: #6b7280; text-transform: uppercase; letter-spacing: 0.08em; }
+    .stat-sub   { font-size: 11px; font-weight: 700; color: #6b7280; margin-top: 3px; }
+
+    /* ── AI Cards ─────────────────────────────────── */
+    .ai-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+    .ai-card {
+      background: #161616 !important;
+      border: 1px solid #2a2a2a;
+      border-radius: 14px;
+      padding: 16px;
+      page-break-inside: avoid;
+      -webkit-print-color-adjust: exact !important;
+    }
+    .ai-card-gold {
+      background: linear-gradient(135deg, rgba(245,158,11,0.1), rgba(120,53,15,0.08)) !important;
+      border-color: rgba(245,158,11,0.35) !important;
+    }
+    .ai-card-red {
+      background: rgba(239,68,68,0.07) !important;
+      border-color: rgba(239,68,68,0.3) !important;
+    }
+    .ai-card-label { font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.2em; color: #6b7280; margin-bottom: 10px; }
+    .ai-label-green { color: #4ade80 !important; }
+    .ai-label-red   { color: #f87171 !important; }
+    .bullet-list { padding-left: 0; list-style: none; display: grid; gap: 6px; margin-top: 4px; }
+    .bullet-list li { font-size: 13px; color: #d4d4d4; line-height: 1.5; padding-left: 14px; position: relative; }
+    .bullet-list li::before { content: '–'; position: absolute; left: 0; color: #f59e0b; }
+
+    /* ── Tables ───────────────────────────────────── */
+    .table-wrap { border-radius: 14px; overflow: hidden; border: 1px solid #262626; }
+    table { width: 100%; border-collapse: collapse; }
+    .thead-row { background: #0b0b0b !important; -webkit-print-color-adjust: exact !important; }
+    .th { padding: 10px 12px; text-align: left; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.14em; color: #6b7280; border-bottom: 1px solid #262626; }
+    .th-center { text-align: center; }
+    .td-mono  { padding: 11px 12px; font-family: ui-monospace, monospace; }
+    .td-muted { color: #6b7280; }
+    .td-name  { padding: 11px 12px; font-weight: 700; color: #f5f5f5; }
+    .td-weight { padding: 11px 12px; font-size: 17px; font-weight: 900; color: #ffffff; }
+    .td-center { text-align: center; }
+    .td-note  { padding: 8px 12px; font-size: 12px; color: #a3a3a3; background: rgba(255,255,255,0.03) !important; font-style: italic; -webkit-print-color-adjust: exact !important; }
+
+    /* ── Exercise Block ────────────────────────────── */
+    .exercise-block { page-break-inside: avoid; margin-bottom: 24px; }
+    .exercise-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 8px;
+      padding: 12px 16px;
+      background: #141414 !important;
+      border: 1px solid #2a2a2a;
+      border-bottom: none;
+      border-radius: 14px 14px 0 0;
+      -webkit-print-color-adjust: exact !important;
+    }
+    .exercise-num {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 26px; height: 26px;
+      background: #f59e0b !important;
+      color: #000 !important;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 900;
+      flex-shrink: 0;
+      -webkit-print-color-adjust: exact !important;
+    }
+    .exercise-name { font-size: 16px; font-weight: 900; text-transform: uppercase; color: #ffffff; letter-spacing: -0.01em; }
+    .exercise-meta { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+    .meta-pill { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; padding: 3px 10px; border-radius: 999px; background: rgba(255,255,255,0.07) !important; color: #9ca3af; border: 1px solid rgba(255,255,255,0.1); -webkit-print-color-adjust: exact !important; }
+    .meta-pill-red { background: rgba(239,68,68,0.12) !important; color: #f87171 !important; border-color: rgba(239,68,68,0.25) !important; }
+    .set-tag { margin-left: 5px; font-size: 9px; font-weight: 700; text-transform: uppercase; color: #9ca3af; background: rgba(255,255,255,0.06) !important; padding: 1px 5px; border-radius: 4px; -webkit-print-color-adjust: exact !important; }
+
+    /* ── Footer ────────────────────────────────────── */
+    .report-footer {
+      margin-top: 36px;
+      padding: 20px 36px;
+      border-top: 1px solid #262626;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.2em;
+      color: #4a4a4a;
+    }
+    .footer-brand { color: #f59e0b !important; font-weight: 900; }
+
+    /* ── Print ─────────────────────────────────────── */
+    @media print {
+      @page { size: A4; margin: 0; }
+      html, body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
+      body { background: #0d0d0d !important; }
+      .page { max-width: none; }
+      .exercise-block { page-break-inside: avoid; }
+      .section-block { page-break-inside: avoid; }
+    }
+    @media (max-width: 600px) {
+      .header-banner { padding: 20px; flex-direction: column; }
+      .header-right { text-align: left; }
+      .stats-main, .stats-sub, .ai-grid { grid-template-columns: repeat(2, 1fr); }
+    }
+    /* ── Print button (visible on screen, hidden when printing) ── */
+    .print-fab {
+      position: fixed; bottom: 24px; right: 24px; z-index: 999;
+      background: #f59e0b; color: #000;
+      border: none; border-radius: 14px;
+      padding: 14px 22px;
+      font-size: 14px; font-weight: 900; cursor: pointer;
+      box-shadow: 0 4px 24px rgba(0,0,0,0.5);
+      display: flex; align-items: center; gap: 8px;
+    }
+    .print-fab:active { opacity: 0.8; }
+    @media print {
+      .print-fab { display: none !important; }
+    }
+  </style>
+</head>
+<body>
+<div class="page">
+
+  <!-- ── Header ─────────────────────────────────── -->
+  <div class="header-banner">
+    <div>
+      <div class="header-brand-row">
+        
+        <div>
+          <div class="header-wordmark">IRON<span>TRACKS</span></div>
+          <div class="header-sub">Relatório de Performance</div>
+        </div>
+      </div>
+    </div>
+    <div class="header-right">
+      <div class="header-workout">F - ombro e tríceps</div>
+      <div class="header-date">20/03/26, 07:35 &nbsp;·&nbsp; 12:42</div>
+      <div class="header-athlete">Atleta: <strong>Maicon Benitz</strong></div>
+    </div>
+  </div>
+  <div class="accent-stripe"></div>
+
+  <div class="container">
+
+    <!-- ── Summary Metrics ───────────────────────── -->
+    <div class="section-block">
+      <div class="section-title"><span class="section-dot"></span>Resumo da Sessão</div>
+      <div class="stats-grid stats-main" style="margin-bottom:12px">
+        <div class="stat-card">
+          <div class="stat-label">Tempo Total</div>
+          <div class="stat-value">80:59</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Tempo Real</div>
+          <div class="stat-value">80:59</div>
+        </div>
+        
+        <div class="stat-card">
+          <div class="stat-label">Execução</div>
+          <div class="stat-value">3:25</div>
+        </div>
+        
+        <div class="stat-card">
+          <div class="stat-label">Descanso</div>
+          <div class="stat-value">42:50</div>
+        </div>
+      </div>
+      <div class="stats-grid stats-sub">
+        <div class="stat-card">
+          <div class="stat-label">Séries</div>
+          <div class="stat-value">18</div>
+          <div class="stat-sub">5 ex</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Volume</div>
+          <div class="stat-value">15.671 <span class="stat-unit">kg</span></div>
+          
+        </div>
+        <div class="stat-card stat-card-accent">
+          <div class="stat-label" style="color:rgba(245,158,11,0.7)">Calorias</div>
+          <div class="stat-value stat-value-gold">~144</div>
+          <div class="stat-sub" style="color:rgba(245,158,11,0.4)">kcal estimada</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-label">Repetições</div>
+          <div class="stat-value">194</div>
+          <div class="stat-sub">Top: 193 kg</div>
+        </div>
+      </div>
+    </div>
+
+    
+    
+      <!-- AI Section -->
+      <div class="section-block">
+        <div class="section-title">
+          <span class="section-dot"></span>Análise Inteligente
+        </div>
+        <div class="ai-grid">
+          <div class="ai-card ai-card-gold">
+            <div class="ai-card-label">Avaliação da IA</div>
+            <div style="font-size:22px;letter-spacing:8px;color:#fbbf24;margin:6px 0">★★★☆☆</div>
+            <div style="font-size:12px;color:#fde68a;font-weight:900">3/5</div>
+            <p style="margin:10px 0 0;font-size:12px;color:#d4d4d4;line-height:1.5">Boa intensidade e conclusão dos sets, mas a recorrência da dor no ombro direito é uma preocupação que afeta a performance geral.</p>
+          </div>
+          <div class="ai-card ai-card-gold">
+            <div class="ai-card-label">Insights</div>
+            <ul class="bullet-list"><li style="color:#d4d4d4">Sessão de ombro e tríceps concluída com bom volume e intensidade.</li><li style="color:#d4d4d4">RPEs elevados foram atingidos em exercícios como o Desenvolvimento lateral máquina 45º e Panturrilha leg press horizontal.</li><li style="color:#d4d4d4">A dor no ombro direito foi relatada durante a Elevação lateral com halter e persistiu no pós-treino.</li><li style="color:#d4d4d4">Tempos de descanso foram variados, com alguns períodos mais longos do que o padrão.</li></ul>
+            <p style="margin:10px 0 0;font-size:12px;color:#9ca3af;font-style:italic">Sua dedicação é notável! Continue a ouvir seu corpo, especialmente em relação à dor no ombro, para garantir treinos seguros e progressivos.</p>
+          </div>
+          <div class="ai-card">
+            <div class="ai-card-label ai-label-green">✓ Pontos Fortes</div>
+            <ul class="bullet-list"><li style="color:#d4d4d4">Atingiu alta intensidade (RPE 10) em sets desafiadores no Desenvolvimento lateral máquina 45º e Panturrilha leg press horizontal.</li><li style="color:#d4d4d4">Concluiu todos os sets e repetições planejadas para os exercícios.</li><li style="color:#d4d4d4">Consistência nas cargas e repetições em Desenvolvimento militar e Desenvolvimento lateral pegada neutra.</li></ul>
+          </div>
+          <div class="ai-card ai-card-red">
+            <div class="ai-card-label ai-label-red">⚠ Alertas</div>
+            <ul class="bullet-list"><li style="color:#d4d4d4">A dor no ombro direito, especialmente durante a Elevação lateral com halter, é um alerta importante.</li><li style="color:#d4d4d4">A recorrência da dor no ombro direito, já presente na sessão anterior, indica a necessidade de atenção e ajustes.</li></ul>
+          </div>
+          <div class="ai-card" style="grid-column: 1 / -1">
+            <div class="ai-card-label">Progressão Sugerida</div>
+            <ul class="bullet-list" style="columns:2;gap:12px"><li><strong style="color:#fafafa">Desenvolvimento militar</strong> — <span style="color:#a3a3a3">Tente aumentar a carga em 2.5-5kg na próxima sessão, mantendo a execução e o RPE objetivo de 8.</span></li><li><strong style="color:#fafafa">Elevação lateral com halter</strong> — <span style="color:#a3a3a3">Reduza a carga e foque na técnica perfeita. Se a dor persistir, considere uma variação na polia ou máquina.</span></li><li><strong style="color:#fafafa">Desenvolvimento lateral máquina 45º</strong> — <span style="color:#a3a3a3">Na próxima sessão, tente igualar ou superar as 8 repetições com 90kg no último set.</span></li><li><strong style="color:#fafafa">Desenvolvimento lateral pegada neutra</strong> — <span style="color:#a3a3a3">Mantenha a carga de 36kg e explore cadências mais lentas ou adicione um micro-set para aumentar o tempo sob tensão.</span></li><li><strong style="color:#fafafa">Panturrilha leg press horizontal</strong> — <span style="color:#a3a3a3">Busque manter as repetições mais altas (14-15) nos primeiros sets com a carga de 193kg.</span></li></ul>
+          </div></div></div>
+    
+      <div class="section-block">
+        <div class="section-title"><span class="section-dot"></span>Detalhe por Exercício</div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr class="thead-row">
+                <th class="th" style="width:40px">#</th>
+                <th class="th">Exercício</th>
+                <th class="th th-center">Execução</th>
+                <th class="th th-center">Descanso Real</th>
+                <th class="th th-center">Descanso Plan.</th>
+              </tr>
+            </thead>
+            <tbody>
+        <tr style="">
+          <td class="td-mono td-muted" style="width:40px">1</td>
+          <td class="td-name">Desenvolvimento militar</td>
+          <td class="td-mono td-center">3.4 min</td>
+          <td class="td-mono td-center">8.3 min</td>
+          <td class="td-mono td-center td-muted">60s</td>
+        </tr>
+        <tr style="background:rgba(255,255,255,0.025)">
+          <td class="td-mono td-muted" style="width:40px">2</td>
+          <td class="td-name">Elevação lateral com halter</td>
+          <td class="td-mono td-center">—</td>
+          <td class="td-mono td-center">6.5 min</td>
+          <td class="td-mono td-center td-muted">120s</td>
+        </tr>
+        <tr style="">
+          <td class="td-mono td-muted" style="width:40px">3</td>
+          <td class="td-name">Desenvolvimento lateral máquina 45º</td>
+          <td class="td-mono td-center">—</td>
+          <td class="td-mono td-center">8.6 min</td>
+          <td class="td-mono td-center td-muted">120s</td>
+        </tr>
+        <tr style="background:rgba(255,255,255,0.025)">
+          <td class="td-mono td-muted" style="width:40px">4</td>
+          <td class="td-name">Desenvolvimento lateral pegada neutra</td>
+          <td class="td-mono td-center">—</td>
+          <td class="td-mono td-center">15.1 min</td>
+          <td class="td-mono td-center td-muted">120s</td>
+        </tr>
+        <tr style="">
+          <td class="td-mono td-muted" style="width:40px">5</td>
+          <td class="td-name">Panturrilha leg press horizontal</td>
+          <td class="td-mono td-center">—</td>
+          <td class="td-mono td-center">4.4 min</td>
+          <td class="td-mono td-center td-muted">120s</td>
+        </tr></tbody>
+          </table>
+        </div>
+      </div>
+
+    <!-- ── Exercises ──────────────────────────────── -->
+    
+    <div class="section-block">
+      <div class="section-title"><span class="section-dot"></span>Séries Executadas</div>
+      
+      <div class="exercise-block">
+        <div class="exercise-header">
+          <div style="display:flex;align-items:center;gap:10px">
+            <span class="exercise-num">1</span>
+            <span class="exercise-name">Desenvolvimento militar</span>
+          </div>
+          <div class="exercise-meta">
+            
+            
+            <span class="meta-pill">RPE <strong style="color:#fafafa">8</strong></span>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr class="thead-row">
+                <th class="th" style="width:60px">Série</th>
+                <th class="th">Carga</th>
+                <th class="th th-center">Reps</th>
+                
+              </tr>
+            </thead>
+            <tbody>
+        <tr style="">
+          <td class="td-mono td-muted">#1</td>
+          <td class="td-weight">20</td>
+          <td class="td-mono td-center">10</td>
+          
+        </tr><tr><td colspan="3" class="td-note">Obs: Aquecimento</td></tr>
+        <tr style="background:rgba(255,255,255,0.025)">
+          <td class="td-mono td-muted">#2</td>
+          <td class="td-weight">35</td>
+          <td class="td-mono td-center">10</td>
+          
+        </tr>
+        <tr style="">
+          <td class="td-mono td-muted">#3</td>
+          <td class="td-weight">45</td>
+          <td class="td-mono td-center">10</td>
+          
+        </tr>
+        <tr style="background:rgba(255,255,255,0.025)">
+          <td class="td-mono td-muted">#4</td>
+          <td class="td-weight">45</td>
+          <td class="td-mono td-center">10</td>
+          
+        </tr></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="exercise-block">
+        <div class="exercise-header">
+          <div style="display:flex;align-items:center;gap:10px">
+            <span class="exercise-num">2</span>
+            <span class="exercise-name">Elevação lateral com halter</span>
+          </div>
+          <div class="exercise-meta">
+            
+            
+            
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr class="thead-row">
+                <th class="th" style="width:60px">Série</th>
+                <th class="th">Carga</th>
+                <th class="th th-center">Reps</th>
+                
+              </tr>
+            </thead>
+            <tbody>
+        <tr style="">
+          <td class="td-mono td-muted">#1</td>
+          <td class="td-weight">20</td>
+          <td class="td-mono td-center">10</td>
+          
+        </tr><tr><td colspan="3" class="td-note">Obs: Dor no ombro direito</td></tr>
+        <tr style="background:rgba(255,255,255,0.025)">
+          <td class="td-mono td-muted">#2</td>
+          <td class="td-weight">20</td>
+          <td class="td-mono td-center">10</td>
+          
+        </tr>
+        <tr style="">
+          <td class="td-mono td-muted">#3</td>
+          <td class="td-weight">20</td>
+          <td class="td-mono td-center">10</td>
+          
+        </tr></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="exercise-block">
+        <div class="exercise-header">
+          <div style="display:flex;align-items:center;gap:10px">
+            <span class="exercise-num">3</span>
+            <span class="exercise-name">Desenvolvimento lateral máquina 45º</span>
+          </div>
+          <div class="exercise-meta">
+            
+            
+            
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr class="thead-row">
+                <th class="th" style="width:60px">Série</th>
+                <th class="th">Carga</th>
+                <th class="th th-center">Reps</th>
+                
+              </tr>
+            </thead>
+            <tbody>
+        <tr style="">
+          <td class="td-mono td-muted">#1</td>
+          <td class="td-weight">70</td>
+          <td class="td-mono td-center">10</td>
+          
+        </tr>
+        <tr style="background:rgba(255,255,255,0.025)">
+          <td class="td-mono td-muted">#2</td>
+          <td class="td-weight">90</td>
+          <td class="td-mono td-center">7</td>
+          
+        </tr>
+        <tr style="">
+          <td class="td-mono td-muted">#3</td>
+          <td class="td-weight">90</td>
+          <td class="td-mono td-center">8</td>
+          
+        </tr></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="exercise-block">
+        <div class="exercise-header">
+          <div style="display:flex;align-items:center;gap:10px">
+            <span class="exercise-num">4</span>
+            <span class="exercise-name">Desenvolvimento lateral pegada neutra</span>
+          </div>
+          <div class="exercise-meta">
+            
+            
+            
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr class="thead-row">
+                <th class="th" style="width:60px">Série</th>
+                <th class="th">Carga</th>
+                <th class="th th-center">Reps</th>
+                
+              </tr>
+            </thead>
+            <tbody>
+        <tr style="">
+          <td class="td-mono td-muted">#1</td>
+          <td class="td-weight">36</td>
+          <td class="td-mono td-center">12</td>
+          
+        </tr>
+        <tr style="background:rgba(255,255,255,0.025)">
+          <td class="td-mono td-muted">#2</td>
+          <td class="td-weight">36</td>
+          <td class="td-mono td-center">12</td>
+          
+        </tr>
+        <tr style="">
+          <td class="td-mono td-muted">#3</td>
+          <td class="td-weight">36</td>
+          <td class="td-mono td-center">12</td>
+          
+        </tr>
+        <tr style="background:rgba(255,255,255,0.025)">
+          <td class="td-mono td-muted">#4</td>
+          <td class="td-weight">36</td>
+          <td class="td-mono td-center">12</td>
+          
+        </tr></tbody>
+          </table>
+        </div>
+      </div>
+      <div class="exercise-block">
+        <div class="exercise-header">
+          <div style="display:flex;align-items:center;gap:10px">
+            <span class="exercise-num">5</span>
+            <span class="exercise-name">Panturrilha leg press horizontal</span>
+          </div>
+          <div class="exercise-meta">
+            
+            
+            
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr class="thead-row">
+                <th class="th" style="width:60px">Série</th>
+                <th class="th">Carga</th>
+                <th class="th th-center">Reps</th>
+                
+              </tr>
+            </thead>
+            <tbody>
+        <tr style="">
+          <td class="td-mono td-muted">#1</td>
+          <td class="td-weight">193</td>
+          <td class="td-mono td-center">15</td>
+          
+        </tr>
+        <tr style="background:rgba(255,255,255,0.025)">
+          <td class="td-mono td-muted">#2</td>
+          <td class="td-weight">193</td>
+          <td class="td-mono td-center">14</td>
+          
+        </tr>
+        <tr style="">
+          <td class="td-mono td-muted">#3</td>
+          <td class="td-weight">193</td>
+          <td class="td-mono td-center">12</td>
+          
+        </tr>
+        <tr style="background:rgba(255,255,255,0.025)">
+          <td class="td-mono td-muted">#4</td>
+          <td class="td-weight">193</td>
+          <td class="td-mono td-center">10</td>
+          
+        </tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+  </div><!-- /container -->
+
+  <!-- ── Footer ─────────────────────────────────── -->
+  <div class="report-footer">
+    <span class="footer-brand">IronTracks</span>
+    <span>Performance Report &nbsp;·&nbsp; 20/03/26, 07:35</span>
+    <span>irontracks.app</span>
+  </div>
+
+</div><!-- /page -->
+
+<button class="print-fab" onclick="window.print()">
+  📄 Salvar como PDF
+</button>
+
+</body>
+</html>

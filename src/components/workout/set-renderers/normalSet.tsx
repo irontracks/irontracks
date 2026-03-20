@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { parseTrainingNumber } from '@/utils/trainingNumber';
 import { Check, MessageSquare } from 'lucide-react';
 import { useWorkoutContext } from '../WorkoutContext';
@@ -9,6 +9,51 @@ import {
   DELOAD_SUGGEST_MODE,
 } from '../utils';
 import { UnknownRecord, WorkoutExercise } from '../types';
+
+// ── Local-state input ─────────────────────────────────────────────────────
+// The workout ticker fires every 1 s and causes a full context re-render.
+// If inputs were fully controlled (value = log.xxx) every keystroke would be
+// lost between the onChange call and the async setState settling.
+// Fix: each field keeps its OWN local string state and only writes to the
+// global log on change (for immediate persistence), but reads from local state
+// so the displayed value is never clobbered by an external re-render while
+// the user is typing.
+function useInputField(externalValue: string, onChange: (v: string) => void) {
+  const [localValue, setLocalValue] = useState(externalValue);
+  const isFocused = useRef(false);
+
+  // When the external value changes (e.g. a teammate updates the log),
+  // sync the local value ONLY if the field is not currently focused.
+  useEffect(() => {
+    if (!isFocused.current) {
+      setLocalValue(externalValue);
+    }
+  }, [externalValue]);
+
+  const handleChange = useCallback(
+    (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+      const v = e.target.value;
+      setLocalValue(v);
+      onChange(v);
+    },
+    [onChange],
+  );
+
+  const handleFocus = useCallback(() => {
+    isFocused.current = true;
+  }, []);
+
+  const handleBlur = useCallback(
+    (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+      isFocused.current = false;
+      // Flush the final value to the global log on blur so nothing is lost
+      onChange(e.target.value);
+    },
+    [onChange],
+  );
+
+  return { value: localValue, handleChange, handleFocus, handleBlur };
+}
 
 export const NormalSet = ({
   ex,
@@ -38,11 +83,14 @@ export const NormalSet = ({
   const cfg = getPlanConfig(ex, setIdx);
   const plannedSet = getPlannedSet(ex, setIdx);
   const restTime = parseTrainingNumber(ex?.restTime ?? ex?.rest_time);
-  const weightValue = String(log.weight ?? cfg?.weight ?? '');
-  const repsValue   = String(log.reps ?? '');
-  const rpeValue    = String(log.rpe ?? '');
-  const notesValue  = String(log.notes ?? '');
-  const done        = !!log.done;
+
+  // External values (from global log state)
+  const extWeight = String(log.weight ?? cfg?.weight ?? '');
+  const extReps   = String(log.reps   ?? '');
+  const extRpe    = String(log.rpe    ?? '');
+  const extNotes  = String(log.notes  ?? '');
+  const done      = !!log.done;
+
   const plannedReps = String(plannedSet?.reps ?? ex?.reps ?? '').trim();
   const plannedRpe  = String(plannedSet?.rpe  ?? ex?.rpe  ?? '').trim();
 
@@ -51,14 +99,28 @@ export const NormalSet = ({
   const suggestion: DeloadEntrySuggestion | null = isObject(suggestionValue)
     ? (suggestionValue as DeloadEntrySuggestion)
     : null;
-  const useWatermark     = DELOAD_SUGGEST_MODE === 'watermark';
+  const useWatermark      = DELOAD_SUGGEST_MODE === 'watermark';
   const weightPlaceholder = useWatermark && suggestion?.weight != null ? `${suggestion.weight} kg` : 'Peso';
   const repsPlaceholder   = useWatermark && suggestion?.reps   != null ? String(suggestion.reps)   : 'Reps';
   const rpePlaceholder    = useWatermark && suggestion?.rpe    != null ? String(suggestion.rpe)    : 'RPE';
 
   const notesId    = `notes-${key}`;
-  const hasNotes   = notesValue.trim().length > 0;
+  const hasNotes   = extNotes.trim().length > 0;
   const isNotesOpen = openNotesKeys.has(key);
+
+  // ── Local input fields with focus-aware sync ──────────────────────────
+  const weightField = useInputField(extWeight, (v) =>
+    updateLog(key, { weight: v, advanced_config: cfg ?? log.advanced_config ?? null }),
+  );
+  const repsField = useInputField(extReps, (v) =>
+    updateLog(key, { reps: v, advanced_config: cfg ?? log.advanced_config ?? null }),
+  );
+  const rpeField = useInputField(extRpe, (v) =>
+    updateLog(key, { rpe: v, advanced_config: cfg ?? log.advanced_config ?? null }),
+  );
+  const notesField = useInputField(extNotes, (v) =>
+    updateLog(key, { notes: v, advanced_config: cfg ?? log.advanced_config ?? null }),
+  );
 
   // Shared input style — left-aligned so text is always visible
   const inputBase =
@@ -81,9 +143,9 @@ export const NormalSet = ({
     const nextDone = !done;
     updateLog(key, {
       done: nextDone,
-      completedAtMs:   nextDone ? nowMs : null,
+      completedAtMs:    nextDone ? nowMs : null,
       executionSeconds: nextDone ? executionSeconds : null,
-      advanced_config: cfg ?? log.advanced_config ?? null,
+      advanced_config:  cfg ?? log.advanced_config ?? null,
     });
 
     if (nextDone && restTime && restTime > 0) {
@@ -92,7 +154,7 @@ export const NormalSet = ({
       startTimer(restTime, { kind: 'rest', key, nextKey, restStartedAtMs: nowMs });
     }
 
-      // Auto-collapse + scroll to FIRST SET of next exercise when last set is done
+    // Auto-collapse + scroll to FIRST SET of next exercise when last set is done
     if (nextDone && setsCount != null && setIdx === setsCount - 1) {
       const delay = restTime && restTime > 0 ? 600 : 300;
       setTimeout(() => {
@@ -102,8 +164,6 @@ export const NormalSet = ({
             next.add(exIdx);
             return next;
           });
-          // Scroll directly to the first SET ROW of the next exercise,
-          // bypassing the card header so the first input is visible immediately.
           const firstSetOfNext = document.querySelector<HTMLElement>(`[data-set-first="${exIdx + 1}"]`);
           const nextCard = document.querySelector<HTMLElement>(`[data-exercise-idx="${exIdx + 1}"]`);
           const target = firstSetOfNext ?? nextCard;
@@ -127,7 +187,7 @@ export const NormalSet = ({
       >
         {/*
           Layout (CSS grid, one line):
-          [badge 28px] [kg flex-3] [reps flex-2] [rpe flex-2] [💬 28px] [OK auto]
+          [kg flex-3] [reps flex-2] [rpe flex-2] [💬 28px] [OK auto]
         */}
         <div className="grid items-center gap-1.5"
           style={{ gridTemplateColumns: '3fr 2fr 2fr 28px auto' }}>
@@ -136,8 +196,10 @@ export const NormalSet = ({
           <input
             inputMode="decimal"
             aria-label={`Peso em kg – série ${setIdx + 1}`}
-            value={weightValue}
-            onChange={(e) => updateLog(key, { weight: e.target.value, advanced_config: cfg ?? log.advanced_config ?? null })}
+            value={weightField.value}
+            onChange={weightField.handleChange}
+            onFocus={weightField.handleFocus}
+            onBlur={weightField.handleBlur}
             placeholder={weightPlaceholder}
             className={inputBase}
           />
@@ -147,8 +209,10 @@ export const NormalSet = ({
             <input
               inputMode="decimal"
               aria-label={`Reps – série ${setIdx + 1}`}
-              value={repsValue}
-              onChange={(e) => updateLog(key, { reps: e.target.value, advanced_config: cfg ?? log.advanced_config ?? null })}
+              value={repsField.value}
+              onChange={repsField.handleChange}
+              onFocus={repsField.handleFocus}
+              onBlur={repsField.handleBlur}
               placeholder={repsPlaceholder}
               className={`${inputBase} ${plannedReps ? 'pr-6' : ''}`}
             />
@@ -164,8 +228,10 @@ export const NormalSet = ({
             <input
               inputMode="decimal"
               aria-label={`RPE – série ${setIdx + 1}`}
-              value={rpeValue}
-              onChange={(e) => updateLog(key, { rpe: e.target.value, advanced_config: cfg ?? log.advanced_config ?? null })}
+              value={rpeField.value}
+              onChange={rpeField.handleChange}
+              onFocus={rpeField.handleFocus}
+              onBlur={rpeField.handleBlur}
               placeholder={rpePlaceholder}
               className={`${inputBase} text-yellow-400 border-yellow-500/25 placeholder:text-yellow-600/60 ${plannedRpe ? 'pr-6' : ''}`}
             />
@@ -212,8 +278,10 @@ export const NormalSet = ({
         <div className="px-1">
           <textarea
             id={notesId}
-            value={notesValue}
-            onChange={(e) => updateLog(key, { notes: e.target.value, advanced_config: cfg ?? log.advanced_config ?? null })}
+            value={notesField.value}
+            onChange={(e) => notesField.handleChange(e as React.ChangeEvent<HTMLTextAreaElement>)}
+            onFocus={() => { notesField.handleFocus(); }}
+            onBlur={(e) => notesField.handleBlur(e as React.FocusEvent<HTMLTextAreaElement>)}
             placeholder="Observações da série (opcional)"
             rows={2}
             className="w-full bg-black/30 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500 shadow-sm shadow-yellow-500/10 transition duration-200"
