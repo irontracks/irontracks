@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { parseTrainingNumber } from '@/utils/trainingNumber';
 import { Check, Pencil } from 'lucide-react';
 import { useWorkoutContext } from '../WorkoutContext';
@@ -35,11 +35,37 @@ export const RestPauseSet = ({
   const cfg = getPlanConfig(ex, setIdx);
   const plannedSet = getPlannedSet(ex, setIdx);
   const restTime = parseTrainingNumber(ex?.restTime ?? ex?.rest_time);
+
+  // ── Focus-aware local input state (prevents ticker re-renders from erasing typed values) ──
+  function useLocalField(external: string, onSave: (v: string) => void) {
+    const [local, setLocal] = useState(external);
+    const focused = useRef(false);
+    useEffect(() => { if (!focused.current) setLocal(external); }, [external]);
+    const onChange = useCallback((e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+      setLocal(e.target.value); onSave(e.target.value);
+    }, [onSave]);
+    const onFocus = useCallback(() => { focused.current = true; }, []);
+    const onBlur = useCallback((e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+      focused.current = false; onSave(e.target.value);
+    }, [onSave]);
+    return { value: local, onChange, onFocus, onBlur };
+  }
+
   type DeloadEntrySuggestion = { weight?: number | null; reps?: number | null; rpe?: number | null };
   const suggestionValue = deloadSuggestions[key];
   const suggestion: DeloadEntrySuggestion | null = isObject(suggestionValue) ? (suggestionValue as DeloadEntrySuggestion) : null;
   const useWatermark = DELOAD_SUGGEST_MODE === 'watermark';
   const weightPlaceholder = useWatermark && suggestion?.weight != null ? `${suggestion.weight} kg` : 'kg';
+
+  const weightField = useLocalField(
+    String(log?.weight ?? cfg?.weight ?? ''),
+    (v) => updateLog(key, { weight: v, advanced_config: cfg ?? log.advanced_config ?? null }),
+  );
+  const notesExternal = String(log.notes ?? '');
+  const notesField = useLocalField(
+    notesExternal,
+    (v) => updateLog(key, { notes: v, advanced_config: cfg ?? log.advanced_config ?? null }),
+  );
 
   const auto = isObject(plannedSet?.it_auto) ? (plannedSet.it_auto as UnknownRecord) : null;
   // SST override takes priority for the label
@@ -86,11 +112,10 @@ export const RestPauseSet = ({
           <div className="w-10 text-xs font-mono text-neutral-400">#{setIdx + 1}</div>
           <input
             inputMode="decimal"
-            value={String(log?.weight ?? cfg?.weight ?? '')}
-            onChange={(e) => {
-              const v = e?.target?.value ?? '';
-              updateLog(key, { weight: v, advanced_config: cfg ?? log.advanced_config ?? null });
-            }}
+            value={weightField.value}
+            onChange={weightField.onChange}
+            onFocus={weightField.onFocus}
+            onBlur={weightField.onBlur}
             placeholder={weightPlaceholder}
             className="w-24 bg-black/30 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
           />
@@ -179,11 +204,10 @@ export const RestPauseSet = ({
         </div>
       </div>
       <textarea
-        value={notesValue}
-        onChange={(e) => {
-          const v = e?.target?.value ?? '';
-          updateLog(key, { notes: v, advanced_config: cfg ?? log.advanced_config ?? null });
-        }}
+        value={notesField.value}
+        onChange={notesField.onChange}
+        onFocus={notesField.onFocus}
+        onBlur={notesField.onBlur}
         placeholder="Observações da série"
         rows={2}
         className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
