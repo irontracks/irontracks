@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useRef, useCallback } from 'react'
+import Image from 'next/image'
 import { Play, Share2, Pencil, Trash2, Loader2, Undo2 } from 'lucide-react'
 import type { DashboardWorkout } from '@/types/dashboard'
 import { isPeriodizedWorkoutFullyLoaded } from '@/hooks/usePeriodizedWorkouts'
@@ -189,7 +190,7 @@ export function WorkoutCard({
               </>
             ) : (
               <>
-                <Play size={16} className="fill-white" /> INICIAR TREINO
+                <Image src="/icons/btn-iniciar-treino.png" alt="" width={20} height={20} className="rounded-[3px]" unoptimized /> INICIAR TREINO
               </>
             )}
           </button>
