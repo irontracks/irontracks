@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useGeoLocation } from '@/hooks/useGeoLocation'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
@@ -25,8 +25,15 @@ interface GymSettingsSectionProps {
   supabase: SupabaseClient
 }
 
+interface GymSuggestion {
+  name: string
+  display: string
+  lat: number
+  lon: number
+}
+
 export default function GymSettingsSection({ userId, supabase }: GymSettingsSectionProps) {
-  const { getCurrentPosition, loading: geoLoading, error: geoError } = useGeoLocation()
+  const { getCurrentPosition, position, loading: geoLoading, error: geoError } = useGeoLocation()
   const [gyms, setGyms] = useState<Gym[]>([])
   const [settings, setSettings] = useState<LocationSettings>({
     gps_enabled: false,
@@ -38,6 +45,13 @@ export default function GymSettingsSection({ userId, supabase }: GymSettingsSect
   const [addingGym, setAddingGym] = useState(false)
   const [newGymName, setNewGymName] = useState('')
   const [saving, setSaving] = useState(false)
+
+  // Autocomplete state
+  const [suggestions, setSuggestions] = useState<GymSuggestion[]>([])
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const [selectedSuggestion, setSelectedSuggestion] = useState<GymSuggestion | null>(null)
+  const [searchingGyms, setSearchingGyms] = useState(false)
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Load gyms & settings
   useEffect(() => {
@@ -56,6 +70,67 @@ export default function GymSettingsSection({ userId, supabase }: GymSettingsSect
     load()
   }, [userId, supabase])
 
+  // Search gyms via Nominatim (OpenStreetMap) — debounced
+  const searchGyms = useCallback(async (query: string) => {
+    if (query.trim().length < 2) {
+      setSuggestions([])
+      setShowSuggestions(false)
+      return
+    }
+
+    setSearchingGyms(true)
+    try {
+      // Build Nominatim search with viewbox bias towards user's location
+      let url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query + ' gym academia')}&limit=5&addressdetails=1`
+      if (position) {
+        // Bias search around user's location (±0.5° ~55km)
+        const bias = 0.5
+        url += `&viewbox=${position.longitude - bias},${position.latitude + bias},${position.longitude + bias},${position.latitude - bias}&bounded=0`
+      }
+
+      const res = await fetch(url, {
+        headers: { 'User-Agent': 'IronTracks/1.0' },
+      })
+      if (!res.ok) throw new Error('Search failed')
+      const data = await res.json()
+
+      const results: GymSuggestion[] = (Array.isArray(data) ? data : [])
+        .filter((item: Record<string, unknown>) => item.lat && item.lon)
+        .map((item: Record<string, unknown>) => ({
+          name: String(item.name || item.display_name || '').split(',')[0].trim(),
+          display: String(item.display_name || '').slice(0, 120),
+          lat: parseFloat(String(item.lat)),
+          lon: parseFloat(String(item.lon)),
+        }))
+
+      setSuggestions(results)
+      setShowSuggestions(results.length > 0)
+    } catch {
+      setSuggestions([])
+      setShowSuggestions(false)
+    }
+    setSearchingGyms(false)
+  }, [position])
+
+  // Handle input change with debounce
+  const handleNameChange = useCallback((value: string) => {
+    setNewGymName(value)
+    setSelectedSuggestion(null)
+
+    if (debounceRef.current) clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(() => {
+      searchGyms(value)
+    }, 400)
+  }, [searchGyms])
+
+  // Select a suggestion
+  const selectSuggestion = useCallback((suggestion: GymSuggestion) => {
+    setNewGymName(suggestion.name)
+    setSelectedSuggestion(suggestion)
+    setShowSuggestions(false)
+    setSuggestions([])
+  }, [])
+
   // Toggle setting
   const toggleSetting = useCallback(async (key: keyof LocationSettings) => {
     const newVal = !settings[key]
@@ -66,20 +141,34 @@ export default function GymSettingsSection({ userId, supabase }: GymSettingsSect
     )
   }, [settings, supabase, userId])
 
-  // Add gym at current location
-  const addGymAtCurrentLocation = useCallback(async () => {
+  // Add gym — use selected suggestion coords or current GPS position
+  const addGym = useCallback(async () => {
     if (!newGymName.trim()) return
     setSaving(true)
-    const pos = await getCurrentPosition()
-    if (!pos) {
-      setSaving(false)
-      return
+
+    let lat: number
+    let lon: number
+
+    if (selectedSuggestion) {
+      // Use coordinates from the autocomplete suggestion
+      lat = selectedSuggestion.lat
+      lon = selectedSuggestion.lon
+    } else {
+      // Fallback: use current GPS position
+      const pos = await getCurrentPosition()
+      if (!pos) {
+        setSaving(false)
+        return
+      }
+      lat = pos.latitude
+      lon = pos.longitude
     }
+
     const { data, error } = await supabase.from('user_gyms').insert({
       user_id: userId,
       name: newGymName.trim(),
-      latitude: pos.latitude,
-      longitude: pos.longitude,
+      latitude: lat,
+      longitude: lon,
       radius_meters: 100,
       is_primary: gyms.length === 0,
     }).select().single()
@@ -88,9 +177,10 @@ export default function GymSettingsSection({ userId, supabase }: GymSettingsSect
       setGyms(prev => [...prev, data as Gym])
       setNewGymName('')
       setAddingGym(false)
+      setSelectedSuggestion(null)
     }
     setSaving(false)
-  }, [newGymName, getCurrentPosition, supabase, userId, gyms.length])
+  }, [newGymName, selectedSuggestion, getCurrentPosition, supabase, userId, gyms.length])
 
   // Delete gym
   const deleteGym = useCallback(async (gymId: string) => {
@@ -201,33 +291,72 @@ export default function GymSettingsSection({ userId, supabase }: GymSettingsSect
             <p className="text-center text-xs text-white/30 py-4">Nenhuma academia salva</p>
           )}
 
-          {/* Add Gym Form */}
+          {/* Add Gym Form with Autocomplete */}
           {addingGym && (
             <div
               className="rounded-xl p-3 space-y-2"
               style={{ background: 'rgba(245,158,11,0.05)', border: '1px solid rgba(245,158,11,0.2)' }}
             >
-              <input
-                type="text"
-                value={newGymName}
-                onChange={e => setNewGymName(e.target.value)}
-                placeholder="Nome da academia..."
-                className="w-full rounded-lg bg-white/5 px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:ring-1 focus:ring-amber-500/50"
-                autoFocus
-                maxLength={100}
-              />
+              <div className="relative">
+                <input
+                  type="text"
+                  value={newGymName}
+                  onChange={e => handleNameChange(e.target.value)}
+                  onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
+                  onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
+                  placeholder="Buscar academia..."
+                  className="w-full rounded-lg bg-white/5 px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:ring-1 focus:ring-amber-500/50"
+                  autoFocus
+                  maxLength={100}
+                />
+                {searchingGyms && (
+                  <div className="absolute right-3 top-2.5">
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-amber-500 border-t-transparent" />
+                  </div>
+                )}
+
+                {/* Suggestions dropdown */}
+                {showSuggestions && suggestions.length > 0 && (
+                  <div
+                    className="absolute z-10 left-0 right-0 top-full mt-1 rounded-xl overflow-hidden shadow-lg"
+                    style={{ background: '#1a1a1a', border: '1px solid rgba(245,158,11,0.3)' }}
+                  >
+                    {suggestions.map((s, i) => (
+                      <button
+                        key={i}
+                        onMouseDown={(e) => { e.preventDefault(); selectSuggestion(s) }}
+                        className="w-full text-left px-3 py-2.5 hover:bg-amber-500/10 transition-colors border-b border-white/5 last:border-0"
+                      >
+                        <p className="text-sm font-medium text-white">{s.name}</p>
+                        <p className="text-xs text-white/30 truncate">{s.display}</p>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {selectedSuggestion && (
+                <p className="text-xs text-amber-400/70">
+                  📍 {selectedSuggestion.display.slice(0, 80)}...
+                </p>
+              )}
+
               {geoError && <p className="text-xs text-red-400">{geoError}</p>}
               <div className="flex gap-2">
                 <button
-                  onClick={addGymAtCurrentLocation}
+                  onClick={addGym}
                   disabled={saving || geoLoading || !newGymName.trim()}
                   className="flex-1 rounded-lg py-2 text-sm font-bold text-black disabled:opacity-50"
                   style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}
                 >
-                  {saving || geoLoading ? 'Localizando...' : '📍 Salvar localização atual'}
+                  {saving || geoLoading
+                    ? 'Salvando...'
+                    : selectedSuggestion
+                      ? '✓ Salvar academia'
+                      : '📍 Salvar localização atual'}
                 </button>
                 <button
-                  onClick={() => { setAddingGym(false); setNewGymName('') }}
+                  onClick={() => { setAddingGym(false); setNewGymName(''); setSelectedSuggestion(null); setSuggestions([]) }}
                   className="rounded-lg px-3 py-2 text-sm text-white/50 hover:text-white"
                 >
                   Cancelar

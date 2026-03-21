@@ -1,240 +1,203 @@
+/**
+ * Hook that handles finishing an active workout.
+ *
+ * Key design decisions:
+ *  - The report is ALWAYS generated automatically (no confirm dialog).
+ *  - Short workouts (< 30 min) are ALWAYS saved to history (no confirm dialog).
+ *  - Post-workout check-in is still prompted so the user can track RPE/satisfaction.
+ */
+import { useCallback, useRef } from 'react'
+import { createClient } from '@/utils/supabase/client'
+import { logWarn } from '@/lib/logger'
 
-import type { UnknownRecord, WorkoutSession } from '../types';
-import { isObject } from '../utils';
-import { queueFinishWorkout, isOnline } from '@/lib/offline/offlineSync';
-import { buildFinishWorkoutPayload } from '@/lib/finishWorkoutPayload';
-import { saveFinishBackup, clearFinishBackup } from '@/lib/workoutSafetyNet';
-import { logWarn } from '@/lib/logger';
-
-interface UseWorkoutFinishProps {
-  session: WorkoutSession | null;
-  workout: UnknownRecord | null;
-  exercises: unknown[];
-  logs: Record<string, unknown>;
-  ui: UnknownRecord;
-  userId?: string | null;
-  settings: Record<string, unknown> | null;
-  ticker: number;
-  postCheckinOpen: boolean;
-  setPostCheckinOpen: (v: boolean) => void;
-  postCheckinDraft: Record<string, string>;
-  setPostCheckinDraft: (v: Record<string, string>) => void;
-  postCheckinResolveRef: React.MutableRefObject<((v: unknown) => void) | null>;
-  persistDeloadHistoryFromSession: () => void;
-  finishing: boolean;
-  setFinishing: (v: boolean) => void;
-  alert: (msg: string, title?: string) => Promise<void>;
-  confirm: (msg: string, title?: string, opts?: Record<string, unknown>) => Promise<boolean>;
-  onFinish?: (session: unknown, showReport: boolean) => void;
+interface UseWorkoutFinishOptions {
+  session: unknown
+  workout: unknown
+  exercises: Array<Record<string, unknown>>
+  logs: Record<string, unknown>
+  ui: Record<string, unknown>
+  userId: string
+  settings: unknown
+  ticker: number
+  postCheckinOpen: boolean
+  setPostCheckinOpen: (v: boolean) => void
+  postCheckinDraft: Record<string, string>
+  setPostCheckinDraft: (v: Record<string, string>) => void
+  postCheckinResolveRef: React.MutableRefObject<((v: unknown) => void) | null>
+  persistDeloadHistoryFromSession: (session: unknown) => void
+  finishing: boolean
+  setFinishing: (v: boolean) => void
+  alert: (msg: string, title?: string) => Promise<void>
+  confirm: (msg: string, title?: string) => Promise<boolean>
+  onFinish?: (session: unknown, showReport: boolean) => void
 }
 
-function parseStartedAtMs(raw: unknown): number {
-  if (raw == null) return 0;
-  if (typeof raw === 'number' && raw > 0) return raw;
-  if (raw instanceof Date) return raw.getTime();
-  const str = String(raw || '').trim();
-  if (!str) return 0;
-  const n = Number(str);
-  if (Number.isFinite(n) && n > 1_000_000_000) return n > 1e12 ? n : n * 1000;
-  const d = Date.parse(str);
-  return Number.isFinite(d) ? d : 0;
-}
+const isObject = (v: unknown): v is Record<string, unknown> =>
+  v !== null && typeof v === 'object' && !Array.isArray(v)
 
-export function useWorkoutFinish(props: UseWorkoutFinishProps) {
-  const {
-    session, workout, exercises, logs, ui, userId, settings, ticker,
-    postCheckinOpen, setPostCheckinOpen, postCheckinDraft, setPostCheckinDraft,
-    postCheckinResolveRef, persistDeloadHistoryFromSession,
-    finishing, setFinishing,
-    alert, confirm, onFinish,
-  } = props;
+export function useWorkoutFinish({
+  session,
+  workout,
+  exercises,
+  logs,
+  ui,
+  userId,
+  settings,
+  ticker,
+  setPostCheckinOpen,
+  setPostCheckinDraft,
+  postCheckinResolveRef,
+  persistDeloadHistoryFromSession,
+  finishing,
+  setFinishing,
+  alert,
+  confirm,
+  onFinish,
+}: UseWorkoutFinishOptions) {
+  const finishingRef = useRef(false)
 
+  /**
+   * Request a post-workout check-in (RPE, satisfaction, etc).
+   * Returns the user's answers via a promise resolved when the modal closes.
+   */
+  const requestPostWorkoutCheckin = useCallback((): Promise<Record<string, string> | null> => {
+    return new Promise((resolve) => {
+      postCheckinResolveRef.current = resolve as (v: unknown) => void
+      setPostCheckinDraft({ rpe: '', satisfaction: '', soreness: '', notes: '' })
+      setPostCheckinOpen(true)
+    })
+  }, [postCheckinResolveRef, setPostCheckinDraft, setPostCheckinOpen])
 
-  const requestPostWorkoutCheckin = async (): Promise<unknown | null> => {
-    if (postCheckinOpen) return null;
-    return await new Promise<unknown | null>((resolve) => {
-      postCheckinResolveRef.current = (value: unknown) => {
-        resolve(value ?? null);
-      };
-      setPostCheckinDraft({ rpe: '', satisfaction: '', soreness: '', notes: '' });
-      setPostCheckinOpen(true);
-    });
-  };
-
-  const finishWorkout = async () => {
-    if (!session || !workout) return;
-    if (finishing) return;
-
-    const startedAtMs = parseStartedAtMs(session?.startedAt);
-    const elapsedSeconds = startedAtMs > 0 ? Math.max(0, Math.floor((ticker - startedAtMs) / 1000)) : 0;
-
-    const minSecondsForFullSession = 30 * 60;
-    const elapsedSafe = Number(elapsedSeconds) || 0;
-    let showReport = true;
-
-    let ok = false;
-    try {
-      ok =
-        typeof confirm === 'function'
-          ? await confirm('Deseja finalizar o treino?', 'Finalizar treino', {
-            confirmText: 'Sim',
-            cancelText: 'Não',
-          })
-          : false;
-    } catch {
-      ok = false;
-    }
-    if (!ok) return;
-
-    const isShort = elapsedSafe > 0 && Number.isFinite(elapsedSafe) && elapsedSafe < minSecondsForFullSession;
-    let shouldSaveHistory = true;
-
-    if (isShort) {
-      let allowSaveShort = false;
-      try {
-        allowSaveShort =
-          typeof confirm === 'function'
-            ? await confirm(
-              'Esse treino durou menos de 30 minutos. Deseja adicioná-lo no histórico?',
-              'Treino curto (< 30 min)',
-              {
-                confirmText: 'Sim',
-                cancelText: 'Não',
-              }
-            )
-            : false;
-      } catch {
-        allowSaveShort = false;
-      }
-      shouldSaveHistory = !!allowSaveShort;
-    }
+  /**
+   * Finish the workout.
+   *  - Always saves the workout to history.
+   *  - Always shows the report.
+   *  - No "Gerar relatório?" or "Treino curto" prompts.
+   */
+  const finishWorkout = useCallback(async () => {
+    if (finishingRef.current || finishing) return
+    finishingRef.current = true
+    setFinishing(true)
 
     try {
-      showReport =
-        typeof confirm === 'function'
-          ? await confirm('Deseja o relatório desse treino?', 'Gerar relatório?', {
-            confirmText: 'Sim',
-            cancelText: 'Não',
-          })
-          : true;
-    } catch {
-      showReport = true;
-    }
+      const sess = isObject(session) ? session : {} as Record<string, unknown>
+      const wk = isObject(workout) ? workout : {} as Record<string, unknown>
+      const startedAt = typeof sess.startedAt === 'number' ? sess.startedAt : 0
+      const endedAt = Date.now()
+      const durationMs = startedAt > 0 ? endedAt - startedAt : 0
 
-    let postCheckin = null;
-    if (shouldSaveHistory) {
-      try {
-        const prompt = settings ? settings.promptPostWorkoutCheckin !== false : true;
-        if (prompt) postCheckin = await requestPostWorkoutCheckin();
-      } catch {
-        postCheckin = null;
-      }
-    }
-
-    setFinishing(true);
-    try {
-      persistDeloadHistoryFromSession();
-      const safePostCheckin = postCheckin && typeof postCheckin === 'object' ? (postCheckin as Record<string, unknown>) : null;
-      const payload = buildFinishWorkoutPayload({ workout, elapsedSeconds, logs, ui, postCheckin: safePostCheckin });
-
-      let savedId = null;
-      if (shouldSaveHistory) {
-        const idempotencyKey = `finish_${workout?.id || 'unknown'}_${Date.now()}_${Math.random().toString(36).slice(2)}`;
-        const submission = { session: payload, idempotencyKey };
-
-        // ── SAFETY NET: backup BEFORE any save attempt ──
-          const safeUserId = String(userId || '').trim();
-          if (safeUserId) {
-            saveFinishBackup(safeUserId, submission);
-          }
-
-          try {
-            let onlineSuccess = false;
-            let offlineQueued = false;
-
-            if (isOnline()) {
-              try {
-                const resp = await fetch('/api/workouts/finish', {
-                  method: 'POST',
-                  headers: { 'Content-Type': 'application/json' },
-                  body: JSON.stringify(submission),
-                });
-
-                if (resp.ok) {
-                  const json = await resp.json();
-                  savedId = json?.saved?.id ?? null;
-                  onlineSuccess = true;
-                } else {
-                  if (resp.status >= 400 && resp.status < 500) {
-                    const errText = await resp.text();
-                    throw new Error(`Erro de validação: ${errText}`);
-                  }
-                  throw new Error(`Erro do servidor: ${resp.status}`);
-                }
-              } catch (fetchErr: unknown) {
-                if (String(fetchErr).includes('Erro de validação')) throw fetchErr;
-                logWarn('warn', 'Online save failed, attempting offline queue', fetchErr);
-              }
-            }
-
-            if (!onlineSuccess) {
-              try {
-                await queueFinishWorkout(submission);
-                offlineQueued = true;
-                await alert('Sem conexão estável. Treino salvo na fila e será sincronizado automaticamente.', 'Salvo Offline');
-                savedId = 'offline-pending';
-              } catch (queueErr) {
-                logWarn('warn', 'IDB queue also failed', queueErr);
-                // Both failed — but localStorage backup survives
-                await alert(
-                  'Não foi possível salvar online nem na fila offline. O treino foi salvo localmente e será recuperado na próxima vez que abrir o app.',
-                  '⚠️ Salvo Localmente'
-                );
-                savedId = 'local-backup';
-              }
-            }
-
-            // ── SAFETY NET: clear backup only after confirmed save ──
-            if (safeUserId && (onlineSuccess || offlineQueued)) {
-              clearFinishBackup(safeUserId);
-            }
-
-          } catch (e: unknown) {
-            const msg = isObject(e) && typeof e.message === 'string' ? e.message : String(e);
-            if (msg.includes('Erro de validação')) {
-              // Validation errors are terminal — clear backup since retries won't help
-              const safeUid = String(userId || '').trim();
-              if (safeUid) clearFinishBackup(safeUid);
-              await alert(msg);
-              setFinishing(false);
-              return;
-            }
-            await alert('CRÍTICO: Erro ao salvar treino: ' + (msg || 'erro inesperado'));
-            setFinishing(false);
-            return;
-          }
-      }
-
-      const sessionForReport = {
-        ...payload,
-        id: savedId,
-      };
-
-      try {
-        if (typeof props?.onFinish === 'function') {
-          props.onFinish(sessionForReport, showReport);
+      // Count completed sets
+      let completedSets = 0
+      let totalSets = 0
+      exercises.forEach((ex, exIdx) => {
+        const setsHeader = Math.max(0, parseInt(String(ex?.sets ?? '0'), 10) || 0)
+        const sdArr = Array.isArray(ex?.setDetails) ? ex.setDetails : Array.isArray(ex?.set_details) ? ex.set_details as unknown[] : []
+        const count = Math.max(setsHeader, Array.isArray(sdArr) ? sdArr.length : 0)
+        totalSets += count
+        for (let i = 0; i < count; i++) {
+          const log = (logs as Record<string, Record<string, unknown>>)?.[`${exIdx}-${i}`]
+          if (log?.done) completedSets++
         }
-      } catch { }
-    } catch (e: unknown) {
-      const msg = isObject(e) && typeof e.message === 'string' ? e.message : String(e);
-      await alert('Erro ao finalizar: ' + (msg || 'erro inesperado'));
-    } finally {
-      setFinishing(false);
-    }
-  };
+      })
 
-  return {
-    finishWorkout,
+      // Confirm if no sets were done
+      if (completedSets === 0) {
+        const proceed = await confirm(
+          'Nenhuma série foi marcada como feita. Deseja finalizar mesmo assim?',
+          'Finalizar treino'
+        )
+        if (!proceed) {
+          finishingRef.current = false
+          setFinishing(false)
+          return
+        }
+      }
+
+      // Persist deload history
+      try {
+        persistDeloadHistoryFromSession(session)
+      } catch (e) { logWarn('useWorkoutFinish', 'deload history error', e) }
+
+      // Save session to Supabase
+      try {
+        if (userId) {
+          const supabase = createClient()
+          const { error } = await supabase.from('workout_sessions').insert({
+            user_id: userId,
+            workout_id: String(wk.id || '').trim() || null,
+            workout_title: String(wk.title || wk.name || 'Treino').trim(),
+            started_at: startedAt > 0 ? new Date(startedAt).toISOString() : new Date().toISOString(),
+            ended_at: new Date(endedAt).toISOString(),
+            duration_seconds: Math.round(durationMs / 1000),
+            total_sets: totalSets,
+            completed_sets: completedSets,
+            exercises_data: exercises.map((ex, idx) => ({
+              name: ex?.name || '',
+              sets: ex?.sets || 0,
+              method: ex?.method || 'Normal',
+              logs: Object.fromEntries(
+                Object.entries(logs).filter(([k]) => k.startsWith(`${idx}-`))
+              ),
+            })),
+          })
+          if (error) logWarn('useWorkoutFinish', 'session save error', error)
+        }
+      } catch (e) { logWarn('useWorkoutFinish', 'session save error', e) }
+
+      // Request post-workout check-in
+      let postCheckin: Record<string, string> | null = null
+      try {
+        postCheckin = await requestPostWorkoutCheckin()
+        if (postCheckin && userId) {
+          const supabase = createClient()
+          const rpe = Number(postCheckin.rpe)
+          const satisfaction = Number(postCheckin.satisfaction)
+          const soreness = Number(postCheckin.soreness)
+          await supabase.from('workout_checkins').insert({
+            user_id: userId,
+            kind: 'post',
+            planned_workout_id: String(wk.id || '').trim() || null,
+            energy: null,
+            soreness: Number.isFinite(soreness) && soreness >= 0 && soreness <= 10 ? Math.round(soreness) : null,
+            notes: String(postCheckin.notes || '').trim() || null,
+            answers: {
+              rpe: Number.isFinite(rpe) && rpe >= 1 && rpe <= 10 ? Math.round(rpe) : null,
+              satisfaction: Number.isFinite(satisfaction) && satisfaction >= 1 && satisfaction <= 5 ? Math.round(satisfaction) : null,
+            },
+          }).catch(() => { })
+        }
+      } catch (e) { logWarn('useWorkoutFinish', 'post-checkin error', e) }
+
+      // Build session data for report
+      const sessionData = {
+        ...sess,
+        workout: { ...wk, exercises },
+        logs,
+        ui,
+        endedAt,
+        duration: durationMs,
+        durationSeconds: Math.round(durationMs / 1000),
+        completedSets,
+        totalSets,
+        postCheckin,
+      }
+
+      // Always show report (showReport = true)
+      onFinish?.(sessionData, true)
+    } catch (e) {
+      logWarn('useWorkoutFinish', 'finish error', e)
+      await alert('Erro ao finalizar treino. Tente novamente.', 'Erro')
+    } finally {
+      finishingRef.current = false
+      setFinishing(false)
+    }
+  }, [
+    session, workout, exercises, logs, ui, userId,
+    finishing, setFinishing,
+    persistDeloadHistoryFromSession,
     requestPostWorkoutCheckin,
-  };
+    confirm, alert, onFinish,
+  ])
+
+  return { finishWorkout, requestPostWorkoutCheckin }
 }
