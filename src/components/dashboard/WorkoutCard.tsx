@@ -1,7 +1,6 @@
 'use client'
 
 import React, { useState, useRef, useCallback } from 'react'
-import Image from 'next/image'
 import { Play, Share2, Pencil, Trash2, Loader2, Undo2 } from 'lucide-react'
 import type { DashboardWorkout } from '@/types/dashboard'
 import { isPeriodizedWorkoutFullyLoaded } from '@/hooks/usePeriodizedWorkouts'
@@ -190,7 +189,16 @@ export function WorkoutCard({
               </>
             ) : (
               <>
-                <Image src="/icons/btn-iniciar-treino.png" alt="" width={20} height={20} className="rounded-[3px]" unoptimized /> INICIAR TREINO
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" className="drop-shadow-[0_0_4px_rgba(234,179,8,0.6)]">
+                  <defs>
+                    <linearGradient id="playGold" x1="0%" y1="0%" x2="100%" y2="100%">
+                      <stop offset="0%" stopColor="#B8860B" />
+                      <stop offset="50%" stopColor="#FFD700" />
+                      <stop offset="100%" stopColor="#D4A017" />
+                    </linearGradient>
+                  </defs>
+                  <path d="M6 3.5L20 12L6 20.5V3.5Z" fill="url(#playGold)" stroke="#FFD700" strokeWidth="0.5" />
+                </svg> INICIAR TREINO
               </>
             )}
           </button>
