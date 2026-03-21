@@ -83,7 +83,7 @@ export async function PATCH(request: Request) {
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
 
     // Invalidar cache de listas para que o bootstrap e workouts/list reflitam a mudança imediatamente
-    await Promise.all([
+    await Promise.allSettled([
       cacheDeletePattern(`dashboard:bootstrap:${user.id}`),
       cacheDeletePattern(`workouts:list:${user.id}*`),
     ])

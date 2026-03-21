@@ -61,7 +61,7 @@ export async function POST(req: Request) {
         } catch (e) { logWarn('admin/vip/revoke', 'Failed to write audit_events', e) }
 
         // Clear cache
-        await Promise.all([
+        await Promise.allSettled([
             cacheDelete(`vip:access:${ent.user_id}`).catch(() => { }),
             cacheDelete(`dashboard:bootstrap:${ent.user_id}`).catch(() => { }),
         ])

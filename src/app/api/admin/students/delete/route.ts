@@ -5,6 +5,7 @@ import { requireRole, requireRoleWithBearer, resolveRoleByUser } from '@/utils/a
 import { getErrorMessage } from '@/utils/errorMessage'
 import { logWarn } from '@/lib/logger'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
+import { safePg } from '@/utils/safePgFilter'
 
 export const dynamic = 'force-dynamic'
 
@@ -129,7 +130,7 @@ export async function POST(req: Request) {
             try { await admin.from('user_settings').delete().eq('user_id', studentUserId) } catch (e) { logWarn('student-delete', 'Failed to delete user_settings', { ...ctx, error: getErrorMessage(e) }) }
             try { await admin.from('active_workout_sessions').delete().eq('user_id', studentUserId) } catch (e) { logWarn('student-delete', 'Failed to delete active_workout_sessions', { ...ctx, error: getErrorMessage(e) }) }
             try {
-                const safeUserId = String(studentUserId).replace(/[,()\\]/g, '')
+                const safeUserId = safePg(String(studentUserId))
                 const { data: channels } = await admin.from('direct_channels').select('id').or(`user1_id.eq.${safeUserId},user2_id.eq.${safeUserId}`)
                 if (Array.isArray(channels) && channels.length > 0) {
                     const ids = channels.map((c: { id: string }) => c.id)
