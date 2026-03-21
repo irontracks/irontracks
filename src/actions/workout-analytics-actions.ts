@@ -1,4 +1,5 @@
 import { createClient } from '@/utils/supabase/client'
+import { logWarn } from '@/lib/logger'
 import type { ActionResult } from '@/types/actions'
 import { parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
@@ -234,7 +235,7 @@ export async function computeWorkoutStreakAndStats(): Promise<ActionResult<Recor
         try {
             const { data: vol, error: vErr } = await supabase.rpc('iron_rank_my_total_volume')
             if (!vErr) totalVolumeKg = Math.round(Number(String(vol ?? 0).replace(',', '.')) || 0)
-        } catch { }
+        } catch (e) { logWarn("workout-analytics", "silenced", e) }
 
         const badges: Array<Record<string, unknown>> = []
         if (totalWorkouts > 0) badges.push({ id: 'first_workout', label: 'Primeiro treino', kind: 'milestone' })

@@ -4,7 +4,7 @@ import { parseSearchParams } from '@/utils/zod'
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { normalizeExerciseName } from '@/utils/normalizeExerciseName'
-import { safePg } from '@/utils/safePgFilter'
+import { safePg, safePgLike } from '@/utils/safePgFilter'
 import { cacheGet, cacheSet } from '@/utils/cache'
 
 // Cache TTL: 120s (resultados de busca mudam raramente durante uma sessão)
@@ -38,7 +38,7 @@ export async function GET(request: Request) {
 
     const admin = createAdminClient()
 
-    const safeQ = safePg(q.q)
+    const safeQ = safePgLike(q.q)
 
     const { data, error } = await admin
       .from('exercises')

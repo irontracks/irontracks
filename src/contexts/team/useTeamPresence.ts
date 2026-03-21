@@ -39,7 +39,7 @@ export function useTeamPresence({ user, supabase, teamSession, teamworkV2Enabled
                     next[uid] = { status: String(r?.status || 'online') as PresenceStatus, last_seen: r?.updated_at ? String(r.updated_at) : undefined };
                 }
                 setPresence(next);
-            } catch {
+            } catch (e) { logWarn("useTeamPresence", "silenced", e)
             }
         };
 
@@ -68,12 +68,12 @@ export function useTeamPresence({ user, supabase, teamSession, teamworkV2Enabled
                                     base[uid] = { status: String(row?.status || 'online') as PresenceStatus };
                                     return base;
                                 });
-                            } catch {
+                            } catch (e) { logWarn("useTeamPresence", "silenced", e)
                             }
                         }
                     )
                     .subscribe();
-            } catch {
+            } catch (e) { logWarn("useTeamPresence", "silenced", e)
             }
         })();
 
@@ -81,7 +81,7 @@ export function useTeamPresence({ user, supabase, teamSession, teamworkV2Enabled
             cancelled = true;
             try {
                 if (channel) supabase.removeChannel(channel);
-            } catch {
+            } catch (e) { logWarn("useTeamPresence", "silenced", e)
             }
         };
     }, [supabase, teamSession?.id, teamworkV2Enabled, user?.id]);
@@ -100,7 +100,7 @@ export function useTeamPresence({ user, supabase, teamSession, teamworkV2Enabled
                         { session_id: teamSession.id, user_id: user.id, status: String(presenceStatus || 'online') },
                         { onConflict: 'session_id,user_id' }
                     );
-            } catch {
+            } catch (e) { logWarn("useTeamPresence", "silenced", e)
             }
         };
         const t = setInterval(() => {

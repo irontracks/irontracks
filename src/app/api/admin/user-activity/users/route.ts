@@ -3,7 +3,7 @@ import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { requireRole, requireRoleWithBearer } from '@/utils/auth/route'
 import { parseSearchParams } from '@/utils/zod'
-import { safePg } from '@/utils/safePgFilter'
+import { safePgLike } from '@/utils/safePgFilter'
 
 export const dynamic = 'force-dynamic'
 
@@ -41,7 +41,7 @@ export async function GET(req: Request) {
 
     let query = admin.from('profiles').select('id, display_name, photo_url, role, last_seen, email').order('last_seen', { ascending: false }).limit(500)
     if (search) {
-      const like = `%${safePg(search)}%`
+      const like = `%${safePgLike(search)}%`
       query = query.or(`display_name.ilike.${like},email.ilike.${like}`)
     }
     if (role) {

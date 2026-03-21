@@ -30,7 +30,7 @@ export async function POST(req: Request) {
       const now = Date.now()
       const fiveMinsAgo = now - 5 * 60 * 1000
       try {
-        await Promise.all([
+        await Promise.allSettled([
           fetch(`${cfg.url}/zremrangebyscore/online_users/-inf/${fiveMinsAgo}`, {
             headers: { Authorization: `Bearer ${cfg.token}` },
           }),
