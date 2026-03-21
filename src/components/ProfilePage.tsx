@@ -7,6 +7,8 @@ import {
 } from 'lucide-react'
 import { getProfileCompletenessScore } from '@/schemas/settings'
 import type { UserSettings } from '@/schemas/settings'
+import dynamic from 'next/dynamic'
+const GymSettingsWrapper = dynamic(() => import('@/components/settings/GymSettingsWrapper'), { ssr: false })
 
 interface ProfilePageProps {
   settings: UserSettings | null
@@ -404,6 +406,11 @@ export default function ProfilePage({ settings, displayName, onSave, onBack }: P
                 ))}
               </div>
             </div>
+          </div>
+
+          {/* GPS & Location Settings */}
+          <div className="mb-5 rounded-2xl border border-neutral-800/40 bg-neutral-900/40 p-4">
+            <GymSettingsWrapper />
           </div>
 
           {/* Save button (sticky bottom) */}
