@@ -1,10 +1,20 @@
 /**
  * Hook that handles finishing an active workout.
  *
+ * IMPORTANT: This hook does NOT persist the workout to the database.
+ * Persistence is handled by the WorkoutReport component which calls
+ * POST /api/workouts/finish after the user sees the report.
+ *
+ * Flow:
+ *  1. Build sessionData with exercise logs, durations, etc.
+ *  2. Call onFinish(sessionData, true) → handleFinishSession
+ *  3. handleFinishSession sets reportData and switches view to 'report'
+ *  4. WorkoutReport calls /api/workouts/finish to persist
+ *
  * Key design decisions:
  *  - The report is ALWAYS generated automatically (no confirm dialog).
- *  - Short workouts (< 30 min) are ALWAYS saved to history (no confirm dialog).
- *  - Post-workout check-in is still prompted so the user can track RPE/satisfaction.
+ *  - Short workouts (< 30 min) are ALWAYS saved (no confirm dialog).
+ *  - Post-workout check-in is prompted after confirmation.
  */
 import { useCallback, useRef } from 'react'
 import { createClient } from '@/utils/supabase/client'
@@ -70,9 +80,9 @@ export function useWorkoutFinish({
 
   /**
    * Finish the workout.
-   *  - Always saves the workout to history.
-   *  - Always shows the report.
-   *  - No "Gerar relatório?" or "Treino curto" prompts.
+   *  - Always shows the report (no "Gerar relatório?" dialog).
+   *  - Short workouts always saved (no "Treino curto" dialog).
+   *  - Only asks confirmation when zero sets are completed.
    */
   const finishWorkout = useCallback(async () => {
     if (finishingRef.current || finishing) return
@@ -82,9 +92,19 @@ export function useWorkoutFinish({
     try {
       const sess = isObject(session) ? session : {} as Record<string, unknown>
       const wk = isObject(workout) ? workout : {} as Record<string, unknown>
-      const startedAt = typeof sess.startedAt === 'number' ? sess.startedAt : 0
+
+      // Parse startedAt - it can be a number (epoch ms), ISO string, or missing
+      let startedAtMs = 0
+      const rawStarted = sess.startedAt
+      if (typeof rawStarted === 'number' && rawStarted > 0) {
+        startedAtMs = rawStarted
+      } else if (typeof rawStarted === 'string') {
+        const parsed = new Date(rawStarted).getTime()
+        if (Number.isFinite(parsed) && parsed > 0) startedAtMs = parsed
+      }
+
       const endedAt = Date.now()
-      const durationMs = startedAt > 0 ? endedAt - startedAt : 0
+      const durationMs = startedAtMs > 0 ? endedAt - startedAtMs : 0
 
       // Count completed sets
       let completedSets = 0
@@ -100,7 +120,7 @@ export function useWorkoutFinish({
         }
       })
 
-      // Confirm if no sets were done
+      // Only confirm if absolutely zero sets were completed
       if (completedSets === 0) {
         const proceed = await confirm(
           'Nenhuma série foi marcada como feita. Deseja finalizar mesmo assim?',
@@ -113,47 +133,22 @@ export function useWorkoutFinish({
         }
       }
 
-      // Persist deload history
+      // Persist deload history (local storage)
       try {
         persistDeloadHistoryFromSession(session)
       } catch (e) { logWarn('useWorkoutFinish', 'deload history error', e) }
-
-      // Save session to Supabase
-      try {
-        if (userId) {
-          const supabase = createClient()
-          const { error } = await supabase.from('workout_sessions').insert({
-            user_id: userId,
-            workout_id: String(wk.id || '').trim() || null,
-            workout_title: String(wk.title || wk.name || 'Treino').trim(),
-            started_at: startedAt > 0 ? new Date(startedAt).toISOString() : new Date().toISOString(),
-            ended_at: new Date(endedAt).toISOString(),
-            duration_seconds: Math.round(durationMs / 1000),
-            total_sets: totalSets,
-            completed_sets: completedSets,
-            exercises_data: exercises.map((ex, idx) => ({
-              name: ex?.name || '',
-              sets: ex?.sets || 0,
-              method: ex?.method || 'Normal',
-              logs: Object.fromEntries(
-                Object.entries(logs).filter(([k]) => k.startsWith(`${idx}-`))
-              ),
-            })),
-          })
-          if (error) logWarn('useWorkoutFinish', 'session save error', error)
-        }
-      } catch (e) { logWarn('useWorkoutFinish', 'session save error', e) }
 
       // Request post-workout check-in
       let postCheckin: Record<string, string> | null = null
       try {
         postCheckin = await requestPostWorkoutCheckin()
+        // Save post check-in to Supabase
         if (postCheckin && userId) {
           const supabase = createClient()
           const rpe = Number(postCheckin.rpe)
           const satisfaction = Number(postCheckin.satisfaction)
           const soreness = Number(postCheckin.soreness)
-          await supabase.from('workout_checkins').insert({
+          supabase.from('workout_checkins').insert({
             user_id: userId,
             kind: 'post',
             planned_workout_id: String(wk.id || '').trim() || null,
@@ -164,33 +159,47 @@ export function useWorkoutFinish({
               rpe: Number.isFinite(rpe) && rpe >= 1 && rpe <= 10 ? Math.round(rpe) : null,
               satisfaction: Number.isFinite(satisfaction) && satisfaction >= 1 && satisfaction <= 5 ? Math.round(satisfaction) : null,
             },
-          }).catch(() => { })
+          }).then(() => { /* fire and forget */ }).catch((e) => logWarn('useWorkoutFinish', 'post-checkin save error', e))
         }
       } catch (e) { logWarn('useWorkoutFinish', 'post-checkin error', e) }
 
-      // Build session data for report
+      // Build the session data that will be passed to the report.
+      // The report component + /api/workouts/finish handle the actual persistence.
+      const workoutTitle = String(wk.title || wk.name || 'Treino').trim()
       const sessionData = {
         ...sess,
         workout: { ...wk, exercises },
+        workoutTitle,
+        workout_title: workoutTitle,
         logs,
         ui,
+        exercises,
+        date: startedAtMs > 0 ? new Date(startedAtMs).toISOString() : new Date().toISOString(),
         endedAt,
+        startedAt: startedAtMs > 0 ? startedAtMs : endedAt,
         duration: durationMs,
         durationSeconds: Math.round(durationMs / 1000),
+        durationMinutes: Math.round(durationMs / 60000),
         completedSets,
         totalSets,
         postCheckin,
+        // Idempotency key to prevent duplicate saves
+        finishIdempotencyKey: `finish-${userId}-${startedAtMs || endedAt}-${Date.now()}`,
       }
 
       // Always show report (showReport = true)
+      // This triggers handleFinishSession → setReportData → setView('report')
+      // The report component then calls POST /api/workouts/finish to persist
       onFinish?.(sessionData, true)
     } catch (e) {
       logWarn('useWorkoutFinish', 'finish error', e)
       await alert('Erro ao finalizar treino. Tente novamente.', 'Erro')
-    } finally {
       finishingRef.current = false
       setFinishing(false)
     }
+    // Note: we do NOT reset finishing/finishingRef here because the view
+    // transitions to 'report'. The state cleanup happens when the session
+    // is cleared by handleFinishSession (useWorkoutCrud).
   }, [
     session, workout, exercises, logs, ui, userId,
     finishing, setFinishing,
