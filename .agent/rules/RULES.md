@@ -1,124 +1,129 @@
 # IronTracks — Agent Rules
 
-## 🚨 REGRAS CRÍTICAS (NUNCA violar)
+## 🚨 CRITICAL RULES (NEVER violate)
 
-### 1. NÃO deletar arquivos com `find -delete` ou `rm` com glob
-- Filenames com espaço no macOS causam deleções acidentais
-- Use SEMPRE `git rm` para rastrear, ou delete um arquivo por vez com path entre aspas
-- **ANTES** de qualquer delete, listar os arquivos que serão afetados e confirmar
+### 1. NEVER delete files with `find -delete` or `rm` with globs
+- Filenames with spaces on macOS cause accidental deletions
+- ALWAYS use `git rm` for tracked files, or delete one file at a time with quoted paths
+- **BEFORE** any delete, list affected files and confirm
 
-### 2. NÃO modificar modais sem verificar o fluxo completo
-- Modais usam `z-index` em camadas: overlay (1200) > modal (1300) > toast (1400)
-- **SEMPRE** verificar se o modal tem:
-  - `onClose` funcional (click no X, click no overlay, ESC key)
-  - `overflow-y-auto` no body para scroll em telas pequenas
-  - `max-h-[85vh]` para não ultrapassar a tela
-  - `pb-safe` para safe area no iOS
-- **NUNCA** remover `position: fixed` ou `inset-0` de overlays
-- **NUNCA** mudar z-index sem verificar colisões com outros modais ativos
+### 2. NEVER modify modals without verifying the full flow
+- Modals use layered `z-index`: overlay (1200) > modal (1300) > toast (1400)
+- **ALWAYS** verify the modal has:
+  - Working `onClose` (X button, overlay click, ESC key)
+  - `overflow-y-auto` on body for scroll on small screens
+  - `max-h-[85vh]` to prevent exceeding viewport
+  - `pb-safe` for iOS safe area
+- **NEVER** remove `position: fixed` or `inset-0` from overlays
+- **NEVER** change z-index without checking collisions with other active modals
 
-### 3. NÃO modificar state management sem entender o fluxo
-- `IronTracksAppClientImpl.tsx` é o God Component — qualquer estado global passa por ele
-- `useViewNavigation.ts` controla TODA a navegação de views
-- **ANTES** de mudar qualquer `useState`/`useEffect` em componentes core, trace o fluxo:
-  1. Quem seta o state?
-  2. Quem consome o state?
-  3. Há side effects dependentes?
+### 3. NEVER modify state management without understanding the flow
+- `IronTracksAppClientImpl.tsx` is the God Component — all global state flows through it
+- `useViewNavigation.ts` controls ALL view navigation
+- **BEFORE** changing any `useState`/`useEffect` in core components, trace the flow:
+  1. Who sets the state?
+  2. Who consumes the state?
+  3. Are there dependent side effects?
 
-### 4. NÃO fazer batch operations em APIs sem rate limit check
-- Toda rota nova DEVE ter `checkRateLimitAsync` ou verificação equivalente
-- Schemas Zod DEVEM ter `.max()` em strings e arrays
+### 4. NEVER do batch operations on APIs without rate limit checks
+- Every new route MUST have `checkRateLimitAsync` or equivalent
+- Zod schemas MUST have `.max()` on strings and arrays
 
-### 5. NÃO interpolar variáveis em `.or()` do Supabase sem `safePg()`
-- **SEMPRE** usar `import { safePg } from '@/utils/safePgFilter'`
-- Pattern correto: `.or(\`col.eq.${safePg(value)}\`)`
-- Pattern ERRADO: `.or(\`col.eq.${value}\`)`
+### 5. NEVER interpolate variables in Supabase `.or()` or `.ilike()` without sanitization
+- **ALWAYS** use `import { safePg, safePgLike } from '@/utils/safePgFilter'`
+- For `.or()`: `.or(\`col.eq.${safePg(value)}\`)`
+- For `.ilike()`: `.ilike('col', \`%${safePgLike(value)}%\`)`
+- **WRONG**: `.or(\`col.eq.${value}\`)` or `.ilike('col', \`%${value}%\`)`
 
 ---
 
-## ⚠️ REGRAS DE SEGURANÇA
+## ⚠️ SECURITY RULES
 
-### 6. Inserções na tabela `notifications`
-- **SEMPRE** incluir `is_read: false` e `read: false` explicitamente
-- Usar `insertNotifications()` de `@/lib/social/notifyFollowers` quando possível (já garante defaults)
+### 6. Notifications table inserts
+- **ALWAYS** include `is_read: false` and `read: false` explicitly
+- Use `insertNotifications()` from `@/lib/social/notifyFollowers` when possible (guarantees defaults)
 
 ### 7. `createAdminClient()` — RLS Bypass
-- Só usar quando RLS impede a operação legítima
-- **SEMPRE** verificar auth ANTES de usar admin client
-- **SEMPRE** adicionar comment: `// NEEDS ADMIN: [razão]`
+- Only use when RLS prevents a legitimate operation
+- **ALWAYS** verify auth BEFORE using admin client
+- **ALWAYS** add comment: `// NEEDS ADMIN: [reason]`
 
-### 8. Deletes e Updates
-- `.delete()` DEVE ter `.eq('user_id', userId)` ou ownership check equivalente
-- `.update()` DEVE filtrar por owner ou ter role check (admin/teacher)
+### 8. Deletes and Updates
+- `.delete()` MUST have `.eq('user_id', userId)` or equivalent ownership check
+- `.update()` MUST filter by owner or have role check (admin/teacher)
 
----
-
-## 🎨 REGRAS DE UI/UX
-
-### 9. Design System Premium
-- Background: `#0a0a0a` (preto profundo), cards: `rgba(15,15,15,0.98)`
-- Gold: `#f59e0b` → `#d97706` → `#b45309` (gradiente 135deg)
-- Borders: `rgba(234,179,8,0.25)` (gold subtle)
-- **NUNCA** usar cores "flat" (vermelho puro, azul puro)
-- **SEMPRE** usar `from '@/components/ui/PremiumUI'` para modais e botões
-- Fontes: `font-black` para títulos, `text-sm` para body
-
-### 10. Componentes > 500 linhas
-- Extrair sub-componentes ou hooks antes de adicionar mais código
-- Hooks > 300 linhas devem ser decompostos
-
-### 11. Lazy Loading
-- Todo modal e painel pesado DEVE usar `dynamic(() => import(...), { ssr: false })`
-- Componentes que usam `chart.js`, `framer-motion` ou `html2canvas` DEVEM ser lazy
-
-### 12. Imagens
-- Usar `next/image` quando possível
-- Exceções aceitas: avatares dinâmicos (Capacitor), previews de câmera, geração de PDF
+### 9. Empty catch blocks
+- **NEVER** write `catch {}` or `catch { }` — always log: `catch (e) { logWarn('context', 'message', e) }`
+- Import `logWarn` from `@/lib/logger`
 
 ---
 
-## 🧪 REGRAS DE QUALIDADE
+## 🎨 UI/UX RULES
 
-### 13. TypeScript
-- **ZERO** `as any` ou `: any` — usar `unknown` + type guard
-- Catch blocks devem logar: `catch (e) { logError('context', e) }`
-- Schemas Zod em `src/schemas/` para validação de input
+### 10. Premium Design System
+- Background: `#0a0a0a` (deep black), cards: `rgba(15,15,15,0.98)`
+- Gold gradient: `#f59e0b` → `#d97706` → `#b45309` (135deg)
+- Borders: `rgba(234,179,8,0.25)` (subtle gold)
+- **NEVER** use flat colors (pure red, pure blue)
+- **ALWAYS** use `from '@/components/ui/PremiumUI'` for modals and buttons
+- Fonts: `font-black` for titles, `text-sm` for body
 
-### 14. Erro Handling
-- APIs retornam `{ ok: boolean, error?: string }`
-- Status HTTP corretos: 401 (auth), 403 (forbidden), 429 (rate limit)
-- **NUNCA** expor stack traces ao cliente em produção
+### 11. Components > 500 lines
+- Extract sub-components or hooks before adding more code
+- Hooks > 300 lines must be decomposed
 
-### 15. Antes de commitar
-- Rodar `npx tsc --noEmit` para type check
-- Verificar que nenhum arquivo foi deletado acidentalmente: `git diff --name-status | grep "^D"`
-- Commit messages em inglês com prefixo: `fix()`, `feat()`, `security()`, `refactor()`
+### 12. Lazy Loading
+- Every heavy modal/panel MUST use `dynamic(() => import(...), { ssr: false })`
+- Components using `chart.js`, `framer-motion`, or `html2canvas` MUST be lazy loaded
+
+### 13. Images
+- Use `next/image` when possible
+- Accepted exceptions: dynamic avatars (Capacitor), camera previews, PDF generation
 
 ---
 
-## 📋 REGRAS DE TASK TRACKING
+## 🧪 CODE QUALITY RULES
 
-### 16. SEMPRE atualizar task.md com impacto pro usuário
-- **ANTES** de começar qualquer fix/feature, atualizar `task.md` marcando `[/]` (em progresso)
-- **DEPOIS** de concluir, marcar `[x]` e adicionar uma linha de **impacto para o usuário**:
-  - Formato: `[x] Fix X — ✅ **Impacto:** [o que muda para o usuário]`
-  - Exemplo: `[x] safePg client-side — ✅ **Impacto:** Proteção contra injection em buscas`
-  - Exemplo: `[x] Atomic counter — ✅ **Impacto:** Contagem de uso correta mesmo com acessos simultâneos`
-- **NUNCA** encerrar uma sessão sem atualizar task.md com o status final
-- Ao notificar o usuário, incluir tabela resumo com coluna "Impacto"
+### 14. TypeScript
+- **ZERO** `as any` or `: any` — use `unknown` + type guard
+- Catch blocks must log: `catch (e) { logError('context', e) }`
+- Zod schemas in `src/schemas/` for input validation
 
-### 17. Economia de tokens — ZERO loops desnecessários
-- **ANTES de qualquer busca/grep**, definir exatamente o que procura e parar ao encontrar
-- **NÃO** repetir o mesmo comando se já falhou — mudar abordagem imediatamente
-- **NÃO** ler arquivos inteiros se só precisa de 10-20 linhas — usar StartLine/EndLine
-- **NÃO** tentar mais de 2 abordagens para o mesmo problema; na 3ª, perguntar ao usuário
-- **NÃO** verificar o mesmo arquivo mais de 1 vez na mesma sessão (guardar contexto)
-- **batch**: se precisa editar vários arquivos com o mesmo padrão, usar `multi_replace` ou `grep` primeiro para listar todos e aplicar em uma rodada
-- **pipeline**: encadear comandos shell com `&&` e `|` em vez de rodar um por um
-- **atalhos**: usar `git diff --stat` em vez de `view_file` para verificar mudanças
-- Se encontrou um erro de permissão/env, **NÃO** tentar 5 variações — usar abordagem alternativa na 2ª tentativa
+### 15. Error Handling
+- APIs return `{ ok: boolean, error?: string }`
+- Correct HTTP status codes: 401 (auth), 403 (forbidden), 429 (rate limit)
+- **NEVER** expose stack traces to the client in production
 
-### 18. SQL no Supabase — usar workflow `/supabase-sql`
-- **NUNCA** pedir ao usuário para rodar SQL manualmente se o workflow está disponível
-- Usar a Management API com PAT do Keychain (workflow já configurado)
-- Após executar SQL, **SEMPRE** verificar com SELECT que a mudança foi aplicada
+### 16. Before committing
+- Run `npx tsc --noEmit` for type check
+- Verify no files were accidentally deleted: `git diff --name-status | grep "^D"`
+- Commit messages in English with prefix: `fix()`, `feat()`, `security()`, `refactor()`
+
+---
+
+## 📋 TASK TRACKING RULES
+
+### 17. ALWAYS update task.md with user impact
+- **BEFORE** starting any fix/feature, update `task.md` marking `[/]` (in progress)
+- **AFTER** completing, mark `[x]` and add a **user impact** line:
+  - Format: `[x] Fix X — ✅ **Impact:** [what changes for the user]`
+  - Example: `[x] safePg client-side — ✅ **Impact:** Search injection protection`
+  - Example: `[x] Atomic counter — ✅ **Impact:** Correct usage count under concurrent access`
+- **NEVER** end a session without updating task.md with final status
+- When notifying the user, include a summary table with an "Impact" column
+
+### 18. Token economy — ZERO unnecessary loops
+- **BEFORE any search/grep**, define exactly what you're looking for and stop when found
+- **DO NOT** repeat the same command if it already failed — change approach immediately
+- **DO NOT** read entire files if you only need 10-20 lines — use StartLine/EndLine
+- **DO NOT** try more than 2 approaches for the same problem; on the 3rd, ask the user
+- **DO NOT** re-read the same file more than once per session (retain context)
+- **Batch**: if editing multiple files with the same pattern, use `grep` first to list all, then apply in one round
+- **Pipeline**: chain shell commands with `&&` and `|` instead of running one by one
+- **Shortcuts**: use `git diff --stat` instead of `view_file` to verify changes
+- On a permission/env error, **DO NOT** try 5 variations — switch to alternative approach on the 2nd attempt
+
+### 19. Supabase SQL — use `/supabase-sql` workflow
+- **NEVER** ask the user to run SQL manually if the workflow is available
+- Use the Management API with the PAT from Keychain (workflow already configured)
+- After executing SQL, **ALWAYS** verify with SELECT that the change was applied

@@ -1,18 +1,18 @@
 ---
 name: multi-agent-coordination
-description: Coordenação de múltiplos agentes trabalhando em paralelo no IronTracks, cada um em um setor isolado para evitar conflitos de arquivos.
+description: Coordination of multiple agents working in parallel on IronTracks, each in an isolated sector to avoid file conflicts.
 ---
 
 # Multi-Agent Coordination — IronTracks
 
-## Conceito
-Dividir o projeto em **5 setores isolados** para que até 5 agentes possam trabalhar em paralelo, cada um em sua própria conversa, sem conflitos de arquivo.
+## Concept
+Split the project into **5 isolated sectors** so up to 5 agents can work in parallel, each in its own conversation, without file conflicts.
 
-## Os 5 Setores
+## The 5 Sectors
 
-### 🏋️ Setor 1: Workout Engine
-**Escopo:** Tudo relacionado ao treino ativo e lógica de sessão.
-**Arquivos exclusivos:**
+### 🏋️ Sector 1: Workout Engine
+**Scope:** Everything related to active training and session logic.
+**Exclusive files:**
 - `src/components/workout/**`
 - `src/components/ActiveWorkout.tsx`
 - `src/lib/finishWorkoutPayload.ts`
@@ -22,9 +22,9 @@ Dividir o projeto em **5 setores isolados** para que até 5 agentes possam traba
 - `src/hooks/useWorkoutRecovery.ts`
 - `src/app/api/workouts/**`
 
-### 📊 Setor 2: Dashboard & UI
-**Escopo:** Dashboard, componentes visuais, layout, navegação.
-**Arquivos exclusivos:**
+### 📊 Sector 2: Dashboard & UI
+**Scope:** Dashboard, visual components, layout, navigation.
+**Exclusive files:**
 - `src/components/dashboard/**`
 - `src/components/ui/**`
 - `src/app/(app)/dashboard/IronTracksAppClientImpl.tsx`
@@ -33,10 +33,10 @@ Dividir o projeto em **5 setores isolados** para que até 5 agentes possam traba
 - `src/components/ProfilePage.tsx`
 - `src/components/SettingsModal.tsx`
 
-### 🔐 Setor 3: Auth, API & Backend
-**Escopo:** Autenticação, APIs, server actions, middleware.
-**Arquivos exclusivos:**
-- `src/app/api/**` (exceto `/api/workouts/`)
+### 🔐 Sector 3: Auth, API & Backend
+**Scope:** Authentication, APIs, server actions, middleware.
+**Exclusive files:**
+- `src/app/api/**` (except `/api/workouts/`)
 - `src/actions/**`
 - `src/middleware.ts`
 - `src/utils/supabase/**`
@@ -44,9 +44,9 @@ Dividir o projeto em **5 setores isolados** para que até 5 agentes possam traba
 - `src/lib/redis*.ts`
 - `supabase/**`
 
-### 🤝 Setor 4: Social & Community
-**Escopo:** Chat, stories, equipes, convites, notificações.
-**Arquivos exclusivos:**
+### 🤝 Sector 4: Social & Community
+**Scope:** Chat, stories, teams, invites, notifications.
+**Exclusive files:**
 - `src/components/Chat*.tsx`
 - `src/components/Story*.tsx`
 - `src/components/Team*.tsx`
@@ -56,9 +56,9 @@ Dividir o projeto em **5 setores isolados** para que até 5 agentes possam traba
 - `src/app/(app)/community/**`
 - `src/hooks/useTeam*.ts`
 
-### 📱 Setor 5: Mobile, PWA & Build
-**Escopo:** Capacitor, service worker, build nativo, deploy.
-**Arquivos exclusivos:**
+### 📱 Sector 5: Mobile, PWA & Build
+**Scope:** Capacitor, service worker, native builds, deploy.
+**Exclusive files:**
 - `ios/**`
 - `android/**`
 - `capacitor.config.ts`
@@ -67,60 +67,62 @@ Dividir o projeto em **5 setores isolados** para que até 5 agentes possam traba
 - `package.json`
 - `.github/**`
 
-## Arquivos Compartilhados (⚠️ Zona de Conflito)
-Estes arquivos podem ser tocados por mais de um setor. **Apenas UM agente** deve editá-los por vez:
-- `src/types/app.ts` — tipos globais
-- `src/utils/*.ts` — utilitários
-- `src/hooks/use*.ts` — hooks genéricos
+## Shared Files (⚠️ Conflict Zone)
+These files may be touched by multiple sectors. **Only ONE agent** should edit them at a time:
+- `src/types/app.ts` — global types
+- `src/utils/*.ts` — utilities (especially `safePgFilter.ts`, `cache.ts`)
+- `src/hooks/use*.ts` — generic hooks
 - `tailwind.config.ts` / `globals.css`
+- `.agent/rules/RULES.md` — agent rules
 
-## Como Usar (Workflow)
+## How to Use (Workflow)
 
-### Passo 1: Abrir 5 conversas
-Abra 5 conversas separadas no Gemini CLI / IDE, uma para cada setor.
+### Step 1: Open up to 5 conversations
+Open separate conversations in your IDE, one per sector.
 
-### Passo 2: Prompt de inicialização
-Copie e cole o seguinte prompt **adaptado para cada setor**:
+### Step 2: Initialization prompt
+Paste the following prompt **adapted for each sector**:
 
 ```
-Você é o agente responsável pelo Setor [N]: [NOME DO SETOR] do IronTracks.
+You are the agent responsible for Sector [N]: [SECTOR NAME] in IronTracks.
 
-REGRAS:
-1. Você SÓ pode editar arquivos dentro do seu escopo (listado abaixo)
-2. Se precisar alterar um arquivo fora do escopo, PARE e peça autorização
-3. Faça git pull antes de começar qualquer trabalho
-4. Faça commits frequentes com prefix: [setor-N]
-5. NÃO edite arquivos compartilhados sem confirmar primeiro
+RULES:
+1. You may ONLY edit files within your scope (listed below)
+2. If you need to change a file outside your scope, STOP and ask for authorization
+3. Run git pull before starting any work
+4. Make frequent commits with prefix: [sector-N]
+5. DO NOT edit shared files without confirming first
+6. Follow all rules in .agent/rules/RULES.md
 
-Seu escopo de arquivos:
-[LISTAR ARQUIVOS DO SETOR]
+Your file scope:
+[LIST SECTOR FILES]
 
-Tarefa atual:
-[DESCREVER A TAREFA]
+Current task:
+[DESCRIBE THE TASK]
 ```
 
-### Passo 3: Coordenação
-- Cada agente faz `git pull` antes de começar
-- Commits com prefixo: `[setor-1] feat: ...`, `[setor-2] fix: ...`
-- Se dois setores precisam do mesmo arquivo → um espera o outro terminar
-- Ao finalizar, cada agente faz push
+### Step 3: Coordination
+- Each agent runs `git pull` before starting
+- Commits with prefix: `[sector-1] feat: ...`, `[sector-2] fix: ...`
+- If two sectors need the same file → one waits for the other to finish
+- On completion, each agent pushes
 
-### Passo 4: Merge
-Após todos finalizarem, faça um pull final e resolva conflitos (se houver).
+### Step 4: Merge
+After all agents finish, do a final pull and resolve conflicts (if any).
 
-## Limitações
-- Não há orquestração automática entre agentes
-- Cada conversa é independente — agentes não se comunicam entre si
-- Conflitos de git são possíveis em arquivos compartilhados
-- O usuário é o "Project Manager" que coordena os agentes
+## Limitations
+- There is no automatic orchestration between agents
+- Each conversation is independent — agents do not communicate with each other
+- Git conflicts are possible on shared files
+- The user is the "Project Manager" who coordinates the agents
 
-## Exemplo Prático
+## Practical Example
 ```
-Conversa 1: "Agente Setor 1, implemente auto-save no treino ativo"
-Conversa 2: "Agente Setor 2, redesenhe o card de Iron Rank"
-Conversa 3: "Agente Setor 3, otimize as queries do Supabase"
-Conversa 4: "Agente Setor 4, implemente reactions nos stories"
-Conversa 5: "Agente Setor 5, configure push notifications no Android"
+Conversation 1: "Sector 1 Agent, implement auto-save for active workout"
+Conversation 2: "Sector 2 Agent, redesign the Iron Rank card"
+Conversation 3: "Sector 3 Agent, optimize Supabase queries"
+Conversation 4: "Sector 4 Agent, implement story reactions"
+Conversation 5: "Sector 5 Agent, configure push notifications on Android"
 ```
 
-Todas as 5 tarefas rodam em paralelo sem conflitos de arquivo.
+All 5 tasks run in parallel without file conflicts.

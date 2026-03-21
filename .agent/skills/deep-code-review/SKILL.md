@@ -1,217 +1,221 @@
 ---
 name: deep-code-review
-description: Análise profunda do codebase em busca de bugs, falhas de segurança, dead code, race conditions, IDOR e problemas de lógica.
+description: Deep, systematic codebase analysis for bugs, security flaws, dead code, race conditions, IDOR, and logic issues.
 ---
 
 # Deep Code Review
 
-Skill para executar uma análise profunda e sistemática do codebase. Siga cada fase na ordem.
+Skill for running a deep, systematic codebase analysis. Follow each phase in order.
 
-## Quando usar
+## When to Use
 
-O usuário pede variações de: "faça um code review", "analise o código", "busque bugs", "/code-review", "/review".
+The user asks for variations of: "do a code review", "analyze the code", "find bugs", "/code-review", "/review".
 
-## Formato de saída
+## Output Format
 
-Gere um artifact `code_review_report.md` com score e categorias. Use o template:
+Generate an artifact `code_review_report.md` with score and categories. Use this template:
 
 ```markdown
-# Code Review — [Nome do Projeto]
+# Code Review — [Project Name]
 
-**Data:** YYYY-MM-DD
-**Escopo:** [arquivos/pastas analisados]
-**Score Global:** X/10
+**Date:** YYYY-MM-DD
+**Scope:** [files/folders analyzed]
+**Global Score:** X/10
 
-## Crítico (Score 100)
-### N. [Título curto]
-[Descrição do problema + impacto]
-`path/to/file.ts:linha`
-**Fix sugerido:** [como resolver]
+## Critical (Score 100)
+### N. [Short title]
+[Problem description + impact]
+`path/to/file.ts:line`
+**Suggested fix:** [how to resolve]
 
-## Alto (Score 75)
+## High (Score 75)
 ...
 
-## Médio (Score 50)
+## Medium (Score 50)
 ...
 
-## Baixo (Score 25)
+## Low (Score 25)
 ...
 
-## Análise de Impacto das Correções
+## Fix Impact Analysis
 
-| # | Fix | Breaking? | Risco de regressão | Impacto para o usuário |
+| # | Fix | Breaking? | Regression Risk | User Impact |
 |---|---|---|---|---|
-| 1 | [Título] | Sim/Não | Baixo/Médio/Alto | [descrição curta] |
+| 1 | [Title] | Yes/No | Low/Medium/High | [short description] |
 | 2 | ... | ... | ... | ... |
 
-### Detalhes de Impacto
-Para cada fix, detalhar:
-- **O que muda** para o usuário final
-- **O que quebra** (se algo) — e se é intencional
-- **Risco de regressão** — quais fluxos podem ser afetados
-- **Dependências** — se o fix depende de outro
+### Impact Details
+For each fix, detail:
+- **What changes** for the end user
+- **What breaks** (if anything) — and whether it's intentional
+- **Regression risk** — which flows may be affected
+- **Dependencies** — whether the fix depends on another
 
-## Resumo
-- X críticos, Y altos, Z médios, W baixos
-- Áreas mais problemáticas: [lista]
+## Summary
+- X critical, Y high, Z medium, W low
+- Most problematic areas: [list]
 ```
 
 ---
 
-## ⚠️ REGRA OBRIGATÓRIA: Confirmação do Usuário
+## ⚠️ MANDATORY RULE: User Confirmation
 
-**NUNCA comece a codar correções automaticamente.**
+**NEVER start coding fixes automatically.**
 
-Após gerar o relatório com a análise de impacto:
+After generating the report with impact analysis:
 
-1. **Apresente** o relatório completo ao usuário via `notify_user` com `BlockedOnUser: true`
-2. **Pergunte explicitamente:** _"Quer que eu corrija todos? Ou deseja selecionar quais corrigir?"_
-3. **Aguarde** a resposta do usuário antes de qualquer edição de código
-4. Se o usuário aprovar tudo → corrija na ordem de prioridade (Crítico → Alto → Médio → Baixo)
-5. Se o usuário selecionar itens específicos → corrija apenas os selecionados
+1. **Present** the full report to the user via `notify_user` with `BlockedOnUser: true`
+2. **Ask explicitly:** _"Should I fix all of them? Or would you like to select which ones?"_
+3. **Wait** for the user's response before any code edits
+4. If the user approves all → fix in priority order (Critical → High → Medium → Low)
+5. If the user selects specific items → fix only those
 
 ---
 
-## Fase 1 — Mapeamento (obrigatório)
+## Phase 1 — Mapping (mandatory)
 
-1. Listar a estrutura principal do projeto (`src/`, `app/`, etc.)
-2. Identificar tecnologias (framework, ORM, auth, storage, billing)
-3. Identificar padrões de autenticação usados (middleware, guards, etc.)
-4. Mapear endpoints de API, server actions e cron jobs
+1. List the main project structure (`src/`, `app/`, etc.)
+2. Identify technologies (framework, ORM, auth, storage, billing)
+3. Identify authentication patterns used (middleware, guards, etc.)
+4. Map API endpoints, server actions, and cron jobs
 
-## Fase 2 — Análise de Segurança (Crítico)
+## Phase 2 — Security Analysis (Critical)
 
-Verificar CADA endpoint e server action para:
+Check EVERY endpoint and server action for:
 
-### 2.1 Autenticação
-- [ ] Toda rota tem auth check? (getUser, requireUser, requireRole)
-- [ ] Server actions validam sessão antes de operar?
-- [ ] Cron jobs usam auth por header (não query string)?
-- [ ] Endpoints de webhook validam assinatura?
+### 2.1 Authentication
+- [ ] Does every route have an auth check? (getUser, requireUser, requireRole)
+- [ ] Do server actions validate session before operating?
+- [ ] Do cron jobs use header-based auth (not query string)?
+- [ ] Do webhook endpoints validate signatures?
 
-### 2.2 Autorização (IDOR)
-- [ ] Mutations filtram por `user_id` do caller? (.eq('user_id', user.id))
-- [ ] Deletes verificam ownership antes de executar?
-- [ ] Updates verificam ownership antes de executar?
-- [ ] Endpoints admin verificam role E ownership (professor → seus alunos)?
+### 2.2 Authorization (IDOR)
+- [ ] Do mutations filter by caller's `user_id`? (.eq('user_id', user.id))
+- [ ] Do deletes verify ownership before executing?
+- [ ] Do updates verify ownership before executing?
+- [ ] Do admin endpoints check role AND ownership (teacher → own students)?
 
 ### 2.3 Injection
-- [ ] Inputs de busca são sanitizados antes de `.or()`, `.ilike()`, `.filter()`?
-- [ ] Valores do cliente são escapados antes de interpolação em queries?
-- [ ] SQL/PostgREST operators são removidos de input? (caracteres: `,().\`)
+- [ ] Are search inputs sanitized before `.or()`, `.ilike()`, `.filter()`?
+- [ ] Are client values escaped before interpolation in queries?
+- [ ] Are SQL/PostgREST operators removed from input? (characters: `,().\``)
+- [ ] Is `safePg()` used for `.or()` and `safePgLike()` for `.ilike()`?
 
 ### 2.4 Upload / Storage
-- [ ] Paths de upload são gerados server-side? (não controlados pelo cliente)
-- [ ] File types e tamanhos são validados?
+- [ ] Are upload paths generated server-side? (not client-controlled)
+- [ ] Are file types and sizes validated?
 
-### 2.5 Rate Limiting e DoS
-- [ ] Endpoints que chamam APIs externas (AI, billing) tem rate limit?
-- [ ] Schemas de input tem `.max()` para strings e arrays?
-- [ ] Endpoints de busca limitam resultados?
+### 2.5 Rate Limiting & DoS
+- [ ] Do endpoints calling external APIs (AI, billing) have rate limits?
+- [ ] Do input schemas have `.max()` for strings and arrays?
+- [ ] Do search endpoints limit results? (.limit())
 
-## Fase 3 — Integridade de Dados
+## Phase 3 — Data Integrity
 
 ### 3.1 Race Conditions
-- [ ] Operações read-then-write são atômicas? (INSERT ON CONFLICT, optimistic lock)
-- [ ] Operações de billing/subscription são idempotentes?
-- [ ] Contadores são incrementados atomicamente?
+- [ ] Are read-then-write operations atomic? (INSERT ON CONFLICT, optimistic lock, RPC)
+- [ ] Are billing/subscription operations idempotent?
+- [ ] Are counters incremented atomically? (use `increment_counter` RPC)
 
-### 3.2 Validação de Input
-- [ ] Dates do cliente são clampadas server-side?
-- [ ] Enums são validados contra lista fixa?
-- [ ] UUIDs são validados antes de usar em queries?
+### 3.2 Input Validation
+- [ ] Are client-provided dates clamped server-side?
+- [ ] Are enums validated against a fixed list?
+- [ ] Are UUIDs validated before use in queries?
 
-### 3.3 Consistência
-- [ ] Cascades de delete são completos? (workout → exercises → sets)
-- [ ] Updates em uma tabela refletem em tabelas relacionadas?
-- [ ] Cancellations revogam entitlements?
+### 3.3 Consistency
+- [ ] Are delete cascades complete? (workout → exercises → sets)
+- [ ] Do updates in one table reflect in related tables?
+- [ ] Do cancellations revoke entitlements?
 
-## Fase 4 — Dead Code e Lógica Morta
+## Phase 4 — Dead Code & Dead Logic
 
-### 4.1 Variáveis e flags
-- [ ] Variáveis são atribuídas e lidas corretamente? (e.g., flag = false dentro do catch, if(flag) nunca true)
-- [ ] Guards e early returns são efetivos?
-- [ ] Variáveis declaradas mas nunca lidas?
+### 4.1 Variables and Flags
+- [ ] Are variables assigned and read correctly? (e.g., flag = false inside catch, if(flag) never true)
+- [ ] Are guards and early returns effective?
+- [ ] Are there variables declared but never read?
 
-### 4.2 Imports e exports
-- [ ] Imports não utilizados?
-- [ ] Exports que nenhum outro arquivo importa?
-- [ ] Funções definidas mas nunca chamadas?
+### 4.2 Imports and Exports
+- [ ] Are there unused imports?
+- [ ] Are there exports that no other file imports?
+- [ ] Are there functions defined but never called?
 
-### 4.3 Condições impossíveis
-- [ ] if/else branches que nunca executam?
-- [ ] Catch blocks vazios que engolem erros?
-- [ ] Default cases que mascaram bugs?
+### 4.3 Impossible Conditions
+- [ ] Are there if/else branches that never execute?
+- [ ] Are there empty catch blocks swallowing errors?
+- [ ] Are there default cases masking bugs?
 
-## Fase 5 — Performance e Cache
+## Phase 5 — Performance & Cache
 
 ### 5.1 Queries
-- [ ] N+1 queries em loops?
-- [ ] Selects sem paginação que podem retornar milhares de rows?
-- [ ] Queries sem index nas colunas filtradas?
+- [ ] N+1 queries in loops?
+- [ ] Selects without pagination that can return thousands of rows?
+- [ ] Queries without indexes on filtered columns?
 
 ### 5.2 Cache
-- [ ] Cache keys são únicas por user? (evitar vazamento cross-user)
-- [ ] Cache é invalidado após mutations?
-- [ ] TTL é razoável?
+- [ ] Are cache keys unique per user? (prevent cross-user leakage)
+- [ ] Is cache invalidated after mutations?
+- [ ] Is TTL reasonable?
 
 ### 5.3 Memory
-- [ ] Arrays grandes em memória sem streaming?
-- [ ] JSON.stringify/parse em objetos muito grandes?
+- [ ] Large arrays in memory without streaming?
+- [ ] JSON.stringify/parse on very large objects?
 
-## Fase 6 — Padrões de Código
+## Phase 6 — Code Patterns
 
 ### 6.1 Error Handling
-- [ ] Catch blocks logam o erro? (não catch vazio)
-- [ ] Erros retornam status HTTP correto?
-- [ ] Erros de DB são tratados antes de retornar ao cliente?
+- [ ] Do catch blocks log errors? (no empty catch)
+- [ ] Do errors return correct HTTP status?
+- [ ] Are DB errors handled before returning to client?
 
 ### 6.2 TypeScript
-- [ ] Uso excessivo de `any`?
-- [ ] Type assertions sem validação (`as Type` sem check)?
-- [ ] Propriedades opcionais acessadas sem null check?
+- [ ] Excessive use of `any`?
+- [ ] Type assertions without validation (`as Type` without check)?
+- [ ] Optional properties accessed without null check?
 
-### 6.3 Naming e Colunas
-- [ ] Nomes de colunas correspondem ao schema real do DB?
-- [ ] Não há typos em nomes de campos? (`read` vs `is_read`)
+### 6.3 Naming & Columns
+- [ ] Do column names match the actual DB schema?
+- [ ] Are there typos in field names? (`read` vs `is_read`)
 
-## Fase 7 — Infraestrutura
+## Phase 7 — Infrastructure
 
 ### 7.1 Env Vars
-- [ ] Secrets não estão hardcoded?
-- [ ] Fallbacks de env vars são seguros?
+- [ ] Are secrets not hardcoded?
+- [ ] Are env var fallbacks safe?
 
 ### 7.2 Realtime / WebSockets
-- [ ] Handlers de realtime validam payload antes de aplicar state?
-- [ ] Partial payloads não zeram dados existentes?
+- [ ] Do realtime handlers validate payload before applying state?
+- [ ] Do partial payloads not zero out existing data?
 
 ### 7.3 Offline / Mobile
-- [ ] Capacitor config permite offline?
-- [ ] Jobs offline desconhecidos são logados (não silenciados)?
-- [ ] Loading states têm timeout de segurança?
+- [ ] Does Capacitor config support offline?
+- [ ] Are unknown offline jobs logged (not silenced)?
+- [ ] Do loading states have a safety timeout?
 
 ---
 
 ## Scoring
 
-| Severity | Score | Critério |
+| Severity | Score | Criteria |
 |----------|-------|---------|
-| Crítico | 100 | Bypass de auth, data leak, injection, perda de dados |
-| Alto | 75 | Bug confirmado que afeta usuários em produção |
-| Médio | 50 | Code smell, performance ruim, manutenção difícil |
-| Baixo | 25 | Style, naming, dead import, melhoria opcional |
+| Critical | 100 | Auth bypass, data leak, injection, data loss |
+| High | 75 | Confirmed bug affecting users in production |
+| Medium | 50 | Code smell, poor performance, hard maintenance |
+| Low | 25 | Style, naming, dead import, optional improvement |
 
-## Dicas de execução
+## Execution Tips
 
-1. **Priorize API routes e server actions** — são a superfície de ataque
-2. **Grep por padrões perigosos:**
-   - `.or(` + variável interpolada → injection
-   - `.delete()` ou `.update()` sem `.eq('user_id'` → IDOR
-   - `catch {}` ou `catch { }` → erros engolidos
-   - `createAdminClient()` em rotas normais → RLS bypass
-   - `req.body` ou `body.` sem sanitização → input trust
-3. **Compare schemas Zod com colunas reais do DB**
-4. **Verifique se client-side pode controlar server-side values** (paths, IDs, dates)
-5. **Não reportar falsos positivos** — confirme cada achado lendo o código ao redor
-6. **SEMPRE inclua a tabela de Análise de Impacto** no relatório
-7. **SEMPRE pergunte ao usuário** antes de começar a codar qualquer correção
+1. **Prioritize API routes and server actions** — they are the attack surface
+2. **Grep for dangerous patterns:**
+   - `.or(` + interpolated variable without `safePg` → injection
+   - `.ilike(` + interpolated variable without `safePgLike` → injection
+   - `.delete()` or `.update()` without `.eq('user_id'` → IDOR
+   - `catch {}` or `catch { }` → swallowed errors
+   - `createAdminClient()` in normal routes → RLS bypass
+   - `req.body` or `body.` without sanitization → input trust
+   - `.upsert(` without `onConflict` → silent data overwrites
+   - `Promise.all(` in non-critical batch ops → partial failures
+3. **Compare Zod schemas with actual DB columns**
+4. **Check if client-side can control server-side values** (paths, IDs, dates)
+5. **Do not report false positives** — confirm each finding by reading surrounding code
+6. **ALWAYS include the Fix Impact Analysis table** in the report
+7. **ALWAYS ask the user** before starting to code any fix
