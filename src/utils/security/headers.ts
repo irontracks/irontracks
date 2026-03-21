@@ -29,7 +29,7 @@ export const applySecurityHeaders = (response: NextResponse, nonce: string, isDe
   response.headers.set('X-Content-Type-Options', 'nosniff')
   response.headers.set('X-XSS-Protection', '1; mode=block')
   response.headers.set('Referrer-Policy', 'strict-origin-when-cross-origin')
-  response.headers.set('Permissions-Policy', 'camera=self, microphone=self, geolocation=(), payment=()')
+  response.headers.set('Permissions-Policy', 'camera=self, microphone=self, geolocation=self, payment=()')
   response.headers.set('X-DNS-Prefetch-Control', 'off')
   response.headers.set('X-Permitted-Cross-Domain-Policies', 'none')
   response.headers.set('Cross-Origin-Opener-Policy', 'same-origin-allow-popups')
