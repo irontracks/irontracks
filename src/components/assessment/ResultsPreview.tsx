@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Download, ArrowLeft, User, Ruler, Calculator, TrendingUp, FileText, Code } from 'lucide-react';
+import dynamic from 'next/dynamic';
 import { AssessmentFormData } from '@/types/assessment';
 import {
   calculateSumSkinfolds,
@@ -13,6 +14,8 @@ import {
 } from '@/utils/calculations/bodyComposition';
 import { generateAssessmentPdf } from '@/utils/report/generatePdf';
 import { logError, logWarn, logInfo } from '@/lib/logger'
+
+const BodyMeasurementMap = dynamic(() => import('./BodyMeasurementMap'), { ssr: false })
 
 interface ResultsPreviewProps {
   formData: AssessmentFormData;
@@ -284,6 +287,9 @@ export default function ResultsPreview({ formData, onBack, studentName }: Result
           </div>
         </div>
       </div>
+
+      {/* Mapa Corporal com Medidas */}
+      <BodyMeasurementMap formData={formData} />
 
       {/* Medidas Circunferências */}
       {[
