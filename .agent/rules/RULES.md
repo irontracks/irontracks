@@ -1,5 +1,12 @@
 # IronTracks — Agent Rules
 
+## 🌐 LANGUAGE
+
+- **ALL responses, reports, questions, explanations, and conversations** MUST be in **Brazilian Portuguese (pt-BR)**
+- Code, commit messages, variable names, and technical documentation (rules, skills, workflows) remain in **English**
+
+---
+
 ## 🚨 CRITICAL RULES (NEVER violate)
 
 ### 1. NEVER delete files with `find -delete` or `rm` with globs
