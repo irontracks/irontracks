@@ -75,6 +75,8 @@ export async function POST(req: Request) {
       title,
       message,
       type,
+      is_read: false,
+      read: false,
     })
 
     if (insertError) {

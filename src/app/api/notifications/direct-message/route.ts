@@ -62,6 +62,8 @@ export async function POST(req: Request) {
       title: safeSenderName,
       message: safePreview,
       type: 'message',
+      is_read: false,
+      read: false,
     })
 
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
