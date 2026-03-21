@@ -1,6 +1,7 @@
 'use client'
 
 import React, { Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import Image from 'next/image'
 
 import { Plus, Dumbbell, Loader2, Activity, CalendarDays, Sparkles, Crown } from 'lucide-react'
 import { EmptyState } from '@/components/ui/EmptyState'
@@ -351,11 +352,63 @@ export default function StudentDashboard(props: Props) {
                   } catch { }
                 }}
                 disabled={creatingWorkout}
-                className="w-full min-h-[48px] bg-yellow-500 hover:bg-yellow-400 p-4 rounded-xl font-black text-black flex items-center justify-center gap-2 shadow-lg shadow-yellow-900/20 transition-all active:scale-95 disabled:opacity-70"
+                className={`btn-shimmer-sweep group relative w-full rounded-2xl p-[1px] transition-all duration-300 active:scale-[0.97] disabled:opacity-70 ${
+                  workouts.length === 0 ? 'animate-pulse' : ''
+                }`}
+                style={{
+                  background: 'linear-gradient(135deg, #D4A017, #F5C542, #D4A017, #B8860B)',
+                  boxShadow: '0 0 24px rgba(234,179,8,0.25), 0 4px 12px rgba(0,0,0,0.4)',
+                }}
               >
-                {creatingWorkout ? <Loader2 size={20} className="animate-spin" /> : <Plus size={22} />}
-                {creatingWorkout ? 'Abrindo editor...' : 'Novo Treino'}
+                {/* Inner card */}
+                <span
+                  className="relative z-10 flex items-center gap-4 rounded-[15px] px-5 py-4"
+                  style={{
+                    background: 'linear-gradient(160deg, rgba(20,16,8,0.95) 0%, rgba(30,24,12,0.92) 50%, rgba(20,16,8,0.95) 100%)',
+                  }}
+                >
+                  {/* AI Icon */}
+                  <span className="relative flex-shrink-0">
+                    <Image
+                      src="/icons/btn-novo-treino.png"
+                      alt="Novo Treino"
+                      width={44}
+                      height={44}
+                      className="rounded-xl transition-transform duration-300 group-hover:scale-110 drop-shadow-[0_0_8px_rgba(234,179,8,0.4)]"
+                      unoptimized
+                    />
+                  </span>
+                  {/* Text content */}
+                  <span className="flex flex-col items-start gap-0.5 text-left">
+                    <span className="flex items-center gap-2">
+                      {creatingWorkout ? (
+                        <Loader2 size={18} className="animate-spin text-yellow-400" />
+                      ) : (
+                        <Plus size={18} className="text-yellow-400" strokeWidth={3} />
+                      )}
+                      <span className="text-base font-black text-white tracking-wide">
+                        {creatingWorkout
+                          ? 'Abrindo editor...'
+                          : workouts.length === 0
+                            ? 'Crie seu primeiro treino!'
+                            : 'Novo Treino'}
+                      </span>
+                    </span>
+                    <span className="flex items-center gap-1 text-[11px] font-semibold text-yellow-500/70">
+                      <Sparkles size={10} className="text-yellow-500/60" />
+                      Monte com inteligência artificial
+                    </span>
+                  </span>
+                  {/* Arrow indicator */}
+                  <span className="ml-auto text-yellow-500/50 transition-transform duration-300 group-hover:translate-x-1">
+                    <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+                      <path d="M6 3L11 8L6 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </span>
+                </span>
               </button>
+
+
 
               <div className={density === 'compact' ? 'space-y-2' : 'space-y-3'}>
                 {/* Linha 1: abas Meus Treinos / Periodizados */}
