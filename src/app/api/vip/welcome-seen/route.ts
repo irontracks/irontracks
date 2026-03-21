@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { logWarn } from '@/lib/logger'
 import { requireUser } from '@/utils/auth/route'
 // NEEDS ADMIN: RLS bypass required for cross-user data operations
 import { createAdminClient } from '@/utils/supabase/admin'
@@ -27,7 +28,7 @@ export async function POST() {
           entity_id: user.id,
           metadata: { userId: user.id, hasVip: false },
         })
-      } catch {}
+      } catch (e) { logWarn('vip:welcome-seen', 'silenced', e) }
       return NextResponse.json({ ok: true, hasVip: false })
     }
 

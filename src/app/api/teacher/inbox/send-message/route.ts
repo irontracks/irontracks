@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { logWarn } from '@/lib/logger'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { requireRole, jsonError } from '@/utils/auth/route'
 import { z } from 'zod'
@@ -48,7 +49,7 @@ export async function POST(req: Request) {
 
     try {
       await auth.supabase.from('direct_channels').update({ last_message_at: new Date().toISOString() }).eq('id', channelId)
-    } catch {}
+    } catch (e) { logWarn('teacher:inbox:send-message', 'silenced', e) }
 
     return NextResponse.json({ ok: true, channel_id: channelId }, { headers: { 'cache-control': 'no-store, max-age=0' } })
   } catch (e: unknown) {

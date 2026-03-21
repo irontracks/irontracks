@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { logWarn } from '@/lib/logger'
 import { parseJsonBody } from '@/utils/zod'
 import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
@@ -86,7 +87,7 @@ export async function POST(req: Request) {
       } else if (existing.file_size_limit !== LIMIT) {
         await admin.storage.updateBucket(bucketId, { public: false, fileSizeLimit: LIMIT })
       }
-    } catch {}
+    } catch (e) { logWarn('execution-videos:prepare', 'silenced', e) }
 
     const { data: signed, error: signedErr } = await admin.storage.from(bucketId).createSignedUploadUrl(objectPath)
     if (signedErr || !signed?.token) return jsonError(400, signedErr?.message || 'signed_upload_failed')

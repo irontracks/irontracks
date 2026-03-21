@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { logWarn } from '@/lib/logger'
 import crypto from 'crypto'
 import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
@@ -103,7 +104,7 @@ export async function POST(req: Request) {
           data_id: dataId,
           payload: body,
         })
-    } catch { }
+    } catch (e) { logWarn('billing:webhooks:mp', 'silenced', e) }
 
     if (eventType === 'preapproval' || action.startsWith('preapproval.')) {
       const preapproval = await mercadopagoRequest<Record<string, unknown>>({

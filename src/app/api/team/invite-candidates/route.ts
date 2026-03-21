@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { parseSearchParams } from '@/utils/zod'
+import { safePgLike } from '@/utils/safePgFilter'
 
 export const dynamic = 'force-dynamic'
 
@@ -36,7 +37,7 @@ export async function GET(req: Request) {
       .order('name', { ascending: true })
 
     if (search) {
-      studentsQuery = studentsQuery.ilike('name', `%${search}%`)
+      studentsQuery = studentsQuery.ilike('name', `%${safePgLike(search)}%`)
     }
 
     const { data: students, error: studentsError } = await studentsQuery
@@ -87,7 +88,7 @@ export async function GET(req: Request) {
       .limit(limit)
 
     if (search) {
-      profilesQuery = profilesQuery.ilike('display_name', `%${search}%`)
+      profilesQuery = profilesQuery.ilike('display_name', `%${safePgLike(search)}%`)
     }
 
     const { data: profiles, error: profilesError } = await profilesQuery

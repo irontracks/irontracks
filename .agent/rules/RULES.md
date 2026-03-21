@@ -93,3 +93,32 @@
 - Rodar `npx tsc --noEmit` para type check
 - Verificar que nenhum arquivo foi deletado acidentalmente: `git diff --name-status | grep "^D"`
 - Commit messages em inglês com prefixo: `fix()`, `feat()`, `security()`, `refactor()`
+
+---
+
+## 📋 REGRAS DE TASK TRACKING
+
+### 16. SEMPRE atualizar task.md com impacto pro usuário
+- **ANTES** de começar qualquer fix/feature, atualizar `task.md` marcando `[/]` (em progresso)
+- **DEPOIS** de concluir, marcar `[x]` e adicionar uma linha de **impacto para o usuário**:
+  - Formato: `[x] Fix X — ✅ **Impacto:** [o que muda para o usuário]`
+  - Exemplo: `[x] safePg client-side — ✅ **Impacto:** Proteção contra injection em buscas`
+  - Exemplo: `[x] Atomic counter — ✅ **Impacto:** Contagem de uso correta mesmo com acessos simultâneos`
+- **NUNCA** encerrar uma sessão sem atualizar task.md com o status final
+- Ao notificar o usuário, incluir tabela resumo com coluna "Impacto"
+
+### 17. Economia de tokens — ZERO loops desnecessários
+- **ANTES de qualquer busca/grep**, definir exatamente o que procura e parar ao encontrar
+- **NÃO** repetir o mesmo comando se já falhou — mudar abordagem imediatamente
+- **NÃO** ler arquivos inteiros se só precisa de 10-20 linhas — usar StartLine/EndLine
+- **NÃO** tentar mais de 2 abordagens para o mesmo problema; na 3ª, perguntar ao usuário
+- **NÃO** verificar o mesmo arquivo mais de 1 vez na mesma sessão (guardar contexto)
+- **batch**: se precisa editar vários arquivos com o mesmo padrão, usar `multi_replace` ou `grep` primeiro para listar todos e aplicar em uma rodada
+- **pipeline**: encadear comandos shell com `&&` e `|` em vez de rodar um por um
+- **atalhos**: usar `git diff --stat` em vez de `view_file` para verificar mudanças
+- Se encontrou um erro de permissão/env, **NÃO** tentar 5 variações — usar abordagem alternativa na 2ª tentativa
+
+### 18. SQL no Supabase — usar workflow `/supabase-sql`
+- **NUNCA** pedir ao usuário para rodar SQL manualmente se o workflow está disponível
+- Usar a Management API com PAT do Keychain (workflow já configurado)
+- Após executar SQL, **SEMPRE** verificar com SELECT que a mudança foi aplicada

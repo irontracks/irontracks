@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { logWarn } from '@/lib/logger'
 import { requireUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
@@ -20,7 +21,7 @@ const calcVolume = (notes: unknown): number => {
   try {
     let session: Record<string, unknown> | null = null
     if (typeof notes === 'string') {
-      try { session = JSON.parse(notes) } catch { }
+      try { session = JSON.parse(notes) } catch (e) { logWarn('social:leaderboard', 'silenced', e) }
     } else if (notes && typeof notes === 'object') {
       session = notes as Record<string, unknown>
     }

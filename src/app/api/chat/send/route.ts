@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { logWarn } from '@/lib/logger'
 import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { parseJsonBody } from '@/utils/zod'
@@ -96,7 +97,7 @@ export async function POST(req: Request) {
         const preview = content.length > 100 ? content.slice(0, 100) + '…' : content
         void sendPushToUsers(recipientIds, `💬 ${senderName}`, preview).catch(() => { })
       }
-    } catch { }
+    } catch (e) { logWarn('chat:send', 'silenced', e) }
 
     return NextResponse.json({ ok: true, message: data })
   } catch (e: unknown) {

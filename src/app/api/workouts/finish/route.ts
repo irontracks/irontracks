@@ -84,7 +84,7 @@ const computeWorkoutStreak = (dateRows: unknown[]) => {
       if (!d || Number.isNaN(d.getTime())) return
       const day = d.toISOString().slice(0, 10)
       daySet.add(day)
-    } catch { }
+    } catch (e) { logWarn('workouts:finish', 'silenced', e) }
   })
   if (!daySet.size) return 0
 
@@ -207,7 +207,7 @@ export async function POST(request: Request) {
       (() => {
         try {
           if (typeof crypto !== 'undefined' && 'randomUUID' in crypto && typeof crypto.randomUUID === 'function') return crypto.randomUUID()
-        } catch { }
+        } catch (e) { logWarn('workouts:finish', 'silenced', e) }
         return `${Date.now()}-${Math.random().toString(16).slice(2)}`
       })()
 
@@ -463,7 +463,7 @@ export async function POST(request: Request) {
                     volume: Math.max(prev.volume, v.volume),
                   })
                 })
-              } catch { }
+              } catch (e) { logWarn('workouts:finish', 'silenced', e) }
             }
 
             const prs: { exercise: string; label: string; value: string; score: number }[] = []

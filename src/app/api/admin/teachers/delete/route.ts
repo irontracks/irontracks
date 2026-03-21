@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { logWarn } from '@/lib/logger'
 import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { requireRole, requireRoleWithBearer } from '@/utils/auth/route'
@@ -55,7 +56,7 @@ export async function POST(req: Request) {
       } else {
         teacherUserId = byTeacherId.user_id ? String(byTeacherId.user_id) : null
       }
-    } catch { }
+    } catch (e) { logWarn('admin:teachers:delete', 'silenced', e) }
 
     const { data, error } = await admin.rpc('delete_teacher_cascade', {
       p_teacher_id: resolvedTeacherId,

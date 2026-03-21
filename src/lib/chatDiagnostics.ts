@@ -1,5 +1,6 @@
 import { logInfo, logError } from '@/lib/logger'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { safePg } from '@/utils/safePgFilter'
 
 export async function runChatDiagnostics(supabase: SupabaseClient, userId: string) {
   const report: { ok: boolean; steps: Record<string, unknown>[]; error?: string } = { ok: true, steps: [] }
@@ -15,7 +16,7 @@ export async function runChatDiagnostics(supabase: SupabaseClient, userId: strin
     const { data: channels, error: chErr } = await supabase
       .from('direct_channels')
       .select('id, user1_id, user2_id, last_message_at')
-      .or(`user1_id.eq.${userId},user2_id.eq.${userId}`)
+      .or(`user1_id.eq.${safePg(userId)},user2_id.eq.${safePg(userId)}`)
       .order('last_message_at', { ascending: false })
       .limit(10)
     report.steps.push({ name: 'channels_list', ok: !chErr, count: channels?.length ?? 0, error: chErr?.message })

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { logWarn } from '@/lib/logger'
 import { parseJsonBody, parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
 import { GoogleGenerativeAI } from '@google/generative-ai'
@@ -515,7 +516,7 @@ export async function POST(req: Request) {
     if (toMapWithAi.length) {
       try {
         newlyMapped = (await classifyExercisesWithAi(apiKey as string, toMapWithAi)) as Array<Record<string, unknown>>
-      } catch { }
+      } catch (e) { logWarn('ai:muscle-map-week', 'silenced', e) }
     }
     if (newlyMapped.length) {
       const rows = newlyMapped.map((it: Record<string, unknown>) => ({

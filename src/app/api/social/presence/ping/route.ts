@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { logWarn } from '@/lib/logger'
 import { requireUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import {
@@ -37,7 +38,7 @@ export async function POST(req: Request) {
             headers: { Authorization: `Bearer ${cfg.token}` },
           }),
         ])
-      } catch { }
+      } catch (e) { logWarn('social:presence:ping', 'silenced', e) }
     }
 
     const throttled = await shouldThrottleBySenderType(userId, 'friend_online', 15)

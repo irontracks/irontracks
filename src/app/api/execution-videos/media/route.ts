@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { logWarn } from '@/lib/logger'
 import { parseJsonBody } from '@/utils/zod'
 import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
@@ -46,14 +47,14 @@ export async function POST(req: Request) {
       try {
         const { data: s } = await admin.from('students').select('id').eq('user_id', studentUserId).eq('teacher_id', requesterId).maybeSingle()
         if (s?.id) allowed = true
-      } catch {}
+      } catch (e) { logWarn('execution-videos:media:student', 'silenced', e) }
     }
     if (!allowed) {
       try {
         const { data: prof } = await admin.from('profiles').select('role').eq('id', requesterId).maybeSingle()
         const role = String(prof?.role || '').toLowerCase()
         if (role === 'admin') allowed = true
-      } catch {}
+      } catch (e) { logWarn('execution-videos:media:admin', 'silenced', e) }
     }
     if (!allowed) return jsonError(403, 'forbidden')
 

@@ -13,6 +13,7 @@ import { parseJsonBody } from '@/utils/zod'
 import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { safePg } from '@/utils/safePgFilter'
 import {
   estimateCaloriesMet,
   estimateDurationFromLogs,
@@ -98,7 +99,7 @@ const getLatestWeightKg = async ({ supabase, targetUserId }: { supabase: Supabas
     const { data } = await supabase
       .from('assessments')
       .select('weight, created_at')
-      .or(`student_id.eq.${targetUserId},user_id.eq.${targetUserId}`)
+      .or(`student_id.eq.${safePg(targetUserId)},user_id.eq.${safePg(targetUserId)}`)
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()
