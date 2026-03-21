@@ -17,6 +17,7 @@ import { formatDateCompact, formatWeekdayCompact, safeGender } from './assessmen
 import type { AiPlanEntry } from '@/hooks/useAssessmentHistoryData'
 
 const AssessmentPDFGenerator = dynamic(() => import('@/components/assessment/AssessmentPDFGenerator'), { ssr: false })
+const BodyMeasurementMap = dynamic(() => import('@/components/assessment/BodyMeasurementMap'), { ssr: false })
 
 // ────────────────────────────────────────────────────────────────
 // Shared field definitions
@@ -346,6 +347,28 @@ export function AssessmentListItem({
               </div>
             </div>
           </div>
+          {/* Mapa Corporal */}
+          <BodyMeasurementMap
+            formData={{
+              gender: safeGender(assessment.gender),
+              weight: String(assessment.weight || ''),
+              height: String(assessment.height || ''),
+              age: String(assessment.age || ''),
+              assessment_date: String(assessment.assessment_date ?? ''),
+              arm_circ: String(getMeasurementCm(assessment, 'arm') || ''),
+              arm_circ_left: String(assessment.arm_circ_left ?? ''),
+              arm_circ_right: String(assessment.arm_circ_right ?? ''),
+              chest_circ: String(getMeasurementCm(assessment, 'chest') || ''),
+              waist_circ: String(getMeasurementCm(assessment, 'waist') || ''),
+              hip_circ: String(getMeasurementCm(assessment, 'hip') || ''),
+              thigh_circ: String(getMeasurementCm(assessment, 'thigh') || ''),
+              thigh_circ_left: String(assessment.thigh_circ_left ?? ''),
+              thigh_circ_right: String(assessment.thigh_circ_right ?? ''),
+              calf_circ: String(getMeasurementCm(assessment, 'calf') || ''),
+              calf_circ_left: String(assessment.calf_circ_left ?? ''),
+              calf_circ_right: String(assessment.calf_circ_right ?? ''),
+            } as any}
+          />
           <AiPlanSection
             assessment={assessment}
             planState={aiPlanState}
