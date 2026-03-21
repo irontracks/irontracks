@@ -9,6 +9,7 @@ import { sendPushToAllPlatforms as sendPushToUsers } from '@/lib/push/sender'
 type AdminResult = { success: true;[key: string]: unknown } | { success?: never; error: string;[key: string]: unknown }
 
 import { getErrorMessage } from '@/utils/errorMessage'
+import { safePg } from '@/utils/safePgFilter'
 
 async function checkAdmin() {
     const auth = await requireRole(['admin'])
@@ -309,7 +310,7 @@ export async function assignWorkoutToStudent(
             const { data: studentRow } = await adminDb
                 .from('students')
                 .select('id, user_id, email')
-                .or(`id.eq.${studentId},user_id.eq.${studentId}`)
+                .or(`id.eq.${safePg(studentId)},user_id.eq.${safePg(studentId)}`)
                 .maybeSingle();
             if (!studentRow) throw new Error('Aluno não encontrado');
             if (studentRow.user_id) {
@@ -442,7 +443,7 @@ export async function getStudentWorkouts(studentId: string): Promise<AdminResult
             const { data: srow } = await adminDb
                 .from('students')
                 .select('id, user_id')
-                .or(`id.eq.${studentId},user_id.eq.${studentId}`)
+                .or(`id.eq.${safePg(studentId)},user_id.eq.${safePg(studentId)}`)
                 .maybeSingle();
             if (srow?.user_id) {
                 isAuthUser = true;
@@ -456,7 +457,7 @@ export async function getStudentWorkouts(studentId: string): Promise<AdminResult
         const { data, error } = await adminDb
             .from('workouts')
             .select('*, exercises(*, sets(*))')
-            .or(`user_id.eq.${targetId},student_id.eq.${targetId}`)
+            .or(`user_id.eq.${safePg(targetId)},student_id.eq.${safePg(targetId)}`)
             .eq('is_template', true)
             .order('name');
 

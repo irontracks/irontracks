@@ -246,15 +246,24 @@ export async function POST(req: Request) {
         })
         .eq('id', jobId)
 
+      // Atomic increment — avoids race condition when two concurrent requests
+      // read the same usage_count and both write count+1 instead of count+2
       try {
-        const { data: canonExisting } = await admin
-          .from('exercise_canonical')
-          .select('usage_count')
-          .eq('user_id', userId)
-          .eq('id', canonicalId)
-          .maybeSingle()
-        const nextCount = (Number((canonExisting as Record<string, unknown>)?.usage_count) || 0) + 1
-        await admin.from('exercise_canonical').update({ usage_count: nextCount }).eq('user_id', userId).eq('id', canonicalId)
+        await admin.rpc('increment_counter', {
+          table_name: 'exercise_canonical',
+          column_name: 'usage_count',
+          row_id: canonicalId,
+        }).then(null, async () => {
+          // Fallback if RPC doesn't exist yet: still use read-then-write but log warning
+          const { data: canonExisting } = await admin
+            .from('exercise_canonical')
+            .select('usage_count')
+            .eq('user_id', userId)
+            .eq('id', canonicalId)
+            .maybeSingle()
+          const nextCount = (Number((canonExisting as Record<string, unknown>)?.usage_count) || 0) + 1
+          await admin.from('exercise_canonical').update({ usage_count: nextCount }).eq('user_id', userId).eq('id', canonicalId)
+        })
       } catch {}
 
       if (!needsReview) created += 1

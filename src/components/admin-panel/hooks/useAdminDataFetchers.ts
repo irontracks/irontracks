@@ -5,6 +5,7 @@ import type { AdminUser, AdminTeacher, AdminWorkoutTemplate } from '@/types/admi
 import type { UnknownRecord } from '@/types/app'
 import type { WorkoutExercise } from '@/types/workout'
 import { adminFetchJson } from '@/utils/admin/adminFetch'
+import { safePg } from '@/utils/safePgFilter'
 import { workoutTitleKey, normalizeWorkoutTitle } from '@/utils/workoutTitle'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { z } from 'zod'
@@ -144,7 +145,7 @@ export function useAdminDataFetchers(deps: AdminDataFetchersDeps) {
                                 .select('*, workouts(*)')
                                 .order('name');
                             const uid = currentUser?.id ? String(currentUser.id) : '';
-                            if (uid) query = query.or(`teacher_id.eq.${uid},user_id.eq.${uid}`);
+                            if (uid) query = query.or(`teacher_id.eq.${safePg(uid)},user_id.eq.${safePg(uid)}`);
                             const { data: studentsData } = await query;
                             list = (studentsData || []).filter(s => (s.email || '').toLowerCase() !== (currentUser.email || '').toLowerCase());
                         }
@@ -201,7 +202,7 @@ export function useAdminDataFetchers(deps: AdminDataFetchersDeps) {
                         .select('*, workouts(*)')
                         .order('name');
                     const uid = currentUser?.id ? String(currentUser.id) : '';
-                    if (uid) query = query.or(`teacher_id.eq.${uid},user_id.eq.${uid}`);
+                    if (uid) query = query.or(`teacher_id.eq.${safePg(uid)},user_id.eq.${safePg(uid)}`);
                     const { data: studentsData } = await query;
                     list = (studentsData || []).filter(s => (s.email || '').toLowerCase() !== (currentUser.email || '').toLowerCase());
                     try {
@@ -599,7 +600,7 @@ export function useAdminDataFetchers(deps: AdminDataFetchersDeps) {
                         const { data } = await supabase
                             .from('workouts')
                             .select('*, exercises(*, sets(*))')
-                            .or(`created_by.eq.${me.id},user_id.eq.${me.id}`)
+                            .or(`created_by.eq.${safePg(me.id)},user_id.eq.${safePg(me.id)}`)
                             .order('name');
                         my = data || [];
                     }
@@ -607,7 +608,7 @@ export function useAdminDataFetchers(deps: AdminDataFetchersDeps) {
                     const { data } = await supabase
                         .from('workouts')
                         .select('*, exercises(*, sets(*))')
-                        .or(`created_by.eq.${me.id},user_id.eq.${me.id},is_template.eq.true`)
+                        .or(`created_by.eq.${safePg(me.id)},user_id.eq.${safePg(me.id)},is_template.eq.true`)
                         .order('name');
                     my = data || [];
                 }

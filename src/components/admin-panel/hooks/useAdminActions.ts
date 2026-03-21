@@ -11,6 +11,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { UnknownRecord } from '@/types/app'
 import { apiAdmin } from '@/lib/api'
 import { logError } from '@/lib/logger'
+import { safePg } from '@/utils/safePgFilter'
 
 type AlertFn = (msg: string, title?: string) => Promise<unknown>;
 type ConfirmFn = (msg: string, title?: string) => Promise<boolean>;
@@ -312,11 +313,11 @@ export function useAdminActions({
                 try { await supabase.from('user_settings').delete().eq('user_id', tUserId); } catch (e) { logError('useAdminActions.deleteUserSettings', e) }
                 try { await supabase.from('notifications').delete().eq('user_id', tUserId); } catch (e) { logError('useAdminActions.deleteNotifications', e) }
                 try { await supabase.from('messages').delete().eq('user_id', tUserId); } catch (e) { logError('useAdminActions.deleteMessages', e) }
-                try { await supabase.from('invites').delete().or(`from_uid.eq.${tUserId},to_uid.eq.${tUserId}`); } catch (e) { logError('useAdminActions.deleteInvites', e) }
+                try { await supabase.from('invites').delete().or(`from_uid.eq.${safePg(tUserId)},to_uid.eq.${safePg(tUserId)}`); } catch (e) { logError('useAdminActions.deleteInvites', e) }
 
                 // DMs
                 try {
-                    const { data: channels } = await supabase.from('direct_channels').select('id').or(`user1_id.eq.${tUserId},user2_id.eq.${tUserId}`);
+                    const { data: channels } = await supabase.from('direct_channels').select('id').or(`user1_id.eq.${safePg(tUserId)},user2_id.eq.${safePg(tUserId)}`);
                     if (Array.isArray(channels) && channels.length > 0) {
                         const cIds = channels.map((c: { id: string }) => c.id);
                         try { await supabase.from('direct_messages').delete().in('channel_id', cIds); } catch (e) { logError('useAdminActions.deleteDirectMessages', e) }

@@ -7,6 +7,7 @@ import { useAssessment } from '@/hooks/useAssessment'
 import { generateAssessmentPlanAi } from '@/actions/workout-actions'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { logError } from '@/lib/logger'
+import { safePg } from '@/utils/safePgFilter'
 import { isIosNative } from '@/utils/platform'
 
 import {
@@ -427,7 +428,7 @@ export function useAssessmentHistoryData(studentId?: string) {
             const { data: studentRow } = await supabase
               .from('students')
               .select('id, user_id, email')
-              .or(`id.eq.${candidateId},user_id.eq.${candidateId}`)
+              .or(`id.eq.${safePg(candidateId)},user_id.eq.${safePg(candidateId)}`)
               .maybeSingle()
 
             if (studentRow?.user_id) candidateIds.push(studentRow.user_id as string)

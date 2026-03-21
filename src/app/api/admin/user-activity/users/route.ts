@@ -39,7 +39,7 @@ export async function GET(req: Request) {
 
     const admin = createAdminClient()
 
-    let query = admin.from('profiles').select('id, display_name, photo_url, role, last_seen, email').order('last_seen', { ascending: false })
+    let query = admin.from('profiles').select('id, display_name, photo_url, role, last_seen, email').order('last_seen', { ascending: false }).limit(500)
     if (search) {
       const like = `%${safePg(search)}%`
       query = query.or(`display_name.ilike.${like},email.ilike.${like}`)

@@ -5,6 +5,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { mapWorkoutRow } from '@/utils/mapWorkoutRow'
 import { cacheGetWorkouts, cacheSetWorkouts } from '@/lib/offline/offlineSync'
 import { logError, logWarn } from '@/lib/logger'
+import { safePg } from '@/utils/safePgFilter'
 import type { Exercise } from '@/types/app'
 import { parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
@@ -181,7 +182,7 @@ export function useWorkoutFetch({
                     const { data: st } = await supabase
                         .from('students')
                         .select('id, name, email, user_id')
-                        .or(`teacher_id.eq.${currentUser.id},user_id.eq.${currentUser.id}`)
+                        .or(`teacher_id.eq.${safePg(currentUser.id)},user_id.eq.${safePg(currentUser.id)}`)
                         .order('name')
                     studentsList = Array.isArray(st) ? st : []
                 } catch (e) {
@@ -287,7 +288,7 @@ export function useWorkoutFetch({
                                 .from('workouts')
                                 .select('id, name, notes, is_template, user_id, created_by, archived_at, sort_order, created_at, student_id')
                                 .eq('is_template', true)
-                                .or(`user_id.eq.${studentId},student_id.eq.${studentId}`)
+                                .or(`user_id.eq.${safePg(studentId)},student_id.eq.${safePg(studentId)}`)
                                 .order('name', { ascending: true })
                                 .limit(500)
                             const legacyHydrated = await hydrateWorkouts(legacyBase || [])
