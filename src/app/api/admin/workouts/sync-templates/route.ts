@@ -5,6 +5,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { hasValidInternalSecret, requireRole, requireRoleWithBearer } from '@/utils/auth/route'
 import { syncAllTemplatesToSubscriber } from '@/lib/workoutSync'
 import { logWarn } from '@/lib/logger'
+import { safePg } from '@/utils/safePgFilter'
 
 export const dynamic = 'force-dynamic'
 
@@ -38,7 +39,7 @@ export async function POST(req: Request) {
     let targetUserId = ''
     let resolvedEmail = String(email || '').trim()
     // R3#8: Sanitize email to prevent PostgREST .or() injection
-    resolvedEmail = resolvedEmail.replace(/[,()\\]/g, '')
+    resolvedEmail = safePg(resolvedEmail)
     if (id) {
       const { data: sById } = await admin.from('students').select('id, user_id, email').eq('id', id).maybeSingle()
       if (sById?.user_id) targetUserId = sById.user_id
@@ -68,7 +69,7 @@ export async function POST(req: Request) {
         const { data: srow } = await admin
           .from('students')
           .select('id, teacher_id, user_id, email')
-          .or(`id.eq.${targetUserId},user_id.eq.${targetUserId}${resolvedEmail ? `,email.ilike.${resolvedEmail}` : ''}`)
+          .or(`id.eq.${safePg(targetUserId)},user_id.eq.${safePg(targetUserId)}${resolvedEmail ? `,email.ilike.${safePg(resolvedEmail)}` : ''}`)
           .maybeSingle()
         if (!srow?.id || srow.teacher_id !== auth.user.id) {
           return NextResponse.json({ ok: false, error: 'forbidden' }, { status: 403 })

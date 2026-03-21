@@ -6,6 +6,7 @@ import { checkVipFeatureAccess, incrementVipUsage } from '@/utils/vip/limits'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { parseJsonBody } from '@/utils/zod'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { safePg } from '@/utils/safePgFilter'
 
 export const dynamic = 'force-dynamic'
 
@@ -118,7 +119,7 @@ export async function POST(req: Request) {
       supabase
         .from('assessments')
         .select('assessment_date, created_at, weight, height, age, gender, body_fat_percentage, bmi, bmr, lean_mass, fat_mass, waist_circ, hip_circ, arm_circ, thigh_circ')
-        .or(`student_id.eq.${userId},user_id.eq.${userId}`)
+        .or(`student_id.eq.${safePg(userId)},user_id.eq.${safePg(userId)}`)
         .order('assessment_date', { ascending: false })
         .limit(1),
       supabase

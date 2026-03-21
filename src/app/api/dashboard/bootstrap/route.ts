@@ -3,6 +3,7 @@ import { createClient } from '@/utils/supabase/server'
 import { errorResponse } from '@/utils/api'
 import { cacheGet, cacheSet } from '@/utils/cache'
 import { logWarn } from '@/lib/logger'
+import { safePg } from '@/utils/safePgFilter'
 
 export const dynamic = 'force-dynamic'
 
@@ -161,7 +162,7 @@ export async function GET() {
             .from('workouts')
             .select('id, name, notes, is_template, user_id, created_by, archived_at, sort_order, created_at, student_id')
             .eq('is_template', true)
-            .or(`user_id.eq.${studentId},student_id.eq.${studentId}`)
+            .or(`user_id.eq.${safePg(studentId)},student_id.eq.${safePg(studentId)}`)
             .order('name', { ascending: true })
             .limit(500)
           workouts = Array.isArray(data) ? data : []

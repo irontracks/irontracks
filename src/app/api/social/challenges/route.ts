@@ -5,6 +5,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { parseJsonBody } from '@/utils/zod'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { insertNotifications } from '@/lib/social/notifyFollowers'
+import { safePg } from '@/utils/safePgFilter'
 
 export const dynamic = 'force-dynamic'
 
@@ -56,7 +57,7 @@ export async function GET(req: Request) {
     const { data: rows } = await admin
       .from('notifications')
       .select('id, type, title, message, sender_id, user_id, metadata, created_at, is_read')
-      .or(`user_id.eq.${userId},sender_id.eq.${userId}`)
+      .or(`user_id.eq.${safePg(userId)},sender_id.eq.${safePg(userId)}`)
       .in('type', ['challenge_created', 'challenge_accepted', 'challenge_declined', 'challenge_completed'])
       .gte('created_at', thirtyDaysAgo)
       .order('created_at', { ascending: false })

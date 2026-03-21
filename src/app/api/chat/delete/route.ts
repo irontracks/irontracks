@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
+// NEEDS ADMIN: RLS bypass required for cross-user data operations
 import { createAdminClient } from '@/utils/supabase/admin'
 import { parseJsonBody, parseJsonWithSchema } from '@/utils/zod'
 import { getErrorMessage } from '@/utils/errorMessage'
