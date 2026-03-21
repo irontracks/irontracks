@@ -115,6 +115,7 @@ import type { AdminUser } from '@/types/admin'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { logError, logWarn, logInfo } from '@/lib/logger'
 import SectionErrorBoundary from '@/components/SectionErrorBoundary'
+import GymDetectToastWrapper from '@/components/dashboard/GymDetectToastWrapper'
 const isRecord = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v)
 const parseStartedAtMs = (raw: unknown): number => {
     const direct = typeof raw === 'number' ? raw : Number(String(raw ?? '').trim())
@@ -785,6 +786,8 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                     <div className="w-full bg-neutral-900 min-h-screen relative flex flex-col overflow-hidden" suppressHydrationWarning>
                         <IncomingInviteModal onStartSession={handleStartSession} />
                         <InviteAcceptedModal />
+                        {/* GPS: Auto-detect gym toast */}
+                        {view === 'dashboard' && <GymDetectToastWrapper userId={user?.id} onStartWorkout={() => setCreateWizardOpen(true)} />}
                         <GuidedTour
                             open={Boolean(tourOpen)}
                             steps={getTourSteps({

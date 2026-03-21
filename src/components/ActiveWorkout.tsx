@@ -10,6 +10,7 @@ import WorkoutFooter from './workout/WorkoutFooter';
 import Modals from './workout/Modals';
 import { ActiveWorkoutProps } from './workout/types';
 import dynamic from 'next/dynamic';
+const CardioGPSPanel = dynamic(() => import('@/components/workout/CardioGPSPanel'), { ssr: false });
 import { useTeamWorkout } from '@/contexts/TeamWorkoutContext';
 
 const TeamChatDrawer = dynamic(
@@ -143,6 +144,8 @@ export default function ActiveWorkout(props: ActiveWorkoutProps) {
           </div>
         )}
 
+        {/* GPS Cardio Tracking Panel */}
+        <CardioGPSPanel workoutId={props.session?.workout?.id} />
         <ExerciseList />
         <WorkoutFooter />
         <Modals />

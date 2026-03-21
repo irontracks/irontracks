@@ -8,6 +8,7 @@ import dynamic from 'next/dynamic'
 import VipWeeklySummaryCard from '@/components/vip/VipWeeklySummaryCard'
 
 const VipPeriodizationPanel = dynamic(() => import('@/components/vip/VipPeriodizationPanel'), { ssr: false })
+const WorkoutHeatMap = dynamic(() => import('@/components/vip/WorkoutHeatMap'), { ssr: false })
 import VipInsightsPanel from '@/components/vip/VipInsightsPanel'
 import { logError } from '@/lib/logger'
 import { useVipCredits } from '@/hooks/useVipCredits'
@@ -447,6 +448,9 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
       </div>
 
       <VipWeeklySummaryCard />
+
+      {/* GPS: Workout Heat Map (VIP) */}
+      <WorkoutHeatMap userId="" />
 
       {insightsOpen ? <VipInsightsPanel onOpenHistory={() => onOpenHistory?.()} onOpenReport={(s) => onOpenReport?.(s as Record<string, unknown>)} /> : null}
 
