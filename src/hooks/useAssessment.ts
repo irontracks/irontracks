@@ -31,6 +31,7 @@ import {
 } from '@/utils/calculations/bodyComposition';
 import { getErrorMessage } from '@/utils/errorMessage';
 import { logError, logWarn, logInfo } from '@/lib/logger'
+import { safePg } from '@/utils/safePgFilter'
 
 interface UseAssessmentReturn {
   // Estado
@@ -268,7 +269,7 @@ export const useAssessment = (): UseAssessmentReturn => {
       const { data, error } = await supabase
         .from('assessments')
         .select('*')
-        .or(`student_id.eq.${resolvedId},user_id.eq.${resolvedId}`)
+        .or(`student_id.eq.${safePg(resolvedId)},user_id.eq.${safePg(resolvedId)}`)
         .order('assessment_date', { ascending: false });
 
       if (error) throw error;
