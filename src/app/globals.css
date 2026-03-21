@@ -309,6 +309,26 @@ select:focus-visible {
   100% { background-position: 0% 50%; }
 }
 
+/* Premium button shimmer light sweep */
+.btn-shimmer-sweep {
+  position: relative;
+  overflow: hidden;
+}
+.btn-shimmer-sweep::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  background: linear-gradient(105deg, transparent 40%, rgba(255,255,255,0.22) 50%, transparent 60%);
+  background-size: 200% 100%;
+  animation: shimmer-sweep 3s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes shimmer-sweep {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
 /* PR celebration badge entrance */
 .pr-badge-enter {
   animation: prBadgeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1);
