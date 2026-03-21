@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { logWarn } from '@/lib/logger'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { getInternalSecret, hasValidInternalSecret } from '@/utils/auth/route'
 import { getErrorMessage } from '@/utils/errorMessage'
@@ -38,7 +39,7 @@ const extractStoragePathFromPublicUrl = (bucket: string, publicUrl: string) => {
       const p = u.pathname.slice(idx2 + alt.length)
       return decodeURIComponent(p).replace(/^\/+/, '')
     }
-  } catch { }
+  } catch (e) { logWarn('cron:cleanup-expired', 'silenced', e) }
   return null
 }
 

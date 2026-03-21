@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { logWarn } from '@/lib/logger'
 import { z } from 'zod'
 import { requireRole, requireRoleWithBearer } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
@@ -60,7 +61,7 @@ export async function POST(req: Request) {
       if (isSourceTemplate) {
         await deleteTemplateFromSubscribers({ sourceUserId: String(w.user_id), sourceWorkoutId: id })
       }
-    } catch {}
+    } catch (e) { logWarn('admin:workouts:delete-any', 'silenced', e) }
 
     return NextResponse.json({ ok: true })
   } catch (e: unknown) {

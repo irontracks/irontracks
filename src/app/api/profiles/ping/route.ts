@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { logWarn } from '@/lib/logger'
 import { createClient } from '@/utils/supabase/server'
 import { checkRateLimitAsync } from '@/utils/rateLimit'
 import { getUpstashConfig } from '@/utils/cache'
@@ -26,7 +27,7 @@ export async function POST() {
             headers: { Authorization: `Bearer ${cfg.token}` },
           }),
         ])
-      } catch { }
+      } catch (e) { logWarn('profiles:ping', 'silenced', e) }
     }
 
     const rl = await checkRateLimitAsync(`profiles:ping:pg:${user.id}`, 1, 5 * 60_000)

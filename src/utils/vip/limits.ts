@@ -2,6 +2,7 @@ import { createClient } from '@/utils/supabase/server'
 import { SupabaseClient } from '@supabase/supabase-js'
 import { logError, logWarn, logInfo } from '@/lib/logger'
 import { getWeeklyResetStart } from './weekReset'
+import { safePg } from '@/utils/safePgFilter'
 
 export type VipTierLimits = {
   chat_daily: number
@@ -165,7 +166,7 @@ export async function getVipPlanLimits(supabase: SupabaseClient, userId: string)
     .eq('user_id', userId)
     .in('status', ['active', 'trialing', 'past_due'])
     .lte('valid_from', nowIso)
-    .or(`valid_until.is.null,valid_until.gte.${nowIso}`)
+    .or(`valid_until.is.null,valid_until.gte.${safePg(nowIso)}`)
     .order('valid_until', { ascending: false, nullsFirst: true })
     .order('created_at', { ascending: false })
     .limit(1)

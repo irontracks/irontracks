@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { logWarn } from '@/lib/logger'
 import { requireUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
@@ -79,7 +80,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ userId: 
         const d = r?.date ? new Date(String(r.date)) : null
         if (!d || Number.isNaN(d.getTime())) return
         daySet.add(d.toISOString().slice(0, 10))
-      } catch { }
+      } catch (e) { logWarn('social:profile', 'silenced', e) }
     })
     let streak = 0
     if (daySet.size) {

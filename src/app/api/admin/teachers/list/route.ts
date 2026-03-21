@@ -3,6 +3,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { jsonError, requireRole, resolveRoleByUser } from '@/utils/auth/route'
 import { z } from 'zod'
 import { parseSearchParams } from '@/utils/zod'
+import { safePgLike } from '@/utils/safePgFilter'
 import { cacheGet, cacheSet } from '@/utils/cache'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 
@@ -47,7 +48,7 @@ export async function GET(req: Request) {
       .range(q?.offset || 0, (q?.offset || 0) + (q?.limit || 50) - 1)
 
     if (q?.search) {
-      query = query.ilike('name', `%${q.search}%`)
+      query = query.ilike('name', `%${safePgLike(q.search)}%`)
     }
 
     const { data: rows, error } = await query

@@ -3,6 +3,7 @@ import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { User } from '@supabase/supabase-js'
+import { safePg } from '@/utils/safePgFilter'
 import { logError } from '@/lib/logger'
 
 export type IrontracksRole = 'admin' | 'teacher' | 'user'
@@ -140,7 +141,7 @@ export async function canUploadToChatMediaPath(userId: string, channelId: string
       .from('direct_channels')
       .select('id')
       .eq('id', cid)
-      .or(`user1_id.eq.${uid},user2_id.eq.${uid}`)
+      .or(`user1_id.eq.${safePg(uid)},user2_id.eq.${safePg(uid)}`)
       .maybeSingle()
     if (direct?.id) return true
   } catch (e) { logError('canUploadToChatMediaPath.directChannel', e) }

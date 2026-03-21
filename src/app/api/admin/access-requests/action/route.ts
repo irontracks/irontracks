@@ -241,7 +241,7 @@ export async function POST(req: Request) {
 
       try {
         await sendApprovalEmail(email, fullName, !!userId)
-      } catch { }
+      } catch (e) { logWarn('admin:access-requests:action', 'silenced', e) }
 
       return NextResponse.json({
         ok: true,

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { logWarn } from '@/lib/logger'
 import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
 import { filterRecipientsByPreference, insertNotifications, listFollowerIdsOf, shouldThrottleBySenderType } from '@/lib/social/notifyFollowers'
@@ -89,7 +90,7 @@ export async function POST(req: Request) {
     if (error || !data?.id) return NextResponse.json({ ok: false, error: getErrorMessage(error) || 'failed' }, { status: 400 })
 
     // Invalidate stories list cache so the new story appears immediately
-    try { await cacheDeletePattern('social:stories:list:*') } catch { }
+    try { await cacheDeletePattern('social:stories:list:*') } catch (e) { logWarn('social:stories:create', 'silenced', e) }
 
     // Fire-and-forget notifications — must not block the response
     const storyId = data.id

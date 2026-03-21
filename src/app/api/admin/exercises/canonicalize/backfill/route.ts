@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { logWarn } from '@/lib/logger'
 
 import { parseJsonBody, parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
@@ -264,7 +265,7 @@ export async function POST(req: Request) {
           const nextCount = (Number((canonExisting as Record<string, unknown>)?.usage_count) || 0) + 1
           await admin.from('exercise_canonical').update({ usage_count: nextCount }).eq('user_id', userId).eq('id', canonicalId)
         })
-      } catch {}
+      } catch (e) { logWarn('canonicalize:backfill', 'silenced', e) }
 
       if (!needsReview) created += 1
     }

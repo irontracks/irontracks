@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { logWarn } from '@/lib/logger'
 import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { requireRole, jsonError } from '@/utils/auth/route'
@@ -105,7 +106,7 @@ export async function GET(req: Request) {
         const prefsObj = prefs as Record<string, unknown>
         cfg = normalizeCoachInboxSettings(prefsObj?.coachInbox)
       }
-    } catch {}
+    } catch (e) { logWarn('teacher:inbox:feed:attach', 'silenced', e) }
 
     const { data: students, error: stErr } = await admin
       .from('students')
@@ -245,7 +246,7 @@ export async function GET(req: Request) {
 
         checkinsAggByUser.set(uid, prev)
       }
-    } catch {}
+    } catch (e) { logWarn('teacher:inbox:feed:photo', 'silenced', e) }
 
     const { data: states, error: stStateErr } = await admin
       .from('coach_inbox_states')

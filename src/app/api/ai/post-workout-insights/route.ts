@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { logWarn } from '@/lib/logger'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
@@ -350,7 +351,7 @@ export async function POST(req: Request) {
 
     try {
       await admin.from('workouts').update({ notes: JSON.stringify(mergedSession) }).eq('id', String(workout.id)).eq('user_id', userId)
-    } catch {}
+    } catch (e) { logWarn('ai:post-workout-insights', 'silenced', e) }
 
     // Increment Usage (Counts as Insights)
     await incrementVipUsage(supabase, userId, 'insights');

@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { logWarn } from '@/lib/logger'
 import { parseJsonBody } from '@/utils/zod'
 import { z } from 'zod'
 import { requireRole, requireRoleWithBearer } from '@/utils/auth/route'
@@ -61,7 +62,7 @@ export async function POST(req: Request) {
       if (String(w?.user_id || '') === requesterId) {
         await deleteTemplateFromSubscribers({ sourceUserId: requesterId, sourceWorkoutId: id })
       }
-    } catch {}
+    } catch (e) { logWarn('admin:workouts:delete', 'silenced', e) }
     return NextResponse.json({ ok: true })
   } catch (e: unknown) {
     return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })

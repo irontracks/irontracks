@@ -2,6 +2,7 @@ import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 import DashboardClientEntry from './DashboardClientEntry'
 import { resolveRoleByUser } from '@/utils/auth/route'
+import { safePg } from '@/utils/safePgFilter'
 
 type SP = Record<string, string | string[] | undefined>
 
@@ -131,7 +132,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
           .from('workouts')
           .select('id, name, notes, is_template, user_id, created_by, archived_at, sort_order, created_at, student_id')
           .eq('is_template', true)
-          .or(`user_id.eq.${studentId},student_id.eq.${studentId}`)
+          .or(`user_id.eq.${safePg(studentId)},student_id.eq.${safePg(studentId)}`)
           .order('name', { ascending: true })
           .limit(500)
         baseWorkouts = Array.isArray(data) ? data : []

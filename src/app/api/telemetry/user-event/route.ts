@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { logWarn } from '@/lib/logger'
 import { parseJsonBody } from '@/utils/zod'
 import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
@@ -85,7 +86,7 @@ export async function POST(req: Request) {
       const { data: p } = await admin.from('profiles').select('display_name, role').eq('id', uid).maybeSingle()
       displayName = p?.display_name != null ? String(p.display_name) : null
       role = p?.role != null ? String(p.role) : null
-    } catch {}
+    } catch (e) { logWarn('telemetry:user-event', 'silenced', e) }
 
     const ua = safeStr(req.headers.get('user-agent') || '', 400)
 

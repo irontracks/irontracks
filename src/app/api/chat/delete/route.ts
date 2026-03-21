@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { logWarn } from '@/lib/logger'
 import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
 // NEEDS ADMIN: RLS bypass required for cross-user data operations
@@ -41,7 +42,7 @@ const extractStoragePathFromPublicUrl = (bucket: string, publicUrl: string) => {
       const p = u.pathname.slice(idx2 + alt.length)
       return decodeURIComponent(p).replace(/^\/+/, '')
     }
-  } catch {}
+  } catch (e) { logWarn('chat:delete', 'silenced', e) }
   return null
 }
 
