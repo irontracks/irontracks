@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+// NEEDS ADMIN: RLS bypass required for cross-user data operations
 import { createAdminClient } from '@/utils/supabase/admin'
 import { hasValidInternalSecret, requireRole } from '@/utils/auth/route'
 import { getErrorMessage } from '@/utils/errorMessage'

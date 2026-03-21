@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { safePg } from '@/utils/safePgFilter'
 
 export async function POST() {
   try {
@@ -15,7 +16,7 @@ export async function POST() {
     const { error } = await admin
       .from('teachers')
       .update({ status: 'active', user_id: user.id })
-      .or(`email.ilike.${String(user.email || '').toLowerCase().trim().replace(/[,()\\]/g, '')},user_id.eq.${user.id}`)
+      .or(`email.ilike.${safePg(user.email)},user_id.eq.${safePg(user.id)}`)
       .eq('status', 'pending')
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
     return NextResponse.json({ ok: true })

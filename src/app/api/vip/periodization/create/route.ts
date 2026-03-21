@@ -4,6 +4,7 @@ import crypto from 'crypto'
 
 import { parseJsonBody, parseJsonWithSchema } from '@/utils/zod'
 import { requireUser } from '@/utils/auth/route'
+// NEEDS ADMIN: RLS bypass required for cross-user data operations
 import { createAdminClient } from '@/utils/supabase/admin'
 import { checkVipFeatureAccess, getVipPlanLimits } from '@/utils/vip/limits'
 import { normalizeExerciseName } from '@/utils/normalizeExerciseName'
