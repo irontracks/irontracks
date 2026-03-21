@@ -26,8 +26,22 @@ interface UseGeoLocationResult {
 }
 
 /**
+ * Try to dynamically import @capacitor/geolocation.
+ * Returns null if not available (e.g. web, simulator without plugin).
+ */
+async function getCapacitorGeolocation() {
+  try {
+    const mod = await import('@capacitor/geolocation')
+    return mod.Geolocation
+  } catch {
+    return null
+  }
+}
+
+/**
  * Central geolocation hook. Works on both Capacitor (native) and web.
  * Uses @capacitor/geolocation on native, navigator.geolocation on web.
+ * Safe in simulators — all Capacitor calls are wrapped in try/catch.
  */
 export function useGeoLocation(): UseGeoLocationResult {
   const [position, setPosition] = useState<GeoPoint | null>(null)
@@ -46,11 +60,16 @@ export function useGeoLocation(): UseGeoLocationResult {
   const checkPermission = useCallback(async (): Promise<PermissionState> => {
     try {
       if (isNativeRef.current) {
-        const { Geolocation } = await import('@capacitor/geolocation')
-        const perm = await Geolocation.checkPermissions()
-        const state = perm.location === 'granted' ? 'granted' : perm.location === 'denied' ? 'denied' : 'prompt'
-        setPermission(state)
-        return state
+        const Geo = await getCapacitorGeolocation()
+        if (!Geo) {
+          // Plugin not available — fall through to web
+          isNativeRef.current = false
+        } else {
+          const perm = await Geo.checkPermissions()
+          const state = perm.location === 'granted' ? 'granted' : perm.location === 'denied' ? 'denied' : 'prompt'
+          setPermission(state)
+          return state
+        }
       }
       // Web fallback
       if (!navigator.geolocation) {
@@ -72,8 +91,12 @@ export function useGeoLocation(): UseGeoLocationResult {
   const requestPermission = useCallback(async (): Promise<boolean> => {
     try {
       if (isNativeRef.current) {
-        const { Geolocation } = await import('@capacitor/geolocation')
-        const perm = await Geolocation.requestPermissions()
+        const Geo = await getCapacitorGeolocation()
+        if (!Geo) {
+          isNativeRef.current = false
+          return true // fallback to web implicit permission
+        }
+        const perm = await Geo.requestPermissions()
         const granted = perm.location === 'granted'
         setPermission(granted ? 'granted' : 'denied')
         return granted
@@ -108,10 +131,19 @@ export function useGeoLocation(): UseGeoLocationResult {
       let point: GeoPoint | null = null
 
       if (isNativeRef.current) {
-        const { Geolocation } = await import('@capacitor/geolocation')
-        const pos = await Geolocation.getCurrentPosition({ enableHighAccuracy: true, timeout: 10000 })
-        point = { latitude: pos.coords.latitude, longitude: pos.coords.longitude }
-      } else {
+        const Geo = await getCapacitorGeolocation()
+        if (Geo) {
+          try {
+            const pos = await Geo.getCurrentPosition({ enableHighAccuracy: true, timeout: 10000 })
+            point = { latitude: pos.coords.latitude, longitude: pos.coords.longitude }
+          } catch {
+            // Native failed — try web fallback
+            isNativeRef.current = false
+          }
+        }
+      }
+
+      if (!point && navigator.geolocation) {
         // Web fallback
         point = await new Promise<GeoPoint | null>((resolve) => {
           navigator.geolocation.getCurrentPosition(
@@ -143,25 +175,37 @@ export function useGeoLocation(): UseGeoLocationResult {
     const run = async () => {
       try {
         if (isNativeRef.current) {
-          const { Geolocation } = await import('@capacitor/geolocation')
-          const id = await Geolocation.watchPosition(
-            { enableHighAccuracy: true },
-            (pos) => {
-              if (pos) {
-                setPosition({ latitude: pos.coords.latitude, longitude: pos.coords.longitude })
-              }
+          const Geo = await getCapacitorGeolocation()
+          if (Geo) {
+            try {
+              const id = await Geo.watchPosition(
+                { enableHighAccuracy: true },
+                (pos: { coords: { latitude: number; longitude: number } } | null) => {
+                  if (pos) {
+                    setPosition({ latitude: pos.coords.latitude, longitude: pos.coords.longitude })
+                  }
+                }
+              )
+              watchIdRef.current = id
+              setWatching(true)
+              return
+            } catch {
+              // Native watch failed — fall through to web
+              isNativeRef.current = false
             }
-          )
-          watchIdRef.current = id
-        } else if (navigator.geolocation) {
+          }
+        }
+
+        // Web fallback
+        if (navigator.geolocation) {
           const id = navigator.geolocation.watchPosition(
             (pos) => setPosition({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
             () => { /* intentional: silenced watch error */ },
             { enableHighAccuracy: true }
           )
           watchIdRef.current = id
+          setWatching(true)
         }
-        setWatching(true)
       } catch (e) {
         setError(e instanceof Error ? e.message : 'Erro ao iniciar tracking')
       }
@@ -174,8 +218,14 @@ export function useGeoLocation(): UseGeoLocationResult {
       try {
         if (watchIdRef.current !== null) {
           if (isNativeRef.current) {
-            const { Geolocation } = await import('@capacitor/geolocation')
-            await Geolocation.clearWatch({ id: String(watchIdRef.current) })
+            const Geo = await getCapacitorGeolocation()
+            if (Geo) {
+              try {
+                await Geo.clearWatch({ id: String(watchIdRef.current) })
+              } catch {
+                // intentional: cleanup errors are non-critical
+              }
+            }
           } else if (navigator.geolocation && typeof watchIdRef.current === 'number') {
             navigator.geolocation.clearWatch(watchIdRef.current)
           }
