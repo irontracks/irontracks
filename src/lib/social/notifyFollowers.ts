@@ -64,7 +64,7 @@ export async function insertNotifications(rows: unknown): Promise<{ ok: boolean;
   const admin = createAdminClient()
   const safeRows = (Array.isArray(rows) ? rows : [])
     .filter((r) => r && typeof r === 'object')
-    .map((r) => r as Record<string, unknown>)
+    .map((r) => ({ ...(r as Record<string, unknown>), is_read: false, read: false }) as Record<string, unknown>)
   if (!safeRows.length) return { ok: true, inserted: 0 }
 
   let inserted = 0

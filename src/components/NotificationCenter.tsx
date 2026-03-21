@@ -164,11 +164,13 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded, open:
         return () => { isMounted = false; if (channel) supabase.removeChannel(channel); };
     }, [supabase, safeUserId]);
 
-    // ─── Mark all read on open ────────────────────────────────────────────────
+    // ─── Mark all read on open (with delay to show unread dots first) ─────────
     useEffect(() => {
         if (!effectiveOpen || !safeUserId || !supabase) return;
         let cancelled = false;
-        const markRead = async () => {
+        // Delay mark-read so the user sees the unread indicators before they disappear
+        const timer = setTimeout(async () => {
+            if (cancelled) return;
             try {
                 // Update ALL unread notifications — covers legacy rows where
                 // one column may be true while the other is still false/null
@@ -182,9 +184,8 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded, open:
                     (Array.isArray(prev) ? prev : []).map(n => ({ ...n, read: true, is_read: true }))
                 );
             } catch (e) { logError('component:NotificationCenter.markRead', e); return; }
-        };
-        markRead();
-        return () => { cancelled = true; };
+        }, 800);
+        return () => { cancelled = true; clearTimeout(timer); };
     }, [effectiveOpen, supabase, safeUserId]);
 
     // ─── Actions ─────────────────────────────────────────────────────────────
