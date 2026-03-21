@@ -14,7 +14,6 @@ import {
   Sparkles,
   Users,
   Crown,
-  User,
 } from 'lucide-react'
 import { isIosNative } from '@/utils/platform'
 
@@ -303,15 +302,23 @@ export default function HeaderActionsMenu({
                   </div>
                 )}
               </div>
-              <div className="flex-1 min-w-0">
+              <button
+                type="button"
+                onClick={() => { onOpenProfile?.(); close() }}
+                className="flex-1 min-w-0 text-left hover:opacity-80 transition-opacity active:scale-[0.98]"
+              >
                 <p className="text-[13px] font-semibold text-white truncate">{displayName}</p>
-                {roleLabel && (
-                  <div className="flex items-center gap-1 mt-0.5">
-                    <Crown size={9} className="text-yellow-500" />
-                    <span className="text-[10px] font-bold text-yellow-500/90 uppercase tracking-wide">{roleLabel}</span>
-                  </div>
-                )}
-              </div>
+                <div className="flex items-center gap-1 mt-0.5">
+                  {roleLabel ? (
+                    <>
+                      <Crown size={9} className="text-yellow-500" />
+                      <span className="text-[10px] font-bold text-yellow-500/90 uppercase tracking-wide">{roleLabel}</span>
+                    </>
+                  ) : (
+                    <span className="text-[10px] text-neutral-500">Ver meu perfil</span>
+                  )}
+                </div>
+              </button>
             </div>
 
             {/* Menu items — staggered entrance */}
@@ -386,11 +393,7 @@ export default function HeaderActionsMenu({
                 label="Histórico"
                 onClick={() => { onOpenHistory?.(); close() }}
               />
-              <MenuItem
-                icon={<User size={14} className="text-neutral-400" />}
-                label="Meu Perfil"
-                onClick={() => { onOpenProfile?.(); close() }}
-              />
+
               <MenuItem
                 icon={<Sparkles size={14} className="text-yellow-400" />}
                 label="Ver tour"
