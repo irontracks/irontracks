@@ -86,6 +86,12 @@ export default function ErrorReporterProvider({ children }: { children: React.Re
 
     const { url, pathname, userAgent } = getContextSnapshot();
     const message = getErrorMessage(error);
+
+    // Skip known Capacitor plugin errors — expected on web/simulator
+    if (/plugin is not implemented/i.test(message) || /not available/i.test(message) && /capacitor/i.test(String(getErrorStack(error)))) {
+      return;
+    }
+
     const stack = getErrorStack(error);
     const signature = normalizeKey([source, pathname, message, stack?.slice(0, 400)].join('|'));
     if (shouldThrottle(signature)) return;
