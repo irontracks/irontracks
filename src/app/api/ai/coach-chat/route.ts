@@ -79,13 +79,20 @@ export async function POST(req: Request) {
       'Responda sempre em pt-BR, de forma objetiva e prática.',
       'Não invente números; use apenas o que o usuário forneceu.',
       '',
+      '── REGRA ESPECIAL PARA TREINOS ──',
+      'Quando o usuário pedir para montar/criar/sugerir um treino, SEMPRE adicione ao FINAL da sua resposta um bloco oculto com o treino estruturado no seguinte formato exato:',
+      '<!-- WORKOUT_JSON:{"title":"Nome do Treino","exercises":[{"name":"Nome do Exercício","sets":3,"reps":"8-12","rest_time":60,"method":"Normal","notes":""}]} -->',
+      'Cada exercício deve ter: name (obrigatório), sets (número), reps (texto), rest_time (segundos), method (Normal/Drop-set/Rest-Pause/etc), notes (opcional).',
+      'O bloco <!-- WORKOUT_JSON:... --> DEVE vir DEPOIS do texto normal da resposta. Nunca omita quando for um treino.',
+      '── FIM DA REGRA ──',
+      '',
       'Contexto (pode ser null):',
       JSON.stringify(context),
       '',
       'Conversa:',
       JSON.stringify(messages),
       '',
-      'Responda apenas com o texto final do coach (sem JSON e sem markdown).',
+      'Responda com o texto final do coach. Sem markdown. Se for um treino, inclua o bloco WORKOUT_JSON ao final.',
     ].join('\n')
 
     const genAI = new GoogleGenerativeAI(apiKey)

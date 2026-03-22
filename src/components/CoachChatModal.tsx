@@ -1,10 +1,11 @@
 import { useFocusTrap } from '@/hooks/useFocusTrap'
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Send, MessageSquare, User, Bot, Loader2, Sparkles, Save, Trash2 } from 'lucide-react';
+import { X, Send, MessageSquare, User, Bot, Loader2, Sparkles, Save, Trash2, Dumbbell, Check, Plus } from 'lucide-react';
 import { useVipCredits } from '@/hooks/useVipCredits';
 import { isIosNative } from '@/utils/platform';
 import type { Exercise } from '@/types/app';
 import { logError, logWarn, logInfo } from '@/lib/logger'
+import { createWorkout } from '@/actions/workout-crud-actions'
 
 interface CoachChatModalProps {
     isOpen: boolean;
@@ -20,7 +21,34 @@ interface CoachMessage {
     role: 'assistant' | 'user' | 'system';
     content?: string;
     isBlock?: boolean;
+    workoutData?: ParsedWorkout | null;
     [key: string]: unknown;
+}
+
+interface ParsedWorkout {
+    title: string;
+    exercises: Array<{
+        name: string;
+        sets?: number;
+        reps?: string;
+        rest_time?: number;
+        method?: string;
+        notes?: string;
+    }>;
+}
+
+/** Extract <!-- WORKOUT_JSON:{...} --> from AI response */
+function extractWorkoutJson(text: string): { cleanText: string; workout: ParsedWorkout | null } {
+    const match = text.match(/<!--\s*WORKOUT_JSON:(\{[\s\S]*?\})\s*-->/)
+    if (!match) return { cleanText: text, workout: null }
+    try {
+        const parsed = JSON.parse(match[1])
+        if (parsed?.title && Array.isArray(parsed?.exercises) && parsed.exercises.length > 0) {
+            const cleanText = text.replace(match[0], '').trim()
+            return { cleanText, workout: parsed as ParsedWorkout }
+        }
+    } catch { /* invalid JSON */ }
+    return { cleanText: text, workout: null }
 }
 
 export default function CoachChatModal({
@@ -37,6 +65,8 @@ export default function CoachChatModal({
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const [showSavePrompt, setShowSavePrompt] = useState(false);
+    const [savingWorkout, setSavingWorkout] = useState<number | null>(null);
+    const [savedWorkouts, setSavedWorkouts] = useState<Set<number>>(new Set());
     const messagesEndRef = useRef<HTMLDivElement | null>(null);
     const inputRef = useRef<HTMLInputElement | null>(null);
 
@@ -140,7 +170,9 @@ export default function CoachChatModal({
             if (!res.ok) throw new Error('Falha na comunicação');
 
             if (data.content || data.text || data.answer) {
-                setMessages(prev => [...prev, { role: 'assistant', content: data.content || data.text || data.answer }]);
+                const rawContent = data.content || data.text || data.answer;
+                const { cleanText, workout } = extractWorkoutJson(rawContent);
+                setMessages(prev => [...prev, { role: 'assistant', content: cleanText, workoutData: workout }]);
             }
         } catch (error) {
             logError('error', error);
@@ -225,6 +257,64 @@ export default function CoachChatModal({
                                 ) : (
                                     msg.content
                                 )}
+                                {/* Save Workout to Dashboard button */}
+                                {msg.workoutData && msg.role === 'assistant' && (() => {
+                                    const msgIdx = idx;
+                                    const isSaving = savingWorkout === msgIdx;
+                                    const isSaved = savedWorkouts.has(msgIdx);
+                                    return (
+                                        <div className="mt-3 pt-3" style={{ borderTop: '1px solid rgba(234,179,8,0.15)' }}>
+                                            <div className="flex items-center gap-2 text-[11px] font-bold text-yellow-500/70 uppercase tracking-wider mb-2">
+                                                <Dumbbell size={12} />
+                                                {msg.workoutData!.title} — {msg.workoutData!.exercises.length} exercício{msg.workoutData!.exercises.length !== 1 ? 's' : ''}
+                                            </div>
+                                            <button
+                                                type="button"
+                                                disabled={isSaving || isSaved}
+                                                onClick={async () => {
+                                                    if (!msg.workoutData || isSaving || isSaved) return;
+                                                    setSavingWorkout(msgIdx);
+                                                    try {
+                                                        const res = await createWorkout({
+                                                            title: msg.workoutData!.title,
+                                                            exercises: msg.workoutData!.exercises.map((ex, i) => ({
+                                                                name: ex.name,
+                                                                sets: ex.sets || 3,
+                                                                reps: ex.reps || '8-12',
+                                                                rest_time: ex.rest_time || 60,
+                                                                method: ex.method || 'Normal',
+                                                                notes: ex.notes || '',
+                                                                order: i,
+                                                            })),
+                                                        });
+                                                        if (res?.ok) {
+                                                            setSavedWorkouts(prev => new Set([...prev, msgIdx]));
+                                                        } else {
+                                                            logError('CoachChat.saveWorkout', res?.error);
+                                                        }
+                                                    } catch (e) {
+                                                        logError('CoachChat.saveWorkout', e);
+                                                    } finally {
+                                                        setSavingWorkout(null);
+                                                    }
+                                                }}
+                                                className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl font-black text-sm uppercase tracking-wider transition-all active:scale-[0.97] ${
+                                                    isSaved
+                                                        ? 'bg-green-500/20 border border-green-500/30 text-green-400 cursor-default'
+                                                        : 'bg-yellow-500 text-black hover:bg-yellow-400'
+                                                }`}
+                                            >
+                                                {isSaving ? (
+                                                    <><Loader2 size={14} className="animate-spin" /> Salvando...</>
+                                                ) : isSaved ? (
+                                                    <><Check size={14} /> Treino adicionado!</>
+                                                ) : (
+                                                    <><Plus size={14} /> Adicionar à Dashboard</>
+                                                )}
+                                            </button>
+                                        </div>
+                                    );
+                                })()}
                             </div>
                         </div>
                     ))}
