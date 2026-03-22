@@ -149,7 +149,7 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded, open:
         fetchNotifications();
 
         channel = supabase
-            .channel(`notifications:${safeUserId}`)
+            .channel(`notif-list:${safeUserId}`)
             .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${safeUserId}` },
                 (payload) => {
                     setSystemNotifications((prev) => {

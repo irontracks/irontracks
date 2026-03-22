@@ -46,7 +46,7 @@ const RealtimeNotificationBridge = ({ userId, setNotification }: RealtimeNotific
           if (!uid) return
 
           channel = supabase
-            .channel(`notifications-bridge:${uid}`)
+            .channel(`notifications:${uid}`)
             .on('postgres_changes', {
               event: 'INSERT',
               schema: 'public',
