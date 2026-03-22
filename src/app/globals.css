@@ -394,6 +394,41 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
+/* ── Safe Area — Global modal/overlay protection (Android + iOS) ───── */
+/* Ensures all fullscreen fixed overlays respect device safe areas.     */
+/* This prevents content being hidden behind status bar, notch, or     */
+/* navigation bar on Android (edge-to-edge) and iOS.                   */
+
+/* Any fixed fullscreen overlay container: add safe-area padding */
+.fixed.inset-0,
+[style*="position: fixed"][style*="inset: 0"],
+[style*="position:fixed"][style*="inset:0"] {
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+  padding-left: env(safe-area-inset-left, 0px);
+  padding-right: env(safe-area-inset-right, 0px);
+}
+
+/* Bottom-sheet style modals: extra bottom protection */
+.modal-bottom-safe {
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), 16px);
+}
+
+/* Modal inner content scrollable areas: ensure last items visible */
+.modal-content-safe {
+  padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 16px);
+}
+
+/* Sticky headers inside modals: push below status bar */
+.modal-header-safe {
+  padding-top: max(env(safe-area-inset-top, 0px), 12px);
+}
+
+/* Sticky footers inside modals: push above nav bar */
+.modal-footer-safe {
+  padding-bottom: max(env(safe-area-inset-bottom, 0px), 12px);
+}
+
 /* ── #11 Font Scale System — responsive clamp() typography ──────── */
 .text-title-hero { font-size: clamp(1.75rem, 5vw, 2.5rem); line-height: 1.1; }
 .text-title-lg   { font-size: clamp(1.25rem, 3.5vw, 1.75rem); line-height: 1.15; }
