@@ -50,6 +50,7 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
     const alarmActiveRef = useRef(false);
     const autoStartFiredRef = useRef(false);
     const wakeLockRef = useRef<{ release: () => Promise<void> } | null>(null);
+    const hasNotifiedRef = useRef(false);
     // Capture total rest seconds on mount so the ring can compute % remaining
     const totalSecondsRef = useRef<number>(0);
     const safeSettings = settings && typeof settings === 'object' ? settings : null;
@@ -189,6 +190,22 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
         };
     }, [isFinished]);
 
+    // ── Capture settings in refs so the main timer effect doesn't re-run ──
+    const allowNotifyRef = useRef(allowNotify);
+    allowNotifyRef.current = allowNotify;
+    const repeatAlarmRef = useRef(repeatAlarm);
+    repeatAlarmRef.current = repeatAlarm;
+    const repeatIntervalMsRef = useRef(repeatIntervalMs);
+    repeatIntervalMsRef.current = repeatIntervalMs;
+    const repeatMaxCountRef = useRef(repeatMaxCount);
+    repeatMaxCountRef.current = repeatMaxCount;
+    const repeatMaxSecondsRef = useRef(repeatMaxSeconds);
+    repeatMaxSecondsRef.current = repeatMaxSeconds;
+    const continuousAlarmRef = useRef(continuousAlarm);
+    continuousAlarmRef.current = continuousAlarm;
+    const soundsEnabledRef = useRef(soundsEnabled);
+    soundsEnabledRef.current = soundsEnabled;
+
     useEffect(() => {
         if (!targetTime) {
             setIdleTimerDisabled(false);
@@ -197,8 +214,13 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
             }
             return;
         }
-        let hasNotified = false;
+        hasNotifiedRef.current = false;
         const id = `${context?.kind || 'rest'}-${context?.exerciseId || ''}-${context?.setId || ''}-${targetTime}`;
+
+        // ★ CANCEL any previous notification before scheduling new one
+        if (notifyIdRef.current && notifyIdRef.current !== id) {
+            cancelRestNotification(notifyIdRef.current);
+        }
         notifyIdRef.current = id;
 
         try {
@@ -207,16 +229,19 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
             const liveTitle = exerciseName ? exerciseName : 'Descanso';
             const notifyTitle = exerciseName ? `⏰ Próximo: ${exerciseName}` : '⏰ Tempo Esgotado!';
             const notifyBody = exerciseName ? 'Hora de iniciar a próxima série!' : 'Hora de voltar para o treino!';
-            const shouldNotify = (allowNotify || (isIosNative() && soundsEnabled)) && seconds > 0;
+            const shouldNotify = (allowNotifyRef.current || (isIosNative() && soundsEnabledRef.current)) && seconds > 0;
             if (shouldNotify) {
-                requestNativeNotifications().then((res) => {
-                    if (!res?.granted) return;
-                    const notifyEverySeconds = Math.max(3, Math.min(30, Math.round(repeatIntervalMs / 1000) || 5));
-                    const maxSeconds = continuousAlarm ? 900 : repeatMaxSeconds;
-                    const maxCount = continuousAlarm ? 120 : repeatMaxCount;
-                    const byDuration = Math.ceil(maxSeconds / notifyEverySeconds);
-                    const notifyCount = repeatAlarm ? Math.max(0, Math.min(maxCount, byDuration)) : 0;
-                    scheduleRestNotification(id, seconds, notifyTitle, notifyBody, notifyCount, notifyEverySeconds);
+                // ★ Cancel ALL pending before scheduling to prevent duplicates
+                cancelRestNotification(id).then(() => {
+                    requestNativeNotifications().then((res) => {
+                        if (!res?.granted) return;
+                        const notifyEverySeconds = Math.max(3, Math.min(30, Math.round(repeatIntervalMsRef.current / 1000) || 5));
+                        const maxSeconds = continuousAlarmRef.current ? 900 : repeatMaxSecondsRef.current;
+                        const maxCount = continuousAlarmRef.current ? 120 : repeatMaxCountRef.current;
+                        const byDuration = Math.ceil(maxSeconds / notifyEverySeconds);
+                        const notifyCount = repeatAlarmRef.current ? Math.max(0, Math.min(maxCount, byDuration)) : 0;
+                        scheduleRestNotification(id, seconds, notifyTitle, notifyBody, notifyCount, notifyEverySeconds);
+                    }).catch(() => { });
                 }).catch(() => { });
             }
             startRestLiveActivity(id, seconds, liveTitle);
@@ -233,9 +258,9 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
             if (remaining <= 0) {
                 setTimeLeft(remaining);
                 setIsFinished(true);
-                if (!hasNotified) {
-                    hasNotified = true;
-                    if (allowNotify && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+                if (!hasNotifiedRef.current) {
+                    hasNotifiedRef.current = true;
+                    if (allowNotifyRef.current && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
                         new Notification("⏰ Tempo Esgotado!", {
                             body: "Hora de voltar para o treino!",
                             icon: 'icone.png',
@@ -260,7 +285,10 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
             stopAlarm(false);
             setIdleTimerDisabled(false);
         };
-    }, [allowNotify, repeatAlarm, repeatIntervalMs, repeatMaxCount, repeatMaxSeconds, continuousAlarm, soundsEnabled, targetTime, context?.exerciseId, context?.kind, context?.setId]);
+    // ★ ONLY depend on targetTime + context identity — not on settings
+    // Settings are read via refs inside the effect body
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [targetTime, context?.exerciseId, context?.kind, context?.setId]);
 
     useEffect(() => {
         if (!isFinished) return;
