@@ -360,7 +360,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     toggleCollapse, toggleLinkWeights,
     addExtraSetToExercise, removeExtraSetFromExercise,
     openEditExercise, saveEditExercise,
-    addExtraExerciseToWorkout,
+    addExtraExerciseToWorkout, swapExerciseName,
     openOrganizeModal, requestCloseOrganize, saveOrganize,
   } = exerciseCrud;
 
@@ -546,6 +546,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     removeExtraSetFromExercise,
     openEditExercise,
     saveEditExercise,
+    swapExerciseName,
     addExtraExerciseToWorkout,
     openOrganizeModal,
     requestCloseOrganize,

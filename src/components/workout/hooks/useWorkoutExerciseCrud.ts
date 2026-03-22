@@ -350,6 +350,20 @@ export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
   };
 
 
+  /** Directly rename an exercise by index — used by AI swap. */
+  const swapExerciseName = (exIdx: number, newName: string) => {
+    if (!workout || typeof onUpdateSession !== 'function') return;
+    if (exIdx < 0 || exIdx >= exercises.length) return;
+    const trimmed = newName.trim();
+    if (!trimmed) return;
+    try {
+      const nextExercises = [...exercises];
+      const exRaw = nextExercises[exIdx] && typeof nextExercises[exIdx] === 'object' ? nextExercises[exIdx] : {} as WorkoutExercise;
+      nextExercises[exIdx] = { ...exRaw, name: trimmed };
+      onUpdateSession({ workout: { ...workout, exercises: nextExercises } });
+    } catch { /* silent */ }
+  };
+
   return {
     toggleCollapse,
     toggleLinkWeights,
@@ -358,6 +372,7 @@ export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
     openEditExercise,
     saveEditExercise,
     addExtraExerciseToWorkout,
+    swapExerciseName,
     openOrganizeModal,
     requestCloseOrganize,
     saveOrganize,
