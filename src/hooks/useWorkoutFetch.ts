@@ -481,6 +481,18 @@ export function useWorkoutFetch({
         return () => { cancelled = true }
     }, [user, fetchWorkouts])
 
+    // Listen for custom event to refresh workouts (e.g., from VipHub AI chat)
+    useEffect(() => {
+        const handler = () => {
+            if (user) {
+                isFetching.current = false // reset to allow re-fetch
+                fetchWorkouts(user).catch((e) => logWarn('useWorkoutFetch', 'event-triggered fetch failed', e))
+            }
+        }
+        window.addEventListener('irontracks:workouts-changed', handler)
+        return () => window.removeEventListener('irontracks:workouts-changed', handler)
+    }, [user, fetchWorkouts])
+
     // Restaura cache local se workouts ainda vazio
     useEffect(() => {
         if (user && workouts.length === 0) {
