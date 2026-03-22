@@ -5,7 +5,13 @@ import type { AssessmentFormData } from '@/types/assessment'
 
 /* ──────────────────────────────────────────────────────────
  * Premium Body Measurement Map
- * Large hero body silhouette with floating delicate labels
+ *
+ * Hero body silhouette with seamless dark background
+ * and delicate floating measurement labels.
+ *
+ * The body PNG has a pure-black background. Using
+ * mix-blend-mode: lighten makes the black invisible,
+ * creating a seamless "infinite dark" effect.
  * ────────────────────────────────────────────────────────── */
 
 interface MeasurementPoint {
@@ -14,29 +20,49 @@ interface MeasurementPoint {
   singleField?: string
   leftField?: string
   rightField?: string
-  /** Position as percentage of container: [left%, top%] */
-  pos: [number, number]
-  /** Dot position on body: [left%, top%] */
-  dot: [number, number]
+  /**
+   * Label position as [left%, top%] of the body image container.
+   * Calibrated against the actual body-front.png anatomy.
+   */
+  labelPos: [number, number]
+  /** Body anchor for the connecting line [left%, top%] */
+  dotPos: [number, number]
   align: 'left' | 'right'
 }
 
+/*
+ * Positions calibrated against the 1024×1024 body-front.png mannequin:
+ * - Head top:    ~8%
+ * - Shoulders:   ~20%
+ * - Mid-arm:     ~30%
+ * - Chest:       ~25%
+ * - Waist:       ~38%
+ * - Hip:         ~44%
+ * - Mid-thigh:   ~58%
+ * - Knees:       ~68%
+ * - Mid-calf:    ~78%
+ * - Feet:        ~95%
+ *
+ * Body center X = 50%, shoulders ≈ 25%–75%
+ */
 const MEASUREMENTS: MeasurementPoint[] = [
-  { id: 'arm_l', label: 'Braço E', leftField: 'arm_circ_left', singleField: 'arm_circ', pos: [2, 22], dot: [27, 27], align: 'left' },
-  { id: 'arm_r', label: 'Braço D', rightField: 'arm_circ_right', singleField: 'arm_circ', pos: [98, 22], dot: [73, 27], align: 'right' },
-  { id: 'chest', label: 'Tórax', singleField: 'chest_circ', pos: [2, 18], dot: [42, 22], align: 'left' },
-  { id: 'waist', label: 'Cintura', singleField: 'waist_circ', pos: [98, 38], dot: [55, 40], align: 'right' },
-  { id: 'hip', label: 'Quadril', singleField: 'hip_circ', pos: [2, 44], dot: [45, 47], align: 'left' },
-  { id: 'thigh_l', label: 'Coxa E', leftField: 'thigh_circ_left', singleField: 'thigh_circ', pos: [2, 60], dot: [38, 60], align: 'left' },
-  { id: 'thigh_r', label: 'Coxa D', rightField: 'thigh_circ_right', singleField: 'thigh_circ', pos: [98, 60], dot: [62, 60], align: 'right' },
-  { id: 'calf_l', label: 'Pant. E', leftField: 'calf_circ_left', singleField: 'calf_circ', pos: [2, 80], dot: [40, 79], align: 'left' },
-  { id: 'calf_r', label: 'Pant. D', rightField: 'calf_circ_right', singleField: 'calf_circ', pos: [98, 80], dot: [60, 79], align: 'right' },
+  // Left side
+  { id: 'chest',   label: 'Tórax',   singleField: 'chest_circ',                                    labelPos: [0, 23],  dotPos: [42, 26],  align: 'left' },
+  { id: 'arm_l',   label: 'Braço E', leftField: 'arm_circ_left',   singleField: 'arm_circ',        labelPos: [0, 32],  dotPos: [28, 32],  align: 'left' },
+  { id: 'hip',     label: 'Quadril', singleField: 'hip_circ',                                      labelPos: [0, 44],  dotPos: [42, 44],  align: 'left' },
+  { id: 'thigh_l', label: 'Coxa E',  leftField: 'thigh_circ_left', singleField: 'thigh_circ',      labelPos: [0, 58],  dotPos: [40, 58],  align: 'left' },
+  { id: 'calf_l',  label: 'Pant. E', leftField: 'calf_circ_left',  singleField: 'calf_circ',       labelPos: [0, 78],  dotPos: [42, 78],  align: 'left' },
+  // Right side
+  { id: 'waist',   label: 'Cintura', singleField: 'waist_circ',                                    labelPos: [100, 36], dotPos: [56, 38],  align: 'right' },
+  { id: 'arm_r',   label: 'Braço D', rightField: 'arm_circ_right', singleField: 'arm_circ',        labelPos: [100, 32], dotPos: [72, 32],  align: 'right' },
+  { id: 'thigh_r', label: 'Coxa D',  rightField: 'thigh_circ_right', singleField: 'thigh_circ',    labelPos: [100, 58], dotPos: [60, 58],  align: 'right' },
+  { id: 'calf_r',  label: 'Pant. D', rightField: 'calf_circ_right',  singleField: 'calf_circ',     labelPos: [100, 78], dotPos: [58, 78],  align: 'right' },
 ]
 
 function resolveValue(data: Record<string, string | undefined>, m: MeasurementPoint): string {
-  if (m.leftField) { const v = parseFloat(data[m.leftField] || '0'); if (v > 0) return v.toFixed(1) }
-  if (m.rightField) { const v = parseFloat(data[m.rightField] || '0'); if (v > 0) return v.toFixed(1) }
-  if (m.singleField) { const v = parseFloat(data[m.singleField] || '0'); if (v > 0) return v.toFixed(1) }
+  if (m.leftField)   { const v = parseFloat(data[m.leftField]  || '0'); if (v > 0) return v.toFixed(1) }
+  if (m.rightField)  { const v = parseFloat(data[m.rightField] || '0'); if (v > 0) return v.toFixed(1) }
+  if (m.singleField) { const v = parseFloat(data[m.singleField]|| '0'); if (v > 0) return v.toFixed(1) }
   return ''
 }
 
@@ -52,90 +78,90 @@ const BodyMeasurementMap = memo(function BodyMeasurementMap({ formData }: Props)
 
   const points = useMemo(() =>
     MEASUREMENTS.map((m) => ({ ...m, value: resolveValue(data, m) })).filter(p => p.value),
-    [data]
+    [data],
   )
 
   if (points.length === 0) return null
 
   return (
     <div
-      className="rounded-2xl border relative overflow-hidden"
-      style={{
-        background: 'linear-gradient(180deg, rgba(15,15,12,0.95) 0%, rgba(8,8,8,0.98) 100%)',
-        borderColor: 'rgba(255,255,255,0.05)',
-      }}
+      className="rounded-2xl relative overflow-hidden"
+      style={{ background: '#000000' }}
     >
-      {/* Top accent line */}
-      <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-yellow-500/15 to-transparent" />
+      {/* Top accent */}
+      <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-yellow-500/10 to-transparent z-10" />
 
-      {/* Header — minimal */}
-      <div className="flex items-center justify-between px-5 pt-4 pb-1">
+      {/* Header */}
+      <div className="relative z-10 flex items-center justify-between px-5 pt-4 pb-0">
         <div className="flex items-center gap-2">
-          <div className="w-1.5 h-1.5 rounded-full bg-yellow-500" />
-          <span className="text-xs font-bold text-neutral-400 uppercase tracking-[0.15em]">Mapa Corporal</span>
+          <div className="w-1 h-1 rounded-full bg-yellow-500/60" />
+          <span className="text-[10px] font-semibold text-neutral-500 uppercase tracking-[0.18em]">Mapa Corporal</span>
         </div>
-        <span className="text-[10px] text-neutral-600 uppercase tracking-[0.2em] font-medium">
+        <span className="text-[9px] text-neutral-700 uppercase tracking-[0.2em]">
           {isFemale ? 'Feminino' : 'Masculino'}
         </span>
       </div>
 
-      {/* Hero body container */}
-      <div className="relative w-full px-4 pb-5" style={{ minHeight: '420px' }}>
-        {/* Body silhouette — LARGE and centered */}
-        <div className="relative mx-auto" style={{ width: '65%', maxWidth: '260px' }}>
-          <div className="relative" style={{ aspectRatio: '200/440' }}>
-            <img
-              src={baseSrc}
-              alt={`Corpo ${isFemale ? 'feminino' : 'masculino'}`}
-              loading="lazy"
-              draggable={false}
-              className="absolute inset-0 w-full h-full object-contain pointer-events-none"
-              style={{ opacity: 0.55, filter: 'brightness(0.75) contrast(1.15)' }}
-              onError={(e) => { e.currentTarget.style.display = 'none' }}
-            />
+      {/* Hero body — large, seamless background */}
+      <div className="relative" style={{ paddingBottom: '110%' }}>
+        {/* Body image — fills most of the container, blended seamlessly */}
+        <img
+          src={baseSrc}
+          alt=""
+          loading="lazy"
+          draggable={false}
+          className="absolute pointer-events-none"
+          style={{
+            left: '15%',
+            top: '2%',
+            width: '70%',
+            height: '96%',
+            objectFit: 'contain',
+            mixBlendMode: 'lighten',
+            opacity: 0.6,
+          }}
+          onError={(e) => { e.currentTarget.style.display = 'none' }}
+        />
 
-            {/* Subtle body glow */}
-            <div
-              className="absolute inset-0 pointer-events-none"
-              style={{
-                background: 'radial-gradient(ellipse 60% 40% at 50% 35%, rgba(234,179,8,0.04) 0%, transparent 70%)',
-              }}
-            />
-          </div>
-        </div>
+        {/* Subtle ambient glow behind body */}
+        <div
+          className="absolute pointer-events-none"
+          style={{
+            left: '20%',
+            top: '10%',
+            width: '60%',
+            height: '60%',
+            background: 'radial-gradient(ellipse at center, rgba(234,179,8,0.03) 0%, transparent 70%)',
+          }}
+        />
 
-        {/* Floating labels + connecting lines — absolutely positioned over the container */}
-        <svg className="absolute inset-0 w-full h-full pointer-events-none" style={{ top: '36px' }}>
+        {/* SVG connecting lines & dots */}
+        <svg className="absolute inset-0 w-full h-full pointer-events-none">
           {points.map((p) => {
             const isActive = selected === p.id
-            // Convert % positions to SVG coordinates
-            const lx = p.pos[0]
-            const ly = p.pos[1]
-            const dx = p.dot[0]
-            const dy = p.dot[1]
-
             return (
-              <g key={p.id}>
-                {/* Thin connecting line */}
+              <g key={`line-${p.id}`}>
                 <line
-                  x1={`${lx}%`} y1={`${ly}%`}
-                  x2={`${dx}%`} y2={`${dy}%`}
-                  stroke={isActive ? 'rgba(234,179,8,0.4)' : 'rgba(234,179,8,0.1)'}
-                  strokeWidth={isActive ? 1 : 0.5}
+                  x1={`${p.labelPos[0] === 0 ? 18 : 82}%`}
+                  y1={`${p.labelPos[1]}%`}
+                  x2={`${p.dotPos[0]}%`}
+                  y2={`${p.dotPos[1]}%`}
+                  stroke={isActive ? 'rgba(234,179,8,0.35)' : 'rgba(234,179,8,0.08)'}
+                  strokeWidth={isActive ? 0.8 : 0.4}
                 />
-                {/* Dot on body */}
                 <circle
-                  cx={`${dx}%`} cy={`${dy}%`}
-                  r={isActive ? 3.5 : 2}
-                  fill={isActive ? '#eab308' : 'rgba(234,179,8,0.35)'}
+                  cx={`${p.dotPos[0]}%`}
+                  cy={`${p.dotPos[1]}%`}
+                  r={isActive ? 3 : 1.5}
+                  fill={isActive ? 'rgba(234,179,8,0.7)' : 'rgba(234,179,8,0.25)'}
                 />
-                {/* Outer ring when active */}
                 {isActive && (
                   <circle
-                    cx={`${dx}%`} cy={`${dy}%`}
-                    r={6}
+                    cx={`${p.dotPos[0]}%`}
+                    cy={`${p.dotPos[1]}%`}
+                    r={7}
                     fill="none"
-                    stroke="rgba(234,179,8,0.2)"
+                    stroke="rgba(234,179,8,0.15)"
                     strokeWidth={0.5}
                   />
                 )}
@@ -144,31 +170,33 @@ const BodyMeasurementMap = memo(function BodyMeasurementMap({ formData }: Props)
           })}
         </svg>
 
-        {/* HTML labels — positioned absolutely for crisp text */}
+        {/* Floating labels */}
         {points.map((p) => {
           const isActive = selected === p.id
+          const isLeft = p.align === 'left'
           return (
             <button
               key={p.id}
               type="button"
               onClick={() => setSelected(isActive ? null : p.id)}
-              className="absolute transition-all duration-300 group"
+              className="absolute transition-all duration-300"
               style={{
-                left: p.align === 'left' ? '4%' : undefined,
-                right: p.align === 'right' ? '4%' : undefined,
-                top: `calc(${p.pos[1]}% + 28px)`,
+                ...(isLeft
+                  ? { left: '3%', textAlign: 'left' as const }
+                  : { right: '3%', textAlign: 'right' as const }),
+                top: `${p.labelPos[1]}%`,
                 transform: 'translateY(-50%)',
-                textAlign: p.align,
               }}
             >
               <div
                 className="transition-colors duration-300"
                 style={{
-                  fontSize: '9px',
-                  fontWeight: 600,
-                  letterSpacing: '0.12em',
-                  textTransform: 'uppercase',
-                  color: isActive ? 'rgba(234,179,8,0.8)' : 'rgba(163,163,163,0.4)',
+                  fontSize: '8px',
+                  fontWeight: 500,
+                  letterSpacing: '0.15em',
+                  textTransform: 'uppercase' as const,
+                  color: isActive ? 'rgba(234,179,8,0.7)' : 'rgba(115,115,115,0.5)',
+                  lineHeight: 1,
                 }}
               >
                 {p.label}
@@ -176,10 +204,10 @@ const BodyMeasurementMap = memo(function BodyMeasurementMap({ formData }: Props)
               <div
                 className="transition-colors duration-300 tabular-nums"
                 style={{
-                  fontSize: '15px',
-                  fontWeight: 700,
-                  color: isActive ? '#fbbf24' : 'rgba(255,255,255,0.7)',
-                  lineHeight: 1.2,
+                  fontSize: '14px',
+                  fontWeight: 600,
+                  color: isActive ? 'rgba(251,191,36,0.9)' : 'rgba(255,255,255,0.55)',
+                  lineHeight: 1.3,
                 }}
               >
                 {p.value}
@@ -189,9 +217,9 @@ const BodyMeasurementMap = memo(function BodyMeasurementMap({ formData }: Props)
         })}
       </div>
 
-      {/* Bottom subtle hint */}
-      <div className="text-center pb-4">
-        <span className="text-[9px] text-neutral-700 uppercase tracking-[0.2em] font-medium">
+      {/* Footer hint */}
+      <div className="relative z-10 text-center pb-3 pt-0">
+        <span className="text-[8px] text-neutral-800 uppercase tracking-[0.25em]">
           cm · toque para destacar
         </span>
       </div>
