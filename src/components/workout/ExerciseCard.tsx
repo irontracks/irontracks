@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useMemo, useState, useEffect } from 'react';
-import { ArrowDown, CheckCircle2, ChevronDown, ChevronUp, Dumbbell, Link, Loader2, Pencil, Play, Plus, Share2, Trash2, Trophy } from 'lucide-react';
+import { ArrowDown, CheckCircle2, ChevronDown, ChevronUp, Dumbbell, Link, Loader2, Pencil, Play, Plus, RefreshCw, Share2, Trash2, Trophy } from 'lucide-react';
 import { useWorkoutContext } from './WorkoutContext';
 import { ExerciseAIChat } from '@/components/ExerciseAIChat';
 import {
@@ -28,6 +28,8 @@ import { WorkoutExercise, UnknownRecord } from './types';
 import ExecutionVideoCapture from '@/components/ExecutionVideoCapture';
 import { logError, logWarn, logInfo } from '@/lib/logger'
 import { useTeamWorkout } from '@/contexts/TeamWorkoutContext'
+import AISuggestionBadge from './AISuggestionBadge'
+import AIExerciseSwap from './AIExerciseSwap'
 
 function useSafeTeamWorkout() {
   try {
@@ -348,6 +350,13 @@ function ExerciseCardInner({ ex, exIdx }: { ex: WorkoutExercise; exIdx: number }
               />
             </div>
           )}
+          {/* AI Load Suggestion — inline badge (only when expanded) */}
+          {!collapsedNow && (
+            <AISuggestionBadge
+              exerciseName={name}
+              setIndex={0}
+            />
+          )}
         </div>
         <div className="mt-1 flex flex-row flex-nowrap items-center justify-end gap-1.5 text-neutral-400">
           {videoUrl ? (
@@ -419,6 +428,7 @@ function ExerciseCardInner({ ex, exIdx }: { ex: WorkoutExercise; exIdx: number }
           >
             <Link size={14} className={linkedWeightExercises?.has(exIdx) ? '' : 'opacity-60'} />
           </button>
+          <AIExerciseSwap exerciseName={name} exerciseIndex={exIdx} />
           <ExerciseAIChat context={aiContext} />
           <button
             type="button"
