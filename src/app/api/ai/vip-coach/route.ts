@@ -229,8 +229,50 @@ export async function POST(req: Request) {
     const answer = String((await result?.response?.text()) || '').trim()
     if (!answer) return NextResponse.json({ ok: false, error: 'Resposta inválida da IA' }, { status: 400 })
 
+    // ── Server-side workout extraction ──────────────────────────
+    let workout: Record<string, unknown> | null = null
+    const lowerAnswer = answer.toLowerCase()
+    const signals = [
+      lowerAnswer.includes('exercício') || lowerAnswer.includes('exercicio') || lowerAnswer.includes('exercícios'),
+      lowerAnswer.includes('série') || lowerAnswer.includes('series') || lowerAnswer.includes('séries'),
+      lowerAnswer.includes('rep') || lowerAnswer.includes('repetições') || lowerAnswer.includes('repetiç'),
+      /\d+\s*x\s*\d+/.test(lowerAnswer),
+      lowerAnswer.includes('descanso') || lowerAnswer.includes('intervalo'),
+      lowerAnswer.includes('treino de') || lowerAnswer.includes('treino para'),
+      lowerAnswer.includes('supino') || lowerAnswer.includes('agachamento') || lowerAnswer.includes('rosca') || lowerAnswer.includes('remada') || lowerAnswer.includes('puxada') || lowerAnswer.includes('leg press'),
+    ]
+    const signalCount = signals.filter(Boolean).length
+    const shouldExtract = signalCount >= 2 || (answer.length > 300 && signalCount >= 1)
+
+    if (shouldExtract) {
+      try {
+        const extractPrompt = [
+          'Dado o texto abaixo, extraia o treino como JSON.',
+          'Responda APENAS com o JSON, sem explicação, sem markdown, sem blocos de código.',
+          'Formato obrigatório:',
+          '{"title":"Nome do Treino","exercises":[{"name":"Supino Reto","sets":4,"reps":"8-12","rest_time":60,"method":"Normal","notes":""}]}',
+          'Se não houver treino estruturado no texto, responda apenas: null',
+          '',
+          'Texto:',
+          answer,
+        ].join('\n')
+        const extractResult = await model.generateContent([{ text: extractPrompt }] as Parameters<typeof model.generateContent>[0])
+        const jsonStr = String((await extractResult?.response?.text()) || '').trim()
+        if (jsonStr && jsonStr !== 'null' && jsonStr !== '{}') {
+          const cleaned = jsonStr.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '').replace(/^\s*json\s*/i, '').trim()
+          const parsed = JSON.parse(cleaned)
+          if (parsed?.title && Array.isArray(parsed?.exercises) && parsed.exercises.length > 0) {
+            workout = parsed
+            console.log('[vip-coach] Workout extracted:', parsed.title, parsed.exercises.length, 'exercises')
+          }
+        }
+      } catch (extractErr) {
+        console.error('[vip-coach] Workout extraction failed:', extractErr)
+      }
+    }
+
     await incrementVipUsage(supabase, userId, 'chat')
-    return NextResponse.json({ ok: true, answer, dataUsed: dataSources, followUps: [], actions: [] })
+    return NextResponse.json({ ok: true, answer, dataUsed: dataSources, followUps: [], actions: [], workout })
   } catch (e: unknown) {
     return NextResponse.json({ ok: false, error: getErrorMessage(e) ?? String(e) }, { status: 500 })
   }

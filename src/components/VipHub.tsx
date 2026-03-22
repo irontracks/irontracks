@@ -2,9 +2,10 @@
 
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import NextImage from 'next/image'
-import { Crown, Sparkles, MessageSquare, Trash2, Zap, BarChart3, ChefHat } from 'lucide-react'
+import { Crown, Sparkles, MessageSquare, Trash2, Zap, BarChart3, ChefHat, Dumbbell, Check, Plus, Loader2 } from 'lucide-react'
 import { isIosNative } from '@/utils/platform'
 import dynamic from 'next/dynamic'
+import { createWorkout } from '@/actions/workout-crud-actions'
 import VipWeeklySummaryCard from '@/components/vip/VipWeeklySummaryCard'
 
 const VipPeriodizationPanel = dynamic(() => import('@/components/vip/VipPeriodizationPanel'), { ssr: false })
@@ -39,6 +40,18 @@ interface ChatAction {
   [key: string]: unknown
 }
 
+interface WorkoutData {
+  title: string
+  exercises: Array<{
+    name: string
+    sets?: number
+    reps?: string
+    rest_time?: number
+    method?: string
+    notes?: string
+  }>
+}
+
 interface ChatMessage {
   id: string
   role: string
@@ -47,6 +60,7 @@ interface ChatMessage {
   dataUsed?: Record<string, unknown>[]
   followUps?: string[]
   actions?: ChatAction[]
+  workoutData?: WorkoutData | null
 }
 
 interface VipStatus {
@@ -67,6 +81,8 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
   const name = useMemo(() => String(user?.displayName || user?.name || '').trim(), [user?.displayName, user?.name])
   const [mode, setMode] = useState('coach')
   const [draft, setDraft] = useState('')
+  const [savingWorkout, setSavingWorkout] = useState<string | null>(null)
+  const [savedWorkouts, setSavedWorkouts] = useState<Set<string>>(new Set())
   const [messages, setMessages] = useState<ChatMessage[]>([])
   const [busy, setBusy] = useState(false)
   const [vipStatus, setVipStatus] = useState<VipStatus | null>(null)
@@ -206,6 +222,13 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
           })
           .filter((a): a is ChatAction => Boolean(a))
         : []
+      // Extract workout data from API response
+      let workoutData: WorkoutData | null = null
+      const wk = json.workout as Record<string, unknown> | null | undefined
+      if (wk?.title && Array.isArray(wk?.exercises) && (wk.exercises as unknown[]).length > 0) {
+        workoutData = wk as unknown as WorkoutData
+      }
+
       const assistant: ChatMessage = {
         id: `${id}-a`,
         role: 'assistant',
@@ -213,6 +236,7 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
         dataUsed,
         followUps,
         actions,
+        workoutData,
       }
       setMessages((prev) => [...(Array.isArray(prev) ? prev : []), assistant].slice(-60))
 
@@ -563,6 +587,59 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
                     <span className="text-[9px] font-bold text-yellow-700">Analisou: {(m.dataUsed as unknown[]).map((d) => typeof d === 'object' && d !== null ? String((d as Record<string, unknown>).label || '') : String(d)).join(', ')}</span>
                   </div>
                 )}
+                {/* Save Workout to Dashboard button */}
+                {m.workoutData && m.role === 'assistant' && (() => {
+                  const isSaving = savingWorkout === m.id
+                  const isSaved = savedWorkouts.has(m.id)
+                  return (
+                    <div className="mt-3 pt-3" style={{ borderTop: '1px solid rgba(234,179,8,0.15)' }}>
+                      <div className="flex items-center gap-2 text-[11px] font-bold text-yellow-500/70 uppercase tracking-wider mb-2">
+                        <Dumbbell size={12} />
+                        {m.workoutData!.title} — {m.workoutData!.exercises.length} exercício{m.workoutData!.exercises.length !== 1 ? 's' : ''}
+                      </div>
+                      <button
+                        type="button"
+                        disabled={isSaving || isSaved}
+                        onClick={async () => {
+                          if (!m.workoutData || isSaving || isSaved) return
+                          setSavingWorkout(m.id)
+                          try {
+                            const res = await createWorkout({
+                              title: m.workoutData!.title,
+                              exercises: m.workoutData!.exercises.map((ex, i) => ({
+                                name: ex.name,
+                                sets: ex.sets || 3,
+                                reps: ex.reps || '8-12',
+                                rest_time: ex.rest_time || 60,
+                                method: ex.method || 'Normal',
+                                notes: ex.notes || '',
+                                order: i,
+                              })),
+                            })
+                            if (res?.ok) {
+                              setSavedWorkouts(prev => new Set([...prev, m.id]))
+                            }
+                          } catch { /* silent */ } finally {
+                            setSavingWorkout(null)
+                          }
+                        }}
+                        className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl font-black text-sm uppercase tracking-wider transition-all active:scale-[0.97] ${
+                          isSaved
+                            ? 'bg-green-500/20 border border-green-500/30 text-green-400 cursor-default'
+                            : 'bg-yellow-500 text-black hover:bg-yellow-400'
+                        }`}
+                      >
+                        {isSaving ? (
+                          <><Loader2 size={14} className="animate-spin" /> Salvando...</>
+                        ) : isSaved ? (
+                          <><Check size={14} /> Treino adicionado!</>
+                        ) : (
+                          <><Plus size={14} /> Adicionar à Dashboard</>
+                        )}
+                      </button>
+                    </div>
+                  )
+                })()}
                 {m.isLimit && !hideVipCtas && (
                   <button onClick={() => window.location.href = '/marketplace'} className="block mt-2 text-xs font-black uppercase text-yellow-500 hover:underline">
                     Fazer Upgrade
