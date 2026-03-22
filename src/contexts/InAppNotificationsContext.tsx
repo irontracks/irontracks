@@ -9,6 +9,16 @@ import { logError } from '@/lib/logger'
 import RealtimeNotificationBridge from '@/components/RealtimeNotificationBridge';
 import NotificationToast from '@/components/NotificationToast';
 
+/* ──────────────────────────────────────────────────────────
+ * InAppNotificationsContext
+ *
+ * Fixes applied:
+ * - Toast QUEUE (up to 3 simultaneous)
+ * - Dedup window reduced to 500ms
+ * - Default duration 5000ms
+ * - Auto-dismiss per toast via individual IDs
+ * ────────────────────────────────────────────────────────── */
+
 interface ToastPayload {
   id?: string | null
   text?: string
@@ -22,6 +32,7 @@ interface ToastPayload {
 }
 
 interface NormalizedToast {
+  queueId: string  // internal queue key
   id?: string
   text: string
   senderName: string
@@ -52,6 +63,8 @@ export function useInAppNotifications() {
   return useContext(InAppNotificationsContext);
 }
 
+let queueCounter = 0
+
 const normalizeToast = (raw: ToastPayload): NormalizedToast | null => {
   const n = raw && typeof raw === 'object' ? raw : null;
   if (!n) return null;
@@ -64,6 +77,7 @@ const normalizeToast = (raw: ToastPayload): NormalizedToast | null => {
   const photoURL = n.photoURL ? String(n.photoURL).trim() : '';
   if (!text) return null;
   return {
+    queueId: `toast_${++queueCounter}_${Date.now()}`,
     id: id || undefined,
     text,
     senderName: senderName || 'Aviso do Sistema',
@@ -73,6 +87,9 @@ const normalizeToast = (raw: ToastPayload): NormalizedToast | null => {
     photoURL: photoURL || null,
   };
 };
+
+const MAX_TOASTS = 3
+const DEDUP_WINDOW_MS = 500
 
 export function InAppNotificationsProvider(props: InAppNotificationsProviderProps) {
   const router = useRouter();
@@ -95,7 +112,6 @@ export function InAppNotificationsProvider(props: InAppNotificationsProviderProp
     let cancelled = false;
     (async () => {
       try {
-        // getSession() reads from local storage — no network round-trip unlike getUser()
         const { data } = await supabase.auth.getSession();
         const id = data?.session?.user?.id ? String(data.session.user.id) : '';
         if (!cancelled && id) setAuthUserId(id);
@@ -109,27 +125,35 @@ export function InAppNotificationsProvider(props: InAppNotificationsProviderProp
   const settingsApi = useUserSettings(resolvedUserId);
   const settings = (props?.settings && typeof props.settings === 'object' ? props.settings : null) || settingsApi?.settings || null;
 
-  const [toast, setToast] = useState<NormalizedToast | null>(null);
+  const [toastQueue, setToastQueue] = useState<NormalizedToast[]>([]);
   const lastKeyRef = useRef({ key: '', at: 0 });
 
-  const clear = useCallback(() => setToast(null), []);
+  const clear = useCallback(() => setToastQueue([]), []);
+
+  const dismissOne = useCallback((queueId: string) => {
+    setToastQueue(prev => prev.filter(t => t.queueId !== queueId))
+  }, [])
 
   const notify = useCallback((payload: ToastPayload) => {
     const normalized = normalizeToast(payload);
     if (!normalized) return;
+    // Dedup: skip if same message within DEDUP_WINDOW_MS
     const key = normalized.id ? `id:${normalized.id}` : `t:${normalized.type}|m:${normalized.text}`;
     const now = Date.now();
     const last = lastKeyRef.current || { key: '', at: 0 };
-    if (last.key === key && now - last.at < 1500) return;
+    if (last.key === key && now - last.at < DEDUP_WINDOW_MS) return;
     lastKeyRef.current = { key, at: now };
-    setToast(normalized);
+    setToastQueue(prev => {
+      // Trim to max — remove oldest if over limit
+      const trimmed = prev.length >= MAX_TOASTS ? prev.slice(1) : prev
+      return [...trimmed, normalized]
+    });
   }, []);
 
-
-  const onToastClick = useCallback(() => {
+  const onToastClick = useCallback((toast: NormalizedToast) => {
     const n = toast && typeof toast === 'object' ? toast : null;
     if (!n) {
-      clear();
+      dismissOne(toast.queueId);
       return;
     }
     const type = String(n.type || '').toLowerCase();
@@ -137,41 +161,51 @@ export function InAppNotificationsProvider(props: InAppNotificationsProviderProp
     try {
       if (type === 'message' && typeof props?.onOpenMessages === 'function') {
         props.onOpenMessages();
-        clear();
+        dismissOne(toast.queueId);
         return;
       }
     } catch { }
     try {
       if (link) {
         router.push(link);
-        clear();
+        dismissOne(toast.queueId);
         return;
       }
     } catch { }
     try {
       if (typeof props?.onOpenNotifications === 'function') {
         props.onOpenNotifications();
-        clear();
+        dismissOne(toast.queueId);
         return;
       }
     } catch { }
-    clear();
-  }, [toast, clear, props, router]);
+    dismissOne(toast.queueId);
+  }, [dismissOne, props, router]);
+
+  const durationMs = Number(props?.durationMs ?? 5000)
 
   return (
     <InAppNotificationsContext.Provider value={{ notify, clear }}>
       {resolvedUserId && props?.disableRealtime !== true ? (
         <RealtimeNotificationBridge userId={resolvedUserId} setNotification={notify} />
       ) : null}
-      {toast ? (
-        <NotificationToast
-          settings={settings}
-          notification={toast}
-          durationMs={Number(props?.durationMs ?? 7000)}
-          onClick={onToastClick}
-          onClose={clear}
-        />
-      ) : null}
+      {/* Toast queue — renders up to MAX_TOASTS simultaneously */}
+      <div
+        className="fixed top-0 right-0 z-[999999] flex flex-col gap-2 pointer-events-none"
+        style={{ paddingTop: 'calc(env(safe-area-inset-top, 0px) + 16px)', paddingRight: '16px' }}
+      >
+        {toastQueue.map((toast) => (
+          <div key={toast.queueId} className="pointer-events-auto">
+            <NotificationToast
+              settings={settings}
+              notification={toast as unknown as Record<string, unknown>}
+              durationMs={durationMs}
+              onClick={() => onToastClick(toast)}
+              onClose={() => dismissOne(toast.queueId)}
+            />
+          </div>
+        ))}
+      </div>
       {props?.children}
     </InAppNotificationsContext.Provider>
   );
