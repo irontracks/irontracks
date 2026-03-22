@@ -618,6 +618,8 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
                             })
                             if (res?.ok) {
                               setSavedWorkouts(prev => new Set([...prev, m.id]))
+                              // Notify dashboard to refresh workout list
+                              window.dispatchEvent(new CustomEvent('irontracks:workouts-changed'))
                             }
                           } catch { /* silent */ } finally {
                             setSavingWorkout(null)
