@@ -134,6 +134,12 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin {
         content.sound = UNNotificationSound.default
         content.categoryIdentifier = "REST_TIMER"
 
+        // ★ Cancel any previous notifications with this ID before scheduling new ones
+        var cancelIds = [id]
+        for i in 1...60 { cancelIds.append("\(id)_repeat_\(i)") }
+        UNUserNotificationCenter.current().removePendingNotificationRequests(withIdentifiers: cancelIds)
+        UNUserNotificationCenter.current().removeDeliveredNotifications(withIdentifiers: cancelIds)
+
         let trigger = UNTimeIntervalNotificationTrigger(timeInterval: TimeInterval(max(1, seconds)), repeats: false)
         let request = UNNotificationRequest(identifier: id, content: content, trigger: trigger)
 
