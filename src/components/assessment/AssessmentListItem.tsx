@@ -368,6 +368,7 @@ export function AssessmentListItem({
               calf_circ_left: String(assessment.calf_circ_left ?? ''),
               calf_circ_right: String(assessment.calf_circ_right ?? ''),
             } as any}
+            bodyFatPercentage={getBodyFatPercent(assessment) ?? undefined}
           />
           <AiPlanSection
             assessment={assessment}

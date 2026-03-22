@@ -289,7 +289,7 @@ export default function ResultsPreview({ formData, onBack, studentName }: Result
       </div>
 
       {/* Mapa Corporal com Medidas */}
-      <BodyMeasurementMap formData={formData} />
+      <BodyMeasurementMap formData={formData} bodyFatPercentage={results.bodyComposition.bodyFatPercentage} />
 
       {/* Medidas Circunferências */}
       {[
