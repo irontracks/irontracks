@@ -96,20 +96,32 @@ export async function POST(req: Request) {
     if (!text) return NextResponse.json({ ok: false, error: 'Resposta inválida da IA' }, { status: 400 })
 
     // ── Server-side workout extraction ──────────────────────────
-    // Detect if the response looks like a workout plan
+    // For any response that's long enough to be a workout,
+    // attempt to extract structured workout data via a fast 2nd call.
     let workout: Record<string, unknown> | null = null
     const lowerText = text.toLowerCase()
-    const hasWorkoutSignals =
-      (lowerText.includes('exercício') || lowerText.includes('exercicio') || lowerText.includes('exercícios')) &&
-      (lowerText.includes('série') || lowerText.includes('series') || lowerText.includes('séries') || lowerText.includes('sets')) &&
-      (lowerText.includes('rep') || lowerText.includes('repetições') || lowerText.includes('repeticoes'))
 
-    if (hasWorkoutSignals) {
+    // Very broad detection: any 2 of these signals trigger extraction
+    const signals = [
+      lowerText.includes('exercício') || lowerText.includes('exercicio') || lowerText.includes('exercícios'),
+      lowerText.includes('série') || lowerText.includes('series') || lowerText.includes('séries'),
+      lowerText.includes('rep') || lowerText.includes('repetições') || lowerText.includes('repetiç'),
+      /\d+\s*x\s*\d+/.test(lowerText), // pattern like "3x12" or "4 x 10"
+      lowerText.includes('descanso') || lowerText.includes('intervalo'),
+      lowerText.includes('treino de') || lowerText.includes('treino para'),
+      lowerText.includes('supino') || lowerText.includes('agachamento') || lowerText.includes('rosca'),
+    ]
+    const signalCount = signals.filter(Boolean).length
+    const shouldExtract = signalCount >= 2 || (text.length > 300 && signalCount >= 1)
+
+    if (shouldExtract) {
       try {
         const extractPrompt = [
-          'Extraia APENAS o JSON do treino abaixo. Responda SOMENTE com JSON puro, sem texto, sem markdown, sem ```.',
-          'Use exatamente este formato:',
-          '{"title":"Nome do Treino","exercises":[{"name":"Nome","sets":3,"reps":"8-12","rest_time":60,"method":"Normal","notes":""}]}',
+          'Dado o texto abaixo, extraia o treino como JSON.',
+          'Responda APENAS com o JSON, sem explicação, sem markdown, sem blocos de código.',
+          'Formato obrigatório:',
+          '{"title":"Nome do Treino","exercises":[{"name":"Supino Reto","sets":4,"reps":"8-12","rest_time":60,"method":"Normal","notes":""}]}',
+          'Se não houver treino no texto, responda apenas: null',
           '',
           'Texto:',
           text,
@@ -117,13 +129,24 @@ export async function POST(req: Request) {
 
         const extractResult = await model.generateContent([{ text: extractPrompt }] as Parameters<typeof model.generateContent>[0])
         const jsonStr = String((await extractResult?.response?.text()) || '').trim()
-        // Clean common markdown wrapping
-        const cleaned = jsonStr.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim()
-        const parsed = JSON.parse(cleaned)
-        if (parsed?.title && Array.isArray(parsed?.exercises) && parsed.exercises.length > 0) {
-          workout = parsed
+
+        if (jsonStr && jsonStr !== 'null' && jsonStr !== '{}') {
+          // Clean markdown wrappers, whitespace, etc
+          const cleaned = jsonStr
+            .replace(/^```(?:json)?\s*/i, '')
+            .replace(/\s*```\s*$/i, '')
+            .replace(/^\s*json\s*/i, '')
+            .trim()
+
+          const parsed = JSON.parse(cleaned)
+          if (parsed?.title && Array.isArray(parsed?.exercises) && parsed.exercises.length > 0) {
+            workout = parsed
+            console.log('[coach-chat] Workout extracted:', parsed.title, parsed.exercises.length, 'exercises')
+          }
         }
-      } catch { /* extraction failed — ok, just skip */ }
+      } catch (extractErr) {
+        console.error('[coach-chat] Workout extraction failed:', extractErr)
+      }
     }
 
     await incrementVipUsage(supabase, userId, 'chat')
@@ -132,4 +155,5 @@ export async function POST(req: Request) {
     return NextResponse.json({ ok: false, error: getErrorMessage(e) ?? String(e) }, { status: 500 })
   }
 }
+
 
