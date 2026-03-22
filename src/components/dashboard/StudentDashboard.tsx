@@ -28,6 +28,9 @@ import { WorkoutToolsPanel } from './WorkoutToolsPanel'
 import { WorkoutCard } from './WorkoutCard'
 import { usePeriodizedWorkouts, isPeriodizedWorkout } from '@/hooks/usePeriodizedWorkouts'
 import type { UnknownRecord } from '@/types/app'
+import dynamic from 'next/dynamic'
+
+const RecoveryScore = dynamic(() => import('./RecoveryScore'), { ssr: false })
 
 
 const isPlainRecord = (v: unknown): v is UnknownRecord => v !== null && typeof v === 'object' && !Array.isArray(v)
@@ -335,6 +338,8 @@ export default function StudentDashboard(props: Props) {
                   reloadKey={props.newRecordsReloadKey}
                 />
               )}
+
+              <RecoveryScore />
 
               <MuscleMapCard onOpenWizard={props.onCreateWorkout} gender={(props.settings?.biologicalSex === 'female' ? 'female' : props.settings?.biologicalSex === 'male' ? 'male' : 'not_informed')} />
 

@@ -50,6 +50,10 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "requestHealthKitPermission", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "saveWorkoutToHealth", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "getHealthSteps", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "getHeartRate", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "getRestingHeartRate", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "getHRV", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "getActiveCalories", returnType: CAPPluginReturnPromise),
         // Photos
         CAPPluginMethod(name: "saveImageToPhotos", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "saveFileToPhotos", returnType: CAPPluginReturnPromise),
@@ -347,6 +351,9 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin {
         let readTypes: Set<HKObjectType> = [
             HKObjectType.quantityType(forIdentifier: .stepCount)!,
             HKObjectType.quantityType(forIdentifier: .activeEnergyBurned)!,
+            HKObjectType.quantityType(forIdentifier: .heartRate)!,
+            HKObjectType.quantityType(forIdentifier: .restingHeartRate)!,
+            HKObjectType.quantityType(forIdentifier: .heartRateVariabilitySDNN)!,
             HKObjectType.workoutType(),
         ]
         healthStore.requestAuthorization(toShare: writeTypes, read: readTypes) { success, error in
@@ -406,6 +413,85 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin {
                                       options: .cumulativeSum) { _, result, _ in
             let steps = Int(result?.sumQuantity()?.doubleValue(for: HKUnit.count()) ?? 0)
             call.resolve(["steps": steps])
+        }
+        healthStore.execute(query)
+    }
+
+    // ── Heart Rate (latest sample — typically from Apple Watch) ──────────────
+
+    @objc func getHeartRate(_ call: CAPPluginCall) {
+        guard HKHealthStore.isHealthDataAvailable(),
+              let hrType = HKQuantityType.quantityType(forIdentifier: .heartRate) else {
+            call.resolve(["bpm": 0, "timestamp": 0]); return
+        }
+        let sortDescriptor = NSSortDescriptor(key: HKSampleSortIdentifierEndDate, ascending: false)
+        let query = HKSampleQuery(sampleType: hrType, predicate: nil, limit: 1,
+                                  sortDescriptors: [sortDescriptor]) { _, results, _ in
+            guard let sample = results?.first as? HKQuantitySample else {
+                call.resolve(["bpm": 0, "timestamp": 0]); return
+            }
+            let bpm = sample.quantity.doubleValue(for: HKUnit(from: "count/min"))
+            let ts = sample.endDate.timeIntervalSince1970 * 1000
+            call.resolve(["bpm": Int(bpm), "timestamp": ts])
+        }
+        healthStore.execute(query)
+    }
+
+    // ── Resting Heart Rate (daily average — computed by Apple Watch) ────────
+
+    @objc func getRestingHeartRate(_ call: CAPPluginCall) {
+        guard HKHealthStore.isHealthDataAvailable(),
+              let rhrType = HKQuantityType.quantityType(forIdentifier: .restingHeartRate) else {
+            call.resolve(["bpm": 0, "timestamp": 0]); return
+        }
+        let sortDescriptor = NSSortDescriptor(key: HKSampleSortIdentifierEndDate, ascending: false)
+        let query = HKSampleQuery(sampleType: rhrType, predicate: nil, limit: 1,
+                                  sortDescriptors: [sortDescriptor]) { _, results, _ in
+            guard let sample = results?.first as? HKQuantitySample else {
+                call.resolve(["bpm": 0, "timestamp": 0]); return
+            }
+            let bpm = sample.quantity.doubleValue(for: HKUnit(from: "count/min"))
+            let ts = sample.endDate.timeIntervalSince1970 * 1000
+            call.resolve(["bpm": Int(bpm), "timestamp": ts])
+        }
+        healthStore.execute(query)
+    }
+
+    // ── Heart Rate Variability (SDNN — computed during sleep by Watch) ──────
+
+    @objc func getHRV(_ call: CAPPluginCall) {
+        guard HKHealthStore.isHealthDataAvailable(),
+              let hrvType = HKQuantityType.quantityType(forIdentifier: .heartRateVariabilitySDNN) else {
+            call.resolve(["sdnn": 0, "timestamp": 0]); return
+        }
+        let sortDescriptor = NSSortDescriptor(key: HKSampleSortIdentifierEndDate, ascending: false)
+        let query = HKSampleQuery(sampleType: hrvType, predicate: nil, limit: 1,
+                                  sortDescriptors: [sortDescriptor]) { _, results, _ in
+            guard let sample = results?.first as? HKQuantitySample else {
+                call.resolve(["sdnn": 0, "timestamp": 0]); return
+            }
+            let sdnn = sample.quantity.doubleValue(for: HKUnit.secondUnit(with: .milli))
+            let ts = sample.endDate.timeIntervalSince1970 * 1000
+            call.resolve(["sdnn": sdnn, "timestamp": ts])
+        }
+        healthStore.execute(query)
+    }
+
+    // ── Active Calories burned today ────────────────────────────────────────
+
+    @objc func getActiveCalories(_ call: CAPPluginCall) {
+        guard HKHealthStore.isHealthDataAvailable(),
+              let calType = HKQuantityType.quantityType(forIdentifier: .activeEnergyBurned) else {
+            call.resolve(["calories": 0]); return
+        }
+        let calendar = Calendar.current
+        let now = Date()
+        let startOfDay = calendar.startOfDay(for: now)
+        let predicate = HKQuery.predicateForSamples(withStart: startOfDay, end: now, options: .strictStartDate)
+        let query = HKStatisticsQuery(quantityType: calType, quantitySamplePredicate: predicate,
+                                      options: .cumulativeSum) { _, result, _ in
+            let cals = Int(result?.sumQuantity()?.doubleValue(for: HKUnit.kilocalorie()) ?? 0)
+            call.resolve(["calories": cals])
         }
         healthStore.execute(query)
     }

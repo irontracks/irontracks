@@ -5,6 +5,7 @@ import { Clock, GripVertical, Plus, UserPlus } from 'lucide-react';
 import { BackButton } from '@/components/ui/BackButton';
 import InviteManager from '@/components/InviteManager';
 import { useWorkoutContext } from './WorkoutContext';
+import HeartRateMonitor from './HeartRateMonitor';
 
 export default function WorkoutHeader() {
   const {
@@ -141,6 +142,11 @@ export default function WorkoutHeader() {
           )}
         </div>
       )}
+
+      {/* Heart Rate from Apple Watch */}
+      <div className="px-4 py-1">
+        <HeartRateMonitor />
+      </div>
 
       <InviteManager
         isOpen={inviteOpen}
