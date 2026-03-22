@@ -171,8 +171,18 @@ export default function CoachChatModal({
 
             if (data.content || data.text || data.answer) {
                 const rawContent = data.content || data.text || data.answer;
-                const { cleanText, workout } = extractWorkoutJson(rawContent);
-                setMessages(prev => [...prev, { role: 'assistant', content: cleanText, workoutData: workout }]);
+                // Primary: server-side workout extraction
+                let workoutObj: ParsedWorkout | null = null;
+                if (data.workout?.title && Array.isArray(data.workout?.exercises) && data.workout.exercises.length > 0) {
+                    workoutObj = data.workout as ParsedWorkout;
+                }
+                // Fallback: try text parsing
+                if (!workoutObj) {
+                    const { workout } = extractWorkoutJson(rawContent);
+                    workoutObj = workout;
+                }
+                const cleanText = rawContent.replace(/<!--\s*WORKOUT_JSON:\{[\s\S]*?\}\s*-->/g, '').trim();
+                setMessages(prev => [...prev, { role: 'assistant', content: cleanText, workoutData: workoutObj }]);
             }
         } catch (error) {
             logError('error', error);

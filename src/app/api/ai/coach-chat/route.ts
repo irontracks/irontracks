@@ -78,13 +78,7 @@ export async function POST(req: Request) {
       'Você é um coach de musculação do app IronTracks.',
       'Responda sempre em pt-BR, de forma objetiva e prática.',
       'Não invente números; use apenas o que o usuário forneceu.',
-      '',
-      '── REGRA ESPECIAL PARA TREINOS ──',
-      'Quando o usuário pedir para montar/criar/sugerir um treino, SEMPRE adicione ao FINAL da sua resposta um bloco oculto com o treino estruturado no seguinte formato exato:',
-      '<!-- WORKOUT_JSON:{"title":"Nome do Treino","exercises":[{"name":"Nome do Exercício","sets":3,"reps":"8-12","rest_time":60,"method":"Normal","notes":""}]} -->',
-      'Cada exercício deve ter: name (obrigatório), sets (número), reps (texto), rest_time (segundos), method (Normal/Drop-set/Rest-Pause/etc), notes (opcional).',
-      'O bloco <!-- WORKOUT_JSON:... --> DEVE vir DEPOIS do texto normal da resposta. Nunca omita quando for um treino.',
-      '── FIM DA REGRA ──',
+      'Quando o usuário pedir um treino, monte um treino completo com nome, exercícios, séries, repetições, descanso e método de cada exercício.',
       '',
       'Contexto (pode ser null):',
       JSON.stringify(context),
@@ -92,7 +86,7 @@ export async function POST(req: Request) {
       'Conversa:',
       JSON.stringify(messages),
       '',
-      'Responda com o texto final do coach. Sem markdown. Se for um treino, inclua o bloco WORKOUT_JSON ao final.',
+      'Responda com o texto final do coach (sem markdown).',
     ].join('\n')
 
     const genAI = new GoogleGenerativeAI(apiKey)
@@ -101,9 +95,41 @@ export async function POST(req: Request) {
     const text = String((await result?.response?.text()) || '').trim()
     if (!text) return NextResponse.json({ ok: false, error: 'Resposta inválida da IA' }, { status: 400 })
 
+    // ── Server-side workout extraction ──────────────────────────
+    // Detect if the response looks like a workout plan
+    let workout: Record<string, unknown> | null = null
+    const lowerText = text.toLowerCase()
+    const hasWorkoutSignals =
+      (lowerText.includes('exercício') || lowerText.includes('exercicio') || lowerText.includes('exercícios')) &&
+      (lowerText.includes('série') || lowerText.includes('series') || lowerText.includes('séries') || lowerText.includes('sets')) &&
+      (lowerText.includes('rep') || lowerText.includes('repetições') || lowerText.includes('repeticoes'))
+
+    if (hasWorkoutSignals) {
+      try {
+        const extractPrompt = [
+          'Extraia APENAS o JSON do treino abaixo. Responda SOMENTE com JSON puro, sem texto, sem markdown, sem ```.',
+          'Use exatamente este formato:',
+          '{"title":"Nome do Treino","exercises":[{"name":"Nome","sets":3,"reps":"8-12","rest_time":60,"method":"Normal","notes":""}]}',
+          '',
+          'Texto:',
+          text,
+        ].join('\n')
+
+        const extractResult = await model.generateContent([{ text: extractPrompt }] as Parameters<typeof model.generateContent>[0])
+        const jsonStr = String((await extractResult?.response?.text()) || '').trim()
+        // Clean common markdown wrapping
+        const cleaned = jsonStr.replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/i, '').trim()
+        const parsed = JSON.parse(cleaned)
+        if (parsed?.title && Array.isArray(parsed?.exercises) && parsed.exercises.length > 0) {
+          workout = parsed
+        }
+      } catch { /* extraction failed — ok, just skip */ }
+    }
+
     await incrementVipUsage(supabase, userId, 'chat')
-    return NextResponse.json({ ok: true, content: text })
+    return NextResponse.json({ ok: true, content: text, workout })
   } catch (e: unknown) {
     return NextResponse.json({ ok: false, error: getErrorMessage(e) ?? String(e) }, { status: 500 })
   }
 }
+
