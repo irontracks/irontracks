@@ -38,6 +38,10 @@ type IronTracksNativePlugin = {
   requestHealthKitPermission: () => Promise<{ granted: boolean; error: string }>
   saveWorkoutToHealth: (opts: { startMs: number; endMs: number; calories?: number }) => Promise<{ saved: boolean; error: string }>
   getHealthSteps: () => Promise<{ steps: number }>
+  getHeartRate: () => Promise<{ bpm: number; timestamp: number }>
+  getRestingHeartRate: () => Promise<{ bpm: number; timestamp: number }>
+  getHRV: () => Promise<{ sdnn: number; timestamp: number }>
+  getActiveCalories: () => Promise<{ calories: number }>
   // Photos
   saveImageToPhotos: (opts: { base64: string }) => Promise<{ saved: boolean; error: string }>
   saveFileToPhotos: (opts: { path: string; isVideo: boolean }) => Promise<{ saved: boolean; error: string }>
@@ -74,6 +78,10 @@ const Native = registerPlugin<IronTracksNativePlugin>('IronTracksNative', {
     requestHealthKitPermission: async () => ({ granted: false, error: 'Not available on web' }),
     saveWorkoutToHealth: async () => ({ saved: false, error: 'Not available on web' }),
     getHealthSteps: async () => ({ steps: 0 }),
+    getHeartRate: async () => ({ bpm: 0, timestamp: 0 }),
+    getRestingHeartRate: async () => ({ bpm: 0, timestamp: 0 }),
+    getHRV: async () => ({ sdnn: 0, timestamp: 0 }),
+    getActiveCalories: async () => ({ calories: 0 }),
     saveImageToPhotos: async () => ({ saved: false, error: 'Not available on web' }),
     saveFileToPhotos: async () => ({ saved: false, error: 'Not available on web' }),
   },
@@ -355,6 +363,43 @@ export const getHealthSteps = async () => {
     if (!isIosNative()) return 0
     const { steps } = await Native.getHealthSteps()
     return steps
+  } catch {
+    return 0
+  }
+}
+
+export const getHeartRate = async () => {
+  try {
+    if (!isIosNative()) return { bpm: 0, timestamp: 0 }
+    return await Native.getHeartRate()
+  } catch {
+    return { bpm: 0, timestamp: 0 }
+  }
+}
+
+export const getRestingHeartRate = async () => {
+  try {
+    if (!isIosNative()) return { bpm: 0, timestamp: 0 }
+    return await Native.getRestingHeartRate()
+  } catch {
+    return { bpm: 0, timestamp: 0 }
+  }
+}
+
+export const getHRV = async () => {
+  try {
+    if (!isIosNative()) return { sdnn: 0, timestamp: 0 }
+    return await Native.getHRV()
+  } catch {
+    return { sdnn: 0, timestamp: 0 }
+  }
+}
+
+export const getActiveCalories = async () => {
+  try {
+    if (!isIosNative()) return 0
+    const { calories } = await Native.getActiveCalories()
+    return calories
   } catch {
     return 0
   }
