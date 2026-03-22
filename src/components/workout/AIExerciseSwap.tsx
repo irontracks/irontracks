@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useCallback, useRef } from 'react'
+import React, { useState, useCallback, useRef, useEffect } from 'react'
 import { RefreshCw, Loader2, X, Check, Dumbbell } from 'lucide-react'
 import { useWorkoutContext } from './WorkoutContext'
 
@@ -9,6 +9,9 @@ import { useWorkoutContext } from './WorkoutContext'
  *
  * Button + modal to swap an exercise for an AI-suggested
  * alternative during an active workout.
+ *
+ * FIX: Uses programmatic draft → save to swap the exercise
+ * name directly, instead of opening the edit modal on top.
  * ────────────────────────────────────────────────────────── */
 
 interface Alternative {
@@ -28,13 +31,16 @@ export default function AIExerciseSwap({
   exerciseName,
   exerciseIndex,
 }: AIExerciseSwapProps) {
-  const { openEditExercise } = useWorkoutContext()
+  const ctx = useWorkoutContext()
+  const { exercises, setEditExerciseDraft, setEditExerciseIdx, setEditExerciseOpen, saveEditExercise } = ctx
   const [alternatives, setAlternatives] = useState<Alternative[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [open, setOpen] = useState(false)
   const [applied, setApplied] = useState('')
   const fetchedRef = useRef(false)
+  // Ref to track pending programmatic save
+  const pendingSaveRef = useRef(false)
 
   const fetchAlternatives = useCallback(async () => {
     if (fetchedRef.current && alternatives.length > 0) {
@@ -68,15 +74,51 @@ export default function AIExerciseSwap({
 
   const handleSelect = useCallback((alt: Alternative) => {
     setApplied(alt.name)
-    // Open exercise editor to apply the swap
+
+    // Programmatically swap by setting the edit draft with the new name,
+    // then triggering save — this updates the exercise array directly
+    // without opening the edit modal UI.
     try {
-      openEditExercise(exerciseIndex)
+      const ex = exercises[exerciseIndex]
+      if (!ex) return
+
+      const setsHeader = Math.max(0, parseInt(String(ex?.sets ?? '0'), 10) || 0)
+      const sdArrRaw = Array.isArray(ex?.setDetails) ? ex.setDetails : Array.isArray((ex as Record<string, unknown>)?.set_details) ? (ex as Record<string, unknown>).set_details as unknown[] : []
+      const setsCount = Math.max(setsHeader, Array.isArray(sdArrRaw) ? sdArrRaw.length : 0) || 1
+      const restTime = String(ex?.restTime ?? ex?.rest_time ?? '60')
+      const method = String(ex?.method || 'Normal')
+
+      // Set the draft with the NEW exercise name
+      setEditExerciseDraft({ name: alt.name, sets: String(setsCount), restTime, method })
+      setEditExerciseIdx(exerciseIndex)
+
+      // Don't open the edit UI — we immediately save
+      // Use a ref + effect to call saveEditExercise after state settles
+      pendingSaveRef.current = true
     } catch { /* silent */ }
+
+    // Close the swap modal after a brief feedback delay
     setTimeout(() => {
       setOpen(false)
       setApplied('')
-    }, 500)
-  }, [exerciseIndex, openEditExercise])
+    }, 600)
+  }, [exercises, exerciseIndex, setEditExerciseDraft, setEditExerciseIdx])
+
+  // Effect to trigger save after draft state has settled
+  useEffect(() => {
+    if (!pendingSaveRef.current) return
+    pendingSaveRef.current = false
+    // Small delay to ensure React state for editExerciseDraft is committed
+    const timer = setTimeout(() => {
+      try { saveEditExercise() } catch { /* silent */ }
+    }, 50)
+    return () => clearTimeout(timer)
+  }, [applied, saveEditExercise])
+
+  const closeModal = useCallback(() => {
+    setOpen(false)
+    setApplied('')
+  }, [])
 
   const similarityColor = (s: number) =>
     s >= 80 ? 'text-emerald-400 bg-emerald-500/10 border-emerald-500/30'
@@ -103,8 +145,12 @@ export default function AIExerciseSwap({
       {/* Modal */}
       {open && (
         <div
-          className="fixed inset-0 z-[2000] bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
-          onClick={() => setOpen(false)}
+          className="fixed inset-0 z-[9999] bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center p-0 sm:p-4"
+          onClick={closeModal}
+          onTouchEnd={(e) => {
+            // Ensure touch on backdrop closes modal on mobile
+            if (e.target === e.currentTarget) closeModal()
+          }}
         >
           <div
             className="w-full max-w-md bg-neutral-900 border border-neutral-800 rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden max-h-[80vh]"
@@ -120,10 +166,12 @@ export default function AIExerciseSwap({
                 </div>
               </div>
               <button
-                onClick={() => setOpen(false)}
-                className="text-neutral-500 hover:text-white p-1"
+                type="button"
+                onClick={closeModal}
+                className="text-neutral-500 hover:text-white p-2 -mr-2 rounded-xl active:bg-neutral-800 transition-colors"
+                aria-label="Fechar"
               >
-                <X size={18} />
+                <X size={20} />
               </button>
             </div>
 
@@ -140,6 +188,7 @@ export default function AIExerciseSwap({
                 <div className="text-center py-8">
                   <p className="text-red-400 text-sm">{error}</p>
                   <button
+                    type="button"
                     onClick={() => { fetchedRef.current = false; fetchAlternatives() }}
                     className="mt-3 px-4 py-2 rounded-xl bg-violet-500/20 border border-violet-500/30 text-violet-300 text-sm font-bold"
                   >
@@ -152,7 +201,11 @@ export default function AIExerciseSwap({
                 <button
                   key={i}
                   type="button"
-                  onClick={() => handleSelect(alt)}
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    handleSelect(alt)
+                  }}
                   className={`w-full text-left p-3 rounded-xl border transition-all active:scale-[0.98] ${
                     applied === alt.name
                       ? 'bg-emerald-500/20 border-emerald-500/40'
@@ -189,6 +242,17 @@ export default function AIExerciseSwap({
                   </div>
                 </button>
               ))}
+            </div>
+
+            {/* Footer close button for extra safety */}
+            <div className="p-4 pt-0">
+              <button
+                type="button"
+                onClick={closeModal}
+                className="w-full py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-400 text-sm font-bold hover:text-white transition-colors active:scale-[0.98]"
+              >
+                Fechar
+              </button>
             </div>
           </div>
         </div>
