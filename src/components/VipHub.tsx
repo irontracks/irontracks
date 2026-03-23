@@ -154,7 +154,7 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
         } else {
           try {
             sessionStorage.setItem('irontracks_open_vip', '1')
-          } catch { }
+          } catch { /* best effort: sessionStorage */ }
           router.push('/dashboard')
         }
       }
@@ -165,7 +165,7 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
     setDraft('')
     try {
       if (inputRef.current) inputRef.current.focus()
-    } catch { }
+    } catch { /* best effort: input focus */ }
 
     setBusy(true)
     try {
@@ -408,7 +408,7 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
   const openNutrition = () => {
     try {
       window.location.href = '/dashboard/nutrition'
-    } catch { }
+    } catch { /* best effort: navigation */ }
   }
 
   const chip = (label: string, used: number | null | undefined, limit: number | null | undefined) => {
@@ -621,7 +621,7 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
                               // Notify dashboard to refresh workout list
                               window.dispatchEvent(new CustomEvent('irontracks:workouts-changed'))
                             }
-                          } catch { /* silent */ } finally {
+                          } catch { /* best effort: save workout */ } finally {
                             setSavingWorkout(null)
                           }
                         }}

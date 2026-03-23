@@ -20,6 +20,7 @@ import { z } from 'zod'
 import type { SupabaseClient, RealtimeChannel } from '@supabase/supabase-js'
 import type { ActiveWorkoutSession } from '@/types/app'
 import { logError, logWarn } from '@/lib/logger'
+import { recoverActiveSession } from '@/lib/offline/activeSessionPersistence'
 
 const isRecord = (v: unknown): v is Record<string, unknown> =>
     v !== null && typeof v === 'object' && !Array.isArray(v)
@@ -123,6 +124,25 @@ export function useSessionSync({
                 localStorage.removeItem('activeSession')
             } catch { }
         }
+
+        // IDB fallback: if localStorage had nothing, try IDB (survives force-close)
+        const tryIdbRecovery = async () => {
+            if (cancelled || localSavedAt > 0) return // localStorage already had a session
+            try {
+                const idbSession = await recoverActiveSession(uid)
+                if (cancelled) return
+                if (idbSession && isRecord(idbSession) && idbSession.startedAt && idbSession.workout) {
+                    const idbSavedAt = Number(idbSession._idbSavedAt || idbSession._savedAt || 0)
+                    localSavedAt = idbSavedAt
+                    setActiveSession(idbSession as unknown as ActiveWorkoutSession)
+                    setView('active')
+                    // Also re-populate localStorage from IDB
+                    try { localStorage.setItem(scopedKey, JSON.stringify(idbSession)) } catch { }
+                    logWarn('useSessionSync', 'Session recovered from IDB (localStorage was empty)')
+                }
+            } catch (e) { logWarn('useSessionSync', 'IDB recovery failed (non-fatal)', e) }
+        }
+        tryIdbRecovery()
 
         const loadServer = async () => {
             try {

@@ -30,7 +30,7 @@ const ensureCtx = (opts: SoundOpts | null | undefined): AudioContext | null => {
         if (!__unlocked && !allowCreate) return null;
         __ctx = new AC();
     }
-    if (__ctx.state === 'suspended') { try { __ctx.resume(); } catch { } }
+    if (__ctx.state === 'suspended') { try { __ctx.resume(); } catch { /* best effort: resume AudioContext */ } }
     return __ctx;
 };
 
@@ -45,7 +45,7 @@ export const unlockAudio = () => {
                 if (maybePromise && typeof maybePromise.then === 'function') {
                     maybePromise.catch(() => { });
                 }
-            } catch { }
+            } catch { /* best effort: play audio */ }
         }
         try {
             const osc = ctx.createOscillator();
@@ -55,8 +55,8 @@ export const unlockAudio = () => {
             gain.gain.setValueAtTime(UNLOCK_SILENT_GAIN, ctx.currentTime);
             osc.start();
             osc.stop(ctx.currentTime + UNLOCK_SILENT_DURATION_S);
-        } catch { }
-    } catch { }
+        } catch { /* best effort: vibrate */ }
+    } catch { /* best effort: sound playback */ }
 };
 
 export const playStartSound = (opts?: SoundOpts) => {

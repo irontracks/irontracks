@@ -5,6 +5,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { asaasRequest } from '@/lib/asaas'
 import { requireRole, requireRoleWithBearer } from '@/utils/auth/route'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { safePgLike } from '@/utils/safePgFilter'
 
 export const dynamic = 'force-dynamic'
 
@@ -90,7 +91,7 @@ export async function POST(req: Request) {
       const { data: profile } = await admin
         .from('profiles')
         .select('id, display_name')
-        .ilike('email', email)
+        .ilike('email', safePgLike(email))
         .maybeSingle()
       if (profile?.id) teacherUserId = profile.id
       resolvedName = (profile?.display_name || null) as string | null
@@ -108,7 +109,7 @@ export async function POST(req: Request) {
     }
 
     if (!teacherRow && email) {
-      const { data } = await admin.from('teachers').select('id, email, user_id, asaas_wallet_id').ilike('email', email).maybeSingle()
+      const { data } = await admin.from('teachers').select('id, email, user_id, asaas_wallet_id').ilike('email', safePgLike(email)).maybeSingle()
       teacherRow = data || null
     }
 
@@ -156,7 +157,7 @@ export async function POST(req: Request) {
           const { data } = await admin
             .from('teachers')
             .select('id, email, user_id, asaas_wallet_id')
-            .ilike('email', resolvedEmail)
+            .ilike('email', safePgLike(resolvedEmail))
             .maybeSingle()
           existing = data || null
         }

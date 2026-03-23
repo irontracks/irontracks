@@ -28,7 +28,13 @@
     "analyze": "ANALYZE=true npm run build",
     "e2e": "playwright test",
     "e2e:ui": "playwright test --ui",
-    "e2e:ci": "playwright test --reporter=github"
+    "e2e:ci": "playwright test --reporter=github",
+    "prepare": "husky"
+  },
+  "lint-staged": {
+    "*.{ts,tsx}": [
+      "eslint --fix --max-warnings 0"
+    ]
   },
   "dependencies": {
     "@capacitor-community/apple-sign-in": "^7.1.0",
@@ -87,6 +93,8 @@
     "tailwindcss": "^4",
     "tsx": "^4.20.5",
     "typescript": "^5.9.3",
-    "vitest": "^4.0.18"
+    "vitest": "^4.0.18",
+    "husky": "^9.1.7",
+    "lint-staged": "^15.5.1"
   }
 }

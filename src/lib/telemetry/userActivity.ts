@@ -54,7 +54,7 @@ const readStored = () => {
     if (!raw) return []
     const parsed = parseJsonWithSchema(raw, z.array(queuedEventSchema))
     return Array.isArray(parsed) ? (parsed as QueuedEvent[]) : []
-  } catch {
+  } catch { /* best effort: localStorage read */ 
     return []
   }
 }
@@ -99,7 +99,7 @@ export function trackUserEvent(eventName: string, data?: Omit<UserActivityEvent,
       if (data?.path) return String(data.path)
       try {
         return window.location?.pathname ? String(window.location.pathname) : ''
-      } catch {
+      } catch { /* best effort: pathname read */
         return ''
       }
     })()
@@ -119,7 +119,7 @@ export function trackUserEvent(eventName: string, data?: Omit<UserActivityEvent,
       appVersion: (() => {
         try {
           return String(getRawVersion() || '')
-        } catch {
+        } catch { /* best effort: version read */
           return undefined
         }
       })(),
@@ -145,7 +145,7 @@ async function flush({ preferBeacon }: { preferBeacon: boolean }) {
     if (typeof window === 'undefined') return
     try {
       if (navigator && 'onLine' in navigator && navigator.onLine === false) return
-    } catch { }
+    } catch { /* best effort: navigator.onLine check */ }
     if (flushing) return
     flushing = true
 
@@ -161,7 +161,7 @@ async function flush({ preferBeacon }: { preferBeacon: boolean }) {
         if (!navigator?.sendBeacon) return false
         const blob = new Blob([body], { type: 'application/json' })
         return navigator.sendBeacon(ENDPOINT, blob)
-      } catch {
+      } catch { /* best effort: sendBeacon fallback */
         return false
       }
     })()
@@ -198,5 +198,5 @@ if (typeof window !== 'undefined') {
     window.addEventListener('pagehide', () => {
       flush({ preferBeacon: true })
     })
-  } catch { }
+  } catch { /* best effort: addEventListener */ }
 }

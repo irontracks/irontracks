@@ -115,7 +115,7 @@ const HistoryList: React.FC<HistoryListProps> = ({
                 {/* Header */}
                 {!embedded && (
                     <div className="mb-5 flex items-center gap-2 sm:gap-3">
-                        <button type="button" onClick={onBack} className="cursor-pointer relative z-10 w-10 h-10 flex items-center justify-center rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 transition-all duration-300 active:scale-95"><ChevronLeft className="pointer-events-none" /></button>
+                        <button type="button" onClick={onBack} className="cursor-pointer relative z-10 w-10 h-10 flex items-center justify-center rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 transition-all duration-300 active:scale-95" aria-label="Voltar"><ChevronLeft className="pointer-events-none" /></button>
                         <div className="flex-1 min-w-0">
                             <h2 className="text-xl font-black flex items-center gap-2 truncate"><History className="text-yellow-500" /> {title || 'Histórico'}</h2>
                             <div className="text-[11px] font-bold uppercase tracking-wider text-neutral-500">{rangeLabel}</div>
@@ -127,7 +127,7 @@ const HistoryList: React.FC<HistoryListProps> = ({
                                 </button>
                             )}
                             {!isReadOnly && !isSelectionMode && (
-                                <button type="button" onClick={() => setShowManual(true)} className="cursor-pointer relative z-10 w-9 h-9 bg-yellow-500 text-black rounded-xl hover:bg-yellow-400 font-black flex items-center justify-center shadow-lg shadow-yellow-500/20 transition-all duration-300 active:scale-95">
+                                <button type="button" onClick={() => setShowManual(true)} className="cursor-pointer relative z-10 w-9 h-9 bg-yellow-500 text-black rounded-xl hover:bg-yellow-400 font-black flex items-center justify-center shadow-lg shadow-yellow-500/20 transition-all duration-300 active:scale-95" aria-label="Adicionar treino">
                                     <Plus size={16} />
                                 </button>
                             )}

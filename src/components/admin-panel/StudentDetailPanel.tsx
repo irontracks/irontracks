@@ -409,8 +409,7 @@ export const StudentDetailPanel: React.FC = () => {
             {/* Edit Student Workout Modal */}
             {
                 editingStudentWorkout && (
-                    <div className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setEditingStudentWorkout(null)
-                    }>
+                    <div className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Editar treino do aluno" onClick={() => setEditingStudentWorkout(null)}>
                         <div className="bg-neutral-900 w-full max-w-3xl rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
                             <div className="p-4 border-b border-neutral-800 flex justify-between items-center" >
                                 <h3 className="font-bold text-white" > Editar Treino do Aluno </h3>
@@ -473,8 +472,7 @@ export const StudentDetailPanel: React.FC = () => {
             {/* View Workout Modal */}
             {
                 viewWorkout && (
-                    <div className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setViewWorkout(null)
-                    }>
+                    <div className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Visualizar treino" onClick={() => setViewWorkout(null)}>
                         <div className="bg-neutral-900 w-full max-w-3xl rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
                             <div className="p-4 border-b border-neutral-800 flex justify-between items-center" >
                                 <h3 className="font-bold text-white" > Treino: {normalizeWorkoutTitle(String((viewWorkout as UnknownRecord)?.name ?? ''))} </h3>
@@ -505,8 +503,7 @@ export const StudentDetailPanel: React.FC = () => {
             {/* Export Modal */}
             {
                 exportOpen && viewWorkout && (
-                    <div className="fixed inset-0 z-[80] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setExportOpen(false)
-                    }>
+                    <div className="fixed inset-0 z-[80] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Exportar treino" onClick={() => setExportOpen(false)}>
                         <div className="bg-neutral-900 w-full max-w-md rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
                             <div className="p-4 border-b border-neutral-800 flex justify-between items-center" >
                                 <h3 className="font-bold text-white" > Como deseja salvar ? </h3>
@@ -527,8 +524,7 @@ export const StudentDetailPanel: React.FC = () => {
             {/* Execution Video Modal */}
             {
                 executionVideoModalOpen && executionVideoModalUrl ? (
-                    <div className="fixed inset-0 z-[80] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => { setExecutionVideoModalOpen(false); setExecutionVideoModalUrl(''); }
-                    }>
+                    <div className="fixed inset-0 z-[80] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Vídeo de execução" onClick={() => { setExecutionVideoModalOpen(false); setExecutionVideoModalUrl(''); }}>
                         <div className="bg-neutral-900 w-full max-w-3xl rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
                             <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3" >
                                 <div className="font-black text-white" > Vídeo de execução </div>

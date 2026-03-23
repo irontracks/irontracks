@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { requireRole, requireRoleWithBearer } from '@/utils/auth/route'
 import { parseSearchParams } from '@/utils/zod'
 import { cacheGet, cacheSet } from '@/utils/cache'
+import { safePgLike } from '@/utils/safePgFilter'
 
 export const dynamic = 'force-dynamic'
 
@@ -41,10 +42,10 @@ export async function GET(req: Request) {
     }
 
     if (!targetUserId && email) {
-      const { data: pByEmail } = await supabase.from('profiles').select('id').ilike('email', email).maybeSingle()
+      const { data: pByEmail } = await supabase.from('profiles').select('id').ilike('email', safePgLike(email)).maybeSingle()
       targetUserId = pByEmail?.id || ''
       if (!targetUserId) {
-        const { data: sByEmail } = await supabase.from('students').select('user_id').ilike('email', email).maybeSingle()
+        const { data: sByEmail } = await supabase.from('students').select('user_id').ilike('email', safePgLike(email)).maybeSingle()
         targetUserId = sByEmail?.user_id || ''
       }
     }

@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Timer, X } from 'lucide-react';
 import { playTimerFinishSound, playTick } from '@/lib/sounds';
-import { isIosNative } from '@/utils/platform';
+import { isNativePlatform } from '@/utils/platform';
 import { cancelRestNotification, endRestLiveActivity, requestNativeNotifications, scheduleRestNotification, setIdleTimerDisabled, startRestLiveActivity, stopAlarmSound, triggerHaptic, updateRestLiveActivity } from '@/utils/native/irontracksNative';
 
 interface RestTimerContext {
@@ -229,7 +229,7 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
             const liveTitle = exerciseName ? exerciseName : 'Descanso';
             const notifyTitle = exerciseName ? `⏰ Próximo: ${exerciseName}` : '⏰ Tempo Esgotado!';
             const notifyBody = exerciseName ? 'Hora de iniciar a próxima série!' : 'Hora de voltar para o treino!';
-            const shouldNotify = (allowNotifyRef.current || (isIosNative() && soundsEnabledRef.current)) && seconds > 0;
+            const shouldNotify = (allowNotifyRef.current || (isNativePlatform() && soundsEnabledRef.current)) && seconds > 0;
             if (shouldNotify) {
                 // ★ Cancel ALL pending before scheduling to prevent duplicates
                 cancelRestNotification(id).then(() => {

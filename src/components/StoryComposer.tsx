@@ -198,7 +198,7 @@ export default function StoryComposer({ open, session, onClose, calories }: Stor
               <h3 className="font-black text-lg truncate leading-tight text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 via-amber-300 to-yellow-500">{metrics.title || 'Story Composer'}</h3>
               <p className="text-[10px] text-yellow-500/50 font-black uppercase tracking-[0.2em] mt-1">COMPARTILHE SUA CONQUISTA</p>
             </div>
-            <button onClick={onClose} className="w-8 h-8 rounded-full bg-neutral-800/80 border border-neutral-700/50 text-neutral-400 flex items-center justify-center hover:bg-neutral-700 transition-colors flex-none"><X size={16} /></button>
+            <button onClick={onClose} className="w-8 h-8 rounded-full bg-neutral-800/80 border border-neutral-700/50 text-neutral-400 flex items-center justify-center hover:bg-neutral-700 transition-colors flex-none" aria-label="Fechar"><X size={16} /></button>
           </div>
 
           <motion.div
@@ -211,7 +211,7 @@ export default function StoryComposer({ open, session, onClose, calories }: Stor
                 <h2 className="font-black text-xl text-transparent bg-clip-text bg-gradient-to-r from-yellow-400 via-amber-300 to-yellow-500">{metrics.title || 'Story Composer'}</h2>
                 <p className="text-[10px] text-yellow-500/50 font-black uppercase tracking-[0.2em] mt-1">COMPARTILHE SUA CONQUISTA</p>
               </div>
-              <button onClick={onClose} className="w-9 h-9 rounded-full bg-neutral-800 border border-neutral-700/50 hover:bg-neutral-700 text-neutral-400 hover:text-white flex items-center justify-center transition-colors"><X size={18} /></button>
+              <button onClick={onClose} className="w-9 h-9 rounded-full bg-neutral-800 border border-neutral-700/50 hover:bg-neutral-700 text-neutral-400 hover:text-white flex items-center justify-center transition-colors" aria-label="Fechar"><X size={18} /></button>
             </div>
 
             <div className="flex-1 overflow-y-auto overscroll-contain min-h-0 bg-black sm:bg-transparent">
@@ -334,6 +334,7 @@ export default function StoryComposer({ open, session, onClose, calories }: Stor
                           type="button"
                           onClick={() => setSelectedSticker(null)}
                           className="w-10 h-10 rounded-xl bg-neutral-900 border border-neutral-700/60 text-neutral-400 hover:text-red-400 text-xs font-black transition-colors flex items-center justify-center"
+                          aria-label="Remover sticker"
                         >
                           ✕
                         </button>
@@ -356,6 +357,7 @@ export default function StoryComposer({ open, session, onClose, calories }: Stor
                       <button type="button" onClick={() => setShowTrimmer(v => !v)}
                         className={`w-12 h-12 rounded-xl border flex items-center justify-center transition-colors active:scale-[0.98] ${showTrimmer ? 'bg-yellow-500 text-black border-yellow-500' : 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-white'}`}
                         disabled={busy}
+                        aria-label="Cortar vídeo"
                       >
                         <Scissors size={18} />
                       </button>

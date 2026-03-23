@@ -54,3 +54,110 @@ export async function logMealAction(mealText: string, dateKey?: string) {
     return { ok: false, error: message || 'nutrition_log_meal_failed' }
   }
 }
+
+export async function deleteMealAction(entryId: string) {
+  try {
+    const id = String(entryId ?? '').trim()
+    if (!id) return { ok: false, error: 'ID inválido.' }
+
+    const supabase = await createClient()
+    const { data: authData, error: authError } = await supabase.auth.getUser()
+    if (authError) throw new Error(authError.message || 'nutrition_auth_failed')
+    const userId = authData?.user?.id
+    if (!userId) throw new Error('nutrition_unauthorized')
+
+    // Fetch entry to know the date before deleting
+    const { data: entry } = await supabase
+      .from('nutrition_meal_entries')
+      .select('date')
+      .eq('id', id)
+      .eq('user_id', userId)
+      .maybeSingle()
+
+    const { error } = await supabase
+      .from('nutrition_meal_entries')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', userId)
+
+    if (error) throw error
+
+    // Recalculate totals for the date
+    let totals = null
+    if (entry?.date) {
+      const { data: remaining } = await supabase
+        .from('nutrition_meal_entries')
+        .select('calories, protein, carbs, fat')
+        .eq('user_id', userId)
+        .eq('date', entry.date)
+
+      const rows = Array.isArray(remaining) ? remaining : []
+      totals = {
+        calories: rows.reduce((s, r) => s + (Number(r?.calories) || 0), 0),
+        protein: rows.reduce((s, r) => s + (Number(r?.protein) || 0), 0),
+        carbs: rows.reduce((s, r) => s + (Number(r?.carbs) || 0), 0),
+        fat: rows.reduce((s, r) => s + (Number(r?.fat) || 0), 0),
+      }
+    }
+
+    revalidatePath('/dashboard/nutrition')
+    return { ok: true, totals }
+  } catch (e: unknown) {
+    return { ok: false, error: String(getErrorMessage(e) || 'nutrition_delete_meal_failed') }
+  }
+}
+
+export async function editMealAction(
+  entryId: string,
+  draft: { food_name: string; calories: number; protein: number; carbs: number; fat: number },
+) {
+  try {
+    const id = String(entryId ?? '').trim()
+    if (!id) return { ok: false, error: 'ID inválido.' }
+
+    const supabase = await createClient()
+    const { data: authData, error: authError } = await supabase.auth.getUser()
+    if (authError) throw new Error(authError.message || 'nutrition_auth_failed')
+    const userId = authData?.user?.id
+    if (!userId) throw new Error('nutrition_unauthorized')
+
+    const { data: updated, error } = await supabase
+      .from('nutrition_meal_entries')
+      .update({
+        food_name: String(draft.food_name ?? '').trim() || 'Refeição',
+        calories: Math.max(0, Number(draft.calories) || 0),
+        protein: Math.max(0, Number(draft.protein) || 0),
+        carbs: Math.max(0, Number(draft.carbs) || 0),
+        fat: Math.max(0, Number(draft.fat) || 0),
+      })
+      .eq('id', id)
+      .eq('user_id', userId)
+      .select('date')
+      .maybeSingle()
+
+    if (error) throw error
+
+    // Recalculate totals for the date
+    let totals = null
+    if (updated?.date) {
+      const { data: all } = await supabase
+        .from('nutrition_meal_entries')
+        .select('calories, protein, carbs, fat')
+        .eq('user_id', userId)
+        .eq('date', updated.date)
+
+      const rows = Array.isArray(all) ? all : []
+      totals = {
+        calories: rows.reduce((s, r) => s + (Number(r?.calories) || 0), 0),
+        protein: rows.reduce((s, r) => s + (Number(r?.protein) || 0), 0),
+        carbs: rows.reduce((s, r) => s + (Number(r?.carbs) || 0), 0),
+        fat: rows.reduce((s, r) => s + (Number(r?.fat) || 0), 0),
+      }
+    }
+
+    revalidatePath('/dashboard/nutrition')
+    return { ok: true, totals }
+  } catch (e: unknown) {
+    return { ok: false, error: String(getErrorMessage(e) || 'nutrition_edit_meal_failed') }
+  }
+}

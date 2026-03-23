@@ -122,8 +122,26 @@ export default function VoiceInput({ onTranscript, disabled }: VoiceInputProps) 
 
 // Type augmentation for Web Speech API
 declare global {
+  // eslint-disable-next-line @typescript-eslint/no-empty-object-type
+  interface SpeechRecognition extends EventTarget {
+    lang: string
+    interimResults: boolean
+    maxAlternatives: number
+    continuous: boolean
+    onresult: ((event: SpeechRecognitionEvent) => void) | null
+    onerror: ((event: Event) => void) | null
+    onend: (() => void) | null
+    start(): void
+    stop(): void
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-empty-object-type
+  interface SpeechRecognitionEvent extends Event {
+    results: SpeechRecognitionResultList
+  }
+
   interface Window {
-    SpeechRecognition: typeof SpeechRecognition
-    webkitSpeechRecognition: typeof SpeechRecognition
+    SpeechRecognition: new () => SpeechRecognition
+    webkitSpeechRecognition: new () => SpeechRecognition
   }
 }

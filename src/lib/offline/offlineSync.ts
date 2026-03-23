@@ -163,15 +163,22 @@ export const flushOfflineQueue = async ({ max = 50, force = false } = {}) => {
     }
 
     try {
-      if (String(j.type || '') === 'finish_workout') {
+      const jobType = String(j.type || '')
+      if (jobType === 'finish_workout') {
         await processFinishWorkout(j);
-        await queueDelete(String(j.id));
-        processed++;
+      } else if (jobType === 'create_workout') {
+        await processCreateWorkout(j);
+      } else if (jobType === 'update_workout') {
+        await processUpdateWorkout(j);
+      } else if (jobType === 'delete_workout') {
+        await processDeleteWorkout(j);
       } else {
         // Unknown job type — do NOT delete. Log and skip.
         logWarn('offlineSync: unknown job type, skipping:', j.type, j.id);
         continue;
       }
+      await queueDelete(String(j.id));
+      processed++;
     } catch (err) {
       logError('Failed to process offline job:', j, err);
       errors++;
@@ -192,6 +199,11 @@ export const flushOfflineQueue = async ({ max = 50, force = false } = {}) => {
       }
       await queuePut(nextJob);
     }
+  }
+
+  // After successful sync, invalidate SW API cache so fresh data is fetched
+  if (processed > 0) {
+    invalidateSwCache('/api/workouts')
   }
 
   return { processed, errors };
@@ -234,4 +246,121 @@ async function processFinishWorkout(job: OfflineJob) {
     const errorText = await response.text();
     throw new Error(`API error: ${response.status} - ${errorText}`);
   }
+}
+
+// ─── CRUD Job Processors ──────────────────────────────────────────────────────
+
+async function processCreateWorkout(job: OfflineJob) {
+  const { payload } = job
+  const response = await fetch('/api/workouts/create', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  if (!response.ok) {
+    const text = await response.text()
+    if (response.status >= 400 && response.status < 500) {
+      throw new Error(`Validation error (4xx): ${text}`)
+    }
+    throw new Error(`API error: ${response.status} - ${text}`)
+  }
+}
+
+async function processUpdateWorkout(job: OfflineJob) {
+  const { payload } = job
+  const response = await fetch('/api/workouts/update', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  })
+  if (!response.ok) {
+    const text = await response.text()
+    if (response.status >= 400 && response.status < 500) {
+      throw new Error(`Validation error (4xx): ${text}`)
+    }
+    throw new Error(`API error: ${response.status} - ${text}`)
+  }
+}
+
+async function processDeleteWorkout(job: OfflineJob) {
+  const { payload } = job
+  const workoutId = payload?.workoutId || payload?.id
+  const response = await fetch(`/api/workouts/delete`, {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ workoutId }),
+  })
+  if (!response.ok) {
+    const text = await response.text()
+    if (response.status >= 400 && response.status < 500) {
+      throw new Error(`Validation error (4xx): ${text}`)
+    }
+    throw new Error(`API error: ${response.status} - ${text}`)
+  }
+}
+
+// ─── CRUD Queue Helpers ───────────────────────────────────────────────────────
+
+export const queueCreateWorkout = async (payload: Record<string, unknown>) => {
+  const id = `create_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+  const job: OfflineJob = {
+    id,
+    type: 'create_workout',
+    createdAt: new Date().toISOString(),
+    payload,
+    details: (payload.title as string) || 'Criar Treino',
+    status: 'pending',
+    attempts: 0,
+    maxAttempts: 5,
+    nextAttemptAt: 0,
+  }
+  await queuePut(job)
+  return id
+}
+
+export const queueUpdateWorkout = async (payload: Record<string, unknown>) => {
+  const id = `update_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+  const job: OfflineJob = {
+    id,
+    type: 'update_workout',
+    createdAt: new Date().toISOString(),
+    payload,
+    details: (payload.title as string) || 'Atualizar Treino',
+    status: 'pending',
+    attempts: 0,
+    maxAttempts: 5,
+    nextAttemptAt: 0,
+  }
+  await queuePut(job)
+  return id
+}
+
+export const queueDeleteWorkout = async (payload: Record<string, unknown>) => {
+  const id = `delete_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+  const job: OfflineJob = {
+    id,
+    type: 'delete_workout',
+    createdAt: new Date().toISOString(),
+    payload,
+    details: (payload.title as string) || 'Excluir Treino',
+    status: 'pending',
+    attempts: 0,
+    maxAttempts: 5,
+    nextAttemptAt: 0,
+  }
+  await queuePut(job)
+  return id
+}
+
+// ─── SW Cache Invalidation Helper ─────────────────────────────────────────────
+
+export function invalidateSwCache(pattern?: string) {
+  try {
+    if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+      navigator.serviceWorker.controller.postMessage({
+        type: 'CACHE_INVALIDATE',
+        pattern: pattern || '',
+      })
+    }
+  } catch { /* best effort */ }
 }

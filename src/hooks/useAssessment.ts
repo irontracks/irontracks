@@ -31,7 +31,7 @@ import {
 } from '@/utils/calculations/bodyComposition';
 import { getErrorMessage } from '@/utils/errorMessage';
 import { logError, logWarn, logInfo } from '@/lib/logger'
-import { safePg } from '@/utils/safePgFilter'
+import { safePg, safePgLike } from '@/utils/safePgFilter'
 
 interface UseAssessmentReturn {
   // Estado
@@ -149,7 +149,7 @@ export const useAssessment = (): UseAssessmentReturn => {
           const { data: profileByEmail, error: profileByEmailError } = await supabase
             .from('profiles')
             .select('id')
-            .ilike('email', studentById.email)
+            .ilike('email', safePgLike(studentById.email))
             .maybeSingle();
 
           if (profileByEmailError) {

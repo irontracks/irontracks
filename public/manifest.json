@@ -1,12 +1,16 @@
 {
   "name": "IronTracks",
   "short_name": "IronTracks",
+  "description": "Seu app de treino premium. Registre séries, acompanhe PRs, compartilhe stories e evolua com inteligência.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0a0a0a",
   "theme_color": "#facc15",
   "orientation": "portrait",
   "scope": "/",
+  "lang": "pt-BR",
+  "dir": "ltr",
+  "categories": ["fitness", "health", "lifestyle"],
   "icons": [
     {
       "src": "/icone.png",
@@ -18,7 +22,15 @@
       "src": "/icone.png",
       "sizes": "512x512",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Dashboard",
+      "short_name": "Dashboard",
+      "url": "/dashboard",
+      "icons": [{ "src": "/icone.png", "sizes": "192x192" }]
     }
   ]
 }

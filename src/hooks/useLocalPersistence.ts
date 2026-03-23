@@ -11,8 +11,9 @@
  */
 'use client'
 import { logWarn } from '@/lib/logger'
+import { persistActiveSession, clearPersistedSession } from '@/lib/offline/activeSessionPersistence'
 
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import type { ActiveWorkoutSession } from '@/types/app'
 
 interface UseLocalPersistenceOptions {
@@ -85,7 +86,8 @@ export function useLocalPersistence({
     } catch (e) { logWarn('useLocalPersistence', 'silenced error', e) }
   }, [view, userId])
 
-  // ─── Persist active session (debounced 250 ms) ───────────────────────────
+  // ─── Persist active session (debounced 250 ms localStorage + 2s IDB) ──────
+  const idbTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => {
     try {
       if (!userId) return
@@ -93,6 +95,9 @@ export function useLocalPersistence({
       if (!activeSession) {
         localStorage.removeItem(key)
         localStorage.removeItem('activeSession')
+        // Clear IDB too
+        clearPersistedSession(userId).catch(() => {})
+        if (idbTimerRef.current) { clearTimeout(idbTimerRef.current); idbTimerRef.current = null }
         return
       }
 
@@ -102,7 +107,18 @@ export function useLocalPersistence({
           localStorage.setItem(key, payload)
         } catch (e) { logWarn('useLocalPersistence', 'silenced error', e) }
       }, 250)
-      return () => clearTimeout(id)
+
+      // IDB dual-write (longer debounce to reduce IDB churn)
+      if (idbTimerRef.current) clearTimeout(idbTimerRef.current)
+      idbTimerRef.current = setTimeout(() => {
+        persistActiveSession(userId, activeSession as unknown as Record<string, unknown>).catch(() => {})
+        idbTimerRef.current = null
+      }, 2000)
+
+      return () => {
+        clearTimeout(id)
+        // Don't clear idbTimer on cleanup — let it complete
+      }
     } catch {
       return
     }

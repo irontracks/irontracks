@@ -4,6 +4,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { requireRole, requireRoleWithBearer } from '@/utils/auth/route'
 import { getVipPlanLimits } from '@/utils/vip/limits'
 import { parseSearchParams } from '@/utils/zod'
+import { safePgLike } from '@/utils/safePgFilter'
 
 export const dynamic = 'force-dynamic'
 
@@ -37,7 +38,7 @@ export async function GET(req: Request) {
 
     let userId = id || ''
     if (!userId && email) {
-      const { data: profile } = await admin.from('profiles').select('id').ilike('email', email).maybeSingle()
+      const { data: profile } = await admin.from('profiles').select('id').ilike('email', safePgLike(email)).maybeSingle()
       userId = String(profile?.id || '').trim()
     }
 
