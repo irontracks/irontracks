@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { requireRole, requireRoleWithBearer } from '@/utils/auth/route'
 import { parseSearchParams } from '@/utils/zod'
+import { safePgLike } from '@/utils/safePgFilter'
 
 export const dynamic = 'force-dynamic'
 
@@ -42,10 +43,10 @@ export async function GET(req: Request) {
       }
     }
     if (!targetUserId && resolvedEmail) {
-      const { data: pByEmail } = await supabase.from('profiles').select('id').ilike('email', resolvedEmail).maybeSingle()
+      const { data: pByEmail } = await supabase.from('profiles').select('id').ilike('email', safePgLike(resolvedEmail)).maybeSingle()
       targetUserId = pByEmail?.id || ''
       if (!targetUserId) {
-        const { data: sByEmail } = await supabase.from('students').select('id, user_id').ilike('email', resolvedEmail).maybeSingle()
+        const { data: sByEmail } = await supabase.from('students').select('id, user_id').ilike('email', safePgLike(resolvedEmail)).maybeSingle()
         if (sByEmail?.id && !sByEmail?.user_id) {
           return NextResponse.json({ ok: false, error: 'Aluno sem conta (user_id).' }, { status: 400 })
         }

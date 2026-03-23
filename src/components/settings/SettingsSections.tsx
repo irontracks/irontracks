@@ -250,7 +250,7 @@ export function SettingsSoundSection({ draft, setValue, canSeeExperimental }: Se
                 <div className="flex items-center justify-between gap-3">
                     <div><div className="text-sm font-bold text-white">Volume</div><div className="text-xs text-neutral-400">Controla intensidade dos sons.</div></div>
                     <div className="w-40 flex items-center gap-3">
-                        <input type="range" min={0} max={100} step={5} value={soundVolume} onChange={(e) => setValue('soundVolume', Number(e.target.value))} className="w-full accent-yellow-500" />
+                        <input type="range" min={0} max={100} step={5} value={soundVolume} onChange={(e) => setValue('soundVolume', Number(e.target.value))} className="w-full accent-yellow-500" aria-label="Volume dos sons" />
                         <div className="font-mono text-xs font-bold text-neutral-200 w-10 text-right">{soundVolume}%</div>
                     </div>
                 </div>
@@ -575,7 +575,7 @@ export function SettingsModulesModal({ draft, setValue, isOpen, onClose }: Setti
     const moduleMarketplace = Boolean(draft?.moduleMarketplace ?? true)
     if (!isOpen) return null
     return (
-        <div className="fixed inset-0 z-[1400] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe" onClick={onClose}>
+        <div className="fixed inset-0 z-[1400] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe" role="dialog" aria-modal="true" aria-label="Personalizar módulos" onClick={onClose}>
             <div className="w-full max-w-md bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
                 <div className="p-4 border-b border-neutral-800 flex items-center justify-between">
                     <div><div className="text-xs font-black uppercase tracking-widest text-yellow-500">Módulos</div><div className="text-white font-black text-lg truncate">Personalizar</div></div>

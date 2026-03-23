@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { requireRole, requireRoleWithBearer } from '@/utils/auth/route'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { safePgLike } from '@/utils/safePgFilter'
 
 export const dynamic = 'force-dynamic'
 
@@ -31,7 +32,7 @@ export async function POST(req: Request) {
     const { data: profile } = await admin
       .from('profiles')
       .select('id, display_name, role')
-      .ilike('email', email)
+      .ilike('email', safePgLike(email))
       .maybeSingle()
 
     if (!profile?.id) return NextResponse.json({ ok: false, error: 'profile not found' }, { status: 404 })
@@ -51,7 +52,7 @@ export async function POST(req: Request) {
       const { data: existingByEmail } = await admin
         .from('teachers')
         .select('id')
-        .ilike('email', email)
+        .ilike('email', safePgLike(email))
         .maybeSingle()
       teacherRow = existingByEmail || null
     }

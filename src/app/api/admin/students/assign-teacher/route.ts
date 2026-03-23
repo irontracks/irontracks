@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { requireRole, requireRoleWithBearer } from '@/utils/auth/route'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { safePgLike } from '@/utils/safePgFilter'
 
 export const dynamic = 'force-dynamic'
 
@@ -39,7 +40,7 @@ export async function POST(req: Request) {
 
     // Resolve teacher_user_id from teacher_email via profiles (auth uid)
     if (!teacher_user_id && teacher_email) {
-      const { data: tProfile } = await admin.from('profiles').select('id').ilike('email', teacher_email).maybeSingle()
+      const { data: tProfile } = await admin.from('profiles').select('id').ilike('email', safePgLike(teacher_email)).maybeSingle()
       teacher_user_id = tProfile?.id || null
     }
     if (!teacher_user_id && String(teacher_email || '').trim()) {
@@ -52,7 +53,7 @@ export async function POST(req: Request) {
       // Best-effort: ensure a row exists in teachers by email if available (do not fail if missing)
       const { data: p } = await admin.from('profiles').select('display_name, email').eq('id', teacher_user_id).maybeSingle()
       if (p?.email) {
-        const { data: existing } = await admin.from('teachers').select('id').ilike('email', p.email).maybeSingle()
+        const { data: existing } = await admin.from('teachers').select('id').ilike('email', safePgLike(p.email)).maybeSingle()
         if (!existing) {
           await admin.from('teachers').insert({ email: p.email, name: p.display_name || null, status: 'active' })
         }
@@ -72,7 +73,7 @@ export async function POST(req: Request) {
       srow = data || null
     }
     if (!srow && email) {
-      const { data } = await admin.from('students').select('id, email').ilike('email', email).maybeSingle()
+      const { data } = await admin.from('students').select('id, email').ilike('email', safePgLike(email)).maybeSingle()
       srow = data || null
     }
     if (!srow && student_id) {
@@ -81,7 +82,7 @@ export async function POST(req: Request) {
     }
     // Upsert by email if not exists
     if (!srow && email) {
-      const { data: profile } = await admin.from('profiles').select('id, display_name').ilike('email', email).maybeSingle()
+      const { data: profile } = await admin.from('profiles').select('id, display_name').ilike('email', safePgLike(email)).maybeSingle()
       const payload: Record<string, unknown> = { email, teacher_id: teacher_user_id || null }
       if (profile?.display_name) payload.name = profile.display_name
       if (profile?.id) payload.user_id = profile.id

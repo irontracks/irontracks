@@ -528,7 +528,7 @@ const ChatScreen = ({ user, onClose }: ChatScreenProps) => {
 		<div className="fixed inset-0 z-50 bg-neutral-900 text-white flex flex-col animate-slide-up">
 			<div className="px-4 py-3 bg-neutral-950 border-b border-neutral-800 flex justify-between items-center shadow-lg pt-safe min-h-[56px]">
 				<div className="flex items-center gap-3">
-					<button onClick={onClose} className="w-11 h-11 flex items-center justify-center text-neutral-200 hover:text-white rounded-full bg-neutral-900 border border-neutral-700 active:scale-95 transition-transform">
+					<button onClick={onClose} className="w-11 h-11 flex items-center justify-center text-neutral-200 hover:text-white rounded-full bg-neutral-900 border border-neutral-700 active:scale-95 transition-transform" aria-label="Voltar">
 						<ChevronLeft size={20} />
 					</button>
 					<div className="bg-yellow-500 p-2 rounded-full text-black"><MessageSquare size={20} /></div>
@@ -545,7 +545,7 @@ const ChatScreen = ({ user, onClose }: ChatScreenProps) => {
                 </div>
                 <div className="flex gap-2">
                     {view === 'list' && (
-                        <button onClick={loadData} className={`p-2 bg-neutral-700 rounded-full hover:bg-neutral-600 text-white ${refreshing ? 'animate-spin' : ''}`}>
+                        <button onClick={loadData} className={`p-2 bg-neutral-700 rounded-full hover:bg-neutral-600 text-white ${refreshing ? 'animate-spin' : ''}`} aria-label="Atualizar">
                             <RefreshCw size={20} />
                         </button>
                     )}
@@ -591,13 +591,13 @@ const ChatScreen = ({ user, onClose }: ChatScreenProps) => {
                         <div ref={dummy}></div>
                     </div>
                     <form onSubmit={handleSendMessage} className="bg-neutral-800 border-t border-neutral-700 flex items-center gap-2 px-4 py-2 pb-[max(env(safe-area-inset-bottom),20px)] mb-[max(env(safe-area-inset-bottom),60px)]">
-                        <input value={newMessage} onChange={(e) => setNewMessage(e.target.value)} className="flex-1 bg-neutral-900 border border-neutral-600 rounded-full px-4 py-3 text-white outline-none focus:border-yellow-500 transition-colors" placeholder="Mensagem..." />
+                        <input value={newMessage} onChange={(e) => setNewMessage(e.target.value)} className="flex-1 bg-neutral-900 border border-neutral-600 rounded-full px-4 py-3 text-white outline-none focus:border-yellow-500 transition-colors" placeholder="Mensagem..." aria-label="Mensagem" />
                         <div className="flex items-center gap-2">
-                            <button type="button" onClick={() => setShowEmoji(v => !v)} className="p-2 rounded-full bg-neutral-700 text-white hover:bg-neutral-600"><Smile size={18} /></button>
-                            <button type="button" onClick={handleAddGif} className="p-2 rounded-full bg-neutral-700 text-white hover:bg-neutral-600"><Link2 size={18} /></button>
-                            <button type="button" onClick={handleAttachClick} className="p-2 rounded-full bg-neutral-700 text-white hover:bg-neutral-600"><ImageIcon size={18} /></button>
+                            <button type="button" onClick={() => setShowEmoji(v => !v)} className="p-2 rounded-full bg-neutral-700 text-white hover:bg-neutral-600" aria-label="Emojis"><Smile size={18} /></button>
+                            <button type="button" onClick={handleAddGif} className="p-2 rounded-full bg-neutral-700 text-white hover:bg-neutral-600" aria-label="Enviar GIF"><Link2 size={18} /></button>
+                            <button type="button" onClick={handleAttachClick} className="p-2 rounded-full bg-neutral-700 text-white hover:bg-neutral-600" aria-label="Anexar mídia"><ImageIcon size={18} /></button>
                             <input ref={fileInputRef} type="file" accept="image/*,video/*" multiple className="hidden" onChange={handleFileSelected} />
-                            <button type="submit" disabled={!newMessage.trim()} className="bg-yellow-500 text-black p-3 rounded-full hover:bg-yellow-400 disabled:opacity-50 transition-transform active:scale-95"><Send size={20} /></button>
+                            <button type="submit" disabled={!newMessage.trim()} className="bg-yellow-500 text-black p-3 rounded-full hover:bg-yellow-400 disabled:opacity-50 transition-transform active:scale-95" aria-label="Enviar mensagem"><Send size={20} /></button>
                         </div>
                         {uploading && <span className="text-xs text-neutral-400 ml-2">Enviando mídia...</span>}
                         {showEmoji && (

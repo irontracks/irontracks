@@ -48,7 +48,7 @@ export const Modals: React.FC = () => {
         <>
             {/* Register Student Modal */}
             {showRegisterModal && (
-                <div className="fixed inset-0 z-[60] bg-black/85 flex items-center justify-center p-4 pt-safe pb-safe backdrop-blur-md">
+                <div className="fixed inset-0 z-[60] bg-black/85 flex items-center justify-center p-4 pt-safe pb-safe backdrop-blur-md" role="dialog" aria-modal="true" aria-label="Cadastrar novo aluno">
                     <div className="p-6 rounded-2xl w-full max-w-sm border shadow-2xl animate-in zoom-in-95 duration-200 relative overflow-hidden" style={{ background: 'linear-gradient(160deg, rgba(20,18,10,0.98) 0%, rgba(10,10,10,0.99) 40%)', borderColor: 'rgba(234,179,8,0.12)', boxShadow: '0 32px 64px -16px rgba(0,0,0,0.8), inset 0 1px 0 rgba(234,179,8,0.1)' }}>
                         <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-yellow-500/40 to-transparent" />
                         <h3 className="font-bold text-white text-xl mb-4 flex items-center gap-2">
@@ -86,7 +86,7 @@ export const Modals: React.FC = () => {
 
             {/* Teacher Modal */}
             {showTeacherModal && (
-                <div className="fixed inset-0 z-[60] bg-black/85 flex items-center justify-center p-4 pt-safe pb-safe backdrop-blur-md">
+                <div className="fixed inset-0 z-[60] bg-black/85 flex items-center justify-center p-4 pt-safe pb-safe backdrop-blur-md" role="dialog" aria-modal="true" aria-label="Cadastrar novo professor">
                     <div className="p-6 rounded-2xl w-full max-w-sm border shadow-2xl animate-in zoom-in-95 duration-200 relative overflow-hidden" style={{ background: 'linear-gradient(160deg, rgba(20,18,10,0.98) 0%, rgba(10,10,10,0.99) 40%)', borderColor: 'rgba(234,179,8,0.12)', boxShadow: '0 32px 64px -16px rgba(0,0,0,0.8), inset 0 1px 0 rgba(234,179,8,0.1)' }}>
                         <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-yellow-500/40 to-transparent" />
                         <h3 className="font-bold text-white text-xl mb-4 flex items-center gap-2">
@@ -133,7 +133,7 @@ export const Modals: React.FC = () => {
 
             {/* Editing Teacher Modal */}
             {editingTeacher && (
-                <div className="fixed inset-0 z-[60] bg-black/85 flex items-center justify-center p-4 pt-safe pb-safe backdrop-blur-md">
+                <div className="fixed inset-0 z-[60] bg-black/85 flex items-center justify-center p-4 pt-safe pb-safe backdrop-blur-md" role="dialog" aria-modal="true" aria-label="Editar professor">
                     <div className="p-6 rounded-2xl w-full max-w-sm border shadow-2xl animate-in zoom-in-95 duration-200 relative overflow-hidden" style={{ background: 'linear-gradient(160deg, rgba(20,18,10,0.98) 0%, rgba(10,10,10,0.99) 40%)', borderColor: 'rgba(234,179,8,0.12)', boxShadow: '0 32px 64px -16px rgba(0,0,0,0.8), inset 0 1px 0 rgba(234,179,8,0.1)' }}>
                         <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-yellow-500/40 to-transparent" />
                         <h3 className="font-bold text-white text-xl mb-4 flex items-center gap-2">
@@ -180,7 +180,7 @@ export const Modals: React.FC = () => {
 
             {/* Execution Video Modal */}
             {executionVideoModalOpen && executionVideoModalUrl && (
-                <div className="fixed inset-0 z-[80] bg-black/85 backdrop-blur-md flex items-center justify-center p-4" onClick={() => { setExecutionVideoModalOpen(false); setExecutionVideoModalUrl(''); }}>
+                <div className="fixed inset-0 z-[80] bg-black/85 backdrop-blur-md flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Vídeo de execução" onClick={() => { setExecutionVideoModalOpen(false); setExecutionVideoModalUrl(''); }}>
                     <div className="w-full max-w-3xl rounded-2xl border shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 relative" style={{ background: 'linear-gradient(160deg, rgba(20,18,10,0.98) 0%, rgba(10,10,10,0.99) 40%)', borderColor: 'rgba(234,179,8,0.12)', boxShadow: '0 32px 64px -16px rgba(0,0,0,0.8), inset 0 1px 0 rgba(234,179,8,0.1)' }} onClick={(e) => e.stopPropagation()}>
                         <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-yellow-500/40 to-transparent" />
                         <div className="p-4 flex items-center justify-between gap-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
@@ -204,7 +204,7 @@ export const Modals: React.FC = () => {
 
             {/* Template Editor Modal */}
             {editingTemplate && (
-                <div className="fixed inset-0 z-[70] bg-black/85 backdrop-blur-md flex items-center justify-center p-4" onClick={() => setEditingTemplate(null)}>
+                <div className="fixed inset-0 z-[70] bg-black/85 backdrop-blur-md flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Editar treino" onClick={() => setEditingTemplate(null)}>
                     <div className="w-full max-w-3xl rounded-2xl border shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 relative" style={{ background: 'linear-gradient(160deg, rgba(20,18,10,0.98) 0%, rgba(10,10,10,0.99) 40%)', borderColor: 'rgba(234,179,8,0.12)', boxShadow: '0 32px 64px -16px rgba(0,0,0,0.8), inset 0 1px 0 rgba(234,179,8,0.1)' }} onClick={(e) => e.stopPropagation()}>
                         <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-yellow-500/40 to-transparent" />
                         <div className="p-4 flex justify-between items-center" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>

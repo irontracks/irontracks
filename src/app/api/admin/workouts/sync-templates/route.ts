@@ -5,7 +5,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { hasValidInternalSecret, requireRole, requireRoleWithBearer } from '@/utils/auth/route'
 import { syncAllTemplatesToSubscriber } from '@/lib/workoutSync'
 import { logWarn } from '@/lib/logger'
-import { safePg } from '@/utils/safePgFilter'
+import { safePg, safePgLike } from '@/utils/safePgFilter'
 
 export const dynamic = 'force-dynamic'
 
@@ -52,8 +52,8 @@ export async function POST(req: Request) {
       }
     }
     if (!targetUserId && resolvedEmail) {
-      const { data: profile } = await admin.from('profiles').select('id').ilike('email', resolvedEmail).maybeSingle()
-      const { data: student } = await admin.from('students').select('id, user_id, email').ilike('email', resolvedEmail).maybeSingle()
+      const { data: profile } = await admin.from('profiles').select('id').ilike('email', safePgLike(resolvedEmail)).maybeSingle()
+      const { data: student } = await admin.from('students').select('id, user_id, email').ilike('email', safePgLike(resolvedEmail)).maybeSingle()
       if (!profile?.id && student?.id && !student?.user_id) {
         return NextResponse.json(
           { ok: false, error: 'Aluno sem conta (user_id). Não é possível sincronizar.' },

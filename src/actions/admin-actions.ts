@@ -9,7 +9,7 @@ import { sendPushToAllPlatforms as sendPushToUsers } from '@/lib/push/sender'
 type AdminResult = { success: true;[key: string]: unknown } | { success?: never; error: string;[key: string]: unknown }
 
 import { getErrorMessage } from '@/utils/errorMessage'
-import { safePg } from '@/utils/safePgFilter'
+import { safePg, safePgLike } from '@/utils/safePgFilter'
 
 async function checkAdmin() {
     const auth = await requireRole(['admin'])
@@ -232,7 +232,7 @@ export async function updateTeacher(id: unknown, data: Record<string, unknown>):
             const { data: existingProfile } = await adminDb
                 .from('profiles')
                 .select('id')
-                .ilike('email', email)
+                .ilike('email', safePgLike(email))
                 .maybeSingle()
             const userId = existingProfile?.id || null
             if (userId) {

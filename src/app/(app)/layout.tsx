@@ -2,6 +2,7 @@ import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 import { resolveRoleByUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
+import { safePgLike } from '@/utils/safePgFilter'
 import OfflineBanner from '@/components/OfflineBanner'
 import React from 'react'
 
@@ -33,7 +34,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
         const { data: reqRow } = await admin
           .from('access_requests')
           .select('id, status, role_requested, full_name, phone, birth_date, cref')
-          .ilike('email', email)
+          .ilike('email', safePgLike(email))
           .maybeSingle()
 
         const reqStatus = String(reqRow?.status || '').toLowerCase()
@@ -52,7 +53,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
           await admin.from('profiles').update(approvalPayload).eq('id', user.id)
 
           if (roleRequested === 'teacher') {
-            const { data: existingTeacher } = await admin.from('teachers').select('id').ilike('email', email).maybeSingle()
+            const { data: existingTeacher } = await admin.from('teachers').select('id').ilike('email', safePgLike(email)).maybeSingle()
             if (existingTeacher?.id) {
               await admin.from('teachers').update({ user_id: user.id }).eq('id', existingTeacher.id)
             } else {
@@ -65,7 +66,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
               })
             }
           } else {
-            const { data: existingStudent } = await admin.from('students').select('id').ilike('email', email).maybeSingle()
+            const { data: existingStudent } = await admin.from('students').select('id').ilike('email', safePgLike(email)).maybeSingle()
             if (existingStudent?.id) {
               await admin.from('students').update({ user_id: user.id }).eq('id', existingStudent.id)
             } else {

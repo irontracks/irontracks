@@ -86,7 +86,7 @@ const GrantModal = ({ open, onClose, onGrant }: {
     }
 
     return (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(16px)' }} onClick={onClose}>
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(16px)' }} role="dialog" aria-modal="true" aria-label="Conceder acesso VIP" onClick={onClose}>
             <div className="rounded-3xl w-full max-w-md p-6 space-y-5" style={{ background: 'rgba(10,10,10,0.99)', border: '1px solid rgba(234,179,8,0.2)', boxShadow: '0 0 40px rgba(234,179,8,0.07), 0 32px 80px rgba(0,0,0,0.7)' }} onClick={e => e.stopPropagation()}>
                 {/* Header */}
                 <div className="flex items-center justify-between">
@@ -99,7 +99,7 @@ const GrantModal = ({ open, onClose, onGrant }: {
                             <p className="text-[11px] text-neutral-500">Adicionar acesso VIP a um usuário</p>
                         </div>
                     </div>
-                    <button onClick={onClose} className="text-neutral-500 hover:text-white transition-colors">
+                    <button onClick={onClose} className="text-neutral-500 hover:text-white transition-colors" aria-label="Fechar">
                         <XCircle size={20} />
                     </button>
                 </div>
@@ -272,6 +272,7 @@ export const VipTab: React.FC = () => {
                         onClick={fetchList}
                         className="w-9 h-9 rounded-xl bg-neutral-800/60 border border-neutral-700/60 hover:bg-neutral-800 text-neutral-400 hover:text-white flex items-center justify-center transition-all active:scale-95"
                         title="Atualizar"
+                        aria-label="Atualizar lista VIP"
                     >
                         <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
                     </button>
@@ -408,6 +409,7 @@ export const VipTab: React.FC = () => {
                                         disabled={isRevoking}
                                         className="flex-shrink-0 opacity-0 group-hover:opacity-100 w-8 h-8 rounded-xl bg-red-500/10 hover:bg-red-500/20 border border-red-500/20 hover:border-red-500/40 text-red-400 flex items-center justify-center transition-all active:scale-95 disabled:opacity-40"
                                         title="Revogar VIP"
+                                        aria-label={`Revogar VIP de ${item.name || item.email}`}
                                     >
                                         {isRevoking ? <Loader2 size={12} className="animate-spin" /> : <XCircle size={14} />}
                                     </button>

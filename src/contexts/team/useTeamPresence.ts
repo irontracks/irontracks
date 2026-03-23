@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { RealtimeChannel } from '@supabase/supabase-js'
 import type { TeamSession, PresenceStatus } from './types'
+import { logWarn } from '@/lib/logger'
 
 interface UseTeamPresenceParams {
     user: { id: string; email?: string | null } | null

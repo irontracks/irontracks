@@ -7,7 +7,7 @@ import { useAssessment } from '@/hooks/useAssessment'
 import { generateAssessmentPlanAi } from '@/actions/workout-actions'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { logError } from '@/lib/logger'
-import { safePg } from '@/utils/safePgFilter'
+import { safePg, safePgLike } from '@/utils/safePgFilter'
 import { isIosNative } from '@/utils/platform'
 
 import {
@@ -436,7 +436,7 @@ export function useAssessmentHistoryData(studentId?: string) {
               const { data: profileByEmail } = await supabase
                 .from('profiles')
                 .select('id')
-                .ilike('email', studentRow.email)
+                .ilike('email', safePgLike(studentRow.email))
                 .maybeSingle()
               if (profileByEmail?.id) candidateIds.push(profileByEmail.id as string)
             }

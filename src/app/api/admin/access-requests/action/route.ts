@@ -5,6 +5,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { requireRole, requireRoleWithBearer } from '@/utils/auth/route'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { logError, logWarn, logInfo } from '@/lib/logger'
+import { safePgLike } from '@/utils/safePgFilter'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 
 export const dynamic = 'force-dynamic'
@@ -119,7 +120,7 @@ export async function POST(req: Request) {
       const { data: profile } = await admin
         .from('profiles')
         .select('id, role, is_approved')
-        .ilike('email', email)
+        .ilike('email', safePgLike(email))
         .maybeSingle()
 
       if (profile?.id && profile.is_approved !== true) {
@@ -138,7 +139,7 @@ export async function POST(req: Request) {
 
           await admin.from('profiles').delete().eq('id', profile.id)
           await admin.auth.admin.deleteUser(profile.id)
-          await admin.from('students').update({ user_id: null }).ilike('email', email)
+          await admin.from('students').update({ user_id: null }).ilike('email', safePgLike(email))
         }
       }
 
@@ -161,14 +162,14 @@ export async function POST(req: Request) {
       const roleRequested = String(request.role_requested || 'student').trim()
       const cref = String(request.cref || '').trim()
 
-      const { data: profile } = await admin.from('profiles').select('id').ilike('email', email).maybeSingle()
+      const { data: profile } = await admin.from('profiles').select('id').ilike('email', safePgLike(email)).maybeSingle()
       const userId = profile?.id ? String(profile.id) : ''
 
       // If approved and requested to be teacher, promote
       if (roleRequested === 'teacher') {
         // 1. Create Teacher record if not exists
         // Note: teachers table columns = id, name, email, phone, status, created_at, payment_status, user_id, asaas_*, birth_date
-        const { data: existingTeacher } = await admin.from('teachers').select('id').ilike('email', email).maybeSingle()
+        const { data: existingTeacher } = await admin.from('teachers').select('id').ilike('email', safePgLike(email)).maybeSingle()
         if (!existingTeacher) {
           const { error: teacherInsertErr } = await admin.from('teachers').insert({
             email,
@@ -227,7 +228,7 @@ export async function POST(req: Request) {
           if (approveError) throw approveError
 
           // Only create student record for non-teacher roles
-          const { data: existingStudent } = await admin.from('students').select('id').ilike('email', email).maybeSingle()
+          const { data: existingStudent } = await admin.from('students').select('id').ilike('email', safePgLike(email)).maybeSingle()
           if (!existingStudent?.id) {
             const payload: Record<string, unknown> = { email, status: 'ativo' }
             if (fullName) payload.name = fullName

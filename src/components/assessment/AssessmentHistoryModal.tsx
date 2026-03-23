@@ -146,7 +146,7 @@ export function AssessmentHistoryModal({
                                                 thigh_skinfold: String(getSkinfoldMm(a, 'thigh') || ''),
                                                 calf_skinfold: String(getSkinfoldMm(a, 'calf') || ''),
                                                 observations: '',
-                                            }}
+                                            } as import('@/types/assessment').AssessmentFormData}
                                             studentName={studentName}
                                             trainerName={String(a.trainer_name ?? '')}
                                             assessmentDate={new Date(

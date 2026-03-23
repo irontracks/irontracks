@@ -36,14 +36,14 @@ export async function mercadopagoRequest<T>(options: MercadoPagoRequestOptions):
         const cryptoGlobal = globalThis as typeof globalThis & { crypto?: { randomUUID?: () => string } }
         const maybe = cryptoGlobal?.crypto?.randomUUID
         if (typeof maybe === 'function') idempotencyKey = String(maybe()).trim()
-      } catch {}
+      } catch { /* best effort: parse error body */ }
     }
     if (!idempotencyKey) {
       try {
         const mod = await import('crypto') as { randomUUID?: () => string }
         const maybe = mod?.randomUUID
         if (typeof maybe === 'function') idempotencyKey = String(maybe()).trim()
-      } catch {}
+      } catch { /* best effort: parse response body */ }
     }
     if (!idempotencyKey) idempotencyKey = `${Date.now()}-${Math.random().toString(16).slice(2)}`
     headers['X-Idempotency-Key'] = idempotencyKey

@@ -1,39 +1,142 @@
 'use client'
 
 import { useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
 import { unlockAudio } from '@/lib/sounds'
-import type { ActiveWorkoutSession } from '@/types/app'
+import { logError } from '@/lib/logger'
+import type { ActiveWorkoutSession, DirectChatState } from '@/types/app'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
-const isRecord = (v: unknown): v is Record<string, unknown> =>
+// ────────────────────────────────────────────────────────────────
+// Exported helpers (used by sibling hooks)
+// ────────────────────────────────────────────────────────────────
+export const isRecord = (v: unknown): v is Record<string, unknown> =>
   v !== null && typeof v === 'object' && !Array.isArray(v)
 
+export const parseStartedAtMs = (raw: unknown): number => {
+  const direct = typeof raw === 'number' ? raw : Number(String(raw ?? '').trim())
+  if (Number.isFinite(direct) && direct > 0) return direct
+  try {
+    const d = new Date(String(raw ?? ''))
+    const t = d.getTime()
+    return Number.isFinite(t) ? t : 0
+  } catch {
+    return 0
+  }
+}
+
+// ────────────────────────────────────────────────────────────────
+// Types
+// ────────────────────────────────────────────────────────────────
 interface UseAppEffectsOptions {
+  // User + auth
+  userId: string | undefined
+  authLoading: boolean
+
+  // View
   view: string
+  setView: (v: string) => void
+
+  // Companion states for view safety net
+  directChat: DirectChatState | null
+  reportDataCurrent: unknown
   activeSession: ActiveWorkoutSession | null
+
+  // Scroll
   mainScrollRef: React.RefObject<HTMLDivElement | null>
+
+  // Admin
   restoreAdminPanelIfNeeded: () => void
+
+  // Timer + session
   handleCloseTimer: () => void
   handleUpdateSessionLog: (key: string, log: Record<string, unknown>) => void
   setActiveSession: React.Dispatch<React.SetStateAction<ActiveWorkoutSession | null>>
+
+  // VIP
+  openVipView: () => void
+
+  // Supabase
+  supabase: SupabaseClient
+
+  // Session clear
+  clearClientSessionState: () => void
 }
 
 /**
- * Bundles misc effects & handlers from IronTracksAppClientImpl:
+ * Bundles ALL standalone effects from IronTracksAppClientImpl:
+ * - VIP session storage check
+ * - View safety net (reset to dashboard if companion state is null)
+ * - Redirect to login when no user
+ * - Preload common modal chunks
  * - Audio unlock on first interaction
+ * - Auth state change listener
  * - Admin panel restore on visibility
  * - Scroll-to-top on active view
  * - handleStartFromRestTimer transition callback
  */
 export function useAppEffects({
+  userId,
+  authLoading,
   view,
+  setView,
+  directChat,
+  reportDataCurrent,
   activeSession,
   mainScrollRef,
   restoreAdminPanelIfNeeded,
   handleCloseTimer,
   handleUpdateSessionLog,
   setActiveSession,
+  openVipView,
+  supabase,
+  clearClientSessionState,
 }: UseAppEffectsOptions) {
-  // Audio unlock on first user interaction
+  const router = useRouter()
+
+  // ── VIP session storage check ─────────────────────────────────
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    try {
+      const flag = sessionStorage.getItem('irontracks_open_vip')
+      if (!flag) return
+      sessionStorage.removeItem('irontracks_open_vip')
+      openVipView()
+    } catch { }
+  }, [])
+
+  // ── View safety net — reset to dashboard if companion state is missing ──
+  useEffect(() => {
+    if (view === 'directChat' && !directChat) { setView('dashboard'); return }
+    if (view === 'report' && !reportDataCurrent) { setView('dashboard'); return }
+    if (view === 'active' && !activeSession) { setView('dashboard'); return }
+    if (view === 'profile' && !userId) { setView('dashboard'); return }
+  }, [view, directChat, activeSession, reportDataCurrent, userId, setView])
+
+  // ── Redirect to login when no user ────────────────────────────
+  useEffect(() => {
+    if (authLoading) return
+    if (userId) return
+    const t = setTimeout(() => {
+      try { window.location.replace('/?next=/dashboard') } catch { }
+    }, 3000)
+    return () => { clearTimeout(t) }
+  }, [authLoading, userId, router])
+
+  // ── Preload common modal chunks 1s after mount ────────────────
+  useEffect(() => {
+    const t = setTimeout(() => {
+      void import('@/components/SettingsModal')
+      void import('@/components/dashboard/WorkoutWizardModal')
+      void import('@/components/HistoryList')
+      void import('@/components/ActiveWorkout')
+      void import('@/components/IncomingInviteModal')
+      void import('@/components/InviteAcceptedModal')
+    }, 1000)
+    return () => clearTimeout(t)
+  }, [])
+
+  // ── Audio unlock on first user interaction ────────────────────
   useEffect(() => {
     const handler = () => { try { unlockAudio(); } catch { } }
     document.addEventListener('touchstart', handler, { once: true })
@@ -44,7 +147,40 @@ export function useAppEffects({
     }
   }, [])
 
-  // Admin panel restore on visibility change
+  // ── Auth state change listener ────────────────────────────────
+  useEffect(() => {
+    try {
+      const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
+        try {
+          const ev = String(_event || '').toUpperCase()
+          if (session && session.user?.id) return
+          if (ev === 'SIGNED_OUT') {
+            clearClientSessionState()
+            if (typeof window !== 'undefined') window.location.href = '/?next=/dashboard'
+            return
+          }
+          if (ev === 'INITIAL_SESSION') {
+            fetch('/api/auth/ping', { method: 'GET', credentials: 'include', cache: 'no-store' })
+              .then((r) => {
+                if (r && r.status === 204) return
+                clearClientSessionState()
+                if (typeof window !== 'undefined') window.location.href = '/?next=/dashboard'
+              })
+              .catch(() => { })
+            return
+          }
+        } catch (e) { logError('IronTracksApp.authStateChange', e) }
+      })
+      return () => {
+        try { sub?.subscription?.unsubscribe?.() } catch { }
+      }
+    } catch (e) {
+      logError('IronTracksApp.authSubscribe', e)
+      return
+    }
+  }, [supabase, clearClientSessionState])
+
+  // ── Admin panel restore on visibility change ──────────────────
   useEffect(() => {
     restoreAdminPanelIfNeeded()
     const onVisibility = () => {
@@ -64,7 +200,7 @@ export function useAppEffects({
     }
   }, [restoreAdminPanelIfNeeded])
 
-  // Scroll to top when entering active workout view
+  // ── Scroll to top when entering active workout view ───────────
   useEffect(() => {
     if (view !== 'active') return
     const scrollToTop = () => {
@@ -80,7 +216,7 @@ export function useAppEffects({
     }
   }, [view, activeSession?.id, mainScrollRef])
 
-  // Handler: transition from rest timer back to active set
+  // ── Handler: transition from rest timer back to active set ────
   const handleStartFromRestTimer = useCallback(
     (ctx?: unknown) => {
       const nowMs = Date.now()

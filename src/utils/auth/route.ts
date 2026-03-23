@@ -3,7 +3,7 @@ import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { User } from '@supabase/supabase-js'
-import { safePg } from '@/utils/safePgFilter'
+import { safePg, safePgLike } from '@/utils/safePgFilter'
 import { logError } from '@/lib/logger'
 
 export type IrontracksRole = 'admin' | 'teacher' | 'user'
@@ -66,7 +66,7 @@ export async function resolveRoleByUser(user: { id?: string | null; email?: stri
 
   try {
     if (email) {
-      const { data: teacherByEmail } = await admin.from('teachers').select('id').ilike('email', email).maybeSingle()
+      const { data: teacherByEmail } = await admin.from('teachers').select('id').ilike('email', safePgLike(email)).maybeSingle()
       if (teacherByEmail?.id) return { role: 'teacher' as IrontracksRole }
     }
   } catch (e) { logError('resolveRoleByUser.teacherByEmail', e) }

@@ -3,13 +3,13 @@
  * Base fetch utility shared by all API client modules.
  * Provides consistent error handling and JSON parsing.
  *
- * # Native iOS header
- * When running inside Capacitor iOS (WKWebView), all API requests include
- * the header `X-Native-Platform: ios` so the server can apply the correct
- * cookie settings (sameSite:none) for cross-site WKWebView requests.
+ * # Native platform header
+ * When running inside Capacitor (iOS or Android), all API requests include
+ * the header `X-Native-Platform: ios|android` so the server can apply the
+ * correct cookie settings for native WebView requests.
  */
 
-import { isIosNative } from '@/utils/platform'
+import { isIosNative, isAndroidNative } from '@/utils/platform'
 
 export class ApiError extends Error {
   constructor(
@@ -32,12 +32,14 @@ export interface ApiResponse<T = unknown> {
  * Core fetch wrapper — throws ApiError on non-ok responses.
  */
 export async function apiFetch<T>(url: string, init?: RequestInit): Promise<T> {
-  // isIosNative() is guarded with `typeof window === 'undefined'` so it is
-  // safe to call on the server — it always returns false there.
+  // isIosNative() / isAndroidNative() are guarded with `typeof window === 'undefined'`
+  // so they are safe to call on the server — they always return false there.
   const nativeHeaders: Record<string, string> =
     typeof window !== 'undefined' && isIosNative()
       ? { 'X-Native-Platform': 'ios' }
-      : {}
+      : typeof window !== 'undefined' && isAndroidNative()
+        ? { 'X-Native-Platform': 'android' }
+        : {}
 
   const res = await fetch(url, {
     credentials: 'include',

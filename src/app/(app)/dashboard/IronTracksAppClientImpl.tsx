@@ -3,35 +3,15 @@
 import React, { useState, useEffect, useCallback, Suspense, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
-import Image from 'next/image';
 
-import {
-    RotateCcw,
-    History,
-    MoreVertical,
-    Share2,
-    Trash2,
-    Download,
-    Plus,
-    Flame,
-    Play,
-    Check,
-    LogOut,
-    Clock,
-    Upload,
-    ArrowLeft,
-    X,
-} from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
-import { createWorkout, updateWorkout, deleteWorkout, importData, setWorkoutArchived, setWorkoutSortOrder } from '@/actions/workout-actions';
+import { createWorkout } from '@/actions/workout-actions';
 
-import LoginScreen from '@/components/LoginScreen';
 import LoadingScreen from '@/components/LoadingScreen';
 const ActiveWorkout = dynamic(() => import('@/components/ActiveWorkout'), { ssr: false });
 const RestTimerOverlay = dynamic(() => import('@/components/workout/RestTimerOverlay'), { ssr: false });
 const IncomingInviteModal = dynamic(() => import('@/components/IncomingInviteModal'), { ssr: false, loading: () => null });
 const InviteAcceptedModal = dynamic(() => import('@/components/InviteAcceptedModal'), { ssr: false, loading: () => null });
-const NotificationCenter = dynamic(() => import('@/components/NotificationCenter'), { ssr: false });
 import { DashboardHeader } from './DashboardHeader';
 
 // Heavy components — loaded only when needed
@@ -41,7 +21,6 @@ const ChatListScreen = dynamic(() => import('@/components/ChatListScreen'), { ss
 const ChatDirectScreen = dynamic(() => import('@/components/ChatDirectScreen'), { ssr: false });
 const HistoryList = dynamic(() => import('@/components/HistoryList'), { ssr: false });
 const CommunityClient = dynamic(() => import('@/app/(app)/community/CommunityClient'), { ssr: false });
-const StudentEvolution = dynamic(() => import('@/components/StudentEvolution'), { ssr: false });
 const WorkoutReport = dynamic(() => import('@/components/WorkoutReport'), { ssr: false });
 const ExerciseEditor = dynamic(() => import('@/components/ExerciseEditor'), { ssr: false });
 const ProfilePage = dynamic(() => import('@/components/ProfilePage'), { ssr: false });
@@ -51,11 +30,8 @@ import ErrorBoundary from '@/components/ErrorBoundary';
 import ErrorReporterProvider from '@/components/ErrorReporterProvider';
 import { DialogProvider, useDialog } from '@/contexts/DialogContext';
 import GlobalDialog from '@/components/GlobalDialog';
-import { playStartSound, unlockAudio } from '@/lib/sounds';
-import { workoutPlanHtml } from '@/utils/report/templates';
-import { estimateExerciseSeconds, toMinutesRounded, calculateExerciseDuration } from '@/utils/pacing';
+import { toMinutesRounded, calculateExerciseDuration } from '@/utils/pacing';
 import { formatProgramWorkoutTitle } from '@/utils/workoutTitle'
-import { resolveCanonicalExerciseName } from '@/utils/exerciseCanonical'
 import { BackButton } from '@/components/ui/BackButton';
 import DashboardModals from './DashboardModals';
 const StudentDashboard = dynamic(() => import('@/components/dashboard/StudentDashboard'), { ssr: false });
@@ -63,12 +39,9 @@ const WorkoutWizardModal = dynamic(() => import('@/components/dashboard/WorkoutW
 const SettingsModal = dynamic(() => import('@/components/SettingsModal'), { ssr: false });
 import { useUserSettings } from '@/hooks/useUserSettings'
 const WhatsNewModal = dynamic(() => import('@/components/WhatsNewModal'), { ssr: false })
-const WelcomeFloatingWindow = dynamic(() => import('@/components/WelcomeFloatingWindow'), { ssr: false })
 import { generateWorkoutFromWizard } from '@/utils/workoutAutoGenerator'
-import { getLatestWhatsNew } from '@/content/whatsNew'
 const GuidedTour = dynamic(() => import('@/components/onboarding/GuidedTour'), { ssr: false })
 import { getTourSteps } from '@/utils/tourSteps'
-import { cacheGetWorkouts, cacheSetWorkouts } from '@/lib/offline/offlineSync'
 const OfflineSyncModal = dynamic(() => import('@/components/OfflineSyncModal'), { ssr: false })
 const WorkoutRecoveryBanner = dynamic(() => import('@/components/WorkoutRecoveryBanner'), { ssr: false, loading: () => null })
 import { useOfflineSync } from '@/hooks/useOfflineSync'
@@ -79,9 +52,6 @@ import { usePresencePing } from '@/hooks/usePresencePing'
 import { useProfileCompletion } from '@/hooks/useProfileCompletion'
 import { useWhatsNew } from '@/hooks/useWhatsNew'
 import { useUnreadBadges } from '@/hooks/useUnreadBadges'
-import { useNativeDeepLinks } from '@/hooks/useNativeDeepLinks'
-import { usePushNotifications } from '@/hooks/usePushNotifications'
-import { onNativeNotificationAction } from '@/utils/native/irontracksNative'
 import { useNativeAppSetup } from '@/hooks/useNativeAppSetup'
 import { BiometricLock, useBiometricLock } from '@/components/BiometricLock'
 import { useLocalPersistence } from '@/hooks/useLocalPersistence'
@@ -95,19 +65,17 @@ import { useWorkoutNormalize } from '@/hooks/useWorkoutNormalize'
 import { useWorkoutFetch } from '@/hooks/useWorkoutFetch'
 import { useSessionSync } from '@/hooks/useSessionSync'
 import { useWorkoutEditor } from '@/hooks/useWorkoutEditor'
-import { mapWorkoutRow } from '@/utils/mapWorkoutRow'
 import { useBootstrap } from '@/hooks/useBootstrap'
 import { useNativeTimerActions } from '@/hooks/useNativeTimerActions'
+import { useAppEffects, isRecord, parseStartedAtMs } from '@/hooks/useAppEffects'
+import { useAppHandlers } from '@/hooks/useAppHandlers'
 
 
 import {
     DirectChatState,
-    WorkoutStreak,
     ActiveSession,
     ActiveWorkoutSession,
-    PendingUpdate,
     Workout,
-    Exercise,
     UserRecord,
     TourState
 } from '@/types/app';
@@ -116,18 +84,6 @@ import { getErrorMessage } from '@/utils/errorMessage'
 import { logError, logWarn, logInfo } from '@/lib/logger'
 import SectionErrorBoundary from '@/components/SectionErrorBoundary'
 import GymDetectToastWrapper from '@/components/dashboard/GymDetectToastWrapper'
-const isRecord = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v)
-const parseStartedAtMs = (raw: unknown): number => {
-    const direct = typeof raw === 'number' ? raw : Number(String(raw ?? '').trim())
-    if (Number.isFinite(direct) && direct > 0) return direct
-    try {
-        const d = new Date(String(raw ?? ''))
-        const t = d.getTime()
-        return Number.isFinite(t) ? t : 0
-    } catch {
-        return 0
-    }
-}
 
 const AssessmentHistory = dynamic(() => import('@/components/assessment/AssessmentHistory'), { ssr: false });
 const VipHub = dynamic(() => import('@/components/VipHub'), { ssr: false });
@@ -161,11 +117,6 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
     // ── Story Ring state: own story status (fed up from StoriesBar) ────────────
     const [hasActiveStory, setHasActiveStory] = useState(false)
     const handleMyStoryStateChange = useCallback((active: boolean) => setHasActiveStory(active), [])
-    // onAddStory: triggers story creator via a custom window event so StoriesBar
-    // can open the modal without needing a direct React ref
-    const handleAddStory = useCallback(() => {
-        try { window.dispatchEvent(new CustomEvent('irontracks:stories:open-creator')) } catch { }
-    }, [])
     // ── Native iOS setup (notifications + biometric lock) ─────────────────────
     useNativeAppSetup(user?.id)
     const userName = String(user?.displayName || user?.email || '')
@@ -220,16 +171,6 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         initialRole,
     })
 
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    useEffect(() => {
-        try {
-            const flag = sessionStorage.getItem('irontracks_open_vip')
-            if (!flag) return
-            sessionStorage.removeItem('irontracks_open_vip')
-            openVipView()
-        } catch { }
-    }, [])
-
     const [coachPending, setCoachPending] = useState(false);
     const [openStudent, setOpenStudent] = useState<Record<string, unknown> | null>(null);
     const [showNotifCenter, setShowNotifCenter] = useState(false);
@@ -241,8 +182,6 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         setProfileIncomplete,
         profileDraftName,
         setProfileDraftName,
-        savingProfile,
-        setSavingProfile,
         showCompleteProfile,
         setShowCompleteProfile,
     } = useProfileCompletion({
@@ -327,44 +266,6 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
     // View + activeSession local persistence — extracted to useLocalPersistence hook
     useLocalPersistence({ userId: user?.id, view, setView, activeSession })
 
-    // Safety net: views that require companion state render nothing if that state is null.
-    // If we detect this situation, reset to 'dashboard' to prevent a permanent black screen.
-    useEffect(() => {
-        if (view === 'directChat' && !directChat) { setView('dashboard'); return }
-        if (view === 'report' && !reportData.current) { setView('dashboard'); return }
-        if (view === 'active' && !activeSession) { setView('dashboard'); return }
-        if (view === 'profile' && !user?.id) { setView('dashboard'); return }
-    }, [view, directChat, activeSession, reportData])
-
-    useEffect(() => {
-        if (authLoading) return;
-        if (user) return;
-        // Give hydration enough time before concluding there's no user.
-        // On WKWebView (iPad/Capacitor) the initial mount can be slower,
-        // so using a short timeout like 150ms would redirect prematurely.
-        const t = setTimeout(() => {
-            try {
-                window.location.replace('/?next=/dashboard');
-            } catch { }
-        }, 3000);
-        return () => {
-            clearTimeout(t);
-        };
-    }, [authLoading, user, router]);
-
-    // Preload common modal chunks 3s after mount so first-open feels instant
-    useEffect(() => {
-        const t = setTimeout(() => {
-            void import('@/components/SettingsModal')
-            void import('@/components/dashboard/WorkoutWizardModal')
-            void import('@/components/HistoryList')
-            void import('@/components/ActiveWorkout')
-            void import('@/components/IncomingInviteModal')
-            void import('@/components/InviteAcceptedModal')
-        }, 1000)
-        return () => clearTimeout(t)
-    }, [])
-
     // whatsNew useEffect + closeWhatsNew — handled by useWhatsNew hook above
 
     // Admin panel open/close state — extracted to useAdminPanelState hook
@@ -411,21 +312,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
     })
 
 
-    useEffect(() => {
-        const handler = () => { try { unlockAudio(); } catch { } };
-        document.addEventListener('touchstart', handler, { once: true });
-        document.addEventListener('click', handler, { once: true });
-        return () => {
-            document.removeEventListener('touchstart', handler);
-            document.removeEventListener('click', handler);
-        };
-    }, []);
-
-    // View + activeSession persistence — handled by useLocalPersistence hook above
-
-
-    // Notification + DM badge useEffects — handled by useUnreadBadges hook above
-
+    // ── User init from server data ───────────────────────────────
     useEffect(() => {
         const baseUserObj = initialUser && typeof initialUser === 'object' ? (initialUser as Record<string, unknown>) : null
         if (!baseUserObj?.id) {
@@ -449,59 +336,6 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         setIsCoach(role === 'teacher' || role === 'admin')
     }, [initialUser, initialProfile])
 
-    // vipAccess fetch is handled by useVipAccess hook above
-
-    useEffect(() => {
-        try {
-            const { data: sub } = supabase.auth.onAuthStateChange((_event, session) => {
-                try {
-                    const ev = String(_event || '').toUpperCase()
-                    if (session && session.user?.id) return
-                    if (ev === 'SIGNED_OUT') {
-                        clearClientSessionState()
-                        if (typeof window !== 'undefined') window.location.href = '/?next=/dashboard'
-                        return
-                    }
-                    if (ev === 'INITIAL_SESSION') {
-                        fetch('/api/auth/ping', { method: 'GET', credentials: 'include', cache: 'no-store' })
-                            .then((r) => {
-                                if (r && r.status === 204) return
-                                clearClientSessionState()
-                                if (typeof window !== 'undefined') window.location.href = '/?next=/dashboard'
-                            })
-                            .catch(() => { })
-                        return
-                    }
-                } catch (e) { logError('IronTracksApp.authStateChange', e) }
-            })
-            return () => {
-                try { sub?.subscription?.unsubscribe?.() } catch { }
-            }
-        } catch (e) {
-            logError('IronTracksApp.authSubscribe', e)
-            return
-        }
-    }, [supabase, clearClientSessionState])
-
-    useEffect(() => {
-        restoreAdminPanelIfNeeded();
-        const onVisibility = () => {
-            if (typeof document === 'undefined') return;
-            if (document.visibilityState === 'visible') restoreAdminPanelIfNeeded();
-        };
-        const onPageShow = () => restoreAdminPanelIfNeeded();
-        try {
-            document.addEventListener('visibilitychange', onVisibility);
-            window.addEventListener('pageshow', onPageShow);
-        } catch { }
-        return () => {
-            try {
-                document.removeEventListener('visibilitychange', onVisibility);
-                window.removeEventListener('pageshow', onPageShow);
-            } catch { }
-        };
-    }, [restoreAdminPanelIfNeeded]);
-
     // Profile completion effect — handled by useProfileCompletion hook above
 
     // Bootstrap: fetch /api/dashboard/bootstrap and hydrate user, isCoach, workouts, stats
@@ -512,8 +346,20 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
     // fetchWorkouts, workouts, stats, studentFolders — handled by useWorkoutFetch hook above
     // streakStats fetch is handled by useWorkoutStreak hook above
 
-    // alert from useDialog returns Promise<boolean>; hooks expect Promise<void>
-    const alertVoid = useCallback(async (msg: string, title?: string): Promise<void> => { await alert(msg, title) }, [alert])
+    // ── Inline handlers — extracted to useAppHandlers ────────────
+    const appHandlers = useAppHandlers({
+        user,
+        supabase,
+        profileDraftName,
+        setProfileIncomplete,
+        setShowCompleteProfile,
+        setCurrentWorkout,
+        setView,
+        clearClientSessionState,
+        confirm,
+        alert,
+    })
+    const { handleLogout, handleSaveProfile, openManualWorkoutEditor, handleAddStory: handleAddStoryAction } = appHandlers
 
     // Export/import de treinos — extraídos para useWorkoutExport
     const {
@@ -530,7 +376,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         handleExportAllWorkouts,
         handleImportWorkout,
         handleJsonUpload,
-    } = useWorkoutExport({ user, workouts, fetchWorkouts, alert: alertVoid, confirm })
+    } = useWorkoutExport({ user, workouts, fetchWorkouts, alert: appHandlers.alertVoid, confirm })
 
     // CRUD de treinos — extraído para useWorkoutCrud
     const userSettingsForCrud = userSettingsApi?.settings && typeof userSettingsApi.settings === 'object'
@@ -593,73 +439,6 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         confirm,
     })
 
-    // Handlers de Sessão
-    const handleLogout = async () => {
-        const ok = await confirm("Deseja realmente sair da sua conta?", "Sair");
-        if (!ok) return;
-        try { clearClientSessionState(); } catch { }
-        try { window.location.href = '/auth/logout'; } catch { }
-    };
-
-    const handleSaveProfile = async () => {
-        if (!user?.id) return;
-        const nextName = String(profileDraftName || '').trim();
-        if (!nextName) {
-            await alert('Informe seu nome para completar o perfil.', 'Perfil incompleto');
-            return;
-        }
-
-        setSavingProfile(true);
-        try {
-            const { data, error } = await supabase
-                .from('profiles')
-                .update({
-                    display_name: nextName,
-                    photo_url: user.photoURL ?? null,
-                    last_seen: new Date().toISOString(),
-                })
-                .eq('id', user.id)
-                .select('id')
-                .maybeSingle();
-            if (error) throw error;
-            if (!data?.id) {
-                await alert('Não foi possível salvar seu perfil (registro não encontrado).', 'Perfil');
-                return;
-            }
-            setProfileIncomplete(false);
-            setShowCompleteProfile(false);
-        } catch (e) {
-            const message = e instanceof Error ? e.message : String(e || '')
-            await alert('Erro ao salvar perfil: ' + message);
-        } finally {
-            setSavingProfile(false);
-        }
-    };
-
-    // Abre o editor manual de treino (sem wizard)
-    const openManualWorkoutEditor = () => {
-        setCurrentWorkout({ title: '', exercises: [] as Exercise[] } as unknown as ActiveSession)
-        setView('edit')
-    }
-
-    useEffect(() => {
-        if (view !== 'active') return;
-        const scrollToTop = () => {
-            const node = mainScrollRef.current;
-            if (node) {
-                node.scrollTo({ top: 0, left: 0, behavior: 'auto' });
-            }
-            if (typeof window !== 'undefined') {
-                window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
-            }
-        };
-        const raf = requestAnimationFrame(scrollToTop);
-        const t = window.setTimeout(scrollToTop, 120);
-        return () => {
-            cancelAnimationFrame(raf);
-            window.clearTimeout(t);
-        };
-    }, [view, activeSession?.id]);
 
     const {
         hideVipOnIos,
@@ -679,6 +458,25 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         tourVersion: TOUR_VERSION,
     })
 
+    // ── All standalone effects — extracted to useAppEffects ──────
+    const { handleStartFromRestTimer } = useAppEffects({
+        userId: user?.id,
+        authLoading,
+        view,
+        setView,
+        directChat,
+        reportDataCurrent: reportData.current,
+        activeSession,
+        mainScrollRef,
+        restoreAdminPanelIfNeeded,
+        handleCloseTimer,
+        handleUpdateSessionLog,
+        setActiveSession,
+        openVipView,
+        supabase,
+        clearClientSessionState,
+    })
+
     const handleOpenProfile = useCallback(() => {
         setView('profile')
     }, [setView])
@@ -687,48 +485,6 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         if (!hideVipOnIos) return;
         if (view === 'vip') setView('dashboard');
     }, [hideVipOnIos, view]);
-
-    const handleStartFromRestTimer = useCallback(
-        (ctx?: unknown) => {
-            const nowMs = Date.now()
-            const ctxObj = isRecord(ctx) ? (ctx as Record<string, unknown>) : null
-            const prevKey = ctxObj ? String(ctxObj.key ?? '').trim() : ''
-            const nextKey = ctxObj ? String(ctxObj.nextKey ?? '').trim() : ''
-            const restStartedRaw = ctxObj ? ctxObj.restStartedAtMs : null
-            const restStartedAtMs = typeof restStartedRaw === 'number' ? restStartedRaw : Number(String(restStartedRaw ?? '').trim())
-
-            if (prevKey) {
-                const logsObj = isRecord(activeSession?.logs) ? (activeSession?.logs as Record<string, unknown>) : {}
-                const prevLog = logsObj[prevKey]
-                const prevLogObj = isRecord(prevLog) ? (prevLog as Record<string, unknown>) : {}
-                const completedRaw = prevLogObj.completedAtMs
-                const completedAtMs = typeof completedRaw === 'number' ? completedRaw : Number(String(completedRaw ?? '').trim())
-                const base = restStartedAtMs > 0 ? restStartedAtMs : completedAtMs > 0 ? completedAtMs : 0
-                const restSeconds = base > 0 ? Math.max(0, Math.round((nowMs - base) / 1000)) : null
-                if (restSeconds != null) {
-                    handleUpdateSessionLog(prevKey, { ...prevLogObj, restSeconds })
-                }
-            }
-
-            if (nextKey) {
-                const logsObj = isRecord(activeSession?.logs) ? (activeSession?.logs as Record<string, unknown>) : {}
-                const nextLog = logsObj[nextKey]
-                const nextLogObj = isRecord(nextLog) ? (nextLog as Record<string, unknown>) : {}
-                if (!Boolean(nextLogObj.done)) {
-                    handleUpdateSessionLog(nextKey, { ...nextLogObj, startedAtMs: nowMs })
-                    setActiveSession((prev) => {
-                        if (!prev) return prev
-                        const base = prev && typeof prev === 'object' ? (prev as Record<string, unknown>) : {}
-                        const ui = isRecord(base.ui) ? (base.ui as Record<string, unknown>) : {}
-                        return { ...(prev as Record<string, unknown>), ui: { ...ui, activeExecution: { key: nextKey, startedAtMs: nowMs } } } as unknown as ActiveWorkoutSession
-                    })
-                }
-            }
-
-            handleCloseTimer()
-        },
-        [activeSession?.logs, handleCloseTimer, handleUpdateSessionLog, setActiveSession]
-    )
 
     // Show loading screen while auth resolves — UNLESS we already have cached workouts
     // to show. In that case, render the dashboard immediately (workouts will be
@@ -845,7 +601,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                             hasUnreadChat={hasUnreadChat}
                             hasUnreadNotification={hasUnreadNotification}
                             hasActiveStory={hasActiveStory}
-                            onAddStory={handleAddStory}
+                            onAddStory={handleAddStoryAction}
                             hideVipOnIos={hideVipOnIos}
                             vipAccess={vipAccess as { hasVip?: boolean } | null}
                             syncState={syncState as { pending?: number; failed?: number; online?: boolean; syncing?: boolean } | null}
@@ -870,7 +626,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                             onOpenProfile={handleOpenProfile}
                             onLogout={handleLogout}
                             onOfflineSyncOpen={() => setOfflineSyncOpen(true)}
-                            onAcceptCoach={async () => { try { const r = await fetch('/api/teachers/accept', { method: 'POST' }); const j = await r.json(); if (j.ok) { setCoachPending(false); await alert('Conta ativada!') } else { await alert('Falha ao ativar: ' + (j.error || '')) } } catch (e) { const m = e instanceof Error ? e.message : String(e); await alert('Erro: ' + m) } }}
+                            onAcceptCoach={async () => { try { const r = await fetch('/api/teachers/accept', { method: 'POST' }); const j = await r.json(); if (j?.ok) { setCoachPending(false); await alert('Conta ativada!') } else { await alert('Falha ao ativar: ' + (j?.error || '')) } } catch (e) { const m = e instanceof Error ? e.message : String(e); await alert('Erro: ' + m) } }}
                         />
 
                         {/* Main Content */}
@@ -946,7 +702,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                         try { openManualWorkoutEditor() } catch { }
                                     }}
                                     onMyStoryStateChange={handleMyStoryStateChange}
-                                    onAddStory={handleAddStory}
+                                    onAddStory={handleAddStoryAction}
                                 />
                               </>
                             )}
@@ -1278,7 +1034,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                             setShowCompleteProfile={setShowCompleteProfile}
                             profileDraftName={profileDraftName}
                             setProfileDraftName={setProfileDraftName}
-                            savingProfile={savingProfile}
+                            savingProfile={appHandlers.savingProfile}
                             handleSaveProfile={handleSaveProfile}
                             showImportModal={showImportModal}
                             setShowImportModal={setShowImportModal}

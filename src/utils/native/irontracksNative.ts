@@ -1,5 +1,5 @@
 import { registerPlugin } from '@capacitor/core'
-import { isIosNative } from '@/utils/platform'
+import { isIosNative, isNativePlatform } from '@/utils/platform'
 
 // ─── Plugin type ────────────────────────────────────────────────────────────
 
@@ -91,14 +91,14 @@ const Native = registerPlugin<IronTracksNativePlugin>('IronTracksNative', {
 
 export const setIdleTimerDisabled = async (enabled: boolean) => {
   try {
-    if (!isIosNative()) return
+    if (!isNativePlatform()) return
     await Native.setIdleTimerDisabled({ enabled: Boolean(enabled) })
   } catch { }
 }
 
 export const openAppSettings = async () => {
   try {
-    if (!isIosNative()) return { ok: false }
+    if (!isNativePlatform()) return { ok: false }
     return await Native.openAppSettings()
   } catch {
     return { ok: false }
@@ -109,7 +109,7 @@ export const openAppSettings = async () => {
 
 export const requestNativeNotifications = async () => {
   try {
-    if (!isIosNative()) return { granted: false }
+    if (!isNativePlatform()) return { granted: false }
     return await Native.requestNotificationPermission()
   } catch {
     return { granted: false }
@@ -118,7 +118,7 @@ export const requestNativeNotifications = async () => {
 
 export const checkNativeNotificationPermission = async () => {
   try {
-    if (!isIosNative()) return { status: 'notDetermined' }
+    if (!isNativePlatform()) return { status: 'notDetermined' }
     return await Native.checkNotificationPermission()
   } catch {
     return { status: 'notDetermined' }
@@ -127,13 +127,13 @@ export const checkNativeNotificationPermission = async () => {
 
 export const setupNativeNotificationActions = async () => {
   try {
-    if (!isIosNative()) return
+    if (!isNativePlatform()) return
     await Native.setupNotificationActions()
   } catch { }
 }
 
 export const onNativeNotificationAction = (handler: (actionId: string) => void) => {
-  if (!isIosNative()) return () => { }
+  if (!isNativePlatform()) return () => { }
   type ListenerHandle = { remove: () => void }
   type MaybePromise<T> = T | Promise<T>
   const isPromise = (v: unknown): v is Promise<ListenerHandle> => {
@@ -172,7 +172,7 @@ export const scheduleRestNotification = async (
   repeatEverySeconds?: number
 ) => {
   try {
-    if (!isIosNative()) return
+    if (!isNativePlatform()) return
     const safeSeconds = Math.max(1, Math.round(Number(seconds) || 0))
     if (!safeSeconds) return
     const safeId = String(id || 'rest_timer').trim() || 'rest_timer'
@@ -191,7 +191,7 @@ export const scheduleRestNotification = async (
 
 export const cancelRestNotification = async (id: string) => {
   try {
-    if (!isIosNative()) return
+    if (!isNativePlatform()) return
     const safeId = String(id || 'rest_timer').trim() || 'rest_timer'
     await Native.cancelRestTimer({ id: safeId })
   } catch { }
@@ -234,7 +234,7 @@ export const scheduleAppNotification = async (opts: {
   delaySeconds?: number
 }) => {
   try {
-    if (!isIosNative()) return null
+    if (!isNativePlatform()) return null
     const result = await Native.scheduleAppNotification(opts)
     return result?.id || null
   } catch {
@@ -246,7 +246,7 @@ export const scheduleAppNotification = async (opts: {
 
 export const stopAlarmSound = async () => {
   try {
-    if (!isIosNative()) return
+    if (!isNativePlatform()) return
     await Native.stopAlarmSound()
   } catch { }
 }
@@ -255,7 +255,7 @@ export const stopAlarmSound = async () => {
 
 export const triggerHaptic = async (style: HapticStyle = 'medium') => {
   try {
-    if (!isIosNative()) return
+    if (!isNativePlatform()) return
     await Native.triggerHaptic({ style })
   } catch { }
 }
@@ -264,7 +264,7 @@ export const triggerHaptic = async (style: HapticStyle = 'medium') => {
 
 export const checkBiometricsAvailable = async () => {
   try {
-    if (!isIosNative()) return { available: false, biometryType: 'none' as const }
+    if (!isNativePlatform()) return { available: false, biometryType: 'none' as const }
     return await Native.checkBiometricsAvailable()
   } catch {
     return { available: false, biometryType: 'none' as const }
@@ -273,7 +273,7 @@ export const checkBiometricsAvailable = async () => {
 
 export const authenticateWithBiometrics = async (reason?: string) => {
   try {
-    if (!isIosNative()) return { success: false, error: 'Not available' }
+    if (!isNativePlatform()) return { success: false, error: 'Not available' }
     return await Native.authenticateWithBiometrics({ reason })
   } catch {
     return { success: false, error: 'Authentication failed' }
@@ -312,14 +312,14 @@ export const clearAllWorkoutsFromSpotlight = async () => {
 
 export const startAccelerometer = async (intervalMs = 100) => {
   try {
-    if (!isIosNative()) return
+    if (!isNativePlatform()) return
     await Native.startAccelerometer({ intervalMs })
   } catch { }
 }
 
 export const stopAccelerometer = async () => {
   try {
-    if (!isIosNative()) return
+    if (!isNativePlatform()) return
     await Native.stopAccelerometer()
   } catch { }
 }
@@ -409,7 +409,7 @@ export const getActiveCalories = async () => {
 
 export const saveImageToPhotos = async (base64: string) => {
   try {
-    if (!isIosNative()) return { saved: false, error: 'Not iOS native' }
+    if (!isNativePlatform()) return { saved: false, error: 'Not native' }
     return await Native.saveImageToPhotos({ base64 })
   } catch {
     return { saved: false, error: 'Save failed' }
@@ -420,7 +420,7 @@ export const saveImageToPhotos = async (base64: string) => {
  *  Avoids base64 round-trip through JS — significantly faster for large files. */
 export const saveBlobToPhotos = async (blob: Blob, filename: string, isVideo: boolean): Promise<{ saved: boolean; error: string }> => {
   try {
-    if (!isIosNative()) return { saved: false, error: 'Not iOS native' }
+    if (!isNativePlatform()) return { saved: false, error: 'Not native' }
 
     const { Filesystem, Directory } = await import('@capacitor/filesystem')
 

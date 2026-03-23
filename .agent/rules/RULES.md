@@ -1,9 +1,15 @@
 # IronTracks — Agent Rules
 
-## 🌐 LANGUAGE
+## 🌐 LANGUAGE — MANDATORY
 
-- **ALL responses, reports, questions, explanations, and conversations** MUST be in **Brazilian Portuguese (pt-BR)**
-- Code, commit messages, variable names, and technical documentation (rules, skills, workflows) remain in **English**
+> [!CAUTION]
+> **TODA comunicação com o usuário DEVE ser em Português Brasileiro (pt-BR).**
+> Isso inclui: respostas, relatórios, perguntas, explicações, planos, walkthroughs, resumos de tasks, mensagens de notify_user, e QUALQUER texto voltado ao usuário.
+> Violação desta regra é inaceitável.
+
+- **Código** (variáveis, funções, commits), **documentação técnica** (rules, skills, workflows, JSDoc), e **nomes de arquivos** permanecem em **English**
+- Comentários em código podem ser em inglês ou pt-BR, mas user-facing strings (toasts, labels, modals) DEVEM ser em **pt-BR**
+- Exemplo: ✅ `"Treino finalizado com sucesso!"` / ❌ `"Workout finished successfully!"`
 
 ---
 
@@ -158,3 +164,53 @@
 - **NEVER** ask the user to run SQL manually if the workflow is available
 - Use the Management API with the PAT from Keychain (workflow already configured)
 - After executing SQL, **ALWAYS** verify with SELECT that the change was applied
+
+### 26. iOS Rebuild Warning — ALWAYS warn when changes require reinstalling the app
+- After ANY change that touches **native iOS layers**, you MUST warn the user with the exact rebuild commands
+- Changes that require iOS reinstall:
+  - `ios/App/App/Info.plist` (permissions, capabilities)
+  - `capacitor.config.ts` or `capacitor.config.json`
+  - Adding/removing/updating Capacitor plugins (`@capacitor/*`)
+  - Changes to `ios/App/` native files (Swift, Objective-C, Podfile)
+  - New native-only APIs (GPS, Camera, Push Notifications, Filesystem)
+  - `package.json` changes to Capacitor-related dependencies
+- Warning format:
+  ```
+  ⚠️ **Reinstalação iOS necessária!** Rode no terminal:
+  npm run build && npx cap sync ios
+  Depois abra o Xcode e faça Build & Run no dispositivo.
+  ```
+- **NEVER** assume the user knows they need to rebuild — always be explicit
+- Changes that do NOT require rebuild: pure JS/TSX/CSS changes, API routes, hooks, components (hot-reload handles these)
+
+---
+
+## 🔗 HOOK & EXTRACTION RULES
+
+### 27. Hook Declaration Order — NEVER reference before declaration
+- Hooks that RETURN values consumed by OTHER hooks MUST be declared BEFORE the consuming hook
+- **BEFORE** wiring a new hook, always trace: "Does this hook reference a variable from another hook? Is that hook declared above?"
+- Common offenders: `useViewNavigation` → `openVipView`, `useAppHandlers` → `alertVoid`
+- When reordering, verify no circular dependencies exist between hooks
+
+### 28. Missing Import/Export Detection — verify before referencing
+- **BEFORE** importing a function from another module, verify it is actually exported with: `grep -n "export.*functionName" path/to/file`
+- **BEFORE** creating a file that `import { X } from './Y'`, verify `X` exists in `Y`
+- When extracting logic to a new hook, first create the hook with exports, THEN update the consumer
+- Common offenders: server actions referenced but never implemented, logger functions imported but not exported
+
+### 29. Dead Code Detection — grep after extraction
+- After extracting logic to a new file, **ALWAYS** verify the original export/component is still used:
+  ```bash
+  grep -r "OldComponentName" src/ --include="*.ts" --include="*.tsx" | head -5
+  ```
+- If zero results: DELETE the old file immediately
+- If only self-referencing: DELETE — it's dead code
+- Run yearly: `find src -name "*.tsx" | xargs grep -L "import\|require" | head -10` to find orphans
+
+### 30. Web API Global Types — NEVER use circular `typeof` in declare global
+- Browser APIs like `SpeechRecognition`, `Notification`, `IntersectionObserver` need explicit interface declarations
+- **WRONG**: `SpeechRecognition: typeof SpeechRecognition` (circular — the type doesn't exist yet)
+- **RIGHT**: Define the interface first, then use `new () => SpeechRecognition` in Window augmentation
+- Always add `// eslint-disable-next-line @typescript-eslint/no-empty-object-type` when extending EventTarget
+

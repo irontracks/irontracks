@@ -112,7 +112,7 @@ export default function ResultsPreview({ formData, onBack, studentName }: Result
   const handleExportPdf = async () => {
     try {
       // generateAssessmentPdf now opens the printable page internally
-      await generateAssessmentPdf(formData, results, studentName);
+      await generateAssessmentPdf(formData as unknown as Record<string, unknown>, results, studentName);
     } catch (e) {
       logError('error', 'Erro ao gerar PDF da avaliação', e);
     } finally {

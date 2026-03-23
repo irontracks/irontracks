@@ -30,11 +30,45 @@ if (!existsSync(iosDir)) {
 
 console.log('[patch-ios] Aplicando patches iOS...');
 
-// ── Add your iOS-specific patches here ──────────────────────────────────────
-// Example: fix Info.plist, update Podfile, patch Swift files, etc.
-// import { readFileSync, writeFileSync } from 'node:fs';
-// const plistPath = join(iosDir, 'App/App/Info.plist');
-// ...
+// ── Fix capacitor-swift-pm version conflicts for Xcode 26+ ──────────────────
+// SPM in Xcode 26+ treats `from: "7.0.0"` as 7.x only (semver major boundary),
+// which conflicts with CapApp-SPM's `exact: "8.0.2"`. This patch aligns all
+// plugin Package.swift files to use `exact` instead of `from`.
+import { readFileSync, writeFileSync } from 'node:fs';
+
+const TARGET_VERSION = '8.0.2';
+const PACKAGES = [
+    'node_modules/@capacitor/app/Package.swift',
+    'node_modules/@capacitor/device/Package.swift',
+    'node_modules/@capacitor/filesystem/Package.swift',
+    'node_modules/@capacitor/push-notifications/Package.swift',
+    'node_modules/@capacitor-community/apple-sign-in/Package.swift',
+    'node_modules/@capacitor/geolocation/Package.swift',
+    'node_modules/@revenuecat/purchases-capacitor/Package.swift',
+];
+
+let fixed = 0;
+for (const rel of PACKAGES) {
+    const abs = join(process.cwd(), rel);
+    if (!existsSync(abs)) continue;
+    const content = readFileSync(abs, 'utf8');
+    const patched = content.replace(
+        /capacitor-swift-pm\.git",\s*from:\s*"[\d.]+"/g,
+        `capacitor-swift-pm.git", exact: "${TARGET_VERSION}"`
+    );
+    if (patched !== content) {
+        writeFileSync(abs, patched);
+        fixed++;
+        const name = rel.replace('node_modules/', '').replace('/Package.swift', '');
+        console.log(`  ✔ ${name} → exact: "${TARGET_VERSION}"`);
+    }
+}
+
+if (fixed > 0) {
+    console.log(`  ℹ️  Fixed ${fixed} Package.swift file(s).`);
+} else {
+    console.log('  ℹ️  All Package.swift files already aligned.');
+}
 // ─────────────────────────────────────────────────────────────────────────────
 
 console.log('[patch-ios] Patches iOS concluídos.');
