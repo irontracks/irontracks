@@ -8,6 +8,7 @@ import Photos
 import LocalAuthentication
 import CoreSpotlight
 import MobileCoreServices
+import ActivityKit
 
 // ─── IronTracksNative Capacitor Plugin ───────────────────────────────────────
 @objc(IronTracksNativePlugin)
@@ -105,16 +106,22 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     @objc func setupNotificationActions(_ call: CAPPluginCall) {
+        // options: [] means the action works directly on the lock screen without unlocking
         let restDoneAction = UNNotificationAction(
             identifier: "REST_DONE",
-            title: "Iniciar Série",
-            options: [.foreground]
+            title: "▶ Iniciar Série",
+            options: []
+        )
+        let skipRestAction = UNNotificationAction(
+            identifier: "SKIP_REST",
+            title: "⏭ Pular Descanso",
+            options: []
         )
         let restCategory = UNNotificationCategory(
             identifier: "REST_TIMER",
-            actions: [restDoneAction],
+            actions: [restDoneAction, skipRestAction],
             intentIdentifiers: [],
-            options: []
+            options: [.customDismissAction]
         )
         UNUserNotificationCenter.current().setNotificationCategories([restCategory])
         call.resolve()
@@ -133,6 +140,9 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin {
         content.body = body
         content.sound = UNNotificationSound.default
         content.categoryIdentifier = "REST_TIMER"
+        if #available(iOS 15.0, *) {
+            content.interruptionLevel = .timeSensitive
+        }
 
         // ★ Cancel any previous notifications with this ID before scheduling new ones
         var cancelIds = [id]
@@ -157,6 +167,10 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin {
                     repeatContent.title = title
                     repeatContent.body = body
                     repeatContent.sound = UNNotificationSound.default
+                    repeatContent.categoryIdentifier = "REST_TIMER"
+                    if #available(iOS 15.0, *) {
+                        repeatContent.interruptionLevel = .timeSensitive
+                    }
                     let repeatRequest = UNNotificationRequest(
                         identifier: "\(id)_repeat_\(i)", content: repeatContent, trigger: repeatTrigger)
                     UNUserNotificationCenter.current().add(repeatRequest, withCompletionHandler: nil)
@@ -193,19 +207,66 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin {
         }
     }
 
-    // ─── Live Activity (stub — requires ActivityKit + WidgetExtension) ──────────
+    // ─── Live Activity (Dynamic Island + Lock Screen) ─────────────────────────
 
     @objc func startRestLiveActivity(_ call: CAPPluginCall) {
-        // Live Activities require an ActivityKit widget extension.
-        // This stub keeps the JS bridge satisfied without crashing.
-        call.resolve()
+        guard #available(iOS 16.1, *) else { call.resolve(); return }
+
+        let id       = call.getString("id")      ?? "rest"
+        let seconds  = call.getInt("seconds")    ?? 60
+        let title    = call.getString("title")   ?? ""
+
+        let attrs = RestTimerAttributes(timerID: id, exerciseName: title)
+        let state = RestTimerAttributes.ContentState(
+            secondsRemaining: seconds,
+            targetSeconds: seconds,
+            isFinished: false
+        )
+        do {
+            let activity = try Activity<RestTimerAttributes>.request(
+                attributes: attrs,
+                contentState: state,
+                pushType: nil
+            )
+            call.resolve(["activityId": activity.id])
+        } catch {
+            // Non-fatal: Live Activities may be disabled in Settings
+            call.resolve(["activityId": ""])
+        }
     }
 
     @objc func updateRestLiveActivity(_ call: CAPPluginCall) {
+        guard #available(iOS 16.1, *) else { call.resolve(); return }
+
+        let id               = call.getString("id")              ?? "rest"
+        let secondsRemaining = call.getInt("secondsRemaining")   ?? 0
+        let targetSeconds    = call.getInt("targetSeconds")      ?? 60
+        let isFinished       = call.getBool("isFinished")        ?? false
+
+        let state = RestTimerAttributes.ContentState(
+            secondsRemaining: secondsRemaining,
+            targetSeconds: targetSeconds,
+            isFinished: isFinished
+        )
+        Task {
+            for activity in Activity<RestTimerAttributes>.activities
+                where activity.attributes.timerID == id {
+                await activity.update(using: state)
+            }
+        }
         call.resolve()
     }
 
     @objc func endRestLiveActivity(_ call: CAPPluginCall) {
+        guard #available(iOS 16.1, *) else { call.resolve(); return }
+
+        let id = call.getString("id") ?? "rest"
+        Task {
+            for activity in Activity<RestTimerAttributes>.activities
+                where activity.attributes.timerID == id {
+                await activity.end(dismissalPolicy: .immediate)
+            }
+        }
         call.resolve()
     }
 
