@@ -13,10 +13,15 @@
 		504EC3081FED79650016851F /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 504EC3071FED79650016851F /* AppDelegate.swift */; };
 		BBBB0001BBBB0001BBBB0001 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBBB0002BBBB0002BBBB0002 /* SceneDelegate.swift */; };
 		AAAA0002AAAA0002AAAA0002 /* IronTracksNativePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAAA0001AAAA0001AAAA0001 /* IronTracksNativePlugin.swift */; };
+		W00FW00FW00FW00F /* RestTimerAttributes.swift in Sources (App) */ = {isa = PBXBuildFile; fileRef = W00AW00AW00AW00A /* RestTimerAttributes.swift */; };
 		504EC30D1FED79650016851F /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30B1FED79650016851F /* Main.storyboard */; };
 		504EC30F1FED79650016851F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30E1FED79650016851F /* Assets.xcassets */; };
 		504EC3121FED79650016851F /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC3101FED79650016851F /* LaunchScreen.storyboard */; };
 		50B271D11FEDC1A000F3C39B /* public in Resources */ = {isa = PBXBuildFile; fileRef = 50B271D01FEDC1A000F3C39B /* public */; };
+		W010W010W010W010 /* RestTimerAttributes.swift in Sources (Widget) */ = {isa = PBXBuildFile; fileRef = W00AW00AW00AW00A /* RestTimerAttributes.swift */; };
+		W011W011W011W011 /* RestTimerWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = W00BW00BW00BW00B /* RestTimerWidget.swift */; };
+		W012W012W012W012 /* IronTracksWidgets.swift in Sources */ = {isa = PBXBuildFile; fileRef = W00CW00CW00CW00C /* IronTracksWidgets.swift */; };
+		W013W013W013W013 /* IronTracksWidgets appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = W002W002W002W002 /* IronTracksWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -27,13 +32,33 @@
 		504EC3071FED79650016851F /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
 		BBBB0002BBBB0002BBBB0002 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
 		AAAA0001AAAA0001AAAA0001 /* IronTracksNativePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IronTracksNativePlugin.swift; sourceTree = "<group>"; };
+		W00AW00AW00AW00A /* RestTimerAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestTimerAttributes.swift; sourceTree = "<group>"; };
 		504EC30C1FED79650016851F /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
 		504EC30E1FED79650016851F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		504EC3111FED79650016851F /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		504EC3131FED79650016851F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		50B271D01FEDC1A000F3C39B /* public */ = {isa = PBXFileReference; lastKnownFileType = folder; path = public; sourceTree = "<group>"; };
 		958DCC722DB07C7200EA8C5F /* debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = debug.xcconfig; path = ../debug.xcconfig; sourceTree = SOURCE_ROOT; };
+		W002W002W002W002 /* IronTracksWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = IronTracksWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		W00BW00BW00BW00B /* RestTimerWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestTimerWidget.swift; sourceTree = "<group>"; };
+		W00CW00CW00CW00C /* IronTracksWidgets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IronTracksWidgets.swift; sourceTree = "<group>"; };
+		W00DW00DW00DW00D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		W00EW00EW00EW00E /* IronTracksWidgets.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = IronTracksWidgets.entitlements; sourceTree = "<group>"; };
 /* End PBXFileReference section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		W014W014W014W014 /* Embed App Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				W013W013W013W013 /* IronTracksWidgets appex in Embed App Extensions */,
+			);
+			name = "Embed App Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		504EC3011FED79650016851F /* Frameworks */ = {
@@ -41,6 +66,13 @@
 			buildActionMask = 2147483647;
 			files = (
 				4D22ABE92AF431CB00220026 /* CapApp-SPM in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		W004W004W004W004 /* Frameworks (Widget) */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -52,6 +84,7 @@
 			children = (
 				958DCC722DB07C7200EA8C5F /* debug.xcconfig */,
 				504EC3061FED79650016851F /* App */,
+				W009W009W009W009 /* IronTracksWidgets */,
 				504EC3051FED79650016851F /* Products */,
 			);
 			sourceTree = "<group>";
@@ -60,6 +93,7 @@
 			isa = PBXGroup;
 			children = (
 				504EC3041FED79650016851F /* App.app */,
+				W002W002W002W002 /* IronTracksWidgets.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -72,6 +106,7 @@
 				BBBB0002BBBB0002BBBB0002 /* SceneDelegate.swift */,
 				AAAA0007AAAA0007AAAA0007 /* App.entitlements */,
 				AAAA0001AAAA0001AAAA0001 /* IronTracksNativePlugin.swift */,
+				W00AW00AW00AW00A /* RestTimerAttributes.swift */,
 				504EC30B1FED79650016851F /* Main.storyboard */,
 				504EC30E1FED79650016851F /* Assets.xcassets */,
 				504EC3101FED79650016851F /* LaunchScreen.storyboard */,
@@ -80,6 +115,17 @@
 				50B271D01FEDC1A000F3C39B /* public */,
 			);
 			path = App;
+			sourceTree = "<group>";
+		};
+		W009W009W009W009 /* IronTracksWidgets */ = {
+			isa = PBXGroup;
+			children = (
+				W00BW00BW00BW00B /* RestTimerWidget.swift */,
+				W00CW00CW00CW00C /* IronTracksWidgets.swift */,
+				W00DW00DW00DW00D /* Info.plist */,
+				W00EW00EW00EW00E /* IronTracksWidgets.entitlements */,
+			);
+			path = IronTracksWidgets;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -92,10 +138,12 @@
 				504EC3001FED79650016851F /* Sources */,
 				504EC3011FED79650016851F /* Frameworks */,
 				504EC3021FED79650016851F /* Resources */,
+				W014W014W014W014 /* Embed App Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				W015W015W015W015 /* PBXTargetDependency */,
 			);
 			name = App;
 			packageProductDependencies = (
@@ -104,6 +152,23 @@
 			productName = App;
 			productReference = 504EC3041FED79650016851F /* App.app */;
 			productType = "com.apple.product-type.application";
+		};
+		W001W001W001W001 /* IronTracksWidgets */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = W006W006W006W006 /* Build configuration list for PBXNativeTarget "IronTracksWidgets" */;
+			buildPhases = (
+				W003W003W003W003 /* Sources */,
+				W004W004W004W004 /* Frameworks (Widget) */,
+				W005W005W005W005 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = IronTracksWidgets;
+			productName = IronTracksWidgets;
+			productReference = W002W002W002W002 /* IronTracksWidgets.appex */;
+			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
 
@@ -117,6 +182,10 @@
 					504EC3031FED79650016851F = {
 						CreatedOnToolsVersion = 9.2;
 						LastSwiftMigration = 1100;
+						ProvisioningStyle = Automatic;
+					};
+					W001W001W001W001 = {
+						CreatedOnToolsVersion = 14.0;
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -138,6 +207,7 @@
 			projectRoot = "";
 			targets = (
 				504EC3031FED79650016851F /* App */,
+				W001W001W001W001 /* IronTracksWidgets */,
 			);
 		};
 /* End PBXProject section */
@@ -156,6 +226,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		W005W005W005W005 /* Resources (Widget) */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
@@ -166,10 +243,39 @@
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
 				BBBB0001BBBB0001BBBB0001 /* SceneDelegate.swift in Sources */,
 				AAAA0002AAAA0002AAAA0002 /* IronTracksNativePlugin.swift in Sources */,
+				W00FW00FW00FW00F /* RestTimerAttributes.swift in Sources (App) */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		W003W003W003W003 /* Sources (Widget) */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				W010W010W010W010 /* RestTimerAttributes.swift in Sources (Widget) */,
+				W011W011W011W011 /* RestTimerWidget.swift in Sources */,
+				W012W012W012W012 /* IronTracksWidgets.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		W015W015W015W015 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = W001W001W001W001 /* IronTracksWidgets */;
+			targetProxy = W016W016W016W016 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin PBXContainerItemProxy section */
+		W016W016W016W016 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 504EC2FC1FED79650016851F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = W001W001W001W001;
+			remoteInfo = IronTracksWidgets;
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXVariantGroup section */
 		504EC30B1FED79650016851F /* Main.storyboard */ = {
@@ -348,6 +454,53 @@
 			};
 			name = Release;
 		};
+		W007W007W007W007 /* Debug (Widget) */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 2;
+				DEVELOPMENT_TEAM = 5XLC55D3YR;
+				CODE_SIGN_ENTITLEMENTS = IronTracksWidgets/IronTracksWidgets.entitlements;
+				INFOPLIST_FILE = IronTracksWidgets/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.1;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.irontracks.app.RestTimerWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		W008W008W008W008 /* Release (Widget) */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 2;
+				DEVELOPMENT_TEAM = 5XLC55D3YR;
+				CODE_SIGN_ENTITLEMENTS = IronTracksWidgets/IronTracksWidgets.entitlements;
+				INFOPLIST_FILE = IronTracksWidgets/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 16.1;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.irontracks.app.RestTimerWidget;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -365,6 +518,15 @@
 			buildConfigurations = (
 				504EC3171FED79650016851F /* Debug */,
 				504EC3181FED79650016851F /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		W006W006W006W006 /* Build configuration list for PBXNativeTarget "IronTracksWidgets" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				W007W007W007W007 /* Debug (Widget) */,
+				W008W008W008W008 /* Release (Widget) */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

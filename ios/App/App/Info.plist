@@ -67,6 +67,10 @@
 	<string>O IronTracks lê seus passos diários do Apple Health para exibir no resumo de atividade.</string>
 	<key>NSHealthUpdateUsageDescription</key>
 	<string>O IronTracks salva seus treinos concluídos (duração e calorias) no Apple Health.</string>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
+	<key>NSSupportsLiveActivitiesFrequentUpdates</key>
+	<true/>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>AllowsArbitraryLoadsInWebContent</key>
