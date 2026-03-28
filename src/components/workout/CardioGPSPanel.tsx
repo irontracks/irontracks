@@ -3,12 +3,15 @@
 import { useCallback, useState } from 'react'
 import { useCardioTracking } from '@/hooks/useCardioTracking'
 import { formatDistance, formatPace } from '@/utils/geoUtils'
+import type { GeoTrackPoint } from '@/utils/geoUtils'
 
 interface CardioGPSPanelProps {
   /** If provided, links the track to a workout */
   workoutId?: string
   /** Called after saving the track */
   onSaved?: (trackId: string) => void
+  /** Body weight in kg for accurate calorie calculation */
+  bodyWeightKg?: number
 }
 
 /** Format seconds as "HH:MM:SS" or "MM:SS" */
@@ -20,8 +23,8 @@ function formatDuration(seconds: number): string {
   return `${m}:${String(s).padStart(2, '0')}`
 }
 
-export default function CardioGPSPanel({ workoutId, onSaved }: CardioGPSPanelProps) {
-  const { isTracking, isPaused, metrics, start, pause, resume, stop, reset } = useCardioTracking()
+export default function CardioGPSPanel({ workoutId, onSaved, bodyWeightKg }: CardioGPSPanelProps) {
+  const { isTracking, isPaused, metrics, trackPoints, start, pause, resume, stop, reset } = useCardioTracking({ bodyWeightKg })
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
 
@@ -96,6 +99,9 @@ export default function CardioGPSPanel({ workoutId, onSaved }: CardioGPSPanelPro
         )}
       </div>
 
+      {/* Route Map */}
+      <RouteMap points={trackPoints} />
+
       {/* Metrics Grid */}
       <div className="grid grid-cols-3 gap-2 mb-3">
         <MetricCard label="Distância" value={formatDistance(metrics.distanceMeters)} accent />
@@ -157,6 +163,73 @@ export default function CardioGPSPanel({ workoutId, onSaved }: CardioGPSPanelPro
           50% { opacity: 0.4; }
         }
       `}</style>
+    </div>
+  )
+}
+
+const SVG_W = 200
+const SVG_H = 80
+const SVG_PAD = 8
+
+function RouteMap({ points }: { points: GeoTrackPoint[] }) {
+  if (points.length < 2) return null
+
+  const lats = points.map(p => p.latitude)
+  const lngs = points.map(p => p.longitude)
+  const minLat = Math.min(...lats)
+  const maxLat = Math.max(...lats)
+  const minLng = Math.min(...lngs)
+  const maxLng = Math.max(...lngs)
+  const latRange = maxLat - minLat || 0.0001
+  const lngRange = maxLng - minLng || 0.0001
+
+  const toX = (lng: number) => SVG_PAD + ((lng - minLng) / lngRange) * (SVG_W - SVG_PAD * 2)
+  // Latitude increases up, SVG y increases down
+  const toY = (lat: number) => SVG_H - SVG_PAD - ((lat - minLat) / latRange) * (SVG_H - SVG_PAD * 2)
+
+  const d = points
+    .map((p, i) => `${i === 0 ? 'M' : 'L'}${toX(p.longitude).toFixed(1)},${toY(p.latitude).toFixed(1)}`)
+    .join(' ')
+
+  const first = points[0]
+  const last = points[points.length - 1]
+
+  return (
+    <div
+      className="mb-3 rounded-xl overflow-hidden"
+      style={{ background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(34,197,94,0.12)' }}
+    >
+      <svg
+        viewBox={`0 0 ${SVG_W} ${SVG_H}`}
+        className="w-full"
+        style={{ height: 72, display: 'block' }}
+      >
+        {/* Route line */}
+        <path
+          d={d}
+          fill="none"
+          stroke="rgba(34,197,94,0.75)"
+          strokeWidth="1.8"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        />
+        {/* Start dot */}
+        <circle
+          cx={toX(first.longitude).toFixed(1)}
+          cy={toY(first.latitude).toFixed(1)}
+          r="3"
+          fill="#22c55e"
+        />
+        {/* Current position dot */}
+        <circle
+          cx={toX(last.longitude).toFixed(1)}
+          cy={toY(last.latitude).toFixed(1)}
+          r="4"
+          fill="white"
+          stroke="#22c55e"
+          strokeWidth="1.5"
+        />
+      </svg>
     </div>
   )
 }

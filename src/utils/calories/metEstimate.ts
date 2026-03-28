@@ -5,10 +5,11 @@
  * MET values from the Compendium of Physical Activities (Ainsworth 2011).
  *
  * ## Validated calorie ranges for resistance training:
- *  - 45 min, light arms (male 80kg):    200–300 kcal
- *  - 60 min, moderate full-body:         350–500 kcal
- *  - 75 min, vigorous leg day:           450–600 kcal
- *  - 90 min, very intense compounds:     500–700 kcal
+ *  - 45 min, light arms (male 80kg):        200–300 kcal
+ *  - 60 min, moderate full-body:             350–500 kcal
+ *  - 75 min, vigorous leg day:               450–600 kcal
+ *  - 90 min, very intense compounds:         500–700 kcal
+ *  - 90 min, extreme volume (20 000+ kg):    550–750 kcal
  *
  * ## Multi-factor inputs:
  *  1. Duration (execution time + rest time)
@@ -52,6 +53,8 @@ export const MET_LIGHT = 3.5
 export const MET_MODERATE = 5.0
 /** Vigorous resistance training (heavy compounds, high density) */
 export const MET_VIGOROUS = 6.0
+/** Very vigorous resistance training (extreme volume/density, e.g. 26 000 kg+ back days) */
+export const MET_VERY_VIGOROUS = 7.5
 /** Rest between sets (sitting/standing, light activity) */
 export const MET_REST = 1.5
 
@@ -66,7 +69,8 @@ export const DEFAULT_BODY_WEIGHT_KG = 78
  * Calibrated to produce correct ranges when combined with other factors:
  *  - < 60 kg/min  → MET 3.5 (light: warm-up, arms, abs)
  *  - 60-200 kg/min → MET 5.0 (moderate: typical hypertrophy)
- *  - ≥ 200 kg/min → MET 6.0 (vigorous: heavy compounds, supersets)
+ *  - 200-500 kg/min → MET 6.0 (vigorous: heavy compounds, supersets)
+ *  - ≥ 500 kg/min → MET 7.5 (very vigorous: extreme volume, e.g. 20 000+ kg sessions)
  */
 export const selectBaseMet = (
   volumeKg: number,
@@ -77,7 +81,8 @@ export const selectBaseMet = (
 
   if (density < 60) return MET_LIGHT
   if (density < 200) return MET_MODERATE
-  return MET_VIGOROUS
+  if (density < 500) return MET_VIGOROUS
+  return MET_VERY_VIGOROUS
 }
 
 // ── Training style detection ─────────────────────────────────────────────────
@@ -85,7 +90,8 @@ export const selectBaseMet = (
  * Detects training style from session data and returns a small multiplier.
  *
  * - Circuit / HIIT (very short rest): 1.10 (elevated HR throughout)
- * - Strength (heavy, low reps, long rest): 0.95 (more rest, less continuous work)
+ * - Strength (heavy, low reps, long rest): 1.00 (rest time already handled by MET_REST; heavy
+ *   compounds have high per-rep metabolic cost that offsets lower continuous HR)
  * - Endurance (light, high reps): 1.05 (more continuous movement)
  * - Hypertrophy (default): 1.00 (baseline)
  */
@@ -143,7 +149,7 @@ export const detectTrainingStyle = (
 export const getStyleFactor = (style: TrainingStyle): number => {
   switch (style) {
     case 'circuit': return 1.10
-    case 'strength': return 0.95
+    case 'strength': return 1.00
     case 'endurance': return 1.05
     case 'hypertrophy': return 1.00
     default: return 1.00
@@ -335,11 +341,13 @@ export const getCadenceFactor = (cadences: string[] | null | undefined): number 
  * Conservative EPOC (Excess Post-exercise Oxygen Consumption).
  * Only applies to vigorous sessions of sufficient duration.
  *
+ * - MET ≥ 7.0 AND duration > 60 min → +7%
  * - MET ≥ 6.0 AND duration > 60 min → +5%
  * - MET ≥ 5.0 AND duration > 45 min → +3%
  * - Otherwise → +0%
  */
 export const getEpocFactor = (met: number, durationMinutes: number): number => {
+  if (met >= 7.0 && durationMinutes > 60) return 1.07
   if (met >= 6.0 && durationMinutes > 60) return 1.05
   if (met >= 5.0 && durationMinutes > 45) return 1.03
   return 1.00
@@ -377,10 +385,10 @@ export const computeActiveWorkMinutes = (
     return Math.max(totalExecSeconds / 60, totalMinutes * 0.35)
   }
 
-  // Otherwise estimate: total - rest, clamped to minimum 35%
+  // Otherwise estimate: total - rest, clamped to minimum 40%
   const restMinutes = totalRestSeconds / 60
   const active = totalMinutes - restMinutes
-  return Math.max(active, totalMinutes * 0.35)
+  return Math.max(active, totalMinutes * 0.40)
 }
 
 // ── Duration fallback from log timestamps ────────────────────────────────────
@@ -507,11 +515,11 @@ export const estimateCaloriesMet = (
   if (!effectiveDuration || effectiveDuration <= 0) return 0
 
   // ── 4. Active vs rest time split ─────────────────────────────────────────
-  // IMPORTANT: activeMinutes must be clamped to at least 35% of total duration.
+  // IMPORTANT: activeMinutes must be clamped to at least 40% of total duration.
   // Without this, sessions with very short logged execution time (e.g. 3 min of
   // actual muscle contraction in an 80-min session) produce near-zero active kcal
   // while rest kcal (MET 1.5) dominate — severely underestimating total burn.
-  const minActiveMinutes = effectiveDuration * 0.35
+  const minActiveMinutes = effectiveDuration * 0.40
   const activeMinutes = (() => {
     if (execMinutesOverride != null && execMinutesOverride > 0)
       return Math.max(execMinutesOverride, minActiveMinutes)

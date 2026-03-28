@@ -35,9 +35,11 @@ interface UseStoryComposerOptions {
     open: boolean
     session: SessionLite
     onClose: () => void
+    /** Pre-calculated calories from the report — overrides internal estimation when provided */
+    caloriesOverride?: number | null
 }
 
-export function useStoryComposer({ open, session, onClose }: UseStoryComposerOptions) {
+export function useStoryComposer({ open, session, onClose, caloriesOverride }: UseStoryComposerOptions) {
     const inputRef = useRef<HTMLInputElement>(null)
     const videoRef = useRef<HTMLVideoElement>(null)
     const compositorRef = useRef<VideoCompositor | null>(null)
@@ -136,24 +138,26 @@ export function useStoryComposer({ open, session, onClose }: UseStoryComposerOpt
         const restMinutesOverride = restSeconds > 0 ? restSeconds / 60 : null
         const durationMinutes = totalTime / 60
 
-        // ── Calculate kcal using the same estimator as the report ─────────────
-        const kcal = estimateCaloriesMet(
-            logs,
-            durationMinutes,
-            bodyWeightKg,
-            exerciseNames,
-            rpe,
-            execMinutesOverride,
-            restMinutesOverride,
-            null, // biologicalSex not available in story context (uses default)
-            exerciseVolumes,
-        )
+        // ── Calculate kcal: prefer override from report, fall back to internal estimator ──
+        const kcal = caloriesOverride != null && Number.isFinite(caloriesOverride) && caloriesOverride > 0
+            ? Math.round(caloriesOverride)
+            : estimateCaloriesMet(
+                logs,
+                durationMinutes,
+                bodyWeightKg,
+                exerciseNames,
+                rpe,
+                execMinutesOverride,
+                restMinutesOverride,
+                null, // biologicalSex not available in story context (uses default)
+                exerciseVolumes,
+            )
 
         const teamObj = s?.team && typeof s.team === 'object' ? (s.team as Record<string, unknown>) : null
         const teamCountRaw = teamObj?.participantsCount ?? s?.teamParticipantsCount ?? s?.teamSessionParticipantsCount
         const teamCount = Number(teamCountRaw)
         return { title, date, volume, totalTime, kcal, teamCount: Number.isFinite(teamCount) ? teamCount : 0 }
-    }, [session])
+    }, [session, caloriesOverride])
 
     // ── Fire-and-forget: API call for server logging only (does NOT drive displayed kcal) ──
     useEffect(() => {
