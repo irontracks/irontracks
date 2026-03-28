@@ -134,7 +134,7 @@ export function useGeoLocation(): UseGeoLocationResult {
         const Geo = await getCapacitorGeolocation()
         if (Geo) {
           try {
-            const pos = await Geo.getCurrentPosition({ enableHighAccuracy: true, timeout: 10000 })
+            const pos = await Geo.getCurrentPosition({ enableHighAccuracy: true, timeout: 15000, maximumAge: 0 })
             point = { latitude: pos.coords.latitude, longitude: pos.coords.longitude }
           } catch {
             // Native failed — try web fallback
@@ -149,7 +149,7 @@ export function useGeoLocation(): UseGeoLocationResult {
           navigator.geolocation.getCurrentPosition(
             (pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
             () => resolve(null),
-            { enableHighAccuracy: true, timeout: 10000 }
+            { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
           )
         })
       }
@@ -179,10 +179,17 @@ export function useGeoLocation(): UseGeoLocationResult {
           if (Geo) {
             try {
               const id = await Geo.watchPosition(
-                { enableHighAccuracy: true },
-                (pos: { coords: { latitude: number; longitude: number } } | null) => {
+                { enableHighAccuracy: true, timeout: 15000 },
+                (
+                  pos: { coords: { latitude: number; longitude: number; altitude?: number | null; speed?: number | null } } | null,
+                  err?: unknown,
+                ) => {
+                  if (err) return // silenced: GPS signal temporarily lost
                   if (pos) {
-                    setPosition({ latitude: pos.coords.latitude, longitude: pos.coords.longitude })
+                    setPosition({
+                      latitude: pos.coords.latitude,
+                      longitude: pos.coords.longitude,
+                    })
                   }
                 }
               )

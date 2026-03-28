@@ -20,6 +20,11 @@ interface CardioMetrics {
   caloriesEstimated: number
 }
 
+interface UseCardioTrackingOptions {
+  /** Body weight in kg — used for accurate MET-based calorie calculation. Defaults to 75 kg. */
+  bodyWeightKg?: number
+}
+
 interface UseCardioTrackingResult {
   /** Whether tracking is active */
   isTracking: boolean
@@ -51,19 +56,33 @@ const EMPTY_METRICS: CardioMetrics = {
 }
 
 /**
- * Estimate calories from distance (meters) and duration (seconds).
- * Uses a rough MET-based formula: ~60 cal/km for running, ~40 cal/km for walking.
- * Threshold: > 8 km/h = running, else walking.
+ * Estimate calories burned using MET × body weight × time.
+ * MET tiers by speed:
+ *   < 5 km/h  → walking slow  (MET 2.8)
+ *   5–6 km/h  → walking brisk (MET 3.5)
+ *   6–8 km/h  → fast walk     (MET 5.0)
+ *   8–10 km/h → jogging       (MET 8.0)
+ *  10–12 km/h → running       (MET 10.0)
+ *  > 12 km/h  → fast running  (MET 11.5)
  */
-function estimateCalories(distanceMeters: number, durationSeconds: number): number {
+function estimateCalories(
+  distanceMeters: number,
+  durationSeconds: number,
+  bodyWeightKg = 75,
+): number {
   if (distanceMeters <= 0 || durationSeconds <= 0) return 0
-  const km = distanceMeters / 1000
   const speed = speedKmh(distanceMeters, durationSeconds)
-  const calPerKm = speed > 8 ? 65 : 45
-  return Math.round(km * calPerKm)
+  const met =
+    speed < 5  ? 2.8 :
+    speed < 6  ? 3.5 :
+    speed < 8  ? 5.0 :
+    speed < 10 ? 8.0 :
+    speed < 12 ? 10.0 : 11.5
+  const durationHours = durationSeconds / 3600
+  return Math.round(met * bodyWeightKg * durationHours)
 }
 
-export function useCardioTracking(): UseCardioTrackingResult {
+export function useCardioTracking({ bodyWeightKg = 75 }: UseCardioTrackingOptions = {}): UseCardioTrackingResult {
   const { startWatching, stopWatching, position, watching } = useGeoLocation()
   const [isTracking, setIsTracking] = useState(false)
   const [isPaused, setIsPaused] = useState(false)
@@ -87,7 +106,7 @@ export function useCardioTracking(): UseCardioTrackingResult {
         ...prev,
         durationSeconds: elapsed,
         paceMinKm: avgPaceMinKm(prev.distanceMeters, elapsed),
-        caloriesEstimated: estimateCalories(prev.distanceMeters, elapsed),
+        caloriesEstimated: estimateCalories(prev.distanceMeters, elapsed, bodyWeightKg),
       }))
     }, 1000)
 
@@ -129,7 +148,7 @@ export function useCardioTracking(): UseCardioTrackingResult {
         paceMinKm: avgPaceMinKm(dist, elapsed),
         currentSpeedKmh: Math.round(currentSpeed * 10) / 10,
         maxSpeedKmh: Math.round(maxSpeedRef.current * 10) / 10,
-        caloriesEstimated: estimateCalories(dist, elapsed),
+        caloriesEstimated: estimateCalories(dist, elapsed, bodyWeightKg),
       })
 
       return updated

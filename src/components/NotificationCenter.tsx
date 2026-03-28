@@ -156,10 +156,15 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded, open:
                         const safePrev = Array.isArray(prev) ? prev : [];
                         const next = payload?.new && typeof payload.new === 'object' ? (payload.new as NotificationItem) : null;
                         if (!next) return safePrev;
+                        // Avoid duplicates (e.g. rapid reconnect)
+                        if (safePrev.some(n => n?.id === (next as NotificationItem).id)) return safePrev;
                         return [next, ...safePrev];
                     });
                 })
-            .subscribe();
+            .subscribe((status) => {
+                // Re-fetch on channel reconnect so no notifications are missed
+                if (status === 'SUBSCRIBED' && isMounted) fetchNotifications();
+            });
 
         return () => { isMounted = false; if (channel) supabase.removeChannel(channel); };
     }, [supabase, safeUserId]);
@@ -183,6 +188,8 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded, open:
                 setSystemNotifications(prev =>
                     (Array.isArray(prev) ? prev : []).map(n => ({ ...n, read: true, is_read: true }))
                 );
+                // Clear iOS app icon badge — best-effort, don't await
+                fetch('/api/push/clear-badge', { method: 'POST', credentials: 'include' }).catch(() => { });
             } catch (e) { logError('component:NotificationCenter.markRead', e); return; }
         }, 800);
         return () => { cancelled = true; clearTimeout(timer); };
@@ -256,7 +263,12 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded, open:
         }))
     ].sort((a, b) => b.timestamp - a.timestamp);
 
-    const unreadCount = allNotifications.filter(n => !n?.read).length;
+    // Use is_read as canonical field; fall back to read for legacy rows
+    const unreadCount = allNotifications.filter(n => {
+        const item = n as typeof n & { is_read?: boolean };
+        if (typeof item?.is_read === 'boolean') return !item.is_read;
+        return !n?.read;
+    }).length;
     const hasItems = allNotifications.length > 0;
 
     // ─── Render list ──────────────────────────────────────────────────────────

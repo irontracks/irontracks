@@ -48,12 +48,10 @@ export default function StoryComposer({ open, session, onClose, calories }: Stor
     loadMedia, onSelectLayout,
     onPiecePointerDown, onPiecePointerMove, onPiecePointerUp,
     shareImage, postToIronTracks,
-  } = useStoryComposer({ open, session, onClose })
+  } = useStoryComposer({ open, session, onClose, caloriesOverride: calories })
 
-  // Override kcal with the pre-calculated value from the report if provided
-  const metrics = calories != null && Number.isFinite(calories) && calories > 0
-    ? { ...rawMetrics, kcal: Math.round(calories) }
-    : rawMetrics
+  // metrics.kcal already reflects caloriesOverride (applied inside the hook so the canvas is correct)
+  const metrics = rawMetrics
 
   // ── Sticker state ───────────────────────────────────────────────────
   const [selectedSticker, setSelectedSticker] = useState<string | null>(null)

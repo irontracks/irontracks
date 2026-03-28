@@ -34,6 +34,12 @@
 	<string>Usamos sua biblioteca de fotos para salvar vídeos gravados quando necessário.</string>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string>O IronTracks usa sua localização para detectar automaticamente sua academia, registrar check-ins e rastrear corridas e caminhadas.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Permitir sempre permite que o IronTracks continue rastreando sua rota mesmo com a tela bloqueada ou ao usar outros apps.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>location</string>
+	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>
 	<key>UIMainStoryboardFile</key>
