@@ -5,7 +5,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Timer, X } from 'lucide-react';
 import { playTimerFinishSound, playTick } from '@/lib/sounds';
 import { isNativePlatform } from '@/utils/platform';
-import { cancelRestNotification, endRestLiveActivity, requestNativeNotifications, scheduleRestNotification, setIdleTimerDisabled, startRestLiveActivity, stopAlarmSound, triggerHaptic, updateRestLiveActivity } from '@/utils/native/irontracksNative';
+import { cancelRestNotification, endRestLiveActivity, requestNativeNotifications, scheduleRestNotification, startRestLiveActivity, stopAlarmSound, triggerHaptic, updateRestLiveActivity } from '@/utils/native/irontracksNative';
 
 interface RestTimerContext {
     kind?: string;
@@ -208,7 +208,6 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
 
     useEffect(() => {
         if (!targetTime) {
-            setIdleTimerDisabled(false);
             if (notifyIdRef.current) {
                 cancelRestNotification(notifyIdRef.current);
             }
@@ -245,7 +244,6 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
                 }).catch(() => { });
             }
             startRestLiveActivity(id, seconds, liveTitle);
-            setIdleTimerDisabled(true);
         } catch { }
 
         // Capture total duration on first tick
@@ -283,7 +281,6 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
                 endRestLiveActivity(notifyIdRef.current);
             }
             stopAlarm(false);
-            setIdleTimerDisabled(false);
         };
     // ★ ONLY depend on targetTime + context identity — not on settings
     // Settings are read via refs inside the effect body
@@ -429,7 +426,7 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
         <>
             {/* Finished flash */}
             {isFinished && (
-                <div className="fixed inset-0 z-[2000] bg-green-600/90 backdrop-blur-sm flex flex-col items-center justify-center pointer-events-none">
+                <div className="fixed inset-0 z-[2000] bg-green-600/90 backdrop-blur-sm flex flex-col items-center justify-center">
                     <div className="text-7xl mb-4">💪</div>
                     <h1 className="text-5xl font-black text-white uppercase tracking-tighter">BORA!</h1>
                     <p className="text-white/80 font-bold mt-2 text-lg">Descanso finalizado</p>

@@ -9,7 +9,8 @@
  * refreshes. Used by the main workout screen and workout controller.
  */
 import { logWarn } from '@/lib/logger'
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
+import { setIdleTimerDisabled } from '@/utils/native/irontracksNative'
 import { ActiveSession, ActiveWorkoutSession } from '@/types/app'
 
 export type PreCheckinDraft = {
@@ -101,6 +102,13 @@ export function useActiveSession({ userId }: UseActiveSessionOptions): UseActive
         },
         [preCheckinOpen, userId]
     )
+
+    // Keep the screen on while a workout session is active
+    useEffect(() => {
+        if (activeSession === null) return
+        setIdleTimerDisabled(true).catch(() => { /* non-native env */ })
+        return () => { setIdleTimerDisabled(false).catch(() => { }) }
+    }, [activeSession === null]) // eslint-disable-line react-hooks/exhaustive-deps
 
     const handleUpdateSessionLog = useCallback((key: string, data: unknown) => {
         setActiveSession((prev) => {
