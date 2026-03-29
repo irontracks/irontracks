@@ -31,6 +31,7 @@ export const DashboardTabs = memo(({
     triggerHaptic('light').catch(() => { })
     onChangeView(next)
   }, [onChangeView])
+
   const tabCls = (active: boolean) =>
     `flex-1 min-h-[52px] px-2 sm:px-3 rounded-xl text-[11px] sm:text-xs uppercase tracking-wider whitespace-nowrap leading-none transition-colors duration-200 flex flex-col items-center justify-center gap-[5px] relative z-10 ${active
       ? 'text-yellow-400 font-black'

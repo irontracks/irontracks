@@ -109,19 +109,19 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin {
         // options: [] means the action works directly on the lock screen without unlocking
         let restDoneAction = UNNotificationAction(
             identifier: "REST_DONE",
-            title: "▶ Iniciar Série",
+            title: "Iniciar Serie",
             options: []
         )
         let skipRestAction = UNNotificationAction(
             identifier: "SKIP_REST",
-            title: "⏭ Pular Descanso",
+            title: "Pular Descanso",
             options: []
         )
         let restCategory = UNNotificationCategory(
             identifier: "REST_TIMER",
             actions: [restDoneAction, skipRestAction],
             intentIdentifiers: [],
-            options: [.customDismissAction]
+            options: []
         )
         UNUserNotificationCenter.current().setNotificationCategories([restCategory])
         call.resolve()
@@ -216,6 +216,14 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin {
         let seconds  = call.getInt("seconds")    ?? 60
         let title    = call.getString("title")   ?? ""
 
+        // End any existing activity for this timer before starting a new one
+        Task {
+            for activity in Activity<RestTimerAttributes>.activities
+                where activity.attributes.timerID == id {
+                await activity.end(dismissalPolicy: .immediate)
+            }
+        }
+
         let attrs = RestTimerAttributes(timerID: id, exerciseName: title)
         let state = RestTimerAttributes.ContentState(
             secondsRemaining: seconds,
@@ -223,14 +231,17 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin {
             isFinished: false
         )
         do {
+            // staleDate tells iOS to auto-dim the activity if the app crashes or is killed
+            let staleDate = Date().addingTimeInterval(Double(seconds + 30))
+            let content = ActivityContent(state: state, staleDate: staleDate)
             let activity = try Activity<RestTimerAttributes>.request(
                 attributes: attrs,
-                contentState: state,
+                content: content,
                 pushType: nil
             )
             call.resolve(["activityId": activity.id])
         } catch {
-            // Non-fatal: Live Activities may be disabled in Settings
+            print("[IronTracks] Live Activity start failed: \(error.localizedDescription)")
             call.resolve(["activityId": ""])
         }
     }
@@ -248,10 +259,12 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin {
             targetSeconds: targetSeconds,
             isFinished: isFinished
         )
+        let staleDate = Date().addingTimeInterval(Double(max(secondsRemaining, 5) + 30))
+        let content = ActivityContent(state: state, staleDate: staleDate)
         Task {
             for activity in Activity<RestTimerAttributes>.activities
                 where activity.attributes.timerID == id {
-                await activity.update(using: state)
+                await activity.update(content)
             }
         }
         call.resolve()
