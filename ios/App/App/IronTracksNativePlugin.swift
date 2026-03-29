@@ -216,33 +216,33 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin {
         let seconds  = call.getInt("seconds")    ?? 60
         let title    = call.getString("title")   ?? ""
 
-        // End any existing activity for this timer before starting a new one
         Task {
+            // End any existing activity for this timer before starting a new one
             for activity in Activity<RestTimerAttributes>.activities
                 where activity.attributes.timerID == id {
                 await activity.end(dismissalPolicy: .immediate)
             }
-        }
 
-        let attrs = RestTimerAttributes(timerID: id, exerciseName: title)
-        let state = RestTimerAttributes.ContentState(
-            secondsRemaining: seconds,
-            targetSeconds: seconds,
-            isFinished: false
-        )
-        do {
-            // staleDate tells iOS to auto-dim the activity if the app crashes or is killed
-            let staleDate = Date().addingTimeInterval(Double(seconds + 30))
-            let content = ActivityContent(state: state, staleDate: staleDate)
-            let activity = try Activity<RestTimerAttributes>.request(
-                attributes: attrs,
-                content: content,
-                pushType: nil
+            let attrs = RestTimerAttributes(timerID: id, exerciseName: title)
+            let state = RestTimerAttributes.ContentState(
+                secondsRemaining: seconds,
+                targetSeconds: seconds,
+                isFinished: false
             )
-            call.resolve(["activityId": activity.id])
-        } catch {
-            print("[IronTracks] Live Activity start failed: \(error.localizedDescription)")
-            call.resolve(["activityId": ""])
+            do {
+                // staleDate tells iOS to auto-dim the activity if the app crashes or is killed
+                let staleDate = Date().addingTimeInterval(Double(seconds + 30))
+                let content = ActivityContent(state: state, staleDate: staleDate)
+                let activity = try Activity<RestTimerAttributes>.request(
+                    attributes: attrs,
+                    content: content,
+                    pushType: nil
+                )
+                call.resolve(["activityId": activity.id])
+            } catch {
+                print("[IronTracks] Live Activity start failed: \(error.localizedDescription)")
+                call.resolve(["activityId": ""])
+            }
         }
     }
 
