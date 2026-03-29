@@ -104,11 +104,12 @@ export function useActiveSession({ userId }: UseActiveSessionOptions): UseActive
     )
 
     // Keep the screen on while a workout session is active
+    const isActive = activeSession !== null
     useEffect(() => {
-        if (activeSession === null) return
+        if (!isActive) return
         setIdleTimerDisabled(true).catch(() => { /* non-native env */ })
         return () => { setIdleTimerDisabled(false).catch(() => { }) }
-    }, [activeSession === null]) // eslint-disable-line react-hooks/exhaustive-deps
+    }, [isActive])
 
     const handleUpdateSessionLog = useCallback((key: string, data: unknown) => {
         setActiveSession((prev) => {

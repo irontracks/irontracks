@@ -42,7 +42,7 @@ export function useNativeTimerActions({
     const off = onNativeNotificationAction((actionId) => {
       if (!actionId) return
 
-      if (actionId === 'SKIP_REST' || actionId === 'START_REST') {
+      if (actionId === 'SKIP_REST' || actionId === 'START_REST' || actionId === 'REST_DONE') {
         handleCloseTimer()
         return
       }

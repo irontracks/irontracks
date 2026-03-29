@@ -454,14 +454,17 @@
 			};
 			name = Release;
 		};
-		W007W007W007W007 /* Debug (Widget) */ = {
+		W007W007W007W007 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = 5XLC55D3YR;
 				CODE_SIGN_ENTITLEMENTS = IronTracksWidgets/IronTracksWidgets.entitlements;
+				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = IronTracksWidgets/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = IronTracksWidgets;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				IPHONEOS_DEPLOYMENT_TARGET = 16.1;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -473,19 +476,23 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
 			name = Debug;
 		};
-		W008W008W008W008 /* Release (Widget) */ = {
+		W008W008W008W008 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 2;
 				DEVELOPMENT_TEAM = 5XLC55D3YR;
 				CODE_SIGN_ENTITLEMENTS = IronTracksWidgets/IronTracksWidgets.entitlements;
+				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = IronTracksWidgets/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = IronTracksWidgets;
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
 				IPHONEOS_DEPLOYMENT_TARGET = 16.1;
 				LD_RUNPATH_SEARCH_PATHS = (
 					"$(inherited)",
@@ -496,6 +503,7 @@
 				PRODUCT_BUNDLE_IDENTIFIER = com.irontracks.app.RestTimerWidget;
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -525,8 +533,8 @@
 		W006W006W006W006 /* Build configuration list for PBXNativeTarget "IronTracksWidgets" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				W007W007W007W007 /* Debug (Widget) */,
-				W008W008W008W008 /* Release (Widget) */,
+				W007W007W007W007 /* Debug */,
+				W008W008W008W008 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
