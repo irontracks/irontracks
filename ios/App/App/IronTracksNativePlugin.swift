@@ -210,77 +210,82 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin {
     // ─── Live Activity (Dynamic Island + Lock Screen) ─────────────────────────
 
     @objc func startRestLiveActivity(_ call: CAPPluginCall) {
-        guard #available(iOS 16.1, *) else { call.resolve(); return }
+        if #available(iOS 16.2, *) {
+            let id       = call.getString("id")      ?? "rest"
+            let seconds  = call.getInt("seconds")    ?? 60
+            let title    = call.getString("title")   ?? ""
 
-        let id       = call.getString("id")      ?? "rest"
-        let seconds  = call.getInt("seconds")    ?? 60
-        let title    = call.getString("title")   ?? ""
+            Task { @MainActor in
+                // End any existing activity for this timer before starting a new one
+                for activity in Activity<RestTimerAttributes>.activities
+                    where activity.attributes.timerID == id {
+                    await activity.end(dismissalPolicy: .immediate)
+                }
 
-        Task {
-            // End any existing activity for this timer before starting a new one
-            for activity in Activity<RestTimerAttributes>.activities
-                where activity.attributes.timerID == id {
-                await activity.end(dismissalPolicy: .immediate)
-            }
-
-            let attrs = RestTimerAttributes(timerID: id, exerciseName: title)
-            let state = RestTimerAttributes.ContentState(
-                secondsRemaining: seconds,
-                targetSeconds: seconds,
-                isFinished: false
-            )
-            do {
-                // staleDate tells iOS to auto-dim the activity if the app crashes or is killed
-                let staleDate = Date().addingTimeInterval(Double(seconds + 30))
-                let content = ActivityContent(state: state, staleDate: staleDate)
-                let activity = try Activity<RestTimerAttributes>.request(
-                    attributes: attrs,
-                    content: content,
-                    pushType: nil
+                let attrs = RestTimerAttributes(timerID: id, exerciseName: title)
+                let state = RestTimerAttributes.ContentState(
+                    secondsRemaining: seconds,
+                    targetSeconds: seconds,
+                    isFinished: false
                 )
-                call.resolve(["activityId": activity.id])
-            } catch {
-                print("[IronTracks] Live Activity start failed: \(error.localizedDescription)")
-                call.resolve(["activityId": ""])
+                do {
+                    let staleDate = Date().addingTimeInterval(Double(seconds + 30))
+                    let content = ActivityContent(state: state, staleDate: staleDate)
+                    let activity = try Activity<RestTimerAttributes>.request(
+                        attributes: attrs,
+                        content: content,
+                        pushType: nil
+                    )
+                    call.resolve(["activityId": activity.id])
+                } catch {
+                    print("[IronTracks] Live Activity start failed: \(error.localizedDescription)")
+                    call.resolve(["activityId": ""])
+                }
             }
+        } else {
+            call.resolve()
         }
     }
 
     @objc func updateRestLiveActivity(_ call: CAPPluginCall) {
-        guard #available(iOS 16.1, *) else { call.resolve(); return }
+        if #available(iOS 16.2, *) {
+            let id               = call.getString("id")              ?? "rest"
+            let secondsRemaining = call.getInt("secondsRemaining")   ?? 0
+            let targetSeconds    = call.getInt("targetSeconds")      ?? 60
+            let isFinished       = call.getBool("isFinished")        ?? false
 
-        let id               = call.getString("id")              ?? "rest"
-        let secondsRemaining = call.getInt("secondsRemaining")   ?? 0
-        let targetSeconds    = call.getInt("targetSeconds")      ?? 60
-        let isFinished       = call.getBool("isFinished")        ?? false
-
-        let state = RestTimerAttributes.ContentState(
-            secondsRemaining: secondsRemaining,
-            targetSeconds: targetSeconds,
-            isFinished: isFinished
-        )
-        let staleDate = Date().addingTimeInterval(Double(max(secondsRemaining, 5) + 30))
-        let content = ActivityContent(state: state, staleDate: staleDate)
-        Task {
-            for activity in Activity<RestTimerAttributes>.activities
-                where activity.attributes.timerID == id {
-                await activity.update(content)
+            let state = RestTimerAttributes.ContentState(
+                secondsRemaining: secondsRemaining,
+                targetSeconds: targetSeconds,
+                isFinished: isFinished
+            )
+            let staleDate = Date().addingTimeInterval(Double(max(secondsRemaining, 5) + 30))
+            let content = ActivityContent(state: state, staleDate: staleDate)
+            Task {
+                for activity in Activity<RestTimerAttributes>.activities
+                    where activity.attributes.timerID == id {
+                    await activity.update(content)
+                }
             }
+            call.resolve()
+        } else {
+            call.resolve()
         }
-        call.resolve()
     }
 
     @objc func endRestLiveActivity(_ call: CAPPluginCall) {
-        guard #available(iOS 16.1, *) else { call.resolve(); return }
-
-        let id = call.getString("id") ?? "rest"
-        Task {
-            for activity in Activity<RestTimerAttributes>.activities
-                where activity.attributes.timerID == id {
-                await activity.end(dismissalPolicy: .immediate)
+        if #available(iOS 16.2, *) {
+            let id = call.getString("id") ?? "rest"
+            Task {
+                for activity in Activity<RestTimerAttributes>.activities
+                    where activity.attributes.timerID == id {
+                    await activity.end(dismissalPolicy: .immediate)
+                }
             }
+            call.resolve()
+        } else {
+            call.resolve()
         }
-        call.resolve()
     }
 
     // ─── Alarm Sound ───────────────────────────────────────────────────────────
