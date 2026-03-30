@@ -32,7 +32,10 @@ interface UseGeoLocationResult {
 async function getCapacitorGeolocation() {
   try {
     const mod = await import('@capacitor/geolocation')
-    return mod.Geolocation
+    // Wrap in an object to prevent async function from calling .then() on the
+    // Capacitor plugin proxy (which is Thenable), which would trigger the native
+    // bridge and throw "Geolocation.then() is not implemented on ios"
+    return { geo: mod.Geolocation }
   } catch {
     return null
   }
@@ -60,11 +63,12 @@ export function useGeoLocation(): UseGeoLocationResult {
   const checkPermission = useCallback(async (): Promise<PermissionState> => {
     try {
       if (isNativeRef.current) {
-        const Geo = await getCapacitorGeolocation()
-        if (!Geo) {
+        const result = await getCapacitorGeolocation()
+        if (!result) {
           // Plugin not available — fall through to web
           isNativeRef.current = false
         } else {
+          const { geo: Geo } = result
           const perm = await Geo.checkPermissions()
           const state = perm.location === 'granted' ? 'granted' : perm.location === 'denied' ? 'denied' : 'prompt'
           setPermission(state)
@@ -91,11 +95,12 @@ export function useGeoLocation(): UseGeoLocationResult {
   const requestPermission = useCallback(async (): Promise<boolean> => {
     try {
       if (isNativeRef.current) {
-        const Geo = await getCapacitorGeolocation()
-        if (!Geo) {
+        const result = await getCapacitorGeolocation()
+        if (!result) {
           isNativeRef.current = false
           return true // fallback to web implicit permission
         }
+        const { geo: Geo } = result
         const perm = await Geo.requestPermissions()
         const granted = perm.location === 'granted'
         setPermission(granted ? 'granted' : 'denied')
@@ -131,8 +136,9 @@ export function useGeoLocation(): UseGeoLocationResult {
       let point: GeoPoint | null = null
 
       if (isNativeRef.current) {
-        const Geo = await getCapacitorGeolocation()
-        if (Geo) {
+        const result = await getCapacitorGeolocation()
+        if (result) {
+          const { geo: Geo } = result
           try {
             const pos = await Geo.getCurrentPosition({ enableHighAccuracy: true, timeout: 15000, maximumAge: 0 })
             point = { latitude: pos.coords.latitude, longitude: pos.coords.longitude }
@@ -175,8 +181,9 @@ export function useGeoLocation(): UseGeoLocationResult {
     const run = async () => {
       try {
         if (isNativeRef.current) {
-          const Geo = await getCapacitorGeolocation()
-          if (Geo) {
+          const result = await getCapacitorGeolocation()
+          if (result) {
+            const { geo: Geo } = result
             try {
               const id = await Geo.watchPosition(
                 { enableHighAccuracy: true, timeout: 15000 },
@@ -225,8 +232,9 @@ export function useGeoLocation(): UseGeoLocationResult {
       try {
         if (watchIdRef.current !== null) {
           if (isNativeRef.current) {
-            const Geo = await getCapacitorGeolocation()
-            if (Geo) {
+            const result = await getCapacitorGeolocation()
+            if (result) {
+              const { geo: Geo } = result
               try {
                 await Geo.clearWatch({ id: String(watchIdRef.current) })
               } catch {
