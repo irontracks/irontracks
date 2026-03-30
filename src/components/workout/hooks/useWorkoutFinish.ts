@@ -20,6 +20,7 @@ import { queueFinishWorkout, isOnline } from '@/lib/offline/offlineSync'
 import { buildFinishWorkoutPayload } from '@/lib/finishWorkoutPayload'
 import { saveFinishBackup, clearFinishBackup } from '@/lib/workoutSafetyNet'
 import { logWarn } from '@/lib/logger'
+import { endAllRestLiveActivities } from '@/utils/native/irontracksNative'
 
 interface UseWorkoutFinishProps {
   session: WorkoutSession | null
@@ -57,11 +58,11 @@ function parseStartedAtMs(raw: unknown): number {
 
 export function useWorkoutFinish(props: UseWorkoutFinishProps) {
   const {
-    session, workout, exercises, logs, ui, userId, settings, ticker,
-    postCheckinOpen, setPostCheckinOpen, postCheckinDraft, setPostCheckinDraft,
+    session, workout, exercises: _exercises, logs, ui, userId, settings, ticker,
+    postCheckinOpen, setPostCheckinOpen, postCheckinDraft: _postCheckinDraft, setPostCheckinDraft,
     postCheckinResolveRef, persistDeloadHistoryFromSession,
     finishing, setFinishing,
-    alert, confirm, onFinish,
+    alert, confirm, onFinish: _onFinish,
   } = props
 
   const requestPostWorkoutCheckin = async (): Promise<unknown | null> => {
@@ -202,6 +203,9 @@ export function useWorkoutFinish(props: UseWorkoutFinishProps) {
         ...payload,
         id: savedId,
       }
+
+      // Ensure any active rest timer Live Activity is cleared when workout ends
+      endAllRestLiveActivities().catch(() => { })
 
       try {
         if (typeof props?.onFinish === 'function') {

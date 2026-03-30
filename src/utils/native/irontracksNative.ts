@@ -17,6 +17,7 @@ type IronTracksNativePlugin = {
   startRestLiveActivity: (opts: { id: string; seconds: number; title?: string }) => Promise<void>
   updateRestLiveActivity: (opts: { id: string; isFinished: boolean; secondsRemaining?: number; targetSeconds?: number; endDateMs?: number }) => Promise<void>
   endRestLiveActivity: (opts: { id: string }) => Promise<void>
+  endAllRestLiveActivities: () => Promise<void>
   // Generic app notification
   scheduleAppNotification: (opts: { id?: string; title: string; body: string; delaySeconds?: number }) => Promise<{ id: string }>
   // Alarm sound
@@ -64,6 +65,7 @@ const Native = registerPlugin<IronTracksNativePlugin>('IronTracksNative', {
     startRestLiveActivity: async () => { },
     updateRestLiveActivity: async () => { },
     endRestLiveActivity: async () => { },
+    endAllRestLiveActivities: async () => { },
     scheduleAppNotification: async () => ({ id: '' }),
     stopAlarmSound: async () => { },
     triggerHaptic: async () => { },
@@ -228,6 +230,13 @@ export const endRestLiveActivity = async (id: string) => {
     if (!isIosNative()) return
     const safeId = String(id || 'rest_timer').trim() || 'rest_timer'
     await Native.endRestLiveActivity({ id: safeId })
+  } catch { }
+}
+
+export const endAllRestLiveActivities = async () => {
+  try {
+    if (!isIosNative()) return
+    await Native.endAllRestLiveActivities()
   } catch { }
 }
 

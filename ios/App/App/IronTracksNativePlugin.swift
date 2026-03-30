@@ -30,6 +30,7 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "startRestLiveActivity", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "updateRestLiveActivity", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "endRestLiveActivity", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "endAllRestLiveActivities", returnType: CAPPluginReturnPromise),
         // App notification
         CAPPluginMethod(name: "scheduleAppNotification", returnType: CAPPluginReturnPromise),
         // Alarm sound
@@ -62,6 +63,18 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin {
 
     private let motionManager = CMMotionManager()
     private let healthStore = HKHealthStore()
+
+    /// On plugin load, end any stale Live Activities left from a previous session
+    /// (e.g. app was killed while a rest timer was running).
+    public override func load() {
+        if #available(iOS 16.2, *) {
+            Task {
+                for activity in Activity<RestTimerAttributes>.activities {
+                    await activity.end(dismissalPolicy: .immediate)
+                }
+            }
+        }
+    }
 
     // ─── Screen ────────────────────────────────────────────────────────────────
 
@@ -216,9 +229,9 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin {
             let title    = call.getString("title")   ?? ""
 
             Task { @MainActor in
-                // End any existing activity for this timer before starting a new one
-                for activity in Activity<RestTimerAttributes>.activities
-                    where activity.attributes.timerID == id {
+                // End ALL existing activities before starting a new one
+                // (covers ghost activities from killed sessions)
+                for activity in Activity<RestTimerAttributes>.activities {
                     await activity.end(dismissalPolicy: .immediate)
                 }
 
@@ -290,6 +303,19 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin {
             Task {
                 for activity in Activity<RestTimerAttributes>.activities
                     where activity.attributes.timerID == id {
+                    await activity.end(dismissalPolicy: .immediate)
+                }
+            }
+            call.resolve()
+        } else {
+            call.resolve()
+        }
+    }
+
+    @objc func endAllRestLiveActivities(_ call: CAPPluginCall) {
+        if #available(iOS 16.2, *) {
+            Task {
+                for activity in Activity<RestTimerAttributes>.activities {
                     await activity.end(dismissalPolicy: .immediate)
                 }
             }
