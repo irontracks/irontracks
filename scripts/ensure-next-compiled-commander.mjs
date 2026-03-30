@@ -40,5 +40,22 @@ if (!allExist) {
     console.log('[ensure-commander] Commander compiled path não encontrado — nenhuma ação necessária.');
 }
 
-// No-op: Next.js 14+ includes commander compiled natively.
+// Patch @edge-runtime/primitives/load.js for Node.js 22 compatibility.
+// The bundled file uses `0 && (module.exports = { load })` which esbuild emits
+// for ESM tree-shaking hints, but in CJS under Node 22 this prevents `load`
+// from being exported. We rewrite it to a proper CJS export.
+const loadPath = join(
+    nextDir,
+    'dist', 'compiled', '@edge-runtime', 'primitives', 'load.js'
+);
+if (existsSync(loadPath)) {
+    const { readFileSync, writeFileSync } = await import('node:fs');
+    const content = readFileSync(loadPath, 'utf8');
+    const broken = '0 && (module.exports = {\n  load\n});';
+    if (content.includes(broken)) {
+        writeFileSync(loadPath, content.replace(broken, 'module.exports = { load };'));
+        console.log('[patch] @edge-runtime/primitives/load.js patched for Node 22');
+    }
+}
+
 process.exit(0);

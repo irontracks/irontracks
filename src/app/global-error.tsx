@@ -1,9 +1,15 @@
 'use client';
 
+import * as Sentry from "@sentry/nextjs"
+import { useEffect } from 'react'
 import { AlertCircle, RefreshCw } from 'lucide-react';
 import { getErrorMessage } from '@/utils/errorMessage'
 
 export default function GlobalError({ error, reset }: { error: Error & { digest?: string }; reset: () => void }) {
+  useEffect(() => {
+    Sentry.captureException(error)
+  }, [error])
+
   return (
     <html lang="pt-BR">
       <body className="bg-neutral-950 text-white">
