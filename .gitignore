@@ -42,6 +42,9 @@ yarn-error.log*
 # local assistants
 .claude
 
+# MCP server config (contains tokens)
+.mcp.json
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts

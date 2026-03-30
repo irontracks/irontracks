@@ -1,3 +1,4 @@
+import { withSentryConfig } from '@sentry/nextjs'
 import type { NextConfig } from 'next'
 
 const nextConfig: NextConfig = {
@@ -7,7 +8,7 @@ const nextConfig: NextConfig = {
   // ─── Tree-shake heavy libs at build time (reduces JS bundle size) ─────────
   // lucide-react: saves ~200kb by only importing icons actually used
   // chart.js / react-chartjs-2: only bundles chart types imported
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   ...({ optimizePackageImports: ['lucide-react', 'chart.js', 'react-chartjs-2', '@tanstack/react-virtual'] } as any),
 
   typescript: {
@@ -115,5 +116,13 @@ const nextConfig: NextConfig = {
   },
 }
 
-export default nextConfig
+export default withSentryConfig(nextConfig, {
+  org: "irontracks-company",
+  project: "javascript-nextjs",
+  silent: !process.env.CI,
+  widenClientFileUpload: true,
+  tunnelRoute: "/monitoring",
+  disableLogger: true,
+  automaticVercelMonitors: true,
+})
 
