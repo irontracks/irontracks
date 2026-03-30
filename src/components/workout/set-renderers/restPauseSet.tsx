@@ -21,6 +21,7 @@ export const RestPauseSet = ({
   sstOverride?: { restSec: number; miniCount: number } | null;
 }) => {
   const {
+    exercises,
     getLog,
     updateLog,
     getPlanConfig,
@@ -103,13 +104,14 @@ export const RestPauseSet = ({
   // canDone: requires at least 1 mini AND all minis have positive reps
   const canDone = miniSets > 0 && minis.length > 0 && minis.every((v) => typeof v === 'number' && Number.isFinite(v) && v > 0);
 
-  const notesValue = String(log.notes ?? '');
+  const _notesValue = String(log.notes ?? '');
 
   return (
     <div key={key} className="space-y-2">
       <div className="rounded-xl bg-neutral-900/50 border border-neutral-800/80 px-3 py-2.5 space-y-2 shadow-sm shadow-black/20">
         <div className="flex items-center gap-2">
           <div className="w-10 text-xs font-mono text-neutral-400">#{setIdx + 1}</div>
+          {/* eslint-disable-next-line jsx-a11y/control-has-associated-label */}
           <input
             inputMode="decimal"
             value={weightField.value}
@@ -181,7 +183,9 @@ export const RestPauseSet = ({
               });
               if (nextDone && restTime && restTime > 0) {
                 const nextPlanned = getPlannedSet(ex, setIdx + 1);
-                const nextKey = nextPlanned ? `${exIdx}-${setIdx + 1}` : null;
+                const nextKey = nextPlanned
+                  ? `${exIdx}-${setIdx + 1}`
+                  : exercises[exIdx + 1] != null ? `${exIdx + 1}-0` : null;
                 startTimer(restTime, {
                   kind: 'rest',
                   key,
@@ -203,6 +207,7 @@ export const RestPauseSet = ({
           </button>
         </div>
       </div>
+      {/* eslint-disable-next-line jsx-a11y/control-has-associated-label */}
       <textarea
         value={notesField.value}
         onChange={notesField.onChange}

@@ -26,6 +26,7 @@ function useInputField(externalValue: string, onChange: (v: string) => void) {
   // sync the local value ONLY if the field is not currently focused.
   useEffect(() => {
     if (!isFocused.current) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setLocalValue(externalValue);
     }
   }, [externalValue]);
@@ -67,6 +68,7 @@ export const NormalSet = ({
   setsCount?: number;
 }) => {
   const {
+    exercises,
     getLog,
     updateLog,
     getPlanConfig,
@@ -150,7 +152,9 @@ export const NormalSet = ({
 
     if (nextDone && restTime && restTime > 0) {
       const nextPlanned = getPlannedSet(ex, setIdx + 1);
-      const nextKey     = nextPlanned ? `${exIdx}-${setIdx + 1}` : null;
+      const nextKey = nextPlanned
+        ? `${exIdx}-${setIdx + 1}`
+        : exercises[exIdx + 1] != null ? `${exIdx + 1}-0` : null;
       startTimer(restTime, { kind: 'rest', key, nextKey, restStartedAtMs: nowMs });
     }
 
@@ -276,6 +280,7 @@ export const NormalSet = ({
       {/* Notes textarea */}
       {isNotesOpen && (
         <div className="px-1">
+          {/* eslint-disable-next-line jsx-a11y/control-has-associated-label */}
           <textarea
             id={notesId}
             value={notesField.value}

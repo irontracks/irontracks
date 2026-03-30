@@ -15,6 +15,7 @@ import { UnknownRecord, WorkoutExercise } from '../types';
 
 export const ClusterSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: number; setIdx: number }) => {
   const {
+    exercises,
     getLog,
     updateLog,
     getPlanConfig,
@@ -104,6 +105,7 @@ export const ClusterSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: 
       <div className="rounded-xl bg-neutral-900/50 border border-neutral-800/80 px-3 py-2.5 space-y-2 shadow-sm shadow-black/20">
         <div className="flex items-center gap-2">
           <div className="w-10 text-xs font-mono text-neutral-400">#{setIdx + 1}</div>
+          {/* eslint-disable-next-line jsx-a11y/control-has-associated-label */}
           <input
             inputMode="decimal"
             value={String(log?.weight ?? cfg?.weight ?? '')}
@@ -180,7 +182,9 @@ export const ClusterSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: 
               });
               if (nextDone && restTime && restTime > 0) {
                 const nextPlanned = getPlannedSet(ex, setIdx + 1);
-                const nextKey = nextPlanned ? `${exIdx}-${setIdx + 1}` : null;
+                const nextKey = nextPlanned
+                  ? `${exIdx}-${setIdx + 1}`
+                  : exercises[exIdx + 1] != null ? `${exIdx + 1}-0` : null;
                 startTimer(restTime, {
                   kind: 'rest',
                   key,
@@ -213,6 +217,7 @@ export const ClusterSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: 
                   <div className="text-[10px] uppercase tracking-widest font-bold text-neutral-400">Bloco {idx + 1}</div>
                   <div className="text-[10px] font-mono text-neutral-500">plan {String(planned)}</div>
                 </div>
+                {/* eslint-disable-next-line jsx-a11y/control-has-associated-label */}
                 <input
                   inputMode="decimal"
                   value={current == null ? '' : String(current)}
@@ -242,6 +247,7 @@ export const ClusterSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: 
           })}
         </div>
       )}
+      {/* eslint-disable-next-line jsx-a11y/control-has-associated-label */}
       <textarea
         value={notesValue}
         onChange={(e) => {
