@@ -15,7 +15,7 @@ type IronTracksNativePlugin = {
   cancelRestTimer: (opts: { id: string }) => Promise<void>
   // Live Activity
   startRestLiveActivity: (opts: { id: string; seconds: number; title?: string }) => Promise<void>
-  updateRestLiveActivity: (opts: { id: string; isFinished: boolean; elapsedSeconds?: number }) => Promise<void>
+  updateRestLiveActivity: (opts: { id: string; isFinished: boolean; secondsRemaining?: number; targetSeconds?: number; endDateMs?: number }) => Promise<void>
   endRestLiveActivity: (opts: { id: string }) => Promise<void>
   // Generic app notification
   scheduleAppNotification: (opts: { id?: string; title: string; body: string; delaySeconds?: number }) => Promise<{ id: string }>
@@ -209,11 +209,17 @@ export const startRestLiveActivity = async (id: string, seconds: number, title?:
   } catch { }
 }
 
-export const updateRestLiveActivity = async (id: string, isFinished: boolean, elapsedSeconds?: number) => {
+export const updateRestLiveActivity = async (
+  id: string,
+  isFinished: boolean,
+  secondsRemaining?: number,
+  targetSeconds?: number,
+  endDateMs?: number,
+) => {
   try {
     if (!isIosNative()) return
     const safeId = String(id || 'rest_timer').trim() || 'rest_timer'
-    await Native.updateRestLiveActivity({ id: safeId, isFinished, elapsedSeconds })
+    await Native.updateRestLiveActivity({ id: safeId, isFinished, secondsRemaining, targetSeconds, endDateMs })
   } catch { }
 }
 

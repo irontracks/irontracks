@@ -222,9 +222,10 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin {
                     await activity.end(dismissalPolicy: .immediate)
                 }
 
+                let endDate = Date().addingTimeInterval(Double(seconds))
                 let attrs = RestTimerAttributes(timerID: id, exerciseName: title)
                 let state = RestTimerAttributes.ContentState(
-                    secondsRemaining: seconds,
+                    endDate: endDate,
                     targetSeconds: seconds,
                     isFinished: false
                 )
@@ -249,17 +250,27 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin {
 
     @objc func updateRestLiveActivity(_ call: CAPPluginCall) {
         if #available(iOS 16.2, *) {
-            let id               = call.getString("id")              ?? "rest"
-            let secondsRemaining = call.getInt("secondsRemaining")   ?? 0
-            let targetSeconds    = call.getInt("targetSeconds")      ?? 60
-            let isFinished       = call.getBool("isFinished")        ?? false
+            let id            = call.getString("id")           ?? "rest"
+            let targetSeconds = call.getInt("targetSeconds")   ?? 60
+            let isFinished    = call.getBool("isFinished")     ?? false
+            // endDateMs: Unix timestamp in ms sent from JS (for +30 s support)
+            // If absent, reconstruct from secondsRemaining
+            let endDate: Date
+            if let ms = call.getDouble("endDateMs"), ms > 0 {
+                endDate = Date(timeIntervalSince1970: ms / 1000.0)
+            } else {
+                let secondsRemaining = call.getInt("secondsRemaining") ?? 0
+                endDate = isFinished
+                    ? Date().addingTimeInterval(-1)          // slightly in the past = finished
+                    : Date().addingTimeInterval(Double(max(0, secondsRemaining)))
+            }
 
             let state = RestTimerAttributes.ContentState(
-                secondsRemaining: secondsRemaining,
+                endDate: endDate,
                 targetSeconds: targetSeconds,
                 isFinished: isFinished
             )
-            let staleDate = Date().addingTimeInterval(Double(max(secondsRemaining, 5) + 30))
+            let staleDate = Date().addingTimeInterval(Double(targetSeconds + 30))
             let content = ActivityContent(state: state, staleDate: staleDate)
             Task {
                 for activity in Activity<RestTimerAttributes>.activities

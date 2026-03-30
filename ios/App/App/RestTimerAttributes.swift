@@ -6,9 +6,9 @@ import Foundation
 @available(iOS 16.1, *)
 struct RestTimerAttributes: ActivityAttributes {
     public struct ContentState: Codable, Hashable {
-        /// Seconds remaining in the rest period (0 when finished)
-        var secondsRemaining: Int
-        /// Original rest duration in seconds
+        /// Exact moment the rest period ends — drives Text(timerInterval:) countdown
+        var endDate: Date
+        /// Original rest duration in seconds (used for progress bar)
         var targetSeconds: Int
         /// True once the countdown hits zero
         var isFinished: Bool

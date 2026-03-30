@@ -2,6 +2,33 @@ import ActivityKit
 import WidgetKit
 import SwiftUI
 
+// ── Timer display helper ──────────────────────────────────────────────────────
+// Uses Text(timerInterval:) so the system drives the countdown automatically,
+// without requiring per-second JS updates.
+@available(iOS 16.1, *)
+private struct TimerCountdownText: View {
+    let endDate: Date
+    let isFinished: Bool
+    let font: Font
+    let color: Color
+
+    var body: some View {
+        if isFinished {
+            // Count UP from when the timer ended (shows overtime: +0:01, +0:02, …)
+            Text(timerInterval: endDate...Date.distantFuture, countsDown: false)
+                .font(font)
+                .foregroundColor(.green)
+                .monospacedDigit()
+        } else {
+            // Count DOWN to endDate — the system ticks this every second
+            Text(timerInterval: Date()...endDate, countsDown: true)
+                .font(font)
+                .foregroundColor(color)
+                .monospacedDigit()
+        }
+    }
+}
+
 @available(iOS 16.1, *)
 struct RestTimerLiveActivity: Widget {
     var body: some WidgetConfiguration {
@@ -17,10 +44,13 @@ struct RestTimerLiveActivity: Widget {
                         .foregroundColor(.green)
                 }
                 DynamicIslandExpandedRegion(.trailing) {
-                    Text(timerText(context.state.secondsRemaining))
-                        .font(.title2.monospacedDigit().bold())
-                        .foregroundColor(context.state.isFinished ? .green : .white)
-                        .padding(.trailing, 4)
+                    TimerCountdownText(
+                        endDate: context.state.endDate,
+                        isFinished: context.state.isFinished,
+                        font: .title2.bold(),
+                        color: .white
+                    )
+                    .padding(.trailing, 4)
                 }
                 DynamicIslandExpandedRegion(.center) {
                     Text(context.attributes.exerciseName)
@@ -29,13 +59,15 @@ struct RestTimerLiveActivity: Widget {
                         .lineLimit(1)
                 }
                 DynamicIslandExpandedRegion(.bottom) {
-                    ProgressView(
-                        value: Double(context.state.targetSeconds - context.state.secondsRemaining),
-                        total: Double(max(1, context.state.targetSeconds))
-                    )
-                    .tint(.green)
-                    .padding(.horizontal, 8)
-                    .padding(.bottom, 4)
+                    // Progress bar: driven by endDate so it animates without JS updates
+                    let remaining = context.state.isFinished
+                        ? 0.0
+                        : max(0.0, context.state.endDate.timeIntervalSinceNow)
+                    let target = Double(max(1, context.state.targetSeconds))
+                    ProgressView(value: max(0, target - remaining), total: target)
+                        .tint(.green)
+                        .padding(.horizontal, 8)
+                        .padding(.bottom, 4)
                 }
             } compactLeading: {
                 // Compact — left side pill
@@ -44,10 +76,13 @@ struct RestTimerLiveActivity: Widget {
                     .font(.caption.bold())
             } compactTrailing: {
                 // Compact — right side pill (most visible spot)
-                Text(timerText(context.state.secondsRemaining))
-                    .font(.caption.monospacedDigit().bold())
-                    .foregroundColor(context.state.isFinished ? .green : .white)
-                    .frame(minWidth: 38)
+                TimerCountdownText(
+                    endDate: context.state.endDate,
+                    isFinished: context.state.isFinished,
+                    font: .caption.bold(),
+                    color: .white
+                )
+                .frame(minWidth: 38)
             } minimal: {
                 // Minimal — tiny dot on secondary island
                 Image(systemName: context.state.isFinished ? "checkmark.circle.fill" : "timer")
@@ -89,22 +124,16 @@ struct LockScreenBannerView: View {
 
             Spacer()
 
-            // Timer
-            Text(timerText(context.state.secondsRemaining))
-                .font(.system(.title, design: .rounded).monospacedDigit().bold())
-                .foregroundColor(context.state.isFinished ? .green : .primary)
+            // Timer: native countdown / count-up driven by endDate
+            TimerCountdownText(
+                endDate: context.state.endDate,
+                isFinished: context.state.isFinished,
+                font: .system(.title, design: .rounded).bold(),
+                color: .primary
+            )
         }
         .padding(16)
         .activityBackgroundTint(Color(red: 0.05, green: 0.05, blue: 0.05))
         .activitySystemActionForegroundColor(.white)
     }
-}
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-private func timerText(_ seconds: Int) -> String {
-    let s = max(0, seconds)
-    let m = s / 60
-    let r = s % 60
-    return String(format: "%d:%02d", m, r)
 }

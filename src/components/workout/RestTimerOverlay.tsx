@@ -2,7 +2,6 @@
 "use client";
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Timer, X } from 'lucide-react';
 import { playTimerFinishSound, playTick } from '@/lib/sounds';
 import { isNativePlatform } from '@/utils/platform';
 import { cancelRestNotification, endRestLiveActivity, requestNativeNotifications, scheduleRestNotification, startRestLiveActivity, stopAlarmSound, triggerHaptic, updateRestLiveActivity } from '@/utils/native/irontracksNative';
@@ -39,7 +38,7 @@ interface RestTimerOverlayProps {
     onToggleAutoStart?: () => void;
 }
 
-const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context, onFinish, onStart, onClose, settings, autoStartEnabled, onToggleAutoStart }) => {
+const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context, onFinish, onStart, onClose: _onClose, settings, autoStartEnabled, onToggleAutoStart }) => {
     const [timeLeft, setTimeLeft] = useState(0);
     const [isFinished, setIsFinished] = useState(false);
     const [autoStartLocal, setAutoStartLocal] = useState(Boolean(autoStartEnabled));
@@ -291,23 +290,11 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
         if (!isFinished) return;
         if (!notifyIdRef.current) return;
 
-        // Immediately mark Live Activity as finished and start count-up
         const id = notifyIdRef.current;
         cancelRestNotification(id);
-
-        // Update every second with elapsedSeconds so the Lock Screen shows count-up
-        const startedFinishAt = targetTime ?? Date.now();
-        const tick = () => {
-            const elapsed = Math.round((Date.now() - startedFinishAt) / 1000);
-            updateRestLiveActivity(id, true, Math.max(0, elapsed));
-        };
-        tick(); // immediate first update
-        const liveActivityInterval = setInterval(tick, 1000);
-
-        return () => {
-            clearInterval(liveActivityInterval);
-        };
-    }, [isFinished, targetTime]);
+        // Mark as finished — the widget handles count-up natively via timerInterval
+        updateRestLiveActivity(id, true, 0, totalSecondsRef.current);
+    }, [isFinished]);
 
     // Wake Lock: keep screen on while timer is running, re-acquire on page visible
     useEffect(() => {
@@ -373,7 +360,6 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
             }
         }, 500);
         return () => clearTimeout(timeout);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isFinished, autoStartLocal]);
 
     if (!targetTime) return null;
@@ -402,7 +388,6 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
 
     // ── YELLOW — countdown phase ─────────────────────────────────────────────
     // progress = remaining / total  →  1.0 at start, 0.0 when done
-    // eslint-disable-next-line react-hooks/refs
     const total = totalSecondsRef.current || 1;
     const countdownProgress = !isFinished
         ? Math.max(0, Math.min(1, baseSeconds / total))
