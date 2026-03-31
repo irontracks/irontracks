@@ -12,6 +12,7 @@ import { getErrorMessage } from '@/utils/errorMessage'
 
 const NotificationCenter = dynamic(() => import('@/components/NotificationCenter'), { ssr: false })
 const SettingsModal = dynamic(() => import('@/components/SettingsModal'), { ssr: false })
+const ProgressPhotos = dynamic(() => import('@/components/ProgressPhotos'), { ssr: false })
 const RestTimerOverlay = dynamic(() => import('@/components/workout/RestTimerOverlay'), { ssr: false })
 const WhatsNewModal = dynamic(() => import('@/components/WhatsNewModal'), { ssr: false })
 const OfflineSyncModal = dynamic(() => import('@/components/OfflineSyncModal'), { ssr: false })
@@ -118,6 +119,10 @@ export interface DashboardModalsProps {
     vipAccess: Record<string, unknown> | null
     openVipView: () => void
 
+    // Progress Photos
+    showProgressPhotos: boolean
+    setShowProgressPhotos: (v: boolean) => void
+
     // Dialog
     alert: (msg: string, title?: string) => Promise<unknown>
 }
@@ -136,6 +141,7 @@ export default function DashboardModals(props: DashboardModalsProps) {
         userSettingsApi, offlineSyncOpen, setOfflineSyncOpen,
         openStudent, setOpenStudent, showExportModal, setShowExportModal, exportWorkout,
         handleExportPdf, handleExportJson, vipAccess, openVipView, alert,
+        showProgressPhotos, setShowProgressPhotos,
     } = props
 
     // Partner exercise share — use hook directly since we're inside TeamWorkoutProvider
@@ -691,6 +697,7 @@ export default function DashboardModals(props: DashboardModalsProps) {
                         }
                         setWhatsNewOpen(true)
                     }}
+                    onOpenProgressPhotos={() => { setSettingsOpen(false); setShowProgressPhotos(true) }}
                     onSave={async (next: unknown) => {
                         try {
                             const safeNext = next && typeof next === 'object' ? next : (settings ?? {})
@@ -706,6 +713,11 @@ export default function DashboardModals(props: DashboardModalsProps) {
                         }
                     }}
                 />
+            )}
+
+            {/* Progress Photos */}
+            {showProgressPhotos && (
+                <ProgressPhotos onClose={() => setShowProgressPhotos(false)} />
             )}
 
             {/* Offline Sync */}

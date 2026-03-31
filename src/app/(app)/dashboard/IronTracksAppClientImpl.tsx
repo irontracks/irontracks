@@ -202,6 +202,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
             : null,
     })
     const [offlineSyncOpen, setOfflineSyncOpen] = useState(false)
+    const [showProgressPhotos, setShowProgressPhotos] = useState(false)
 
     const supabase = useRef(createClient()).current;
     const router = useRouter();
@@ -1088,6 +1089,8 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                             handleExportJson={handleExportJson}
                             vipAccess={vipAccess as unknown as Record<string, unknown> | null}
                             openVipView={openVipView}
+                            showProgressPhotos={showProgressPhotos}
+                            setShowProgressPhotos={setShowProgressPhotos}
                             alert={alert}
                         />
                     </div>

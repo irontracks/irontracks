@@ -50,6 +50,7 @@ interface SettingsModalProps {
   onClose?: () => void
   onSave?: (settings: unknown) => Promise<boolean | void>
   onOpenWhatsNew?: () => void
+  onOpenProgressPhotos?: () => void
 }
 
 export default function SettingsModal(props: SettingsModalProps) {
@@ -180,7 +181,7 @@ export default function SettingsModal(props: SettingsModalProps) {
           <SettingsAppearanceSection draft={draft} setValue={setValue} />
           <SettingsWorkoutNamesSection draft={draft} setValue={setValue} />
           <SettingsAppModeSection draft={draft} setValue={setValue} setModulesModalOpen={setModulesModalOpen} />
-          <SettingsToolsSection draft={draft} setValue={setValue} onOpenWhatsNew={props?.onOpenWhatsNew} />
+          <SettingsToolsSection draft={draft} setValue={setValue} onOpenWhatsNew={props?.onOpenWhatsNew} onOpenProgressPhotos={props?.onOpenProgressPhotos} />
           <SettingsWorkoutSection draft={draft} setValue={setValue} />
           <SettingsSoundSection draft={draft} setValue={setValue} canSeeExperimental={canSeeExperimental} />
           <SettingsNotificationsSection
