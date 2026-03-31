@@ -5,6 +5,8 @@ import { Check, X, Loader2, Calendar, Mail, Phone, Clock, GraduationCap } from '
 import { useDialog } from '@/contexts/DialogContext'
 import { logError } from '@/lib/logger'
 import { createClient } from '@/utils/supabase/client'
+import { useAdminPanel } from '@/components/admin-panel/AdminPanelContext'
+import type { AdminUser } from '@/types/admin'
 
 interface AccessRequest {
     id: string
@@ -37,6 +39,7 @@ async function getAuthHeaders(): Promise<Record<string, string>> {
 
 export default function RequestsTab() {
     const { confirm, alert } = useDialog()
+    const { setUsersList, setPendingProfiles } = useAdminPanel()
     const [requests, setRequests] = useState<AccessRequest[]>([])
     const [loading, setLoading] = useState(true)
     const [processing, setProcessing] = useState<string | null>(null) // id being processed
@@ -93,6 +96,34 @@ export default function RequestsTab() {
             if (json.ok) {
                 await alert(json.message || 'Sucesso!')
                 setRequests(prev => prev.filter(r => r.id !== req.id))
+
+                // After successful accept, inject the approved user into the students list
+                // so they appear immediately in the ALUNOS tab without needing a reload.
+                if (action === 'accept' && req.role_requested !== 'teacher') {
+                    const newStudent: AdminUser = {
+                        id: `approved_${req.id}`,
+                        user_id: req.user_id || '',
+                        name: req.full_name || null,
+                        email: req.email || null,
+                        teacher_id: null,
+                        status: 'pendente',
+                        workouts: [],
+                    } as AdminUser
+                    setUsersList(prev => {
+                        // Avoid duplicates if the user already exists
+                        const exists = prev.some(s =>
+                            (s.email && req.email && String(s.email).toLowerCase() === String(req.email).toLowerCase()) ||
+                            (s.user_id && req.user_id && s.user_id === req.user_id)
+                        )
+                        return exists ? prev : [...prev, newStudent]
+                    })
+                    // Also remove from pending profiles if present
+                    if (req.user_id) {
+                        setPendingProfiles(prev =>
+                            Array.isArray(prev) ? prev.filter(p => String(p.user_id || '') !== req.user_id) : prev
+                        )
+                    }
+                }
             } else {
                 await alert(json.error || 'Erro ao processar.')
             }

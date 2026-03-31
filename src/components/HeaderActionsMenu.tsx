@@ -139,7 +139,8 @@ export default function HeaderActionsMenu({
 }: HeaderActionsMenuProps) {
   const [open, setOpen] = useState(false)
   const [cancellingVip, setCancellingVip] = useState(false)
-  const hideVipCtas = isIosNative()
+  const [hideVipCtas, setHideVipCtas] = useState(false)
+  useEffect(() => { setHideVipCtas(isIosNative()) }, [])
 
   useEffect(() => {
     if (!open) return
