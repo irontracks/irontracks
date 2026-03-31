@@ -3,12 +3,13 @@
 import React, { useState, useCallback, useMemo } from 'react'
 import {
   User, Scale, Ruler, Calendar, Phone, MapPin, Building2, Dumbbell,
-  Activity, Target, BarChart3, ChevronLeft, Save, Check, Flame
+  Activity, BarChart3, ChevronLeft, Save, Check, Flame
 } from 'lucide-react'
 import { getProfileCompletenessScore } from '@/schemas/settings'
 import type { UserSettings } from '@/schemas/settings'
 import dynamic from 'next/dynamic'
 const GymSettingsWrapper = dynamic(() => import('@/components/settings/GymSettingsWrapper'), { ssr: false })
+const ReferralSection = dynamic(() => import('@/components/settings/ReferralSection'), { ssr: false })
 
 interface ProfilePageProps {
   settings: UserSettings | null
@@ -71,15 +72,16 @@ function FieldLabel({ label, hint }: { label: string; hint?: string }) {
 }
 
 function TextInput({
-  value, onChange, placeholder, type = 'text', step
+  value, onChange, placeholder, type = 'text', step, label
 }: {
-  value: string; onChange: (v: string) => void; placeholder?: string; type?: string; step?: string
+  value: string; onChange: (v: string) => void; placeholder?: string; type?: string; step?: string; label?: string
 }) {
   return (
     <input
       type={type}
       step={step}
       value={value}
+      aria-label={label || placeholder}
       onChange={e => onChange(e.target.value)}
       placeholder={placeholder}
       className="w-full bg-neutral-800/80 border border-neutral-700/60 rounded-xl px-4 py-3 text-white text-sm placeholder-neutral-600 focus:outline-none focus:border-yellow-500/60 transition-colors"
@@ -237,6 +239,7 @@ export default function ProfilePage({ settings, displayName, onSave, onBack }: P
                 <Calendar size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-500" />
                 <input
                   type="number"
+                  aria-label="Idade"
                   min="10" max="100"
                   value={draft.age ?? ''}
                   onChange={e => set('age', e.target.value ? Number(e.target.value) : null as unknown as number)}
@@ -253,6 +256,7 @@ export default function ProfilePage({ settings, displayName, onSave, onBack }: P
                 <Phone size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-500" />
                 <input
                   type="tel"
+                  aria-label="Telefone"
                   value={draft.phone ?? ''}
                   onChange={e => set('phone', e.target.value)}
                   placeholder="Ex: (11) 98765-4321"
@@ -274,6 +278,7 @@ export default function ProfilePage({ settings, displayName, onSave, onBack }: P
                   <Scale size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
                   <input
                     type="number" step="0.1" min="30" max="300"
+                    aria-label="Peso em kg"
                     value={draft.bodyWeightKg ?? ''}
                     onChange={e => set('bodyWeightKg', e.target.value ? Number(e.target.value) : null as unknown as number)}
                     placeholder="Ex: 80.5"
@@ -288,6 +293,7 @@ export default function ProfilePage({ settings, displayName, onSave, onBack }: P
                   <Ruler size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
                   <input
                     type="number" step="0.5" min="100" max="250"
+                    aria-label="Altura em cm"
                     value={draft.heightCm ?? ''}
                     onChange={e => set('heightCm', e.target.value ? Number(e.target.value) : null as unknown as number)}
                     placeholder="Ex: 175"
@@ -320,6 +326,7 @@ export default function ProfilePage({ settings, displayName, onSave, onBack }: P
                 <Building2 size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
                 <input
                   type="text"
+                  aria-label="Academia"
                   value={draft.gym ?? ''}
                   onChange={e => set('gym', e.target.value)}
                   placeholder="Ex: Smart Fit - Centro"
@@ -359,6 +366,7 @@ export default function ProfilePage({ settings, displayName, onSave, onBack }: P
                 <BarChart3 size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
                 <input
                   type="number" step="0.5" min="0" max="50"
+                  aria-label="Anos de treino"
                   value={draft.trainingExperienceYears ?? ''}
                   onChange={e => set('trainingExperienceYears', e.target.value ? Number(e.target.value) : null as unknown as number)}
                   placeholder="Ex: 2.5"
@@ -411,6 +419,11 @@ export default function ProfilePage({ settings, displayName, onSave, onBack }: P
           {/* GPS & Location Settings */}
           <div className="mb-5 rounded-2xl border border-neutral-800/40 bg-neutral-900/40 p-4">
             <GymSettingsWrapper />
+          </div>
+
+          {/* Referral */}
+          <div className="mb-5 rounded-2xl border border-neutral-800/40 bg-neutral-900/40 p-4">
+            <ReferralSection />
           </div>
 
           {/* Save button (sticky bottom) */}
