@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState, useCallback } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { Check, X, Loader2, Calendar, Mail, Phone, Clock, GraduationCap } from 'lucide-react'
 import { useDialog } from '@/contexts/DialogContext'
 import { logError } from '@/lib/logger'
@@ -94,7 +94,11 @@ export default function RequestsTab() {
             const json = await res.json()
 
             if (json.ok) {
-                await alert(json.message || 'Sucesso!')
+                const msg = [
+                    json.message || 'Sucesso!',
+                    json.email_warning ? '⚠️ O e-mail de notificação não foi enviado. Avise o usuário manualmente.' : null,
+                ].filter(Boolean).join('\n\n')
+                await alert(msg)
                 setRequests(prev => prev.filter(r => r.id !== req.id))
 
                 // After successful accept, inject the approved user into the students list

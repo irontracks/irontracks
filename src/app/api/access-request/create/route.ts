@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { parseJsonBody } from '@/utils/zod'
-import { logError, logWarn, logInfo } from '@/lib/logger'
+import { logError } from '@/lib/logger'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 
 export const dynamic = 'force-dynamic'
@@ -58,23 +58,26 @@ export async function POST(req: Request) {
       if (existingRequest.status === 'pending') {
         return NextResponse.json({ ok: true, message: 'Solicitação já está pendente.', id: existingRequest.id })
       }
-      if (existingRequest.status === 'accepted') {
-        return NextResponse.json({ ok: true, message: 'Solicitação já foi aprovada.', id: existingRequest.id })
+      // 'approved' is the canonical approved state (migration normalizes 'accepted' → 'approved')
+      if (existingRequest.status === 'approved' || existingRequest.status === 'accepted') {
+        return NextResponse.json({ ok: true, message: 'Solicitação já foi aprovada. Faça login.', id: existingRequest.id })
       }
-      // If rejected, allow re-request by updating the same row (email is unique)
+      // If rejected (deleted), fall through to allow a fresh request
     }
 
-    // 3. Check if user already exists in Auth (Optional, but good UX)
-    // Note: This requires admin privileges which we have via createAdminClient
-    // But checking auth.users is distinct. Usually we check 'profiles' table.
+    // 3. Check if profile already exists — user already completed signup
     const { data: existingProfile } = await supabaseAdmin
         .from('profiles')
-        .select('id')
-        .eq('email', email)
+        .select('id, is_approved')
+        .ilike('email', email)
         .maybeSingle()
-    
+
     if (existingProfile) {
-        return NextResponse.json({ ok: false, error: 'Usuário já cadastrado. Faça login.' }, { status: 400 })
+      if (existingProfile.is_approved) {
+        return NextResponse.json({ ok: false, error: 'Usuário já cadastrado e aprovado. Faça login.' }, { status: 400 })
+      }
+      // Profile exists but not yet approved — treat as duplicate pending signup
+      return NextResponse.json({ ok: true, message: 'Cadastro já realizado. Aguarde a aprovação do administrador.' })
     }
 
     // 4. Create / Reset Request
