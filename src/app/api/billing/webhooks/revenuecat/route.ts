@@ -160,6 +160,7 @@ export async function POST(request: NextRequest) {
           user_id: userId,
           plan_id: dbPlanId || productId,
           status: 'active',
+          provider: 'revenuecat',
           current_period_start: new Date().toISOString(),
           current_period_end: expiresDate,
           cancel_at_period_end: false,
