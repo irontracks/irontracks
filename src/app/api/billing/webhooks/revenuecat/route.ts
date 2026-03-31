@@ -17,9 +17,18 @@ import { cacheDelete } from '@/utils/cache'
 function resolveDbPlanId(productId: string): string {
   const s = String(productId || '').trim().toLowerCase()
   if (!s) return s
-  const withAnnual = s.replace(/_yearly$/, '_annual').replace(/_year$/, '_annual')
+  const withAnnual = s
+    .replace(/\d+_yearly$/, '_annual')
+    .replace(/\d+_year$/, '_annual')
+    .replace(/_yearly$/, '_annual')
+    .replace(/_year$/, '_annual')
   if (withAnnual !== s) return withAnnual
-  return s.replace(/_monthly$/, '').replace(/_month$/, '').replace(/_mensal$/, '')
+  return s
+    .replace(/\d+_monthly$/, '')
+    .replace(/\d+_month$/, '')
+    .replace(/_monthly$/, '')
+    .replace(/_month$/, '')
+    .replace(/_mensal$/, '')
 }
 
 export const dynamic = 'force-dynamic'
