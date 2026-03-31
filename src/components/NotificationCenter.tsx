@@ -136,12 +136,13 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded, open:
 
         const fetchNotifications = async () => {
             try {
-                const { data } = await supabase
+                const { data, error } = await supabase
                     .from('notifications')
-                    .select('id, user_id, type, title, body, message, data, read, is_read, read_at, created_at')
+                    .select('id, user_id, type, title, message, metadata, read, is_read, created_at')
                     .eq('user_id', safeUserId)
                     .order('created_at', { ascending: false })
                     .limit(50);
+                if (error) logError('component:NotificationCenter.fetchNotifications', error);
                 if (isMounted) setSystemNotifications((data as NotificationItem[]) || []);
             } catch (e) { logError('component:NotificationCenter.fetchNotifications', e); if (isMounted) setSystemNotifications([]); }
         };
@@ -391,6 +392,7 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded, open:
             {isOpen && (
                 <>
                     {/* Backdrop */}
+                    {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */}
                     <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
 
                     {/* Panel */}
