@@ -95,7 +95,6 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
 
   // Load VIP Status
   useEffect(() => {
-    if (hideVipCtas) return
     let cancelled = false
       ; (async () => {
         try {
@@ -109,7 +108,7 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
     return () => {
       cancelled = true
     }
-  }, [hideVipCtas])
+  }, [])
 
   const [threadId, setThreadId] = useState('')
   const [chatLoaded, setChatLoaded] = useState(false)
@@ -421,8 +420,6 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
     return <div className={`text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-xl border ${cls}`}>{txt}</div>
   }
 
-  if (hideVipCtas) return null
-
   return (
     <div className="space-y-4">
       {/* Header VIP Card */}
@@ -682,6 +679,7 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
               onChange={(e) => setDraft(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && send()}
               placeholder="Pergunte ao Iron Coach..."
+              aria-label="Mensagem para o Coach IA"
               className="flex-1 rounded-xl px-4 py-3 text-sm text-white placeholder:text-neutral-600 focus:outline-none transition-all input-premium-focus"
               style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(234,179,8,0.12)' }}
             />
