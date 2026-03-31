@@ -12,7 +12,6 @@
 import { logWarn } from '@/lib/logger'
 
 import { useCallback, useTransition } from 'react'
-import { isIosNative } from '@/utils/platform'
 
 export type AppView =
   | 'dashboard'
@@ -42,7 +41,7 @@ export function useViewNavigation({
   tourVersion,
 }: UseViewNavigationOptions) {
   const [, startViewTransition] = useTransition()
-  const hideVipOnIos = isIosNative()
+  const hideVipOnIos: boolean = false
 
   const openVipView = useCallback(() => {
     if (hideVipOnIos) return
