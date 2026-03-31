@@ -2,7 +2,7 @@
 import React, { useRef, useState, useEffect, useMemo, Suspense } from 'react';
 import dynamic from 'next/dynamic';
 import NextImage from 'next/image';
-import { Download, ArrowLeft, FileText, Code, Users, Sparkles, Loader2, Check, MessageSquare } from 'lucide-react';
+import { Download, ArrowLeft, FileText, Code, Share2 } from 'lucide-react';
 import { buildReportHTML } from '@/utils/report/buildHtml';
 import { fetchLogoDataUrl } from '@/utils/report/fetchLogoDataUrl';
 import { workoutPlanHtml } from '@/utils/report/templates';
@@ -14,7 +14,7 @@ import { getErrorMessage } from '@/utils/errorMessage'
 import { escapeHtml } from '@/utils/escapeHtml'
 import {
     formatDate as sharedFormatDate,
-    formatDuration as sharedFormatDuration,
+    formatDuration as _sharedFormatDuration,
     normalizeExerciseKey,
 } from '@/utils/report/formatters'
 import { ReportMetricsPanel } from '@/components/workout-report/ReportMetricsPanel'
@@ -43,6 +43,7 @@ const ReportMusclePieChart = dynamic(() => import('@/components/workout-report/R
 
 // Modals — loaded only when user opens them
 const StoryComposer = dynamic(() => import('@/components/StoryComposer'), { ssr: false, loading: () => null })
+const WorkoutShareCard = dynamic(() => import('@/components/WorkoutShareCard'), { ssr: false, loading: () => null })
 
 import {
     useReportData,
@@ -79,26 +80,27 @@ interface WorkoutReportProps {
     onUpgrade?: () => void
 }
 
-const WorkoutReport = ({ session, previousSession, user, isVip, onClose, settings, onUpgrade }: WorkoutReportProps) => {
+const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose, settings, onUpgrade }: WorkoutReportProps) => {
     const safeSession = session && typeof session === 'object' ? (session as AnyObj) : null;
     const reportRef = useRef<HTMLDivElement | null>(null);
     const [showExportMenu, setShowExportMenu] = useState(false);
     const [showStory, setShowStory] = useState(false);
+    const [showShareCard, setShowShareCard] = useState(false);
     const storiesV2Enabled = useMemo(() => isFeatureEnabled(settings, FEATURE_KEYS.storiesV2), [settings]);
-    const [showStoryPrompt, setShowStoryPrompt] = useState(false);
+    const [_showStoryPrompt, setShowStoryPrompt] = useState(false);
 
     const { credits } = useVipCredits();
-    const formatLimit = (limit: number | null | undefined) => (limit == null ? '∞' : limit > 1000 ? '∞' : limit)
-    const isInsightsExhausted = (entry?: { used: number; limit: number | null }) => !!entry && entry.limit !== null && entry.used >= entry.limit
+    const _formatLimit = (limit: number | null | undefined) => (limit == null ? '∞' : limit > 1000 ? '∞' : `${limit}`)
+    const _isInsightsExhausted = (entry?: { used: number; limit: number | null }) => !!entry && entry.limit !== null && entry.used >= entry.limit
     // Celebration splash — 8.1
     const [showSplash, setShowSplash] = useState(true);
     useEffect(() => { const t = setTimeout(() => setShowSplash(false), 1200); return () => clearTimeout(t); }, []);
 
     // ── Data hook ──────────────────────────────────────────────────────────
     const {
-        supabase,
+        supabase: _supabase,
         effectivePreviousSession,
-        targetUserId,
+        targetUserId: _targetUserId,
         preCheckin: rawPreCheckin,
         postCheckin: rawPostCheckin,
         aiState, setAiState,
@@ -123,7 +125,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
     const formatDate = sharedFormatDate;
     const getCurrentDate = () => new Date().toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
-    const prevSessionLogs: Record<string, unknown> = effectivePreviousSession?.logs && typeof effectivePreviousSession.logs === 'object' ? (effectivePreviousSession.logs as Record<string, unknown>) : {};
+    const _prevSessionLogs: Record<string, unknown> = effectivePreviousSession?.logs && typeof effectivePreviousSession.logs === 'object' ? (effectivePreviousSession.logs as Record<string, unknown>) : {};
 
     if (!session) return null;
 
@@ -411,7 +413,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
             document.body.appendChild(a);
             a.click();
             a.remove();
-        } catch (e) {
+        } catch {
             alert('Não foi possível compartilhar. Baixei o arquivo para você.\n+Abra com seu gerenciador e compartilhe.');
             try {
                 if (!pdfUrl) return;
@@ -541,8 +543,9 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
         <div className="fixed inset-0 z-[1000] bg-neutral-950 text-white overflow-y-auto overflow-x-hidden">
             {/* 8.1 — Celebration Splash Overlay */}
             {showSplash && (
-                <div
-                    className="fixed inset-0 z-[1200] flex flex-col items-end justify-end bg-neutral-950 overflow-hidden"
+                <button
+                    type="button"
+                    className="fixed inset-0 z-[1200] flex flex-col items-end justify-end bg-neutral-950 overflow-hidden w-full border-0 p-0 text-left"
                     onClick={() => setShowSplash(false)}
                 >
                     {/* Victory hero — full screen background */}
@@ -581,7 +584,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                         )}
                         <div className="mt-3 text-xs font-bold text-neutral-400">Toque para ver o relatório</div>
                     </div>
-                </div>
+                </button>
             )}
             {/* Fixed header bar */}
             <div className={`fixed top-0 left-0 right-0 z-[1100] no-print bg-neutral-950/95 backdrop-blur border-b border-neutral-800/80 px-3 md:px-6 pt-safe pb-1.5 ${isGenerating ? 'opacity-50 pointer-events-none' : ''}`}>
@@ -620,6 +623,14 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                             className="min-h-[36px] bg-yellow-500 hover:bg-yellow-400 text-black px-3 rounded-xl font-black shadow-lg inline-flex items-center gap-1.5"
                         >
                             <span className="text-xs uppercase tracking-widest">Storie</span>
+                        </button>
+                        <button
+                            type="button"
+                            onClick={() => { setShowExportMenu(false); setShowStoryPrompt(false); setShowShareCard(true); }}
+                            className="min-h-[36px] bg-neutral-800 hover:bg-neutral-700 text-white px-3 rounded-xl font-black inline-flex items-center gap-1.5 border border-neutral-700"
+                        >
+                            <Share2 size={14} className="text-yellow-500" />
+                            <span className="text-xs uppercase tracking-widest">Card</span>
                         </button>
                     </div>
 
@@ -793,7 +804,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                         <button onClick={closePreview} className="bg-neutral-800 text-white px-4 py-2 rounded-lg font-bold border border-neutral-700 hover:bg-neutral-700">Fechar</button>
                     </div>
                     <div className="flex-1 bg-white">
-                        <iframe ref={pdfFrameRef} src={pdfUrl} className="w-full h-full" />
+                        <iframe ref={pdfFrameRef} src={pdfUrl} className="w-full h-full" title="Relatório de treino PDF" />
                     </div>
                     <div className="p-4 bg-neutral-900 border-t border-neutral-800 flex items-center justify-end gap-2 pb-safe">
                         <button onClick={handleShare} className="bg-neutral-800 text-white px-4 py-2 rounded-lg">Compartilhar</button>
@@ -802,6 +813,20 @@ const WorkoutReport = ({ session, previousSession, user, isVip, onClose, setting
                 </div>
             )}
             {showStory ? <StoryComposer open={showStory} session={session} calories={calories} onClose={() => setShowStory(false)} /> : null}
+            {showShareCard ? (
+                <WorkoutShareCard
+                    session={safeSession}
+                    dateStr={formatDate(safeSession?.date)}
+                    workoutTitle={workoutTitleMain}
+                    calories={typeof calories === 'number' ? calories : 0}
+                    currentVolume={typeof currentVolume === 'number' ? currentVolume : 0}
+                    setsCompleted={typeof setsCompleted === 'number' ? setsCompleted : 0}
+                    totalTime={typeof safeSession?.totalTime === 'number' ? (safeSession.totalTime as number) : 0}
+                    prCount={typeof prCount === 'number' ? prCount : 0}
+                    detectedPrs={Array.isArray(detectedPrs) ? (detectedPrs as { exerciseName?: string; name?: string; e1rm?: number; weight?: number }[]) : []}
+                    onClose={() => setShowShareCard(false)}
+                />
+            ) : null}
 
         </div>
     );
