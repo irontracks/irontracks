@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
   const rl = await checkRateLimitAsync(`ai:supplements:${auth.user.id}:${ip}`, 5, 60_000)
   if (!rl.allowed) return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 })
 
-  const access = await checkVipFeatureAccess(auth.supabase, auth.user.id, 'ai_coach')
+  const access = await checkVipFeatureAccess(auth.supabase, auth.user.id, 'insights_weekly')
   if (!access.allowed) return NextResponse.json({ ok: false, error: 'vip_required' }, { status: 403 })
 
   const parsed = await parseJsonBody(req, BodySchema)
@@ -101,7 +101,7 @@ Inclua no máximo 6 suplementos, ordenados por prioridade. Seja específico e ba
       return NextResponse.json({ ok: false, error: 'invalid_ai_response' }, { status: 500 })
     }
 
-    await incrementVipUsage(auth.supabase, auth.user.id, 'ai_coach')
+    await incrementVipUsage(auth.supabase, auth.user.id, 'insights')
 
     return NextResponse.json({
       ok: true,
