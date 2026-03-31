@@ -4,7 +4,7 @@ import { useRouter } from 'next/navigation';
 import { Plus, FileText, TrendingUp, X, Upload } from 'lucide-react';
 import { AssessmentForm } from './AssessmentForm';
 import { logError, logWarn, logInfo } from '@/lib/logger'
-import { isIosNative } from '@/utils/platform'
+import { useIsIosNative } from '@/hooks/useIsIosNative'
 import { parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
 
@@ -26,7 +26,7 @@ export default function AssessmentButton({
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const scanInputRef = useRef<HTMLInputElement | null>(null);
-  const isIosNativeApp = isIosNative();
+  const isIosNativeApp = useIsIosNative();
 
   const handleNewAssessment = () => {
     router.push(`/assessments/new/${studentId}`);

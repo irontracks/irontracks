@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useCallback } from 'react'
+import { useEffect } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { logError } from '@/lib/logger'
 import type { UserRecord } from '@/types/app'
@@ -63,13 +63,27 @@ export function useAuthInit({
             return
           }
           if (ev === 'INITIAL_SESSION') {
-            fetch('/api/auth/ping', { method: 'GET', credentials: 'include', cache: 'no-store' })
-              .then((r) => {
-                if (r && r.status === 204) return
-                clearClientSessionState()
-                if (typeof window !== 'undefined') window.location.href = '/?next=/dashboard'
-              })
-              .catch(() => { })
+            // WKWebView (iOS) may not propagate cookies on the very first load.
+            // Retry up to 3 times with increasing delays before forcing a redirect,
+            // so new users don't get stuck in a flash/redirect loop.
+            const pingWithRetry = (attemptsLeft: number, delayMs: number): void => {
+              fetch('/api/auth/ping', { method: 'GET', credentials: 'include', cache: 'no-store' })
+                .then((r) => {
+                  if (r && r.status === 204) return
+                  if (attemptsLeft > 1) {
+                    setTimeout(() => pingWithRetry(attemptsLeft - 1, delayMs * 2), delayMs)
+                    return
+                  }
+                  clearClientSessionState()
+                  if (typeof window !== 'undefined') window.location.href = '/?next=/dashboard'
+                })
+                .catch(() => {
+                  if (attemptsLeft > 1) {
+                    setTimeout(() => pingWithRetry(attemptsLeft - 1, delayMs * 2), delayMs)
+                  }
+                })
+            }
+            pingWithRetry(3, 1500)
             return
           }
         } catch (e) { logError('IronTracksApp.authStateChange', e) }

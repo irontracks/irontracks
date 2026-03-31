@@ -1,7 +1,7 @@
 'use client'
 
 import { Upload, User, X } from 'lucide-react'
-import { isIosNative } from '@/utils/platform'
+import { useIsIosNative } from '@/hooks/useIsIosNative'
 
 type AssessmentHeaderProps = {
   onCreate: () => void
@@ -24,7 +24,7 @@ export const AssessmentHeader = ({
   scanInputRef,
   onScanFileChange,
 }: AssessmentHeaderProps) => {
-  const isIosNativeApp = isIosNative()
+  const isIosNativeApp = useIsIosNative()
   const scanDisabled = importing || !studentId
   return (
     <div
