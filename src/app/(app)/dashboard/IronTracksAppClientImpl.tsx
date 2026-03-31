@@ -36,6 +36,7 @@ import { BackButton } from '@/components/ui/BackButton';
 import DashboardModals from './DashboardModals';
 const StudentDashboard = dynamic(() => import('@/components/dashboard/StudentDashboard'), { ssr: false });
 const WorkoutWizardModal = dynamic(() => import('@/components/dashboard/WorkoutWizardModal'), { ssr: false });
+const ExpressWorkoutModal = dynamic(() => import('@/components/dashboard/ExpressWorkoutModal'), { ssr: false });
 const SettingsModal = dynamic(() => import('@/components/SettingsModal'), { ssr: false });
 import { useUserSettings } from '@/hooks/useUserSettings'
 const WhatsNewModal = dynamic(() => import('@/components/WhatsNewModal'), { ssr: false })
@@ -126,6 +127,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
     const { streakStats, setStreakStats, streakLoading } = useWorkoutStreak(user?.id);
     const [currentWorkout, setCurrentWorkout] = useState<ActiveSession | null>(null);
     const [createWizardOpen, setCreateWizardOpen] = useState(false)
+    const [expressWorkoutOpen, setExpressWorkoutOpen] = useState(false)
     const [quickViewWorkout, setQuickViewWorkout] = useState<ActiveSession | null>(null);
     const [reportData, setReportData] = useState({ current: null, previous: null });
     const mainScrollRef = useRef<HTMLDivElement | null>(null);
@@ -682,6 +684,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                     vipEnabled={!hideVipOnIos}
                                     settings={userSettingsApi?.settings ?? null}
                                     onCreateWorkout={handleCreateWorkout}
+                                    onExpressWorkout={() => setExpressWorkoutOpen(true)}
                                     onQuickView={(w) => setQuickViewWorkout(w)}
                                     onStartSession={(w) => handleStartSession(w)}
                                     onRestoreWorkout={(w: unknown) => handleRestoreWorkout(w)}
@@ -707,6 +710,21 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                 />
                               </>
                             )}
+
+                            <ExpressWorkoutModal
+                                isOpen={expressWorkoutOpen}
+                                onClose={() => setExpressWorkoutOpen(false)}
+                                onUseDraft={(draft) => {
+                                    try {
+                                        const title = String(draft?.title || '').trim() || 'Treino Express'
+                                        const exercises = (Array.isArray(draft?.exercises) ? draft.exercises : []) as import('@/types/app').Exercise[]
+                                        setCurrentWorkout({ title, exercises })
+                                        setView('edit')
+                                    } finally {
+                                        setExpressWorkoutOpen(false)
+                                    }
+                                }}
+                            />
 
                             <WorkoutWizardModal
                                 isOpen={createWizardOpen}
