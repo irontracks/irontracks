@@ -2,7 +2,7 @@ import { useFocusTrap } from '@/hooks/useFocusTrap'
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { X, Send, MessageSquare, User, Bot, Loader2, Sparkles, Save, Trash2, Dumbbell, Check, Plus } from 'lucide-react';
 import { useVipCredits } from '@/hooks/useVipCredits';
-import { isIosNative } from '@/utils/platform';
+import { useIsIosNative } from '@/hooks/useIsIosNative';
 import type { Exercise } from '@/types/app';
 import { logError, logWarn, logInfo } from '@/lib/logger'
 import { createWorkout } from '@/actions/workout-crud-actions'
@@ -61,6 +61,7 @@ export default function CoachChatModal({
     onUpgrade
 }: CoachChatModalProps) {
     const { credits } = useVipCredits();
+    const hideVipCtas = useIsIosNative();
     const [messages, setMessages] = useState<CoachMessage[]>([]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
@@ -212,7 +213,6 @@ export default function CoachChatModal({
     };
 
     if (!isOpen) return null;
-    const hideVipCtas = isIosNative();
 
     const formatLimit = (limit: number | null | undefined) => (limit == null ? '∞' : limit > 1000 ? '∞' : limit)
     const isChatExhausted = (entry?: { used: number; limit: number | null }) => !!entry && entry.limit !== null && entry.used >= entry.limit

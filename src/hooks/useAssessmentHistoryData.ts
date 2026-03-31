@@ -8,7 +8,7 @@ import { generateAssessmentPlanAi } from '@/actions/workout-actions'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { logError } from '@/lib/logger'
 import { safePg, safePgLike } from '@/utils/safePgFilter'
-import { isIosNative } from '@/utils/platform'
+import { useIsIosNative } from '@/hooks/useIsIosNative'
 
 import {
   AssessmentRow,
@@ -88,7 +88,7 @@ export function useAssessmentHistoryData(studentId?: string) {
   // ── Refs ──────────────────────────────────────────────────────
   const scanInputRef = useRef<HTMLInputElement | null>(null)
   const planAnchorRefs = useRef<Record<string, HTMLDivElement | null>>({})
-  const isIosNativeApp = isIosNative()
+  const isIosNativeApp = useIsIosNative()
 
   // ── Merge helper for scan import ────────────────────────────
   const mergeImportedFormData = useCallback(

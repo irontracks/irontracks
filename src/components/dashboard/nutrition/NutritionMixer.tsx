@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, useTransition, useCallback } from 'react'
 import { logMealAction } from '@/app/(app)/dashboard/nutrition/actions'
 import type { MealLog } from '@/lib/nutrition/engine'
-import { isIosNative } from '@/utils/platform'
+import { useIsIosNative } from '@/hooks/useIsIosNative'
 import { createClient } from '@/utils/supabase/client'
 import { getErrorMessage } from '@/utils/errorMessage'
 import dynamic from 'next/dynamic'
@@ -152,7 +152,7 @@ export default function NutritionMixer({
   goalsSource?: 'saved' | 'profile' | 'default'
 }) {
   const supabase = useMemo(() => createClient(), [])
-  const hideVipCtas = useMemo(() => isIosNative(), [])
+  const hideVipCtas = useIsIosNative()
 
   // ── Auth ──────────────────────────────────────────────────────────────────
   const [userId, setUserId] = useState<string | undefined>()

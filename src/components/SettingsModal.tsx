@@ -12,6 +12,7 @@ import { DEFAULT_SETTINGS } from '@/hooks/useUserSettings'
 import { createClient } from '@/utils/supabase/client'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { isIosNative } from '@/utils/platform'
+import { useIsIosNative } from '@/hooks/useIsIosNative'
 import { useFocusTrap } from '@/hooks/useFocusTrap'
 import {
   checkBiometricsAvailable,
@@ -55,6 +56,7 @@ interface SettingsModalProps {
 
 export default function SettingsModal(props: SettingsModalProps) {
   const { alert } = useDialog()
+  const iosNative = useIsIosNative()
   const isOpen = !!props?.isOpen
   const saving = !!props?.saving
   const rawSettings = props?.settings
@@ -187,11 +189,11 @@ export default function SettingsModal(props: SettingsModalProps) {
           <SettingsNotificationsSection
             draft={draft} setValue={setValue}
             iosNotifStatus={iosNotifStatus} iosNotifBusy={iosNotifBusy}
-            isIosNative={isIosNative()}
+            isIosNative={iosNative}
             onRequestIosNotifPermission={handleRequestIosNotifPermission}
             onOpenAppSettings={handleOpenAppSettings}
           />
-          {isIosNative() && (
+          {iosNative && (
             <SettingsHealthKitSection
               isHealthKitAvailable={Boolean(iosDiagObj?.healthKitAvailable)}
               healthKitGranted={healthKitGranted}
@@ -200,10 +202,10 @@ export default function SettingsModal(props: SettingsModalProps) {
               onOpenAppSettings={handleOpenAppSettings}
             />
           )}
-          {isIosNative() && <SettingsSecuritySection draft={draft} setValue={setValue} />}
+          {iosNative && <SettingsSecuritySection draft={draft} setValue={setValue} />}
 
           {/* iOS Diagnostics */}
-          {isIosNative() && (
+          {iosNative && (
             <div className="rounded-xl p-4" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
               <div className="flex items-center justify-between gap-3 mb-3">
                 <div>
