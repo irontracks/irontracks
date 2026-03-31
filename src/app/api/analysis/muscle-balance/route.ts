@@ -64,7 +64,7 @@ export async function GET() {
 
         // Map exercise to muscle groups
         const normalized = normalizeExerciseName(name)
-        const heuristic = buildHeuristicExerciseMap(normalized, name)
+        const heuristic = buildHeuristicExerciseMap(normalized)
         if (!heuristic) return
 
         for (const c of heuristic.mapping.contributions) {
