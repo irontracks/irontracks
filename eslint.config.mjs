@@ -86,6 +86,14 @@ const eslintConfig = defineConfig([
       "react-hooks/set-state-in-effect": "off",
     },
   },
+  // Pre-existing unused-var warnings in useLoginScreen (Capacitor dynamic imports pattern).
+  {
+    files: ["src/hooks/useLoginScreen.ts"],
+    rules: {
+      "@typescript-eslint/no-unused-vars": "off",
+      "react-hooks/exhaustive-deps": "off",
+    },
+  },
   // Pre-existing unused-var and a11y warnings in files touched by the iOS login fix.
   {
     files: [

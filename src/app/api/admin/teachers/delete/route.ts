@@ -31,7 +31,8 @@ export async function POST(req: Request) {
       }
     }
 
-    const actorId = String(auth.user?.id || '').trim()
+    // actorId must be a valid UUID or null — never an empty string (causes Postgres UUID cast error)
+    const actorId = String(auth.user?.id || '').trim() || null
     const actorEmail = auth.user?.email ? String(auth.user.email).trim() : null
     const actorRole = String(auth.role || 'admin')
 
@@ -60,9 +61,9 @@ export async function POST(req: Request) {
 
     const { data, error } = await admin.rpc('delete_teacher_cascade', {
       p_teacher_id: resolvedTeacherId,
-      p_actor_id: actorId || null,
+      p_actor_id:   actorId,
       p_actor_email: actorEmail,
-      p_actor_role: actorRole,
+      p_actor_role:  actorRole,
     })
 
     if (error) {

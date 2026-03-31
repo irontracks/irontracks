@@ -1,11 +1,10 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
-import { requireRole, requireRoleWithBearer, resolveRoleByUser } from '@/utils/auth/route'
+import { requireRole, resolveRoleByUser } from '@/utils/auth/route'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { logWarn } from '@/lib/logger'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
-import { safePg } from '@/utils/safePgFilter'
 
 export const dynamic = 'force-dynamic'
 
@@ -39,7 +38,6 @@ export async function POST(req: Request) {
             actorEmail = cookieAuth.user?.email ? String(cookieAuth.user.email) : null
             actorRole = String(cookieAuth.role || 'admin')
         } else {
-            // Try bearer header
             const headerToken = String(req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '').trim()
             const tokenToUse = headerToken || String(bodyToken || '').trim()
             if (!tokenToUse) {
@@ -81,90 +79,61 @@ export async function POST(req: Request) {
             return NextResponse.json({ ok: false, error: 'Aluno não encontrado.' }, { status: 404 })
         }
 
-        // R2#4: Teachers can only delete their own students
+        // R2#4: Teachers can only delete their OWN students.
+        // Fix: block if teacher_id is NULL (unassigned) — only admins can delete unassigned students.
         if (actorRole === 'teacher' && actorId) {
             const { data: studentFull } = await admin.from('students').select('teacher_id').eq('id', studentRow.id).maybeSingle()
             const teacherId = studentFull?.teacher_id ? String(studentFull.teacher_id) : ''
-            if (teacherId && teacherId !== actorId) {
-                return NextResponse.json({ ok: false, error: 'Você não tem permissão para excluir alunos de outro professor.' }, { status: 403 })
+            if (!teacherId || teacherId !== actorId) {
+                return NextResponse.json({ ok: false, error: 'Você não tem permissão para excluir este aluno.' }, { status: 403 })
             }
         }
 
-        const studentUserId = studentRow.user_id
+        // Atomically delete all student data via RPC (single transaction)
+        const { data: rpcResult, error: rpcError } = await admin.rpc('delete_student_cascade', {
+            p_student_id:  studentRow.id,
+            p_actor_id:    actorId || null,
+            p_actor_email: actorEmail,
+            p_actor_role:  actorRole,
+        })
 
-        // Delete cascade — log errors instead of silently swallowing them
-        const ctx = { studentId: studentRow.id, studentUserId }
+        if (rpcError) {
+            const msg = String(rpcError.message || '').trim()
+            const lower = msg.toLowerCase()
+            if (lower.includes('student_not_found')) {
+                return NextResponse.json({ ok: false, error: 'Aluno não encontrado.' }, { status: 404 })
+            }
+            if (lower.includes('schema cache') || lower.includes('delete_student_cascade')) {
+                return NextResponse.json({
+                    ok: false,
+                    error: 'Função de exclusão não encontrada. Rode a migration 20260401_delete_student_cascade.sql no Supabase.',
+                }, { status: 400 })
+            }
+            return NextResponse.json({ ok: false, error: msg || 'Falha ao excluir aluno.' }, { status: 400 })
+        }
+
+        const report = (rpcResult || {}) as { student_id: string; student_user_id: string | null }
+        const studentUserId = report.student_user_id || studentRow.user_id
+
+        // Delete auth user — must happen outside Postgres (external auth service)
+        let authDeleteWarning = false
         if (studentUserId) {
-            try { await admin.from('workout_checkins').delete().eq('user_id', studentUserId) } catch (e) { logWarn('student-delete', 'Failed to delete workout_checkins', { ...ctx, error: getErrorMessage(e) }) }
-            try { await admin.from('exercise_execution_submissions').delete().eq('student_user_id', studentUserId) } catch (e) { logWarn('student-delete', 'Failed to delete execution_submissions', { ...ctx, error: getErrorMessage(e) }) }
-
-            const assessmentIds: string[] = []
             try {
-                const { data: assessments } = await admin.from('assessments').select('id').eq('student_id', studentUserId)
-                if (Array.isArray(assessments)) assessmentIds.push(...assessments.map((a: { id: string }) => a.id))
-            } catch (e) { logWarn('student-delete', 'Failed to fetch assessments', { ...ctx, error: getErrorMessage(e) }) }
-            if (assessmentIds.length > 0) {
-                try { await admin.from('assessment_photos').delete().in('assessment_id', assessmentIds) } catch (e) { logWarn('student-delete', 'Failed to delete assessment_photos', { ...ctx, error: getErrorMessage(e) }) }
+                await admin.auth.admin.deleteUser(studentUserId)
+            } catch (e) {
+                // Student data was already deleted atomically by the RPC.
+                // Auth user remains orphaned — admin should be notified.
+                logWarn('student-delete', 'auth.users delete failed after cascade', { studentUserId, error: getErrorMessage(e) })
+                authDeleteWarning = true
             }
-            try { await admin.from('assessments').delete().eq('student_id', studentUserId) } catch (e) { logWarn('student-delete', 'Failed to delete assessments', { ...ctx, error: getErrorMessage(e) }) }
-
-            const workoutIds: string[] = []
-            try {
-                const { data: workouts } = await admin.from('workouts').select('id').eq('user_id', studentUserId)
-                if (Array.isArray(workouts)) workoutIds.push(...workouts.map((w: { id: string }) => w.id))
-            } catch (e) { logWarn('student-delete', 'Failed to fetch workouts', { ...ctx, error: getErrorMessage(e) }) }
-            if (workoutIds.length > 0) {
-                const exerciseIds: string[] = []
-                try {
-                    const { data: exercises } = await admin.from('exercises').select('id').in('workout_id', workoutIds)
-                    if (Array.isArray(exercises)) exerciseIds.push(...exercises.map((e: { id: string }) => e.id))
-                } catch (e) { logWarn('student-delete', 'Failed to fetch exercises', { ...ctx, error: getErrorMessage(e) }) }
-                if (exerciseIds.length > 0) {
-                    try { await admin.from('sets').delete().in('exercise_id', exerciseIds) } catch (e) { logWarn('student-delete', 'Failed to delete sets', { ...ctx, error: getErrorMessage(e) }) }
-                    try { await admin.from('exercises').delete().in('id', exerciseIds) } catch (e) { logWarn('student-delete', 'Failed to delete exercises', { ...ctx, error: getErrorMessage(e) }) }
-                }
-                try { await admin.from('workouts').delete().in('id', workoutIds) } catch (e) { logWarn('student-delete', 'Failed to delete workouts', { ...ctx, error: getErrorMessage(e) }) }
-            }
-
-            try { await admin.from('notifications').delete().eq('user_id', studentUserId) } catch (e) { logWarn('student-delete', 'Failed to delete notifications', { ...ctx, error: getErrorMessage(e) }) }
-            try { await admin.from('user_settings').delete().eq('user_id', studentUserId) } catch (e) { logWarn('student-delete', 'Failed to delete user_settings', { ...ctx, error: getErrorMessage(e) }) }
-            try { await admin.from('active_workout_sessions').delete().eq('user_id', studentUserId) } catch (e) { logWarn('student-delete', 'Failed to delete active_workout_sessions', { ...ctx, error: getErrorMessage(e) }) }
-            try {
-                const safeUserId = safePg(String(studentUserId))
-                const { data: channels } = await admin.from('direct_channels').select('id').or(`user1_id.eq.${safeUserId},user2_id.eq.${safeUserId}`)
-                if (Array.isArray(channels) && channels.length > 0) {
-                    const ids = channels.map((c: { id: string }) => c.id)
-                    try { await admin.from('direct_messages').delete().in('channel_id', ids) } catch (e) { logWarn('student-delete', 'Failed to delete direct_messages', { ...ctx, error: getErrorMessage(e) }) }
-                    try { await admin.from('direct_channels').delete().in('id', ids) } catch (e) { logWarn('student-delete', 'Failed to delete direct_channels', { ...ctx, error: getErrorMessage(e) }) }
-                }
-            } catch (e) { logWarn('student-delete', 'Failed to delete direct channels', { ...ctx, error: getErrorMessage(e) }) }
         }
 
-        // Delete the student record
-        const { error: deleteError } = await admin.from('students').delete().eq('id', studentRow.id)
-        if (deleteError) {
-            return NextResponse.json({ ok: false, error: String(deleteError.message || 'Falha ao excluir') }, { status: 400 })
-        }
-
-        // Audit log
-        try {
-            await admin.from('audit_events').insert({
-                actor_id: actorId || null,
-                actor_email: actorEmail,
-                actor_role: actorRole,
-                action: 'delete_student',
-                entity_type: 'student',
-                entity_id: studentRow.id,
-                metadata: { student_user_id: studentUserId },
-            })
-        } catch (e) { logWarn('student-delete', 'Failed to write audit log', { ...ctx, error: getErrorMessage(e) }) }
-
-        // Delete from auth.users
-        if (studentUserId) {
-            try { await admin.auth.admin.deleteUser(studentUserId) } catch (e) { logWarn('student-delete', 'Failed to delete auth user', { ...ctx, error: getErrorMessage(e) }) }
-        }
-
-        return NextResponse.json({ ok: true, student_id: studentRow.id, student_user_id: studentUserId })
+        return NextResponse.json({
+            ok: true,
+            student_id: studentRow.id,
+            student_user_id: studentUserId,
+            ...(authDeleteWarning ? { auth_delete_warning: 'Aluno removido do sistema, mas a conta de login pode precisar de exclusão manual.' } : {}),
+        })
     } catch (e: unknown) {
         return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
     }

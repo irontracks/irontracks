@@ -42,12 +42,7 @@ const sendApprovalEmail = async (toEmail: string, fullName: string, accountAlrea
       Authorization: `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify({
-      from,
-      to: [to],
-      subject,
-      html,
-    }),
+    body: JSON.stringify({ from, to: [to], subject, html }),
   }).catch((): null => null)
 }
 
@@ -83,7 +78,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: 'internal_error' }, { status: 500 })
     }
 
-    // Fetch request details — use select('*') to avoid column-not-found errors
+    // Fetch request details
     const { data: request, error: fetchError } = await admin
       .from('access_requests')
       .select('*')
@@ -92,7 +87,6 @@ export async function POST(req: Request) {
 
     if (fetchError) {
       logError('access-requests/action', `Fetch error for requestId ${requestId}: ${fetchError.message}`)
-      // Expose real error to help diagnose
       return NextResponse.json({ ok: false, error: 'Erro ao buscar solicitação.' }, { status: 500 })
     }
 
@@ -102,9 +96,14 @@ export async function POST(req: Request) {
     }
 
     if (request.status !== 'pending') {
-      return NextResponse.json({ ok: false, error: `Essa solicitação já foi ${request.status === 'accepted' || request.status === 'approved' ? 'aprovada' : 'recusada'} anteriormente.` }, { status: 400 })
+      const wasApproved = request.status === 'approved' || request.status === 'accepted'
+      return NextResponse.json({
+        ok: false,
+        error: `Essa solicitação já foi ${wasApproved ? 'aprovada' : 'recusada'} anteriormente.`,
+      }, { status: 400 })
     }
 
+    // ── REJECT ────────────────────────────────────────────────────────────────
     if (action === 'reject') {
       const email = String(request.email || '').trim()
 
@@ -137,7 +136,6 @@ export async function POST(req: Request) {
             entity_id: profile.id,
             metadata: { email, role },
           })
-
           await admin.from('profiles').delete().eq('id', profile.id)
           await admin.auth.admin.deleteUser(profile.id)
           await admin.from('students').update({ user_id: null }).ilike('email', safePgLike(email))
@@ -150,109 +148,68 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, message: 'Solicitação recusada e removida.' })
     }
 
+    // ── ACCEPT ────────────────────────────────────────────────────────────────
     if (action === 'accept') {
-      const { error: updateError } = await admin
-        .from('access_requests')
-        .update({ status: 'accepted', updated_at: new Date().toISOString() })
-        .eq('id', requestId)
+      const actorId = String(auth.user?.id || '').trim() || null
+      const actorEmail = auth.user?.email ? String(auth.user.email).trim() : null
+      const actorRole = String(auth.role || 'admin')
 
-      if (updateError) throw updateError
+      // Atomically approve via RPC — all DB writes in one transaction
+      const { data: rpcResult, error: rpcError } = await admin.rpc('approve_access_request', {
+        p_request_id:  requestId,
+        p_actor_id:    actorId,
+        p_actor_email: actorEmail,
+        p_actor_role:  actorRole,
+      })
 
-      const email = String(request.email || '').trim()
-      const fullName = String(request.full_name || '').trim()
-      const roleRequested = String(request.role_requested || 'student').trim()
-
-
-      const { data: profile } = await admin.from('profiles').select('id').ilike('email', safePgLike(email)).maybeSingle()
-      const userId = profile?.id ? String(profile.id) : ''
-
-      // If approved and requested to be teacher, promote
-      if (roleRequested === 'teacher') {
-        // 1. Create Teacher record if not exists
-        // Note: teachers table columns = id, name, email, phone, status, created_at, payment_status, user_id, asaas_*, birth_date
-        const { data: existingTeacher } = await admin.from('teachers').select('id').ilike('email', safePgLike(email)).maybeSingle()
-        if (!existingTeacher) {
-          const { error: teacherInsertErr } = await admin.from('teachers').insert({
-            email,
-            name: fullName || email.split('@')[0],
-            phone: request.phone || null,
-            user_id: userId || null,
-            status: 'active',
-            birth_date: request.birth_date || null,
-          })
-          if (teacherInsertErr) logError('access-requests/action', 'Teacher insert failed:', teacherInsertErr.message)
-        } else {
-          // Update existing teacher record
-          const { error: teacherUpdateErr } = await admin.from('teachers').update({
-            user_id: userId || null,
-            status: 'active',
-          }).eq('id', existingTeacher.id)
-          if (teacherUpdateErr) logError('access-requests/action', 'Teacher update failed:', teacherUpdateErr.message)
+      if (rpcError) {
+        const msg = String(rpcError.message || '').trim()
+        const lower = msg.toLowerCase()
+        if (lower.includes('request_not_found')) {
+          return NextResponse.json({ ok: false, error: 'Solicitação não encontrada.' }, { status: 404 })
         }
-
-        // 2. Update Profile role if exists
-        if (userId) {
-          await admin.from('profiles').update({
-            role: 'teacher',
-            is_approved: true,
-            approval_status: 'approved',
-            approved_at: new Date().toISOString(),
-            approved_by: auth.user.id,
-          }).eq('id', userId)
+        if (lower.includes('request_not_pending')) {
+          return NextResponse.json({ ok: false, error: 'Essa solicitação já foi processada.' }, { status: 400 })
         }
-        // If user has no account yet, store pre-approval in access_requests
-        // so that when they sign up, the onboarding flow can pick up their approved status
-        if (!userId) {
-          try {
-            await admin.from('access_requests').update({
-              status: 'accepted',
-              metadata: {
-                pre_approved: true,
-                role: 'teacher',
-                approved_at: new Date().toISOString(),
-                approved_by: auth.user.id,
-              }
-            }).eq('id', requestId)
-          } catch { /* non-fatal — pre-approval stored in teachers table */ }
+        if (lower.includes('schema cache') || lower.includes('approve_access_request')) {
+          return NextResponse.json({
+            ok: false,
+            error: 'Função de aprovação não encontrada. Rode a migration 20260401_approve_access_request_rpc.sql no Supabase.',
+          }, { status: 400 })
         }
+        throw rpcError
       }
 
-      if (userId) {
-        // If not teacher, ensure approved and create student record
-        if (roleRequested !== 'teacher') {
-          const { error: approveError } = await admin.from('profiles').update({
-            is_approved: true,
-            approval_status: 'approved',
-            approved_at: new Date().toISOString(),
-            approved_by: auth.user.id,
-          }).eq('id', userId)
-          if (approveError) throw approveError
-
-          // Only create student record for non-teacher roles
-          const { data: existingStudent } = await admin.from('students').select('id').ilike('email', safePgLike(email)).maybeSingle()
-          if (!existingStudent?.id) {
-            const payload: Record<string, unknown> = { email, status: 'ativo' }
-            if (fullName) payload.name = fullName
-            payload.user_id = userId
-            await admin.from('students').insert(payload)
-          } else {
-            await admin.from('students').update({ user_id: userId, status: 'ativo' }).eq('id', existingStudent.id)
-          }
-        }
+      const result = (rpcResult || {}) as {
+        user_id: string | null
+        email: string
+        full_name: string
+        role: string
+        account_existed: boolean
       }
 
+      // Send approval email (external API — outside the DB transaction, best-effort)
+      let emailWarning = false
       try {
-        await sendApprovalEmail(email, fullName, !!userId)
-      } catch (e) { logWarn('admin:access-requests:action', 'silenced', e) }
+        await sendApprovalEmail(
+          result.email || String(request.email || ''),
+          result.full_name || String(request.full_name || ''),
+          result.account_existed,
+        )
+      } catch (e) {
+        logWarn('admin:access-requests:action', 'Email send failed (non-fatal):', e)
+        emailWarning = true
+      }
 
-      // Bust students list cache so the admin panel immediately reflects the new student
-      try {
-        await cacheDeletePattern('admin:students:list:*')
-      } catch { /* non-fatal */ }
+      // Bust students list cache so admin panel reflects the change immediately
+      try { await cacheDeletePattern('admin:students:list:*') } catch { /* non-fatal */ }
 
       return NextResponse.json({
         ok: true,
-        message: userId ? 'Acesso liberado e e-mail enviado.' : 'Solicitação aprovada. Usuário já pode criar a conta.',
+        message: result.account_existed
+          ? 'Acesso liberado e e-mail enviado.'
+          : 'Solicitação aprovada. Usuário já pode criar a conta.',
+        ...(emailWarning ? { email_warning: true } : {}),
       })
     }
 

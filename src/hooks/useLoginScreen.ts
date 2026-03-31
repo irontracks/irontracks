@@ -293,12 +293,26 @@ export function useLoginScreen() {
                 if (isTeacher && !cref) throw new Error('CREF é obrigatório para cadastro de professor.')
                 const cleanPhone = emailData.phone.replace(/\D/g, '')
                 if (cleanPhone.length < 10) throw new Error('Telefone inválido (mínimo 10 dígitos com DDD).')
+                // Step 1: Create auth user first — the handle_new_user trigger creates the profile.
+                // If this fails, we never create the access_request (no orphan records).
+                const { error: signUpError } = await supabase.auth.signUp({
+                    email, password,
+                    options: { data: { full_name: emailData.fullName, display_name: emailData.fullName, phone: emailData.phone, birth_date: emailData.birthDate, role_requested: isTeacher ? 'teacher' : 'student', cref: isTeacher ? cref : null } }
+                })
+                if (signUpError) throw signUpError
+                // Step 2: Create the access_request so the admin sees it in the panel.
+                // If this fails after a successful signUp, the user still exists — they will show
+                // up as a pending_profile in the admin panel and the admin can approve from there.
                 try {
                     const json = await apiAuth.createAccessRequest({ email, full_name: emailData.fullName, phone: emailData.phone, birth_date: emailData.birthDate, role_requested: isTeacher ? 'teacher' : 'student', cref: isTeacher ? cref : null })
-                    if (!json?.ok) throw new Error((json?.error as string | undefined) || 'Não foi possível enviar sua solicitação.')
-                } catch (e: unknown) { throw new Error(e instanceof Error ? e.message : 'Não foi possível enviar sua solicitação.') }
-                const { error } = await supabase.auth.signUp({ email, password, options: { data: { full_name: emailData.fullName, display_name: emailData.fullName, phone: emailData.phone, birth_date: emailData.birthDate, role_requested: isTeacher ? 'teacher' : 'student', cref: isTeacher ? cref : null } } })
-                if (error) throw error
+                    if (!json?.ok) {
+                        // Log but don't block — user was created, admin can still find them
+                        const errMsg = (json?.error as string | undefined) || 'Falha ao registrar solicitação'
+                        logError('signup', 'createAccessRequest failed after signUp:', errMsg)
+                    }
+                } catch (e: unknown) {
+                    logError('signup', 'createAccessRequest threw after signUp:', e)
+                }
                 if (rememberMe) localStorage.setItem('it_remembered_email', email)
                 holdLoading = true; window.location.replace('/wait-approval')
             } else if (authMode === 'recover') {
