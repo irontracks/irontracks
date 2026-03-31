@@ -13,7 +13,7 @@
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Copy, Download, Loader2, RefreshCw, X, QrCode, Check } from 'lucide-react'
-import QRCodeLib from 'qrcode'
+import * as QRCodeLib from 'qrcode'
 
 interface GymQRCodeProps {
   /** UUID of the gym owned by the current user */
