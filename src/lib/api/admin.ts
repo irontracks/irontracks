@@ -74,9 +74,9 @@ export const apiAdmin = {
     }),
 
   /** POST assign a teacher to a student */
-  assignTeacher: (studentUserId: string, teacherUserId: string | null, authHeaders?: Record<string, string>, email?: string) =>
+  assignTeacher: (studentId: string, teacherUserId: string | null, authHeaders?: Record<string, string>, email?: string) =>
     apiPost<{ ok: boolean; student_id?: string }>('/api/admin/students/assign-teacher', {
-      student_user_id: studentUserId,
+      student_id: studentId,       // s.id is the students table PK — must match route's eq('id', ...)
       teacher_user_id: teacherUserId,
       ...(email ? { email } : {}),
     }, { headers: { 'Content-Type': 'application/json', ...authHeaders } }),
