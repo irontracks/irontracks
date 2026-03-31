@@ -1,13 +1,12 @@
 'use client'
 
-import React, { Suspense, useEffect, useMemo, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import Image from 'next/image'
 
-import { Plus, Dumbbell, Loader2, Activity, CalendarDays, Sparkles, Crown } from 'lucide-react'
+import { Plus, Loader2, Sparkles, Crown, Zap } from 'lucide-react'
 import { EmptyState } from '@/components/ui/EmptyState'
 
 import { createClient } from '@/utils/supabase/client'
-import { StoriesBarSkeleton, MuscleMapSkeleton, SectionSkeleton } from '@/components/ui/SuspenseFallbacks'
 import type { DashboardWorkout, DashboardExercise, DashboardSetDetail } from '@/types/dashboard'
 
 // Re-export types so existing consumers don't break
@@ -89,6 +88,7 @@ type Props = {
     city?: string
   } | null
   onCreateWorkout: () => MaybePromise<void>
+  onExpressWorkout?: () => void
   onQuickView: (w: DashboardWorkout) => void
   onStartSession: (w: DashboardWorkout) => MaybePromise<void | boolean>
   onRestoreWorkout?: (w: DashboardWorkout) => MaybePromise<void>
@@ -120,7 +120,7 @@ type Props = {
 }
 
 export default function StudentDashboard(props: Props) {
-  const workouts = Array.isArray(props.workouts) ? props.workouts : []
+  const workouts = useMemo(() => Array.isArray(props.workouts) ? props.workouts : [], [props.workouts])
   const density = props.settings?.dashboardDensity === 'compact' ? 'compact' : 'comfortable'
   const [toolsOpen, setToolsOpen] = useState(false)
   const [workoutsTab, setWorkoutsTab] = useState<'normal' | 'periodized'>('normal')
@@ -138,7 +138,6 @@ export default function StudentDashboard(props: Props) {
   const [editListOpen, setEditListOpen] = useState(false)
   const [editListDraft, setEditListDraft] = useState<{ id: string; title: string; sort_order: number }[]>([])
   const [savingListEdits, setSavingListEdits] = useState(false)
-  const TABS_BAR_MIN_HEIGHT_PX = 60
   const CREATE_WORKOUT_LOADING_TIMEOUT_MS = 900
   const isMountedRef = useRef(true)
   const showNewRecordsCard = props.settings?.showNewRecordsCard !== false
@@ -158,7 +157,6 @@ export default function StudentDashboard(props: Props) {
     loadWorkoutFullById,
   } = usePeriodizedWorkouts({ view: props.view, workoutsTab })
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   const workoutsForTab = useMemo(
     () =>
       workoutsTab === 'periodized'
@@ -413,7 +411,26 @@ export default function StudentDashboard(props: Props) {
                 </span>
               </button>
 
-
+              {/* Express workout quick-start */}
+              {props.onExpressWorkout && (
+                <button
+                  type="button"
+                  onClick={props.onExpressWorkout}
+                  className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all active:scale-[0.98]"
+                  style={{ background: 'rgba(234,179,8,0.06)', border: '1px solid rgba(234,179,8,0.15)' }}
+                >
+                  <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(234,179,8,0.15)' }}>
+                    <Zap size={15} className="text-yellow-400" />
+                  </div>
+                  <div className="text-left flex-1">
+                    <p className="text-sm font-black text-white">Treino Express</p>
+                    <p className="text-xs text-white/30">IA gera em segundos · 15–45 min</p>
+                  </div>
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className="text-white/20">
+                    <path d="M6 3L11 8L6 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+              )}
 
               <div className={density === 'compact' ? 'space-y-2' : 'space-y-3'}>
                 {/* Linha 1: abas Meus Treinos / Periodizados */}
