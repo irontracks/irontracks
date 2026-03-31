@@ -5,15 +5,16 @@ import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { useUserSettings } from '@/hooks/useUserSettings'
 import { InAppNotificationsProvider, useInAppNotifications } from '@/contexts/InAppNotificationsContext'
-import { ArrowLeft, Search, Settings, UserPlus, UserMinus, Users, Check, X, Clock, Bell, Loader2, Rss, Trophy, Radio } from 'lucide-react'
+import { ArrowLeft, Search, Settings, UserPlus, UserMinus, Users, Check, X, Clock, Bell, Loader2, Rss, Trophy, Radio, Swords } from 'lucide-react'
 import { EmptyState } from '@/components/ui/EmptyState'
 import { useCommunityData, type ProfileRow, type FollowRow, type FollowRequestItem } from './useCommunityData'
 import FeedCard from './FeedCard'
 import type { FeedItem } from './FeedCard'
 import UserProfileModal from './UserProfileModal'
 import LeaderboardPanel from './LeaderboardPanel'
+import ChallengesPanel from './ChallengesPanel'
 
-type CommunityTab = 'feed' | 'follow' | 'ranking'
+type CommunityTab = 'feed' | 'follow' | 'ranking' | 'challenges'
 
 const safeString = (v: unknown): string => (v === null || v === undefined ? '' : String(v))
 
@@ -104,6 +105,36 @@ const GoldButton = ({
   )
 }
 
+function ToggleButton({
+  settingKey, label, description, userSettingsApi,
+}: {
+  settingKey: string
+  label: string
+  description: string
+  userSettingsApi: ReturnType<typeof useUserSettings>
+}) {
+  const isOn = Boolean((userSettingsApi?.settings as Record<string, unknown>)?.[settingKey] ?? true)
+  return (
+    <div className="flex items-center justify-between gap-3 py-3 border-b border-white/5 last:border-0">
+      <div className="min-w-0">
+        <div className="text-sm font-bold text-white">{label}</div>
+        <div className="text-xs text-neutral-500 mt-0.5">{description}</div>
+      </div>
+      <button
+        type="button"
+        aria-label={label}
+        onClick={() => userSettingsApi.updateSetting(settingKey, !isOn)}
+        className={`relative flex-shrink-0 w-12 h-6 rounded-full transition-all duration-300 ${isOn ? 'bg-yellow-500' : 'bg-neutral-700'}`}
+        style={isOn ? { boxShadow: '0 0 12px rgba(234,179,8,0.4)' } : {}}
+      >
+        <span
+          className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-lg transition-all duration-300 ${isOn ? 'left-6' : 'left-0.5'}`}
+        />
+      </button>
+    </div>
+  )
+}
+
 export default function CommunityClient({ embedded }: { embedded?: boolean }) {
   if (embedded) return <CommunityClientInner embedded />
   return (
@@ -161,29 +192,8 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
       feedLoadedRef.current = true
       loadFeed(true)
     }
-  }, [userId, activeTab, loadFeed])
+  }, [userId, activeTab, loadFeed, feedLoadedRef])
 
-  const ToggleButton = ({ settingKey, label, description }: { settingKey: string; label: string; description: string }) => {
-    const isOn = Boolean((userSettingsApi?.settings as Record<string, unknown>)?.[settingKey] ?? true)
-    return (
-      <div className="flex items-center justify-between gap-3 py-3 border-b border-white/5 last:border-0">
-        <div className="min-w-0">
-          <div className="text-sm font-bold text-white">{label}</div>
-          <div className="text-xs text-neutral-500 mt-0.5">{description}</div>
-        </div>
-        <button
-          type="button"
-          onClick={() => userSettingsApi.updateSetting(settingKey, !isOn)}
-          className={`relative flex-shrink-0 w-12 h-6 rounded-full transition-all duration-300 ${isOn ? 'bg-yellow-500' : 'bg-neutral-700'}`}
-          style={isOn ? { boxShadow: '0 0 12px rgba(234,179,8,0.4)' } : {}}
-        >
-          <span
-            className={`absolute top-0.5 w-5 h-5 bg-white rounded-full shadow-lg transition-all duration-300 ${isOn ? 'left-6' : 'left-0.5'}`}
-          />
-        </button>
-      </div>
-    )
-  }
 
   if (userId && userSettingsApi?.loaded && !communityEnabled) {
     return (
@@ -237,10 +247,10 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
                   </div>
                   <div className="text-white font-black text-xl leading-tight truncate flex items-center gap-2">
                     <Users size={18} className="text-yellow-500 flex-shrink-0" />
-                    {activeTab === 'feed' ? 'Atividades' : activeTab === 'ranking' ? 'Ranking' : 'Seguir Amigos'}
+                    {activeTab === 'feed' ? 'Atividades' : activeTab === 'ranking' ? 'Ranking' : activeTab === 'challenges' ? 'Desafios' : 'Seguir Amigos'}
                   </div>
                   <div className="text-xs text-neutral-500 mt-0.5">
-                    {activeTab === 'feed' ? 'Veja o que seus amigos estão fazendo.' : activeTab === 'ranking' ? 'Ranking semanal entre amigos.' : 'Siga alunos e professores para receber notificações.'}
+                    {activeTab === 'feed' ? 'Veja o que seus amigos estão fazendo.' : activeTab === 'ranking' ? 'Ranking semanal entre amigos.' : activeTab === 'challenges' ? 'Desafie amigos e veja quem treina mais.' : 'Siga alunos e professores para receber notificações.'}
                   </div>
                 </div>
               </div>
@@ -261,6 +271,7 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
                 { key: 'feed' as CommunityTab, label: 'Feed', icon: <Rss size={13} /> },
                 { key: 'follow' as CommunityTab, label: 'Seguir', icon: <UserPlus size={13} /> },
                 { key: 'ranking' as CommunityTab, label: 'Ranking', icon: <Trophy size={13} /> },
+                { key: 'challenges' as CommunityTab, label: 'Desafios', icon: <Swords size={13} /> },
               ].map((tab) => {
                 const isActive = activeTab === tab.key
                 return (
@@ -343,14 +354,14 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
 
               {/* Settings body */}
               <div className="px-5 py-3 max-h-[60vh] overflow-y-auto">
-                <ToggleButton settingKey="allowSocialFollows" label="Permitir convites para seguir" description="Se desligar, ninguém consegue solicitar para te seguir." />
-                <ToggleButton settingKey="notifySocialFollows" label="Notificações sociais" description="Solicitações de seguir e confirmações." />
-                <ToggleButton settingKey="notifyFriendOnline" label="Amigo entrou no app" description="Avisos de presença." />
-                <ToggleButton settingKey="notifyFriendWorkoutEvents" label="Atividades de treino do amigo" description="Início/fim/criação/edição de treino." />
-                <ToggleButton settingKey="notifyFriendPRs" label="PRs do amigo" description="Avisos quando bater recorde pessoal." />
-                <ToggleButton settingKey="notifyFriendStreaks" label="Streak do amigo" description="Avisos de sequência de dias treinando." />
-                <ToggleButton settingKey="notifyFriendGoals" label="Metas do amigo" description="Avisos de marcos (ex.: 10, 50 treinos)." />
-                <ToggleButton settingKey="inAppToasts" label="Card flutuante (toasts)" description="Mensagens rápidas no topo da tela." />
+                <ToggleButton userSettingsApi={userSettingsApi} settingKey="allowSocialFollows" label="Permitir convites para seguir" description="Se desligar, ninguém consegue solicitar para te seguir." />
+                <ToggleButton userSettingsApi={userSettingsApi} settingKey="notifySocialFollows" label="Notificações sociais" description="Solicitações de seguir e confirmações." />
+                <ToggleButton userSettingsApi={userSettingsApi} settingKey="notifyFriendOnline" label="Amigo entrou no app" description="Avisos de presença." />
+                <ToggleButton userSettingsApi={userSettingsApi} settingKey="notifyFriendWorkoutEvents" label="Atividades de treino do amigo" description="Início/fim/criação/edição de treino." />
+                <ToggleButton userSettingsApi={userSettingsApi} settingKey="notifyFriendPRs" label="PRs do amigo" description="Avisos quando bater recorde pessoal." />
+                <ToggleButton userSettingsApi={userSettingsApi} settingKey="notifyFriendStreaks" label="Streak do amigo" description="Avisos de sequência de dias treinando." />
+                <ToggleButton userSettingsApi={userSettingsApi} settingKey="notifyFriendGoals" label="Metas do amigo" description="Avisos de marcos (ex.: 10, 50 treinos)." />
+                <ToggleButton userSettingsApi={userSettingsApi} settingKey="inAppToasts" label="Card flutuante (toasts)" description="Mensagens rápidas no topo da tela." />
               </div>
 
               {/* Modal Footer */}
@@ -634,6 +645,13 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
             {activeTab === 'ranking' && (
               <GoldGradientBorder>
                 <LeaderboardPanel userId={userId} />
+              </GoldGradientBorder>
+            )}
+
+            {/* ── CHALLENGES TAB ── */}
+            {activeTab === 'challenges' && (
+              <GoldGradientBorder>
+                <ChallengesPanel userId={userId} />
               </GoldGradientBorder>
             )}
 
