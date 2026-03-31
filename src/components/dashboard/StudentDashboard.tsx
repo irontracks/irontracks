@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import Image from 'next/image'
 
 import { Plus, Loader2, Sparkles, Crown, Zap } from 'lucide-react'
+const MuscleBalanceCard = dynamic(() => import('@/components/MuscleBalanceCard'), { ssr: false })
 import { EmptyState } from '@/components/ui/EmptyState'
 
 import { createClient } from '@/utils/supabase/client'
@@ -336,6 +337,8 @@ export default function StudentDashboard(props: Props) {
                   reloadKey={props.newRecordsReloadKey}
                 />
               )}
+
+              <MuscleBalanceCard />
 
               <RecoveryScore />
 
