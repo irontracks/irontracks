@@ -4,6 +4,18 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { cacheDelete } from '@/utils/cache'
 
+/**
+ * Maps Apple/RevenueCat product identifiers to app_plans.id values.
+ * e.g. "vip_pro_monthly" → "vip_pro", "vip_pro_year" → "vip_pro_annual"
+ */
+function resolveDbPlanId(productId: string): string {
+  const s = String(productId || '').trim().toLowerCase()
+  if (!s) return s
+  const withAnnual = s.replace(/_yearly$/, '_annual').replace(/_year$/, '_annual')
+  if (withAnnual !== s) return withAnnual
+  return s.replace(/_monthly$/, '').replace(/_month$/, '').replace(/_mensal$/, '')
+}
+
 export const dynamic = 'force-dynamic'
 
 const getRevenueCatSubscriber = async (appUserId: string) => {
@@ -51,12 +63,15 @@ export async function POST() {
     if (!active) return NextResponse.json({ ok: false, error: 'no_active_entitlement' }, { status: 402 })
 
     const admin = createAdminClient()
-    const { data: plan } = await admin
-      .from('app_plans')
-      .select('id')
-      .eq('id', productId)
-      .maybeSingle()
-    if (!plan?.id) return NextResponse.json({ ok: false, error: 'plan_not_found' }, { status: 400 })
+    // Try exact Apple product ID first, then normalized DB plan ID
+    const dbPlanId = resolveDbPlanId(productId)
+    const candidates = [...new Set([productId, dbPlanId].filter(Boolean))]
+    let resolvedPlanId: string | null = null
+    for (const candidate of candidates) {
+      const { data: plan } = await admin.from('app_plans').select('id').eq('id', candidate).maybeSingle()
+      if (plan?.id) { resolvedPlanId = plan.id; break }
+    }
+    if (!resolvedPlanId) return NextResponse.json({ ok: false, error: 'plan_not_found' }, { status: 400 })
 
     // R2#6: Filter by provider to avoid overwriting subscriptions from other providers (Asaas, MercadoPago)
     const { data: existing } = await admin
@@ -81,7 +96,7 @@ export async function POST() {
       const { error } = await admin
         .from('app_subscriptions')
         .update({
-          plan_id: productId,
+          plan_id: resolvedPlanId,
           status: 'active',
           current_period_end: expiresDate,
           cancel_at_period_end: false,
@@ -95,7 +110,7 @@ export async function POST() {
         .from('app_subscriptions')
         .insert({
           user_id: user.id,
-          plan_id: productId,
+          plan_id: resolvedPlanId,
           status: 'active',
           current_period_start: new Date().toISOString(),
           current_period_end: expiresDate,
@@ -105,13 +120,53 @@ export async function POST() {
       if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
     }
 
+    // Sync to user_entitlements (primary VIP resolution table)
+    // provider='apple' because RevenueCat is intermediary for Apple IAP
+    const { data: existingEnt } = await admin
+      .from('user_entitlements')
+      .select('id')
+      .eq('user_id', user.id)
+      .eq('provider', 'apple')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
+    if (existingEnt?.id) {
+      await admin
+        .from('user_entitlements')
+        .update({
+          plan_id: resolvedPlanId,
+          status: 'active',
+          valid_until: expiresDate,
+          current_period_end: expiresDate,
+          metadata: meta,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', existingEnt.id)
+    } else {
+      await admin
+        .from('user_entitlements')
+        .insert({
+          user_id: user.id,
+          plan_id: resolvedPlanId,
+          status: 'active',
+          provider: 'apple',
+          provider_subscription_id: productId,
+          valid_from: new Date().toISOString(),
+          valid_until: expiresDate,
+          current_period_start: new Date().toISOString(),
+          current_period_end: expiresDate,
+          metadata: meta,
+        })
+    }
+
     // Invalidate VIP caches so the user sees the new status immediately
     await Promise.all([
       cacheDelete(`vip:access:${user.id}`).catch(() => {}),
       cacheDelete(`dashboard:bootstrap:${user.id}`).catch(() => {}),
     ])
 
-    return NextResponse.json({ ok: true, planId: productId, expiresDate })
+    return NextResponse.json({ ok: true, planId: resolvedPlanId, expiresDate })
   } catch (e: unknown) {
     return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 400 })
   }
