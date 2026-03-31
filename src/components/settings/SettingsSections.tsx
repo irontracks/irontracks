@@ -149,8 +149,9 @@ export function SettingsAppModeSection({ draft, setValue, setModulesModalOpen }:
 // ── Ferramentas ──────────────────────────────────────────────────────────────
 interface SettingsToolsSectionProps extends SettingsSectionProps {
     onOpenWhatsNew?: () => void
+    onOpenProgressPhotos?: () => void
 }
-export function SettingsToolsSection({ draft, setValue, onOpenWhatsNew }: SettingsToolsSectionProps) {
+export function SettingsToolsSection({ draft, setValue, onOpenWhatsNew, onOpenProgressPhotos }: SettingsToolsSectionProps) {
     const showNewRecordsCard = Boolean(draft?.showNewRecordsCard ?? true)
     const showIronRank = Boolean(draft?.showIronRank ?? true)
     const showBadges = Boolean(draft?.showBadges ?? true)
@@ -177,6 +178,12 @@ export function SettingsToolsSection({ draft, setValue, onOpenWhatsNew }: Settin
                     <div><div className="text-sm font-bold text-white">Stories no Dashboard</div><div className="text-xs text-neutral-400">Mostra a barra de stories no topo do dashboard.</div></div>
                     <ToggleSwitch checked={showStoriesBar} onChange={() => setValue('showStoriesBar', !showStoriesBar)} />
                 </div>
+                {onOpenProgressPhotos && (
+                    <div className="flex items-center justify-between gap-3">
+                        <div><div className="text-sm font-bold text-white">Diário de Progresso</div><div className="text-xs text-neutral-400">Fotos before/after com comparador deslizável.</div></div>
+                        <button type="button" onClick={onOpenProgressPhotos} className="px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black hover:bg-neutral-800">Abrir</button>
+                    </div>
+                )}
                 {onOpenWhatsNew && (
                     <div className="flex items-center justify-between gap-3">
                         <div><div className="text-sm font-bold text-white">Últimas atualizações</div><div className="text-xs text-neutral-400">Veja o que mudou na versão mais recente.</div></div>
@@ -575,7 +582,9 @@ export function SettingsModulesModal({ draft, setValue, isOpen, onClose }: Setti
     const moduleMarketplace = Boolean(draft?.moduleMarketplace ?? true)
     if (!isOpen) return null
     return (
-        <div className="fixed inset-0 z-[1400] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe" role="dialog" aria-modal="true" aria-label="Personalizar módulos" onClick={onClose}>
+        // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
+        <div className="fixed inset-0 z-[1400] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe" role="dialog" aria-modal="true" aria-label="Personalizar módulos" onClick={onClose} onKeyDown={(e) => e.key === 'Escape' && onClose?.()}>
+            {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events */}
             <div className="w-full max-w-md bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
                 <div className="p-4 border-b border-neutral-800 flex items-center justify-between">
                     <div><div className="text-xs font-black uppercase tracking-widest text-yellow-500">Módulos</div><div className="text-white font-black text-lg truncate">Personalizar</div></div>

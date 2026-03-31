@@ -7,7 +7,7 @@ import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 
 // R3#1: Client no longer controls folder or publicId — they are built server-side
 const BodySchema = z.object({
-  purpose: z.enum(['story', 'profile', 'chat', 'assessment']).optional().default('story'),
+  purpose: z.enum(['story', 'profile', 'chat', 'assessment', 'progress']).optional().default('story'),
 })
 
 export async function POST(req: Request) {
