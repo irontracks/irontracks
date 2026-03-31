@@ -4,9 +4,10 @@ import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { requireRole, requireRoleWithBearer } from '@/utils/auth/route'
 import { getErrorMessage } from '@/utils/errorMessage'
-import { logError, logWarn, logInfo } from '@/lib/logger'
+import { logError, logWarn } from '@/lib/logger'
 import { safePgLike } from '@/utils/safePgFilter'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
+import { cacheDeletePattern } from '@/utils/cache'
 
 export const dynamic = 'force-dynamic'
 
@@ -160,7 +161,7 @@ export async function POST(req: Request) {
       const email = String(request.email || '').trim()
       const fullName = String(request.full_name || '').trim()
       const roleRequested = String(request.role_requested || 'student').trim()
-      const cref = String(request.cref || '').trim()
+
 
       const { data: profile } = await admin.from('profiles').select('id').ilike('email', safePgLike(email)).maybeSingle()
       const userId = profile?.id ? String(profile.id) : ''
@@ -243,6 +244,11 @@ export async function POST(req: Request) {
       try {
         await sendApprovalEmail(email, fullName, !!userId)
       } catch (e) { logWarn('admin:access-requests:action', 'silenced', e) }
+
+      // Bust students list cache so the admin panel immediately reflects the new student
+      try {
+        await cacheDeletePattern('admin:students:list:*')
+      } catch { /* non-fatal */ }
 
       return NextResponse.json({
         ok: true,
