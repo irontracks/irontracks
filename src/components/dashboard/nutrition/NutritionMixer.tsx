@@ -19,6 +19,7 @@ const SmartSuggestions = dynamic(() => import('./SmartSuggestions'), { ssr: fals
 const DateNavigator = dynamic(() => import('./DateNavigator'), { ssr: false })
 const CustomFoodScanner = dynamic(() => import('./CustomFoodScanner'), { ssr: false })
 const CustomFoodLibrary = dynamic(() => import('./CustomFoodLibrary'), { ssr: false })
+const NutritionWorkoutCorrelation = dynamic(() => import('./NutritionWorkoutCorrelation'), { ssr: false })
 
 // ── Hooks ──────────────────────────────────────────────────────────────────────
 import { useFavoriteMeals } from './useFavoriteMeals'
@@ -448,6 +449,7 @@ export default function NutritionMixer({
                     </label>
                     <input
                       value={String(goalsDraft[f])}
+                      aria-label={f === 'calories' ? 'Calorias (kcal)' : f === 'protein' ? 'Proteína (g)' : f === 'carbs' ? 'Carboidratos (g)' : 'Gordura (g)'}
                       onChange={e => setGoalsDraft(p => ({ ...p, [f]: safeNumber(e.target.value) }))}
                       inputMode="numeric"
                       disabled={f !== 'calories' && !canViewMacros}
@@ -490,6 +492,9 @@ export default function NutritionMixer({
       {safeEntries.length > 0 && (
         <Card className="p-4"><CalorieTimeline entries={safeEntries} /></Card>
       )}
+
+      {/* ══ TREINO × NUTRIÇÃO CORRELATION ════════════════════════════════ */}
+      <NutritionWorkoutCorrelation />
 
       {/* ══ QUICK ACTIONS ════════════════════════════════════════════════ */}
       <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none -mx-1 px-1">
@@ -554,6 +559,7 @@ export default function NutritionMixer({
           <div className="mt-1 text-xs text-neutral-600">Ex.: 150g frango + arroz branco + salada</div>
           <textarea
             ref={inputRef}
+            aria-label="Adicionar refeição"
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (!isPending && !schemaMissing) handleSubmit() } }}
