@@ -1,8 +1,10 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react'
 import { useGeoLocation } from '@/hooks/useGeoLocation'
 import type { SupabaseClient } from '@supabase/supabase-js'
+
+const GymQRCode = lazy(() => import('@/components/GymQRCode'))
 
 interface Gym {
   id: string
@@ -35,6 +37,7 @@ interface GymSuggestion {
 export default function GymSettingsSection({ userId, supabase }: GymSettingsSectionProps) {
   const { getCurrentPosition, position, loading: geoLoading, error: geoError } = useGeoLocation()
   const [gyms, setGyms] = useState<Gym[]>([])
+  const [qrGym, setQrGym] = useState<{ id: string; name: string } | null>(null)
   const [settings, setSettings] = useState<LocationSettings>({
     gps_enabled: false,
     auto_checkin: false,
@@ -224,6 +227,7 @@ export default function GymSettingsSection({ userId, supabase }: GymSettingsSect
             </div>
             <button
               onClick={() => toggleSetting(key)}
+              aria-label={label}
               className={`relative h-6 w-11 rounded-full transition-colors ${settings[key] ? 'bg-amber-500' : 'bg-white/10'}`}
               role="switch"
               aria-checked={settings[key]}
@@ -277,6 +281,13 @@ export default function GymSettingsSection({ userId, supabase }: GymSettingsSect
                   </button>
                 )}
                 <button
+                  onClick={() => setQrGym({ id: gym.id, name: gym.name })}
+                  className="rounded-lg px-2 py-1 text-xs text-white/40 hover:text-yellow-400 transition-colors"
+                  title="QR Code de check-in"
+                >
+                  📲
+                </button>
+                <button
                   onClick={() => deleteGym(gym.id)}
                   className="rounded-lg px-2 py-1 text-xs text-white/40 hover:text-red-400 transition-colors"
                   title="Remover"
@@ -286,6 +297,12 @@ export default function GymSettingsSection({ userId, supabase }: GymSettingsSect
               </div>
             </div>
           ))}
+
+          {qrGym && (
+            <Suspense fallback={null}>
+              <GymQRCode gymId={qrGym.id} gymName={qrGym.name} onClose={() => setQrGym(null)} />
+            </Suspense>
+          )}
 
           {gyms.length === 0 && !addingGym && (
             <p className="text-center text-xs text-white/30 py-4">Nenhuma academia salva</p>
@@ -301,11 +318,13 @@ export default function GymSettingsSection({ userId, supabase }: GymSettingsSect
                 <input
                   type="text"
                   value={newGymName}
+                  aria-label="Nome da academia"
                   onChange={e => handleNameChange(e.target.value)}
                   onBlur={() => setTimeout(() => setShowSuggestions(false), 200)}
                   onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
                   placeholder="Buscar academia..."
                   className="w-full rounded-lg bg-white/5 px-3 py-2 text-sm text-white placeholder-white/30 outline-none focus:ring-1 focus:ring-amber-500/50"
+                  // eslint-disable-next-line jsx-a11y/no-autofocus
                   autoFocus
                   maxLength={100}
                 />
