@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { logWarn } from '@/lib/logger'
 import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
-import { requireRole, requireRoleWithBearer } from '@/utils/auth/route'
+import { requireRoleOrBearer } from '@/utils/auth/route'
 import { parseJsonBody } from '@/utils/zod'
 import { getErrorMessage } from '@/utils/errorMessage'
 
@@ -18,18 +18,8 @@ export async function POST(req: Request) {
   try {
     // Auth first (before consuming request body)
     // Accept both admin and teacher roles — the admin panel already gates access
-    let auth = await requireRole(['admin', 'teacher'])
-    if (!auth.ok) {
-      auth = await requireRoleWithBearer(req, ['admin', 'teacher'])
-      if (!auth.ok) {
-        // Return descriptive error for debugging
-        const hasBearer = !!(req.headers.get('authorization') || '').trim()
-        return NextResponse.json(
-          { ok: false, error: hasBearer ? 'Unauthorized: token inválido ou role insuficiente' : 'Unauthorized: token não fornecido' },
-          { status: 401 }
-        )
-      }
-    }
+    const auth = await requireRoleOrBearer(req, ['admin', 'teacher'])
+    if (!auth.ok) return auth.response
 
     // actorId must be a valid UUID or null — never an empty string (causes Postgres UUID cast error)
     const actorId = String(auth.user?.id || '').trim() || null

@@ -1,16 +1,13 @@
 import { NextResponse } from 'next/server'
-import { requireRole, requireRoleWithBearer } from '@/utils/auth/route'
+import { requireRoleOrBearer } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { normalizeWorkoutTitle } from '@/utils/workoutTitle'
 import { getErrorMessage } from '@/utils/errorMessage'
 
 export async function POST(req: Request) {
   try {
-    let auth = await requireRole(['admin', 'teacher'])
-    if (!auth.ok) {
-      auth = await requireRoleWithBearer(req, ['admin', 'teacher'])
-      if (!auth.ok) return auth.response
-    }
+    const auth = await requireRoleOrBearer(req, ['admin', 'teacher'])
+    if (!auth.ok) return auth.response
 
     const admin = createAdminClient()
     const uid = String(auth.user.id || '').trim()

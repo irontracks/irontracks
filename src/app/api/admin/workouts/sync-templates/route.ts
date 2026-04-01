@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { parseJsonBody } from '@/utils/zod'
 import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
-import { hasValidInternalSecret, requireRole, requireRoleWithBearer } from '@/utils/auth/route'
+import { hasValidInternalSecret, requireRoleOrBearer } from '@/utils/auth/route'
 import { syncAllTemplatesToSubscriber } from '@/lib/workoutSync'
 import { logWarn } from '@/lib/logger'
 import { safePg, safePgLike } from '@/utils/safePgFilter'
@@ -23,11 +23,8 @@ const ZodBodySchema = z
 
 export async function POST(req: Request) {
   try {
-    let auth = await requireRole(['admin', 'teacher'])
-    if (!auth.ok) {
-      auth = await requireRoleWithBearer(req, ['admin', 'teacher'])
-      if (!auth.ok) return auth.response
-    }
+    const auth = await requireRoleOrBearer(req, ['admin', 'teacher'])
+    if (!auth.ok) return auth.response
 
     const admin = createAdminClient()
     const parsedBody = await parseJsonBody(req, ZodBodySchema)
@@ -153,7 +150,7 @@ export async function POST(req: Request) {
       return candidates[0] || null
     }
 
-    const buildNameOr = (lettersIn: string[]) => {
+    const _buildNameOr = (lettersIn: string[]) => {
       const safe = (lettersIn || []).map((l) => String(l || '').toLowerCase()).filter((l) => /^[a-z]$/.test(l))
       const parts: string[] = []
       for (const l of safe) {

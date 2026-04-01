@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
-import { requireRole, requireRoleWithBearer } from '@/utils/auth/route'
+import { requireRoleOrBearer } from '@/utils/auth/route'
 import { parseJsonBody } from '@/utils/zod'
 
 export const dynamic = 'force-dynamic'
@@ -22,11 +22,8 @@ export type VipBatchResult = Record<string, VipBatchEntry>
 
 export async function POST(req: Request) {
     try {
-        let auth = await requireRole(['admin', 'teacher'])
-        if (!auth.ok) {
-            auth = await requireRoleWithBearer(req, ['admin', 'teacher'])
-            if (!auth.ok) return auth.response
-        }
+        const auth = await requireRoleOrBearer(req, ['admin', 'teacher'])
+        if (!auth.ok) return auth.response
 
         const parsed = await parseJsonBody(req, BodySchema)
         if (parsed.response) return parsed.response

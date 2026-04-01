@@ -8,7 +8,7 @@ import { cacheDelete } from '@/utils/cache'
  * Maps Apple/RevenueCat product identifiers to app_plans.id values.
  * e.g. "vip_pro_monthly" → "vip_pro", "vip_pro_year" → "vip_pro_annual"
  */
-function resolveDbPlanId(productId: string): string {
+export function resolveDbPlanId(productId: string): string {
   const s = String(productId || '').trim().toLowerCase()
   if (!s) return s
   const withAnnual = s

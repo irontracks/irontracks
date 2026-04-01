@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/admin'
-import { jsonError, requireRoleWithBearer } from '@/utils/auth/route'
+import { jsonError, requireRoleOrBearer } from '@/utils/auth/route'
 import { z } from 'zod'
 import { parseSearchParams } from '@/utils/zod'
 
@@ -16,7 +16,7 @@ export async function GET(req: Request) {
     const admin = createAdminClient()
 
     // Auth: require admin or teacher via Bearer token (admin panel sends Authorization header)
-    const auth = await requireRoleWithBearer(req, ['admin', 'teacher'])
+    const auth = await requireRoleOrBearer(req, ['admin', 'teacher'])
     if (!auth.ok) return auth.response
 
     const { data: q, response } = parseSearchParams(req, QuerySchema)

@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
-import { requireRole, requireRoleWithBearer } from '@/utils/auth/route'
+import { requireRoleOrBearer } from '@/utils/auth/route'
 import { getVipPlanLimits } from '@/utils/vip/limits'
 import { parseSearchParams } from '@/utils/zod'
 import { safePgLike } from '@/utils/safePgFilter'
@@ -20,11 +20,8 @@ const QuerySchema = z
 
 export async function GET(req: Request) {
   try {
-    let auth = await requireRole(['admin'])
-    if (!auth.ok) {
-      auth = await requireRoleWithBearer(req, ['admin'])
-      if (!auth.ok) return auth.response
-    }
+    const auth = await requireRoleOrBearer(req, ['admin'])
+    if (!auth.ok) return auth.response
 
     const parsedQuery = parseSearchParams(req, QuerySchema)
     if (parsedQuery.response) return parsedQuery.response

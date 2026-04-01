@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { parseJsonBody } from '@/utils/zod'
 import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
-import { requireRole, requireRoleWithBearer } from '@/utils/auth/route'
+import { requireRoleOrBearer } from '@/utils/auth/route'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { logError, logWarn } from '@/lib/logger'
 import { safePgLike } from '@/utils/safePgFilter'
@@ -48,11 +48,8 @@ const sendApprovalEmail = async (toEmail: string, fullName: string, accountAlrea
 
 export async function POST(req: Request) {
   try {
-    let auth = await requireRole(['admin'])
-    if (!auth.ok) {
-      auth = await requireRoleWithBearer(req, ['admin'])
-      if (!auth.ok) return auth.response
-    }
+    const auth = await requireRoleOrBearer(req, ['admin'])
+    if (!auth.ok) return auth.response
 
     const ip = getRequestIp(req)
     const rlKey = `admin:access-action:${auth.user.id}:${ip}`

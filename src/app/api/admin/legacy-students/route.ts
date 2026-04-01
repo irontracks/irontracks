@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/admin'
-import { jsonError, requireRole, resolveRoleByUser } from '@/utils/auth/route'
+import { requireRoleOrBearer } from '@/utils/auth/route'
 import { getErrorMessage } from '@/utils/errorMessage'
 
 export const dynamic = 'force-dynamic'
@@ -8,16 +8,8 @@ export const dynamic = 'force-dynamic'
 export async function GET(req: Request) {
   try {
     const admin = createAdminClient()
-    const auth = await requireRole(['admin'])
-    if (!auth.ok) {
-      const token = String(req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '').trim()
-      if (!token) return auth.response
-      const { data, error } = await admin.auth.getUser(token)
-      const user = data?.user ?? null
-      if (error || !user?.id) return auth.response
-      const { role } = await resolveRoleByUser({ id: user.id, email: user.email })
-      if (role !== 'admin') return jsonError(403, 'forbidden')
-    }
+    const auth = await requireRoleOrBearer(req, ['admin'])
+    if (!auth.ok) return auth.response
 
     // Get all distinct user_ids from workouts (fallback when athlete_uuid column is not available)
     const { data: workouts, error: wError } = await admin

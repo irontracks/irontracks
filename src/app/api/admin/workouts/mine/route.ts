@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { requireRoleWithBearer } from '@/utils/auth/route'
+import { requireRoleOrBearer } from '@/utils/auth/route'
 import { createClient } from '@/utils/supabase/server'
 import { getErrorMessage } from '@/utils/errorMessage'
 
@@ -14,7 +14,7 @@ export async function GET(req: Request) {
     let resolvedSupabase = supabase
 
     if (!resolvedUser) {
-      const auth = await requireRoleWithBearer(req, ['admin', 'teacher'])
+      const auth = await requireRoleOrBearer(req, ['admin', 'teacher'])
       if (!auth.ok) return auth.response
       resolvedUser = auth.user
       resolvedSupabase = auth.supabase
