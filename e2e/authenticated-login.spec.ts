@@ -1,40 +1,34 @@
 import { test, expect } from '@playwright/test'
 
 /**
- * Authenticated E2E: Login Flow
+ * Authenticated E2E: Login / Auth Flow
  *
- * Verifies the complete login experience — the user arrives at /login,
- * enters credentials, and is redirected to the dashboard.
+ * The login form lives at / (root). When already authenticated,
+ * the root page server-redirects to /dashboard.
  *
- * Requires: E2E_USER_EMAIL + E2E_USER_PASSWORD env vars.
+ * Requires: auth storage state (e2e/.auth/user.json).
  */
 test.describe('Login Flow', () => {
-    test('login page renders correctly', async ({ page }) => {
-        await page.goto('/login')
-        // Should have email + password fields
-        await expect(page.locator('input[type="email"]')).toBeVisible({ timeout: 10_000 })
-        await expect(page.locator('input[type="password"]')).toBeVisible()
-        // Should have a submit button
-        await expect(page.locator('button[type="submit"]')).toBeVisible()
+    // Authenticated users hitting / should be redirected to /dashboard
+    test('authenticated user at / is redirected to dashboard', async ({ page }) => {
+        await page.goto('/')
+        await page.waitForURL(url => url.toString().includes('/dashboard'), { timeout: 15_000 })
+        expect(page.url()).toContain('/dashboard')
     })
 
-    test('login page has proper heading', async ({ page }) => {
-        await page.goto('/login')
-        // Should have a recognizable heading or brand
+    test('dashboard page has IronTracks brand', async ({ page }) => {
+        await page.goto('/')
+        await page.waitForTimeout(3000)
         const body = await page.textContent('body')
         expect(body?.toLowerCase()).toContain('iron')
     })
 
-    test('empty form shows validation feedback', async ({ page }) => {
-        await page.goto('/login')
-        await page.waitForSelector('input[type="email"]', { timeout: 10_000 })
-        // Click submit without filling anything
-        await page.click('button[type="submit"]')
-        // HTML5 validation should prevent submission — email field required
-        const emailInput = page.locator('input[type="email"]')
-        const isInvalid = await emailInput.evaluate(
-            (el: HTMLInputElement) => !el.checkValidity(),
-        )
-        expect(isInvalid).toBe(true)
+    test('direct /dashboard access works without re-login', async ({ page }) => {
+        await page.goto('/dashboard')
+        await page.waitForTimeout(3000)
+        expect(page.url()).toContain('/dashboard')
+        // Should NOT be back on login
+        const body = await page.textContent('body')
+        expect(body?.toLowerCase()).not.toContain('entrar com email')
     })
 })
