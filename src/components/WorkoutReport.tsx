@@ -35,7 +35,6 @@ const SectionSkeleton = () => (
 
 // Lazy-loaded panels (secondary data, deferred rendering)
 const MuscleTrendPanel = dynamic(() => import('@/components/workout-report/MuscleTrendPanel').then(m => ({ default: m.MuscleTrendPanel })), { ssr: false, loading: () => <SectionSkeleton /> })
-const MuscleTrend4wPanel = dynamic(() => import('@/components/workout-report/MuscleTrend4wPanel').then(m => ({ default: m.MuscleTrend4wPanel })), { ssr: false, loading: () => <SectionSkeleton /> })
 const ExerciseTrendPanel = dynamic(() => import('@/components/workout-report/ExerciseTrendPanel').then(m => ({ default: m.ExerciseTrendPanel })), { ssr: false, loading: () => <SectionSkeleton /> })
 const ReportCheckinPanel = dynamic(() => import('@/components/workout-report/ReportCheckinPanel').then(m => ({ default: m.ReportCheckinPanel })), { ssr: false, loading: () => <SectionSkeleton /> })
 const ReportAiSection = dynamic(() => import('@/components/workout-report/ReportAiSection').then(m => ({ default: m.ReportAiSection })), { ssr: false, loading: () => <SectionSkeleton /> })
@@ -705,13 +704,10 @@ const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose,
 
                 <Suspense fallback={<SectionSkeleton />}>
                     {muscleTrend.status === 'ready' && muscleTrend.data && (
-                        <MuscleTrendPanel data={muscleTrend.data} muscleById={MUSCLE_BY_ID} />
-                    )}
-
-                    {muscleTrend4w.status === 'ready' && muscleTrend4w.data && (
-                        <MuscleTrend4wPanel
-                            data={muscleTrend4w.data}
+                        <MuscleTrendPanel
+                            data={muscleTrend.data}
                             muscleById={MUSCLE_BY_ID}
+                            series={muscleTrend4w.status === 'ready' ? muscleTrend4w.data?.series : undefined}
                             buildSparklinePoints={buildSparklinePoints}
                         />
                     )}
