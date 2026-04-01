@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { Dumbbell, History, Edit3, Trash2, Plus, Sparkles, ChevronDown, Upload, ScanLine } from 'lucide-react';
 import { normalizeWorkoutTitle } from '@/utils/workoutTitle';
@@ -44,6 +44,8 @@ export const StudentWorkoutsTab: React.FC = () => {
     } = useAdminPanel();
 
     const toolsRef = useRef<HTMLDivElement>(null);
+    const [isSyncing, setIsSyncing] = useState(false);
+    const [deletingWorkoutId, setDeletingWorkoutId] = useState<string | null>(null);
 
     if (!selectedStudent) return null;
 
@@ -58,6 +60,7 @@ export const StudentWorkoutsTab: React.FC = () => {
                 ref={jsonFileInputRef as React.RefObject<HTMLInputElement>}
                 type="file"
                 accept=".json"
+                aria-label="Importar arquivo JSON"
                 style={{ display: 'none' }}
                 onChange={handleJsonImport}
             />
@@ -114,6 +117,7 @@ export const StudentWorkoutsTab: React.FC = () => {
                             {toolsPanelOpen && (
                                 <>
                                     {/* Backdrop */}
+                                    {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */}
                                     <div className="fixed inset-0 z-40" onClick={() => setToolsPanelOpen(false)} />
 
                                     {/* Dropdown panel */}
@@ -215,7 +219,9 @@ export const StudentWorkoutsTab: React.FC = () => {
             {/* Sync button */}
             {templates.length > 0 && (
                 <button
+                    disabled={isSyncing}
                     onClick={async () => {
+                        setIsSyncing(true);
                         try {
                             const looksLikeUuid = (v: unknown) => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(String(v || '').trim());
                             const maybeId = selectedStudent.user_id || selectedStudent.id || null;
@@ -291,9 +297,11 @@ export const StudentWorkoutsTab: React.FC = () => {
                         } catch (e: unknown) {
                             const msg = e && typeof e === 'object' && 'message' in e && typeof (e as { message?: unknown }).message === 'string' ? (e as { message: string }).message : String(e);
                             await alert('Erro ao sincronizar: ' + msg);
+                        } finally {
+                            setIsSyncing(false);
                         }
                     }}
-                    className="px-3 py-2 bg-neutral-800 border border-neutral-700 text-neutral-200 rounded-lg text-xs font-bold"
+                    className="px-3 py-2 bg-neutral-800 border border-neutral-700 text-neutral-200 rounded-lg text-xs font-bold disabled:opacity-60"
                 >
                     Sincronizar com Meus Treinos
                 </button>
@@ -304,6 +312,7 @@ export const StudentWorkoutsTab: React.FC = () => {
                 <div className="mt-4">
                     <h3 className="font-bold text-yellow-500 text-xs uppercase tracking-widest mb-2">Treinos sincronizados</h3>
                     {syncedWorkouts.map((w) => (
+                        // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions
                         <div
                             key={String((w as UnknownRecord)?.id ?? '')}
                             className="p-4 rounded-2xl border flex justify-between items-center cursor-pointer transition-all hover:border-yellow-500/15"
@@ -317,9 +326,12 @@ export const StudentWorkoutsTab: React.FC = () => {
                             <div className="flex items-center gap-2">
                                 <button onClick={(e) => openEditWorkout(e, w)} className="p-2 bg-neutral-700 hover:bg-yellow-500 text-neutral-300 hover:text-black rounded"><Edit3 size={16} /></button>
                                 <button
+                                    disabled={deletingWorkoutId === String((w as UnknownRecord)?.id)}
                                     onClick={async (e) => {
                                         e.stopPropagation();
                                         if (!(await confirm('Remover este treino do aluno?'))) return;
+                                        const workoutId = String((w as UnknownRecord)?.id);
+                                        setDeletingWorkoutId(workoutId);
                                         try {
                                             const authHeaders = await getAdminAuthHeaders();
                                             const res = await fetch('/api/admin/workouts/delete', { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders }, body: JSON.stringify({ id: (w as UnknownRecord)?.id }) });
@@ -330,9 +342,11 @@ export const StudentWorkoutsTab: React.FC = () => {
                                         } catch (e: unknown) {
                                             const msg = e && typeof e === 'object' && 'message' in e && typeof (e as { message?: unknown }).message === 'string' ? (e as { message: string }).message : String(e);
                                             await alert('Erro ao remover: ' + msg);
+                                        } finally {
+                                            setDeletingWorkoutId(null);
                                         }
                                     }}
-                                    className="p-2 text-red-500 hover:bg-red-900/20 rounded"
+                                    className="p-2 text-red-500 hover:bg-red-900/20 rounded disabled:opacity-60"
                                 >
                                     <Trash2 size={18} />
                                 </button>
@@ -345,6 +359,7 @@ export const StudentWorkoutsTab: React.FC = () => {
             {/* Student workouts */}
             {studentWorkouts.length === 0 && <p className="text-neutral-500 text-sm">Nenhum treino atribuído.</p>}
             {studentWorkouts.map((w) => (
+                // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions
                 <div
                     key={String((w as UnknownRecord)?.id ?? '')}
                     className="bg-neutral-800 p-4 rounded-xl border border-neutral-700 flex justify-between items-center cursor-pointer"
@@ -357,12 +372,14 @@ export const StudentWorkoutsTab: React.FC = () => {
                     <div className="flex items-center gap-2">
                         <button onClick={(e) => openEditWorkout(e, w)} className="p-2 bg-neutral-700 hover:bg-yellow-500 text-neutral-300 hover:text-black rounded"><Edit3 size={16} /></button>
                         <button
+                            disabled={deletingWorkoutId === String((w as UnknownRecord)?.id)}
                             onClick={async (e) => {
                                 e.stopPropagation();
                                 if (!(await confirm('Remover este treino do aluno?'))) return;
+                                const workoutId = (w as UnknownRecord)?.id;
+                                setDeletingWorkoutId(String(workoutId));
                                 try {
                                     const authHeaders = await getAdminAuthHeaders();
-                                    const workoutId = (w as UnknownRecord)?.id;
                                     const res = await fetch('/api/admin/workouts/delete', { method: 'POST', headers: { 'Content-Type': 'application/json', ...authHeaders }, body: JSON.stringify({ id: workoutId }) });
                                     const json: UnknownRecord = await res.json().catch(() => ({} as UnknownRecord));
                                     if (!json.ok) throw new Error(String(json.error || 'Falha ao remover'));
@@ -370,9 +387,11 @@ export const StudentWorkoutsTab: React.FC = () => {
                                 } catch (err: unknown) {
                                     const msg = err && typeof err === 'object' && 'message' in err && typeof (err as { message?: unknown }).message === 'string' ? (err as { message: string }).message : String(err);
                                     await alert('Erro ao remover: ' + msg);
+                                } finally {
+                                    setDeletingWorkoutId(null);
                                 }
                             }}
-                            className="p-2 text-red-500 hover:bg-red-900/20 rounded"
+                            className="p-2 text-red-500 hover:bg-red-900/20 rounded disabled:opacity-60"
                         >
                             <Trash2 size={18} />
                         </button>
