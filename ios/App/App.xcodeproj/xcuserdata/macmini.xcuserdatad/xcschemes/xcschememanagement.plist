@@ -7,7 +7,12 @@
 		<key>App.xcscheme_^#shared#^_</key>
 		<dict>
 			<key>orderHint</key>
-			<integer>2</integer>
+			<integer>10</integer>
+		</dict>
+		<key>IronTracksWidgets.xcscheme_^#shared#^_</key>
+		<dict>
+			<key>orderHint</key>
+			<integer>11</integer>
 		</dict>
 		<key>RestTimerLiveActivity.xcscheme_^#shared#^_</key>
 		<dict>
