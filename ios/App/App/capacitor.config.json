@@ -10,8 +10,8 @@
 		"AppPlugin",
 		"DevicePlugin",
 		"FilesystemPlugin",
+		"GeolocationPlugin",
 		"PushNotificationsPlugin",
-		"PurchasesPlugin",
-		"GeolocationPlugin"
+		"PurchasesPlugin"
 	]
 }

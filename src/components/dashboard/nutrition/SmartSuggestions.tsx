@@ -69,6 +69,7 @@ export default function SmartSuggestions({ goals, consumed, onSelect }: SmartSug
         <button
           type="button"
           onClick={fetchSuggestions}
+          disabled={loading}
           className="
             w-full rounded-2xl border border-purple-500/20 bg-purple-500/8
             px-4 py-3 text-sm text-purple-200
@@ -90,6 +91,7 @@ export default function SmartSuggestions({ goals, consumed, onSelect }: SmartSug
             </div>
             <button
               type="button"
+              aria-label="Fechar sugestões"
               onClick={() => { setOpen(false); setSuggestions([]); setTip(''); setError(null) }}
               className="text-xs text-neutral-500 hover:text-neutral-300"
             >
@@ -114,6 +116,7 @@ export default function SmartSuggestions({ goals, consumed, onSelect }: SmartSug
             <button
               key={i}
               type="button"
+              aria-label={`Selecionar ${s.food}, ${s.portion}`}
               onClick={() => {
                 onSelect(`${s.portion} ${s.food}`)
                 setOpen(false)
