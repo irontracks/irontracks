@@ -1,9 +1,10 @@
 'use client'
 
 import React, { memo, useCallback, useEffect, useState } from 'react'
-import { Activity, Moon, Heart, TrendingUp } from 'lucide-react'
+import { Activity, Heart, TrendingUp } from 'lucide-react'
 import { getRestingHeartRate, getHRV, isHealthKitAvailable } from '@/utils/native/irontracksNative'
 import { isIosNative } from '@/utils/platform'
+import { logError } from '@/lib/logger'
 
 /* ──────────────────────────────────────────────────────────
  * RecoveryScore — readiness-to-train indicator
@@ -67,7 +68,7 @@ const RecoveryScore = memo(function RecoveryScore() {
         setRhr(restHR)
         setScore(computeScore(sdnn, restHR))
       }
-    } catch { /* silent */ }
+    } catch (e) { logError('RecoveryScore:loadData', e) }
     setLoading(false)
   }, [])
 

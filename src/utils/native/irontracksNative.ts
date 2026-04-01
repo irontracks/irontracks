@@ -57,6 +57,7 @@ export type HapticStyle =
 const Native = registerPlugin<IronTracksNativePlugin>('IronTracksNative', {
   web: {
     setIdleTimerDisabled: async () => { },
+    openAppSettings: async () => ({ ok: false }),
     requestNotificationPermission: async () => ({ granted: false }),
     checkNotificationPermission: async () => ({ status: 'notDetermined' }),
     setupNotificationActions: async () => { },

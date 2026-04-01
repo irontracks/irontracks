@@ -87,6 +87,20 @@ export async function requireRole(allowed: IrontracksRole[]): Promise<RouteAuthF
   return { ok: true as const, supabase: auth.supabase, user: auth.user, role }
 }
 
+/**
+ * Cookie session auth with automatic Bearer token fallback.
+ * Replaces the 8-line inline pattern repeated across admin routes.
+ *
+ * Usage:
+ *   const auth = await requireRoleOrBearer(req, ['admin'])
+ *   if (!auth.ok) return auth.response
+ */
+export async function requireRoleOrBearer(req: Request, allowed: IrontracksRole[]): Promise<RouteAuthFail | RouteAuthOk> {
+  const cookieAuth = await requireRole(allowed)
+  if (cookieAuth.ok) return cookieAuth
+  return requireRoleWithBearer(req, allowed)
+}
+
 export async function requireRoleWithBearer(req: Request, allowed: IrontracksRole[]): Promise<RouteAuthFail | RouteAuthOk> {
   try {
     const token = String(req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '').trim()
