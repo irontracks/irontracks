@@ -122,5 +122,8 @@ export default withSentryConfig(nextConfig, {
   tunnelRoute: "/monitoring",
   disableLogger: true,
   automaticVercelMonitors: true,
+  // Desabilita geração de source maps no build do Vercel (~30-50s economizados).
+  // Sentry ainda captura erros em produção; stack traces mostram código minificado.
+  sourcemaps: { disable: true },
 })
 
