@@ -3,7 +3,7 @@
   "version": "4.0.0",
   "private": true,
   "engines": {
-    "node": ">=20 <23"
+    "node": ">=20 <23 || 22.x"
   },
   "scripts": {
     "predev": "node scripts/ensure-next-compiled-commander.mjs",
