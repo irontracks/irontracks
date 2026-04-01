@@ -11,11 +11,6 @@ const nextConfig: NextConfig = {
    
   ...({ optimizePackageImports: ['lucide-react', 'chart.js', 'react-chartjs-2', '@tanstack/react-virtual'] } as any),
 
-  typescript: {
-    // TSC validates with 0 errors. These are strict cast issues
-    // (GenericStringError→Record, Exercise→{sets}) that don't affect runtime.
-    ignoreBuildErrors: true,
-  },
   images: {
     localPatterns: [
       {

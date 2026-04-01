@@ -2,7 +2,6 @@ import React, { useRef, useEffect } from 'react';
 import { MessageSquare, Check } from 'lucide-react';
 import { motion, useAnimationControls } from 'framer-motion';
 import { HelpHint } from '@/components/ui/HelpHint';
-import { HELP_TERMS } from '@/utils/help/terms';
 import { useActiveWorkout } from './ActiveWorkoutContext';
 import { isObject, toNumber } from './utils';
 import { UnknownRecord } from './types';
@@ -222,7 +221,7 @@ export const SetInputRow: React.FC<Props> = ({ ex, exIdx, setIdx }) => {
                   timingPatch.restStartMs = now;
                 }
                 // Haptic feedback on completion
-                try { triggerHaptic('success'); } catch { }
+                triggerHaptic('success').catch(() => {})
               } else {
                 timingPatch.executionSeconds = null;
                 timingPatch.restStartMs = null;

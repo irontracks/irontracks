@@ -28,10 +28,13 @@ export interface ApiResponse<T = unknown> {
   error?: string
 }
 
+const RETRYABLE_STATUSES = new Set([408, 429, 502, 503, 504])
+
 /**
  * Core fetch wrapper — throws ApiError on non-ok responses.
+ * Retries up to 2 times on transient network errors and retryable HTTP statuses.
  */
-export async function apiFetch<T>(url: string, init?: RequestInit): Promise<T> {
+export async function apiFetch<T>(url: string, init?: RequestInit, _retries = 2): Promise<T> {
   // isIosNative() / isAndroidNative() are guarded with `typeof window === 'undefined'`
   // so they are safe to call on the server — they always return false there.
   const nativeHeaders: Record<string, string> =
@@ -41,12 +44,29 @@ export async function apiFetch<T>(url: string, init?: RequestInit): Promise<T> {
         ? { 'X-Native-Platform': 'android' }
         : {}
 
-  const res = await fetch(url, {
-    credentials: 'include',
-    headers: { 'Content-Type': 'application/json', ...nativeHeaders, ...(init?.headers ?? {}) },
-    ...init,
-  })
+  let res: Response
+  try {
+    res = await fetch(url, {
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json', ...nativeHeaders, ...(init?.headers ?? {}) },
+      ...init,
+    })
+  } catch (networkErr) {
+    if (_retries > 0) {
+      await new Promise((r) => setTimeout(r, 800))
+      return apiFetch<T>(url, init, _retries - 1)
+    }
+    throw networkErr
+  }
+
   if (!res.ok) {
+    // Retry on transient server errors (rate-limit, gateway, timeout)
+    if (RETRYABLE_STATUSES.has(res.status) && _retries > 0) {
+      const retryAfter = Number(res.headers.get('Retry-After') || 0)
+      const delay = retryAfter > 0 ? retryAfter * 1000 : 800
+      await new Promise((r) => setTimeout(r, delay))
+      return apiFetch<T>(url, init, _retries - 1)
+    }
     let message = `HTTP ${res.status}`
     try {
       const body = await res.json()

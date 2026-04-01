@@ -139,20 +139,16 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
                 }
             }
 
-            try {
-                if (allowVibrate) {
-                    triggerHaptic('success');
-                    if (repeatAlarm) {
-                        if (vibrateIntervalRef.current) clearInterval(vibrateIntervalRef.current);
-                        vibrateIntervalRef.current = setInterval(() => {
-                            if (!alarmActiveRef.current) return;
-                            try {
-                                triggerHaptic('warning');
-                            } catch { }
-                        }, repeatIntervalMs);
-                    }
+            if (allowVibrate) {
+                triggerHaptic('success').catch(() => {});
+                if (repeatAlarm) {
+                    if (vibrateIntervalRef.current) clearInterval(vibrateIntervalRef.current);
+                    vibrateIntervalRef.current = setInterval(() => {
+                        if (!alarmActiveRef.current) return;
+                        triggerHaptic('warning').catch(() => {});
+                    }, repeatIntervalMs);
                 }
-            } catch { }
+            }
         }
 
         return () => {
