@@ -23,8 +23,8 @@ const NutritionPDFExport = memo(function NutritionPDFExport({ dateKey, autoPrint
     if (autoPrint) params.set('autoprint', '1')
     const url = `/api/nutrition/export-pdf?${params.toString()}`
     const popup = window.open(url, '_blank', 'width=900,height=700,menubar=no,toolbar=no,scrollbars=yes')
-    // If popup was blocked, fall back to new tab
-    if (!popup) window.open(url, '_blank')
+    // If popup was blocked, navigate in the current tab as fallback
+    if (!popup) window.location.href = url
     // Reset busy after a short delay
     setTimeout(() => setBusy(false), 1500)
   }, [dateKey, autoPrint])
