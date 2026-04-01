@@ -229,12 +229,10 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
                 cancelRestNotification(id).then(() => {
                     requestNativeNotifications().then((res) => {
                         if (!res?.granted) return;
-                        const notifyEverySeconds = Math.max(3, Math.min(30, Math.round(repeatIntervalMsRef.current / 1000) || 5));
-                        const maxSeconds = continuousAlarmRef.current ? 900 : repeatMaxSecondsRef.current;
-                        const maxCount = continuousAlarmRef.current ? 120 : repeatMaxCountRef.current;
-                        const byDuration = Math.ceil(maxSeconds / notifyEverySeconds);
-                        const notifyCount = repeatAlarmRef.current ? Math.max(0, Math.min(maxCount, byDuration)) : 0;
-                        scheduleRestNotification(id, seconds, notifyTitle, notifyBody, notifyCount, notifyEverySeconds);
+                        // Only 1 push notification — repeat alerting is handled in-app
+                        // (sound/vibration loop). Scheduling multiple notifications causes
+                        // repeated banners when the app is backgrounded and JS can't cancel them.
+                        scheduleRestNotification(id, seconds, notifyTitle, notifyBody, 0, 0);
                     }).catch(() => { });
                 }).catch(() => { });
             }

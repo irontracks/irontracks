@@ -64,9 +64,16 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin {
     private let motionManager = CMMotionManager()
     private let healthStore = HKHealthStore()
 
+    /// Native task that marks the Live Activity as finished after `seconds` seconds.
+    /// Runs independently of JS so the Dynamic Island / Lock Screen update even when
+    /// the app is backgrounded and JavaScript execution is throttled by iOS.
+    private var autoFinishTask: Task<Void, Never>? = nil
+
     /// On plugin load, end any stale Live Activities left from a previous session
     /// (e.g. app was killed while a rest timer was running).
     public override func load() {
+        autoFinishTask?.cancel()
+        autoFinishTask = nil
         if #available(iOS 16.2, *) {
             Task {
                 for activity in Activity<RestTimerAttributes>.activities {
@@ -228,6 +235,10 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin {
             let seconds  = call.getInt("seconds")    ?? 60
             let title    = call.getString("title")   ?? ""
 
+            // Cancel any pending auto-finish from a previous timer
+            autoFinishTask?.cancel()
+            autoFinishTask = nil
+
             Task { @MainActor in
                 // End ALL existing activities before starting a new one
                 // (covers ghost activities from killed sessions)
@@ -243,7 +254,9 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin {
                     isFinished: false
                 )
                 do {
-                    let staleDate = Date().addingTimeInterval(Double(seconds + 30))
+                    // staleDate = 5 minutes after timer ends — generous window so the
+                    // finished state remains visible even if the app is slow to update.
+                    let staleDate = endDate.addingTimeInterval(300)
                     let content = ActivityContent(state: state, staleDate: staleDate)
                     let activity = try Activity<RestTimerAttributes>.request(
                         attributes: attrs,
@@ -254,6 +267,37 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin {
                 } catch {
                     print("[IronTracks] Live Activity start failed: \(error.localizedDescription)")
                     call.resolve(["activityId": ""])
+                    return
+                }
+
+                // ── Native auto-finish: update the Live Activity when the timer ends ──
+                // This fires even when JS is backgrounded/throttled by iOS, ensuring the
+                // Dynamic Island and Lock Screen switch to the "Hora de Treinar!" state.
+                let capturedId = id
+                let capturedEndDate = endDate
+                let capturedSeconds = seconds
+                self.autoFinishTask = Task {
+                    // Sleep until the timer ends (wall-clock — survives backgrounding)
+                    let nsDelay = UInt64(max(1, seconds)) * 1_000_000_000
+                    try? await Task.sleep(nanoseconds: nsDelay)
+                    guard !Task.isCancelled else { return }
+
+                    if #available(iOS 16.2, *) {
+                        let finishedState = RestTimerAttributes.ContentState(
+                            endDate: capturedEndDate,
+                            targetSeconds: capturedSeconds,
+                            isFinished: true
+                        )
+                        // Keep the finished state visible for 5 minutes
+                        let finishedContent = ActivityContent(
+                            state: finishedState,
+                            staleDate: Date().addingTimeInterval(300)
+                        )
+                        for activity in Activity<RestTimerAttributes>.activities
+                            where activity.attributes.timerID == capturedId {
+                            await activity.update(finishedContent)
+                        }
+                    }
                 }
             }
         } else {
@@ -283,7 +327,10 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin {
                 targetSeconds: targetSeconds,
                 isFinished: isFinished
             )
-            let staleDate = Date().addingTimeInterval(Double(targetSeconds + 30))
+            // When finished: keep visible for 5 min. When running: end of timer + 5 min.
+            let staleDate = isFinished
+                ? Date().addingTimeInterval(300)
+                : endDate.addingTimeInterval(300)
             let content = ActivityContent(state: state, staleDate: staleDate)
             Task {
                 for activity in Activity<RestTimerAttributes>.activities
@@ -298,6 +345,9 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     @objc func endRestLiveActivity(_ call: CAPPluginCall) {
+        // Cancel the native auto-finish task so it doesn't fire on a dead activity
+        autoFinishTask?.cancel()
+        autoFinishTask = nil
         if #available(iOS 16.2, *) {
             let id = call.getString("id") ?? "rest"
             Task {
@@ -313,6 +363,9 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin {
     }
 
     @objc func endAllRestLiveActivities(_ call: CAPPluginCall) {
+        // Cancel the native auto-finish task
+        autoFinishTask?.cancel()
+        autoFinishTask = nil
         if #available(iOS 16.2, *) {
             Task {
                 for activity in Activity<RestTimerAttributes>.activities {
