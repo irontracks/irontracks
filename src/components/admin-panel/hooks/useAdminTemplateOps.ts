@@ -2,7 +2,6 @@ import { useState, useCallback } from 'react';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import type { AdminUser, AdminWorkoutTemplate } from '@/types/admin';
 import type { UnknownRecord } from '@/types/app';
-import type { Exercise } from '@/types/app';
 import { useDialog } from '@/contexts/DialogContext';
 import { workoutPlanHtml } from '@/utils/report/templates';
 import { escapeHtml } from '@/utils/escapeHtml';
@@ -73,7 +72,7 @@ export const useAdminTemplateOps = ({
                 notes: ex.notes || ''
             }))
         });
-    }, [getSetsCount]);
+    }, [getSetsCount, setEditingStudentWorkout]);
 
     const openEditTemplate = useCallback((t: UnknownRecord) => {
         setEditingTemplate({
@@ -241,12 +240,14 @@ export const useAdminTemplateOps = ({
             const html = workoutPlanHtml(safeWorkout, safeUser);
             const blob = new Blob([html], { type: 'text/html' });
             const blobUrl = URL.createObjectURL(blob);
-            const win = window.open(blobUrl, '_blank');
-            if (!win) { URL.revokeObjectURL(blobUrl); return; }
-            setTimeout(() => {
-                try { win.print(); } catch { }
-                setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
-            }, 400);
+            const filename = `${String(viewWorkout?.name || 'treino').replace(/\s+/g, '_')}.html`;
+            const a = document.createElement('a');
+            a.href = blobUrl;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
         } catch (e: unknown) {
             const msg = e && typeof e === 'object' && 'message' in e && typeof (e as { message?: unknown }).message === 'string' ? (e as { message: string }).message : String(e);
             await alert('Erro ao gerar PDF: ' + msg);

@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useAdminNavigation } from './hooks/useAdminNavigation';
 import { useAdminTeacherDetail } from './hooks/useAdminTeacherDetail';
 import { useAdminUserActivity } from './hooks/useAdminUserActivity';
@@ -11,10 +11,6 @@ import { useRouter } from 'next/navigation';
 import { AdminUser, AdminTeacher, ErrorReport } from '@/types/admin';
 import { useStableSupabaseClient } from '@/hooks/useStableSupabaseClient';
 import { useDialog } from '@/contexts/DialogContext';
-import { sendBroadcastMessage, addTeacher, updateTeacher } from '@/actions/admin-actions';
-import { logError, logWarn, logInfo } from '@/lib/logger'
-import { getErrorMessage } from '@/utils/errorMessage'
-import { adminFetchJson } from '@/utils/admin/adminFetch';
 
 import { useAdminActions } from './hooks/useAdminActions';
 import { useAdminDataFetchers } from './hooks/useAdminDataFetchers';
@@ -26,10 +22,10 @@ export type AdminPanelProps = {
     onClose?: () => void;
 };
 
-export const useAdminPanelController = ({ user, onClose }: AdminPanelProps) => {
+export const useAdminPanelController = ({ user, onClose: _onClose }: AdminPanelProps) => {
     const { alert, confirm } = useDialog();
     const supabase = useStableSupabaseClient();
-    const router = useRouter();
+    const _router = useRouter();
 
     const getAdminAuthHeaders = useCallback(async (): Promise<Record<string, string>> => {
         try {
@@ -46,14 +42,14 @@ export const useAdminPanelController = ({ user, onClose }: AdminPanelProps) => {
     // Roles
     const isAdmin = user?.role === 'admin';
     const isTeacher = user?.role === 'teacher';
-    const unauthorized = !isAdmin && !isTeacher;
+    const _unauthorized = !isAdmin && !isTeacher;
 
     const {
         usersList, setUsersList,
         teachersList, setTeachersList,
         templates, setTemplates,
-        templatesUserId, setTemplatesUserId,
-        myWorkoutsCount, setMyWorkoutsCount,
+        templatesUserId, setTemplatesUserId: _setTemplatesUserId,
+        myWorkoutsCount, setMyWorkoutsCount: _setMyWorkoutsCount,
         tab, setTab,
         subTab, setSubTab,
         studentQuery, setStudentQuery,
@@ -61,13 +57,13 @@ export const useAdminPanelController = ({ user, onClose }: AdminPanelProps) => {
         teacherQuery, setTeacherQuery,
         teacherStatusFilter, setTeacherStatusFilter,
         templateQuery, setTemplateQuery,
-        normalizeText,
-        statusMatches,
-        studentMatchesQuery,
-        teacherMatchesQuery,
-        templateMatchesQuery,
-        totalStudents, studentsWithTeacher, studentsWithoutTeacher, totalTeachers,
-        studentStatusStats,
+        normalizeText: _normalizeText,
+        statusMatches: _statusMatches,
+        studentMatchesQuery: _studentMatchesQuery,
+        teacherMatchesQuery: _teacherMatchesQuery,
+        templateMatchesQuery: _templateMatchesQuery,
+        totalStudents: _totalStudents, studentsWithTeacher: _studentsWithTeacher, studentsWithoutTeacher: _studentsWithoutTeacher, totalTeachers: _totalTeachers,
+        studentStatusStats: _studentStatusStats,
         dashboardCharts,
         coachInboxItems,
         studentsWithTeacherFiltered,
@@ -199,6 +195,17 @@ export const useAdminPanelController = ({ user, onClose }: AdminPanelProps) => {
         setTemplates: (v) => setTemplates(v as Parameters<typeof setTemplates>[0]),
     });
 
+    // Wrap export handlers to close the modal after export
+    const handleExportPdfWithClose = useCallback(async () => {
+        await handleExportPdf();
+        setExportOpen(false);
+    }, [handleExportPdf, setExportOpen]);
+
+    const handleExportJsonWithClose = useCallback(() => {
+        handleExportJson();
+        setExportOpen(false);
+    }, [handleExportJson, setExportOpen]);
+
     // Priorities / Inbox
     const {
         prioritiesItems, setPrioritiesItems,
@@ -277,26 +284,6 @@ export const useAdminPanelController = ({ user, onClose }: AdminPanelProps) => {
     // Loading State (Global)
     const [loading, setLoading] = useState<boolean>(false);
 
-    // --- Actions (extracted to useAdminActions) ---
-    const {
-        handleRegisterStudent,
-        handleAddTeacher,
-        handleUpdateTeacher,
-        handleSendBroadcast,
-        handleUpdateStudentTeacher,
-        handleUpdateStudentStatus,
-        handleToggleStudentStatus,
-        handleDeleteStudent,
-        handleDeleteTeacher,
-    } = useAdminActions({
-        supabase, user, alert, confirm, getAdminAuthHeaders,
-        setUsersList, setTeachersList,
-        newStudent: { name: '', email: '' }, setNewStudent: () => { }, setShowRegisterModal: () => { }, setRegistering: () => { },
-        newTeacher: { name: '', email: '', phone: '', birth_date: '' }, setNewTeacher: () => { }, setShowTeacherModal: () => { }, setAddingTeacher: () => { },
-        editingTeacher: null, setEditingTeacher: () => { },
-        broadcastTitle, broadcastMsg, setBroadcastTitle, setBroadcastMsg, setSendingBroadcast,
-    });
-
     // Modals & Forms for register/teacher (kept inline — small and used by useAdminActions)
     const [showRegisterModal, setShowRegisterModal] = useState<boolean>(false);
     const [newStudent, setNewStudent] = useState<{ name: string; email: string }>({ name: '', email: '' });
@@ -367,9 +354,9 @@ export const useAdminPanelController = ({ user, onClose }: AdminPanelProps) => {
     }, [selectedStudent, setHistoryOpen]);
 
     useEffect(() => {
+        // Intentional: clear teacher selection when a student is selected
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         if (selectedStudent) setSelectedTeacher(null);
-        // Intentional: clearing selectedTeacher when a student is selected is the desired behavior
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [selectedStudent]);
 
     return {
@@ -558,8 +545,8 @@ export const useAdminPanelController = ({ user, onClose }: AdminPanelProps) => {
         handleExportSystem,
         handleImportSystemClick,
         handleImportSystem,
-        handleExportPdf,
-        handleExportJson,
+        handleExportPdf: handleExportPdfWithClose,
+        handleExportJson: handleExportJsonWithClose,
         openEditWorkout,
         openEditTemplate,
 
