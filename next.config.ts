@@ -11,6 +11,10 @@ const nextConfig: NextConfig = {
    
   ...({ optimizePackageImports: ['lucide-react', 'chart.js', 'react-chartjs-2', '@tanstack/react-virtual'] } as any),
 
+  // tsc roda localmente via `npm run deploy` antes de cada push.
+  // Desabilitar no build do Vercel evita checagem duplicada (~40-60s por deploy).
+  typescript: { ignoreBuildErrors: true },
+
   images: {
     localPatterns: [
       {
