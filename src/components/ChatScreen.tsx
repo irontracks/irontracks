@@ -5,17 +5,11 @@ import Image from 'next/image';
 import {
     ChevronLeft,
     MessageSquare,
-    X,
     Users,
     Send,
-    Plus,
-    Check,
-    Bell,
-    Search,
     RefreshCw,
     Image as ImageIcon,
     Smile,
-    Film,
     Link2,
     Trash2
 } from 'lucide-react';
@@ -24,12 +18,11 @@ import { useDialog } from '@/contexts/DialogContext';
 import { compressImage, generateImageThumbnail } from '@/utils/chat/media';
 import { getErrorMessage } from '@/utils/errorMessage'
 import { apiChat, apiStorage } from '@/lib/api'
-import { logError, logWarn, logInfo } from '@/lib/logger'
+import { logError, logWarn } from '@/lib/logger'
 import { parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
 
 interface ChannelRow { id: string; name?: string; [key: string]: unknown }
-interface InviteRow { to_uid: string; from_uid: string; [key: string]: unknown }
 
 interface FormattedMessage {
     id: string
@@ -92,6 +85,7 @@ const ChatMessage = React.memo(function ChatMessage({ msg, isMe, showAvatar, cha
                         onClick={() => { try { const url = msg?.mediaUrl ? String(msg.mediaUrl) : ''; if (url) window.open(url, '_blank'); } catch {} }}
                     />
                 )}
+                {/* eslint-disable-next-line jsx-a11y/media-has-caption, jsx-a11y/control-has-associated-label */}
                 {msg.kind === 'video' && (<video src={msg.mediaUrl} controls playsInline className="rounded-lg max-h-64 w-full" />)}
                 {msg.kind === 'gif' && (
                     <Image src={msg.mediaUrl || ''} alt="gif" width={CHAT_MEDIA_PREVIEW_SIZE} height={CHAT_MEDIA_PREVIEW_SIZE} className="rounded-lg max-h-64 w-full object-cover" unoptimized />
@@ -111,7 +105,7 @@ const ChatMessage = React.memo(function ChatMessage({ msg, isMe, showAvatar, cha
 const ChatScreen = ({ user, onClose }: ChatScreenProps) => {
     const [view, setView] = useState('list');
     const [activeChannel, setActiveChannel] = useState<ChannelRow | null>(null);
-    const [loading, setLoading] = useState(true);
+    const [_loading, setLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const { confirm, alert, prompt } = useDialog();
     const alertRef = useRef(alert);
@@ -126,7 +120,7 @@ const ChatScreen = ({ user, onClose }: ChatScreenProps) => {
     const [uploading, setUploading] = useState(false);
     const visibilityRef = useRef(true);
     
-    const [searchQuery] = useState('');
+    const [_searchQuery] = useState('');
     const userObj: Record<string, unknown> = isRecord(user) ? user : {}
     const safeUserId = userObj?.id ? String(userObj.id) : '';
 
@@ -158,8 +152,10 @@ const ChatScreen = ({ user, onClose }: ChatScreenProps) => {
         };
     }, []);
 
-    const [privateChannels, setPrivateChannels] = useState<Array<Record<string, unknown>>>([]);
-    const [sendingInviteTo, setSendingInviteTo] = useState<{ uid: string; displayName: string } | null>(null);
+    const [privateChannels, _setPrivateChannels] = useState<Array<Record<string, unknown>>>([]);
+    const [_sendingInviteTo, setSendingInviteTo] = useState<{ uid: string; displayName: string } | null>(null);
+    const [openingChat, setOpeningChat] = useState(false);
+    const [sendingGif, setSendingGif] = useState(false);
 
     const fetchGlobalId = useCallback(async () => {
         const j = await apiChat.getGlobalChannelId()
@@ -211,21 +207,23 @@ const ChatScreen = ({ user, onClose }: ChatScreenProps) => {
     }, [])
 
     useEffect(() => {
-        let mounted = true;
+        let _mounted = true;
 
         loadData();
         ensureBucket().catch(err => logWarn('warn', 'Bucket ensure failed', err));
 
-        return () => { mounted = false; };
+        return () => { _mounted = false; };
     }, [ensureBucket, loadData]);
 
     const openGlobalChat = useCallback(async () => {
+        if (openingChat) return;
         if (globalChannel) {
             setActiveChannel({ id: globalChannel.id, name: 'Iron Lounge', type: 'global' });
             setView('chat');
             return;
         }
 
+        setOpeningChat(true);
         try {
             const gid = await fetchGlobalId()
 
@@ -261,8 +259,10 @@ const ChatScreen = ({ user, onClose }: ChatScreenProps) => {
             try {
                 await alertRef.current(`Erro ao conectar no chat global: ${msg || 'Erro desconhecido'}`);
             } catch {}
+        } finally {
+            setOpeningChat(false);
         }
-    }, [fetchGlobalId, globalChannel, supabase])
+    }, [fetchGlobalId, globalChannel, openingChat, supabase])
 
     useEffect(() => {
         if (globalChannel && view === 'list') {
@@ -430,10 +430,15 @@ const ChatScreen = ({ user, onClose }: ChatScreenProps) => {
             return
         }
         const payload = { type: 'gif', media_url: trimmedUrl }
-        await apiChat.sendMessage({ channel_id: activeChannel.id, content: JSON.stringify(payload) })
+        setSendingGif(true);
+        try {
+            await apiChat.sendMessage({ channel_id: activeChannel.id, content: JSON.stringify(payload) })
+        } finally {
+            setSendingGif(false);
+        }
     }
 
-    const handleUserClick = async (targetUser: Record<string, unknown>) => {
+    const _handleUserClick = async (targetUser: Record<string, unknown>) => {
         if (!safeUserId) {
             await alertRef.current('Sessão inválida. Faça login novamente.');
             return;
@@ -491,7 +496,7 @@ const ChatScreen = ({ user, onClose }: ChatScreenProps) => {
         }
     };
 
-    const handleAcceptInvite = async (invite: Record<string, unknown>) => {
+    const _handleAcceptInvite = async (invite: Record<string, unknown>) => {
         if (!safeUserId) {
             await alertRef.current('Sessão inválida. Faça login novamente.');
             return;
@@ -513,7 +518,7 @@ const ChatScreen = ({ user, onClose }: ChatScreenProps) => {
         }
     };
 
-    const handleRejectInvite = async (id: string) => {
+    const _handleRejectInvite = async (id: string) => {
         await supabase.from('chat_invites').update({ status: 'rejected' }).eq('id', id);
         loadData();
     };
@@ -545,7 +550,7 @@ const ChatScreen = ({ user, onClose }: ChatScreenProps) => {
                 </div>
                 <div className="flex gap-2">
                     {view === 'list' && (
-                        <button onClick={loadData} className={`p-2 bg-neutral-700 rounded-full hover:bg-neutral-600 text-white ${refreshing ? 'animate-spin' : ''}`} aria-label="Atualizar">
+                        <button onClick={loadData} disabled={refreshing} className={`p-2 bg-neutral-700 rounded-full hover:bg-neutral-600 text-white disabled:opacity-60 ${refreshing ? 'animate-spin' : ''}`} aria-label="Atualizar">
                             <RefreshCw size={20} />
                         </button>
                     )}
@@ -554,7 +559,7 @@ const ChatScreen = ({ user, onClose }: ChatScreenProps) => {
 
             {view === 'list' && (
                 <div className="flex-1 overflow-y-auto p-4 space-y-6">
-                    <button onClick={openGlobalChat} className="w-full bg-gradient-to-r from-neutral-800 to-neutral-800/50 p-4 rounded-xl flex items-center gap-4 hover:border-yellow-500 border border-neutral-700 transition-all group">
+                    <button onClick={openGlobalChat} disabled={openingChat} className="w-full bg-gradient-to-r from-neutral-800 to-neutral-800/50 p-4 rounded-xl flex items-center gap-4 hover:border-yellow-500 border border-neutral-700 transition-all group disabled:opacity-60">
                         <div className="w-12 h-12 rounded-full bg-yellow-500 flex items-center justify-center text-black font-bold shrink-0 shadow-lg shadow-yellow-900/20 group-hover:scale-110 transition-transform">
                             <Users size={24} />
                         </div>
@@ -594,9 +599,9 @@ const ChatScreen = ({ user, onClose }: ChatScreenProps) => {
                         <input value={newMessage} onChange={(e) => setNewMessage(e.target.value)} className="flex-1 bg-neutral-900 border border-neutral-600 rounded-full px-4 py-3 text-white outline-none focus:border-yellow-500 transition-colors" placeholder="Mensagem..." aria-label="Mensagem" />
                         <div className="flex items-center gap-2">
                             <button type="button" onClick={() => setShowEmoji(v => !v)} className="p-2 rounded-full bg-neutral-700 text-white hover:bg-neutral-600" aria-label="Emojis"><Smile size={18} /></button>
-                            <button type="button" onClick={handleAddGif} className="p-2 rounded-full bg-neutral-700 text-white hover:bg-neutral-600" aria-label="Enviar GIF"><Link2 size={18} /></button>
+                            <button type="button" onClick={handleAddGif} disabled={sendingGif} className="p-2 rounded-full bg-neutral-700 text-white hover:bg-neutral-600 disabled:opacity-60" aria-label="Enviar GIF"><Link2 size={18} /></button>
                             <button type="button" onClick={handleAttachClick} className="p-2 rounded-full bg-neutral-700 text-white hover:bg-neutral-600" aria-label="Anexar mídia"><ImageIcon size={18} /></button>
-                            <input ref={fileInputRef} type="file" accept="image/*,video/*" multiple className="hidden" onChange={handleFileSelected} />
+                            <input ref={fileInputRef} type="file" accept="image/*,video/*" multiple className="hidden" onChange={handleFileSelected} aria-label="Selecionar arquivos" />
                             <button type="submit" disabled={!newMessage.trim()} className="bg-yellow-500 text-black p-3 rounded-full hover:bg-yellow-400 disabled:opacity-50 transition-transform active:scale-95" aria-label="Enviar mensagem"><Send size={20} /></button>
                         </div>
                         {uploading && <span className="text-xs text-neutral-400 ml-2">Enviando mídia...</span>}

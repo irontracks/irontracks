@@ -71,6 +71,7 @@ export default function PostWorkoutMeal({
       <button
         type="button"
         onClick={fetchMeal}
+        disabled={loading}
         className="w-full rounded-xl bg-gradient-to-r from-orange-950/40 to-amber-950/30 border border-orange-500/20 p-3 text-left hover:border-orange-500/40 transition-all active:scale-[0.99]"
       >
         <div className="flex items-center gap-2">

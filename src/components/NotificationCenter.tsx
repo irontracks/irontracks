@@ -125,6 +125,7 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded, open:
     const effectiveOpen = embedded ? !!externalOpen : isOpen;
     const { incomingInvites, acceptInvite, rejectInvite } = useTeamWorkout();
     const [systemNotifications, setSystemNotifications] = useState<NotificationItem[]>([]);
+    const [clearing, setClearing] = useState(false);
     const safeUserId = user?.id ? String(user.id) : '';
     const supabase = useMemo(() => { try { return createClient(); } catch { return null; } }, []);
 
@@ -205,6 +206,8 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded, open:
     };
 
     const handleClearAll = async () => {
+        if (clearing) return;
+        setClearing(true);
         try {
             const confirmed = await confirm("Limpar todas as notificações?");
             if (!confirmed || !supabase) return;
@@ -212,7 +215,9 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded, open:
             if (!currentUser) return;
             await supabase.from('notifications').delete().eq('user_id', currentUser.id);
             setSystemNotifications([]);
-        } catch (e) { logError('component:NotificationCenter.clearAll', e); return; }
+        } catch (e) { logError('component:NotificationCenter.clearAll', e); } finally {
+            setClearing(false);
+        }
     };
 
     const handleAccept = async (item: { data?: unknown;[key: string]: unknown }) => {
@@ -233,7 +238,7 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded, open:
     // ─── Data assembly ────────────────────────────────────────────────────────
     const formatTime = (isoString?: string) => {
         if (!isoString) return 'Agora';
-        // eslint-disable-next-line react-hooks/purity
+         
         const diff = (Date.now() - new Date(isoString).getTime()) / 1000;
         if (diff < 60) return 'Agora';
         if (diff < 3600) return `${Math.floor(diff / 60)}m atrás`;
@@ -360,7 +365,7 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded, open:
             <div className="w-full">
                 {systemNotifications.length > 0 && (
                     <div className="flex justify-end mb-2 px-1">
-                        <button onClick={handleClearAll} className="text-[10px] text-neutral-600 hover:text-red-400 uppercase font-bold tracking-widest transition-colors flex items-center gap-1">
+                        <button onClick={handleClearAll} disabled={clearing} className="text-[10px] text-neutral-600 hover:text-red-400 uppercase font-bold tracking-widest transition-colors flex items-center gap-1 disabled:opacity-60">
                             <Trash2 size={10} /> Limpar tudo
                         </button>
                     </div>
@@ -418,7 +423,8 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded, open:
                                     {hasItems && (
                                         <button
                                             onClick={handleClearAll}
-                                            className="flex items-center gap-1 text-[10px] text-neutral-500 hover:text-red-400 font-bold uppercase tracking-wider transition-colors px-2 py-1 rounded-lg hover:bg-red-500/10"
+                                            disabled={clearing}
+                                            className="flex items-center gap-1 text-[10px] text-neutral-500 hover:text-red-400 font-bold uppercase tracking-wider transition-colors px-2 py-1 rounded-lg hover:bg-red-500/10 disabled:opacity-60"
                                         >
                                             <Trash2 size={10} /> Limpar
                                         </button>

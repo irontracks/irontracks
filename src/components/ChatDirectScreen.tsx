@@ -5,7 +5,6 @@ import Image from 'next/image';
 import {
     ChevronLeft,
     Send,
-    Circle,
     Image as ImageIcon,
     Smile,
     Link2,
@@ -14,7 +13,7 @@ import {
 import { createClient } from '@/utils/supabase/client';
 import { useDialog } from '@/contexts/DialogContext';
 import { compressImage, generateImageThumbnail } from '@/utils/chat/media';
-import { logError, logWarn, logInfo } from '@/lib/logger'
+import { logError } from '@/lib/logger'
 import { parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
 import { apiChat, apiStorage } from '@/lib/api'
@@ -27,11 +26,6 @@ interface ChatUser {
     last_seen?: string | null
 }
 
-interface ChannelState {
-    channelId: string
-    hostId: string
-    guestId: string
-}
 
 interface MessageRow {
     id: string
@@ -77,7 +71,7 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
     const [loading, setLoading] = useState(true);
     const [nowMs, setNowMs] = useState(0);
     const [otherUser, setOtherUser] = useState<ChatUser | null>(null);
-    const [isTyping, setIsTyping] = useState(false);
+    const [_isTyping, _setIsTyping] = useState(false);
     const [channelId, setChannelId] = useState<string | null>(null);
     const [oldestCreatedAt, setOldestCreatedAt] = useState<string | null>(null);
     const [hasMore, setHasMore] = useState(true);
@@ -87,12 +81,13 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
     const supabase = useMemo(() => createClient(), []);
     const messagesEndRef = useRef<HTMLDivElement | null>(null);
     const scrollContainerRef = useRef<HTMLDivElement | null>(null);
-    const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    const _typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const [showEmoji, setShowEmoji] = useState(false);
     const [uploading, setUploading] = useState(false);
     const fileInputRef = useRef<HTMLInputElement | null>(null);
     const [debugChat, setDebugChat] = useState(false);
+    const [sendingGif, setSendingGif] = useState(false);
 
     const userObj: Record<string, unknown> = isRecord(user) ? user : {}
     const targetObj: Record<string, unknown> = isRecord(targetUser) ? targetUser : {}
@@ -456,6 +451,7 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
     const insertEmoji = (emoji: string) => { setNewMessage(prev => prev + emoji); setShowEmoji(false) }
 
     const handleAddGif = async () => {
+        if (sendingGif) return;
         const url = await prompt('Cole a URL do GIF (GIPHY/Tenor):', 'GIF')
         if (!url || !channelId || !safeUserId) {
             if (!safeUserId) await alert('Sessão inválida. Faça login novamente.');
@@ -477,11 +473,16 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
             return
         }
         const payload = { type: 'gif', media_url: trimmedUrl }
-        await supabase.from('direct_messages').insert({
-            channel_id: channelId,
-            sender_id: safeUserId,
-            content: JSON.stringify(payload)
-        });
+        setSendingGif(true);
+        try {
+            await supabase.from('direct_messages').insert({
+                channel_id: channelId,
+                sender_id: safeUserId,
+                content: JSON.stringify(payload)
+            });
+        } finally {
+            setSendingGif(false);
+        }
     }
 
     const isUserOnline = () => {
@@ -641,6 +642,7 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
                                                         }}
                                                     />
                                                 );
+                                            // eslint-disable-next-line jsx-a11y/media-has-caption, jsx-a11y/control-has-associated-label
                                             if (payload?.type === 'video') return <video src={String(payload.media_url ?? '')} controls playsInline className="rounded-lg max-h-64 w-full" />;
                                             if (payload?.type === 'gif')
                                                 return (
@@ -690,8 +692,8 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
                 <div className="flex items-center gap-2 rounded-2xl px-2 py-2" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
                     <button type="button" onClick={() => setShowEmoji(v => !v)} className="w-11 h-11 rounded-xl bg-neutral-800 text-neutral-200 hover:text-white hover:bg-neutral-700 active:scale-95 transition-transform inline-flex items-center justify-center" aria-label="Emojis"><Smile size={18} /></button>
                     <button type="button" onClick={handleAttachClick} className="w-11 h-11 rounded-xl bg-neutral-800 text-neutral-200 hover:text-white hover:bg-neutral-700 active:scale-95 transition-transform inline-flex items-center justify-center" aria-label="Anexar mídia"><ImageIcon size={18} /></button>
-                    <button type="button" onClick={handleAddGif} className="w-11 h-11 rounded-xl bg-neutral-800 text-neutral-200 hover:text-white hover:bg-neutral-700 active:scale-95 transition-transform inline-flex items-center justify-center" aria-label="Enviar GIF"><Link2 size={18} /></button>
-                    <input ref={fileInputRef} type="file" accept="image/*,video/*" multiple className="hidden" onChange={handleFileSelected} />
+                    <button type="button" onClick={handleAddGif} disabled={sendingGif} className="w-11 h-11 rounded-xl bg-neutral-800 text-neutral-200 hover:text-white hover:bg-neutral-700 active:scale-95 transition-transform inline-flex items-center justify-center disabled:opacity-60" aria-label="Enviar GIF"><Link2 size={18} /></button>
+                    <input ref={fileInputRef} type="file" accept="image/*,video/*" multiple className="hidden" onChange={handleFileSelected} aria-label="Selecionar arquivos" />
                     <input
                         type="text"
                         value={newMessage}

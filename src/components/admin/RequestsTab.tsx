@@ -163,7 +163,7 @@ export default function RequestsTab() {
                 <h3 className="text-xs font-black uppercase tracking-widest text-neutral-400">
                     Solicitações Pendentes ({requests.length})
                 </h3>
-                <button onClick={fetchRequests} className="text-[10px] font-bold text-yellow-500 hover:text-yellow-400 uppercase">
+                <button onClick={fetchRequests} disabled={loading} className="text-[10px] font-bold text-yellow-500 hover:text-yellow-400 uppercase disabled:opacity-60">
                     Atualizar
                 </button>
             </div>
