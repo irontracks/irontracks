@@ -1,7 +1,12 @@
 import * as Sentry from "@sentry/nextjs"
 
 Sentry.init({
-  dsn: "https://910aedd6d0464ce76c8599d29ca3368b@o4511127064412160.ingest.us.sentry.io/4511127085842432",
-  tracesSampleRate: 1.0,
-  sendDefaultPii: true,
+  dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
+  environment: process.env.NEXT_PUBLIC_VERCEL_ENV ?? "development",
+  release: process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA,
+
+  // 20% das transações em produção para não estourar cota; 100% em outros ambientes
+  tracesSampleRate: process.env.NEXT_PUBLIC_VERCEL_ENV === "production" ? 0.2 : 1.0,
+
+  sendDefaultPii: false,
 })

@@ -1,11 +1,20 @@
 import * as Sentry from "@sentry/nextjs"
 
 Sentry.init({
-  dsn: "https://910aedd6d0464ce76c8599d29ca3368b@o4511127064412160.ingest.us.sentry.io/4511127085842432",
-  tracesSampleRate: 1.0,
+  dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
+  environment: process.env.NEXT_PUBLIC_VERCEL_ENV ?? "development",
+  release: process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA,
+
+  // 20% das transações em produção para não estourar cota; 100% em outros ambientes
+  tracesSampleRate: process.env.NEXT_PUBLIC_VERCEL_ENV === "production" ? 0.2 : 1.0,
+
+  // 10% das sessões normais, 100% quando há erro
   replaysSessionSampleRate: 0.1,
   replaysOnErrorSampleRate: 1.0,
-  sendDefaultPii: true,
+
+  // false = não envia IP/user-agent por padrão (LGPD)
+  sendDefaultPii: false,
+
   integrations: [
     Sentry.replayIntegration(),
   ],
