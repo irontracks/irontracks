@@ -59,15 +59,24 @@ struct RestTimerLiveActivity: Widget {
                         .lineLimit(1)
                 }
                 DynamicIslandExpandedRegion(.bottom) {
-                    // Progress bar: driven by endDate so it animates without JS updates
-                    let remaining = context.state.isFinished
-                        ? 0.0
-                        : max(0.0, context.state.endDate.timeIntervalSinceNow)
-                    let target = Double(max(1, context.state.targetSeconds))
-                    ProgressView(value: max(0, target - remaining), total: target)
-                        .tint(.green)
-                        .padding(.horizontal, 8)
-                        .padding(.bottom, 4)
+                    // Progress bar: system-driven via timerInterval — animates every second
+                    // without JS updates, same mechanism as Text(timerInterval:)
+                    let startDate = context.state.endDate.addingTimeInterval(
+                        -Double(max(1, context.state.targetSeconds))
+                    )
+                    if context.state.isFinished {
+                        ProgressView(value: 1.0, total: 1.0)
+                            .tint(.green)
+                            .padding(.horizontal, 8)
+                            .padding(.bottom, 4)
+                    } else {
+                        ProgressView(timerInterval: startDate...context.state.endDate, countsDown: false)
+                            .progressViewStyle(.linear)
+                            .tint(.green)
+                            .labelsHidden()
+                            .padding(.horizontal, 8)
+                            .padding(.bottom, 4)
+                    }
                 }
             } compactLeading: {
                 // Compact — left side pill
