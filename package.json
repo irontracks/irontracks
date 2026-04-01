@@ -32,6 +32,12 @@
     "scan:buttons": "node scripts/scan-buttons-static.mjs",
     "scan:buttons:critical": "node scripts/scan-buttons-static.mjs --only-critical",
     "scan:buttons:full": "playwright test e2e/authenticated-button-scan.spec.ts --reporter=list",
+    "scan:secrets": "node scripts/scan-secrets.mjs",
+    "scan:a11y": "node scripts/scan-a11y.mjs",
+    "scan:async": "node scripts/scan-async-loading.mjs",
+    "scan:async:critical": "node scripts/scan-async-loading.mjs --only-critical",
+    "scan:console": "node scripts/scan-console.mjs",
+    "scan:all": "node scripts/scan-secrets.mjs && node scripts/scan-a11y.mjs && node scripts/scan-async-loading.mjs --only-critical && node scripts/scan-buttons-static.mjs --only-critical",
     "prepare": "husky"
   },
   "lint-staged": {

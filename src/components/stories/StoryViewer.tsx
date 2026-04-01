@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Image from 'next/image'
-import { Heart, MessageCircle, X, ChevronLeft, ChevronRight, Eye, Trash2, Loader2, Volume2, VolumeX } from 'lucide-react'
+import { Heart, MessageCircle, X, Eye, Trash2, Loader2, Volume2, VolumeX } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useDialog } from '@/contexts/DialogContext'
 import { Story, StoryGroup } from '@/types/social'
@@ -87,13 +87,13 @@ export default function StoryViewer({
   // Estados de UI
   const [commentsOpen, setCommentsOpen] = useState(false)
   const [commentsLoading, setCommentsLoading] = useState(false)
-  const [commentsError, setCommentsError] = useState('')
+  const [_commentsError, setCommentsError] = useState('')
   const [comments, setComments] = useState<unknown[]>([])
   const [commentText, setCommentText] = useState('')
 
   const [viewersOpen, setViewersOpen] = useState(false)
   const [viewersLoading, setViewersLoading] = useState(false)
-  const [viewersError, setViewersError] = useState('')
+  const [_viewersError, setViewersError] = useState('')
   const [viewers, setViewers] = useState<unknown[]>([])
   const viewersStoryIdRef = useRef<string>('')
 
@@ -104,12 +104,13 @@ export default function StoryViewer({
   const [muted, setMuted] = useState(true)
   const [videoError, setVideoError] = useState('')
   const [reactedEmoji, setReactedEmoji] = useState<string | null>(null)
+  const [isReacting, setIsReacting] = useState(false)
 
   // Use a single "paused" state that controls CSS animation-play-state
   // This avoids tearing down useEffect loops on every touch
   const isPaused = holding || commentsOpen || viewersOpen || hidden || deleting
 
-  const rafRef = useRef<number | null>(null)
+  const _rafRef = useRef<number | null>(null)
   const lastTsRef = useRef<number>(0)
   const elapsedRef = useRef<number>(0)
   const closeRequestedRef = useRef(false)
@@ -203,7 +204,7 @@ export default function StoryViewer({
     stallRef.current = { lastTime: 0, lastTs: 0, attempts: 0 }
     advanceLockRef.current = ''
     // Reset all bars immediately when story changes
-    barRefsRef.current.forEach((el, i) => {
+    barRefsRef.current.forEach((el, _i) => {
       if (el) el.style.transform = 'scaleX(0)'
     })
   }, [storyId])
@@ -677,7 +678,9 @@ export default function StoryViewer({
                 <button
                   key={emoji}
                   type="button"
+                  disabled={isReacting}
                   onClick={async () => {
+                    setIsReacting(true)
                     setReactedEmoji(emoji)
                     setTimeout(() => setReactedEmoji(null), 1200)
                     try {
@@ -686,9 +689,11 @@ export default function StoryViewer({
                         headers: { 'content-type': 'application/json' },
                         body: JSON.stringify({ storyId: story.id, emoji }),
                       })
-                    } catch { }
+                    } catch { } finally {
+                      setIsReacting(false)
+                    }
                   }}
-                  className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg transition-all duration-200 active:scale-125 ${
+                  className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg transition-all duration-200 active:scale-125 disabled:opacity-60 ${
                     reactedEmoji === emoji ? 'scale-125 bg-yellow-500/20 border-yellow-500/50' : 'bg-neutral-900/80 hover:bg-neutral-800/80 border-neutral-800'
                   } border`}
                 >

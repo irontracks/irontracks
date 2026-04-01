@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Video } from 'lucide-react';
 import { useAdminPanel } from './AdminPanelContext';
 import { useDialog } from '@/contexts/DialogContext';
@@ -22,6 +22,8 @@ export const StudentVideosTab: React.FC = () => {
         setExecutionVideoModalUrl,
         setExecutionVideoModalOpen,
     } = useAdminPanel();
+
+    const [reviewingId, setReviewingId] = useState<string | null>(null);
 
     if (!selectedStudent) return null;
 
@@ -112,7 +114,9 @@ export const StudentVideosTab: React.FC = () => {
                                         {/* Watch */}
                                         <button
                                             type="button"
+                                            disabled={reviewingId === id}
                                             onClick={async () => {
+                                                setReviewingId(id);
                                                 try {
                                                     const json = await apiAdmin.getExecutionVideoMedia(id)
                                                         .catch((): null => null) as Record<string, unknown> | null;
@@ -122,16 +126,20 @@ export const StudentVideosTab: React.FC = () => {
                                                 } catch (e: unknown) {
                                                     const msg = e && typeof e === 'object' && 'message' in e && typeof (e as { message?: unknown }).message === 'string' ? (e as { message: string }).message : String(e);
                                                     await alert('Erro: ' + msg);
+                                                } finally {
+                                                    setReviewingId(null);
                                                 }
                                             }}
-                                            className="min-h-[44px] px-4 py-3 bg-neutral-900/70 border border-neutral-800 hover:bg-neutral-900 text-neutral-200 rounded-xl font-black flex items-center justify-center gap-2 transition-all duration-300 active:scale-95"
+                                            className="min-h-[44px] px-4 py-3 bg-neutral-900/70 border border-neutral-800 hover:bg-neutral-900 text-neutral-200 rounded-xl font-black flex items-center justify-center gap-2 transition-all duration-300 active:scale-95 disabled:opacity-60"
                                         >
                                             Assistir
                                         </button>
                                         {/* Approve */}
                                         <button
                                             type="button"
+                                            disabled={reviewingId === id}
                                             onClick={async () => {
+                                                setReviewingId(id);
                                                 try {
                                                     const feedback = String(draft || '').trim();
                                                     const json = await apiAdmin.reviewExecutionVideo({ video_id: id, status: 'reviewed', feedback })
@@ -141,16 +149,20 @@ export const StudentVideosTab: React.FC = () => {
                                                 } catch (e: unknown) {
                                                     const msg = e && typeof e === 'object' && 'message' in e && typeof (e as { message?: unknown }).message === 'string' ? (e as { message: string }).message : String(e);
                                                     await alert('Erro: ' + msg);
+                                                } finally {
+                                                    setReviewingId(null);
                                                 }
                                             }}
-                                            className="min-h-[44px] px-4 py-3 bg-green-600 hover:bg-green-500 text-white rounded-xl font-black transition-all duration-300 active:scale-95"
+                                            className="min-h-[44px] px-4 py-3 bg-green-600 hover:bg-green-500 text-white rounded-xl font-black transition-all duration-300 active:scale-95 disabled:opacity-60"
                                         >
                                             Aprovar
                                         </button>
                                         {/* Reject */}
                                         <button
                                             type="button"
+                                            disabled={reviewingId === id}
                                             onClick={async () => {
+                                                setReviewingId(id);
                                                 try {
                                                     const feedback = String(draft || '').trim();
                                                     const json = await apiAdmin.reviewExecutionVideo({ video_id: id, status: 'rejected', feedback })
@@ -160,9 +172,11 @@ export const StudentVideosTab: React.FC = () => {
                                                 } catch (e: unknown) {
                                                     const msg = e && typeof e === 'object' && 'message' in e && typeof (e as { message?: unknown }).message === 'string' ? (e as { message: string }).message : String(e);
                                                     await alert('Erro: ' + msg);
+                                                } finally {
+                                                    setReviewingId(null);
                                                 }
                                             }}
-                                            className="min-h-[44px] px-4 py-3 bg-red-600 hover:bg-red-500 text-white rounded-xl font-black transition-all duration-300 active:scale-95"
+                                            className="min-h-[44px] px-4 py-3 bg-red-600 hover:bg-red-500 text-white rounded-xl font-black transition-all duration-300 active:scale-95 disabled:opacity-60"
                                         >
                                             Reprovar
                                         </button>
@@ -170,7 +184,9 @@ export const StudentVideosTab: React.FC = () => {
                                 </div>
                                 {/* Feedback textarea */}
                                 <div className="mt-3">
+                                    {/* eslint-disable-next-line jsx-a11y/label-has-associated-control */}
                                     <label className="block text-[11px] font-black uppercase tracking-widest text-neutral-500 mb-2">Mensagem para o aluno</label>
+                                    {/* eslint-disable-next-line jsx-a11y/control-has-associated-label */}
                                     <textarea
                                         value={String(draft || '')}
                                         onChange={(e) => {
