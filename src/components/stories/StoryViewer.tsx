@@ -105,6 +105,8 @@ export default function StoryViewer({
   const [videoError, setVideoError] = useState('')
   const [reactedEmoji, setReactedEmoji] = useState<string | null>(null)
   const [isReacting, setIsReacting] = useState(false)
+  const [liking, setLiking] = useState(false)
+  const [sendingComment, setSendingComment] = useState(false)
 
   // Use a single "paused" state that controls CSS animation-play-state
   // This avoids tearing down useEffect loops on every touch
@@ -420,18 +422,22 @@ export default function StoryViewer({
 
   // Ações
   const toggleLike = async () => {
-    if (!story?.id) return
+    if (!story?.id || liking) return
+    setLiking(true)
     const nextLiked = !story.hasLiked
     onStoryUpdated(story.id, { hasLiked: nextLiked, likeCount: Math.max(0, story.likeCount + (nextLiked ? 1 : -1)) })
     try {
       await apiSocial.likeStory(story.id, nextLiked)
     } catch {
       onStoryUpdated(story.id, { hasLiked: story.hasLiked, likeCount: story.likeCount })
+    } finally {
+      setLiking(false)
     }
   }
 
   const sendComment = async () => {
-    if (!story?.id || !commentText.trim()) return
+    if (!story?.id || !commentText.trim() || sendingComment) return
+    setSendingComment(true)
     const text = commentText.trim()
     setCommentText('')
     try {
@@ -440,7 +446,9 @@ export default function StoryViewer({
         setComments((prev) => [...prev, (json as Record<string, unknown>).data])
         onStoryUpdated(story.id, { commentCount: story.commentCount + 1 })
       }
-    } catch { }
+    } catch { } finally {
+      setSendingComment(false)
+    }
   }
 
   const handleDelete = async () => {
@@ -518,7 +526,7 @@ export default function StoryViewer({
               <div className="text-[11px] text-neutral-300 font-bold">{formatAgo(story.createdAt)}</div>
             </div>
             {isMine && (
-              <button onClick={handleDelete} className="w-10 h-10 rounded-xl bg-black/40 text-red-400 flex items-center justify-center hover:bg-black/60">
+              <button onClick={handleDelete} disabled={deleting} className="w-10 h-10 rounded-xl bg-black/40 text-red-400 flex items-center justify-center hover:bg-black/60 disabled:opacity-60">
                 {deleting ? <Loader2 size={18} className="animate-spin" /> : <Trash2 size={18} />}
               </button>
             )}
@@ -656,7 +664,7 @@ export default function StoryViewer({
               )}
 
               <div className="flex flex-col items-center">
-                <button onClick={toggleLike} className={`w-12 h-12 rounded-2xl border flex items-center justify-center ${story.hasLiked ? 'bg-red-500/20 border-red-500 text-red-400' : 'bg-neutral-900/80 border-neutral-800 text-white'}`}>
+                <button onClick={toggleLike} disabled={liking} className={`w-12 h-12 rounded-2xl border flex items-center justify-center disabled:opacity-60 ${story.hasLiked ? 'bg-red-500/20 border-red-500 text-red-400' : 'bg-neutral-900/80 border-neutral-800 text-white'}`}>
                   <Heart size={20} className={story.hasLiked ? 'fill-current' : ''} />
                 </button>
                 <span className="text-[10px] font-bold text-white drop-shadow">{story.likeCount}</span>
@@ -738,7 +746,7 @@ export default function StoryViewer({
               {commentsOpen && (
                 <div className="p-2 border-t border-neutral-800 flex gap-2">
                   <input value={commentText} onChange={e => setCommentText(e.target.value)} className="flex-1 bg-black/40 border border-neutral-700 rounded-xl px-3 text-xs text-white" placeholder="Escreva..." aria-label="Escrever comentário" />
-                  <button onClick={sendComment} className="px-3 py-2 bg-yellow-500 rounded-xl text-black text-xs font-black">Enviar</button>
+                  <button onClick={sendComment} disabled={sendingComment} className="px-3 py-2 bg-yellow-500 rounded-xl text-black text-xs font-black disabled:opacity-60">Enviar</button>
                 </div>
               )}
             </motion.div>

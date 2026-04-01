@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Download, ArrowLeft, User, Ruler, Calculator, TrendingUp, FileText, Code } from 'lucide-react';
+import { Download, User, Ruler, Calculator, TrendingUp, FileText, Code } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { AssessmentFormData } from '@/types/assessment';
 import {
@@ -13,7 +13,7 @@ import {
   classifyBodyFat
 } from '@/utils/calculations/bodyComposition';
 import { generateAssessmentPdf } from '@/utils/report/generatePdf';
-import { logError, logWarn, logInfo } from '@/lib/logger'
+import { logError } from '@/lib/logger'
 
 const BodyMeasurementMap = dynamic(() => import('./BodyMeasurementMap'), { ssr: false })
 
@@ -23,8 +23,9 @@ interface ResultsPreviewProps {
   studentName: string;
 }
 
-export default function ResultsPreview({ formData, onBack, studentName }: ResultsPreviewProps) {
+export default function ResultsPreview({ formData, onBack: _onBack, studentName }: ResultsPreviewProps) {
   const [showExportMenu, setShowExportMenu] = useState(false);
+  const [exporting, setExporting] = useState(false);
   const results = useMemo(() => {
     const weight = parseFloat(formData.weight || '0');
     const height = parseFloat(formData.height || '0');
@@ -110,12 +111,15 @@ export default function ResultsPreview({ formData, onBack, studentName }: Result
   };
 
   const handleExportPdf = async () => {
+    if (exporting) return
+    setExporting(true)
     try {
       // generateAssessmentPdf now opens the printable page internally
       await generateAssessmentPdf(formData as unknown as Record<string, unknown>, results, studentName);
     } catch (e) {
       logError('error', 'Erro ao gerar PDF da avaliação', e);
     } finally {
+      setExporting(false)
       setShowExportMenu(false);
     }
   };
@@ -345,7 +349,8 @@ export default function ResultsPreview({ formData, onBack, studentName }: Result
             <div className="absolute right-0 mt-2 w-52 bg-neutral-900 border border-neutral-800 rounded-xl shadow-xl z-10">
               <button
                 onClick={handleExportPdf}
-                className="w-full flex items-center gap-2 px-4 py-2 text-left text-sm text-neutral-100 hover:bg-neutral-800"
+                disabled={exporting}
+                className="w-full flex items-center gap-2 px-4 py-2 text-left text-sm text-neutral-100 hover:bg-neutral-800 disabled:opacity-60"
               >
                 <FileText className="w-4 h-4 text-yellow-500" />
                 <span>Exportar PDF</span>

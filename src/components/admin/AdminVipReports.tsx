@@ -1,10 +1,10 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import React, { useEffect, useState, useMemo, useCallback } from 'react';
-import { 
-    Users, MessageSquare, Zap, Crown, Star, TrendingUp, 
-    Download, RefreshCw, AlertCircle 
+import {
+    Zap, Crown,
+    Download, RefreshCw, AlertCircle
 } from 'lucide-react';
-import { Bar, Doughnut } from 'react-chartjs-2';
+import { Bar } from 'react-chartjs-2';
 import {
     Chart as ChartJS,
     CategoryScale,
@@ -12,10 +12,9 @@ import {
     BarElement,
     Title,
     Tooltip,
-    Legend,
-    ArcElement
+    Legend
 } from 'chart.js';
-import { logError, logWarn, logInfo } from '@/lib/logger'
+import { logError } from '@/lib/logger'
 
 ChartJS.register(
     CategoryScale,
@@ -23,8 +22,7 @@ ChartJS.register(
     BarElement,
     Title,
     Tooltip,
-    Legend,
-    ArcElement
+    Legend
 );
 
 const TIER_COLORS: Record<string, string> = {
@@ -255,7 +253,7 @@ export default function AdminVipReports({ supabase }: AdminVipReportsProps) {
             <div className="p-8 flex flex-col items-center justify-center text-red-400">
                 <AlertCircle size={32} className="mb-2" />
                 <p>{error}</p>
-                <button onClick={loadStats} className="mt-4 px-4 py-2 bg-neutral-800 rounded-lg hover:bg-neutral-700 text-white">
+                <button onClick={loadStats} disabled={loading} className="mt-4 px-4 py-2 bg-neutral-800 rounded-lg hover:bg-neutral-700 text-white disabled:opacity-60">
                     Tentar Novamente
                 </button>
             </div>
@@ -287,7 +285,7 @@ export default function AdminVipReports({ supabase }: AdminVipReportsProps) {
                             30 Dias
                         </button>
                     </div>
-                    <button onClick={loadStats} className="p-2 bg-neutral-900 hover:bg-neutral-800 rounded-lg border border-neutral-800 text-neutral-400 hover:text-white">
+                    <button onClick={loadStats} disabled={loading} className="p-2 bg-neutral-900 hover:bg-neutral-800 rounded-lg border border-neutral-800 text-neutral-400 hover:text-white disabled:opacity-60">
                         <RefreshCw size={18} />
                     </button>
                     <button onClick={downloadCsv} className="p-2 bg-yellow-500 hover:bg-yellow-400 rounded-lg text-black font-bold flex items-center gap-2">
@@ -383,12 +381,13 @@ export default function AdminVipReports({ supabase }: AdminVipReportsProps) {
                                         <span className={TIER_TEXT_CLASS[row.tier] || 'text-white'}>{TIER_LABELS[row.tier] || row.tier}</span>
                                     </td>
                                     <td className="px-6 py-4 text-center font-mono text-white">{row.user_count}</td>
+                                    {/* eslint-disable-next-line jsx-a11y/control-has-associated-label */}
                                     <td className="px-6 py-4 text-center">
                                         <div className="flex flex-col items-center">
                                             <span className="font-bold text-white">{row.stats.chat.usage.toLocaleString()}</span>
                                             <span className="text-xs text-neutral-500">de {row.stats.chat.capacity.toLocaleString()}</span>
                                             <div className="w-16 h-1 mt-1">
-                                                <svg className="w-full h-1" viewBox="0 0 100 4" preserveAspectRatio="none">
+                                                <svg aria-hidden="true" className="w-full h-1" viewBox="0 0 100 4" preserveAspectRatio="none">
                                                     <rect x="0" y="0" width="100" height="4" rx="2" fill="#27272a" />
                                                     <rect
                                                         x="0"
@@ -402,12 +401,13 @@ export default function AdminVipReports({ supabase }: AdminVipReportsProps) {
                                             </div>
                                         </div>
                                     </td>
+                                    {/* eslint-disable-next-line jsx-a11y/control-has-associated-label */}
                                     <td className="px-6 py-4 text-center">
                                         <div className="flex flex-col items-center">
                                             <span className="font-bold text-white">{row.stats.insights.usage.toLocaleString()}</span>
                                             <span className="text-xs text-neutral-500">de {row.stats.insights.capacity.toLocaleString()}</span>
                                             <div className="w-16 h-1 mt-1">
-                                                <svg className="w-full h-1" viewBox="0 0 100 4" preserveAspectRatio="none">
+                                                <svg aria-hidden="true" className="w-full h-1" viewBox="0 0 100 4" preserveAspectRatio="none">
                                                     <rect x="0" y="0" width="100" height="4" rx="2" fill="#27272a" />
                                                     <rect
                                                         x="0"

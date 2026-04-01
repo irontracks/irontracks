@@ -12,6 +12,7 @@ export default function ReferralSection() {
   const [count, setCount] = useState(0)
   const [loading, setLoading] = useState(true)
   const [copied, setCopied] = useState(false)
+  const [sharing, setSharing] = useState(false)
 
   // Enter a code state
   const [inputCode, setInputCode] = useState('')
@@ -45,9 +46,13 @@ export default function ReferralSection() {
   }
 
   const handleShare = async () => {
+    if (sharing) return
+    setSharing(true)
     try {
       await navigator.share({ title: 'IronTracks', text: 'Entre no IronTracks com meu convite!', url: referralUrl })
-    } catch { /* ignore */ }
+    } catch { /* ignore */ } finally {
+      setSharing(false)
+    }
   }
 
   const handleSubmitCode = async () => {
@@ -109,8 +114,9 @@ export default function ReferralSection() {
           <button
             type="button"
             onClick={handleCopy}
+            disabled={copied}
             aria-label="Copiar código"
-            className="text-white/40 hover:text-white transition-colors"
+            className="text-white/40 hover:text-white transition-colors disabled:opacity-60"
           >
             {copied ? <Check size={16} className="text-green-400" /> : <Copy size={16} />}
           </button>
@@ -122,7 +128,8 @@ export default function ReferralSection() {
         <button
           type="button"
           onClick={handleCopy}
-          className="flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-all"
+          disabled={copied}
+          className="flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-bold transition-all disabled:opacity-60"
           style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)', color: copied ? '#4ade80' : 'rgba(255,255,255,0.7)' }}
         >
           {copied ? <Check size={14} /> : <Copy size={14} />}
@@ -131,7 +138,8 @@ export default function ReferralSection() {
         <button
           type="button"
           onClick={handleShare}
-          className="flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-black text-black"
+          disabled={sharing}
+          className="flex items-center justify-center gap-2 py-3 rounded-xl text-sm font-black text-black disabled:opacity-60"
           style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)' }}
         >
           <Share2 size={14} />

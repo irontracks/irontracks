@@ -86,6 +86,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose,
     const [showExportMenu, setShowExportMenu] = useState(false);
     const [showStory, setShowStory] = useState(false);
     const [showShareCard, setShowShareCard] = useState(false);
+    const [sharing, setSharing] = useState(false);
     const storiesV2Enabled = useMemo(() => isFeatureEnabled(settings, FEATURE_KEYS.storiesV2), [settings]);
     const [_showStoryPrompt, setShowStoryPrompt] = useState(false);
 
@@ -384,6 +385,8 @@ const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose,
     };
 
     const handleShare = async () => {
+        if (sharing) return;
+        setSharing(true);
         try {
             if (!pdfUrl && !pdfBlob) {
                 alert('Gere o PDF antes de compartilhar.');
@@ -425,6 +428,8 @@ const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose,
                 a.click();
                 a.remove();
             } catch { }
+        } finally {
+            setSharing(false);
         }
     };
 
@@ -807,7 +812,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose,
                         <iframe ref={pdfFrameRef} src={pdfUrl} className="w-full h-full" title="Relatório de treino PDF" />
                     </div>
                     <div className="p-4 bg-neutral-900 border-t border-neutral-800 flex items-center justify-end gap-2 pb-safe">
-                        <button onClick={handleShare} className="bg-neutral-800 text-white px-4 py-2 rounded-lg">Compartilhar</button>
+                        <button onClick={handleShare} disabled={sharing} className="bg-neutral-800 text-white px-4 py-2 rounded-lg disabled:opacity-60">Compartilhar</button>
                         <button onClick={handlePrintIframe} className="bg-yellow-500 text-black px-4 py-2 rounded-lg font-bold">Imprimir</button>
                     </div>
                 </div>

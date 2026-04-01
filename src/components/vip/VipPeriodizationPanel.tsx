@@ -67,7 +67,7 @@ const friendlyCreateError = (codeRaw: unknown) => {
   return String(codeRaw || 'Falha ao criar periodização.')
 }
 
-const formatMoneyLike = (n: number) => {
+const _formatMoneyLike = (n: number) => {
   const v = Number.isFinite(n) ? n : 0
   if (v >= 1_000_000) return `${(v / 1_000_000).toFixed(2)}M`
   if (v >= 1_000) return `${(v / 1_000).toFixed(1)}k`
@@ -359,7 +359,7 @@ export default function VipPeriodizationPanel({
             <TrendingUp size={16} className="text-green-400" />
             <div className="font-black text-white text-sm">Progresso (14 semanas)</div>
           </div>
-          <button type="button" onClick={loadStats} className="inline-flex items-center gap-2 text-xs font-black text-neutral-300 hover:text-white">
+          <button type="button" onClick={loadStats} disabled={loading} className="inline-flex items-center gap-2 text-xs font-black text-neutral-300 hover:text-white disabled:opacity-60">
             <RefreshCw size={14} />
             Atualizar
           </button>
@@ -392,7 +392,7 @@ export default function VipPeriodizationPanel({
             >
               {calendarOpen ? 'Esconder' : 'Mostrar'}
             </button>
-            <button type="button" onClick={loadActive} className="inline-flex items-center gap-2 text-xs font-black text-neutral-300 hover:text-white">
+            <button type="button" onClick={loadActive} disabled={loading} className="inline-flex items-center gap-2 text-xs font-black text-neutral-300 hover:text-white disabled:opacity-60">
               <RefreshCw size={14} />
             </button>
           </div>
@@ -599,6 +599,7 @@ export default function VipPeriodizationPanel({
                   <label className="flex items-center gap-2 rounded-xl bg-neutral-950 border border-neutral-800 px-3 py-3 text-sm text-white font-bold">
                     <input
                       type="checkbox"
+                      aria-label="Academia completa"
                       checked={form.equipment.includes('gym')}
                       onChange={(e) =>
                         setForm((p) => ({ ...p, equipment: e.target.checked ? Array.from(new Set([...p.equipment, 'gym'])) : p.equipment.filter((x) => x !== 'gym') }))
@@ -609,6 +610,7 @@ export default function VipPeriodizationPanel({
                   <label className="flex items-center gap-2 rounded-xl bg-neutral-950 border border-neutral-800 px-3 py-3 text-sm text-white font-bold">
                     <input
                       type="checkbox"
+                      aria-label="Casa / equipamento limitado"
                       checked={form.equipment.includes('home')}
                       onChange={(e) =>
                         setForm((p) => ({ ...p, equipment: e.target.checked ? Array.from(new Set([...p.equipment, 'home'])) : p.equipment.filter((x) => x !== 'home') }))
