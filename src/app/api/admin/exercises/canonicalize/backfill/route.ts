@@ -3,7 +3,7 @@ import { logWarn } from '@/lib/logger'
 
 import { parseJsonBody, parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
-import { requireRole, requireRoleWithBearer } from '@/utils/auth/route'
+import { requireRoleOrBearer } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { normalizeExerciseName } from '@/utils/normalizeExerciseName'
 import { GoogleGenerativeAI } from '@google/generative-ai'
@@ -66,11 +66,8 @@ async function resolveWithGemini(items: Array<{ normalized: string; alias: strin
 }
 
 export async function POST(req: Request) {
-  let auth = await requireRole(['admin'])
-  if (!auth.ok) {
-    auth = await requireRoleWithBearer(req, ['admin'])
-    if (!auth.ok) return auth.response
-  }
+  const auth = await requireRoleOrBearer(req, ['admin'])
+  if (!auth.ok) return auth.response
 
   try {
     const parsedBody = await parseJsonBody(req, ZodBodySchema)

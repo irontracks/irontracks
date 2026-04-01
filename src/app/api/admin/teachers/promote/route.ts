@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { parseJsonBody } from '@/utils/zod'
 import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
-import { requireRole, requireRoleWithBearer } from '@/utils/auth/route'
+import { requireRoleOrBearer } from '@/utils/auth/route'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { safePgLike } from '@/utils/safePgFilter'
 
@@ -16,11 +16,8 @@ const ZodBodySchema = z
 
 export async function POST(req: Request) {
   try {
-    let auth = await requireRole(['admin'])
-    if (!auth.ok) {
-      auth = await requireRoleWithBearer(req, ['admin'])
-      if (!auth.ok) return auth.response
-    }
+    const auth = await requireRoleOrBearer(req, ['admin'])
+    if (!auth.ok) return auth.response
 
     const parsedBody = await parseJsonBody(req, ZodBodySchema)
     if (parsedBody.response) return parsedBody.response
