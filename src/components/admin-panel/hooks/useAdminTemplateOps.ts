@@ -5,6 +5,7 @@ import type { UnknownRecord } from '@/types/app';
 import { useDialog } from '@/contexts/DialogContext';
 import { workoutPlanHtml } from '@/utils/report/templates';
 import { escapeHtml } from '@/utils/escapeHtml';
+import { logWarn } from '@/lib/logger';
 import React from 'react';
 import { useStudentWorkoutCreate } from './useStudentWorkoutCreate';
 
@@ -238,16 +239,46 @@ export const useAdminTemplateOps = ({
                 email: escapeHtml(baseUser.email ?? '')
             };
             const html = workoutPlanHtml(safeWorkout, safeUser);
+            const title = String(viewWorkout?.name || 'treino').trim();
+            const fileName = `${title.replace(/\s+/g, '_')}_irontracks.html`;
+
+            // iOS/Capacitor: window.open + anchor.click não funciona em WKWebView.
+            // Web Share API abre a planilha nativa → usuário toca "Imprimir" → salvar como PDF.
+            const canShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function';
+            if (canShare) {
+                try {
+                    const blob = new Blob([html], { type: 'text/html' });
+                    const file = new File([blob], fileName, { type: 'text/html' });
+                    const canShareFiles = typeof (navigator as { canShare?: (data: { files: File[] }) => boolean }).canShare === 'function'
+                        && (navigator as { canShare: (data: { files: File[] }) => boolean }).canShare({ files: [file] });
+                    if (canShareFiles) {
+                        await navigator.share({ files: [file], title: `${title} • IronTracks` });
+                    } else {
+                        const url = URL.createObjectURL(blob);
+                        await navigator.share({ title: `${title} • IronTracks`, url });
+                        URL.revokeObjectURL(url);
+                    }
+                    return;
+                } catch (shareErr) {
+                    const msg = shareErr instanceof Error ? shareErr.message : '';
+                    if (msg.toLowerCase().includes('cancel') || msg.toLowerCase().includes('abort')) return;
+                    // Fallthrough to window.open on other errors
+                }
+            }
+
+            // Desktop fallback: nova aba + diálogo de impressão (Salvar como PDF)
             const blob = new Blob([html], { type: 'text/html' });
-            const blobUrl = URL.createObjectURL(blob);
-            const filename = `${String(viewWorkout?.name || 'treino').replace(/\s+/g, '_')}.html`;
-            const a = document.createElement('a');
-            a.href = blobUrl;
-            a.download = filename;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            setTimeout(() => URL.revokeObjectURL(blobUrl), 1000);
+            const url = URL.createObjectURL(blob);
+            const win = window.open(url, '_blank');
+            if (!win) {
+                URL.revokeObjectURL(url);
+                await alert('Não foi possível abrir a janela de impressão. Permita pop-ups e tente novamente.');
+                return;
+            }
+            setTimeout(() => {
+                try { win.print(); } catch (e) { logWarn('useAdminTemplateOps', 'silenced print error', e); }
+                setTimeout(() => URL.revokeObjectURL(url), 60_000);
+            }, 400);
         } catch (e: unknown) {
             const msg = e && typeof e === 'object' && 'message' in e && typeof (e as { message?: unknown }).message === 'string' ? (e as { message: string }).message : String(e);
             await alert('Erro ao gerar PDF: ' + msg);
