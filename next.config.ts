@@ -115,7 +115,6 @@ export default withSentryConfig(nextConfig, {
   org: "irontracks-company",
   project: "javascript-nextjs",
   silent: !process.env.CI,
-  widenClientFileUpload: true,
   tunnelRoute: "/monitoring",
   disableLogger: true,
   automaticVercelMonitors: true,
