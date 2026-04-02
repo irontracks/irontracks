@@ -9,7 +9,7 @@ import {
 import { createClient } from '@/utils/supabase/client';
 import { useDialog } from '@/contexts/DialogContext';
 import { getErrorMessage } from '@/utils/errorMessage'
-import { logError, logWarn, logInfo } from '@/lib/logger'
+import { logError } from '@/lib/logger'
 
 interface ChatUser {
     id: string;
@@ -29,10 +29,9 @@ interface ProfilePresenceRow {
 interface ChatListScreenProps {
     user: { id: string | number } | null;
     onClose: () => void;
-    onSelectUser?: (u: ChatUser) => void;
     onSelectChannel?: (ch: { channel_id: string; other_user_id: string; other_user_name: string | null; other_user_photo: string | null }) => void;
 }
-const ChatListScreen = ({ user, onClose, onSelectUser, onSelectChannel }: ChatListScreenProps) => {
+const ChatListScreen = ({ user, onClose, onSelectChannel }: ChatListScreenProps) => {
     const [users, setUsers] = useState<ChatUser[]>([]);
     const [loading, setLoading] = useState(true);
     const [nowMs, setNowMs] = useState(0);
@@ -157,7 +156,7 @@ const ChatListScreen = ({ user, onClose, onSelectUser, onSelectChannel }: ChatLi
 
     if (loading) {
         return (
-            <div className="fixed inset-0 z-50 flex flex-col h-[100dvh] overflow-hidden" style={{ background: '#090909' }}>
+            <div className="fixed inset-0 z-50 flex flex-col h-full overflow-hidden" style={{ background: '#090909' }}>
                 <div className="px-4 pt-[max(env(safe-area-inset-top),12px)] pb-3 flex justify-between items-center sticky top-0 z-20" style={{ background: 'rgba(9,9,9,0.98)', borderBottom: '1px solid rgba(255,255,255,0.06)', backdropFilter: 'blur(12px)' }}>
                     <div className="h-px absolute bottom-0 left-0 right-0" style={{ background: 'linear-gradient(90deg, transparent, rgba(234,179,8,0.3), transparent)' }} />
                     <div className="flex items-center gap-3">
@@ -181,7 +180,7 @@ const ChatListScreen = ({ user, onClose, onSelectUser, onSelectChannel }: ChatLi
     const offlineUsers = users.filter(u => !isUserOnline(u.last_seen ?? null));
 
     return (
-        <div className="fixed inset-0 z-50 flex flex-col h-[100dvh] overflow-hidden text-white" style={{ background: '#090909' }}>
+        <div className="fixed inset-0 z-50 flex flex-col h-full overflow-hidden text-white" style={{ background: '#090909' }}>
             {/* Header */}
             <div className="px-4 pt-[max(env(safe-area-inset-top),12px)] pb-3 flex justify-between items-center sticky top-0 z-20 relative" style={{ background: 'rgba(9,9,9,0.98)', borderBottom: '1px solid rgba(255,255,255,0.06)', backdropFilter: 'blur(12px)' }}>
                 <div className="h-px absolute bottom-0 left-0 right-0" style={{ background: 'linear-gradient(90deg, transparent, rgba(234,179,8,0.3), transparent)' }} />
@@ -218,7 +217,7 @@ const ChatListScreen = ({ user, onClose, onSelectUser, onSelectChannel }: ChatLi
                                 <p className="text-[10px] font-black text-green-500 uppercase tracking-[0.18em]">● Online — {onlineUsers.length}</p>
                             </div>
                         )}
-                        {onlineUsers.map((u, idx) => (
+                        {onlineUsers.map((u) => (
                             <button key={u.id} onClick={() => handleOpenChat(u)} className="w-full px-4 py-3.5 flex items-center gap-3.5 transition-colors hover:bg-white/[0.03] active:bg-white/5 text-left group" style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
                                 <div className="relative flex-shrink-0">
                                     <div className="w-11 h-11 rounded-full overflow-hidden" style={{ boxShadow: '0 0 0 1.5px rgba(234,179,8,0.25)' }}>
