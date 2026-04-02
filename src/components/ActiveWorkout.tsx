@@ -102,7 +102,7 @@ export default function ActiveWorkout(props: ActiveWorkoutProps) {
 
   return (
     <WorkoutProvider value={controller}>
-      <div className="fixed inset-0 z-[50] flex flex-col bg-neutral-900 text-white animate-slide-up">
+      <div className="fixed inset-0 z-[50] flex flex-col bg-neutral-950 text-white animate-slide-up">
         <WorkoutHeader />
 
         {/* Scrollable content — sits below the fixed header */}
