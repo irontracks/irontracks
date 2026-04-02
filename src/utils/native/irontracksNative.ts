@@ -52,43 +52,55 @@ export type HapticStyle =
   | 'light' | 'medium' | 'heavy' | 'rigid' | 'soft'
   | 'success' | 'warning' | 'error' | 'selection'
 
-// ─── Register plugin ─────────────────────────────────────────────────────────
+// ─── Web / fallback implementation ───────────────────────────────────────────
 
-const Native = registerPlugin<IronTracksNativePlugin>('IronTracksNative', {
-  web: {
-    setIdleTimerDisabled: async () => { },
-    openAppSettings: async () => ({ ok: false }),
-    requestNotificationPermission: async () => ({ granted: false }),
-    checkNotificationPermission: async () => ({ status: 'notDetermined' }),
-    setupNotificationActions: async () => { },
-    scheduleRestTimer: async () => { },
-    cancelRestTimer: async () => { },
-    startRestLiveActivity: async () => { },
-    updateRestLiveActivity: async () => { },
-    endRestLiveActivity: async () => { },
-    endAllRestLiveActivities: async () => { },
-    scheduleAppNotification: async () => ({ id: '' }),
-    stopAlarmSound: async () => { },
-    triggerHaptic: async () => { },
-    checkBiometricsAvailable: async () => ({ available: false, biometryType: 'none' as const }),
-    authenticateWithBiometrics: async () => ({ success: false, error: 'Not available on web' }),
-    indexWorkout: async () => { },
-    removeWorkoutIndex: async () => { },
-    clearAllWorkoutIndexes: async () => { },
-    startAccelerometer: async () => { },
-    stopAccelerometer: async () => { },
-    isHealthKitAvailable: async () => ({ available: false }),
-    requestHealthKitPermission: async () => ({ granted: false, error: 'Not available on web' }),
-    saveWorkoutToHealth: async () => ({ saved: false, error: 'Not available on web' }),
-    getHealthSteps: async () => ({ steps: 0 }),
-    getHeartRate: async () => ({ bpm: 0, timestamp: 0 }),
-    getRestingHeartRate: async () => ({ bpm: 0, timestamp: 0 }),
-    getHRV: async () => ({ sdnn: 0, timestamp: 0 }),
-    getActiveCalories: async () => ({ calories: 0 }),
-    saveImageToPhotos: async () => ({ saved: false, error: 'Not available on web' }),
-    saveFileToPhotos: async () => ({ saved: false, error: 'Not available on web' }),
-  },
-})
+const webFallback: IronTracksNativePlugin = {
+  setIdleTimerDisabled: async () => { },
+  openAppSettings: async () => ({ ok: false }),
+  requestNotificationPermission: async () => ({ granted: false }),
+  checkNotificationPermission: async () => ({ status: 'notDetermined' }),
+  setupNotificationActions: async () => { },
+  scheduleRestTimer: async () => { },
+  cancelRestTimer: async () => { },
+  startRestLiveActivity: async () => { },
+  updateRestLiveActivity: async () => { },
+  endRestLiveActivity: async () => { },
+  endAllRestLiveActivities: async () => { },
+  scheduleAppNotification: async () => ({ id: '' }),
+  stopAlarmSound: async () => { },
+  triggerHaptic: async () => { },
+  checkBiometricsAvailable: async () => ({ available: false, biometryType: 'none' as const }),
+  authenticateWithBiometrics: async () => ({ success: false, error: 'Not available on web' }),
+  indexWorkout: async () => { },
+  removeWorkoutIndex: async () => { },
+  clearAllWorkoutIndexes: async () => { },
+  startAccelerometer: async () => { },
+  stopAccelerometer: async () => { },
+  isHealthKitAvailable: async () => ({ available: false }),
+  requestHealthKitPermission: async () => ({ granted: false, error: 'Not available on web' }),
+  saveWorkoutToHealth: async () => ({ saved: false, error: 'Not available on web' }),
+  getHealthSteps: async () => ({ steps: 0 }),
+  getHeartRate: async () => ({ bpm: 0, timestamp: 0 }),
+  getRestingHeartRate: async () => ({ bpm: 0, timestamp: 0 }),
+  getHRV: async () => ({ sdnn: 0, timestamp: 0 }),
+  getActiveCalories: async () => ({ calories: 0 }),
+  saveImageToPhotos: async () => ({ saved: false, error: 'Not available on web' }),
+  saveFileToPhotos: async () => ({ saved: false, error: 'Not available on web' }),
+}
+
+// ─── Register plugin ─────────────────────────────────────────────────────────
+// Wrapped in try/catch: on iOS, registerPlugin can throw synchronously if the
+// native bridge isn't ready yet, which would cause an unhandled rejection and
+// crash module initialisation. Falling back to webFallback keeps all callers safe.
+
+let Native: IronTracksNativePlugin
+try {
+  Native = registerPlugin<IronTracksNativePlugin>('IronTracksNative', {
+    web: webFallback,
+  })
+} catch {
+  Native = webFallback
+}
 
 // ─── Screen ──────────────────────────────────────────────────────────────────
 

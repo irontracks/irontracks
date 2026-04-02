@@ -512,24 +512,32 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
 
     const isHeaderVisible = view !== 'active' && view !== 'report';
 
+    // Mounted state: prevents the loading overlay from rendering on the server,
+    // which avoids a hydration mismatch caused by dynamic inline styles that
+    // differ between SSR and client (isAppLoading is always false on the server).
+    const [mounted, setMounted] = useState(false);
+    useEffect(() => { setMounted(true); }, []);
 
     return (
         <>
-            {/* Persistent loading overlay — always mounted, fades out via CSS.
-                Never unmounts so there's zero flicker between loading phases. */}
-            <div
-                aria-hidden
-                style={{
-                    position: 'fixed',
-                    inset: 0,
-                    zIndex: 9999,
-                    opacity: isAppLoading ? 1 : 0,
-                    pointerEvents: isAppLoading ? 'auto' : 'none',
-                    transition: isAppLoading ? 'none' : 'opacity 0.25s ease-out',
-                }}
-            >
-                <LoadingScreen />
-            </div>
+            {/* Persistent loading overlay — rendered only on the client to avoid
+                hydration mismatches from dynamic inline styles (isAppLoading).
+                Fades out via CSS once the app is ready. */}
+            {mounted && (
+                <div
+                    aria-hidden
+                    style={{
+                        position: 'fixed',
+                        inset: 0,
+                        zIndex: 9999,
+                        opacity: isAppLoading ? 1 : 0,
+                        pointerEvents: isAppLoading ? 'auto' : 'none',
+                        transition: isAppLoading ? 'none' : 'opacity 0.25s ease-out',
+                    }}
+                >
+                    <LoadingScreen />
+                </div>
+            )}
             {/* Biometric lock — shown on top of everything when app resumes from background */}
             {isLocked && user?.id ? (
                 <BiometricLock userName={userName} onUnlocked={unlock} />

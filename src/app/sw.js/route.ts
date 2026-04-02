@@ -2,12 +2,12 @@ import { NextResponse } from 'next/server'
 
 const getVersion = () => {
   const v =
-    process.env.NEXT_PUBLIC_APP_VERSION ||
-    process.env.VERCEL_GIT_COMMIT_SHA ||
-    process.env.VERCEL_DEPLOYMENT_ID ||
-    process.env.npm_package_version ||
-    'dev'
-  return String(v || 'dev')
+    process.env.NEXT_PUBLIC_APP_VERSION ??
+    process.env.VERCEL_GIT_COMMIT_SHA ??
+    process.env.VERCEL_DEPLOYMENT_ID ??
+    process.env.npm_package_version ??
+    'v1'
+  return String(v || 'v1')
 }
 
 export async function GET() {
