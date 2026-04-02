@@ -1,4 +1,5 @@
 import { getErrorMessage } from '@/utils/errorMessage'
+import { logWarn } from '@/lib/logger'
 export type Gender = 'MALE' | 'FEMALE'
 
 export type ActivityLevel = 'SEDENTARY' | 'LIGHT' | 'MODERATE' | 'VERY_ACTIVE' | 'EXTRA_ACTIVE'
@@ -194,7 +195,7 @@ export async function trackMeal(userId: string, meal: MealLog, dateKey?: string)
     if (upsertError) {
       // Non-fatal: entry was saved, daily log update failed
       // Log but don't throw — the entry is already persisted
-      console.warn('[nutrition] daily_nutrition_logs upsert failed:', upsertError.message)
+      logWarn('nutrition:engine', 'daily_nutrition_logs upsert failed', upsertError.message)
     }
 
     // Return shape matching what NutritionMixer expects

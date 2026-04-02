@@ -6,6 +6,7 @@ import { checkVipFeatureAccess, incrementVipUsage } from '@/utils/vip/limits'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { parseJsonBody } from '@/utils/zod'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { logInfo, logError } from '@/lib/logger'
 import { safePg } from '@/utils/safePgFilter'
 
 export const dynamic = 'force-dynamic'
@@ -263,11 +264,11 @@ export async function POST(req: Request) {
           const parsed = JSON.parse(cleaned)
           if (parsed?.title && Array.isArray(parsed?.exercises) && parsed.exercises.length > 0) {
             workout = parsed
-            console.log('[vip-coach] Workout extracted:', parsed.title, parsed.exercises.length, 'exercises')
+            logInfo('api:ai:vip-coach', 'Workout extracted', { title: parsed.title, exercises: parsed.exercises.length })
           }
         }
       } catch (extractErr) {
-        console.error('[vip-coach] Workout extraction failed:', extractErr)
+        logError('api:ai:vip-coach', extractErr)
       }
     }
 
