@@ -999,7 +999,6 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                     <ChatListScreen
                                         user={user as AdminUser}
                                         onClose={() => setView('dashboard')}
-                                        onSelectUser={() => { }}
                                         onSelectChannel={(c: unknown) => {
                                             const ch = isRecord(c) ? c : {}
                                             const channelId = String(ch.channel_id ?? ch.channelId ?? '')

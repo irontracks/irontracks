@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef } from 'react';
 import Image from 'next/image';
-import { Dumbbell, X, CheckCircle2, AlertCircle, Loader2, Mail, ArrowLeft, Lock, User, Phone, Calendar, ShieldAlert, Eye, EyeOff } from 'lucide-react';
+import { X, CheckCircle2, AlertCircle, Loader2, Mail, ArrowLeft, Lock, User, Phone, Calendar, ShieldAlert, Eye, EyeOff } from 'lucide-react';
 import LoadingScreen from '@/components/LoadingScreen';
 import { useNativeAppSetup } from '@/hooks/useNativeAppSetup'
 import { useLoginScreen } from '@/hooks/useLoginScreen'
@@ -100,7 +100,6 @@ const LoginScreen = () => {
         showRequestModal, setShowRequestModal,
         reqLoading, reqSuccess, setReqSuccess,
         reqError, formData, setFormData,
-        handleGoogleLogin,
         handleAppleLogin,
         handleEmailAuth,
         handleRequestSubmit,
@@ -112,7 +111,7 @@ const LoginScreen = () => {
     }
 
     return (
-        <div className="relative flex flex-col items-center justify-center h-[100dvh] overflow-hidden bg-neutral-950 text-white p-4">
+        <div className="relative flex flex-col items-center justify-center h-screen overflow-hidden bg-neutral-950 text-white p-4">
             {/* Subtle ambient glow */}
             <div className="absolute inset-0 pointer-events-none">
                 <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[600px] h-[400px] bg-amber-500/8 rounded-full blur-[100px]" />
@@ -241,9 +240,11 @@ const LoginScreen = () => {
                                     </div>
                                 </div>
                                 <div className="pt-2">
-                                    <label className="flex items-center gap-3 cursor-pointer group">
+                                    <label htmlFor="is-teacher-checkbox" className="flex items-center gap-3 cursor-pointer group">
                                         <div className="relative flex items-center justify-center w-5 h-5">
                                             <input
+                                                id="is-teacher-checkbox"
+                                                aria-label="Sou Personal Trainer / Professor"
                                                 type="checkbox"
                                                 checked={emailData.isTeacher}
                                                 onChange={(e) => setEmailData(prev => ({ ...prev, isTeacher: e.target.checked }))}
@@ -258,8 +259,9 @@ const LoginScreen = () => {
 
                                     {emailData.isTeacher && (
                                         <div className="mt-3 space-y-1 animate-in fade-in slide-in-from-top-2">
-                                            <label className="text-xs font-bold text-yellow-500 uppercase">Número do CREF</label>
+                                            <label htmlFor="cref-input" className="text-xs font-bold text-yellow-500 uppercase">Número do CREF</label>
                                             <input
+                                                id="cref-input"
                                                 required
                                                 name="cref"
                                                 aria-label="Número do CREF"
@@ -358,9 +360,11 @@ const LoginScreen = () => {
 
                         {authMode === 'login' && (
                             <div className="flex items-center px-1">
-                                <label className="flex items-center gap-2 cursor-pointer group">
+                                <label htmlFor="remember-me-checkbox" className="flex items-center gap-2 cursor-pointer group">
                                     <div className="relative flex items-center justify-center w-5 h-5">
                                         <input
+                                            id="remember-me-checkbox"
+                                            aria-label="Lembrar meu e-mail"
                                             type="checkbox"
                                             checked={rememberMe}
                                             onChange={(e) => setRememberMe(e.target.checked)}
@@ -580,8 +584,10 @@ const LoginScreen = () => {
                                     )}
 
                                     <div className="space-y-1">
-                                        <label className="text-xs font-bold text-neutral-400 uppercase">Nome Completo</label>
+                                        <label htmlFor="req-full-name" className="text-xs font-bold text-neutral-400 uppercase">Nome Completo</label>
                                         <input
+                                            id="req-full-name"
+                                            aria-label="Nome Completo"
                                             required
                                             name="full_name"
                                             value={formData.full_name}
@@ -592,8 +598,10 @@ const LoginScreen = () => {
                                     </div>
 
                                     <div className="space-y-1">
-                                        <label className="text-xs font-bold text-neutral-400 uppercase">E-mail</label>
+                                        <label htmlFor="req-email" className="text-xs font-bold text-neutral-400 uppercase">E-mail</label>
                                         <input
+                                            id="req-email"
+                                            aria-label="E-mail"
                                             required
                                             type="email"
                                             name="email"
@@ -606,8 +614,10 @@ const LoginScreen = () => {
 
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         <div className="space-y-1">
-                                            <label className="text-xs font-bold text-neutral-400 uppercase">Telefone</label>
+                                            <label htmlFor="req-phone" className="text-xs font-bold text-neutral-400 uppercase">Telefone</label>
                                             <input
+                                                id="req-phone"
+                                                aria-label="Telefone"
                                                 required
                                                 name="phone"
                                                 value={formData.phone}
@@ -617,8 +627,10 @@ const LoginScreen = () => {
                                             />
                                         </div>
                                         <div className="space-y-1">
-                                            <label className="text-xs font-bold text-neutral-400 uppercase">Nascimento</label>
+                                            <label htmlFor="req-birth-date" className="text-xs font-bold text-neutral-400 uppercase">Nascimento</label>
                                             <input
+                                                id="req-birth-date"
+                                                aria-label="Data de Nascimento"
                                                 required
                                                 type="date"
                                                 name="birth_date"
@@ -630,9 +642,11 @@ const LoginScreen = () => {
                                     </div>
 
                                     <div className="pt-2">
-                                        <label className="flex items-center gap-3 cursor-pointer group">
+                                        <label htmlFor="req-is-teacher-checkbox" className="flex items-center gap-3 cursor-pointer group">
                                             <div className="relative flex items-center justify-center w-5 h-5">
                                                 <input
+                                                    id="req-is-teacher-checkbox"
+                                                    aria-label="Sou Personal Trainer / Professor"
                                                     type="checkbox"
                                                     checked={formData.is_teacher}
                                                     onChange={(e) => setFormData(prev => ({ ...prev, is_teacher: e.target.checked }))}
@@ -647,8 +661,10 @@ const LoginScreen = () => {
 
                                         {formData.is_teacher && (
                                             <div className="mt-3 space-y-1 animate-in fade-in slide-in-from-top-2">
-                                                <label className="text-xs font-bold text-yellow-500 uppercase">Número do CREF</label>
+                                                <label htmlFor="req-cref-input" className="text-xs font-bold text-yellow-500 uppercase">Número do CREF</label>
                                                 <input
+                                                    id="req-cref-input"
+                                                    aria-label="Número do CREF"
                                                     required
                                                     name="cref"
                                                     value={formData.cref}

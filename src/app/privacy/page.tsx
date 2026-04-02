@@ -87,7 +87,7 @@ export default function PrivacyPolicy() {
   ]
 
   return (
-    <div className="min-h-[100dvh] bg-neutral-950 font-sans selection:bg-yellow-500/30">
+    <div className="min-h-screen bg-neutral-950 font-sans selection:bg-yellow-500/30">
       {/* HEADER SECTION */}
       <header className="sticky top-0 z-50 bg-neutral-950/80 backdrop-blur-xl border-b border-white/5 pt-safe-top">
         <div className="max-w-4xl mx-auto px-4 md:px-8 py-4 flex items-center justify-between">
