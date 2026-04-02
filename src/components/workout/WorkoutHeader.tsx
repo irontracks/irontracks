@@ -30,7 +30,7 @@ export default function WorkoutHeader() {
   return (
     <>
       <div
-        className="bg-neutral-950 border-b border-neutral-800 px-4 md:px-6 pb-3 flex-shrink-0"
+        className="bg-neutral-950 border-b border-neutral-800 px-4 md:px-6 pb-1.5 flex-shrink-0"
         style={{ paddingTop: 'env(safe-area-inset-top)' }}
       >
         <div className="max-w-6xl mx-auto flex items-center justify-between gap-3">
@@ -70,8 +70,11 @@ export default function WorkoutHeader() {
             </button>
           </div>
           <div className="min-w-0 flex-1">
-            <div className="font-black text-white truncate text-right">{String(workout?.title || 'Treino')}</div>
-            <div className="text-xs text-neutral-400 flex items-center justify-end gap-2 mt-1">
+            <div className="flex items-center justify-end gap-2">
+              <div className="font-black text-white truncate">{String(workout?.title || 'Treino')}</div>
+              <HeartRateMonitor />
+            </div>
+            <div className="text-xs text-neutral-400 flex items-center justify-end gap-2 mt-0.5">
               {/* Progress Ring SVG */}
               {totalSets > 0 && (() => {
                 const size = 28
@@ -143,11 +146,6 @@ export default function WorkoutHeader() {
           )}
         </div>
       )}
-
-      {/* Heart Rate from Apple Watch */}
-      <div className="px-4 py-1">
-        <HeartRateMonitor />
-      </div>
 
       <InviteManager
         isOpen={inviteOpen}
