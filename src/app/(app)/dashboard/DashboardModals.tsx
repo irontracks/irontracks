@@ -177,7 +177,7 @@ export default function DashboardModals(props: DashboardModalsProps) {
                 <div className="fixed inset-0 z-[85] bg-black/80 flex items-center justify-center p-4">
                     <div className="bg-neutral-900 p-6 rounded-2xl w-full max-w-sm border border-neutral-800">
                         <div className="flex items-center justify-between gap-3 mb-4">
-                            <h3 className="font-black text-white">Completar Perfil</h3>
+                            <h3 className="font-bold text-white">Completar Perfil</h3>
                             <button type="button" onClick={() => setShowCompleteProfile(false)} className="w-9 h-9 rounded-full bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center text-neutral-400 hover:text-white transition-colors" aria-label="Fechar"><X size={18} /></button>
                         </div>
                         <label className="block text-xs font-bold uppercase tracking-widest text-neutral-500 mb-2">Nome de Exibição</label>
@@ -268,8 +268,8 @@ export default function DashboardModals(props: DashboardModalsProps) {
                                             <Dumbbell size={18} className="text-yellow-400" />
                                         </div>
                                         <div className="min-w-0">
-                                            <div className="text-[10px] font-black uppercase tracking-[0.25em] text-yellow-500/70 leading-none mb-1">Treino</div>
-                                            <h3 className="font-black text-white text-lg leading-snug truncate">{title}</h3>
+                                            <div className="text-[10px] font-bold uppercase tracking-[0.25em] text-yellow-500/70 leading-none mb-1">Treino</div>
+                                            <h3 className="font-bold text-white text-lg leading-snug truncate">{title}</h3>
                                             <div className="flex items-center gap-2 mt-1">
                                                 <span className="text-[11px] font-bold text-neutral-500">{exCount} exercício{exCount !== 1 ? 's' : ''}</span>
                                             </div>
@@ -321,7 +321,7 @@ export default function DashboardModals(props: DashboardModalsProps) {
                                                             <span className="flex-shrink-0 w-5 h-5 rounded-md bg-yellow-500/15 border border-yellow-500/25 flex items-center justify-center text-[10px] font-black text-yellow-400 leading-none mt-0.5">
                                                                 {idx + 1}
                                                             </span>
-                                                            <h4 className="font-black text-white text-[13.5px] leading-snug">{String(ex?.name || '—')}</h4>
+                                                            <h4 className="font-bold text-white text-[13.5px] leading-snug">{String(ex?.name || '—')}</h4>
                                                         </div>
                                                         {sets > 0 && (
                                                             <div className="flex-shrink-0 px-2.5 py-1 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
@@ -570,8 +570,8 @@ export default function DashboardModals(props: DashboardModalsProps) {
                     <div className="bg-neutral-900 w-full max-w-md rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
                         <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
                             <div className="min-w-0">
-                                <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Check-in</div>
-                                <div className="text-white font-black text-lg truncate">Pré-treino</div>
+                                <div className="text-xs font-bold uppercase tracking-widest text-yellow-500">Check-in</div>
+                                <div className="text-white font-bold text-lg truncate">Pré-treino</div>
                                 <div className="text-xs text-neutral-400 truncate">{String(preCheckinWorkout?.title || preCheckinWorkout?.name || 'Treino')}</div>
                             </div>
                             <button
@@ -609,7 +609,7 @@ export default function DashboardModals(props: DashboardModalsProps) {
                                         <span className="text-green-400 text-sm">✓</span>
                                     </div>
                                     <div>
-                                        <p className="text-xs font-black text-green-300">Peso do perfil: {profileBodyWeightKg} kg</p>
+                                        <p className="text-xs font-semibold text-green-300">Peso do perfil: {profileBodyWeightKg} kg</p>
                                         <p className="text-[11px] text-green-400/60">Gasto calórico calculado automaticamente</p>
                                     </div>
                                 </div>

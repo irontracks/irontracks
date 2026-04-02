@@ -30,7 +30,7 @@ export default function WorkoutHeader() {
   return (
     <>
       <div
-        className="sticky top-0 z-40 bg-neutral-950 border-b border-neutral-800 px-4 md:px-6 pb-3"
+        className="bg-neutral-950 border-b border-neutral-800 px-4 md:px-6 pb-3 flex-shrink-0"
         style={{ paddingTop: 'env(safe-area-inset-top)' }}
       >
         <div className="max-w-6xl mx-auto flex items-center justify-between gap-3">

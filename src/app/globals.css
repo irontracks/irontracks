@@ -92,7 +92,7 @@
 }
 
 .pt-header-safe {
-  padding-top: 80px;
+  padding-top: calc(env(safe-area-inset-top) + 60px);
 }
 
 /* ── Premium global scrollbar (desktop only — iOS scroll breaks with custom scrollbar) ── */
@@ -194,8 +194,8 @@ button:active,
   animation: expandIn 0.25s ease-out;
 }
 @keyframes expandIn {
-  0%   { opacity: 0; max-height: 0; transform: translateY(-8px); }
-  100% { opacity: 1; max-height: 500px; transform: translateY(0); }
+  0%   { opacity: 0; transform: translateY(-6px); }
+  100% { opacity: 1; transform: translateY(0); }
 }
 
 /* Icon spin on action (refresh, sync) */

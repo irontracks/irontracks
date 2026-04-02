@@ -102,51 +102,55 @@ export default function ActiveWorkout(props: ActiveWorkoutProps) {
 
   return (
     <WorkoutProvider value={controller}>
-      <div className="fixed inset-0 z-[50] overflow-y-auto bg-neutral-900 text-white flex flex-col">
+      <div className="fixed inset-0 z-[50] flex flex-col bg-neutral-900 text-white animate-slide-up">
         <WorkoutHeader />
 
-        {/* Pause banner — shown when a partner paused the session */}
-        {inTeamSession && teamCtx.sessionPaused && (
-          <div className="bg-yellow-500/15 border-b border-yellow-500/30 px-4 py-2 flex items-center justify-between text-sm">
-            <span className="text-yellow-300 font-bold">⏸ Parceiro pausou o treino</span>
-            <button
-              onClick={() => teamCtx.resumeSession()}
-              className="text-[11px] font-black bg-yellow-500 text-black px-3 py-1 rounded-lg hover:bg-yellow-400 transition-colors"
-            >
-              Retomar
-            </button>
-          </div>
-        )}
-
-        {/* Workout edit sync banner — shown when a teammate edited the workout */}
-        {inTeamSession && pendingEdit && (
-          <div className="bg-blue-500/15 border-b border-blue-500/30 px-4 py-2.5 flex items-center justify-between gap-2 text-sm">
-            <div className="flex items-center gap-2 min-w-0">
-              <span className="text-lg">✏️</span>
-              <span className="text-blue-200 font-semibold truncate">
-                <strong className="text-blue-100">{pendingEdit.fromName}</strong> editou o treino
-              </span>
-            </div>
-            <div className="flex items-center gap-1.5 flex-shrink-0">
+        {/* Scrollable content — sits below the fixed header */}
+        <div className="flex-1 overflow-y-auto">
+          {/* Pause banner — shown when a partner paused the session */}
+          {inTeamSession && teamCtx.sessionPaused && (
+            <div className="bg-yellow-500/15 border-b border-yellow-500/30 px-4 py-2 flex items-center justify-between text-sm">
+              <span className="text-yellow-300 font-bold">⏸ Parceiro pausou o treino</span>
               <button
-                onClick={handleAcceptWorkoutEdit}
-                className="text-[11px] font-black bg-blue-500 text-white px-3 py-1.5 rounded-lg hover:bg-blue-400 transition-colors"
+                onClick={() => teamCtx.resumeSession()}
+                className="text-[11px] font-black bg-yellow-500 text-black px-3 py-1 rounded-lg hover:bg-yellow-400 transition-colors"
               >
-                Aceitar
-              </button>
-              <button
-                onClick={() => teamCtx.dismissWorkoutEdit()}
-                className="text-[11px] font-black bg-neutral-700 text-neutral-300 px-3 py-1.5 rounded-lg hover:bg-neutral-600 transition-colors"
-              >
-                Ignorar
+                Retomar
               </button>
             </div>
-          </div>
-        )}
+          )}
 
-        {/* GPS Cardio Tracking Panel */}
-        <CardioGPSPanel workoutId={props.session?.workout?.id} />
-        <ExerciseList />
+          {/* Workout edit sync banner — shown when a teammate edited the workout */}
+          {inTeamSession && pendingEdit && (
+            <div className="bg-blue-500/15 border-b border-blue-500/30 px-4 py-2.5 flex items-center justify-between gap-2 text-sm">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-lg">✏️</span>
+                <span className="text-blue-200 font-semibold truncate">
+                  <strong className="text-blue-100">{pendingEdit.fromName}</strong> editou o treino
+                </span>
+              </div>
+              <div className="flex items-center gap-1.5 flex-shrink-0">
+                <button
+                  onClick={handleAcceptWorkoutEdit}
+                  className="text-[11px] font-black bg-blue-500 text-white px-3 py-1.5 rounded-lg hover:bg-blue-400 transition-colors"
+                >
+                  Aceitar
+                </button>
+                <button
+                  onClick={() => teamCtx.dismissWorkoutEdit()}
+                  className="text-[11px] font-black bg-neutral-700 text-neutral-300 px-3 py-1.5 rounded-lg hover:bg-neutral-600 transition-colors"
+                >
+                  Ignorar
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* GPS Cardio Tracking Panel */}
+          <CardioGPSPanel workoutId={props.session?.workout?.id} />
+          <ExerciseList />
+        </div>
+
         <WorkoutFooter />
         <Modals />
 

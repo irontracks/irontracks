@@ -3,11 +3,12 @@
 import React, { useState, useCallback, useMemo } from 'react'
 import {
   User, Scale, Ruler, Calendar, Phone, MapPin, Building2, Dumbbell,
-  Activity, BarChart3, ChevronLeft, Save, Check, Flame
+  Activity, BarChart3, ChevronLeft, Save, Check, Flame, Zap, Heart, Trophy
 } from 'lucide-react'
 import { getProfileCompletenessScore } from '@/schemas/settings'
 import type { UserSettings } from '@/schemas/settings'
 import dynamic from 'next/dynamic'
+import { PremiumInput } from '@/components/ui/PremiumUI'
 const GymSettingsWrapper = dynamic(() => import('@/components/settings/GymSettingsWrapper'), { ssr: false })
 const ReferralSection = dynamic(() => import('@/components/settings/ReferralSection'), { ssr: false })
 
@@ -36,12 +37,12 @@ const fitnessLevelOptions: Array<{ value: FitnessLevel; label: string; desc: str
   { value: 'advanced', label: 'Avançado', desc: '3+ anos', color: 'from-orange-500/20 to-orange-600/5 border-orange-500/30 text-orange-400' },
 ]
 
-const fitnessGoalOptions: Array<{ value: FitnessGoal; label: string; icon: string }> = [
-  { value: 'hypertrophy', label: 'Hipertrofia', icon: '💪' },
-  { value: 'weight_loss', label: 'Emagrecimento', icon: '🔥' },
-  { value: 'strength', label: 'Força', icon: '🏋️' },
-  { value: 'performance', label: 'Performance', icon: '⚡' },
-  { value: 'health', label: 'Saúde', icon: '❤️' },
+const fitnessGoalOptions: Array<{ value: FitnessGoal; label: string; icon: React.ReactNode }> = [
+  { value: 'hypertrophy', label: 'Hipertrofia', icon: <Dumbbell size={18} /> },
+  { value: 'weight_loss', label: 'Emagrecimento', icon: <Flame size={18} /> },
+  { value: 'strength', label: 'Força', icon: <Trophy size={18} /> },
+  { value: 'performance', label: 'Performance', icon: <Zap size={18} /> },
+  { value: 'health', label: 'Saúde', icon: <Heart size={18} /> },
 ]
 
 const weekDayOptions = [1, 2, 3, 4, 5, 6, 7]
@@ -55,7 +56,7 @@ function SectionTitle({ icon: Icon, title, subtitle }: { icon: React.ElementType
         <Icon size={16} className="text-yellow-400" />
       </div>
       <div>
-        <p className="text-sm font-black text-white leading-none">{title}</p>
+        <p className="text-sm font-bold text-white leading-none">{title}</p>
         {subtitle && <p className="text-xs text-neutral-500 mt-0.5">{subtitle}</p>}
       </div>
     </div>
@@ -65,27 +66,9 @@ function SectionTitle({ icon: Icon, title, subtitle }: { icon: React.ElementType
 function FieldLabel({ label, hint }: { label: string; hint?: string }) {
   return (
     <div className="mb-1.5">
-      <label className="text-xs font-black uppercase tracking-widest text-neutral-500">{label}</label>
+      <label className="text-xs font-semibold uppercase tracking-widest text-neutral-500">{label}</label>
       {hint && <p className="text-[10px] text-yellow-500/60 mt-0.5">{hint}</p>}
     </div>
-  )
-}
-
-function TextInput({
-  value, onChange, placeholder, type = 'text', step, label
-}: {
-  value: string; onChange: (v: string) => void; placeholder?: string; type?: string; step?: string; label?: string
-}) {
-  return (
-    <input
-      type={type}
-      step={step}
-      value={value}
-      aria-label={label || placeholder}
-      onChange={e => onChange(e.target.value)}
-      placeholder={placeholder}
-      className="w-full bg-neutral-800/80 border border-neutral-700/60 rounded-xl px-4 py-3 text-white text-sm placeholder-neutral-600 focus:outline-none focus:border-yellow-500/60 transition-colors"
-    />
   )
 }
 
@@ -311,11 +294,11 @@ export default function ProfilePage({ settings, displayName, onSave, onBack }: P
             <div className="grid grid-cols-2 gap-3 mb-3">
               <div>
                 <FieldLabel label="Cidade" />
-                <TextInput value={draft.city ?? ''} onChange={v => set('city', v)} placeholder="São Paulo" />
+                <PremiumInput value={draft.city ?? ''} onChange={v => set('city', v)} placeholder="São Paulo" />
               </div>
               <div>
                 <FieldLabel label="Estado" />
-                <TextInput value={draft.state ?? ''} onChange={v => set('state', v)} placeholder="SP" />
+                <PremiumInput value={draft.state ?? ''} onChange={v => set('state', v)} placeholder="SP" />
               </div>
             </div>
 
@@ -408,7 +391,7 @@ export default function ProfilePage({ settings, displayName, onSave, onBack }: P
                       ? 'bg-yellow-500/15 border-yellow-500/40 text-yellow-300 font-black'
                       : 'bg-neutral-800/40 border-neutral-700/40 text-neutral-500 hover:border-neutral-600'}`}
                   >
-                    <span className="text-xl">{opt.icon}</span>
+                    <span className="text-yellow-500/80">{opt.icon}</span>
                     <span className="text-[11px] leading-tight text-center">{opt.label}</span>
                   </button>
                 ))}
