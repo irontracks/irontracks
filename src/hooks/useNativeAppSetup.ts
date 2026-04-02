@@ -34,7 +34,7 @@ export function useNativeAppSetup(userId?: string | null) {
 
     // Request permission — shows iOS system dialog on first call
     requestNativeNotifications()
-      .then((res) => {
+      .then(() => {
         if (typeof window !== 'undefined') {
           localStorage.setItem(storageKey, '1')
         }
