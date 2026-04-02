@@ -29,9 +29,8 @@ interface UseExerciseEditorLogicParams {
 export function useExerciseEditorLogic({
     workout,
     onSave, onCancel, onChange, onSaved,
-    saving, setSaving,
+    setSaving,
     setScannerLoading, setScannerError,
-    fileInputRef, scannerFileInputRef,
     normalizeMethod, buildDefaultSetDetail, ensureSetDetails,
 }: UseExerciseEditorLogicParams) {
     const { confirm, alert, closeDialog, showLoading } = useDialog()
@@ -327,7 +326,7 @@ export function useExerciseEditorLogic({
             if (typeof closeDialog === 'function') closeDialog()
             setSaving(false)
         }
-    }, [workout, onSave, onSaved, saving, setSaving, alert, showLoading, closeDialog])
+    }, [workout, onSave, onSaved, setSaving, alert, showLoading, closeDialog])
 
     return {
         getExerciseType,
