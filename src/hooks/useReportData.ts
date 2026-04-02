@@ -14,8 +14,6 @@ import { logWarn } from '@/lib/logger'
 import { useRef, useState, useEffect, useMemo } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { getKcalEstimate } from '@/utils/calories/kcalClient'
-import { parseJsonWithSchema } from '@/utils/zod'
-import { z } from 'zod'
 import { normalizeExerciseKey, calculateTotalVolume } from '@/utils/report/formatters'
 import { estimateCaloriesMet, getBodyweightFraction, DEFAULT_BODY_WEIGHT_KG } from '@/utils/calories/metEstimate'
 import { useCheckins } from './useCheckins'
@@ -33,56 +31,6 @@ export {
 // ─── Helpers (pure, no hooks) ────────────────────────────────────────────────
 
 type AnyObj = Record<string, unknown>
-
-const parseSessionNotes = (notes: unknown): AnyObj | null => {
-  try {
-    if (typeof notes === 'string') {
-      const trimmed = notes.trim()
-      if (!trimmed) return null
-      return parseJsonWithSchema(trimmed, z.record(z.unknown()))
-    }
-    if (notes && typeof notes === 'object') return notes as AnyObj
-    return null
-  } catch { return null }
-}
-
-const toDateMs = (v: unknown): number | null => {
-  try {
-    if (!v) return null
-    const vObj = v && typeof v === 'object' ? (v as AnyObj) : null
-    if (vObj?.toDate && typeof vObj.toDate === 'function') {
-      const d = (vObj.toDate as () => unknown)()
-      const ms = d instanceof Date ? d.getTime() : new Date(d as string | number | Date).getTime()
-      return Number.isFinite(ms) ? ms : null
-    }
-    if (v instanceof Date) {
-      const ms = v.getTime()
-      return Number.isFinite(ms) ? ms : null
-    }
-    if (vObj) {
-      const seconds = Number(vObj?.seconds ?? vObj?._seconds ?? vObj?.sec ?? null)
-      const nanos = Number(vObj?.nanoseconds ?? vObj?._nanoseconds ?? 0)
-      if (Number.isFinite(seconds) && seconds > 0) {
-        const ms = seconds * 1000 + Math.floor(nanos / 1e6)
-        return Number.isFinite(ms) ? ms : null
-      }
-    }
-    const ms = new Date(v as string | number | Date).getTime()
-    return Number.isFinite(ms) ? ms : null
-  } catch { return null }
-}
-
-const normalizeTitleKey = (v: unknown): string => {
-  try { return String(v || '').trim().toLowerCase() } catch { return '' }
-}
-
-const computeMatchKey = (s: unknown): { originId: string | null; titleKey: string } => {
-  if (!s || typeof s !== 'object') return { originId: null, titleKey: '' }
-  const obj = s as AnyObj
-  const originId = obj?.originWorkoutId ?? obj?.workoutId ?? null
-  const titleKey = normalizeTitleKey(obj?.workoutTitle ?? obj?.name ?? '')
-  return { originId: originId ? String(originId) : null, titleKey }
-}
 
 
 
@@ -303,7 +251,10 @@ export const useReportData = ({ session, previousSession, user, settings }: UseR
     return previousSession
   })()
 
-  const sessionLogs: Record<string, unknown> = safeSession?.logs && typeof safeSession.logs === 'object' ? (safeSession.logs as Record<string, unknown>) : {}
+  const sessionLogs: Record<string, unknown> = useMemo(
+    () => safeSession?.logs && typeof safeSession.logs === 'object' ? (safeSession.logs as Record<string, unknown>) : {},
+    [safeSession?.logs]
+  )
   const prevSessionLogs: Record<string, unknown> = effectivePreviousSession?.logs && typeof effectivePreviousSession.logs === 'object' ? (effectivePreviousSession.logs as Record<string, unknown>) : {}
   const currentVolume = calculateTotalVolume(sessionLogs)
   const prevVolume = effectivePreviousSession ? calculateTotalVolume(prevSessionLogs) : 0
@@ -433,7 +384,7 @@ export const useReportData = ({ session, previousSession, user, settings }: UseR
       Number(safeSession?.startedAt ?? safeSession?.started_at ?? 0) || null,
       cadenceNames && cadenceNames.length > 0 ? cadenceNames : null,
     )
-  }, [sessionLogs, durationInMinutes, checkinBodyWeightKg, sessionExerciseNames, exerciseVolumes, postCheckinRpe, outdoorBike, safeSession?.executionTotalSeconds, safeSession?.restTotalSeconds, safeSession?.totalTime, safeSession?.startedAt, safeSession?.started_at, settings?.biologicalSex, settings?.bodyWeightKg, safeSession?.exercises])
+  }, [sessionLogs, durationInMinutes, checkinBodyWeightKg, sessionExerciseNames, exerciseVolumes, postCheckinRpe, outdoorBike, safeSession?.executionTotalSeconds, safeSession?.execution_total_seconds, safeSession?.restTotalSeconds, safeSession?.rest_total_seconds, safeSession?.startedAt, safeSession?.started_at, settings?.biologicalSex, safeSession?.exercises])
 
 
   const reportMeta = safeSession?.reportMeta && typeof safeSession.reportMeta === 'object' ? (safeSession.reportMeta as AnyObj) : null
