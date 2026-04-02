@@ -30,7 +30,7 @@ export default function WorkoutHeader() {
   return (
     <>
       <div
-        className="bg-neutral-950 border-b border-neutral-800 px-4 md:px-6 pb-1.5 flex-shrink-0 relative"
+        className="bg-neutral-950 border-b border-neutral-800 px-4 md:px-6 pb-1 flex-shrink-0 relative"
         style={{ paddingTop: 'max(env(safe-area-inset-top), 0px)' }}
       >
         {/* Preenche a área do status bar com a mesma cor, sem faixa transparente */}
@@ -44,7 +44,7 @@ export default function WorkoutHeader() {
             <button
               type="button"
               onClick={() => setAddExerciseOpen(true)}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-yellow-500 text-black hover:bg-yellow-400 transition-colors active:scale-95"
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-yellow-500 text-black hover:bg-yellow-400 transition-colors active:scale-95"
               title="Adicionar exercício extra"
             >
               <Plus size={16} />
@@ -56,8 +56,8 @@ export default function WorkoutHeader() {
               disabled={exercises.length < 2}
               className={
                 exercises.length < 2
-                  ? 'inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-800 text-neutral-700'
-                  : 'inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-800 text-yellow-500 hover:text-yellow-400 hover:bg-neutral-800 transition-colors active:scale-95'
+                  ? 'inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-neutral-900 border border-neutral-800 text-neutral-700'
+                  : 'inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-neutral-900 border border-neutral-800 text-yellow-500 hover:text-yellow-400 hover:bg-neutral-800 transition-colors active:scale-95'
               }
               title="Organizar exercícios"
             >
@@ -67,7 +67,7 @@ export default function WorkoutHeader() {
             <button
               type="button"
               onClick={() => setInviteOpen(true)}
-              className="inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-800 text-yellow-500 hover:text-yellow-400 hover:bg-neutral-800 transition-colors active:scale-95"
+              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-neutral-900 border border-neutral-800 text-yellow-500 hover:text-yellow-400 hover:bg-neutral-800 transition-colors active:scale-95"
               title="Convidar para treinar junto"
             >
               <UserPlus size={16} />
