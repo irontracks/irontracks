@@ -105,7 +105,7 @@ export function SectionHeader({
             {label && (
                 <GoldBadge className="mb-2">{label}</GoldBadge>
             )}
-            <div className="text-white font-black text-xl leading-tight flex items-center gap-2">
+            <div className="text-white font-bold text-xl leading-tight flex items-center gap-2">
                 {icon && <span className="text-yellow-500 flex-shrink-0">{icon}</span>}
                 {title}
             </div>
@@ -198,6 +198,7 @@ export function PremiumToggle({
     return (
         <button
             type="button"
+            aria-label="Toggle"
             onClick={() => !disabled && onChange(!value)}
             disabled={disabled}
             className={`relative flex-shrink-0 w-12 h-6 rounded-full transition-all duration-300 ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}
@@ -256,10 +257,12 @@ export function ModalOverlay({
 }) {
     return (
         <div
-            className={`fixed inset-0 z-[1200] flex p-4 pt-safe ${position === 'bottom' ? 'items-end' : 'items-center'
+            role="presentation"
+            className={`fixed inset-0 z-[1200] flex p-4 ${position === 'bottom' ? 'items-end pb-safe' : 'items-center'
                 } justify-center ${className}`}
             style={{ background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(16px)' }}
             onClick={(e) => { if (e.target === e.currentTarget) onClose?.() }}
+            onKeyDown={(e) => { if (e.key === 'Escape') onClose?.() }}
         >
             {children}
         </div>
@@ -309,7 +312,7 @@ export function ModalHeader({
         >
             <div className="min-w-0">
                 {label && <GoldBadge className="mb-2">{label}</GoldBadge>}
-                <div className="text-white font-black text-lg flex items-center gap-2">
+                <div className="text-white font-bold text-lg flex items-center gap-2">
                     {icon && <span className="text-yellow-500">{icon}</span>}
                     {title}
                 </div>
@@ -400,6 +403,7 @@ export function PremiumInput({
                     value={value}
                     onChange={(e) => onChange(e.target.value)}
                     placeholder={placeholder}
+                    aria-label={label ?? placeholder ?? 'input'}
                     disabled={disabled}
                     className="bg-transparent outline-none text-sm text-white flex-1 placeholder-neutral-600 disabled:opacity-50"
                 />

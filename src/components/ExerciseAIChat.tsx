@@ -118,7 +118,7 @@ export function ExerciseAIChat({ context }: ExerciseAIChatProps) {
       <button
         type="button"
         onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleOpen() }}
-        className="h-9 w-9 inline-flex items-center justify-center rounded-xl bg-gradient-to-br from-violet-600/80 to-purple-700/80 border border-violet-500/40 text-white hover:from-violet-500 hover:to-purple-600 transition-all active:scale-95 flex-shrink-0 shadow-md shadow-violet-900/30"
+        className="h-9 w-9 inline-flex items-center justify-center rounded-xl bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 hover:bg-yellow-500/20 transition-all active:scale-95 flex-shrink-0"
         title="Coach IA — tire dúvidas sobre este exercício"
         aria-label="Abrir chat com IA sobre este exercício"
       >
@@ -128,16 +128,20 @@ export function ExerciseAIChat({ context }: ExerciseAIChatProps) {
       {/* ── Drawer rendered via portal to document.body — avoids event bubbling to ExerciseCard ── */}
       {mounted && open && createPortal(
         <div
+          role="presentation"
           className="fixed inset-0 z-[80] flex items-end"
-          onClick={() => setOpen(false)}
+          onClick={(e) => { if (e.target === e.currentTarget) setOpen(false) }}
+          onKeyDown={(e) => { if (e.key === 'Escape') setOpen(false) }}
         >
           {/* Backdrop */}
           <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" />
 
           {/* Sheet — stopPropagation so backdrop click doesn't close when clicking inside */}
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Coach IA"
             className="relative w-full max-h-[80vh] flex flex-col rounded-t-3xl bg-neutral-950 border-t border-l border-r border-neutral-800 shadow-2xl overflow-hidden"
-            onClick={e => e.stopPropagation()}
           >
             {/* Handle bar */}
             <div className="flex justify-center pt-3 pb-1">
@@ -147,12 +151,12 @@ export function ExerciseAIChat({ context }: ExerciseAIChatProps) {
             {/* Header */}
             <div className="flex items-center justify-between px-4 py-3 border-b border-neutral-800/80">
               <div className="flex items-center gap-2.5 min-w-0">
-                <div className="w-7 h-7 rounded-xl bg-gradient-to-br from-violet-600 to-purple-700 flex items-center justify-center shrink-0">
-                  <Sparkles size={13} className="text-white" />
+                <div className="w-7 h-7 rounded-xl bg-yellow-500/15 border border-yellow-500/30 flex items-center justify-center shrink-0">
+                  <Sparkles size={13} className="text-yellow-400" />
                 </div>
                 <div className="min-w-0">
                   <p className="text-xs font-black text-white leading-tight">Coach IA</p>
-                  <p className="text-[10px] text-violet-400 truncate font-medium">{context.exerciseName}</p>
+                  <p className="text-[10px] text-yellow-500/60 truncate font-medium">{context.exerciseName}</p>
                 </div>
               </div>
               <button
@@ -172,8 +176,8 @@ export function ExerciseAIChat({ context }: ExerciseAIChatProps) {
                   className={`flex gap-2 items-end ${msg.role === 'user' ? 'flex-row-reverse' : 'flex-row'}`}
                 >
                   {msg.role === 'assistant' && (
-                    <div className="w-6 h-6 rounded-full bg-gradient-to-br from-violet-600 to-purple-700 flex items-center justify-center shrink-0 mb-0.5">
-                      <Zap size={10} className="text-white" />
+                    <div className="w-6 h-6 rounded-full bg-yellow-500/15 border border-yellow-500/25 flex items-center justify-center shrink-0 mb-0.5">
+                      <Zap size={10} className="text-yellow-400" />
                     </div>
                   )}
                   <div className={[
@@ -190,7 +194,7 @@ export function ExerciseAIChat({ context }: ExerciseAIChatProps) {
               {loading && (
                 <div className="flex gap-2 items-end">
                   <div className="w-6 h-6 rounded-full bg-gradient-to-br from-violet-600 to-purple-700 flex items-center justify-center shrink-0">
-                    <Zap size={10} className="text-white" />
+                    <Zap size={10} className="text-yellow-400" />
                   </div>
                   <div className="bg-neutral-800 border border-neutral-700/60 rounded-2xl rounded-bl-sm px-3 py-2.5 flex items-center gap-1.5">
                     <Loader2 size={12} className="text-violet-400 animate-spin" />
@@ -217,7 +221,7 @@ export function ExerciseAIChat({ context }: ExerciseAIChatProps) {
                     key={q}
                     type="button"
                     onClick={() => sendMessage(q)}
-                    className="text-[10px] font-medium px-2.5 py-1 rounded-full bg-violet-500/15 border border-violet-500/30 text-violet-300 hover:bg-violet-500/25 transition-colors active:scale-95"
+                    className="text-[10px] font-medium px-2.5 py-1 rounded-full bg-yellow-500/10 border border-yellow-500/25 text-yellow-400 hover:bg-yellow-500/20 transition-colors active:scale-95"
                   >
                     {q}
                   </button>
@@ -233,16 +237,17 @@ export function ExerciseAIChat({ context }: ExerciseAIChatProps) {
                 onChange={e => setInput(e.target.value)}
                 onKeyDown={handleKeyDown}
                 placeholder="Pergunte algo sobre este exercício…"
+                aria-label="Mensagem para o Coach IA"
                 maxLength={300}
                 disabled={loading}
                 autoComplete="off"
-                className="flex-1 bg-neutral-800 text-white text-xs rounded-xl px-3 py-2.5 outline-none placeholder:text-neutral-500 border border-neutral-700 focus:border-violet-500/50 transition-colors disabled:opacity-50"
+                className="flex-1 bg-neutral-800 text-white text-xs rounded-xl px-3 py-2.5 outline-none placeholder:text-neutral-500 border border-neutral-700 focus:border-yellow-500/40 transition-colors disabled:opacity-50"
               />
               <button
                 type="button"
                 onClick={() => sendMessage(input)}
                 disabled={!input.trim() || loading}
-                className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-600 to-purple-700 text-white flex items-center justify-center disabled:opacity-30 hover:from-violet-500 hover:to-purple-600 transition-all active:scale-95 shadow-md shadow-violet-900/30"
+                className="w-9 h-9 rounded-xl bg-yellow-500 text-black flex items-center justify-center disabled:opacity-30 hover:bg-yellow-400 transition-all active:scale-95"
               >
                 {loading ? <Loader2 size={14} className="animate-spin" /> : <Send size={13} />}
               </button>

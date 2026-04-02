@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { parseTrainingNumber } from '@/utils/trainingNumber';
 import { Check, MessageSquare } from 'lucide-react';
+import { triggerHaptic } from '@/utils/native/irontracksNative';
 import { useWorkoutContext } from '../WorkoutContext';
 import {
   isObject,
@@ -149,6 +150,8 @@ export const NormalSet = ({
       executionSeconds: nextDone ? executionSeconds : null,
       advanced_config:  cfg ?? log.advanced_config ?? null,
     });
+
+    if (nextDone) triggerHaptic('success').catch(() => {});
 
     if (nextDone && restTime && restTime > 0) {
       const nextPlanned = getPlannedSet(ex, setIdx + 1);

@@ -14,8 +14,8 @@ export const MuscleTrendPanel = ({ data, muscleById, series, buildSparklinePoint
     <div className="mb-8 p-4 rounded-xl border border-neutral-800 bg-neutral-900/60">
       <div className="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
         <div className="min-w-0">
-          <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Tendência semanal por músculo</div>
-          <div className="text-lg font-black text-white">Comparativo semanal</div>
+          <div className="text-xs font-bold uppercase tracking-widest text-neutral-400">Tendência semanal por músculo</div>
+          <div className="text-lg font-bold text-white">Comparativo semanal</div>
           <div className="text-xs text-neutral-300">
             {hasSparklines ? 'Top músculos da semana vs anterior + histórico 4 semanas.' : 'Top músculos da semana vs semana anterior.'}
           </div>
@@ -55,6 +55,7 @@ export const MuscleTrendPanel = ({ data, muscleById, series, buildSparklinePoint
                       <td className="px-3 py-2 text-right">
                         {sparkPoints ? (
                           <svg width="80" height="20" viewBox="0 0 80 20" className="inline-block">
+                            <polygon fill="#eab308" fillOpacity="0.10" points={`0,20 ${sparkPoints} 80,20`} />
                             <polyline fill="none" stroke="#eab308" strokeWidth="2" points={sparkPoints} />
                           </svg>
                         ) : (

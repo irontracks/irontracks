@@ -20,7 +20,7 @@ import { queueFinishWorkout, isOnline } from '@/lib/offline/offlineSync'
 import { buildFinishWorkoutPayload } from '@/lib/finishWorkoutPayload'
 import { saveFinishBackup, clearFinishBackup } from '@/lib/workoutSafetyNet'
 import { logWarn } from '@/lib/logger'
-import { endAllRestLiveActivities } from '@/utils/native/irontracksNative'
+import { endAllRestLiveActivities, triggerHaptic } from '@/utils/native/irontracksNative'
 
 interface UseWorkoutFinishProps {
   session: WorkoutSession | null
@@ -206,6 +206,7 @@ export function useWorkoutFinish(props: UseWorkoutFinishProps) {
 
       // Ensure any active rest timer Live Activity is cleared when workout ends
       endAllRestLiveActivities().catch(() => { })
+      triggerHaptic('heavy').catch(() => { })
 
       try {
         if (typeof props?.onFinish === 'function') {
