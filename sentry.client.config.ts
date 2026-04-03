@@ -18,4 +18,24 @@ Sentry.init({
   integrations: [
     Sentry.replayIntegration(),
   ],
+
+  // Filtra erros esperados que não representam bugs reais
+  beforeSend(event, hint) {
+    const err = hint?.originalException
+    const name = (err instanceof Error || (err && typeof err === 'object'))
+      ? (err as { name?: string }).name
+      : null
+    const message = err instanceof Error
+      ? err.message
+      : typeof err === 'string' ? err : ''
+
+    // AbortError: navegação/desmontagem de componente cancela fetches em andamento.
+    // Comportamento esperado — não é bug acionável.
+    if (name === 'AbortError') return null
+    if (typeof message === 'string' && message.toLowerCase().includes('abortederror')) return null
+    if (typeof message === 'string' && message.toLowerCase().includes('the operation was aborted')) return null
+    if (typeof message === 'string' && message.toLowerCase().includes('signal is aborted')) return null
+
+    return event
+  },
 })
