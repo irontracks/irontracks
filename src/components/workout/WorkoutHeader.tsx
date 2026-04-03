@@ -1,7 +1,8 @@
 'use client';
 
 import React from 'react';
-import { Clock, GripVertical, Plus, UserPlus } from 'lucide-react';
+import { AnimatePresence, motion } from 'framer-motion';
+import { Clock, GripVertical, MoreHorizontal, Plus, UserPlus } from 'lucide-react';
 import { BackButton } from '@/components/ui/BackButton';
 import InviteManager from '@/components/InviteManager';
 import { useWorkoutContext } from './WorkoutContext';
@@ -22,10 +23,32 @@ export default function WorkoutHeader() {
     completedSets,
     totalSets,
     progressPct,
+    session,
+    ticker,
   } = useWorkoutContext();
 
-  // Helper function extracted from ActiveWorkout_OLD
-  const isObject = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
+  const exitOnBack = (useWorkoutContext() as unknown as { _exitOnBack?: () => void })._exitOnBack;
+
+  // Detect if a set is actively being executed — collapse action buttons to reduce distraction
+  const isRecord = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
+  const ui = isRecord(session?.ui) ? (session?.ui as Record<string, unknown>) : null;
+  const activeExec = ui && isRecord(ui.activeExecution) ? (ui.activeExecution as Record<string, unknown>) : null;
+  const startedAtMs = activeExec ? Number(activeExec.startedAtMs) : 0;
+  const isExecuting = Number.isFinite(startedAtMs) && startedAtMs > 0 && ticker > startedAtMs;
+
+  const [overflowOpen, setOverflowOpen] = React.useState(false);
+  const overflowRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    if (!overflowOpen) return;
+    const handler = (e: MouseEvent) => {
+      if (overflowRef.current && !overflowRef.current.contains(e.target as Node)) {
+        setOverflowOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [overflowOpen]);
 
   return (
     <>
@@ -33,47 +56,81 @@ export default function WorkoutHeader() {
         className="bg-neutral-950 border-b border-neutral-800 px-4 md:px-6 pb-1 flex-shrink-0 relative"
         style={{ paddingTop: 'max(env(safe-area-inset-top), 0px)' }}
       >
-        {/* Preenche a área do status bar com a mesma cor, sem faixa transparente */}
+        {/* Fills status bar area with same color — no transparent strip */}
         <div
           className="absolute left-0 right-0 top-0 bg-neutral-950"
           style={{ height: 'env(safe-area-inset-top)' }}
         />
         <div className="max-w-6xl mx-auto flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
-            <BackButton />
-            <button
-              type="button"
-              onClick={() => setAddExerciseOpen(true)}
-              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-yellow-500 text-black hover:bg-yellow-400 transition-colors active:scale-95"
-              title="Adicionar exercício extra"
-            >
-              <Plus size={16} />
-              <span className="text-sm font-black hidden sm:inline">Exercício</span>
-            </button>
-            <button
-              type="button"
-              onClick={openOrganizeModal}
-              disabled={exercises.length < 2}
-              className={
-                exercises.length < 2
-                  ? 'inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-neutral-900 border border-neutral-800 text-neutral-700'
-                  : 'inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-neutral-900 border border-neutral-800 text-yellow-500 hover:text-yellow-400 hover:bg-neutral-800 transition-colors active:scale-95'
-              }
-              title="Organizar exercícios"
-            >
-              <GripVertical size={16} />
-              <span className="text-sm font-black hidden sm:inline">Organizar</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => setInviteOpen(true)}
-              className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-neutral-900 border border-neutral-800 text-yellow-500 hover:text-yellow-400 hover:bg-neutral-800 transition-colors active:scale-95"
-              title="Convidar para treinar junto"
-            >
-              <UserPlus size={16} />
-              <span className="text-sm font-black hidden sm:inline">Convidar</span>
-            </button>
+            <BackButton onClick={exitOnBack} />
+
+            {/* Action buttons — hidden during active set execution to reduce distraction */}
+            <AnimatePresence initial={false}>
+              {!isExecuting && (
+                <motion.div
+                  className="flex items-center gap-2"
+                  initial={{ opacity: 0, width: 0 }}
+                  animate={{ opacity: 1, width: 'auto' }}
+                  exit={{ opacity: 0, width: 0 }}
+                  transition={{ duration: 0.2, ease: 'easeInOut' }}
+                  style={{ overflow: 'hidden' }}
+                >
+                  {/* Primary action — always first */}
+                  <button
+                    type="button"
+                    onClick={() => setAddExerciseOpen(true)}
+                    className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-yellow-500 text-black hover:bg-yellow-400 transition-colors active:scale-95 whitespace-nowrap"
+                    title="Adicionar exercício extra"
+                  >
+                    <Plus size={16} />
+                    <span className="text-sm font-black hidden sm:inline">Exercício</span>
+                  </button>
+
+                  {/* Overflow menu — secondary actions */}
+                  <div className="relative" ref={overflowRef}>
+                    <button
+                      type="button"
+                      onClick={() => setOverflowOpen(v => !v)}
+                      className="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-neutral-900 border border-neutral-800 text-neutral-400 hover:text-yellow-400 hover:border-yellow-500/30 hover:bg-neutral-800 transition-colors active:scale-95"
+                      title="Mais opções"
+                    >
+                      <MoreHorizontal size={16} />
+                    </button>
+
+                    {overflowOpen && (
+                      <div className="absolute top-full left-0 mt-1.5 w-48 rounded-2xl bg-neutral-900 border border-neutral-800 shadow-2xl z-10 overflow-hidden animate-dropdown-in">
+                        <button
+                          type="button"
+                          onClick={() => { openOrganizeModal(); setOverflowOpen(false); }}
+                          disabled={exercises.length < 2}
+                          className={[
+                            'w-full flex items-center gap-3 px-4 py-3 text-sm font-black text-left transition-colors',
+                            exercises.length < 2
+                              ? 'text-neutral-700 cursor-not-allowed'
+                              : 'text-yellow-400 hover:bg-neutral-800',
+                          ].join(' ')}
+                        >
+                          <GripVertical size={15} />
+                          Organizar
+                        </button>
+                        <div className="h-px bg-neutral-800" />
+                        <button
+                          type="button"
+                          onClick={() => { setInviteOpen(true); setOverflowOpen(false); }}
+                          className="w-full flex items-center gap-3 px-4 py-3 text-sm font-black text-left text-yellow-400 hover:bg-neutral-800 transition-colors"
+                        >
+                          <UserPlus size={15} />
+                          Convidar
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
+
           <div className="min-w-0 flex-1">
             <div className="flex items-center justify-end gap-2">
               <div className="font-black text-white truncate">{String(workout?.title || 'Treino')}</div>
@@ -82,15 +139,14 @@ export default function WorkoutHeader() {
             <div className="text-xs text-neutral-400 flex items-center justify-end gap-2 mt-0.5">
               {/* Progress Ring SVG */}
               {totalSets > 0 && (() => {
-                const size = 28
-                const stroke = 3
-                const radius = (size - stroke) / 2
-                const circumference = 2 * Math.PI * radius
-                const offset = circumference - (progressPct / 100) * circumference
-                const ringColor = progressPct >= 90 ? '#10b981' : progressPct >= 50 ? '#f59e0b' : '#d97706'
+                const size = 32;
+                const stroke = 3.5;
+                const radius = (size - stroke) / 2;
+                const circumference = 2 * Math.PI * radius;
+                const offset = circumference - (progressPct / 100) * circumference;
+                const ringColor = progressPct >= 90 ? '#10b981' : progressPct >= 50 ? '#f59e0b' : '#d97706';
                 return (
                   <div className="relative flex-shrink-0" style={{ width: size, height: size }}>
-                    {/* Track */}
                     <svg width={size} height={size} className="rotate-[-90deg]">
                       <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth={stroke} />
                       <circle
@@ -106,12 +162,8 @@ export default function WorkoutHeader() {
                         }}
                       />
                     </svg>
-                    {/* Center percentage */}
-                    <span className="absolute inset-0 flex items-center justify-center text-[8px] font-black tabular-nums" style={{ color: ringColor }}>
-                      {progressPct}
-                    </span>
                   </div>
-                )
+                );
               })()}
               {totalSets > 0 && (
                 <span className="font-mono text-neutral-500">
@@ -124,6 +176,7 @@ export default function WorkoutHeader() {
           </div>
         </div>
       </div>
+
       {/* Progress bar — premium animated gradient */}
       {totalSets > 0 && (
         <div className="h-[3px] bg-neutral-800 w-full relative overflow-hidden">
@@ -139,10 +192,8 @@ export default function WorkoutHeader() {
               boxShadow: progressPct >= 80 ? '0 0 12px rgba(251,191,36,0.5)' : 'none',
             }}
           >
-            {/* Shimmer overlay */}
             <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent" style={{ animation: 'shimmer 2s ease-in-out infinite' }} />
           </div>
-          {/* Completion pulse at 100% */}
           {progressPct >= 100 && (
             <div className="absolute inset-0" style={{
               background: 'linear-gradient(90deg, transparent, rgba(16,185,129,0.4), transparent)',
@@ -162,7 +213,7 @@ export default function WorkoutHeader() {
               : { title: 'Treino', exercises: [] };
             await sendInvite(targetUser, payloadWorkout);
           } catch (e: unknown) {
-            const msg = isObject(e) && typeof e.message === 'string' ? e.message : String(e || '');
+            const msg = isRecord(e) && typeof e.message === 'string' ? e.message : String(e || '');
             await alert('Falha ao enviar convite: ' + msg);
           }
         }}

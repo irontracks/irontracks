@@ -7,6 +7,7 @@ import { useWorkoutContext } from '../WorkoutContext';
 import {
   isObject,
   toNumber,
+  normalizeExerciseKey,
 } from '../utils';
 import { UnknownRecord, WorkoutExercise } from '../types';
 
@@ -22,7 +23,7 @@ const GROUP_METHOD_INFO: Record<string, string> = {
 };
 
 export const GroupMethodSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: number; setIdx: number }) => {
-  const { getLog, updateLog, setGroupMethodModal, openNotesKeys, toggleNotes, startTimer, getPlanConfig } = useWorkoutContext();
+  const { getLog, updateLog, setGroupMethodModal, openNotesKeys, toggleNotes, startTimer, getPlanConfig, reportHistory } = useWorkoutContext();
   const key = `${exIdx}-${setIdx}`;
   const log = getLog(key);
   const cfg = getPlanConfig(ex, setIdx);
@@ -39,6 +40,16 @@ export const GroupMethodSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exI
   const plannedSet = ex?.sets ? (Array.isArray(ex.sets) ? ex.sets[setIdx] : null) : null;
   const plannedReps = String(isObject(plannedSet) ? (plannedSet as UnknownRecord).reps ?? '' : ex?.reps ?? '').trim();
 
+  const plannedWeight = parseTrainingNumber(isObject(plannedSet) ? (plannedSet as UnknownRecord).weight ?? ex?.weight ?? null : ex?.weight ?? null);
+
+  const histEntry = reportHistory?.exercises?.[normalizeExerciseKey(ex.name)];
+  const lastItem = histEntry?.items?.length
+    ? [...histEntry.items].sort((a, b) => b.ts - a.ts)[0]
+    : null;
+  const histWeight = lastItem?.setWeights?.[setIdx] ?? null;
+  const histReps   = lastItem?.setReps?.[setIdx]   ?? null;
+  const histRpe    = lastItem?.setRpes?.[setIdx]   ?? null;
+
   return (
     <div key={key} className="rounded-xl bg-neutral-900/50 border border-neutral-800/80 px-3 py-2.5 space-y-2 shadow-sm shadow-black/20">
       {/* Row 1: número + inputs */}
@@ -47,26 +58,29 @@ export const GroupMethodSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exI
         <input
           type="number"
           inputMode="decimal"
+          aria-label={`Peso em kg – série ${setIdx + 1}`}
           value={weightValue}
           onChange={(e) => updateLog(key, { weight: e?.target?.value ?? '' })}
-          placeholder="Peso (kg)"
-          className="flex-1 min-w-0 bg-black/30 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+          placeholder={histWeight != null ? `${histWeight} kg` : plannedWeight != null ? `${plannedWeight} kg` : 'Peso (kg)'}
+          className="flex-1 min-w-0 bg-black/30 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white placeholder:text-neutral-400 outline-none focus:ring-1 ring-yellow-500"
         />
         <input
           type="number"
           inputMode="numeric"
+          aria-label={`Reps – série ${setIdx + 1}`}
           value={repsValue}
           onChange={(e) => updateLog(key, { reps: e?.target?.value ?? '' })}
-          placeholder={plannedReps || 'Reps'}
-          className="w-20 shrink-0 bg-black/30 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+          placeholder={plannedReps || (histReps != null ? String(histReps) : 'Reps')}
+          className="w-20 shrink-0 bg-black/30 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white placeholder:text-neutral-400 outline-none focus:ring-1 ring-yellow-500"
         />
         <input
           type="number"
           inputMode="decimal"
+          aria-label={`RPE – série ${setIdx + 1}`}
           value={rpeValue}
           onChange={(e) => updateLog(key, { rpe: e?.target?.value ?? '' })}
-          placeholder="RPE"
-          className="w-16 shrink-0 bg-black/30 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+          placeholder={histRpe != null ? String(histRpe) : 'RPE'}
+          className="w-16 shrink-0 bg-black/30 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white placeholder:text-yellow-400/50 outline-none focus:ring-1 ring-yellow-500"
         />
       </div>
       {/* Row 2: badge método + botões de ação */}
@@ -95,7 +109,7 @@ export const GroupMethodSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exI
             updateLog(key, { done: nextDone, weight: weightValue, reps: repsValue, rpe: rpeValue });
             if (nextDone && restTime && restTime > 0) startTimer(restTime, { kind: 'rest', key, nextKey: null, restStartedAtMs: Date.now() });
           }}
-          className={canDone ? done ? 'inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-yellow-500 text-black font-black' : 'inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 font-bold hover:bg-neutral-700' : 'inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-neutral-800/40 border border-neutral-800 text-neutral-500 font-bold cursor-not-allowed'}
+          className={canDone ? done ? 'inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-500 text-black font-black shadow-sm shadow-emerald-500/30' : 'inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 font-black hover:bg-yellow-500/20 hover:border-yellow-500/50 transition-all' : 'inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-neutral-800/40 border border-neutral-800 text-neutral-500 font-bold cursor-not-allowed'}
         >
           <Check size={16} />
           <span className="text-xs">{done ? 'Feito' : 'Concluir'}</span>
@@ -103,6 +117,7 @@ export const GroupMethodSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exI
       </div>
       {isNotesOpen && (
         <textarea
+          aria-label="Observações da série"
           value={notesValue}
           onChange={(e) => updateLog(key, { notes: e?.target?.value ?? '' })}
           placeholder="Observações da série"

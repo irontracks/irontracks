@@ -1,7 +1,7 @@
 import { createContext, useContext } from 'react';
 import { useActiveWorkoutController } from './useActiveWorkoutController';
 
-type WorkoutContextType = ReturnType<typeof useActiveWorkoutController>;
+export type WorkoutContextType = ReturnType<typeof useActiveWorkoutController>;
 
 const WorkoutContext = createContext<WorkoutContextType | null>(null);
 

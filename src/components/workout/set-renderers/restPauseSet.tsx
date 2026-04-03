@@ -9,6 +9,7 @@ import { HELP_TERMS } from '@/utils/help/terms';
 import {
   isObject,
   DELOAD_SUGGEST_MODE,
+  normalizeExerciseKey,
 } from '../utils';
 import { UnknownRecord, WorkoutExercise } from '../types';
 
@@ -29,6 +30,7 @@ export const RestPauseSet = ({
     startTimer,
     setRestPauseModal,
     deloadSuggestions,
+    reportHistory,
   } = useWorkoutContext();
 
   const key = `${exIdx}-${setIdx}`;
@@ -56,7 +58,19 @@ export const RestPauseSet = ({
   const suggestionValue = deloadSuggestions[key];
   const suggestion: DeloadEntrySuggestion | null = isObject(suggestionValue) ? (suggestionValue as DeloadEntrySuggestion) : null;
   const useWatermark = DELOAD_SUGGEST_MODE === 'watermark';
-  const weightPlaceholder = useWatermark && suggestion?.weight != null ? `${suggestion.weight} kg` : 'kg';
+
+  const plannedWeight = parseTrainingNumber((plannedSet as Record<string, unknown> | null)?.weight ?? ex?.weight ?? null);
+
+  const histEntry = reportHistory?.exercises?.[normalizeExerciseKey(ex.name)];
+  const lastItem = histEntry?.items?.length
+    ? [...histEntry.items].sort((a, b) => b.ts - a.ts)[0]
+    : null;
+  const histWeight = lastItem?.setWeights?.[setIdx] ?? null;
+
+  const weightPlaceholder = useWatermark && suggestion?.weight != null
+    ? `${suggestion.weight} kg`
+    : histWeight != null ? `${histWeight} kg`
+    : plannedWeight != null ? `${plannedWeight} kg` : 'kg';
 
   const weightField = useLocalField(
     String(log?.weight ?? cfg?.weight ?? ''),
@@ -119,7 +133,7 @@ export const RestPauseSet = ({
             onFocus={weightField.onFocus}
             onBlur={weightField.onBlur}
             placeholder={weightPlaceholder}
-            className="w-24 bg-black/30 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+            className="w-24 bg-black/30 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white placeholder:text-neutral-400 outline-none focus:ring-1 ring-yellow-500"
           />
           <button
             type="button"
@@ -197,8 +211,8 @@ export const RestPauseSet = ({
             className={
               canDone
                 ? done
-                  ? 'inline-flex items-center justify-center gap-2 min-h-[40px] px-3 py-2 rounded-xl bg-yellow-500 text-black font-black shadow-yellow-500/20 shadow-sm active:scale-95 transition duration-150 sm:w-auto'
-                  : 'inline-flex items-center justify-center gap-2 min-h-[40px] px-3 py-2 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 font-bold hover:bg-neutral-700 active:scale-95 transition duration-150 sm:w-auto'
+                  ? 'inline-flex items-center justify-center gap-2 min-h-[40px] px-3 py-2 rounded-xl bg-emerald-500 text-black font-black shadow-sm shadow-emerald-500/30 active:scale-95 transition duration-150 sm:w-auto'
+                  : 'inline-flex items-center justify-center gap-2 min-h-[40px] px-3 py-2 rounded-xl bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 font-black hover:bg-yellow-500/20 hover:border-yellow-500/50 active:scale-95 transition duration-150 sm:w-auto'
                 : 'inline-flex items-center justify-center gap-2 min-h-[40px] px-3 py-2 rounded-xl bg-neutral-800/40 border border-neutral-800 text-neutral-500 font-bold cursor-not-allowed sm:w-auto'
             }
           >
