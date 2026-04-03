@@ -150,7 +150,7 @@ export const NormalSet = ({
   const inputBase =
     'w-full bg-black/40 border border-neutral-700/80 rounded-xl px-2.5 py-2 text-sm text-white ' +
     'outline-none focus:ring-1 ring-yellow-500 focus:border-yellow-500/50 transition-all duration-200 ' +
-    'placeholder:text-neutral-400 placeholder:text-xs focus:placeholder:opacity-0';
+    'placeholder:text-neutral-500/70 placeholder:text-xs focus:placeholder:opacity-0';
 
   const handleComplete = () => {
     const nowMs        = Date.now();
@@ -215,10 +215,18 @@ export const NormalSet = ({
       >
         {/*
           Layout (CSS grid, one line):
-          [kg flex-3] [reps flex-2] [rpe flex-2] [💬 28px] [OK auto]
+          [# 18px] [kg flex-3] [reps flex-2] [rpe flex-2] [💬 28px] [OK auto]
         */}
         <div className="grid items-center gap-1.5"
-          style={{ gridTemplateColumns: '3fr 2fr 2fr 28px auto' }}>
+          style={{ gridTemplateColumns: '18px 3fr 2fr 2fr 28px auto' }}>
+
+          {/* Set number */}
+          <span className={[
+            'text-center text-[11px] font-black tabular-nums leading-none',
+            done ? 'text-emerald-400/70' : 'text-neutral-600',
+          ].join(' ')}>
+            {setIdx + 1}
+          </span>
 
           {/* kg */}
           <input
@@ -261,7 +269,7 @@ export const NormalSet = ({
               onFocus={rpeField.handleFocus}
               onBlur={rpeField.handleBlur}
               placeholder={rpePlaceholder}
-              className={`${inputBase} text-yellow-400 border-yellow-500/25 placeholder:text-yellow-400/50 ${plannedRpe ? 'pr-6' : ''}`}
+              className={`${inputBase} text-yellow-400 border-yellow-500/25 placeholder:text-neutral-500/70 ${plannedRpe ? 'pr-6' : ''}`}
             />
             {plannedRpe && (
               <span className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] font-mono text-yellow-600/50">
@@ -304,9 +312,9 @@ export const NormalSet = ({
       {/* Notes textarea */}
       {isNotesOpen && (
         <div className="px-1">
-          {/* eslint-disable-next-line jsx-a11y/control-has-associated-label */}
           <textarea
             id={notesId}
+            aria-label={`Observações – série ${setIdx + 1}`}
             value={notesField.value}
             onChange={(e) => notesField.handleChange(e as React.ChangeEvent<HTMLTextAreaElement>)}
             onFocus={() => { notesField.handleFocus(); }}

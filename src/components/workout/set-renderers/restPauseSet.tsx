@@ -125,15 +125,15 @@ export const RestPauseSet = ({
       <div className="rounded-xl bg-neutral-900/50 border border-neutral-800/80 px-3 py-2.5 space-y-2 shadow-sm shadow-black/20">
         <div className="flex items-center gap-2">
           <div className="w-10 text-xs font-mono text-neutral-400">#{setIdx + 1}</div>
-          {/* eslint-disable-next-line jsx-a11y/control-has-associated-label */}
           <input
             inputMode="decimal"
+            aria-label={`Peso em kg – série ${setIdx + 1}`}
             value={weightField.value}
             onChange={weightField.onChange}
             onFocus={weightField.onFocus}
             onBlur={weightField.onBlur}
             placeholder={weightPlaceholder}
-            className="w-24 bg-black/30 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white placeholder:text-neutral-400 outline-none focus:ring-1 ring-yellow-500"
+            className="w-24 bg-black/30 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white placeholder:text-neutral-500/70 outline-none focus:ring-1 ring-yellow-500"
           />
           <button
             type="button"
@@ -221,8 +221,8 @@ export const RestPauseSet = ({
           </button>
         </div>
       </div>
-      {/* eslint-disable-next-line jsx-a11y/control-has-associated-label */}
       <textarea
+        aria-label={`Observações – série ${setIdx + 1}`}
         value={notesField.value}
         onChange={notesField.onChange}
         onFocus={notesField.onFocus}

@@ -121,16 +121,16 @@ export const ClusterSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: 
       <div className="rounded-xl bg-neutral-900/50 border border-neutral-800/80 px-3 py-2.5 space-y-2 shadow-sm shadow-black/20">
         <div className="flex items-center gap-2">
           <div className="w-10 text-xs font-mono text-neutral-400">#{setIdx + 1}</div>
-          {/* eslint-disable-next-line jsx-a11y/control-has-associated-label */}
           <input
             inputMode="decimal"
+            aria-label={`Peso em kg – série ${setIdx + 1}`}
             value={String(log?.weight ?? cfg?.weight ?? '')}
             onChange={(e) => {
               const v = e?.target?.value ?? '';
               updateLog(key, { weight: v, advanced_config: cfg ?? log.advanced_config ?? null });
             }}
             placeholder={weightPlaceholder}
-            className="w-24 bg-black/30 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white placeholder:text-neutral-400 outline-none focus:ring-1 ring-yellow-500"
+            className="w-24 bg-black/30 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white placeholder:text-neutral-500/70 outline-none focus:ring-1 ring-yellow-500"
           />
           <button
             type="button"
@@ -233,9 +233,9 @@ export const ClusterSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: 
                   <div className="text-[10px] uppercase tracking-widest font-bold text-neutral-400">Bloco {idx + 1}</div>
                   <div className="text-[10px] font-mono text-neutral-500">plan {String(planned)}</div>
                 </div>
-                {/* eslint-disable-next-line jsx-a11y/control-has-associated-label */}
                 <input
                   inputMode="decimal"
+                  aria-label={`Reps – bloco ${idx + 1}, série ${setIdx + 1}`}
                   value={current == null ? '' : String(current)}
                   ref={(el) => {
                     if (!clusterRefs.current[key]) clusterRefs.current[key] = [];
@@ -263,8 +263,8 @@ export const ClusterSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: 
           })}
         </div>
       )}
-      {/* eslint-disable-next-line jsx-a11y/control-has-associated-label */}
       <textarea
+        aria-label={`Observações – série ${setIdx + 1}`}
         value={notesValue}
         onChange={(e) => {
           const v = e?.target?.value ?? '';
