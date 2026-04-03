@@ -384,7 +384,7 @@ async function shareOrSaveHtml(html: string, studentName: string): Promise<void>
 
   // Strategy 2: Save via @capacitor/filesystem
   try {
-    // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+     
     // @ts-ignore optional Capacitor dependency, may not have types installed
     const { Filesystem, Directory, Encoding } = await import('@capacitor/filesystem')
     await Filesystem.writeFile({

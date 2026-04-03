@@ -258,26 +258,30 @@ function ExerciseCardInner({ ex, exIdx }: { ex: WorkoutExercise; exIdx: number }
         : 'border-neutral-800/80',
       justCompleted ? 'scale-[1.01] shadow-[0_0_30px_-4px_rgba(52,211,153,0.35)]' : '',
     ].join(' ')}>
-      <div
-        role="button"
-        tabIndex={0}
-        onClick={() => {
-          setCurrentExerciseIdx(exIdx);
-          toggleCollapse(exIdx);
-        }}
-        onKeyDown={(e) => {
-          const key = e?.key;
-          if (key === 'Enter' || key === ' ') {
-            try {
-              e.preventDefault();
-            } catch { }
+      {/* Outer wrapper — plain div, no interactive role */}
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+        {/* Collapse trigger: exercise info only, no nested interactive elements */}
+        <div
+          role="button"
+          tabIndex={0}
+          aria-expanded={!collapsedNow}
+          aria-label={`${collapsedNow ? 'Expandir' : 'Recolher'} ${name}`}
+          onClick={() => {
             setCurrentExerciseIdx(exIdx);
             toggleCollapse(exIdx);
-          }
-        }}
-        className="w-full flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3"
-      >
-        <div className="min-w-0 text-left flex-1">
+          }}
+          onKeyDown={(e) => {
+            const key = e?.key;
+            if (key === 'Enter' || key === ' ') {
+              try {
+                e.preventDefault();
+              } catch { }
+              setCurrentExerciseIdx(exIdx);
+              toggleCollapse(exIdx);
+            }
+          }}
+          className="min-w-0 text-left flex-1 cursor-pointer"
+        >
           <div className="flex items-center gap-2 min-w-0">
             {/* Exercise number badge */}
             <span className={[
@@ -349,7 +353,8 @@ function ExerciseCardInner({ ex, exIdx }: { ex: WorkoutExercise; exIdx: number }
             </div>
           )}
         </div>
-        <div className="mt-1 flex flex-row flex-nowrap items-center justify-end gap-1.5 text-neutral-400">
+        {/* Action toolbar — sibling of collapse trigger, never nested inside interactive element */}
+        <div className="flex-shrink-0 flex flex-row flex-wrap items-center justify-end gap-1.5 text-neutral-400">
           {videoUrl ? (
             <button
               type="button"

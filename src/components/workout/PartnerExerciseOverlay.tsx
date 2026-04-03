@@ -17,7 +17,7 @@ interface PartnerExerciseOverlayProps {
 }
 
 export default function PartnerExerciseOverlay({ share, onSendUpdate, onEnd }: PartnerExerciseOverlayProps) {
-    const exercise = share.exercise || {}
+    const exercise = useMemo(() => share.exercise || {}, [share.exercise])
     const exerciseIdx = share.exerciseIdx
     const name = String(exercise.name || '').trim() || `Exercício ${exerciseIdx + 1}`
     const method = String(exercise.method || 'Normal')
@@ -268,7 +268,7 @@ export default function PartnerExerciseOverlay({ share, onSendUpdate, onEnd }: P
         progressPct,
         remainingSets: setsCount - doneSets,
         ui: {} as UnknownRecord,
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+     
     }), [
         exercise, fakeWorkout, localLogs, getLog, updateLog, getPlanConfig, getPlannedSet,
         startTimer, openNotesKeys, toggleNotes, noop, noopAsync, noopWithArg, noopWithTwoArgs,
