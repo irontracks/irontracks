@@ -3,12 +3,10 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { parseTrainingNumber } from '@/utils/trainingNumber';
 import { Check, MessageSquare } from 'lucide-react';
-import { triggerHaptic } from '@/utils/native/irontracksNative';
 import { useWorkoutContext } from '../WorkoutContext';
 import {
   isObject,
   DELOAD_SUGGEST_MODE,
-  normalizeExerciseKey,
 } from '../utils';
 import { UnknownRecord, WorkoutExercise } from '../types';
 
@@ -70,7 +68,6 @@ export const NormalSet = ({
   setsCount?: number;
 }) => {
   const {
-    exercises,
     getLog,
     updateLog,
     getPlanConfig,
@@ -80,7 +77,6 @@ export const NormalSet = ({
     toggleNotes,
     deloadSuggestions,
     setCollapsed,
-    reportHistory,
   } = useWorkoutContext();
 
   const key = `${exIdx}-${setIdx}`;
@@ -98,35 +94,16 @@ export const NormalSet = ({
 
   const plannedReps = String(plannedSet?.reps ?? ex?.reps ?? '').trim();
   const plannedRpe  = String(plannedSet?.rpe  ?? ex?.rpe  ?? '').trim();
-  const plannedWeight = parseTrainingNumber((plannedSet as Record<string, unknown> | null)?.weight ?? ex?.weight ?? null);
 
   type DeloadEntrySuggestion = { weight?: number | null; reps?: number | null; rpe?: number | null };
   const suggestionValue = deloadSuggestions[key];
   const suggestion: DeloadEntrySuggestion | null = isObject(suggestionValue)
     ? (suggestionValue as DeloadEntrySuggestion)
     : null;
-  const useWatermark = DELOAD_SUGGEST_MODE === 'watermark';
-
-  // Last-session per-set values as watermark (from deload suggestions or direct reportHistory lookup)
-  const histEntry = reportHistory?.exercises?.[normalizeExerciseKey(ex.name)];
-  const lastItem = histEntry?.items?.length
-    ? [...histEntry.items].sort((a, b) => b.ts - a.ts)[0]
-    : null;
-  const histWeight = lastItem?.setWeights?.[setIdx] ?? null;
-  const histReps   = lastItem?.setReps?.[setIdx]   ?? null;
-  const histRpe    = lastItem?.setRpes?.[setIdx]   ?? null;
-
-  // Priority: deload suggestion → last-session history → planned weight from program → generic
-  const weightPlaceholder = useWatermark && suggestion?.weight != null
-    ? `${suggestion.weight} kg`
-    : histWeight != null ? `${histWeight} kg`
-    : plannedWeight != null ? `${plannedWeight} kg` : 'Peso';
-  const repsPlaceholder = useWatermark && suggestion?.reps != null
-    ? String(suggestion.reps)
-    : histReps != null ? String(histReps) : plannedReps || 'Reps';
-  const rpePlaceholder = useWatermark && suggestion?.rpe != null
-    ? String(suggestion.rpe)
-    : histRpe != null ? String(histRpe) : plannedRpe || 'RPE';
+  const useWatermark      = DELOAD_SUGGEST_MODE === 'watermark';
+  const weightPlaceholder = useWatermark && suggestion?.weight != null ? `${suggestion.weight} kg` : 'Peso';
+  const repsPlaceholder   = useWatermark && suggestion?.reps   != null ? String(suggestion.reps)   : 'Reps';
+  const rpePlaceholder    = useWatermark && suggestion?.rpe    != null ? String(suggestion.rpe)    : 'RPE';
 
   const notesId    = `notes-${key}`;
   const hasNotes   = extNotes.trim().length > 0;
@@ -150,7 +127,7 @@ export const NormalSet = ({
   const inputBase =
     'w-full bg-black/40 border border-neutral-700/80 rounded-xl px-2.5 py-2 text-sm text-white ' +
     'outline-none focus:ring-1 ring-yellow-500 focus:border-yellow-500/50 transition-all duration-200 ' +
-    'placeholder:text-neutral-500/70 placeholder:text-xs focus:placeholder:opacity-0';
+    'placeholder:text-neutral-600 placeholder:text-xs focus:placeholder:opacity-0';
 
   const handleComplete = () => {
     const nowMs        = Date.now();
@@ -172,13 +149,9 @@ export const NormalSet = ({
       advanced_config:  cfg ?? log.advanced_config ?? null,
     });
 
-    if (nextDone) triggerHaptic('success').catch(() => {});
-
     if (nextDone && restTime && restTime > 0) {
       const nextPlanned = getPlannedSet(ex, setIdx + 1);
-      const nextKey = nextPlanned
-        ? `${exIdx}-${setIdx + 1}`
-        : exercises[exIdx + 1] != null ? `${exIdx + 1}-0` : null;
+      const nextKey     = nextPlanned ? `${exIdx}-${setIdx + 1}` : null;
       startTimer(restTime, { kind: 'rest', key, nextKey, restStartedAtMs: nowMs });
     }
 
@@ -215,18 +188,10 @@ export const NormalSet = ({
       >
         {/*
           Layout (CSS grid, one line):
-          [# 18px] [kg flex-3] [reps flex-2] [rpe flex-2] [💬 28px] [OK auto]
+          [kg flex-3] [reps flex-2] [rpe flex-2] [💬 28px] [OK auto]
         */}
         <div className="grid items-center gap-1.5"
-          style={{ gridTemplateColumns: '18px 3fr 2fr 2fr 28px auto' }}>
-
-          {/* Set number */}
-          <span className={[
-            'text-center text-[11px] font-black tabular-nums leading-none',
-            done ? 'text-emerald-400/70' : 'text-neutral-600',
-          ].join(' ')}>
-            {setIdx + 1}
-          </span>
+          style={{ gridTemplateColumns: '3fr 2fr 2fr 28px auto' }}>
 
           {/* kg */}
           <input
@@ -269,7 +234,7 @@ export const NormalSet = ({
               onFocus={rpeField.handleFocus}
               onBlur={rpeField.handleBlur}
               placeholder={rpePlaceholder}
-              className={`${inputBase} text-yellow-400 border-yellow-500/25 placeholder:text-neutral-500/70 ${plannedRpe ? 'pr-6' : ''}`}
+              className={`${inputBase} text-yellow-400 border-yellow-500/25 placeholder:text-yellow-600/60 ${plannedRpe ? 'pr-6' : ''}`}
             />
             {plannedRpe && (
               <span className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] font-mono text-yellow-600/50">

@@ -95,7 +95,7 @@ export function useAppEffects({
   const router = useRouter()
 
   // ── VIP session storage check ─────────────────────────────────
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+   
   useEffect(() => {
     try {
       const flag = sessionStorage.getItem('irontracks_open_vip')
@@ -103,7 +103,7 @@ export function useAppEffects({
       sessionStorage.removeItem('irontracks_open_vip')
       openVipView()
     } catch { }
-  }, [])
+  }, [openVipView])
 
   // ── View safety net — reset to dashboard if companion state is missing ──
   useEffect(() => {
