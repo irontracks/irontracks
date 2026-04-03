@@ -74,7 +74,6 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
     session,
     workout,
     exercises,
-    logs,
     getLog,
     updateLog,
     getPlanConfig,
@@ -582,14 +581,13 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
         baseSuggestion: baseSuggestion.ok ? baseSuggestion : null,
       };
       return result;
-    } catch (e: unknown) {
+    } catch {
       return { ok: false, error: 'Falha ao analisar histórico.' };
     }
   };
 
 
   const openDeloadModal = async (ex: WorkoutExercise, exIdx: number): Promise<void> => {
-    const startedAt = Date.now();
     const totalTimeoutMs = REPORT_FETCH_TIMEOUT_MS + AI_SUGGESTION_TIMEOUT_MS + 3000;
     try {
       await withTimeout(
@@ -718,7 +716,7 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
         })(),
         totalTimeoutMs,
       );
-    } catch (e: unknown) {
+    } catch {
       try {
         await alert('Tempo limite ao processar o Deload. Tente novamente em instantes.');
       } catch { }
@@ -814,7 +812,7 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
         workoutId: workout?.id ?? null,
       });
       setDeloadModal(null);
-    } catch (e: unknown) {
+    } catch {
       try {
         await alert('Não foi possível aplicar o deload agora.');
       } catch { }

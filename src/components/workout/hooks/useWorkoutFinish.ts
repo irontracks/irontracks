@@ -115,6 +115,9 @@ export function useWorkoutFinish(props: UseWorkoutFinishProps) {
       }
     }
 
+    // Haptic: triumphant pattern on workout finish
+    try { navigator?.vibrate?.([30, 50, 80, 50, 120]) } catch { /* not supported */ }
+
     setFinishing(true)
     try {
       persistDeloadHistoryFromSession()

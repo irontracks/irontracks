@@ -1,7 +1,8 @@
 'use client';
 
 import React from 'react';
-import { ChevronUp, Clock, Save, X, Pause, Play } from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { ChevronDown, ChevronUp, Clock, Save, X, Pause, Play, Zap } from 'lucide-react';
 import { useWorkoutContext } from './WorkoutContext';
 import { useTeamWorkout } from '@/contexts/TeamWorkoutContext';
 
@@ -9,6 +10,8 @@ export default function WorkoutFooter() {
   const {
     session,
     currentExercise,
+    currentExerciseIdx,
+    logs,
     elapsedSeconds,
     formatElapsed,
     ticker,
@@ -18,12 +21,19 @@ export default function WorkoutFooter() {
     finishWorkout,
     confirm,
     onFinish,
-    exercises,
-    logs,
     completedSets,
     totalSets,
     remainingSets,
   } = useWorkoutContext();
+
+  // Compute series count for the current exercise (not global total)
+  const currentExSetsHeader = currentExercise ? Math.max(0, parseInt(String(currentExercise?.sets ?? '0'), 10) || 0) : 0;
+  const currentExSdArr = currentExercise && Array.isArray(currentExercise?.setDetails) ? currentExercise.setDetails : [];
+  const currentExSetsCount = Math.max(currentExSetsHeader, (currentExSdArr as unknown[]).length);
+  const exLogs = logs as Record<string, Record<string, unknown>>;
+  const currentExDoneSets = currentExSetsCount > 0 && Number.isFinite(currentExerciseIdx as number)
+    ? Array.from({ length: currentExSetsCount }).filter((_, i) => exLogs[`${currentExerciseIdx}-${i}`]?.done).length
+    : 0;
 
   // Team pause/resume — gracefully degrades if no team session
   const teamCtx = useTeamWorkout() as unknown as {
@@ -60,60 +70,113 @@ export default function WorkoutFooter() {
   )
   const displayTime = `${formatElapsed(displaySeconds)}${recoveryExtraSeconds > 0 ? ` (+${formatElapsed(recoveryExtraSeconds)})` : ''}`
 
+  // Recovery ring: shows progress from plannedRestSec → 0
+  const recoveryRingPct = hasRecovery && plannedRestSec > 0
+    ? Math.max(0, Math.min(100, (recoverySeconds / plannedRestSec) * 100))
+    : 0
+  const recoveryRingColor = recoveryRingPct > 60 ? '#22c55e' : recoveryRingPct > 30 ? '#f59e0b' : '#ef4444'
+
   return (
     <>
-      {/* ── Timer card — bottom-left, tap header to collapse ── */}
-      <div className="fixed left-3 pl-safe bottom-[88px] z-[60]">
+      {/* ── Timer strip — full width, sits above the bottom bar ── */}
+      <div
+        className="fixed left-0 right-0 px-4 z-40"
+        style={{ bottom: 'calc(68px + env(safe-area-inset-bottom, 0px))' }}
+      >
         {timerMinimized ? (
-          /* Minimized pill — tap anywhere to expand */
+          /* Minimized: slim full-width strip */
           <button
             type="button"
             onClick={() => setTimerMinimized(false)}
-            className="inline-flex items-center gap-2 rounded-2xl bg-neutral-900/95 border border-neutral-700 px-2.5 py-1.5 text-neutral-200 shadow-xl hover:bg-neutral-800 active:scale-95 transition-transform"
+            className="w-full flex items-center justify-between gap-3 rounded-2xl bg-neutral-900/95 border border-neutral-700 px-4 py-2.5 backdrop-blur-sm shadow-xl hover:bg-neutral-800 active:scale-[0.99] transition-all"
           >
-            <Clock size={13} className={isPaused ? 'text-yellow-400 animate-pulse' : 'text-yellow-500'} />
-            <span className="text-[11px] font-black">{isPaused ? '⏸ Pausado' : 'Tempo'}</span>
-            <span className="text-xs font-mono text-yellow-500">{displayTime}</span>
-            <ChevronUp size={13} className="text-neutral-500" />
+            <div className="flex items-center gap-2">
+              <Clock size={13} className={isPaused ? 'text-yellow-400 animate-pulse' : 'text-yellow-500'} />
+              <span className="text-[11px] font-black text-neutral-300">{isPaused ? 'Pausado' : displayLabel}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className={`text-sm font-black font-mono ${isPaused ? 'text-yellow-400 animate-pulse' : 'text-yellow-500'}`}>{displayTime}</span>
+              <ChevronUp size={13} className="text-neutral-500" />
+            </div>
           </button>
         ) : (
-          /* Expanded card */
-          <div className="w-[210px] rounded-2xl bg-neutral-900/98 border border-neutral-700 shadow-2xl overflow-hidden">
+          /* Expanded card — full width */
+          <div className="w-full rounded-2xl bg-neutral-900/98 border border-neutral-700 shadow-2xl overflow-hidden">
             {/* Header — tap to collapse */}
             <button
               type="button"
               onClick={() => setTimerMinimized(true)}
-              className="w-full flex items-start justify-between gap-2 px-3 pt-2.5 pb-1 text-left"
+              className="w-full flex items-center justify-between gap-2 px-4 pt-3 pb-2 text-left"
             >
               <div className="min-w-0">
                 <div className="text-[9px] uppercase tracking-widest text-neutral-500 font-bold">Timer</div>
-                <div className="text-xs font-black text-white truncate">{currentExercise?.name || 'Treino ativo'}</div>
+                <div className="text-sm font-black text-white truncate">{currentExercise?.name || 'Treino ativo'}</div>
                 <div className="text-[10px] text-neutral-500">
-                  {allSets > 0 ? `${doneSets}/${allSets} séries` : `Descanso: ${plannedRestSec > 0 ? `${Math.round(plannedRestSec)}s` : '—'}`}
+                  {currentExSetsCount > 0 ? `${currentExDoneSets}/${currentExSetsCount} séries` : `Descanso: ${plannedRestSec > 0 ? `${Math.round(plannedRestSec)}s` : '—'}`}
                 </div>
               </div>
-              {/* Collapse hint */}
-              <div className="w-5 h-5 mt-0.5 shrink-0 flex items-center justify-center rounded-lg bg-neutral-800 border border-neutral-700">
-                <Clock size={10} className="text-neutral-400" />
-              </div>
+              <ChevronDown size={14} className="text-neutral-500 shrink-0" />
             </button>
 
-            {/* Time display */}
-            <div className="flex items-center justify-between px-3 pt-1 pb-2.5">
-              <div className={`text-xl font-black font-mono ${isPaused ? 'text-yellow-400 animate-pulse' : 'text-white'}`}>
+            {/* Time display + recovery ring */}
+            <div className="flex items-center justify-between px-4 pt-0.5 pb-3 gap-3">
+              <div className={`text-2xl font-black font-mono ${isPaused ? 'text-yellow-400 animate-pulse' : 'text-white'}`}>
                 {displayTime}
               </div>
-              <div className="text-[9px] uppercase tracking-widest text-yellow-500 font-black">{displayLabel}</div>
+              <div className="flex items-center gap-3">
+                <div className="text-[9px] uppercase tracking-widest text-yellow-500 font-black">{displayLabel}</div>
+                {/* Recovery ring — visible only during active recovery */}
+                <AnimatePresence>
+                  {hasRecovery && plannedRestSec > 0 && (
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.7 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      exit={{ opacity: 0, scale: 0.7 }}
+                      transition={{ duration: 0.2 }}
+                    >
+                      {(() => {
+                        const size = 38;
+                        const stroke = 3.5;
+                        const radius = (size - stroke) / 2;
+                        const circumference = 2 * Math.PI * radius;
+                        const offset = circumference - (recoveryRingPct / 100) * circumference;
+                        return (
+                          <div className="relative" style={{ width: size, height: size }}>
+                            <svg width={size} height={size} className="rotate-[-90deg]">
+                              <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth={stroke} />
+                              <circle
+                                cx={size / 2} cy={size / 2} r={radius} fill="none"
+                                stroke={recoveryRingColor}
+                                strokeWidth={stroke}
+                                strokeLinecap="round"
+                                strokeDasharray={circumference}
+                                strokeDashoffset={offset}
+                                style={{
+                                  transition: 'stroke-dashoffset 0.9s linear, stroke 0.5s',
+                                  filter: `drop-shadow(0 0 4px ${recoveryRingColor}90)`,
+                                }}
+                              />
+                            </svg>
+                            <span className="absolute inset-0 flex items-center justify-center text-[9px] font-black tabular-nums" style={{ color: recoveryRingColor }}>
+                              {recoverySeconds}
+                            </span>
+                          </div>
+                        );
+                      })()}
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
             </div>
 
             {/* Pause / Resume button — only for team sessions */}
             {inTeamSession && (
-              <div className="border-t border-neutral-800 px-2.5 py-2">
+              <div className="border-t border-neutral-800 px-3 py-2.5">
                 <button
                   type="button"
                   onClick={() => isPaused ? teamCtx.resumeSession() : teamCtx.pauseSession()}
                   className={[
-                    'w-full flex items-center justify-center gap-1.5 py-1.5 rounded-xl text-xs font-black transition-all active:scale-95',
+                    'w-full flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs font-black transition-all active:scale-95',
                     isPaused
                       ? 'bg-yellow-500 text-black hover:bg-yellow-400'
                       : 'bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 hover:border-yellow-500/40',
@@ -142,28 +205,45 @@ export default function WorkoutFooter() {
                 if (typeof onFinish === 'function') onFinish(null, false);
               } catch { }
             }}
-            className="inline-flex items-center gap-2 px-4 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 font-bold hover:bg-neutral-700"
+            className="w-11 h-11 flex items-center justify-center rounded-xl bg-neutral-900 border border-neutral-700/50 text-neutral-500 hover:text-red-400 hover:border-red-500/30 active:scale-95 transition-all"
+            title="Cancelar treino"
           >
-            <X size={16} />
-            <span className="text-sm">Cancelar</span>
+            <X size={18} />
           </button>
 
-          <button
-            type="button"
-            disabled={finishing}
-            onClick={finishWorkout}
-            className={[
-              'inline-flex items-center gap-2 px-5 py-3 rounded-xl font-black text-black text-sm transition-all duration-300',
-              finishing
-                ? 'bg-yellow-500/60 cursor-wait'
-                : allDone
-                  ? 'bg-gradient-to-r from-yellow-400 to-amber-400 shadow-lg shadow-yellow-500/40 animate-pulse'
-                  : 'bg-gradient-to-r from-yellow-500 to-amber-400 shadow-md shadow-yellow-900/30 hover:shadow-yellow-500/40 hover:from-yellow-400 hover:to-amber-300',
-            ].join(' ')}
-          >
-            <Save size={16} />
-            <span>{finishing ? 'Salvando...' : allDone ? 'FINALIZAR ⚡' : remainingSets <= 3 && remainingSets > 0 ? `Finalizar (${remainingSets})` : 'Finalizar'}</span>
-          </button>
+          {/* Finalizar — with glow celebration ring when allDone */}
+          <div className="relative">
+            {allDone && !finishing && (
+              <motion.div
+                className="absolute inset-0 rounded-xl pointer-events-none"
+                animate={{
+                  boxShadow: [
+                    '0 0 0px 0px rgba(251,191,36,0)',
+                    '0 0 16px 4px rgba(251,191,36,0.6)',
+                    '0 0 0px 0px rgba(251,191,36,0)',
+                  ],
+                }}
+                transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
+              />
+            )}
+            <button
+              type="button"
+              disabled={finishing}
+              onClick={finishWorkout}
+              className={[
+                'inline-flex items-center gap-2 px-5 py-3 rounded-xl font-black text-black text-sm transition-all duration-300',
+                finishing
+                  ? 'bg-yellow-500/60 cursor-wait'
+                  : allDone
+                    ? 'bg-gradient-to-r from-yellow-400 to-amber-400 shadow-lg shadow-yellow-500/40'
+                    : 'bg-gradient-to-r from-yellow-500 to-amber-400 shadow-md shadow-yellow-900/30 hover:shadow-yellow-500/40 hover:from-yellow-400 hover:to-amber-300',
+              ].join(' ')}
+            >
+              <Save size={16} />
+              {allDone && !finishing && <Zap size={14} className="text-yellow-300" />}
+              <span>{finishing ? 'Salvando...' : allDone ? 'FINALIZAR' : remainingSets <= 3 && remainingSets > 0 ? `Finalizar (${remainingSets})` : 'Finalizar'}</span>
+            </button>
+          </div>
         </div>
       </div>
     </>

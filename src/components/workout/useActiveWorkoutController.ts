@@ -13,76 +13,12 @@ import {
   ActiveWorkoutProps,
   UnknownRecord,
   WorkoutExercise,
-  WorkoutSession,
-  WorkoutDraft,
-  WorkoutSetDetail,
-  ReportHistory,
-  ReportHistoryItem,
-  AiRecommendation,
-  DeloadSetEntries,
-  DeloadSetSuggestion,
-  DeloadAnalysis,
-  DeloadSuggestion
 } from './types';
-import {
-  isObject,
-  isClusterConfig,
-  isRestPauseConfig,
-  buildPlannedBlocks,
-  buildBlocksByCount,
-  toNumber,
-  safeJsonParse,
-  toDateMs,
-  averageNumbers,
-  extractLogWeight,
-  withTimeout,
-  normalizeReportHistory,
-  readReportCache,
-  writeReportCache,
-  clampNumber,
-  roundToStep,
-  normalizeExerciseKey,
-  estimate1Rm,
-  DELOAD_HISTORY_KEY,
-  DELOAD_AUDIT_KEY,
-  DELOAD_HISTORY_SIZE,
-  DELOAD_HISTORY_MIN,
-  DELOAD_RECENT_WINDOW,
-  DELOAD_STAGNATION_PCT,
-  DELOAD_REGRESSION_PCT,
-  DELOAD_REDUCTION_STABLE,
-  DELOAD_REDUCTION_STAGNATION,
-  DELOAD_REDUCTION_OVERTRAIN,
-  DELOAD_MIN_1RM_FACTOR,
-  DELOAD_REDUCTION_MIN,
-  DELOAD_REDUCTION_MAX,
-  WEIGHT_ROUND_STEP,
-  REPORT_HISTORY_LIMIT,
-  REPORT_CACHE_KEY,
-  REPORT_CACHE_TTL_MS,
-  REPORT_FETCH_TIMEOUT_MS,
-  DELOAD_SUGGEST_MODE,
-  DEFAULT_SUGGESTED_RPE,
-  AI_SUGGESTION_MIN_HISTORY,
-  AI_SUGGESTION_TIMEOUT_MS,
-  DROPSET_STAGE_LIMIT
-} from './utils';
+import { isObject } from './utils';
 import {
   getPlanConfig,
   getPlannedSet,
-  normalizeNaturalNote,
-  collectExerciseSetInputs,
-  collectExercisePlannedInputs,
 } from './helpers/setPlanningHelpers';
-import {
-  loadDeloadHistory,
-  saveDeloadHistory,
-  appendDeloadAudit,
-  analyzeDeloadHistory,
-  parseAiRecommendation,
-  estimate1RmFromSets,
-  getDeloadReason,
-} from './helpers/deloadHelpers';
 import { HELP_TERMS } from '@/utils/help/terms';
 
 const parseStartedAtMs = (raw: unknown): number => {
@@ -113,13 +49,12 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
   const broadcastMyLog = teamWorkout.broadcastMyLog
   const broadcastWorkoutEdit = teamWorkout.broadcastWorkoutEdit
   const teamSession = teamWorkout.teamSession
-  const sharedLogs = teamWorkout.sharedLogs
   const session = props.session;
   const workout = session?.workout ?? null;
   const workoutExercises = workout?.exercises;
   const exercises = useMemo<WorkoutExercise[]>(() => (Array.isArray(workoutExercises) ? workoutExercises : []), [workoutExercises]);
 
-  const logs: Record<string, unknown> = (session?.logs ?? {}) as Record<string, unknown>;
+  const logs = useMemo<Record<string, unknown>>(() => (session?.logs ?? {}) as Record<string, unknown>, [session?.logs]);
   // ── logsRef: always reflects the LATEST logs, even before React re-renders.
   // This prevents the stale-closure race condition where a rapid sequence of
   // updateLog calls (e.g., RPE input → OK click) causes the second call to
@@ -127,12 +62,11 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
   // erasing the user's typed values.
   const logsRef = useRef<Record<string, unknown>>(logs);
   logsRef.current = logs; // synchronous — always current
+  // propsRef: stable reference to latest props so callbacks can access them without rebuilding
+  const propsRef = useRef(props);
+  propsRef.current = props;
   const ui: UnknownRecord = (session?.ui ?? {}) as UnknownRecord;
   const settings = props.settings ?? null;
-
-  type PostCheckinDraft = { rpe: string; satisfaction: string; soreness: string; notes: string };
-  type ReportHistoryStatus = { status: 'idle' | 'loading' | 'ready' | 'error'; error: string; source: string };
-  type InputRefMap = Record<string, Array<HTMLInputElement | null>>;
 
   const { ticker, timerMinimized, setTimerMinimized } = useWorkoutTicker();
 
@@ -181,20 +115,14 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
   } = useWorkoutModals(collapsedKey);
 
 
-  const MAX_EXTRA_SETS_PER_EXERCISE = 50;
-  const MAX_EXTRA_EXERCISES_PER_SETS_PER_EXERCISE = 50;
-  const MAX_EXTRA_EXERCISES_PER_WORKOUT = 50;
-  const DEFAULT_EXTRA_EXERCISE_REST_TIME_S = 60;
-
-
-  const getLog = (key: string): UnknownRecord => {
+  const getLog = useCallback((key: string): UnknownRecord => {
     const v = logsRef.current[key];
     return isObject(v) ? v : {};
-  };
+  }, []);
 
-  const updateLog = (key: string, patch: unknown) => {
+  const updateLog = useCallback((key: string, patch: unknown) => {
     try {
-      if (typeof props?.onUpdateLog !== 'function') return;
+      if (typeof propsRef.current?.onUpdateLog !== 'function') return;
 
       const patchObj: UnknownRecord = isObject(patch) ? patch : {};
       const [exIdxStr, sIdxStr] = key.split('-');
@@ -203,7 +131,20 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
 
       // Haptic feedback when completing a set
       if (patchObj.done === true) {
-        try { navigator?.vibrate?.(50) } catch { /* not supported */ }
+        // Check if this is the last set of the exercise (exercise completion)
+        const ex = exercises[exIdx];
+        const setsHeader = ex ? Math.max(0, Number.parseInt(String(ex?.sets ?? '0'), 10) || 0) : 0;
+        const sdArr: unknown[] = ex && Array.isArray(ex?.setDetails) ? (ex.setDetails as unknown[]) : ex && Array.isArray((ex as UnknownRecord)?.set_details) ? ((ex as UnknownRecord).set_details as unknown[]) : [];
+        const setsCount = Math.max(setsHeader, Array.isArray(sdArr) ? sdArr.length : 0);
+        const doneBefore = Array.from({ length: setsCount }).filter((_, i) => i !== sIdx && getLog(`${exIdx}-${i}`)?.done).length;
+        const isExerciseComplete = setsCount > 0 && doneBefore === setsCount - 1;
+        if (isExerciseComplete) {
+          // Exercise complete — double tap pattern
+          try { navigator?.vibrate?.([15, 30, 15]) } catch { /* not supported */ }
+        } else {
+          // Single set done — short tap
+          try { navigator?.vibrate?.(10) } catch { /* not supported */ }
+        }
       }
 
       // If weight changes and this exercise has linked weights enabled, update all sets
@@ -217,7 +158,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
           for (let setIdx = 0; setIdx < setsCount; setIdx++) {
             const linkedKey = `${exIdx}-${setIdx}`;
             const prev = getLog(linkedKey);
-            props.onUpdateLog(linkedKey, { ...prev, ...patchObj });
+            propsRef.current.onUpdateLog(linkedKey, { ...prev, ...patchObj });
           }
           // Broadcast linked weight update for first set only
           try {
@@ -229,7 +170,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
       }
 
       const prev = getLog(key);
-      props.onUpdateLog(key, { ...prev, ...patchObj });
+      propsRef.current.onUpdateLog(key, { ...prev, ...patchObj });
 
       // Broadcast log update to team partners
       try {
@@ -241,7 +182,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
         }
       } catch { }
     } catch (e) { logError('hook:useActiveWorkoutController.updateLog', e) }
-  };
+  }, [exercises, linkedWeightExercises, broadcastMyLog, getLog]);
 
   // ── Apply partner exercise control updates ───────────────────────────────
   const exerciseControlUpdates = teamWorkout.exerciseControlUpdates
@@ -255,12 +196,12 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
       try {
         const prev = getLog(key)
         const merged = { ...prev, ...update.patch }
-        if (typeof props?.onUpdateLog === 'function') {
-          props.onUpdateLog(key, merged)
+        if (typeof propsRef.current?.onUpdateLog === 'function') {
+          propsRef.current.onUpdateLog(key, merged)
         }
       } catch (e) { logError('hook:useActiveWorkoutController.applyPartnerUpdate', e) }
     }
-  }, [exerciseControlUpdates, getLog, props])
+  }, [exerciseControlUpdates, getLog])
 
 
   // ── Deload + report history (extracted to useWorkoutDeload) ──────────────
@@ -275,7 +216,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     deloadSuggestions, deloadModal, setDeloadModal,
     deloadAiCacheRef, reportHistoryLoadingRef,
     reportHistoryLoadingSinceRef, reportHistoryStatusRef, reportHistoryUpdatedAtRef,
-    buildExerciseHistoryEntry, persistDeloadHistoryFromSession,
+    persistDeloadHistoryFromSession,
     openDeloadModal, updateDeloadModalFromPercent, updateDeloadModalFromWeight,
     applyDeloadToExercise,
   } = deload;
@@ -413,7 +354,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     alert: alertVoid,
     confirm, onFinish: props.onFinish as ((session: unknown, showReport: boolean) => void) | undefined,
   });
-  const { finishWorkout, requestPostWorkoutCheckin } = finishHook;
+  const { finishWorkout } = finishHook;
 
 
 

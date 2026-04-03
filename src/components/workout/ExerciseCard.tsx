@@ -26,13 +26,12 @@ import { parseTrainingNumber } from '@/utils/trainingNumber';
 import { isObject, isClusterConfig, isRestPauseConfig } from './utils';
 import { WorkoutExercise, UnknownRecord } from './types';
 import ExecutionVideoCapture from '@/components/ExecutionVideoCapture';
-import { logError, logWarn, logInfo } from '@/lib/logger'
+import { logError, logInfo } from '@/lib/logger'
 import { useTeamWorkout } from '@/contexts/TeamWorkoutContext'
 import AIExerciseSwap from './AIExerciseSwap'
 
 function useSafeTeamWorkout() {
   try {
-    // eslint-disable-next-line react-hooks/rules-of-hooks
     return useTeamWorkout()
   } catch {
     return null
@@ -396,11 +395,11 @@ function ExerciseCardInner({ ex, exIdx }: { ex: WorkoutExercise; exIdx: number }
               setCurrentExerciseIdx(exIdx);
               await openDeloadModal(ex, exIdx);
             }}
-            className="h-9 w-9 inline-flex items-center justify-center rounded-xl bg-neutral-900 border border-neutral-800 text-yellow-500 hover:bg-neutral-800 transition-colors active:scale-95 flex-shrink-0"
+            className="h-9 w-9 inline-flex items-center justify-center rounded-xl bg-neutral-900 border border-neutral-800 text-neutral-500 hover:text-yellow-400 hover:bg-neutral-800 transition-colors active:scale-95 flex-shrink-0"
             title="Sugestão de Deload"
             aria-label="Sugestão de Deload"
           >
-            {isReportLoading ? <Loader2 size={16} className="animate-spin" /> : <ArrowDown size={16} />}
+            {isReportLoading ? <Loader2 size={16} className="animate-spin text-yellow-500" /> : <ArrowDown size={16} />}
           </button>
           <button
             type="button"

@@ -1,6 +1,7 @@
 'use client'
 
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import { ChevronDown, ChevronUp } from 'lucide-react'
 import { useCardioTracking } from '@/hooks/useCardioTracking'
 import { formatDistance, formatPace } from '@/utils/geoUtils'
 import type { GeoTrackPoint } from '@/utils/geoUtils'
@@ -27,6 +28,12 @@ export default function CardioGPSPanel({ workoutId, onSaved, bodyWeightKg }: Car
   const { isTracking, isPaused, metrics, trackPoints, start, pause, resume, stop, reset } = useCardioTracking({ bodyWeightKg })
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  // Collapsed by default — auto-expands when tracking starts
+  const [isOpen, setIsOpen] = useState(false)
+
+  useEffect(() => {
+    if (isTracking) setIsOpen(true)
+  }, [isTracking])
 
   const handleStop = useCallback(async () => {
     const result = stop()
@@ -73,92 +80,105 @@ export default function CardioGPSPanel({ workoutId, onSaved, bodyWeightKg }: Car
 
   return (
     <div
-      className="rounded-2xl border p-4"
+      className="mx-4 rounded-2xl border overflow-hidden"
       style={{
         background: 'linear-gradient(135deg, rgba(15,15,15,0.98) 0%, rgba(10,20,15,0.98) 100%)',
         borderColor: isTracking ? 'rgba(34,197,94,0.3)' : 'rgba(255,255,255,0.08)',
       }}
     >
-      {/* Header */}
-      <div className="flex items-center justify-between mb-3">
+      {/* Accordion header — always visible */}
+      <button
+        type="button"
+        onClick={() => setIsOpen(v => !v)}
+        className="w-full flex items-center justify-between px-4 py-3 text-left"
+      >
         <div className="flex items-center gap-2">
-          <span className="text-lg">🏃</span>
-          <h3 className="text-sm font-bold text-white">Cardio GPS</h3>
-        </div>
-        {isTracking && (
-          <div className="flex items-center gap-1.5">
-            <span
-              className="h-2 w-2 rounded-full"
-              style={{
-                background: isPaused ? '#eab308' : '#22c55e',
-                animation: isPaused ? 'none' : 'pulse 1.5s ease-in-out infinite',
-              }}
-            />
-            <span className="text-xs text-white/50">{isPaused ? 'Pausado' : 'Gravando'}</span>
-          </div>
-        )}
-      </div>
-
-      {/* Route Map */}
-      <RouteMap points={trackPoints} />
-
-      {/* Metrics Grid */}
-      <div className="grid grid-cols-3 gap-2 mb-3">
-        <MetricCard label="Distância" value={formatDistance(metrics.distanceMeters)} accent />
-        <MetricCard label="Tempo" value={formatDuration(metrics.durationSeconds)} />
-        <MetricCard label="Pace" value={formatPace(metrics.paceMinKm)} unit="/km" />
-        <MetricCard label="Velocidade" value={`${metrics.currentSpeedKmh}`} unit="km/h" />
-        <MetricCard label="Max" value={`${metrics.maxSpeedKmh}`} unit="km/h" />
-        <MetricCard label="Calorias" value={`${metrics.caloriesEstimated}`} unit="kcal" />
-      </div>
-
-      {/* Controls */}
-      <div className="flex gap-2">
-        {!isTracking && !saved ? (
-          <button
-            onClick={start}
-            className="flex-1 rounded-xl py-3 text-sm font-bold text-black transition-all active:scale-95"
-            style={{ background: 'linear-gradient(135deg, #22c55e, #16a34a)' }}
-          >
-            ▶ Iniciar Cardio
-          </button>
-        ) : isTracking ? (
-          <>
-            <button
-              onClick={isPaused ? resume : pause}
-              className="flex-1 rounded-xl py-3 text-sm font-bold text-black transition-all active:scale-95"
-              style={{ background: isPaused ? 'linear-gradient(135deg, #22c55e, #16a34a)' : 'linear-gradient(135deg, #eab308, #ca8a04)' }}
-            >
-              {isPaused ? '▶ Retomar' : '⏸ Pausar'}
-            </button>
-            <button
-              onClick={handleStop}
-              disabled={saving}
-              className="rounded-xl border px-5 py-3 text-sm font-bold text-red-400 transition-all active:scale-95 disabled:opacity-50"
-              style={{ borderColor: 'rgba(239,68,68,0.3)' }}
-            >
-              {saving ? '...' : '⏹ Parar'}
-            </button>
-          </>
-        ) : saved ? (
-          <div className="flex-1 flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <span className="text-green-400">✓</span>
-              <span className="text-sm text-white/60">Cardio salvo!</span>
+          <span className="text-base">🏃</span>
+          <span className="text-sm font-bold text-white">Cardio GPS</span>
+          {isTracking && (
+            <div className="flex items-center gap-1.5">
+              <span
+                className="h-1.5 w-1.5 rounded-full"
+                style={{
+                  background: isPaused ? '#eab308' : '#22c55e',
+                  animation: isPaused ? 'none' : 'gps-pulse 1.5s ease-in-out infinite',
+                }}
+              />
+              <span className="text-xs text-white/50">{isPaused ? 'Pausado' : 'Gravando'}</span>
             </div>
-            <button
-              onClick={handleReset}
-              className="rounded-lg px-3 py-1.5 text-xs text-white/40 hover:text-white transition-colors"
-              style={{ background: 'rgba(255,255,255,0.05)' }}
-            >
-              Novo
-            </button>
+          )}
+        </div>
+        {isOpen
+          ? <ChevronUp size={15} className="text-neutral-500" />
+          : <ChevronDown size={15} className="text-neutral-500" />
+        }
+      </button>
+
+      {/* Collapsible content */}
+      {isOpen && (
+        <div className="px-4 pb-4">
+          {/* Route Map */}
+          <RouteMap points={trackPoints} />
+
+          {/* Metrics Grid */}
+          <div className="grid grid-cols-3 gap-2 mb-3">
+            <MetricCard label="Distância" value={formatDistance(metrics.distanceMeters)} accent />
+            <MetricCard label="Tempo" value={formatDuration(metrics.durationSeconds)} />
+            <MetricCard label="Pace" value={formatPace(metrics.paceMinKm)} unit="/km" />
+            <MetricCard label="Velocidade" value={`${metrics.currentSpeedKmh}`} unit="km/h" />
+            <MetricCard label="Max" value={`${metrics.maxSpeedKmh}`} unit="km/h" />
+            <MetricCard label="Calorias" value={`${metrics.caloriesEstimated}`} unit="kcal" />
           </div>
-        ) : null}
-      </div>
+
+          {/* Controls */}
+          <div className="flex gap-2">
+            {!isTracking && !saved ? (
+              <button
+                onClick={start}
+                className="flex-1 rounded-xl py-3 text-sm font-bold text-black transition-all active:scale-95"
+                style={{ background: 'linear-gradient(135deg, #22c55e, #16a34a)' }}
+              >
+                ▶ Iniciar Cardio
+              </button>
+            ) : isTracking ? (
+              <>
+                <button
+                  onClick={isPaused ? resume : pause}
+                  className="flex-1 rounded-xl py-3 text-sm font-bold text-black transition-all active:scale-95"
+                  style={{ background: isPaused ? 'linear-gradient(135deg, #22c55e, #16a34a)' : 'linear-gradient(135deg, #eab308, #ca8a04)' }}
+                >
+                  {isPaused ? '▶ Retomar' : '⏸ Pausar'}
+                </button>
+                <button
+                  onClick={handleStop}
+                  disabled={saving}
+                  className="rounded-xl border px-5 py-3 text-sm font-bold text-red-400 transition-all active:scale-95 disabled:opacity-50"
+                  style={{ borderColor: 'rgba(239,68,68,0.3)' }}
+                >
+                  {saving ? '...' : '⏹ Parar'}
+                </button>
+              </>
+            ) : saved ? (
+              <div className="flex-1 flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <span className="text-green-400">✓</span>
+                  <span className="text-sm text-white/60">Cardio salvo!</span>
+                </div>
+                <button
+                  onClick={handleReset}
+                  className="rounded-lg px-3 py-1.5 text-xs text-white/40 hover:text-white transition-colors"
+                  style={{ background: 'rgba(255,255,255,0.05)' }}
+                >
+                  Novo
+                </button>
+              </div>
+            ) : null}
+          </div>
+        </div>
+      )}
 
       <style jsx>{`
-        @keyframes pulse {
+        @keyframes gps-pulse {
           0%, 100% { opacity: 1; }
           50% { opacity: 0.4; }
         }
@@ -184,7 +204,6 @@ function RouteMap({ points }: { points: GeoTrackPoint[] }) {
   const lngRange = maxLng - minLng || 0.0001
 
   const toX = (lng: number) => SVG_PAD + ((lng - minLng) / lngRange) * (SVG_W - SVG_PAD * 2)
-  // Latitude increases up, SVG y increases down
   const toY = (lat: number) => SVG_H - SVG_PAD - ((lat - minLat) / latRange) * (SVG_H - SVG_PAD * 2)
 
   const d = points
@@ -199,36 +218,10 @@ function RouteMap({ points }: { points: GeoTrackPoint[] }) {
       className="mb-3 rounded-xl overflow-hidden"
       style={{ background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(34,197,94,0.12)' }}
     >
-      <svg
-        viewBox={`0 0 ${SVG_W} ${SVG_H}`}
-        className="w-full"
-        style={{ height: 72, display: 'block' }}
-      >
-        {/* Route line */}
-        <path
-          d={d}
-          fill="none"
-          stroke="rgba(34,197,94,0.75)"
-          strokeWidth="1.8"
-          strokeLinecap="round"
-          strokeLinejoin="round"
-        />
-        {/* Start dot */}
-        <circle
-          cx={toX(first.longitude).toFixed(1)}
-          cy={toY(first.latitude).toFixed(1)}
-          r="3"
-          fill="#22c55e"
-        />
-        {/* Current position dot */}
-        <circle
-          cx={toX(last.longitude).toFixed(1)}
-          cy={toY(last.latitude).toFixed(1)}
-          r="4"
-          fill="white"
-          stroke="#22c55e"
-          strokeWidth="1.5"
-        />
+      <svg viewBox={`0 0 ${SVG_W} ${SVG_H}`} className="w-full" style={{ height: 72, display: 'block' }}>
+        <path d={d} fill="none" stroke="rgba(34,197,94,0.75)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+        <circle cx={toX(first.longitude).toFixed(1)} cy={toY(first.latitude).toFixed(1)} r="3" fill="#22c55e" />
+        <circle cx={toX(last.longitude).toFixed(1)} cy={toY(last.latitude).toFixed(1)} r="4" fill="white" stroke="#22c55e" strokeWidth="1.5" />
       </svg>
     </div>
   )
