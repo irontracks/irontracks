@@ -67,6 +67,9 @@ import { useWorkoutFetch } from '@/hooks/useWorkoutFetch'
 import { useSessionSync } from '@/hooks/useSessionSync'
 import { useWorkoutEditor } from '@/hooks/useWorkoutEditor'
 import { useBootstrap } from '@/hooks/useBootstrap'
+import { useHealthKit } from '@/hooks/useHealthKit'
+import { saveWorkoutToHealth } from '@/utils/native/irontracksNative'
+import HealthWidget from '@/components/dashboard/HealthWidget'
 import { useNativeTimerActions } from '@/hooks/useNativeTimerActions'
 import { useAppEffects, isRecord, parseStartedAtMs } from '@/hooks/useAppEffects'
 import { useAppHandlers } from '@/hooks/useAppHandlers'
@@ -179,6 +182,11 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
 
     // Profile completion state — extracted to useProfileCompletion hook
     const userSettingsApi = useUserSettings(user?.id)
+    const appleHealthEnabled = Boolean(userSettingsApi?.settings?.appleHealthSync)
+    const { data: healthData, refetch: refetchHealth } = useHealthKit({
+        enabled: appleHealthEnabled,
+        userId: user?.id,
+    })
     const {
         profileIncomplete,
         setProfileIncomplete,
@@ -427,6 +435,24 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         inAppNotify,
     })
 
+    // Wrap handleFinishSession to save workout to Apple Health when enabled
+    const handleFinishSessionWithHealth = useCallback(async (sessionData: unknown, showReport?: boolean) => {
+        if (appleHealthEnabled) {
+            try {
+                const sd = sessionData && typeof sessionData === 'object'
+                    ? (sessionData as Record<string, unknown>)
+                    : null
+                const startMs = typeof sd?.startedAt === 'number' ? sd.startedAt : 0
+                const endMs = startMs > 0 ? Date.now() : 0
+                if (startMs > 0 && endMs > startMs) {
+                    await saveWorkoutToHealth({ startMs, endMs }).catch(() => { })
+                    void refetchHealth()
+                }
+            } catch { /* health save is best-effort */ }
+        }
+        return handleFinishSession(sessionData, showReport)
+    }, [appleHealthEnabled, handleFinishSession, refetchHealth])
+
     // Normalização de títulos e exercícios — extraído para useWorkoutNormalize
     const {
         handleNormalizeAiWorkoutTitles,
@@ -658,6 +684,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                             {(view === 'dashboard' || view === 'assessments' || view === 'community' || view === 'vip') && (
                               <>
                                 {view === 'dashboard' && <WorkoutRecoveryBanner userId={String(user?.id || initialUserObj?.id || '')} />}
+                                {view === 'dashboard' && appleHealthEnabled && <HealthWidget data={healthData} />}
                                 <StudentDashboard
                                     workouts={Array.isArray(workouts) ? workouts : []}
                                     profileIncomplete={Boolean(profileIncomplete)}
@@ -837,7 +864,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                         user={user as AdminUser}
                                         settings={userSettingsApi?.settings ?? null}
                                         onUpdateLog={handleUpdateSessionLog}
-                                        onFinish={handleFinishSession}
+                                        onFinish={handleFinishSessionWithHealth}
                                         onPersistWorkoutTemplate={handlePersistWorkoutTemplateFromSession}
                                         onBack={() => setView('dashboard')}
                                         onStartTimer={handleStartTimer}

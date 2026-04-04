@@ -64,6 +64,8 @@ export const UserSettingsSchema = z
     featureStoriesV2: z.boolean().default(false),
     featureOfflineSyncV2: z.boolean().default(false),
     requireBiometricsOnStartup: z.boolean().default(false),
+    // ── Integrations ──────────────────────────────────────────────────────────
+    appleHealthSync: z.boolean().default(false),
   })
   .passthrough()
 

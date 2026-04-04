@@ -161,6 +161,12 @@ export default function DashboardModals(props: DashboardModalsProps) {
         ? (userSettingsApi as Record<string, unknown>).save as ((next: unknown) => Promise<{ ok: boolean; error?: string }>) | undefined
         : undefined
 
+    // Patch a subset of settings immediately (used by SettingsModal for HealthKit consent)
+    const patchSettingsFn = async (patch: Record<string, unknown>) => {
+        if (!saveFn || !settings) return
+        await saveFn({ ...(settings as Record<string, unknown>), ...patch }).catch(() => { })
+    }
+
     // Determine if the user already has body weight in profile (so we can hide weight from pre-checkin)
     const profileBodyWeightKg = (() => {
         try {
@@ -698,6 +704,7 @@ export default function DashboardModals(props: DashboardModalsProps) {
                         setWhatsNewOpen(true)
                     }}
                     onOpenProgressPhotos={() => { setSettingsOpen(false); setShowProgressPhotos(true) }}
+                    patchSettings={patchSettingsFn}
                     onSave={async (next: unknown) => {
                         try {
                             const safeNext = next && typeof next === 'object' ? next : (settings ?? {})
