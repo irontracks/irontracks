@@ -33,6 +33,7 @@ interface VipHubProps {
   onOpenWizard?: () => void
   onOpenHistory?: () => void
   onOpenReport?: (s?: Record<string, unknown>) => void
+  onOpenNutrition?: () => void
 }
 
 interface ChatAction {
@@ -76,7 +77,7 @@ interface VipStatus {
   }
 }
 
-export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab, onStartSession, onOpenWizard, onOpenHistory, onOpenReport }: VipHubProps) {
+export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab, onStartSession, onOpenWizard, onOpenHistory, onOpenReport, onOpenNutrition }: VipHubProps) {
   const isLocked = !!locked
   const [hideVipCtas, setHideVipCtas] = useState(false)
   useEffect(() => { setHideVipCtas(isIosNative()) }, [])
@@ -407,9 +408,8 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
   const nutritionSubtitle = macrosEnabled ? 'Macros liberado' : 'Macros (Pro+)'
 
   const openNutrition = () => {
-    try {
-      window.location.href = '/dashboard/nutrition'
-    } catch { /* best effort: navigation */ }
+    if (onOpenNutrition) { onOpenNutrition(); return }
+    router.push('/dashboard/nutrition')
   }
 
   const chip = (label: string, used: number | null | undefined, limit: number | null | undefined) => {

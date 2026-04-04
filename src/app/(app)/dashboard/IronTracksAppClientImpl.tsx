@@ -42,6 +42,7 @@ import { useUserSettings } from '@/hooks/useUserSettings'
 const WhatsNewModal = dynamic(() => import('@/components/WhatsNewModal'), { ssr: false })
 import { generateWorkoutFromWizard } from '@/utils/workoutAutoGenerator'
 const GuidedTour = dynamic(() => import('@/components/onboarding/GuidedTour'), { ssr: false })
+const NutritionOverlay = dynamic(() => import('@/components/dashboard/nutrition/NutritionOverlay'), { ssr: false })
 import { getTourSteps } from '@/utils/tourSteps'
 const OfflineSyncModal = dynamic(() => import('@/components/OfflineSyncModal'), { ssr: false })
 const WorkoutRecoveryBanner = dynamic(() => import('@/components/WorkoutRecoveryBanner'), { ssr: false, loading: () => null })
@@ -131,6 +132,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
     const [currentWorkout, setCurrentWorkout] = useState<ActiveSession | null>(null);
     const [createWizardOpen, setCreateWizardOpen] = useState(false)
     const [expressWorkoutOpen, setExpressWorkoutOpen] = useState(false)
+    const [nutritionOpen, setNutritionOpen] = useState(false)
     const [quickViewWorkout, setQuickViewWorkout] = useState<ActiveSession | null>(null);
     const [reportData, setReportData] = useState({ current: null, previous: null });
     const mainScrollRef = useRef<HTMLDivElement | null>(null);
@@ -716,6 +718,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                                     setReportData({ current: s, previous: null } as unknown as Parameters<typeof setReportData>[0]);
                                                     setView('report');
                                                 }}
+                                                onOpenNutrition={() => setNutritionOpen(true)}
                                             />
                                     }
                                     vipLabel="VIP"
@@ -764,6 +767,13 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                     }
                                 }}
                             />
+
+                            {nutritionOpen ? (
+                                <NutritionOverlay
+                                    onClose={() => setNutritionOpen(false)}
+                                    canViewMacros={!!(vipStatus?.limits as Record<string, unknown> | undefined)?.nutrition_macros}
+                                />
+                            ) : null}
 
                             <WorkoutWizardModal
                                 isOpen={createWizardOpen}
