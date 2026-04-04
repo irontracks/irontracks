@@ -22,7 +22,8 @@ export default function WorkoutFooter() {
     currentExDoneSets,
   } = useWorkoutContext();
 
-  // Guard against double-tap on Finalizar button
+  // Separate guards for Cancel and Finalizar — shared ref would make one block the other
+  const cancelBusyRef = React.useRef(false);
   const finishBusyRef = React.useRef(false);
 
   const { ticker, elapsedSeconds, formatElapsed, timerMinimized, setTimerMinimized } = useWorkoutTimer();
@@ -194,13 +195,13 @@ export default function WorkoutFooter() {
           <button
             type="button"
             onClick={async () => {
-              if (finishBusyRef.current) return;
-              const ok = await confirm('Cancelar treino em andamento? (não salva no histórico)', 'Cancelar');
-              if (!ok) return;
-              finishBusyRef.current = true;
+              if (cancelBusyRef.current) return;
+              cancelBusyRef.current = true;
               try {
+                const ok = await confirm('Cancelar treino em andamento? (não salva no histórico)', 'Cancelar');
+                if (!ok) { cancelBusyRef.current = false; return; }
                 if (typeof onFinish === 'function') onFinish(null, false);
-              } catch { }
+              } catch { cancelBusyRef.current = false; }
             }}
             className="w-11 h-11 flex items-center justify-center rounded-xl bg-neutral-900 border border-neutral-700/50 text-neutral-500 hover:text-red-400 hover:border-red-500/30 active:scale-95 transition-all"
             title="Cancelar treino"

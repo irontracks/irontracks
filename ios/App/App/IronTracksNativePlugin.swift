@@ -295,21 +295,19 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin {
                     try? await Task.sleep(nanoseconds: nsDelay)
                     guard !Task.isCancelled else { return }
 
-                    if #available(iOS 16.2, *) {
-                        let finishedState = RestTimerAttributes.ContentState(
-                            endDate: capturedEndDate,
-                            targetSeconds: capturedSeconds,
-                            isFinished: true
-                        )
-                        // Keep the finished state visible for 5 minutes
-                        let finishedContent = ActivityContent(
-                            state: finishedState,
-                            staleDate: Date().addingTimeInterval(300)
-                        )
-                        for activity in Activity<RestTimerAttributes>.activities
-                            where activity.attributes.timerID == capturedId {
-                            await activity.update(finishedContent)
-                        }
+                    let finishedState = RestTimerAttributes.ContentState(
+                        endDate: capturedEndDate,
+                        targetSeconds: capturedSeconds,
+                        isFinished: true
+                    )
+                    // Keep the finished state visible for 5 minutes
+                    let finishedContent = ActivityContent(
+                        state: finishedState,
+                        staleDate: Date().addingTimeInterval(300)
+                    )
+                    for activity in Activity<RestTimerAttributes>.activities
+                        where activity.attributes.timerID == capturedId {
+                        await activity.update(finishedContent)
                     }
                 }
             }
