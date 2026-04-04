@@ -41,6 +41,7 @@ function useSafeTeamWorkout() {
 function ExerciseCardInner({ ex, exIdx }: { ex: WorkoutExercise; exIdx: number }) {
   const {
     workout,
+    logs,
     collapsed,
     toggleCollapse,
     setCurrentExerciseIdx,
@@ -121,15 +122,16 @@ function ExerciseCardInner({ ex, exIdx }: { ex: WorkoutExercise; exIdx: number }
         ? Math.max(...items.map(i => Number(i.topWeight ?? 0)).filter(v => v > 0))
         : 0;
       if (!histTopWeight) return false;
+      const logsObj = logs as Record<string, Record<string, unknown>>;
       let sessionMax = 0;
       for (let i = 0; i < setsCount; i++) {
-        const log = getLog(`${exIdx}-${i}`);
-        const w = Number(log.weight ?? log.total_weight ?? 0);
+        const log = logsObj[`${exIdx}-${i}`];
+        const w = Number(log?.weight ?? log?.total_weight ?? 0);
         if (w > sessionMax) sessionMax = w;
       }
       return sessionMax > 0 && sessionMax > histTopWeight;
     } catch { return false; }
-  }, [ex?.name, exIdx, getLog, reportHistory, setsCount]);
+  }, [ex?.name, exIdx, logs, reportHistory, setsCount]);
 
   // Parse SST config from exercise description (e.g. "SST na última: Falha > 10s > Falha > 10s > Falha")
   const parsedSSTConfig = (() => {

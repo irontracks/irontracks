@@ -158,7 +158,8 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
           for (let setIdx = 0; setIdx < setsCount; setIdx++) {
             const linkedKey = `${exIdx}-${setIdx}`;
             const prev = getLog(linkedKey);
-            propsRef.current.onUpdateLog(linkedKey, { ...prev, ...patchObj });
+            // Only propagate weight — never propagate done/reps/notes to other sets
+            propsRef.current.onUpdateLog(linkedKey, { ...prev, weight: patchObj.weight });
           }
           // Broadcast linked weight update for first set only
           try {
@@ -222,9 +223,9 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
   } = deload;
 
 
-  const startTimer = (seconds: unknown, context: unknown) => {
+  const startTimer = useCallback((seconds: unknown, context: unknown) => {
     try {
-      if (typeof props?.onStartTimer !== 'function') return;
+      if (typeof propsRef.current?.onStartTimer !== 'function') return;
       const s = Number(seconds);
       if (!Number.isFinite(s) || s <= 0) return;
       // Auto-inject exerciseName from key ("exIdx-setIdx") if not already provided
@@ -232,13 +233,15 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
       if (!ctx.exerciseName) {
         const key = String(ctx.key || '').trim();
         const exIdx = key ? Number(key.split('-')[0]) : NaN;
-        if (Number.isFinite(exIdx) && exIdx >= 0 && exercises[exIdx]) {
-          ctx.exerciseName = String(exercises[exIdx]?.name || '').trim() || undefined;
+        const currentExercises = propsRef.current?.session?.workout?.exercises;
+        const exArr = Array.isArray(currentExercises) ? currentExercises : [];
+        if (Number.isFinite(exIdx) && exIdx >= 0 && exArr[exIdx]) {
+          ctx.exerciseName = String(exArr[exIdx]?.name || '').trim() || undefined;
         }
       }
-      props.onStartTimer(s, ctx);
+      propsRef.current.onStartTimer(s, ctx);
     } catch { }
-  };
+  }, []);
 
   /**
    * Called when the rest timer finishes or is dismissed (onFinish / onClose
@@ -331,14 +334,14 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
   });
 
   // ── Toggle exercise notes ──────────────────────────────────────────────
-  const toggleNotes = (key: string) => {
+  const toggleNotes = useCallback((key: string) => {
     setOpenNotesKeys((prev: Set<string>) => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key);
       else next.add(key);
       return next;
     });
-  };
+  }, [setOpenNotesKeys]);
 
 
   // ── Finish workout (extracted to useWorkoutFinish) ──────────────────────
@@ -359,6 +362,23 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
 
 
   const currentExercise = exercises[currentExerciseIdx] ?? null;
+
+  // ── Current exercise progress (consumed by WorkoutFooter) ──────────
+  const { currentExSetsCount, currentExDoneSets } = useMemo(() => {
+    if (!currentExercise) return { currentExSetsCount: 0, currentExDoneSets: 0 };
+    const setsHeader = Math.max(0, parseInt(String(currentExercise?.sets ?? '0'), 10) || 0);
+    const sdArr = Array.isArray(currentExercise?.setDetails)
+      ? currentExercise.setDetails
+      : Array.isArray((currentExercise as Record<string, unknown>)?.set_details)
+        ? (currentExercise as Record<string, unknown>).set_details as unknown[]
+        : [];
+    const count = Math.max(setsHeader, Array.isArray(sdArr) ? sdArr.length : 0);
+    const logsObj = logs as Record<string, Record<string, unknown>>;
+    const done = count > 0 && Number.isFinite(currentExerciseIdx)
+      ? Array.from({ length: count }).filter((_, i) => logsObj[`${currentExerciseIdx}-${i}`]?.done).length
+      : 0;
+    return { currentExSetsCount: count, currentExDoneSets: done };
+  }, [currentExercise, currentExerciseIdx, logs]);
 
   const elapsedSeconds = useMemo(() => {
     const startedAtMs = parseStartedAtMs(session?.startedAt);
@@ -525,5 +545,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     totalSets,
     progressPct,
     remainingSets,
+    currentExSetsCount,
+    currentExDoneSets,
   };
 }

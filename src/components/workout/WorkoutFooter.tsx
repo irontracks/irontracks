@@ -10,8 +10,6 @@ export default function WorkoutFooter() {
   const {
     session,
     currentExercise,
-    currentExerciseIdx,
-    logs,
     elapsedSeconds,
     formatElapsed,
     ticker,
@@ -24,16 +22,9 @@ export default function WorkoutFooter() {
     completedSets,
     totalSets,
     remainingSets,
+    currentExSetsCount,
+    currentExDoneSets,
   } = useWorkoutContext();
-
-  // Compute series count for the current exercise (not global total)
-  const currentExSetsHeader = currentExercise ? Math.max(0, parseInt(String(currentExercise?.sets ?? '0'), 10) || 0) : 0;
-  const currentExSdArr = currentExercise && Array.isArray(currentExercise?.setDetails) ? currentExercise.setDetails : [];
-  const currentExSetsCount = Math.max(currentExSetsHeader, (currentExSdArr as unknown[]).length);
-  const exLogs = logs as Record<string, Record<string, unknown>>;
-  const currentExDoneSets = currentExSetsCount > 0 && Number.isFinite(currentExerciseIdx as number)
-    ? Array.from({ length: currentExSetsCount }).filter((_, i) => exLogs[`${currentExerciseIdx}-${i}`]?.done).length
-    : 0;
 
   // Team pause/resume — gracefully degrades if no team session
   const teamCtx = useTeamWorkout() as unknown as {
@@ -71,10 +62,13 @@ export default function WorkoutFooter() {
   const displayTime = `${formatElapsed(displaySeconds)}${recoveryExtraSeconds > 0 ? ` (+${formatElapsed(recoveryExtraSeconds)})` : ''}`
 
   // Recovery ring: shows progress from plannedRestSec → 0
-  const recoveryRingPct = hasRecovery && plannedRestSec > 0
-    ? Math.max(0, Math.min(100, (recoverySeconds / plannedRestSec) * 100))
-    : 0
-  const recoveryRingColor = recoveryRingPct > 60 ? '#22c55e' : recoveryRingPct > 30 ? '#f59e0b' : '#ef4444'
+  const { recoveryRingPct, recoveryRingColor } = React.useMemo(() => {
+    const pct = hasRecovery && plannedRestSec > 0
+      ? Math.max(0, Math.min(100, (recoverySeconds / plannedRestSec) * 100))
+      : 0
+    const color = pct > 60 ? '#22c55e' : pct > 30 ? '#f59e0b' : '#ef4444'
+    return { recoveryRingPct: pct, recoveryRingColor: color }
+  }, [hasRecovery, plannedRestSec, recoverySeconds])
 
   return (
     <>
