@@ -6,27 +6,26 @@ import { Clock, GripVertical, MoreHorizontal, Plus, UserPlus } from 'lucide-reac
 import { BackButton } from '@/components/ui/BackButton';
 import InviteManager from '@/components/InviteManager';
 import { useWorkoutContext } from './WorkoutContext';
+import { useWorkoutTimer } from './WorkoutTimerContext';
 import HeartRateMonitor from './HeartRateMonitor';
 
 export default function WorkoutHeader() {
   const {
     workout,
     exercises,
-    elapsedSeconds,
     inviteOpen,
     setInviteOpen,
     setAddExerciseOpen,
     openOrganizeModal,
-    formatElapsed,
     sendInvite,
     alert,
     completedSets,
     totalSets,
     progressPct,
     session,
-    ticker,
     _exitOnBack: exitOnBack,
   } = useWorkoutContext();
+  const { ticker, elapsedSeconds, formatElapsed } = useWorkoutTimer();
 
   // Detect if a set is actively being executed — collapse action buttons to reduce distraction
   const isRecord = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);

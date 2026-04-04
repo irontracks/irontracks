@@ -2,7 +2,7 @@
  * Tests for src/components/workout/utils.ts
  * Covers: toNumber, averageNumbers, clampNumber, roundToStep, toDateMs,
  *         buildPlannedBlocks, buildBlocksByCount, isClusterConfig, isRestPauseConfig,
- *         normalizeExerciseKey, extractLogWeight, estimate1Rm
+ *         normalizeExerciseKey, extractLogWeight, estimate1Rm, formatElapsed
  */
 
 import { describe, it, expect } from 'vitest';
@@ -16,6 +16,7 @@ import {
   buildBlocksByCount,
   isClusterConfig,
   isRestPauseConfig,
+  formatElapsed,
   normalizeExerciseKey,
   extractLogWeight,
   estimate1Rm,
@@ -199,6 +200,26 @@ describe('isRestPauseConfig', () => {
   });
   it('returns false for non-object', () => {
     expect(isRestPauseConfig(null)).toBe(false);
+  });
+});
+
+// ─── formatElapsed ───────────────────────────────────────────────────────────
+
+describe('formatElapsed', () => {
+  it('formats 0 seconds', () => {
+    expect(formatElapsed(0)).toBe('0:00');
+  });
+  it('formats 65 seconds as 1:05', () => {
+    expect(formatElapsed(65)).toBe('1:05');
+  });
+  it('formats 3600 seconds as 60:00', () => {
+    expect(formatElapsed(3600)).toBe('60:00');
+  });
+  it('handles string input', () => {
+    expect(formatElapsed('125')).toBe('2:05');
+  });
+  it('handles null as 0:00', () => {
+    expect(formatElapsed(null)).toBe('0:00');
   });
 });
 

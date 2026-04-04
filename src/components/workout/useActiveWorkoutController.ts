@@ -1,7 +1,8 @@
 
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { logError } from '@/lib/logger';
-import { useWorkoutTicker } from './hooks/useWorkoutTicker';
+// Note: useWorkoutTicker is no longer called here — it lives in WorkoutTimerProvider.
+// The controller no longer re-renders every second, only on user interaction.
 import { useWorkoutModals } from './hooks/useWorkoutModals';
 import { useWorkoutDeload } from './hooks/useWorkoutDeload';
 import { useWorkoutExerciseCrud } from './hooks/useWorkoutExerciseCrud';
@@ -21,17 +22,7 @@ import {
 } from './helpers/setPlanningHelpers';
 import { HELP_TERMS } from '@/utils/help/terms';
 
-const parseStartedAtMs = (raw: unknown): number => {
-  const direct = typeof raw === 'number' ? raw : Number(String(raw ?? '').trim())
-  if (Number.isFinite(direct) && direct > 0) return direct
-  try {
-    const d = new Date(String(raw ?? ''))
-    const t = d.getTime()
-    return Number.isFinite(t) ? t : 0
-  } catch {
-    return 0
-  }
-}
+// parseStartedAtMs moved to ActiveWorkout.tsx (timer provider) and useWorkoutFinish.ts
 
 export function useActiveWorkoutController(props: ActiveWorkoutProps) {
   const { alert, confirm } = useDialog();
@@ -68,7 +59,8 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
   const ui: UnknownRecord = (session?.ui ?? {}) as UnknownRecord;
   const settings = props.settings ?? null;
 
-  const { ticker, timerMinimized, setTimerMinimized } = useWorkoutTicker();
+  // ticker/timerMinimized now live in WorkoutTimerContext (separate provider)
+  // This prevents the controller from re-rendering every second.
 
   // Persist collapsed card indices across app restarts
   const collapsedKey = (() => {
@@ -134,7 +126,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
         // Check if this is the last set of the exercise (exercise completion)
         const ex = exercises[exIdx];
         const setsHeader = ex ? Math.max(0, Number.parseInt(String(ex?.sets ?? '0'), 10) || 0) : 0;
-        const sdArr: unknown[] = ex && Array.isArray(ex?.setDetails) ? (ex.setDetails as unknown[]) : ex && Array.isArray((ex as UnknownRecord)?.set_details) ? ((ex as UnknownRecord).set_details as unknown[]) : [];
+        const sdArr: unknown[] = ex && Array.isArray(ex?.setDetails) ? (ex.setDetails as unknown[]) : ex && Array.isArray(ex?.set_details) ? (ex.set_details as unknown[]) : [];
         const setsCount = Math.max(setsHeader, Array.isArray(sdArr) ? sdArr.length : 0);
         const doneBefore = Array.from({ length: setsCount }).filter((_, i) => i !== sIdx && getLog(`${exIdx}-${i}`)?.done).length;
         const isExerciseComplete = setsCount > 0 && doneBefore === setsCount - 1;
@@ -210,7 +202,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     session, workout, exercises, logs, getLog, updateLog,
     getPlanConfig: (ex, setIdx) => getPlanConfig(ex, setIdx),
     getPlannedSet: (ex, setIdx) => getPlannedSet(ex, setIdx),
-    ticker, alert: alertVoid, confirm,
+    alert: alertVoid, confirm,
   });
   const {
     reportHistory, reportHistoryStatus, reportHistoryUpdatedAt,
@@ -348,7 +340,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
   const finishHook = useWorkoutFinish({
     session, workout, exercises, logs, ui,
     userId: String((settings as Record<string, unknown>)?.userId ?? (session as Record<string, unknown>)?.userId ?? ''),
-    settings, ticker,
+    settings,
     postCheckinOpen, setPostCheckinOpen,
     postCheckinDraft: postCheckinDraft as Record<string, string>,
     setPostCheckinDraft: setPostCheckinDraft as (v: Record<string, string>) => void,
@@ -369,8 +361,8 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     const setsHeader = Math.max(0, parseInt(String(currentExercise?.sets ?? '0'), 10) || 0);
     const sdArr = Array.isArray(currentExercise?.setDetails)
       ? currentExercise.setDetails
-      : Array.isArray((currentExercise as Record<string, unknown>)?.set_details)
-        ? (currentExercise as Record<string, unknown>).set_details as unknown[]
+      : Array.isArray(currentExercise?.set_details)
+        ? (currentExercise.set_details as unknown[])
         : [];
     const count = Math.max(setsHeader, Array.isArray(sdArr) ? sdArr.length : 0);
     const logsObj = logs as Record<string, Record<string, unknown>>;
@@ -380,17 +372,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     return { currentExSetsCount: count, currentExDoneSets: done };
   }, [currentExercise, currentExerciseIdx, logs]);
 
-  const elapsedSeconds = useMemo(() => {
-    const startedAtMs = parseStartedAtMs(session?.startedAt);
-    return startedAtMs > 0 ? Math.max(0, Math.floor((ticker - startedAtMs) / 1000)) : 0;
-  }, [session?.startedAt, ticker]);
-
-  const formatElapsed = (sec: unknown) => {
-    const s = Number(sec) || 0;
-    const m = Math.floor(s / 60);
-    const r = s % 60;
-    return `${m}:${r < 10 ? '0' : ''}${r}`;
-  };
+  // elapsedSeconds + formatElapsed now live in WorkoutTimerContext
 
   // ── Centralized progress calculation (single source of truth) ───────────
   const { completedSets, totalSets, progressPct, remainingSets } = useMemo(() => {
@@ -398,7 +380,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     let done = 0;
     exercises.forEach((ex, exIdx) => {
       const setsHeader = Math.max(0, parseInt(String(ex?.sets ?? '0'), 10) || 0);
-      const sdArr = Array.isArray(ex?.setDetails) ? ex.setDetails : Array.isArray((ex as Record<string, unknown>)?.set_details) ? (ex as Record<string, unknown>).set_details as unknown[] : [];
+      const sdArr = Array.isArray(ex?.setDetails) ? ex.setDetails : Array.isArray(ex?.set_details) ? (ex.set_details as unknown[]) : [];
       const count = Math.max(setsHeader, Array.isArray(sdArr) ? sdArr.length : 0);
       total += count;
       for (let i = 0; i < count; i++) {
@@ -417,7 +399,6 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     logs,
     ui,
     settings,
-    ticker,
     collapsed,
     setCollapsed,
     finishing,
@@ -473,8 +454,6 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     reportHistoryStatus,
     reportHistoryUpdatedAt,
     deloadSuggestions,
-    timerMinimized,
-    setTimerMinimized,
     currentExerciseIdx,
     setCurrentExerciseIdx,
     editExerciseOpen,
@@ -537,8 +516,6 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     confirm,
     HELP_TERMS,
     currentExercise,
-    elapsedSeconds,
-    formatElapsed,
     onFinish: props.onFinish,
     sendInvite,
     completedSets,

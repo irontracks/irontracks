@@ -1,4 +1,5 @@
 import * as Sentry from "@sentry/nextjs"
+import { isNoiseByName, isNoiseException } from "@/utils/sentryFilters"
 
 Sentry.init({
   dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
@@ -26,23 +27,15 @@ Sentry.init({
       ? (err as { name?: string }).name
       : null
 
-    // AbortError: navegação/desmontagem de componente cancela fetches em andamento.
-    // Comportamento esperado — não é bug acionável.
-    if (errName === 'AbortError') return null
+    // Check hint.originalException name
+    if (isNoiseByName(errName)) return null
 
     // Fallback: iOS Safari/WebKit pode não popular hint.originalException em
-    // unhandled rejections — checar também os valores de exceção do evento.
+    // unhandled rejections — checar os valores de exceção do evento.
     const exValues = event.exception?.values
     if (Array.isArray(exValues)) {
       for (const val of exValues) {
-        if (val.type === 'AbortError') return null
-      }
-    }
-
-    // ResizeObserver loop — ruído comum em browsers, não acionável
-    if (Array.isArray(exValues)) {
-      for (const val of exValues) {
-        if (typeof val.value === 'string' && val.value.includes('ResizeObserver loop')) return null
+        if (isNoiseException(val.type, val.value)) return null
       }
     }
 

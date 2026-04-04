@@ -7,6 +7,7 @@ import { BackButton } from '@/components/ui/BackButton';
 import { useActiveWorkoutController } from './workout/useActiveWorkoutController';
 import { WorkoutProvider } from './workout/WorkoutContext';
 import type { WorkoutContextType } from './workout/WorkoutContext';
+import { WorkoutTimerProvider } from './workout/WorkoutTimerContext';
 import WorkoutHeader from './workout/WorkoutHeader';
 import ExerciseList from './workout/ExerciseList';
 import WorkoutFooter from './workout/WorkoutFooter';
@@ -34,6 +35,14 @@ export default function ActiveWorkout(props: ActiveWorkoutProps) {
     setIsExiting(true);
     exitTimerRef.current = setTimeout(cb, 280);
   }, []);
+
+  // Compute startedAtMs for the timer provider (must be before early return — Rules of Hooks)
+  const rawStartedAt = session?.startedAt;
+  const startedAtMs = React.useMemo(() => {
+    const direct = typeof rawStartedAt === 'number' ? rawStartedAt : Number(String(rawStartedAt ?? '').trim());
+    if (Number.isFinite(direct) && direct > 0) return direct;
+    try { const t = new Date(String(rawStartedAt ?? '')).getTime(); return Number.isFinite(t) ? t : 0; } catch { return 0; }
+  }, [rawStartedAt]);
 
   // Enhanced context injects _exitOnBack so WorkoutHeader can trigger animation
   const enhancedController = React.useMemo((): WorkoutContextType => {
@@ -127,6 +136,7 @@ export default function ActiveWorkout(props: ActiveWorkoutProps) {
 
   return (
     <WorkoutProvider value={enhancedController}>
+     <WorkoutTimerProvider startedAtMs={startedAtMs}>
       <motion.div
         initial={{ y: '100%' }}
         animate={{ y: isExiting ? '100%' : 0 }}
@@ -192,6 +202,7 @@ export default function ActiveWorkout(props: ActiveWorkoutProps) {
           />
         )}
       </motion.div>
+     </WorkoutTimerProvider>
     </WorkoutProvider>
   );
 }
