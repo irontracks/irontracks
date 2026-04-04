@@ -157,7 +157,7 @@ export default function ProfilePage({ settings, displayName, onSave, onBack }: P
   return (
     <div className="min-h-screen bg-neutral-950 text-white flex flex-col">
       {/* Fixed Header */}
-      <div className="fixed top-0 left-0 right-0 z-40 bg-neutral-950/95 backdrop-blur-xl border-b border-white/5 px-4 pt-[env(safe-area-inset-top)]" style={{ minHeight: 'calc(3.5rem + env(safe-area-inset-top))' }}>
+      <div className="fixed top-0 left-0 right-0 z-40 bg-neutral-950 backdrop-blur-xl border-b border-white/5 px-4 pt-safe">
         <div className="flex items-center justify-between h-14">
           <button
             type="button"
@@ -183,7 +183,7 @@ export default function ProfilePage({ settings, displayName, onSave, onBack }: P
       </div>
 
       {/* Scrollable content */}
-      <div className="flex-1 overflow-y-auto" style={{ paddingTop: 'calc(3.5rem + env(safe-area-inset-top))' }}>
+      <div className="flex-1 overflow-y-auto pt-safe" style={{ paddingTop: 'calc(3.5rem + env(safe-area-inset-top, 0px))' }}>
         <div className="max-w-lg mx-auto px-4 pb-[env(safe-area-inset-bottom)] pb-8 space-y-6 pt-4">
 
           {/* Profile Completeness Ring */}
