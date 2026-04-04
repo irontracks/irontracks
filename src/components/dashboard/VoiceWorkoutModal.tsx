@@ -363,60 +363,76 @@ export default function VoiceWorkoutModal({
       return
     }
 
-    setTranscript('')
-    setInterimTranscript('')
-    setError('')
-
-    const recognition = new SpeechRecognitionAPI()
-    recognition.lang = 'pt-BR'
-    recognition.continuous = true
-    recognition.interimResults = true
-    recognitionRef.current = recognition
-
-    recognition.onstart = () => setIsRecording(true)
-
-    recognition.onresult = (e: ISpeechRecognitionEvent) => {
-      if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current)
-      let final = ''
-      let interim = ''
-      for (let i = e.resultIndex; i < e.results.length; i++) {
-        const r = e.results[i]
-        if (r.isFinal) final += r[0].transcript
-        else interim += r[0].transcript
-      }
-      setTranscript(prev => prev + final)
-      setInterimTranscript(interim)
-
-      // Auto-stop after 3s silence
-      silenceTimerRef.current = setTimeout(() => {
-        recognition.stop()
-      }, 3000)
-    }
-
-    recognition.onend = () => {
-      setIsRecording(false)
+    const begin = () => {
+      setTranscript('')
       setInterimTranscript('')
-      const finalText = (document.getElementById('voice-transcript-hidden') as HTMLInputElement | null)?.value || ''
-      if (finalText.trim()) {
-        void parseTranscript(finalText)
+      setError('')
+
+      const recognition = new SpeechRecognitionAPI()
+      recognition.lang = 'pt-BR'
+      recognition.continuous = true
+      recognition.interimResults = true
+      recognitionRef.current = recognition
+
+      recognition.onstart = () => setIsRecording(true)
+
+      recognition.onresult = (e: ISpeechRecognitionEvent) => {
+        if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current)
+        let final = ''
+        let interim = ''
+        for (let i = e.resultIndex; i < e.results.length; i++) {
+          const r = e.results[i]
+          if (r.isFinal) final += r[0].transcript
+          else interim += r[0].transcript
+        }
+        setTranscript(prev => prev + final)
+        setInterimTranscript(interim)
+
+        // Auto-stop after 3s silence
+        silenceTimerRef.current = setTimeout(() => {
+          recognition.stop()
+        }, 3000)
       }
+
+      recognition.onend = () => {
+        setIsRecording(false)
+        setInterimTranscript('')
+        const finalText = (document.getElementById('voice-transcript-hidden') as HTMLInputElement | null)?.value || ''
+        if (finalText.trim()) {
+          void parseTranscript(finalText)
+        }
+      }
+
+      recognition.onerror = (e: { error?: string }) => {
+        setIsRecording(false)
+        const code = e?.error || ''
+        if (code === 'not-allowed' || code === 'service-not-allowed') {
+          setError('Permissão de microfone negada. Habilite nas configurações do dispositivo.')
+        } else if (code === 'no-speech') {
+          setError('Nenhuma fala detectada. Tente novamente.')
+        } else if (code === 'network') {
+          setError('Erro de rede. Verifique sua conexão.')
+        } else {
+          setError('Erro no reconhecimento de voz. Tente novamente.')
+        }
+      }
+
+      recognition.start()
     }
 
-    recognition.onerror = (e: { error?: string }) => {
-      setIsRecording(false)
-      const code = e?.error || ''
-      if (code === 'not-allowed' || code === 'service-not-allowed') {
+    // Request microphone permission explicitly before SpeechRecognition.
+    // In WKWebView (Capacitor iOS), getUserMedia triggers the system permission dialog.
+    if (typeof navigator !== 'undefined' && navigator.mediaDevices?.getUserMedia) {
+      navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
+        stream.getTracks().forEach((t) => t.stop())
+        begin()
+      }).catch(() => {
         setError('Permissão de microfone negada. Habilite nas configurações do dispositivo.')
-      } else if (code === 'no-speech') {
-        setError('Nenhuma fala detectada. Tente novamente.')
-      } else if (code === 'network') {
-        setError('Erro de rede. Verifique sua conexão.')
-      } else {
-        setError('Erro no reconhecimento de voz. Tente novamente.')
-      }
+      })
+      return
     }
 
-    recognition.start()
+    begin()
   }, [parseTranscript])
 
   const confirmPending = useCallback(() => {
