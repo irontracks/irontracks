@@ -42,6 +42,8 @@ import {
   SettingsHealthKitSection,
   SettingsModulesModal,
 } from '@/components/settings/SettingsSections'
+import ChangePasswordModal from '@/components/settings/ChangePasswordModal'
+import AvatarUploadModal from '@/components/settings/AvatarUploadModal'
 
 interface SettingsModalProps {
   isOpen?: boolean
@@ -63,6 +65,11 @@ export default function SettingsModal(props: SettingsModalProps) {
   const base = useMemo(() => (isObject(rawSettings) ? rawSettings : {}), [rawSettings])
   const [draft, setDraft] = useState<Record<string, unknown>>(() => base)
   const [modulesModalOpen, setModulesModalOpen] = useState(false)
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false)
+  const [avatarUploadOpen, setAvatarUploadOpen] = useState(false)
+  const [userEmail, setUserEmail] = useState('')
+  const [userId, setUserId] = useState('')
+  const [userPhotoURL, setUserPhotoURL] = useState<string | null>(null)
   const [iosNotifStatus, setIosNotifStatus] = useState<string>('unknown')
   const [iosNotifBusy, setIosNotifBusy] = useState(false)
   const [iosDiag, setIosDiag] = useState<Record<string, unknown> | null>(null)
@@ -128,6 +135,23 @@ export default function SettingsModal(props: SettingsModalProps) {
   }
   useEffect(() => { if (isOpen && isIosNative()) { loadIosDiag() } }, [isOpen])
 
+  // Fetch user identity when modal opens (for password change + avatar)
+  useEffect(() => {
+    if (!isOpen) return
+    const supabase = createClient()
+    supabase.auth.getUser().then(({ data }) => {
+      const uid = String(data?.user?.id || '')
+      setUserEmail(String(data?.user?.email || ''))
+      setUserId(uid)
+      if (uid) {
+        supabase.from('profiles').select('photo_url').eq('id', uid).maybeSingle()
+          .then(({ data: profile }) => {
+            setUserPhotoURL(String(profile?.photo_url || data?.user?.user_metadata?.avatar_url || '') || null)
+          })
+      }
+    })
+  }, [isOpen])
+
   const iosDiagObj = isObject(iosDiag) ? (iosDiag as Record<string, unknown>) : null
   const iosDiagApp = iosDiagObj && isObject(iosDiagObj.app) ? (iosDiagObj.app as Record<string, unknown>) : null
   const iosDiagDevice = iosDiagObj && isObject(iosDiagObj.device) ? (iosDiagObj.device as Record<string, unknown>) : null
@@ -181,7 +205,15 @@ export default function SettingsModal(props: SettingsModalProps) {
 
         {/* Sections */}
         <div className="p-4 space-y-3 max-h-[75vh] overflow-y-auto custom-scrollbar">
-          <SettingsProfileSection draft={draft} setValue={setValue} />
+          <SettingsProfileSection
+            draft={draft}
+            setValue={setValue}
+            userEmail={userEmail}
+            userId={userId}
+            userPhotoURL={userPhotoURL}
+            onOpenChangePassword={() => setChangePasswordOpen(true)}
+            onOpenAvatarUpload={() => setAvatarUploadOpen(true)}
+          />
           <SettingsAppearanceSection draft={draft} setValue={setValue} />
           <SettingsWorkoutNamesSection draft={draft} setValue={setValue} />
           <SettingsAppModeSection draft={draft} setValue={setValue} setModulesModalOpen={setModulesModalOpen} />
@@ -305,6 +337,18 @@ export default function SettingsModal(props: SettingsModalProps) {
 
         {/* Modules modal */}
         <SettingsModulesModal draft={draft} setValue={setValue} isOpen={modulesModalOpen} onClose={() => setModulesModalOpen(false)} />
+
+        {/* Change password modal */}
+        <ChangePasswordModal isOpen={changePasswordOpen} onClose={() => setChangePasswordOpen(false)} userEmail={userEmail} />
+
+        {/* Avatar upload modal */}
+        <AvatarUploadModal
+          isOpen={avatarUploadOpen}
+          onClose={() => setAvatarUploadOpen(false)}
+          currentPhotoURL={userPhotoURL}
+          userId={userId}
+          onPhotoUpdated={(url) => { setUserPhotoURL(url); setAvatarUploadOpen(false) }}
+        />
 
         {/* Footer */}
         <div className="p-4 flex items-center justify-between gap-2" style={{ borderTop: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)' }}>

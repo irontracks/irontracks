@@ -465,19 +465,6 @@ const LoginScreen = () => {
                                     </button>
                                 </div>
 
-                                {/* Migration Notice */}
-                                <div className="bg-neutral-800/50 border border-neutral-800 rounded-xl p-3 text-center relative z-20">
-                                    <p className="text-[11px] text-neutral-400 mb-2">
-                                        Já usava com Google?
-                                    </p>
-                                    <button
-                                        type="button"
-                                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setAuthMode('recover'); setErrorMsg(''); }}
-                                        className="text-xs font-bold text-yellow-500 hover:text-yellow-400 underline decoration-yellow-500/30 underline-offset-2 cursor-pointer p-1"
-                                    >
-                                        Crie sua senha aqui para acessar
-                                    </button>
-                                </div>
                             </>
                         )}
 
