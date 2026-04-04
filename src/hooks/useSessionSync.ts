@@ -34,15 +34,27 @@ function parseJsonWithSchema<T>(raw: string, schema: z.ZodType<T>): T | null {
     }
 }
 
-// Unique identifier for this browser tab. Every upsert includes this ID so the
-// Realtime handler can deterministically discard self-echoes regardless of timing.
+// Unique identifier for this browser tab / WKWebView instance. Persisted in
+// localStorage so it survives iOS WKWebView context suspensions (the OS can
+// kill & recreate the JS context when the app backgrounds). Without persistence,
+// a new ID would be generated on resume and old Realtime echoes would no longer
+// be recognised as self-echoes, causing state reversion.
 const DEVICE_ID: string = (() => {
+    const KEY = 'irontracks._deviceId'
     try {
-        if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-            return crypto.randomUUID()
-        }
-    } catch { /* fallback below */ }
-    return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+        const stored = typeof localStorage !== 'undefined' ? localStorage.getItem(KEY) : null
+        if (stored && stored.length > 8) return stored
+    } catch { /* ignore */ }
+    const id = (() => {
+        try {
+            if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+                return crypto.randomUUID()
+            }
+        } catch { /* fallback */ }
+        return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+    })()
+    try { localStorage.setItem(KEY, id) } catch { /* ignore */ }
+    return id
 })()
 
 interface UseSessionSyncParams {
@@ -123,6 +135,10 @@ export function useSessionSync({
                 const parsed: unknown = parseJsonWithSchema(raw, z.record(z.unknown()))
                 if (isRecord(parsed) && parsed?.startedAt && parsed?.workout) {
                     localSavedAt = Number(parsed?._savedAt ?? 0) || 0
+                    // Seed echo guard from restored state — critical on iOS where
+                    // WKWebView may reconnect Realtime after app resume and deliver
+                    // stale events that would otherwise pass the guard (ref = 0).
+                    lastLocalUpsertAtRef.current = Math.max(lastLocalUpsertAtRef.current, localSavedAt)
                     setActiveSession(parsed as unknown as ActiveWorkoutSession)
                     setView('active')
 
@@ -151,6 +167,7 @@ export function useSessionSync({
                 if (idbSession && isRecord(idbSession) && idbSession.startedAt && idbSession.workout) {
                     const idbSavedAt = Number(idbSession._idbSavedAt || idbSession._savedAt || 0)
                     localSavedAt = idbSavedAt
+                    lastLocalUpsertAtRef.current = Math.max(lastLocalUpsertAtRef.current, idbSavedAt)
                     setActiveSession(idbSession as unknown as ActiveWorkoutSession)
                     setView('active')
                     // Also re-populate localStorage from IDB
@@ -186,6 +203,7 @@ export function useSessionSync({
 
                 if (updatedAtMs <= localSavedAt) return
 
+                lastLocalUpsertAtRef.current = Math.max(lastLocalUpsertAtRef.current, updatedAtMs)
                 setActiveSession(state)
                 setView('active')
                 try {
@@ -258,12 +276,18 @@ export function useSessionSync({
                                 if (incomingDeviceId === DEVICE_ID) {
                                     return
                                 }
-                                // ── Secondary guard (_savedAt) for legacy/other writers ──
+                                // Reject events without _deviceId — these are either legacy
+                                // writes from before the fix or stale echoes after iOS
+                                // WKWebView context recreation. Too risky to apply.
+                                if (!incomingDeviceId) {
+                                    return
+                                }
+                                // ── Secondary guard (_savedAt) ──────────────────────────
                                 const incomingSavedAt = Number((state as Record<string, unknown>)._savedAt ?? 0) || 0
                                 if (incomingSavedAt > 0 && incomingSavedAt <= lastLocalUpsertAtRef.current) {
                                     return
                                 }
-                                // Genuinely foreign update — apply it
+                                // Genuinely foreign update from another device — apply it
                                 setActiveSession(state as unknown as ActiveWorkoutSession)
                                 setView('active')
                                 try { localStorage.setItem(`irontracks.activeSession.v2.${uid}`, JSON.stringify(state)) } catch { }
