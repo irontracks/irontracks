@@ -63,7 +63,6 @@ export function useSessionSync({
     suppressForeignFinishToastUntilRef,
     activeSession,
     setSessionTicker,
-    view,
 }: UseSessionSyncParams) {
     const serverSessionSyncRef = useRef<{ timer: ReturnType<typeof setTimeout> | null; lastKey: string }>({ timer: null, lastKey: '' })
     const serverSessionSyncWarnedRef = useRef(false)
@@ -367,7 +366,8 @@ export function useSessionSync({
                 const startedAtMs = typeof startedAtRaw === 'number' ? startedAtRaw : new Date(startedAtRaw || 0).getTime()
                 if (!Number.isFinite(startedAtMs) || startedAtMs <= 0) return
 
-                const state = { ...(session || {}), _savedAt: Date.now() }
+                const savedAt = Date.now()
+                const state = { ...(session || {}), _savedAt: savedAt }
 
                 const { error } = await supabase
                     .from('active_workout_sessions')
@@ -381,6 +381,10 @@ export function useSessionSync({
                         { onConflict: 'user_id' }
                     )
                 if (error && isMissingTable(error)) notifyMigrationWarning()
+                else if (!error) {
+                    // Mark as our own write so the Realtime echo is discarded
+                    lastLocalUpsertAtRef.current = savedAt
+                }
             } catch (e) { logError('hook:useSessionSync.heartbeat', e) }
         }
 
