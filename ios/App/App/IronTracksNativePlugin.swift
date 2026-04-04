@@ -63,10 +63,19 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "saveFileToPhotos", returnType: CAPPluginReturnPromise),
         // Voice
         CAPPluginMethod(name: "requestVoicePermissions", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "startSpeechRecognition", returnType: CAPPluginReturnCallback),
+        CAPPluginMethod(name: "stopSpeechRecognition", returnType: CAPPluginReturnPromise),
     ]
 
     private let motionManager = CMMotionManager()
     private let healthStore = HKHealthStore()
+
+    // ── Speech Recognition state ─────────────────────────────────────────────
+    private var speechRecognizer: SFSpeechRecognizer?
+    private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
+    private var recognitionTask: SFSpeechRecognitionTask?
+    private var audioEngine = AVAudioEngine()
+    private var speechCallId: String?
 
     /// Native task that marks the Live Activity as finished after `seconds` seconds.
     /// Runs independently of JS so the Dynamic Island / Lock Screen update even when
@@ -747,5 +756,101 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin {
                 call.resolve(["saved": success, "error": error?.localizedDescription ?? ""])
             }
         }
+    }
+
+    // ─── Native Speech Recognition ────────────────────────────────────────────
+    //
+    // Uses SFSpeechRecognizer + AVAudioEngine to perform on-device speech
+    // recognition. This bypasses the unreliable webkitSpeechRecognition in
+    // WKWebView. Results are streamed back to JS via keepAlive callbacks.
+
+    @objc func startSpeechRecognition(_ call: CAPPluginCall) {
+        call.keepAlive = true
+        speechCallId = call.callbackId
+        let lang = call.getString("lang") ?? "pt-BR"
+
+        speechRecognizer = SFSpeechRecognizer(locale: Locale(identifier: lang))
+
+        guard let speechRecognizer = speechRecognizer, speechRecognizer.isAvailable else {
+            call.resolve(["error": "speech_unavailable"])
+            return
+        }
+
+        // Stop any previous session
+        stopRecognitionEngine()
+
+        recognitionRequest = SFSpeechAudioBufferRecognitionRequest()
+        guard let recognitionRequest = recognitionRequest else {
+            call.resolve(["error": "request_init_failed"])
+            return
+        }
+        recognitionRequest.shouldReportPartialResults = true
+
+        let inputNode = audioEngine.inputNode
+        let recordingFormat = inputNode.outputFormat(forBus: 0)
+
+        inputNode.installTap(onBus: 0, bufferSize: 1024, format: recordingFormat) { buffer, _ in
+            self.recognitionRequest?.append(buffer)
+        }
+
+        audioEngine.prepare()
+        do {
+            let session = AVAudioSession.sharedInstance()
+            try session.setCategory(.record, mode: .measurement, options: .duckOthers)
+            try session.setActive(true, options: .notifyOthersOnDeactivation)
+            try audioEngine.start()
+        } catch {
+            call.resolve(["error": "audio_engine_failed", "message": error.localizedDescription])
+            return
+        }
+
+        recognitionTask = speechRecognizer.recognitionTask(with: recognitionRequest) { [weak self] result, error in
+            guard let self = self else { return }
+
+            if let result = result {
+                let transcript = result.bestTranscription.formattedString
+                let isFinal = result.isFinal
+                call.resolve([
+                    "transcript": transcript,
+                    "isFinal": isFinal,
+                ])
+                if isFinal {
+                    self.stopRecognitionEngine()
+                }
+            }
+
+            if let error = error {
+                let nsError = error as NSError
+                // Code 1110 = no speech detected (normal timeout), 216 = cancelled
+                if nsError.code != 216 {
+                    call.resolve([
+                        "error": "recognition_error",
+                        "message": error.localizedDescription,
+                        "code": nsError.code,
+                    ])
+                }
+                self.stopRecognitionEngine()
+            }
+        }
+    }
+
+    @objc func stopSpeechRecognition(_ call: CAPPluginCall) {
+        stopRecognitionEngine()
+        // Release the keepAlive callback
+        if let callId = speechCallId {
+            bridge?.releaseCall(withID: callId)
+            speechCallId = nil
+        }
+        call.resolve(["ok": true])
+    }
+
+    private func stopRecognitionEngine() {
+        audioEngine.stop()
+        audioEngine.inputNode.removeTap(onBus: 0)
+        recognitionRequest?.endAudio()
+        recognitionTask?.cancel()
+        recognitionRequest = nil
+        recognitionTask = nil
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
     }
 }
