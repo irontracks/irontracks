@@ -27,10 +27,11 @@ export default function ActiveWorkout(props: ActiveWorkoutProps) {
 
   // Exit animation — intercept back/finish callbacks to play slide-down before unmounting
   const [isExiting, setIsExiting] = React.useState(false);
+  const exitTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
+  React.useEffect(() => () => { if (exitTimerRef.current) clearTimeout(exitTimerRef.current); }, []);
   const triggerExit = React.useCallback((cb: () => void) => {
     setIsExiting(true);
-    const t = setTimeout(cb, 280);
-    return () => clearTimeout(t);
+    exitTimerRef.current = setTimeout(cb, 280);
   }, []);
 
   // Enhanced context injects _exitOnBack so WorkoutHeader can trigger animation
@@ -41,9 +42,8 @@ export default function ActiveWorkout(props: ActiveWorkoutProps) {
       onFinish: originalOnFinish
         ? (s: unknown, saved: boolean) => triggerExit(() => originalOnFinish(s, saved))
         : originalOnFinish,
-      // _exitOnBack is read by WorkoutHeader via type cast
       ...(props.onBack ? { _exitOnBack: () => triggerExit(props.onBack!) } : {}),
-    } as WorkoutContextType;
+    };
   }, [controller, props.onBack, triggerExit]);
 
   // Team context for chat, pause banner and workout edit sync

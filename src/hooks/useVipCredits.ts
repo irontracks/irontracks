@@ -8,7 +8,7 @@
  *
  * @returns `{ credits, useCredit, isExhausted, refresh }`
  */
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { logError, logWarn } from '@/lib/logger'
 
 interface VipCredits {
@@ -43,16 +43,28 @@ export function useVipCredits() {
         }
     };
 
+    const controllerRef = useRef<AbortController | null>(null);
+
     useEffect(() => {
         const controller = new AbortController();
+        controllerRef.current = controller;
         fetchCredits(controller.signal).catch((err) => {
             if ((err as { name?: string })?.name === 'AbortError') return;
             logWarn('warn', 'useVipCredits: unexpected error', err);
         });
-        return () => { controller.abort(); };
+        return () => { controller.abort(); controllerRef.current = null; };
     }, []);
 
-    const refresh = () => fetchCredits();
+    const refresh = useCallback(() => {
+        // Abort any in-flight refresh before starting a new one
+        controllerRef.current?.abort();
+        const controller = new AbortController();
+        controllerRef.current = controller;
+        fetchCredits(controller.signal).catch((err) => {
+            if ((err as { name?: string })?.name === 'AbortError') return;
+            logWarn('warn', 'useVipCredits.refresh: unexpected error', err);
+        });
+    }, []);
 
     return { credits, loading, error, refresh };
 }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useCallback } from 'react'
+import { useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { unlockAudio } from '@/lib/sounds'
 import { logError } from '@/lib/logger'
@@ -95,15 +95,17 @@ export function useAppEffects({
   const router = useRouter()
 
   // ── VIP session storage check ─────────────────────────────────
-   
+  // Use ref to avoid re-firing when openVipView identity changes — this is a one-shot effect
+  const openVipViewRef = useRef(openVipView)
+  openVipViewRef.current = openVipView
   useEffect(() => {
     try {
       const flag = sessionStorage.getItem('irontracks_open_vip')
       if (!flag) return
       sessionStorage.removeItem('irontracks_open_vip')
-      openVipView()
+      openVipViewRef.current()
     } catch { }
-  }, [openVipView])
+  }, [])
 
   // ── View safety net — reset to dashboard if companion state is missing ──
   useEffect(() => {

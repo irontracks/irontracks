@@ -27,7 +27,7 @@ export default function WorkoutHeader() {
     ticker,
   } = useWorkoutContext();
 
-  const exitOnBack = (useWorkoutContext() as unknown as { _exitOnBack?: () => void })._exitOnBack;
+  const { _exitOnBack: exitOnBack } = useWorkoutContext();
 
   // Detect if a set is actively being executed — collapse action buttons to reduce distraction
   const isRecord = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);

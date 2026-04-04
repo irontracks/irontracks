@@ -1,14 +1,206 @@
 /**
  * Tests for src/components/workout/utils.ts
- * Covers: normalizeExerciseKey, extractLogWeight, estimate1Rm
+ * Covers: toNumber, averageNumbers, clampNumber, roundToStep, toDateMs,
+ *         buildPlannedBlocks, buildBlocksByCount, isClusterConfig, isRestPauseConfig,
+ *         normalizeExerciseKey, extractLogWeight, estimate1Rm
  */
 
 import { describe, it, expect } from 'vitest';
 import {
+  toNumber,
+  averageNumbers,
+  clampNumber,
+  roundToStep,
+  toDateMs,
+  buildPlannedBlocks,
+  buildBlocksByCount,
+  isClusterConfig,
+  isRestPauseConfig,
   normalizeExerciseKey,
   extractLogWeight,
   estimate1Rm,
 } from '../utils';
+
+// ─── toNumber ────────────────────────────────────────────────────────────────
+
+describe('toNumber', () => {
+  it('parses integer', () => {
+    expect(toNumber(42)).toBe(42);
+  });
+  it('parses float string', () => {
+    expect(toNumber('77.5')).toBe(77.5);
+  });
+  it('parses comma decimal', () => {
+    expect(toNumber('77,5')).toBe(77.5);
+  });
+  it('extracts number from mixed string', () => {
+    expect(toNumber('80kg')).toBe(80);
+  });
+  it('returns 0 for null (regex finds no digits, Number("") = 0)', () => {
+    expect(toNumber(null)).toBe(0);
+  });
+  it('returns 0 for undefined', () => {
+    expect(toNumber(undefined)).toBe(0);
+  });
+  it('returns 0 for empty string', () => {
+    expect(toNumber('')).toBe(0);
+  });
+  it('returns 0 for non-numeric string (no digits)', () => {
+    expect(toNumber('abc')).toBe(0);
+  });
+  it('parses negative number', () => {
+    expect(toNumber('-5')).toBe(-5);
+  });
+  it('returns 0 for "0"', () => {
+    expect(toNumber('0')).toBe(0);
+  });
+});
+
+// ─── averageNumbers ──────────────────────────────────────────────────────────
+
+describe('averageNumbers', () => {
+  it('averages a list of numbers', () => {
+    expect(averageNumbers([10, 20, 30])).toBe(20);
+  });
+  it('returns null for empty array', () => {
+    expect(averageNumbers([])).toBeNull();
+  });
+  it('returns null for non-array', () => {
+    expect(averageNumbers(null)).toBeNull();
+  });
+  it('filters non-finite values', () => {
+    expect(averageNumbers([10, 'abc', 20])).toBe(15);
+  });
+  it('handles single value', () => {
+    expect(averageNumbers([42])).toBe(42);
+  });
+});
+
+// ─── clampNumber ─────────────────────────────────────────────────────────────
+
+describe('clampNumber', () => {
+  it('clamps value below min', () => {
+    expect(clampNumber(-5, 0, 100)).toBe(0);
+  });
+  it('clamps value above max', () => {
+    expect(clampNumber(200, 0, 100)).toBe(100);
+  });
+  it('returns value within range', () => {
+    expect(clampNumber(50, 0, 100)).toBe(50);
+  });
+  it('returns min for non-finite', () => {
+    expect(clampNumber('abc', 0, 100)).toBe(0);
+  });
+  it('returns min for NaN', () => {
+    expect(clampNumber(NaN, 5, 10)).toBe(5);
+  });
+});
+
+// ─── roundToStep ─────────────────────────────────────────────────────────────
+
+describe('roundToStep', () => {
+  it('rounds to step of 2.5', () => {
+    expect(roundToStep(81, 2.5)).toBe(80);
+  });
+  it('rounds up correctly', () => {
+    expect(roundToStep(82, 2.5)).toBe(82.5);
+  });
+  it('returns value for step <= 0', () => {
+    expect(roundToStep(42, 0)).toBe(42);
+  });
+  it('returns value for non-finite step', () => {
+    expect(roundToStep(42, 'abc')).toBe(42);
+  });
+});
+
+// ─── toDateMs ────────────────────────────────────────────────────────────────
+
+describe('toDateMs', () => {
+  it('parses ISO string', () => {
+    expect(toDateMs('2025-01-15T12:00:00Z')).toBe(new Date('2025-01-15T12:00:00Z').getTime());
+  });
+  it('parses timestamp number', () => {
+    expect(toDateMs(1705312800000)).toBe(1705312800000);
+  });
+  it('returns 0 for null (falls to new Date(0) → epoch)', () => {
+    expect(toDateMs(null)).toBe(0);
+  });
+  it('returns null for invalid date string', () => {
+    expect(toDateMs('not-a-date')).toBeNull();
+  });
+});
+
+// ─── buildPlannedBlocks ──────────────────────────────────────────────────────
+
+describe('buildPlannedBlocks', () => {
+  it('splits 12 reps into blocks of 4', () => {
+    expect(buildPlannedBlocks(12, 4)).toEqual([4, 4, 4]);
+  });
+  it('handles remainder', () => {
+    expect(buildPlannedBlocks(10, 3)).toEqual([3, 3, 3, 1]);
+  });
+  it('returns empty for zero total', () => {
+    expect(buildPlannedBlocks(0, 4)).toEqual([]);
+  });
+  it('returns empty for zero cluster size', () => {
+    expect(buildPlannedBlocks(10, 0)).toEqual([]);
+  });
+  it('returns empty for non-finite inputs', () => {
+    expect(buildPlannedBlocks('abc', 4)).toEqual([]);
+  });
+});
+
+// ─── buildBlocksByCount ──────────────────────────────────────────────────────
+
+describe('buildBlocksByCount', () => {
+  it('splits 10 reps into 3 blocks', () => {
+    // 10/3 = 3 base, 1 remainder → [4, 3, 3]
+    expect(buildBlocksByCount(10, 3)).toEqual([4, 3, 3]);
+  });
+  it('splits evenly', () => {
+    expect(buildBlocksByCount(12, 4)).toEqual([3, 3, 3, 3]);
+  });
+  it('returns empty for zero total', () => {
+    expect(buildBlocksByCount(0, 3)).toEqual([]);
+  });
+  it('returns empty for zero blocks', () => {
+    expect(buildBlocksByCount(10, 0)).toEqual([]);
+  });
+});
+
+// ─── isClusterConfig ─────────────────────────────────────────────────────────
+
+describe('isClusterConfig', () => {
+  it('returns true with cluster_size + intra_rest_sec', () => {
+    expect(isClusterConfig({ cluster_size: 3, intra_rest_sec: 15 })).toBe(true);
+  });
+  it('returns true with cluster_size + total_reps', () => {
+    expect(isClusterConfig({ cluster_size: 3, total_reps: 12 })).toBe(true);
+  });
+  it('returns false for empty object', () => {
+    expect(isClusterConfig({})).toBe(false);
+  });
+  it('returns false for non-object', () => {
+    expect(isClusterConfig(null)).toBe(false);
+  });
+});
+
+// ─── isRestPauseConfig ───────────────────────────────────────────────────────
+
+describe('isRestPauseConfig', () => {
+  it('returns true with mini_sets + rest_time_sec', () => {
+    expect(isRestPauseConfig({ mini_sets: 3, rest_time_sec: 15 })).toBe(true);
+  });
+  it('returns true with mini_sets + initial_reps', () => {
+    expect(isRestPauseConfig({ mini_sets: 3, initial_reps: 8 })).toBe(true);
+  });
+  it('returns false for empty object', () => {
+    expect(isRestPauseConfig({})).toBe(false);
+  });
+  it('returns false for non-object', () => {
+    expect(isRestPauseConfig(null)).toBe(false);
+  });
+});
 
 // ─── normalizeExerciseKey ─────────────────────────────────────────────────────
 
@@ -122,7 +314,7 @@ describe('estimate1Rm', () => {
     expect(estimate1Rm(100, 10)).toBeCloseTo(133.33, 1);
   });
 
-  it('returns weight itself for 1 rep', () => {
+  it('returns near-weight for 1 rep (formula still adds 1/30)', () => {
     // 80 × (1 + 1/30) = 80 × 1.0333 = 82.66...
     expect(estimate1Rm(80, 1)).toBeCloseTo(82.67, 1);
   });

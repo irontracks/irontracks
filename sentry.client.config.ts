@@ -22,19 +22,29 @@ Sentry.init({
   // Filtra erros esperados que não representam bugs reais
   beforeSend(event, hint) {
     const err = hint?.originalException
-    const name = (err instanceof Error || (err && typeof err === 'object'))
+    const errName = (err instanceof Error || (err && typeof err === 'object'))
       ? (err as { name?: string }).name
       : null
-    const message = err instanceof Error
-      ? err.message
-      : typeof err === 'string' ? err : ''
 
     // AbortError: navegação/desmontagem de componente cancela fetches em andamento.
     // Comportamento esperado — não é bug acionável.
-    if (name === 'AbortError') return null
-    if (typeof message === 'string' && message.toLowerCase().includes('abortederror')) return null
-    if (typeof message === 'string' && message.toLowerCase().includes('the operation was aborted')) return null
-    if (typeof message === 'string' && message.toLowerCase().includes('signal is aborted')) return null
+    if (errName === 'AbortError') return null
+
+    // Fallback: iOS Safari/WebKit pode não popular hint.originalException em
+    // unhandled rejections — checar também os valores de exceção do evento.
+    const exValues = event.exception?.values
+    if (Array.isArray(exValues)) {
+      for (const val of exValues) {
+        if (val.type === 'AbortError') return null
+      }
+    }
+
+    // ResizeObserver loop — ruído comum em browsers, não acionável
+    if (Array.isArray(exValues)) {
+      for (const val of exValues) {
+        if (typeof val.value === 'string' && val.value.includes('ResizeObserver loop')) return null
+      }
+    }
 
     return event
   },

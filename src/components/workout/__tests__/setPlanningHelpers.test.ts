@@ -184,6 +184,13 @@ describe('getPlannedSet', () => {
     expect(getPlannedSet(ex, 0)).toBeNull();
     expect(getPlannedSet(ex, 1)).toBeNull();
   });
+
+  it('reads from set_details (snake_case) when setDetails is absent', () => {
+    const sd = { reps: 12, weight: 60 };
+    // Simulate raw DB format using snake_case
+    const ex = { ...makeEx(), set_details: [sd] } as Record<string, unknown>;
+    expect(getPlannedSet(ex, 0)).toMatchObject(sd);
+  });
 });
 
 // ─── collectExerciseSetInputs ─────────────────────────────────────────────────
