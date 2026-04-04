@@ -48,6 +48,8 @@ type IronTracksNativePlugin = {
   saveFileToPhotos: (opts: { path: string; isVideo: boolean }) => Promise<{ saved: boolean; error: string }>
   // Voice
   requestVoicePermissions: () => Promise<{ microphone: string; speechRecognition: string }>
+  startSpeechRecognition: (opts: { lang?: string }, callback: (result: { transcript?: string; isFinal?: boolean; error?: string; message?: string; code?: number }) => void) => Promise<string>
+  stopSpeechRecognition: () => Promise<{ ok: boolean }>
 }
 
 export type HapticStyle =
@@ -89,6 +91,8 @@ const webFallback: IronTracksNativePlugin = {
   saveImageToPhotos: async () => ({ saved: false, error: 'Not available on web' }),
   saveFileToPhotos: async () => ({ saved: false, error: 'Not available on web' }),
   requestVoicePermissions: async () => ({ microphone: 'granted', speechRecognition: 'granted' }),
+  startSpeechRecognition: async () => '',
+  stopSpeechRecognition: async () => ({ ok: false }),
 }
 
 // ─── Register plugin ─────────────────────────────────────────────────────────
@@ -461,6 +465,39 @@ export const requestVoicePermissions = async () => {
   } catch {
     return { microphone: 'undetermined', speechRecognition: 'undetermined' }
   }
+}
+
+/**
+ * Start native speech recognition via SFSpeechRecognizer on iOS.
+ * Returns partial/final transcripts via callback. Falls back to false on non-native.
+ */
+export const startNativeSpeechRecognition = async (
+  lang: string,
+  onResult: (transcript: string, isFinal: boolean) => void,
+  onError: (error: string) => void,
+): Promise<boolean> => {
+  try {
+    if (!isIosNative()) return false
+    await Native.startSpeechRecognition({ lang }, (result) => {
+      if (result.error) {
+        onError(result.message || result.error)
+        return
+      }
+      if (result.transcript !== undefined) {
+        onResult(result.transcript, !!result.isFinal)
+      }
+    })
+    return true
+  } catch {
+    return false
+  }
+}
+
+export const stopNativeSpeechRecognition = async () => {
+  try {
+    if (!isIosNative()) return
+    await Native.stopSpeechRecognition()
+  } catch { /* silent */ }
 }
 
 // ─── Photos ───────────────────────────────────────────────────────────────────

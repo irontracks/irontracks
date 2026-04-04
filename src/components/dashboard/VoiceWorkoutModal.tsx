@@ -16,7 +16,7 @@ import {
   Pencil, Trash2, RotateCcw, Dumbbell, Settings,
 } from 'lucide-react'
 import type { ParsedExercise } from '@/app/api/ai/parse-exercise-voice/route'
-import { requestVoicePermissions, openAppSettings } from '@/utils/native/irontracksNative'
+import { requestVoicePermissions, openAppSettings, startNativeSpeechRecognition, stopNativeSpeechRecognition } from '@/utils/native/irontracksNative'
 import { isIosNative } from '@/utils/platform'
 
 // ── Web Speech API types (not fully typed in all TS DOM libs) ─────────────────
@@ -304,6 +304,7 @@ export default function VoiceWorkoutModal({
 
   const recognitionRef = useRef<ISpeechRecognition | null>(null)
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const nativeRecognitionRef = useRef(false)
   const listRef = useRef<HTMLDivElement>(null)
 
   // Cleanup recognition on unmount
@@ -311,6 +312,10 @@ export default function VoiceWorkoutModal({
     return () => {
       recognitionRef.current?.abort()
       if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current)
+      if (nativeRecognitionRef.current) {
+        void stopNativeSpeechRecognition()
+        nativeRecognitionRef.current = false
+      }
     }
   }, [])
 
@@ -334,7 +339,12 @@ export default function VoiceWorkoutModal({
 
   const stopRecording = useCallback(() => {
     if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current)
-    recognitionRef.current?.stop()
+    if (nativeRecognitionRef.current) {
+      void stopNativeSpeechRecognition()
+      nativeRecognitionRef.current = false
+    } else {
+      recognitionRef.current?.stop()
+    }
     setIsRecording(false)
   }, [])
 
@@ -442,14 +452,10 @@ export default function VoiceWorkoutModal({
       }
     }
 
-    // On iOS native: request BOTH microphone AND speech recognition permissions via the
-    // native plugin before attempting to start recognition. webkitSpeechRecognition in
-    // WKWebView requires SFSpeechRecognizer.requestAuthorization (speech recognition) in
-    // addition to AVAudioSession.requestRecordPermission (microphone). If only the
-    // microphone permission dialog appears and speech recognition is denied/undetermined,
-    // recognition.start() fires onerror 'not-allowed'.
+    // On iOS native: use SFSpeechRecognizer directly (webkitSpeechRecognition is
+    // unreliable in WKWebView). Request permissions first, then start native recognition.
     if (isIosNative()) {
-      requestVoicePermissions().then((status) => {
+      requestVoicePermissions().then(async (status) => {
         if (status.microphone === 'denied') {
           setIsPermissionDenied(true)
           setError('Permissão de microfone negada. Habilite nas configurações do dispositivo.')
@@ -460,7 +466,53 @@ export default function VoiceWorkoutModal({
           setError('Permissão de reconhecimento de voz negada. Habilite nas configurações do dispositivo.')
           return
         }
-        begin()
+
+        // Use native SFSpeechRecognizer instead of webkitSpeechRecognition
+        let nativeTranscript = ''
+        setIsRecording(true)
+        nativeRecognitionRef.current = true
+
+        const started = await startNativeSpeechRecognition(
+          'pt-BR',
+          (transcript, isFinal) => {
+            if (isFinal) {
+              nativeTranscript = transcript
+              nativeRecognitionRef.current = false
+              setIsRecording(false)
+              setTranscript(transcript)
+              setInterimTranscript('')
+              if (transcript.trim()) {
+                void parseTranscript(transcript)
+              }
+            } else {
+              setInterimTranscript(transcript)
+              // Reset silence timer on each partial result
+              if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current)
+              nativeTranscript = transcript
+              silenceTimerRef.current = setTimeout(() => {
+                void stopNativeSpeechRecognition()
+                nativeRecognitionRef.current = false
+                setIsRecording(false)
+                setTranscript(nativeTranscript)
+                setInterimTranscript('')
+                if (nativeTranscript.trim()) {
+                  void parseTranscript(nativeTranscript)
+                }
+              }, 3000)
+            }
+          },
+          (errorMsg) => {
+            nativeRecognitionRef.current = false
+            setIsRecording(false)
+            setError(`Erro no reconhecimento de voz: ${errorMsg}`)
+          },
+        )
+
+        if (!started) {
+          // Fallback to web speech recognition if native fails to start
+          nativeRecognitionRef.current = false
+          begin()
+        }
       })
       return
     }
