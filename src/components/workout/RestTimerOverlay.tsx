@@ -340,6 +340,9 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
         autoStartFiredRef.current = true;
         // Small delay so the "BORA!" flash is visible before advancing
         const timeout = setTimeout(() => {
+            // Skip if user already clicked START manually
+            if (startBusyRef.current) return;
+            startBusyRef.current = true;
             try {
                 if (notifyIdRef.current) {
                     endRestLiveActivity(notifyIdRef.current);
@@ -356,9 +359,14 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
         return () => clearTimeout(timeout);
     }, [isFinished, autoStartLocal]);
 
+    // Guard against double-tap on START button
+    const startBusyRef = useRef(false);
+
     if (!targetTime) return null;
 
     const handleStart = () => {
+        if (startBusyRef.current) return;
+        startBusyRef.current = true;
         try {
             if (notifyIdRef.current) {
                 endRestLiveActivity(notifyIdRef.current);

@@ -22,6 +22,9 @@ export default function WorkoutFooter() {
     currentExDoneSets,
   } = useWorkoutContext();
 
+  // Guard against double-tap on Finalizar button
+  const finishBusyRef = React.useRef(false);
+
   const { ticker, elapsedSeconds, formatElapsed, timerMinimized, setTimerMinimized } = useWorkoutTimer();
 
   // Team pause/resume — gracefully degrades if no team session
@@ -191,8 +194,10 @@ export default function WorkoutFooter() {
           <button
             type="button"
             onClick={async () => {
+              if (finishBusyRef.current) return;
               const ok = await confirm('Cancelar treino em andamento? (não salva no histórico)', 'Cancelar');
               if (!ok) return;
+              finishBusyRef.current = true;
               try {
                 if (typeof onFinish === 'function') onFinish(null, false);
               } catch { }
@@ -221,7 +226,12 @@ export default function WorkoutFooter() {
             <button
               type="button"
               disabled={finishing}
-              onClick={finishWorkout}
+              onClick={() => {
+                if (finishBusyRef.current) return;
+                finishBusyRef.current = true;
+                setTimeout(() => { finishBusyRef.current = false; }, 1000);
+                finishWorkout();
+              }}
               className={[
                 'inline-flex items-center gap-2 px-5 py-3 rounded-xl font-black text-black text-sm transition-all duration-300',
                 finishing

@@ -79,6 +79,9 @@ export const NormalSet = ({
     setCollapsed,
   } = useWorkoutContext();
 
+  // Guard against double-tap toggling the done state back
+  const completeBusyRef = useRef(false);
+
   const key = `${exIdx}-${setIdx}`;
   const log = getLog(key);
   const cfg = getPlanConfig(ex, setIdx);
@@ -130,6 +133,11 @@ export const NormalSet = ({
     'placeholder:text-neutral-600 placeholder:text-xs focus:placeholder:opacity-0';
 
   const handleComplete = () => {
+    // Prevent double-tap from toggling done back to false
+    if (completeBusyRef.current) return;
+    completeBusyRef.current = true;
+    setTimeout(() => { completeBusyRef.current = false; }, 400);
+
     const nowMs        = Date.now();
     const startedRaw   = (log as UnknownRecord)?.startedAtMs;
     const startedAtMs  =
