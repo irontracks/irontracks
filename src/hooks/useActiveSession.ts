@@ -115,7 +115,14 @@ export function useActiveSession({ userId }: UseActiveSessionOptions): UseActive
         setActiveSession((prev) => {
             if (!prev) return prev
             const logs = prev.logs && typeof prev.logs === 'object' ? prev.logs : {}
-            const next: Record<string, unknown> = { ...(prev as Record<string, unknown>), logs: { ...(logs as Record<string, unknown>), [key]: data } }
+            // Defensive merge: overlay incoming data onto the EXISTING log entry
+            // from `prev` (the latest queued state). This protects against stale
+            // closures in callers — even if the caller constructed `data` from a
+            // render-time snapshot that was missing fields, the merge with
+            // `existing` preserves them.
+            const existing = isRecord((logs as Record<string, unknown>)[key]) ? (logs as Record<string, unknown>)[key] as Record<string, unknown> : {}
+            const merged = isRecord(data) ? { ...existing, ...(data as Record<string, unknown>) } : data
+            const next: Record<string, unknown> = { ...(prev as Record<string, unknown>), logs: { ...(logs as Record<string, unknown>), [key]: merged } }
             const dataObj = isRecord(data) ? data : null
             const done = !!dataObj?.done
             const ui = isRecord((prev as Record<string, unknown>).ui) ? ((prev as Record<string, unknown>).ui as Record<string, unknown>) : null
