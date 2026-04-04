@@ -31,7 +31,7 @@ interface ISpeechRecognition {
   onstart: (() => void) | null
   onresult: ((e: ISpeechRecognitionEvent) => void) | null
   onend: (() => void) | null
-  onerror: (() => void) | null
+  onerror: ((e: { error?: string }) => void) | null
   start(): void
   stop(): void
   abort(): void
@@ -402,9 +402,18 @@ export default function VoiceWorkoutModal({
       }
     }
 
-    recognition.onerror = () => {
+    recognition.onerror = (e: { error?: string }) => {
       setIsRecording(false)
-      setError('Erro no microfone. Tente novamente.')
+      const code = e?.error || ''
+      if (code === 'not-allowed' || code === 'service-not-allowed') {
+        setError('Permissão de microfone negada. Habilite nas configurações do dispositivo.')
+      } else if (code === 'no-speech') {
+        setError('Nenhuma fala detectada. Tente novamente.')
+      } else if (code === 'network') {
+        setError('Erro de rede. Verifique sua conexão.')
+      } else {
+        setError('Erro no reconhecimento de voz. Tente novamente.')
+      }
     }
 
     recognition.start()
