@@ -46,6 +46,8 @@ type IronTracksNativePlugin = {
   // Photos
   saveImageToPhotos: (opts: { base64: string }) => Promise<{ saved: boolean; error: string }>
   saveFileToPhotos: (opts: { path: string; isVideo: boolean }) => Promise<{ saved: boolean; error: string }>
+  // Voice
+  requestVoicePermissions: () => Promise<{ microphone: string; speechRecognition: string }>
 }
 
 export type HapticStyle =
@@ -86,6 +88,7 @@ const webFallback: IronTracksNativePlugin = {
   getActiveCalories: async () => ({ calories: 0 }),
   saveImageToPhotos: async () => ({ saved: false, error: 'Not available on web' }),
   saveFileToPhotos: async () => ({ saved: false, error: 'Not available on web' }),
+  requestVoicePermissions: async () => ({ microphone: 'granted', speechRecognition: 'granted' }),
 }
 
 // ─── Register plugin ─────────────────────────────────────────────────────────
@@ -443,6 +446,24 @@ export const saveImageToPhotos = async (base64: string) => {
     return { saved: false, error: 'Save failed' }
   }
 }
+
+// ─── Voice ────────────────────────────────────────────────────────────────────
+
+/**
+ * Requests microphone AND speech recognition permissions from iOS.
+ * Both are required for webkitSpeechRecognition to work in WKWebView.
+ * On non-native platforms returns 'granted' so the web path is unblocked.
+ */
+export const requestVoicePermissions = async () => {
+  try {
+    if (!isIosNative()) return { microphone: 'granted', speechRecognition: 'granted' }
+    return await Native.requestVoicePermissions()
+  } catch {
+    return { microphone: 'undetermined', speechRecognition: 'undetermined' }
+  }
+}
+
+// ─── Photos ───────────────────────────────────────────────────────────────────
 
 /** Write a Blob to a temp file via Capacitor Filesystem and save to camera roll.
  *  Avoids base64 round-trip through JS — significantly faster for large files. */
