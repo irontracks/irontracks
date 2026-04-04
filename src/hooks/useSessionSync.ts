@@ -34,6 +34,17 @@ function parseJsonWithSchema<T>(raw: string, schema: z.ZodType<T>): T | null {
     }
 }
 
+// Unique identifier for this browser tab. Every upsert includes this ID so the
+// Realtime handler can deterministically discard self-echoes regardless of timing.
+const DEVICE_ID: string = (() => {
+    try {
+        if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+            return crypto.randomUUID()
+        }
+    } catch { /* fallback below */ }
+    return `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`
+})()
+
 interface UseSessionSyncParams {
     userId: string | undefined
     supabase: SupabaseClient
@@ -67,8 +78,11 @@ export function useSessionSync({
     const serverSessionSyncRef = useRef<{ timer: ReturnType<typeof setTimeout> | null; lastKey: string }>({ timer: null, lastKey: '' })
     const serverSessionSyncWarnedRef = useRef(false)
     // Tracks the _savedAt timestamp of the last upsert we wrote to the server.
-    // Used by the Realtime handler to discard echoes of our own writes.
+    // Used by the Realtime handler as a secondary guard (primary = DEVICE_ID).
     const lastLocalUpsertAtRef = useRef<number>(0)
+    // Prevents effect #1 from re-running the restore logic if deps change
+    // while userId stays the same.
+    const restoredForUserRef = useRef<string>('')
 
     const notifyMigrationWarning = useCallback(() => {
         if (serverSessionSyncWarnedRef.current) return
@@ -90,10 +104,14 @@ export function useSessionSync({
         return code === '42p01' || msg.includes('does not exist') || msg.includes('relation') || msg.includes('schema cache')
     }, [])
 
-    // 1. Restore from localStorage + load from server
+    // 1. Restore from localStorage + load from server (runs once per userId)
     useEffect(() => {
         const uid = userId ? String(userId) : ''
         if (!uid) return
+        // Guard: only restore once per userId — prevents stale localStorage/server
+        // data from overwriting in-flight user changes if deps cause a re-fire.
+        if (restoredForUserRef.current === uid) return
+        restoredForUserRef.current = uid
         let cancelled = false
 
         const scopedKey = `irontracks.activeSession.v2.${uid}`
@@ -228,22 +246,24 @@ export function useSessionSync({
                                 const stateRaw = rowNew?.state
                                 const state = isRecord(stateRaw) ? stateRaw : null
                                 if (!state || !state?.startedAt || !state?.workout) {
-                                    // Payload may be truncated by Supabase Realtime — ignore partial updates
-                                    // instead of zeroing the active session (which would lose workout data)
                                     logWarn('useSessionSync', 'ignoring partial realtime UPDATE — missing startedAt or workout')
                                     return
                                 }
-                                // ── Self-echo guard ─────────────────────────────────────────
-                                // Supabase Realtime echoes every UPDATE back to the device that
-                                // triggered it. We track the exact _savedAt we last wrote
-                                // (lastLocalUpsertAtRef). If the incoming event's _savedAt is ≤
-                                // that value it must be our own echo (or an older write) — discard
-                                // it to avoid reverting user actions (e.g. done=true → done=false).
-                                const incomingSavedAt = Number((state as Record<string, unknown>)._savedAt ?? 0) || 0
-                                if (incomingSavedAt <= lastLocalUpsertAtRef.current) {
+                                // ── Self-echo guard (primary: device ID) ─────────────────
+                                // Every upsert we make includes our DEVICE_ID. If the
+                                // incoming event carries the same ID it is our own echo —
+                                // discard it unconditionally. This is timing-independent
+                                // and eliminates all race conditions.
+                                const incomingDeviceId = String((state as Record<string, unknown>)._deviceId ?? '')
+                                if (incomingDeviceId === DEVICE_ID) {
                                     return
                                 }
-                                // R2#8: Apply valid state from a different device (genuinely newer)
+                                // ── Secondary guard (_savedAt) for legacy/other writers ──
+                                const incomingSavedAt = Number((state as Record<string, unknown>)._savedAt ?? 0) || 0
+                                if (incomingSavedAt > 0 && incomingSavedAt <= lastLocalUpsertAtRef.current) {
+                                    return
+                                }
+                                // Genuinely foreign update — apply it
                                 setActiveSession(state as unknown as ActiveWorkoutSession)
                                 setView('active')
                                 try { localStorage.setItem(`irontracks.activeSession.v2.${uid}`, JSON.stringify(state)) } catch { }
@@ -295,7 +315,7 @@ export function useSessionSync({
                 if (!activeSession?.workout) return
 
                 const savedAt = Date.now()
-                const state = { ...(activeSession || {}), _savedAt: savedAt }
+                const state = { ...(activeSession || {}), _savedAt: savedAt, _deviceId: DEVICE_ID }
 
                 const { error } = await supabase
                     .from('active_workout_sessions')
@@ -310,8 +330,6 @@ export function useSessionSync({
                     )
                 if (error && isMissingTable(error)) notifyMigrationWarning()
                 else if (!error) {
-                    // Record the exact timestamp we just wrote so the Realtime
-                    // handler can identify and discard the echo of this upsert.
                     lastLocalUpsertAtRef.current = savedAt
                 }
             } catch (err) { logWarn('useSessionSync', 'sync upsert failed: ' + String(err)) }
@@ -324,7 +342,7 @@ export function useSessionSync({
         } catch { }
 
         return () => { try { if (timerId) clearTimeout(timerId) } catch { } }
-    }, [activeSession, supabase, userId, inAppNotify, setActiveSession, setView, isMissingTable, notifyMigrationWarning])
+    }, [activeSession, supabase, userId, isMissingTable, notifyMigrationWarning])
 
     // 4. Session ticker (1s interval)
     useEffect(() => {
@@ -367,7 +385,7 @@ export function useSessionSync({
                 if (!Number.isFinite(startedAtMs) || startedAtMs <= 0) return
 
                 const savedAt = Date.now()
-                const state = { ...(session || {}), _savedAt: savedAt }
+                const state = { ...(session || {}), _savedAt: savedAt, _deviceId: DEVICE_ID }
 
                 const { error } = await supabase
                     .from('active_workout_sessions')
@@ -382,7 +400,6 @@ export function useSessionSync({
                     )
                 if (error && isMissingTable(error)) notifyMigrationWarning()
                 else if (!error) {
-                    // Mark as our own write so the Realtime echo is discarded
                     lastLocalUpsertAtRef.current = savedAt
                 }
             } catch (e) { logError('hook:useSessionSync.heartbeat', e) }
