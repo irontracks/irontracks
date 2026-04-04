@@ -1,10 +1,9 @@
 'use client'
-// Focus trap for accessibility
-import { useFocusTrap } from '@/hooks/useFocusTrap'
 
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import Image from 'next/image'
-import { X, ChevronLeft, ChevronRight, Sparkles, Loader2, Wand2 } from 'lucide-react'
+import { X, ChevronLeft, ChevronRight, Sparkles, Loader2, Wand2, Mic } from 'lucide-react'
+import VoiceWorkoutModal, { type VoiceExerciseDraft } from './VoiceWorkoutModal'
 import { useVipCredits } from '@/hooks/useVipCredits'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { parseJsonWithSchema } from '@/utils/zod'
@@ -144,6 +143,29 @@ const titleFocus = (f: WorkoutWizardFocus) =>
 
 const titleEquipment = (e: WorkoutWizardEquipment) => (e === 'gym' ? 'Academia' : e === 'home' ? 'Casa' : 'Mínimo')
 
+// ── Voice → WorkoutDraft conversion ───────────────────────────────────
+function voiceToWorkoutDraft(exercises: VoiceExerciseDraft[]): WorkoutDraft {
+  return {
+    title: 'Treino por Voz',
+    exercises: exercises.map((e) => {
+      const noteParts: string[] = []
+      if (e.weightKg != null) noteParts.push(`${e.weightKg}kg`)
+      if (e.notes) noteParts.push(e.notes)
+      return {
+        id: e.id,
+        name: e.name,
+        sets: e.sets ?? 3,
+        reps: e.reps,
+        rpe: e.rpe,
+        method: e.method,
+        restTime: e.restSeconds,
+        cadence: e.cadence,
+        notes: noteParts.length ? noteParts.join(' • ') : null,
+      }
+    }),
+  }
+}
+
 // ── Main Component ─────────────────────────────────────────────────────
 export default function WorkoutWizardModal(props: Props) {
   const { credits, loading: creditsLoading, error: creditsError } = useVipCredits()
@@ -168,6 +190,7 @@ export default function WorkoutWizardModal(props: Props) {
   const [draftIdx, setDraftIdx] = useState(0)
   const [savingAll, setSavingAll] = useState(false)
   const [error, setError] = useState('')
+  const [showVoice, setShowVoice] = useState(false)
 
   const canBack = step > 0
   const canNext = step < 4
@@ -197,10 +220,6 @@ export default function WorkoutWizardModal(props: Props) {
       }
     } catch { }
   }, [isOpen])
-
-  const previewTitle = useMemo(() => {
-    return `${titleGoal(answers.goal)} • ${titleSplit(answers.split)} • ${answers.timeMinutes}min`
-  }, [answers.goal, answers.split, answers.timeMinutes])
 
   const goBack = () => { if (canBack) { setError(''); setStep((s) => Math.max(0, s - 1)) } }
   const goNext = () => { if (canNext) { setError(''); setStep((s) => Math.min(4, s + 1)) } }
@@ -293,6 +312,7 @@ export default function WorkoutWizardModal(props: Props) {
   }
 
   return (
+    <>
     <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 pt-safe" style={{ background: 'rgba(0,0,0,0.92)', backdropFilter: 'blur(20px)' }} role="dialog" aria-modal="true" aria-label="WorkoutWizard">
       <div
         className="w-full max-w-2xl rounded-2xl overflow-hidden"
@@ -374,6 +394,29 @@ export default function WorkoutWizardModal(props: Props) {
                   <div className="text-[11px] text-yellow-600/80 mt-1">Responda 4 perguntas e a IA monta tudo pra você.</div>
                 </button>
               </div>
+
+              {/* Por Voz */}
+              <button
+                type="button"
+                aria-label="Criar treino por voz"
+                onClick={() => setShowVoice(true)}
+                className="group w-full text-left rounded-xl p-4 border transition-all active:scale-[0.97]"
+                style={{
+                  background: 'linear-gradient(135deg, rgba(59,130,246,0.08) 0%, rgba(59,130,246,0.02) 100%)',
+                  border: '1px solid rgba(59,130,246,0.3)',
+                  boxShadow: '0 0 20px rgba(59,130,246,0.06)',
+                }}
+              >
+                <div className="flex items-center gap-3">
+                  <span className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(59,130,246,0.15)' }}>
+                    <Mic size={20} className="text-blue-400" />
+                  </span>
+                  <div>
+                    <div className="font-black text-sm text-blue-400">Por Voz</div>
+                    <div className="text-[11px] text-blue-600/80 mt-0.5">Dite os exercícios e a IA transcreve e estrutura automaticamente.</div>
+                  </div>
+                </div>
+              </button>
 
               {/* Mode toggle */}
               <div className="rounded-xl border border-neutral-800 bg-neutral-950/40 p-3">
@@ -504,6 +547,7 @@ export default function WorkoutWizardModal(props: Props) {
                 <div className="text-sm font-bold text-white">📋 Preferências e restrições</div>
                 <div className="text-[11px] text-neutral-500 mt-1">Ex.: foco em deltoide lateral, evitar overhead, dor no joelho, sem barra.</div>
                 <textarea
+                  aria-label="Preferências e restrições"
                   value={answers.constraints}
                   onChange={(e) => setAnswers((p) => ({ ...p, constraints: e.target.value }))}
                   rows={3}
@@ -703,5 +747,18 @@ export default function WorkoutWizardModal(props: Props) {
         </div>
       </div>
     </div>
+
+    {showVoice && (
+      <VoiceWorkoutModal
+        isOpen={showVoice}
+        onClose={() => setShowVoice(false)}
+        onComplete={(exercises) => {
+          setShowVoice(false)
+          props.onClose()
+          props.onUseDraft(voiceToWorkoutDraft(exercises))
+        }}
+      />
+    )}
+    </>
   )
 }
