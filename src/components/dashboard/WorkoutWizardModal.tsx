@@ -1,5 +1,5 @@
 'use client'
-
+// v2: voice workout integration
 import React, { useEffect, useState } from 'react'
 import Image from 'next/image'
 import { X, ChevronLeft, ChevronRight, Sparkles, Loader2, Wand2, Mic } from 'lucide-react'
@@ -312,7 +312,6 @@ export default function WorkoutWizardModal(props: Props) {
   }
 
   return (
-    <>
     <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 pt-safe" style={{ background: 'rgba(0,0,0,0.92)', backdropFilter: 'blur(20px)' }} role="dialog" aria-modal="true" aria-label="WorkoutWizard">
       <div
         className="w-full max-w-2xl rounded-2xl overflow-hidden"
@@ -746,19 +745,17 @@ export default function WorkoutWizardModal(props: Props) {
           </div>
         </div>
       </div>
+      {showVoice && (
+        <VoiceWorkoutModal
+          isOpen={showVoice}
+          onClose={() => setShowVoice(false)}
+          onComplete={(exercises) => {
+            setShowVoice(false)
+            props.onClose()
+            props.onUseDraft(voiceToWorkoutDraft(exercises))
+          }}
+        />
+      )}
     </div>
-
-    {showVoice && (
-      <VoiceWorkoutModal
-        isOpen={showVoice}
-        onClose={() => setShowVoice(false)}
-        onComplete={(exercises) => {
-          setShowVoice(false)
-          props.onClose()
-          props.onUseDraft(voiceToWorkoutDraft(exercises))
-        }}
-      />
-    )}
-    </>
   )
 }
