@@ -1,16 +1,21 @@
 'use client'
 
-import React, { useState, useCallback, useMemo } from 'react'
+import React, { useEffect, useState, useCallback, useMemo } from 'react'
+import Image from 'next/image'
 import {
   User, Scale, Ruler, Calendar, Phone, MapPin, Building2, Dumbbell,
-  Activity, BarChart3, ChevronLeft, Save, Check, Flame, Zap, Heart, Trophy
+  Activity, BarChart3, ChevronLeft, Save, Check, Flame, Zap, Heart, Trophy,
+  Camera, Lock,
 } from 'lucide-react'
 import { getProfileCompletenessScore } from '@/schemas/settings'
 import type { UserSettings } from '@/schemas/settings'
 import dynamic from 'next/dynamic'
 import { PremiumInput } from '@/components/ui/PremiumUI'
+import { createClient } from '@/utils/supabase/client'
 const GymSettingsWrapper = dynamic(() => import('@/components/settings/GymSettingsWrapper'), { ssr: false })
 const ReferralSection = dynamic(() => import('@/components/settings/ReferralSection'), { ssr: false })
+const ChangePasswordModal = dynamic(() => import('@/components/settings/ChangePasswordModal'), { ssr: false })
+const AvatarUploadModal = dynamic(() => import('@/components/settings/AvatarUploadModal'), { ssr: false })
 
 interface ProfilePageProps {
   settings: UserSettings | null
@@ -77,6 +82,28 @@ function FieldLabel({ label, hint }: { label: string; hint?: string }) {
 export default function ProfilePage({ settings, displayName, onSave, onBack }: ProfilePageProps) {
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+
+  // Account modals
+  const [changePasswordOpen, setChangePasswordOpen] = useState(false)
+  const [avatarUploadOpen, setAvatarUploadOpen] = useState(false)
+  const [userEmail, setUserEmail] = useState('')
+  const [userId, setUserId] = useState('')
+  const [userPhotoURL, setUserPhotoURL] = useState<string | null>(null)
+
+  useEffect(() => {
+    const supabase = createClient()
+    supabase.auth.getUser().then(({ data }) => {
+      const uid = String(data?.user?.id || '')
+      setUserEmail(String(data?.user?.email || ''))
+      setUserId(uid)
+      if (uid) {
+        supabase.from('profiles').select('photo_url').eq('id', uid).maybeSingle()
+          .then(({ data: profile }) => {
+            setUserPhotoURL(String(profile?.photo_url || data?.user?.user_metadata?.avatar_url || '') || null)
+          })
+      }
+    })
+  }, [])
 
   // Local draft state mirroring settings
   const [draft, setDraft] = useState<Partial<UserSettings>>({
@@ -188,6 +215,54 @@ export default function ProfilePage({ settings, displayName, onSave, onBack }: P
                     ? `Faltam: ${missingFields.slice(0, 3).join(', ')}${missingFields.length > 3 ? ' e mais...' : ''}`
                     : 'Complete os campos para melhorar a precisão dos cálculos.'}
               </p>
+            </div>
+          </div>
+
+          {/* ── Seção 0: Conta (foto + senha) ─────────────────────────────── */}
+          <div className="rounded-3xl bg-neutral-900/60 border border-white/[0.05] p-5">
+            <SectionTitle icon={User} title="Conta" subtitle="Foto de perfil e segurança" />
+
+            {/* Avatar */}
+            <div className="flex items-center gap-4 mb-4">
+              <div className="relative w-16 h-16 rounded-full overflow-hidden border-2 border-yellow-500/40 flex-shrink-0">
+                {userPhotoURL ? (
+                  <Image src={userPhotoURL} width={64} height={64} className="w-full h-full object-cover" alt="Avatar" unoptimized />
+                ) : (
+                  <div className="w-full h-full bg-neutral-800 flex items-center justify-center">
+                    <Camera size={24} className="text-neutral-600" />
+                  </div>
+                )}
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-bold text-white">{displayName || 'Atleta'}</p>
+                {userEmail && <p className="text-[11px] text-neutral-500 truncate">{userEmail}</p>}
+              </div>
+              <button
+                type="button"
+                onClick={() => setAvatarUploadOpen(true)}
+                className="px-3 py-2 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 text-xs font-bold hover:bg-neutral-750 transition-colors flex items-center gap-1.5"
+              >
+                <Camera size={12} />
+                Trocar
+              </button>
+            </div>
+
+            {/* Change Password */}
+            <div className="pt-3 border-t border-neutral-700/40">
+              <div className="flex items-center justify-between gap-3">
+                <div>
+                  <p className="text-sm font-bold text-white">Trocar Senha</p>
+                  <p className="text-[11px] text-neutral-500">Alterar senha de acesso à conta.</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setChangePasswordOpen(true)}
+                  className="px-3 py-2 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 text-xs font-bold hover:bg-neutral-750 transition-colors flex items-center gap-1.5"
+                >
+                  <Lock size={12} />
+                  Alterar
+                </button>
+              </div>
             </div>
           </div>
 
@@ -425,6 +500,18 @@ export default function ProfilePage({ settings, displayName, onSave, onBack }: P
 
         </div>
       </div>
+
+      {/* Password change modal */}
+      <ChangePasswordModal isOpen={changePasswordOpen} onClose={() => setChangePasswordOpen(false)} userEmail={userEmail} />
+
+      {/* Avatar upload modal */}
+      <AvatarUploadModal
+        isOpen={avatarUploadOpen}
+        onClose={() => setAvatarUploadOpen(false)}
+        currentPhotoURL={userPhotoURL}
+        userId={userId}
+        onPhotoUpdated={(url) => { setUserPhotoURL(url); setAvatarUploadOpen(false) }}
+      />
     </div>
   )
 }
