@@ -1,10 +1,19 @@
 'use client'
 import React from 'react'
-import { Palette, CalendarDays, Layers, Wrench, Dumbbell, Volume2, Bell, Timer, Lock, RotateCcw, User } from 'lucide-react'
+import Image from 'next/image'
+import { Camera, Palette, CalendarDays, Layers, Wrench, Dumbbell, Volume2, Bell, Timer, Lock, RotateCcw, User } from 'lucide-react'
 import { SectionCard, SectionHeader, ToggleSwitch, type SettingsSectionProps } from './settingsShared'
 
 // ── Perfil ───────────────────────────────────────────────────────────────────
-export function SettingsProfileSection({ draft, setValue }: SettingsSectionProps) {
+interface SettingsProfileSectionProps extends SettingsSectionProps {
+    userEmail?: string
+    userId?: string
+    userPhotoURL?: string | null
+    onOpenChangePassword?: () => void
+    onOpenAvatarUpload?: () => void
+}
+
+export function SettingsProfileSection({ draft, setValue, userPhotoURL, onOpenAvatarUpload, onOpenChangePassword }: SettingsProfileSectionProps) {
     const biologicalSex = String(draft?.biologicalSex ?? 'not_informed')
     const options = [
         { value: 'male', label: '♂ Masculino' },
@@ -15,6 +24,28 @@ export function SettingsProfileSection({ draft, setValue }: SettingsSectionProps
         <SectionCard>
             <SectionHeader icon={User} label="Perfil" color="#3b82f6" />
             <div className="space-y-3">
+                {/* Avatar */}
+                <div className="flex items-center gap-4 pb-3 border-b border-neutral-700/60">
+                    <div className="relative w-14 h-14 rounded-full overflow-hidden border-2 border-yellow-500/40 flex-shrink-0">
+                        {userPhotoURL ? (
+                            <Image src={userPhotoURL} width={56} height={56} className="w-full h-full object-cover" alt="Avatar" unoptimized />
+                        ) : (
+                            <div className="w-full h-full bg-neutral-800 flex items-center justify-center">
+                                <Camera size={20} className="text-neutral-600" />
+                            </div>
+                        )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                        <div className="text-sm font-bold text-white">Foto de Perfil</div>
+                        <div className="text-[11px] text-neutral-500">Visível para outros usuários.</div>
+                    </div>
+                    <button type="button" onClick={() => onOpenAvatarUpload?.()}
+                        className="px-3 py-2 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 text-xs font-bold hover:bg-neutral-750 transition-colors">
+                        Trocar
+                    </button>
+                </div>
+
+                {/* Biological sex */}
                 <div>
                     <div className="text-sm font-bold text-white mb-1">Sexo biológico</div>
                     <div className="text-xs text-neutral-400 mb-3">Usado para estimar calorias com mais precisão (±10%).</div>
@@ -33,6 +64,21 @@ export function SettingsProfileSection({ draft, setValue }: SettingsSectionProps
                                 {opt.label}
                             </button>
                         ))}
+                    </div>
+                </div>
+
+                {/* Change password */}
+                <div className="pt-3 border-t border-neutral-700/60">
+                    <div className="flex items-center justify-between gap-3">
+                        <div>
+                            <div className="text-sm font-bold text-white">Trocar Senha</div>
+                            <div className="text-[11px] text-neutral-500">Alterar senha de acesso à conta.</div>
+                        </div>
+                        <button type="button" onClick={() => onOpenChangePassword?.()}
+                            className="px-3 py-2 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 text-xs font-bold hover:bg-neutral-750 transition-colors flex items-center gap-1.5">
+                            <Lock size={12} />
+                            Alterar
+                        </button>
                     </div>
                 </div>
             </div>
