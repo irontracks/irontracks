@@ -7,7 +7,9 @@ import OfflineBanner from '@/components/OfflineBanner'
 import React from 'react'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  const supabase = await createClient()
+  let supabase: Awaited<ReturnType<typeof createClient>> | null = null
+  try { supabase = await createClient() } catch { redirect('/') }
+  if (!supabase) return null
   const { data: { user } } = await supabase.auth.getUser()
 
   if (user?.id) {
