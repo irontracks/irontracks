@@ -418,22 +418,28 @@ export default function VoiceWorkoutModal({
         }
       }
 
-      recognition.onerror = (e: { error?: string }) => {
+      recognition.onerror = (e: { error?: string; message?: string }) => {
         setIsRecording(false)
         const code = e?.error || ''
         if (code === 'not-allowed' || code === 'service-not-allowed') {
           setIsPermissionDenied(true)
-          setError('Permissão negada. Habilite o microfone e o reconhecimento de voz nas configurações do dispositivo.')
+          setError('Permissão de reconhecimento de voz negada. Habilite o microfone e o reconhecimento de voz nas configurações do dispositivo.')
         } else if (code === 'no-speech') {
           setError('Nenhuma fala detectada. Tente novamente.')
         } else if (code === 'network') {
           setError('Erro de rede. Verifique sua conexão.')
         } else {
-          setError('Erro no reconhecimento de voz. Tente novamente.')
+          setError(`Erro no reconhecimento de voz (${code || 'unknown'}). Tente novamente.`)
         }
       }
 
-      recognition.start()
+      try {
+        recognition.start()
+      } catch {
+        setIsRecording(false)
+        setIsPermissionDenied(true)
+        setError(`Não foi possível iniciar o reconhecimento de voz. Verifique as permissões de microfone e reconhecimento de voz.`)
+      }
     }
 
     // On iOS native: request BOTH microphone AND speech recognition permissions via the
@@ -459,8 +465,9 @@ export default function VoiceWorkoutModal({
       return
     }
 
-    // On web: use getUserMedia to trigger the browser's permission dialog.
-    // When already denied, it throws NotAllowedError immediately.
+    // On web: try getUserMedia to trigger the browser permission dialog, then start
+    // speech recognition. If getUserMedia is unavailable (insecure context, old browser)
+    // skip straight to begin() and let SpeechRecognition.start() handle its own errors.
     if (typeof navigator !== 'undefined' && navigator.mediaDevices?.getUserMedia) {
       navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
         stream.getTracks().forEach((t) => t.stop())
@@ -472,14 +479,17 @@ export default function VoiceWorkoutModal({
           (err instanceof Error && err.name === 'NotAllowedError')
         if (isNotAllowed) {
           setIsPermissionDenied(true)
-          setError('Permissão de microfone negada. Habilite nas configurações do dispositivo.')
+          setError('Permissão de microfone negada. Habilite nas configurações do navegador.')
         } else {
-          setError('Não foi possível acessar o microfone. Tente novamente.')
+          // getUserMedia failed for a non-permission reason (e.g. no audio device).
+          // Still try speech recognition — it may work independently.
+          begin()
         }
       })
       return
     }
 
+    // getUserMedia unavailable — go straight to speech recognition
     begin()
   }, [parseTranscript])
 
