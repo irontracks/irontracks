@@ -150,8 +150,9 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
           for (let setIdx = 0; setIdx < setsCount; setIdx++) {
             const linkedKey = `${exIdx}-${setIdx}`;
             const prev = getLog(linkedKey);
-            // Only propagate weight — never propagate done/reps/notes to other sets
-            propsRef.current.onUpdateLog(linkedKey, { ...prev, weight: patchObj.weight });
+            const linkedMerged = { ...prev, weight: patchObj.weight };
+            propsRef.current.onUpdateLog(linkedKey, linkedMerged);
+            logsRef.current = { ...logsRef.current, [linkedKey]: linkedMerged };
           }
           // Broadcast linked weight update for first set only
           try {
@@ -163,7 +164,15 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
       }
 
       const prev = getLog(key);
-      propsRef.current.onUpdateLog(key, { ...prev, ...patchObj });
+      const merged = { ...prev, ...patchObj };
+      propsRef.current.onUpdateLog(key, merged);
+
+      // ── Eagerly update logsRef so the NEXT updateLog call in the same
+      // React batch sees the value we just wrote. Without this, rapid
+      // sequences like blur → click (common on iOS WKWebView) cause the
+      // second call to read a stale `prev` that's missing the first
+      // call's fields (e.g., weight typed just before pressing OK).
+      logsRef.current = { ...logsRef.current, [key]: merged };
 
       // Broadcast log update to team partners
       try {
