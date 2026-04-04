@@ -4,17 +4,13 @@ import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown, ChevronUp, Clock, Save, X, Pause, Play, Zap } from 'lucide-react';
 import { useWorkoutContext } from './WorkoutContext';
+import { useWorkoutTimer } from './WorkoutTimerContext';
 import { useTeamWorkout } from '@/contexts/TeamWorkoutContext';
 
 export default function WorkoutFooter() {
   const {
     session,
     currentExercise,
-    elapsedSeconds,
-    formatElapsed,
-    ticker,
-    timerMinimized,
-    setTimerMinimized,
     finishing,
     finishWorkout,
     confirm,
@@ -25,6 +21,8 @@ export default function WorkoutFooter() {
     currentExSetsCount,
     currentExDoneSets,
   } = useWorkoutContext();
+
+  const { ticker, elapsedSeconds, formatElapsed, timerMinimized, setTimerMinimized } = useWorkoutTimer();
 
   // Team pause/resume — gracefully degrades if no team session
   const teamCtx = useTeamWorkout() as unknown as {

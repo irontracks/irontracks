@@ -35,7 +35,7 @@ export default function ExerciseList() {
     const completedNow = new Set<number>();
     exercises.forEach((ex, exIdx) => {
       const setsHeader = Math.max(0, parseInt(String(ex?.sets ?? '0'), 10) || 0);
-      const sdArr = Array.isArray(ex?.setDetails) ? ex.setDetails : Array.isArray((ex as Record<string, unknown>)?.set_details) ? (ex as Record<string, unknown>).set_details as unknown[] : [];
+      const sdArr = Array.isArray(ex?.setDetails) ? ex.setDetails : Array.isArray(ex?.set_details) ? (ex.set_details as unknown[]) : [];
       const count = Math.max(setsHeader, Array.isArray(sdArr) ? sdArr.length : 0);
       if (count === 0) return;
       let done = 0;

@@ -230,6 +230,13 @@ export const roundToStep = (value: unknown, step: unknown) => {
 
 export const normalizeExerciseKey = (name: unknown) => String(name || '').trim().toLowerCase();
 
+export const formatElapsed = (sec: unknown): string => {
+  const s = Number(sec) || 0;
+  const m = Math.floor(s / 60);
+  const r = s % 60;
+  return `${m}:${r < 10 ? '0' : ''}${r}`;
+};
+
 export const estimate1Rm = (weight: unknown, reps: unknown): number | null => {
   const w = Number(weight);
   const r = Number(reps);

@@ -64,7 +64,6 @@ interface UseWorkoutDeloadProps {
   updateLog: (key: string, patch: unknown) => void;
   getPlanConfig: (ex: WorkoutExercise, setIdx: number) => UnknownRecord | null;
   getPlannedSet: (ex: WorkoutExercise, setIdx: number) => UnknownRecord | null;
-  ticker: number;
   alert: (msg: string, title?: string) => Promise<void>;
   confirm: (msg: string, title?: string) => Promise<boolean>;
 }
@@ -78,7 +77,6 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
     updateLog,
     getPlanConfig,
     getPlannedSet,
-    ticker,
     alert,
     confirm,
   } = props;
@@ -313,27 +311,31 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
     };
   }, [supabase, buildReportHistoryFromWorkouts]);
 
+  // Watchdog: detect stale loading state and timeout (replaces old ticker dep)
   useEffect(() => {
-    try {
-      const statusObj = reportHistoryStatusRef.current && typeof reportHistoryStatusRef.current === 'object' ? reportHistoryStatusRef.current : { status: 'idle' };
-      const status = String(statusObj?.status || 'idle');
-      const updatedAt = Number(reportHistoryUpdatedAtRef.current || 0);
-      const since = Number(reportHistoryLoadingSinceRef.current || 0);
-      if (status !== 'loading' || updatedAt) return;
-      if (!since) return;
-      const elapsed = Date.now() - since;
-      const max = REPORT_FETCH_TIMEOUT_MS + 2000;
-      if (elapsed <= max) return;
-      reportHistoryLoadingRef.current = false;
-      reportHistoryLoadingSinceRef.current = 0;
-      setReportHistoryStatus((prev) =>
-        prev?.status === 'loading'
-          ? { status: 'error', error: 'Tempo limite ao carregar relatórios', source: prev?.source || '' }
-          : prev,
-      );
-      setReportHistoryUpdatedAt((prev) => (prev ? prev : Date.now()));
-    } catch { }
-  }, [ticker]);
+    const id = setInterval(() => {
+      try {
+        const statusObj = reportHistoryStatusRef.current && typeof reportHistoryStatusRef.current === 'object' ? reportHistoryStatusRef.current : { status: 'idle' };
+        const status = String(statusObj?.status || 'idle');
+        const updatedAt = Number(reportHistoryUpdatedAtRef.current || 0);
+        const since = Number(reportHistoryLoadingSinceRef.current || 0);
+        if (status !== 'loading' || updatedAt) return;
+        if (!since) return;
+        const elapsed = Date.now() - since;
+        const max = REPORT_FETCH_TIMEOUT_MS + 2000;
+        if (elapsed <= max) return;
+        reportHistoryLoadingRef.current = false;
+        reportHistoryLoadingSinceRef.current = 0;
+        setReportHistoryStatus((prev) =>
+          prev?.status === 'loading'
+            ? { status: 'error', error: 'Tempo limite ao carregar relatórios', source: prev?.source || '' }
+            : prev,
+        );
+        setReportHistoryUpdatedAt((prev) => (prev ? prev : Date.now()));
+      } catch { }
+    }, 2000); // Check every 2s — no need for 1s granularity on a timeout watchdog
+    return () => clearInterval(id);
+  }, []);
 
   // ── Popula deloadSuggestions com o peso do último treino como watermark ──
   // Roda sempre que reportHistory muda (carregou do cache ou da rede).
@@ -370,8 +372,7 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
         // Número de séries do exercício atual
         const setsHeader = Math.max(0, Number(ex?.sets ?? 0));
         const sdArr: unknown[] = Array.isArray(ex?.setDetails) ? (ex.setDetails as unknown[]) :
-          Array.isArray((ex as unknown as Record<string, unknown>)?.set_details) ?
-            ((ex as unknown as Record<string, unknown>).set_details as unknown[]) : [];
+          Array.isArray(ex?.set_details) ? (ex.set_details as unknown[]) : [];
         const setsCount = Math.max(setsHeader, sdArr.length, 1);
 
         for (let setIdx = 0; setIdx < setsCount; setIdx++) {

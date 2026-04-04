@@ -30,7 +30,6 @@ interface UseWorkoutFinishProps {
   ui: UnknownRecord
   userId?: string | null
   settings: Record<string, unknown> | null
-  ticker: number
   postCheckinOpen: boolean
   setPostCheckinOpen: (v: boolean) => void
   postCheckinDraft: Record<string, string>
@@ -58,7 +57,7 @@ function parseStartedAtMs(raw: unknown): number {
 
 export function useWorkoutFinish(props: UseWorkoutFinishProps) {
   const {
-    session, workout, exercises: _exercises, logs, ui, userId, settings, ticker,
+    session, workout, exercises: _exercises, logs, ui, userId, settings,
     postCheckinOpen, setPostCheckinOpen, postCheckinDraft: _postCheckinDraft, setPostCheckinDraft,
     postCheckinResolveRef, persistDeloadHistoryFromSession,
     finishing, setFinishing,
@@ -81,7 +80,7 @@ export function useWorkoutFinish(props: UseWorkoutFinishProps) {
     if (finishing) return
 
     const startedAtMs = parseStartedAtMs(session?.startedAt)
-    const elapsedSeconds = startedAtMs > 0 ? Math.max(0, Math.floor((ticker - startedAtMs) / 1000)) : 0
+    const elapsedSeconds = startedAtMs > 0 ? Math.max(0, Math.floor((Date.now() - startedAtMs) / 1000)) : 0
 
     // Always show report (removed "Gerar relatório?" dialog per user request)
     const showReport = true
