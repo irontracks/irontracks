@@ -7,14 +7,17 @@ export default function NutritionConsoleShell({
   title,
   subtitle,
   children,
+  onBack,
 }: {
   title: string
   subtitle?: string
   children: React.ReactNode
+  onBack?: () => void
 }) {
   const router = useRouter()
 
   const goBack = () => {
+    if (onBack) { onBack(); return }
     try {
       if (typeof window !== 'undefined' && window.history.length > 1) router.back()
       else router.push('/dashboard')

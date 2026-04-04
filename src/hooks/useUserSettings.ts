@@ -13,7 +13,7 @@ import { logWarn } from '@/lib/logger'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createClient } from '@/utils/supabase/client'
-import { UserSettingsSchema, type UserSettings, DEFAULT_USER_SETTINGS } from '@/schemas/settings'
+import { type UserSettings, DEFAULT_USER_SETTINGS } from '@/schemas/settings'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
@@ -56,6 +56,7 @@ export function useUserSettings(userId: string | null | undefined) {
         const cached = cachedRaw ? safeJsonParse(cachedRaw) : null
         if (cached && typeof cached === 'object') {
           setSettings((prev) => ({ ...prev, ...(cached as Partial<UserSettings>) }))
+          setLoaded(true)
         }
       }
     } catch (e) { logWarn('useUserSettings', 'silenced error', e) }
