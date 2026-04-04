@@ -52,6 +52,7 @@ interface SettingsModalProps {
   userRole?: string
   onClose?: () => void
   onSave?: (settings: unknown) => Promise<boolean | void>
+  patchSettings?: (patch: Record<string, unknown>) => Promise<void>
   onOpenWhatsNew?: () => void
   onOpenProgressPhotos?: () => void
 }
@@ -173,7 +174,12 @@ export default function SettingsModal(props: SettingsModalProps) {
     try {
       setHealthKitBusy(true)
       const res = await requestHealthKitPermission()
-      setHealthKitGranted(!!res?.granted)
+      const granted = !!res?.granted
+      setHealthKitGranted(granted)
+      if (granted) {
+        // Persist the user's consent so useHealthKit knows to fetch data
+        await props?.patchSettings?.({ appleHealthSync: true }).catch(() => { })
+      }
     } catch (e) { logError('component:SettingsModal.requestHealthKit', e); setHealthKitGranted(false) } finally { setHealthKitBusy(false) }
   }
 
