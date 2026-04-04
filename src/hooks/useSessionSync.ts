@@ -342,7 +342,7 @@ export function useSessionSync({
         } catch { }
 
         return () => { try { if (timerId) clearTimeout(timerId) } catch { } }
-    }, [activeSession, supabase, userId, isMissingTable, notifyMigrationWarning])
+    }, [activeSession, supabase, userId, inAppNotify, setActiveSession, setView, isMissingTable, notifyMigrationWarning])
 
     // 4. Session ticker (1s interval)
     useEffect(() => {
