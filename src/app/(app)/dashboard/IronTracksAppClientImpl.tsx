@@ -512,32 +512,29 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
 
     const isHeaderVisible = view !== 'active' && view !== 'report';
 
-    // Mounted state: prevents the loading overlay from rendering on the server,
-    // which avoids a hydration mismatch caused by dynamic inline styles that
-    // differ between SSR and client (isAppLoading is always false on the server).
-    const [mounted, setMounted] = useState(false);
-    useEffect(() => { setMounted(true); }, []);
+    // Loading overlay starts visible (opacity 1) on both SSR and client.
+    // Once isAppLoading becomes false on the client, it fades out.
+    // No `mounted` gate needed — SSR always shows loading, client fades it away.
+    const loadingDone = !isAppLoading;
 
     return (
         <>
-            {/* Persistent loading overlay — rendered only on the client to avoid
-                hydration mismatches from dynamic inline styles (isAppLoading).
-                Fades out via CSS once the app is ready. */}
-            {mounted && (
-                <div
-                    aria-hidden
-                    style={{
-                        position: 'fixed',
-                        inset: 0,
-                        zIndex: 9999,
-                        opacity: isAppLoading ? 1 : 0,
-                        pointerEvents: isAppLoading ? 'auto' : 'none',
-                        transition: isAppLoading ? 'none' : 'opacity 0.25s ease-out',
-                    }}
-                >
-                    <LoadingScreen />
-                </div>
-            )}
+            {/* Persistent loading overlay — always rendered, starts visible.
+                Fades out via CSS transition once the app is ready. */}
+            <div
+                aria-hidden
+                className={loadingDone ? 'loading-overlay-done' : undefined}
+                style={{
+                    position: 'fixed',
+                    inset: 0,
+                    zIndex: 9999,
+                    opacity: loadingDone ? 0 : 1,
+                    pointerEvents: loadingDone ? 'none' : 'auto',
+                    transition: loadingDone ? 'opacity 0.3s ease-out' : 'none',
+                }}
+            >
+                <LoadingScreen />
+            </div>
             {/* Biometric lock — shown on top of everything when app resumes from background */}
             {isLocked && user?.id ? (
                 <BiometricLock userName={userName} onUnlocked={unlock} />
