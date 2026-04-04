@@ -5,12 +5,10 @@ import Image from 'next/image'
 import {
   Bell,
   Calendar,
-  Camera,
   Cog,
   Command,
   CreditCard,
   History,
-  Lock,
   LogOut,
   MessageSquare,
   Sparkles,
@@ -18,10 +16,6 @@ import {
   Crown,
 } from 'lucide-react'
 import { isIosNative } from '@/utils/platform'
-import dynamic from 'next/dynamic'
-
-const ChangePasswordModal = dynamic(() => import('@/components/settings/ChangePasswordModal'), { ssr: false })
-const AvatarUploadModal = dynamic(() => import('@/components/settings/AvatarUploadModal'), { ssr: false })
 
 interface HeaderActionsMenuProps {
   user: {
@@ -187,35 +181,8 @@ export default function HeaderActionsMenu({
     }
   }
 
-  // Password change + avatar upload modals
-  const [changePasswordOpen, setChangePasswordOpen] = useState(false)
-  const [avatarUploadOpen, setAvatarUploadOpen] = useState(false)
-  const [userEmail, setUserEmail] = useState('')
-  const [userId, setUserId] = useState('')
-  const [localPhotoURL, setLocalPhotoURL] = useState<string | null>(null)
-
-  // Fetch user data when menu opens (for modals)
-  useEffect(() => {
-    if (!open) return
-    import('@/utils/supabase/client').then(({ createClient }) => {
-      const supabase = createClient()
-      supabase.auth.getUser().then(({ data }) => {
-        const uid = String(data?.user?.id || '')
-        setUserEmail(String(data?.user?.email || ''))
-        setUserId(uid)
-        if (uid) {
-          supabase.from('profiles').select('photo_url').eq('id', uid).maybeSingle()
-            .then(({ data: profile }) => {
-              setLocalPhotoURL(String(profile?.photo_url || data?.user?.user_metadata?.avatar_url || '') || null)
-            })
-        }
-      })
-    })
-  }, [open])
-
   const displayName = String(user?.displayName || '').trim() || 'Usuário'
   const initial = displayName.slice(0, 1).toUpperCase()
-  const effectivePhotoURL = localPhotoURL || user?.photoURL || null
   const roleLabel = isCoach ? 'Coach' : user?.role === 'admin' ? 'Admin' : null
 
   // Long-press detection for "add story"
@@ -245,7 +212,6 @@ export default function HeaderActionsMenu({
   }
 
   return (
-    <>
     <div className="relative">
       {/* Story Ring Avatar trigger */}
       <button
@@ -320,62 +286,40 @@ export default function HeaderActionsMenu({
             <div className="h-px bg-gradient-to-r from-transparent via-yellow-500/80 to-transparent" />
 
             {/* User mini-profile */}
-            <div className="px-4 py-3.5 border-b border-white/5">
-              <div className="flex items-center gap-3">
-                <div className="relative w-9 h-9 rounded-full overflow-hidden border-2 border-yellow-500/60 flex-shrink-0">
-                  {effectivePhotoURL ? (
-                    <Image
-                      src={effectivePhotoURL}
-                      width={36}
-                      height={36}
-                      className="w-full h-full object-cover"
-                      alt="Perfil"
-                      unoptimized
-                    />
+            <div className="flex items-center gap-3 px-4 py-3.5 border-b border-white/5">
+              <div className="relative w-9 h-9 rounded-full overflow-hidden border-2 border-yellow-500/60 flex-shrink-0">
+                {user?.photoURL ? (
+                  <Image
+                    src={user.photoURL}
+                    width={36}
+                    height={36}
+                    className="w-full h-full object-cover"
+                    alt="Perfil"
+                    unoptimized
+                  />
+                ) : (
+                  <div className="w-full h-full bg-neutral-800 flex items-center justify-center font-black text-yellow-500 text-xs">
+                    {initial}
+                  </div>
+                )}
+              </div>
+              <button
+                type="button"
+                onClick={() => { onOpenProfile?.(); close() }}
+                className="flex-1 min-w-0 text-left hover:opacity-80 transition-opacity active:scale-[0.98]"
+              >
+                <p className="text-[13px] font-semibold text-white truncate">{displayName}</p>
+                <div className="flex items-center gap-1 mt-0.5">
+                  {roleLabel ? (
+                    <>
+                      <Crown size={9} className="text-yellow-500" />
+                      <span className="text-[10px] font-bold text-yellow-500/90 uppercase tracking-wide">{roleLabel}</span>
+                    </>
                   ) : (
-                    <div className="w-full h-full bg-neutral-800 flex items-center justify-center font-black text-yellow-500 text-xs">
-                      {initial}
-                    </div>
+                    <span className="text-[10px] text-neutral-500">Ver meu perfil</span>
                   )}
                 </div>
-                <button
-                  type="button"
-                  onClick={() => { onOpenProfile?.(); close() }}
-                  className="flex-1 min-w-0 text-left hover:opacity-80 transition-opacity active:scale-[0.98]"
-                >
-                  <p className="text-[13px] font-semibold text-white truncate">{displayName}</p>
-                  <div className="flex items-center gap-1 mt-0.5">
-                    {roleLabel ? (
-                      <>
-                        <Crown size={9} className="text-yellow-500" />
-                        <span className="text-[10px] font-bold text-yellow-500/90 uppercase tracking-wide">{roleLabel}</span>
-                      </>
-                    ) : (
-                      <span className="text-[10px] text-neutral-500">Ver meu perfil</span>
-                    )}
-                  </div>
-                </button>
-              </div>
-
-              {/* Account quick actions */}
-              <div className="flex items-center gap-2 mt-2.5 pl-12">
-                <button
-                  type="button"
-                  onClick={() => { close(); setAvatarUploadOpen(true) }}
-                  className="flex items-center gap-1 px-2 py-1 rounded-lg bg-neutral-800/80 border border-neutral-700/60 text-[10px] font-bold text-neutral-300 hover:bg-neutral-700/80 transition-colors"
-                >
-                  <Camera size={10} />
-                  Trocar Foto
-                </button>
-                <button
-                  type="button"
-                  onClick={() => { close(); setChangePasswordOpen(true) }}
-                  className="flex items-center gap-1 px-2 py-1 rounded-lg bg-neutral-800/80 border border-neutral-700/60 text-[10px] font-bold text-neutral-300 hover:bg-neutral-700/80 transition-colors"
-                >
-                  <Lock size={10} />
-                  Trocar Senha
-                </button>
-              </div>
+              </button>
             </div>
 
             {/* Menu items — staggered entrance */}
@@ -495,18 +439,5 @@ export default function HeaderActionsMenu({
         </>
       )}
     </div>
-
-    {/* Password change modal */}
-    <ChangePasswordModal isOpen={changePasswordOpen} onClose={() => setChangePasswordOpen(false)} userEmail={userEmail} />
-
-    {/* Avatar upload modal */}
-    <AvatarUploadModal
-      isOpen={avatarUploadOpen}
-      onClose={() => setAvatarUploadOpen(false)}
-      currentPhotoURL={effectivePhotoURL}
-      userId={userId}
-      onPhotoUpdated={(url) => { setLocalPhotoURL(url); setAvatarUploadOpen(false) }}
-    />
-    </>
   )
 }
