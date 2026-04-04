@@ -517,6 +517,13 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
     // No `mounted` gate needed — SSR always shows loading, client fades it away.
     const loadingDone = !isAppLoading;
 
+    // Notify the root-layout AppLoadingOverlay that the app is ready.
+    useEffect(() => {
+        if (!isAppLoading) {
+            try { window.dispatchEvent(new CustomEvent('irontracks:app:ready')) } catch { }
+        }
+    }, [isAppLoading])
+
     return (
         <>
             {/* Persistent loading overlay — always rendered, starts visible.

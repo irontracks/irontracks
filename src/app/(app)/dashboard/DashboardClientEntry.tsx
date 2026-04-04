@@ -2,13 +2,10 @@
 
 import dynamic from 'next/dynamic'
 import ErrorBoundary from '@/components/ErrorBoundary'
-import LoadingScreen from '@/components/LoadingScreen'
-
-// Use the real LoadingScreen as fallback so that client-side navigation from
-// LoginGate → Dashboard shows a seamless logo instead of a black flash.
+// No loading fallback needed — AppLoadingOverlay (root layout) covers this transition.
 const IronTracksAppClient = dynamic(() => import('./IronTracksAppClient'), {
     ssr: false,
-    loading: () => <LoadingScreen />,
+    loading: () => null,
 })
 
 export default function DashboardClientEntry(props: Record<string, unknown>) {

@@ -11,7 +11,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/utils/supabase/client'
-import LoadingScreen from '@/components/LoadingScreen'
 import LoginScreen from '@/components/LoginScreen'
 
 export default function LoginGate() {
@@ -33,18 +32,21 @@ export default function LoginGate() {
       if (session?.user?.id) {
         // Client-side navigation: no page reload, no black screen
         router.replace('/dashboard')
-        // Keep showing LoadingScreen while navigating
+        // Keep showing LoadingScreen while navigating (AppLoadingOverlay covers the transition)
       } else {
         setNoSession(true)
+        // App is ready to show the login screen — dismiss the root overlay
+        try { window.dispatchEvent(new CustomEvent('irontracks:app:ready')) } catch { }
       }
     }).catch(() => {
       setNoSession(true)
+      try { window.dispatchEvent(new CustomEvent('irontracks:app:ready')) } catch { }
     })
   }, [router])
 
-  if (!noSession) {
-    return <LoadingScreen />
-  }
+  // While checking session or navigating to dashboard, render nothing —
+  // AppLoadingOverlay (root layout) covers the screen.
+  if (!noSession) return null
 
   return <LoginScreen />
 }
