@@ -6,7 +6,7 @@
  * human-readable labels. Decrements locally on use and re-syncs with
  * the server periodically.
  *
- * @returns `{ credits, useCredit, isExhausted, refresh }`
+ * @returns `{ credits, loading, error, refresh }`
  */
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { logError, logWarn } from '@/lib/logger'

@@ -30,6 +30,7 @@ export default function ActiveWorkout(props: ActiveWorkoutProps) {
   const exitTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   React.useEffect(() => () => { if (exitTimerRef.current) clearTimeout(exitTimerRef.current); }, []);
   const triggerExit = React.useCallback((cb: () => void) => {
+    if (exitTimerRef.current) return; // already exiting — prevent double-tap
     setIsExiting(true);
     exitTimerRef.current = setTimeout(cb, 280);
   }, []);
