@@ -26,7 +26,15 @@ export default function LoginGate() {
     // Prefetch dashboard chunks immediately (parallel with session check)
     router.prefetch('/dashboard')
 
-    const supabase = createClient()
+    let supabase: ReturnType<typeof createClient> | null = null
+    try { supabase = createClient() } catch { }
+    if (!supabase) {
+      Promise.resolve().then(() => {
+        setNoSession(true)
+        try { window.dispatchEvent(new CustomEvent('irontracks:app:ready')) } catch { }
+      })
+      return
+    }
     // getSession() reads from localStorage — no network request, very fast
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session?.user?.id) {
