@@ -13,9 +13,11 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
   Mic, MicOff, Loader2, Check, X,
-  Pencil, Trash2, RotateCcw, Dumbbell,
+  Pencil, Trash2, RotateCcw, Dumbbell, Settings,
 } from 'lucide-react'
 import type { ParsedExercise } from '@/app/api/ai/parse-exercise-voice/route'
+import { requestVoicePermissions, openAppSettings } from '@/utils/native/irontracksNative'
+import { isIosNative } from '@/utils/platform'
 
 // ── Web Speech API types (not fully typed in all TS DOM libs) ─────────────────
 
@@ -298,6 +300,7 @@ export default function VoiceWorkoutModal({
   const [editDraft, setEditDraft] = useState<VoiceExerciseDraft | null>(null)
   const [error, setError] = useState('')
   const [isRecording, setIsRecording] = useState(false)
+  const [isPermissionDenied, setIsPermissionDenied] = useState(false)
 
   const recognitionRef = useRef<ISpeechRecognition | null>(null)
   const silenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -308,6 +311,17 @@ export default function VoiceWorkoutModal({
     return () => {
       recognitionRef.current?.abort()
       if (silenceTimerRef.current) clearTimeout(silenceTimerRef.current)
+    }
+  }, [])
+
+  // Opens the app's settings page so the user can re-enable mic / speech recognition
+  const openDeviceSettings = useCallback(() => {
+    // On iOS native, use the Capacitor plugin that calls UIApplication.openSettingsURLString.
+    // On web / Android, fall back to the system URL scheme.
+    if (isIosNative()) {
+      void openAppSettings()
+    } else {
+      window.open('app-settings:', '_system')
     }
   }, [])
 
@@ -352,6 +366,7 @@ export default function VoiceWorkoutModal({
   }, [existingExercises])
 
   const startRecording = useCallback(() => {
+    setIsPermissionDenied(false)
     const win = typeof window !== 'undefined' ? (window as unknown as Record<string, unknown>) : null
     const SpeechRecognitionAPI: ISpeechRecognitionCtor | null =
       (win?.SpeechRecognition as ISpeechRecognitionCtor | undefined) ||
@@ -407,7 +422,8 @@ export default function VoiceWorkoutModal({
         setIsRecording(false)
         const code = e?.error || ''
         if (code === 'not-allowed' || code === 'service-not-allowed') {
-          setError('Permissão de microfone negada. Habilite nas configurações do dispositivo.')
+          setIsPermissionDenied(true)
+          setError('Permissão negada. Habilite o microfone e o reconhecimento de voz nas configurações do dispositivo.')
         } else if (code === 'no-speech') {
           setError('Nenhuma fala detectada. Tente novamente.')
         } else if (code === 'network') {
@@ -420,14 +436,46 @@ export default function VoiceWorkoutModal({
       recognition.start()
     }
 
-    // Request microphone permission explicitly before SpeechRecognition.
-    // In WKWebView (Capacitor iOS), getUserMedia triggers the system permission dialog.
+    // On iOS native: request BOTH microphone AND speech recognition permissions via the
+    // native plugin before attempting to start recognition. webkitSpeechRecognition in
+    // WKWebView requires SFSpeechRecognizer.requestAuthorization (speech recognition) in
+    // addition to AVAudioSession.requestRecordPermission (microphone). If only the
+    // microphone permission dialog appears and speech recognition is denied/undetermined,
+    // recognition.start() fires onerror 'not-allowed'.
+    if (isIosNative()) {
+      requestVoicePermissions().then((status) => {
+        if (status.microphone === 'denied') {
+          setIsPermissionDenied(true)
+          setError('Permissão de microfone negada. Habilite nas configurações do dispositivo.')
+          return
+        }
+        if (status.speechRecognition === 'denied') {
+          setIsPermissionDenied(true)
+          setError('Permissão de reconhecimento de voz negada. Habilite nas configurações do dispositivo.')
+          return
+        }
+        begin()
+      })
+      return
+    }
+
+    // On web: use getUserMedia to trigger the browser's permission dialog.
+    // When already denied, it throws NotAllowedError immediately.
     if (typeof navigator !== 'undefined' && navigator.mediaDevices?.getUserMedia) {
       navigator.mediaDevices.getUserMedia({ audio: true }).then((stream) => {
         stream.getTracks().forEach((t) => t.stop())
         begin()
-      }).catch(() => {
-        setError('Permissão de microfone negada. Habilite nas configurações do dispositivo.')
+      }).catch((err: unknown) => {
+        const isNotAllowed =
+          (err instanceof DOMException &&
+            (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError')) ||
+          (err instanceof Error && err.name === 'NotAllowedError')
+        if (isNotAllowed) {
+          setIsPermissionDenied(true)
+          setError('Permissão de microfone negada. Habilite nas configurações do dispositivo.')
+        } else {
+          setError('Não foi possível acessar o microfone. Tente novamente.')
+        }
       })
       return
     }
@@ -623,17 +671,29 @@ export default function VoiceWorkoutModal({
               )}
 
               {error && (
-                <div className="w-full bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2 flex items-center gap-2">
-                  <X size={13} className="text-red-400 flex-shrink-0" />
-                  <p className="text-red-300 text-xs font-medium">{error}</p>
-                  <button
-                    type="button"
-                    onClick={() => setError('')}
-                    className="ml-auto text-red-400 hover:text-red-300"
-                    aria-label="Fechar erro"
-                  >
-                    <X size={13} />
-                  </button>
+                <div className="w-full bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2 flex flex-col gap-2">
+                  <div className="flex items-center gap-2">
+                    <X size={13} className="text-red-400 flex-shrink-0" />
+                    <p className="text-red-300 text-xs font-medium">{error}</p>
+                    <button
+                      type="button"
+                      onClick={() => { setError(''); setIsPermissionDenied(false) }}
+                      className="ml-auto text-red-400 hover:text-red-300 flex-shrink-0"
+                      aria-label="Fechar erro"
+                    >
+                      <X size={13} />
+                    </button>
+                  </div>
+                  {isPermissionDenied && (
+                    <button
+                      type="button"
+                      onClick={openDeviceSettings}
+                      className="w-full py-2 rounded-lg text-xs font-black text-white bg-red-500/20 border border-red-500/30 hover:bg-red-500/30 active:scale-95 transition-all flex items-center justify-center gap-1.5"
+                    >
+                      <Settings size={12} />
+                      Abrir Configurações
+                    </button>
+                  )}
                 </div>
               )}
 

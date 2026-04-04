@@ -9,6 +9,8 @@ import LocalAuthentication
 import CoreSpotlight
 import MobileCoreServices
 import ActivityKit
+import Speech
+import AVFoundation
 
 // ─── IronTracksNative Capacitor Plugin ───────────────────────────────────────
 @objc(IronTracksNativePlugin)
@@ -59,6 +61,8 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin {
         // Photos
         CAPPluginMethod(name: "saveImageToPhotos", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "saveFileToPhotos", returnType: CAPPluginReturnPromise),
+        // Voice
+        CAPPluginMethod(name: "requestVoicePermissions", returnType: CAPPluginReturnPromise),
     ]
 
     private let motionManager = CMMotionManager()
@@ -669,6 +673,35 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin {
             call.resolve(["calories": cals])
         }
         healthStore.execute(query)
+    }
+
+    // ─── Voice Permissions ─────────────────────────────────────────────────────
+    //
+    // webkitSpeechRecognition in WKWebView requires TWO separate iOS permissions:
+    //   1. Microphone  — AVAudioSession.requestRecordPermission
+    //   2. SpeechRecognition — SFSpeechRecognizer.requestAuthorization
+    //
+    // Both must be "authorized" before recognition.start() can succeed.
+    // This method requests them in sequence and returns the combined status so the
+    // JS layer can decide whether to proceed or prompt the user to open Settings.
+
+    @objc func requestVoicePermissions(_ call: CAPPluginCall) {
+        AVAudioSession.sharedInstance().requestRecordPermission { micGranted in
+            if !micGranted {
+                call.resolve(["microphone": "denied", "speechRecognition": "denied"])
+                return
+            }
+            SFSpeechRecognizer.requestAuthorization { status in
+                let speech: String
+                switch status {
+                case .authorized:             speech = "granted"
+                case .denied, .restricted:    speech = "denied"
+                case .notDetermined:          speech = "undetermined"
+                @unknown default:             speech = "undetermined"
+                }
+                call.resolve(["microphone": "granted", "speechRecognition": speech])
+            }
+        }
     }
 
     // ─── Photos ────────────────────────────────────────────────────────────────
