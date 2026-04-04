@@ -2,13 +2,21 @@
 import Image from 'next/image'
 import { useEffect, useState } from 'react'
 
+// Module-level flag: true after the first LoadingScreen has been shown in this
+// browser session. Subsequent mounts skip the splash-in animation so the logo
+// appears instantly, preventing the "IRONTRACKS appears twice" double-blink on iOS.
+let splashHasPlayed = false
+
 const LoadingScreen = () => {
+    // Capture before the effect sets it, so the FIRST mount gets the animation.
+    const shouldAnimate = !splashHasPlayed
     // Safety valve: if still mounted after 8 s, it means we are stuck in a
     // redirect loop (e.g. failed Apple Sign-In left an inconsistent localStorage).
     // Show a soft offline / retry hint instead of looping indefinitely.
     const [stuck, setStuck] = useState(false)
 
     useEffect(() => {
+        splashHasPlayed = true
         const t = setTimeout(() => setStuck(true), 8000)
         return () => clearTimeout(t)
     }, [])
@@ -59,7 +67,9 @@ const LoadingScreen = () => {
         {/* Center content */}
         <div
             className="relative z-10 flex flex-col items-center"
-            style={{ animation: 'splash-in 0.9s cubic-bezier(0.16, 1, 0.3, 1) forwards', opacity: 0 }}
+            style={shouldAnimate
+                ? { animation: 'splash-in 0.9s cubic-bezier(0.16, 1, 0.3, 1) forwards', opacity: 0 }
+                : { opacity: 1 }}
         >
             {/* IRONTRACKS wordmark — with shimmer sweep */}
             <div className="mb-3 relative overflow-hidden">
@@ -92,14 +102,20 @@ const LoadingScreen = () => {
         {/* Progress bar — bottom of screen, premium gold animated */}
         <div
             className="absolute bottom-12 left-1/2 -translate-x-1/2 w-20 h-[2px] bg-neutral-800 rounded-full overflow-hidden"
-            style={{ animation: 'fade-in 0.4s ease-out 0.5s forwards', opacity: 0 }}
+            style={shouldAnimate
+                ? { animation: 'fade-in 0.4s ease-out 0.5s forwards', opacity: 0 }
+                : { opacity: 1 }}
         >
             <div
                 className="h-full rounded-full relative overflow-hidden"
-                style={{
+                style={shouldAnimate ? {
                     background: 'linear-gradient(90deg, #92400e, #d97706, #fbbf24, #fde68a)',
                     animation: 'progress 1.8s cubic-bezier(0.4, 0, 0.2, 1) 0.4s forwards',
                     width: '0%',
+                    boxShadow: '0 0 8px rgba(251,191,36,0.4)',
+                } : {
+                    background: 'linear-gradient(90deg, #92400e, #d97706, #fbbf24, #fde68a)',
+                    width: '100%',
                     boxShadow: '0 0 8px rgba(251,191,36,0.4)',
                 }}
             >
