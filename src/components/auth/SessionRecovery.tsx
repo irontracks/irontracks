@@ -39,12 +39,13 @@ const isOnline = () => {
 const shouldRefresh = () => now() - readLastRefresh() >= MIN_REFRESH_GAP_MS
 
 export default function SessionRecovery() {
-  const supabase = useMemo(() => createClient(), [])
+  const supabase = useMemo(() => { try { return createClient() } catch { return null } }, [])
   const refreshingRef = useRef(false)
 
   // Sincronizador de Backup de Sessão para iOS Nativo / PWA WKWebView
   // A Apple apaga cookies ao matar o app. O localStorage sobrevive.
   useEffect(() => {
+    if (!supabase) return
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       try {
         if (typeof window === 'undefined') return
@@ -66,6 +67,7 @@ export default function SessionRecovery() {
   }, [supabase])
 
   useEffect(() => {
+    if (!supabase) return
     let interval: ReturnType<typeof setInterval> | null = null
     let mounted = true
 
