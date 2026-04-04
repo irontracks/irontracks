@@ -25,8 +25,8 @@ export default function NutritionConsoleShell({
 
   return (
     <div className="min-h-screen bg-neutral-950 text-white">
-      <div className="sticky top-0 z-30 border-b border-neutral-800/60 bg-neutral-950/80 backdrop-blur">
-        <div className="mx-auto w-full max-w-md px-4 py-3 flex items-center justify-between gap-3">
+      <div className="sticky top-0 z-30 border-b border-neutral-800/60 bg-neutral-950/80 backdrop-blur pt-safe">
+        <div className="mx-auto w-full max-w-md px-4 pb-3 pt-2 flex items-center justify-between gap-3">
           <button
             type="button"
             onClick={goBack}
