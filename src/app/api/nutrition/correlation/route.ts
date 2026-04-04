@@ -27,7 +27,7 @@ export async function GET() {
   // Workout days from workout_sessions
   const { data: sessions } = await admin
     .from('workout_sessions')
-    .select('started_at, calories_burned')
+    .select('started_at, calories_estimate')
     .eq('user_id', auth.user.id)
     .gte('started_at', thirtyDaysAgo.toISOString())
     .order('started_at', { ascending: true })
@@ -35,23 +35,23 @@ export async function GET() {
   // Nutrition days from daily_nutrition_logs
   const { data: nutLogs } = await admin
     .from('daily_nutrition_logs')
-    .select('log_date, total_calories')
+    .select('date, calories')
     .eq('user_id', auth.user.id)
-    .gte('log_date', from)
-    .lte('log_date', today)
+    .gte('date', from)
+    .lte('date', today)
 
   // Build lookup maps
   const workoutByDay = new Map<string, number>()
   for (const s of Array.isArray(sessions) ? sessions : []) {
     const day = isoDate(new Date(String(s.started_at)))
-    const cal = Number(s.calories_burned) || 0
+    const cal = Number(s.calories_estimate) || 0
     workoutByDay.set(day, (workoutByDay.get(day) || 0) + cal)
   }
 
   const nutritionByDay = new Map<string, number>()
   for (const n of Array.isArray(nutLogs) ? nutLogs : []) {
-    const day = String(n.log_date).slice(0, 10)
-    nutritionByDay.set(day, Number(n.total_calories) || 0)
+    const day = String(n.date).slice(0, 10)
+    nutritionByDay.set(day, Number(n.calories) || 0)
   }
 
   // Build 30-day array
