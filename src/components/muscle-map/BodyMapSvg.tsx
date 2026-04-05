@@ -80,7 +80,10 @@ const BodyMapSvg = memo(function BodyMapSvg({ view, muscles, onSelect, selected,
   const layers = useMemo(() => dedup(overlays, muscles), [overlays, muscles])
 
   return (
-    <div className="relative w-full max-w-[280px] mx-auto select-none overflow-hidden rounded-2xl bg-black border border-neutral-800 aspect-square isolate">
+    <div
+      className="relative w-full max-w-[280px] mx-auto select-none overflow-hidden rounded-2xl bg-black border border-neutral-800 aspect-square isolate"
+      style={{ WebkitMaskImage: '-webkit-radial-gradient(white, black)', WebkitBackfaceVisibility: 'hidden' }}
+    >
 
       {/* Base body (dark mannequin) — uses <img> for mix-blend-mode compatibility */}
       {/* eslint-disable-next-line @next/next/no-img-element, jsx-a11y/no-noninteractive-element-interactions */}
