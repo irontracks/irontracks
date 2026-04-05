@@ -79,8 +79,7 @@ const BodyMapSvg = memo(function BodyMapSvg({ view, muscles, onSelect, selected,
 
   return (
     <div
-      className="relative w-full max-w-[280px] mx-auto select-none rounded-2xl bg-black border border-neutral-800 aspect-square isolate"
-      style={{ overflow: 'hidden', contain: 'paint', clipPath: 'inset(0 round 16px)' }}
+      className="relative w-full max-w-[280px] mx-auto select-none overflow-hidden rounded-2xl bg-black border border-neutral-800 aspect-square"
     >
 
       {/* Base body (dark mannequin) — uses background-image to avoid iOS img+blend leaking */}
@@ -110,7 +109,6 @@ const BodyMapSvg = memo(function BodyMapSvg({ view, muscles, onSelect, selected,
               backgroundPosition: 'center',
               backgroundRepeat: 'no-repeat',
               opacity,
-              mixBlendMode: 'lighten',
               filter: isSelected ? 'saturate(1.4) brightness(1.15)' : 'none',
             }}
           />
@@ -131,8 +129,7 @@ const BodyMapSvg = memo(function BodyMapSvg({ view, muscles, onSelect, selected,
               backgroundPosition: 'center',
               backgroundRepeat: 'no-repeat',
               opacity: 0.4,
-              mixBlendMode: 'screen',
-              filter: 'blur(8px) brightness(1.5)',
+              filter: 'blur(6px) brightness(1.5)',
             }}
           />
         )
