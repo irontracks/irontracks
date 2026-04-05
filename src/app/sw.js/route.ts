@@ -96,6 +96,30 @@ self.addEventListener('fetch', (event) => {
   }
 
   if (isAsset(url.pathname)) {
+    // ── Network-first for JS/CSS bundles (_next/static/) to prevent stale
+    // code from being served on iOS WKWebView after a deploy. Stale
+    // bundles can reintroduce fixed bugs (e.g., race conditions in
+    // workout state management). Other assets (images, fonts) keep
+    // stale-while-revalidate for faster loads.
+    const isCodeBundle = url.pathname.startsWith('/_next/static/') &&
+      (url.pathname.endsWith('.js') || url.pathname.endsWith('.css'));
+
+    if (isCodeBundle) {
+      event.respondWith((async () => {
+        const cache = await caches.open(RUNTIME_CACHE);
+        try {
+          const res = await fetch(request);
+          cache.put(request, res.clone());
+          return res;
+        } catch {
+          const cached = await cache.match(request);
+          return cached || new Response('', { status: 504 });
+        }
+      })());
+      return;
+    }
+
+    // Stale-while-revalidate for non-code assets (images, fonts, etc.)
     event.respondWith((async () => {
       const cache = await caches.open(RUNTIME_CACHE);
       const cached = await cache.match(request);
