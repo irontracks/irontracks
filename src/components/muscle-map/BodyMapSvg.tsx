@@ -73,28 +73,25 @@ const BodyMapSvg = memo(function BodyMapSvg({ view, muscles, onSelect, selected,
   const baseSrc = view === 'front'
     ? (isFemale ? '/body-front-female.png' : '/body-front.png')
     : (isFemale ? '/body-back-female.png' : '/body-back.png')
-  // Female mode reuses the same overlay set — the original overlays already depict
-  // female anatomy (chest/glutes) and have pure black backgrounds that blend correctly.
   const overlayFolder = '/muscle-overlays'
 
   const layers = useMemo(() => dedup(overlays, muscles), [overlays, muscles])
 
   return (
     <div
-      className="relative w-full max-w-[280px] mx-auto select-none overflow-hidden rounded-2xl bg-black border border-neutral-800 aspect-square isolate"
-      style={{ WebkitMaskImage: '-webkit-radial-gradient(white, black)', WebkitBackfaceVisibility: 'hidden' }}
+      className="relative w-full max-w-[280px] mx-auto select-none rounded-2xl bg-black border border-neutral-800 aspect-square"
+      style={{ overflow: 'hidden', contain: 'paint' }}
     >
 
-      {/* Base body (dark mannequin) — uses <img> for mix-blend-mode compatibility */}
-      {/* eslint-disable-next-line @next/next/no-img-element, jsx-a11y/no-noninteractive-element-interactions */}
-      <img
-        key={`base-${view}-${isFemale ? 'f' : 'm'}`}
-        src={baseSrc}
-        alt={`Body ${view}`}
-        loading="lazy"
-        draggable={false}
-        className="absolute inset-0 w-full h-full object-contain pointer-events-none"
-        onError={(e) => { e.currentTarget.style.display = 'none' }}
+      {/* Base body (dark mannequin) — uses background-image to avoid iOS img+blend leaking */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          backgroundImage: `url(${baseSrc})`,
+          backgroundSize: 'contain',
+          backgroundPosition: 'center',
+          backgroundRepeat: 'no-repeat',
+        }}
       />
 
       {/* Muscle overlay layers — stacked with 'lighten' blend mode */}
@@ -104,20 +101,18 @@ const BodyMapSvg = memo(function BodyMapSvg({ view, muscles, onSelect, selected,
         if (opacity <= 0) return null
 
         return (
-          // eslint-disable-next-line @next/next/no-img-element, jsx-a11y/no-noninteractive-element-interactions
-          <img
+          <div
             key={`${overlayFolder}/${file}`}
-            src={`${overlayFolder}/${file}`}
-            alt=""
-            loading="lazy"
-            draggable={false}
-            className="absolute inset-0 w-full h-full object-contain pointer-events-none transition-opacity duration-500"
+            className="absolute inset-0 pointer-events-none transition-opacity duration-500"
             style={{
+              backgroundImage: `url(${overlayFolder}/${file})`,
+              backgroundSize: 'contain',
+              backgroundPosition: 'center',
+              backgroundRepeat: 'no-repeat',
               opacity,
               mixBlendMode: 'lighten',
               filter: isSelected ? 'saturate(1.4) brightness(1.15)' : 'none',
             }}
-            onError={(e) => { e.currentTarget.style.display = 'none' }}
           />
         )
       })}
@@ -127,20 +122,18 @@ const BodyMapSvg = memo(function BodyMapSvg({ view, muscles, onSelect, selected,
         const matchingLayer = layers.find((l) => l.muscleIds.includes(selected))
         if (!matchingLayer || ratioToOpacity(matchingLayer.maxRatio, true) <= 0) return null
         return (
-          // eslint-disable-next-line @next/next/no-img-element, jsx-a11y/no-noninteractive-element-interactions
-          <img
+          <div
             key={`glow-${matchingLayer.file}`}
-            src={`${overlayFolder}/${matchingLayer.file}`}
-            alt=""
-            loading="lazy"
-            draggable={false}
-            className="absolute inset-0 w-full h-full object-contain pointer-events-none"
+            className="absolute inset-0 pointer-events-none"
             style={{
+              backgroundImage: `url(${overlayFolder}/${matchingLayer.file})`,
+              backgroundSize: 'contain',
+              backgroundPosition: 'center',
+              backgroundRepeat: 'no-repeat',
               opacity: 0.4,
               mixBlendMode: 'screen',
               filter: 'blur(8px) brightness(1.5)',
             }}
-            onError={(e) => { e.currentTarget.style.display = 'none' }}
           />
         )
       })()}
