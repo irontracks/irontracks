@@ -58,78 +58,118 @@ export const DropSetSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: 
   const hasNotes = notesValue.trim().length > 0;
   const isNotesOpen = openNotesKeys.has(key);
 
+  const handleToggleDone = () => {
+    const nextDone = !done;
+    const lastWeight = String(stages?.[stages.length - 1]?.weight || '').trim();
+    const stageOut = stages.map((s) => ({
+      weight: String(s?.weight ?? '').trim(),
+      reps: parseTrainingNumber(s?.reps) ?? null,
+    }));
+    updateLog(key, {
+      done: nextDone,
+      weight: lastWeight,
+      reps: String(total || ''),
+      drop_set: { stages: stageOut },
+    });
+  };
+
+  const summaryText = stages.map((s) => `${s.weight || '?'}kg×${s.reps ?? '?'}`).join(' → ');
+
   return (
-    <div key={key} className="space-y-2">
-      <div className="flex items-center gap-2">
-        <div className="w-10 text-xs font-mono text-neutral-400">#{setIdx + 1}</div>
-        <button
-          type="button"
-          onClick={() => {
-            const baseStages = stages.map((s) => ({
-              weight: String(s?.weight ?? '').trim(),
-              reps: parseTrainingNumber(s?.reps) ?? null,
-            }));
-            setDropSetModal({ key, label: modeLabel, stages: baseStages, error: '' });
-          }}
-          className="w-24 bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none hover:border-yellow-500/60 hover:text-yellow-500 transition-colors inline-flex items-center justify-center gap-2"
-        >
-          <Pencil size={14} />
-          <span className="text-xs font-black">Abrir</span>
-        </button>
-        <div className="flex items-center gap-2 flex-1 min-w-0">
-          <span className="text-[10px] uppercase tracking-widest font-black text-yellow-500 inline-flex items-center gap-1 group">
-            {modeLabel || 'Drop'}
-            <HelpHint
-              title={(stagesCount >= 3 ? HELP_TERMS.dropSetDuplo : HELP_TERMS.dropSet).title}
-              text={(stagesCount >= 3 ? HELP_TERMS.dropSetDuplo : HELP_TERMS.dropSet).text}
-              tooltip={(stagesCount >= 3 ? HELP_TERMS.dropSetDuplo : HELP_TERMS.dropSet).tooltip}
-              className="h-4 w-4 text-[10px]"
-            />
-          </span>
-          <span className="text-xs text-neutral-400 truncate">Etapas {stagesCount} • Total: {total || 0} reps</span>
-        </div>
-        <button
-          type="button"
-          onClick={() => toggleNotes(key)} aria-label="Observações"
-          className={
-            isNotesOpen || hasNotes
-              ? 'inline-flex items-center justify-center rounded-lg p-2 text-yellow-500 bg-yellow-500/10 border border-yellow-500/40 hover:bg-yellow-500/15 transition duration-200'
-              : 'inline-flex items-center justify-center rounded-lg p-2 text-neutral-400 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'
-          }
-        >
-          <MessageSquare size={14} />
-        </button>
-        <button
-          type="button"
-          disabled={!canDone}
-          onClick={() => {
-            const nextDone = !done;
-            const lastWeight = String(stages?.[stages.length - 1]?.weight || '').trim();
-            const stageOut = stages.map((s) => ({
-              weight: String(s?.weight ?? '').trim(),
-              reps: parseTrainingNumber(s?.reps) ?? null,
-            }));
-            updateLog(key, {
-              done: nextDone,
-              weight: lastWeight,
-              reps: String(total || ''),
-              drop_set: { stages: stageOut },
-            });
-          }}
-          className={
-            canDone
-              ? done
-                ? 'inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-500 text-black font-black shadow-sm shadow-emerald-500/30'
-                : 'inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 font-black hover:bg-yellow-500/20 hover:border-yellow-500/50 transition-all'
-              : 'inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-neutral-800/40 border border-neutral-800 text-neutral-500 font-bold cursor-not-allowed'
-          }
-        >
-          <Check size={16} />
-          <span className="text-xs">{done ? 'Feito' : 'Concluir'}</span>
-        </button>
+    <div key={key} className="space-y-1">
+      <div
+        className={[
+          'rounded-xl border px-2.5 py-2 transition-all duration-300 shadow-sm',
+          done
+            ? 'bg-emerald-950/30 border-emerald-500/30'
+            : 'bg-neutral-900/50 border-neutral-800/80',
+        ].join(' ')}
+      >
+        {done ? (
+          /* ── Collapsed green row when done ── */
+          <div className="flex items-center gap-2">
+            <div className="w-10 text-xs font-mono text-neutral-400 shrink-0">#{setIdx + 1}</div>
+            <span className="text-[10px] uppercase tracking-widest font-black text-emerald-400 shrink-0">{modeLabel || 'Drop'}</span>
+            <span className="text-xs text-neutral-300 truncate flex-1 min-w-0">{summaryText}</span>
+            <button
+              type="button"
+              onClick={() => toggleNotes(key)} aria-label="Observações"
+              className={
+                isNotesOpen || hasNotes
+                  ? 'w-7 h-7 inline-flex items-center justify-center rounded-lg text-yellow-500 bg-yellow-500/10 border border-yellow-500/40 hover:bg-yellow-500/15 transition duration-200'
+                  : 'w-7 h-7 inline-flex items-center justify-center rounded-lg text-neutral-500 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'
+              }
+            >
+              <MessageSquare size={12} />
+            </button>
+            <button
+              type="button"
+              onClick={handleToggleDone}
+              className="inline-flex items-center justify-center gap-1 h-9 px-3 rounded-xl font-black text-xs whitespace-nowrap active:scale-95 transition-all duration-150 bg-emerald-500 text-black shadow-sm shadow-emerald-500/30"
+            >
+              <Check size={13} />
+              Feito
+            </button>
+          </div>
+        ) : (
+          /* ── Expanded row when not done ── */
+          <div className="flex items-center gap-2">
+            <div className="w-10 text-xs font-mono text-neutral-400">#{setIdx + 1}</div>
+            <button
+              type="button"
+              onClick={() => {
+                const baseStages = stages.map((s) => ({
+                  weight: String(s?.weight ?? '').trim(),
+                  reps: parseTrainingNumber(s?.reps) ?? null,
+                }));
+                setDropSetModal({ key, label: modeLabel, stages: baseStages, error: '' });
+              }}
+              className="w-24 bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none hover:border-yellow-500/60 hover:text-yellow-500 transition-colors inline-flex items-center justify-center gap-2"
+            >
+              <Pencil size={14} />
+              <span className="text-xs font-black">Abrir</span>
+            </button>
+            <div className="flex items-center gap-2 flex-1 min-w-0">
+              <span className="text-[10px] uppercase tracking-widest font-black text-yellow-500 inline-flex items-center gap-1 group">
+                {modeLabel || 'Drop'}
+                <HelpHint
+                  title={(stagesCount >= 3 ? HELP_TERMS.dropSetDuplo : HELP_TERMS.dropSet).title}
+                  text={(stagesCount >= 3 ? HELP_TERMS.dropSetDuplo : HELP_TERMS.dropSet).text}
+                  tooltip={(stagesCount >= 3 ? HELP_TERMS.dropSetDuplo : HELP_TERMS.dropSet).tooltip}
+                  className="h-4 w-4 text-[10px]"
+                />
+              </span>
+              <span className="text-xs text-neutral-400 truncate">Etapas {stagesCount} • Total: {total || 0} reps</span>
+            </div>
+            <button
+              type="button"
+              onClick={() => toggleNotes(key)} aria-label="Observações"
+              className={
+                isNotesOpen || hasNotes
+                  ? 'inline-flex items-center justify-center rounded-lg p-2 text-yellow-500 bg-yellow-500/10 border border-yellow-500/40 hover:bg-yellow-500/15 transition duration-200'
+                  : 'inline-flex items-center justify-center rounded-lg p-2 text-neutral-400 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'
+              }
+            >
+              <MessageSquare size={14} />
+            </button>
+            <button
+              type="button"
+              disabled={!canDone}
+              onClick={handleToggleDone}
+              className={
+                canDone
+                  ? 'inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 font-black hover:bg-yellow-500/20 hover:border-yellow-500/50 transition-all'
+                  : 'inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-neutral-800/40 border border-neutral-800 text-neutral-500 font-bold cursor-not-allowed'
+              }
+            >
+              <Check size={16} />
+              <span className="text-xs">Concluir</span>
+            </button>
+          </div>
+        )}
       </div>
 
-      {!canDone && (
+      {!done && !canDone && (
         <div className="pl-12 text-[11px] text-neutral-500 font-semibold">
           Preencha peso e reps em todas as etapas no modal para concluir.
         </div>
