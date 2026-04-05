@@ -1,197 +1,147 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
-import L from 'leaflet'
+import { useMemo } from 'react'
 import type { GeoTrackPoint } from '@/utils/geoUtils'
 
-// Critical Leaflet CSS inlined — guarantees tiles render correctly without
-// depending on external CSS file loading (fixes blank map on iOS WKWebView)
-const LEAFLET_CRITICAL_CSS = `
-.leaflet-pane,.leaflet-tile,.leaflet-marker-icon,.leaflet-marker-shadow,
-.leaflet-tile-container,.leaflet-pane>svg,.leaflet-pane>canvas,
-.leaflet-zoom-box,.leaflet-image-layer,.leaflet-layer{position:absolute;left:0;top:0}
-.leaflet-container{overflow:hidden;-webkit-tap-highlight-color:transparent;
-font-size:12px;line-height:1.5;background:#0a0a0a}
-.leaflet-tile,.leaflet-marker-icon,.leaflet-marker-shadow{
--webkit-user-select:none;user-select:none;-webkit-user-drag:none}
-.leaflet-tile{filter:inherit;visibility:hidden}
-.leaflet-tile-loaded{visibility:inherit}
-.leaflet-tile-pane{z-index:200}
-.leaflet-overlay-pane{z-index:400}
-.leaflet-shadow-pane{z-index:500}
-.leaflet-marker-pane{z-index:600}
-.leaflet-tooltip-pane{z-index:650}
-.leaflet-popup-pane{z-index:700}
-.leaflet-map-pane canvas{z-index:100}
-.leaflet-map-pane svg{z-index:200}
-.leaflet-tile-container{pointer-events:none}
-.leaflet-zoom-animated{-webkit-transform-origin:0 0;transform-origin:0 0}
-.leaflet-fade-anim .leaflet-tile,.leaflet-fade-anim .leaflet-popup{
-opacity:0;-webkit-transition:opacity 0.2s linear;transition:opacity 0.2s linear}
-.leaflet-fade-anim .leaflet-tile-loaded,.leaflet-fade-anim .leaflet-map-pane .leaflet-popup{opacity:1}
-.leaflet-control-container .leaflet-control-zoom{display:none}
-`
-
-// Inject critical CSS once
-if (typeof window !== 'undefined') {
-  const id = 'leaflet-critical-css'
-  if (!document.getElementById(id)) {
-    const style = document.createElement('style')
-    style.id = id
-    style.textContent = LEAFLET_CRITICAL_CSS
-    document.head.appendChild(style)
-  }
-}
-
-// Tile URL — proxied through same origin via Next.js rewrites
-const CARTO_DARK = '/map-tiles/carto/dark_all/{z}/{x}/{y}.png'
-const OSM_FALLBACK = '/map-tiles/osm/{z}/{x}/{y}.png'
-
-interface RouteMapLeafletProps {
+interface RouteMapProps {
   points: GeoTrackPoint[]
   height?: number
   live?: boolean
 }
 
-export default function RouteMapLeaflet({ points, height = 200, live }: RouteMapLeafletProps) {
-  const containerRef = useRef<HTMLDivElement>(null)
-  const mapRef = useRef<L.Map | null>(null)
-  const polylineRef = useRef<L.Polyline | null>(null)
-  const startMarkerRef = useRef<L.CircleMarker | null>(null)
-  const endMarkerRef = useRef<L.CircleMarker | null>(null)
-  const [tileStatus, setTileStatus] = useState<'loading' | 'ok' | 'error'>('loading')
+const PAD = 16
+const GRID_LINES = 6
 
-  // Initialize map once
-  useEffect(() => {
-    if (!containerRef.current || mapRef.current) return
+/**
+ * GPS-style route map — pure SVG, zero external dependencies.
+ * Dark background with subtle grid and green route polyline.
+ * Works reliably on all platforms including iOS WKWebView.
+ */
+export default function RouteMapLeaflet({ points, height = 200, live }: RouteMapProps) {
+  const data = useMemo(() => {
+    if (points.length < 2) return null
 
-    const map = L.map(containerRef.current, {
-      zoomControl: false,
-      attributionControl: false,
-      dragging: true,
-      scrollWheelZoom: false,
-      doubleClickZoom: false,
-      touchZoom: true,
-      fadeAnimation: true,
-    }).setView([-23.55, -46.63], 13)
+    const lats = points.map(p => p.latitude)
+    const lngs = points.map(p => p.longitude)
+    const minLat = Math.min(...lats)
+    const maxLat = Math.max(...lats)
+    const minLng = Math.min(...lngs)
+    const maxLng = Math.max(...lngs)
 
-    const cartoLayer = L.tileLayer(CARTO_DARK, { maxZoom: 19 })
+    // Add 15% padding to bounds so route doesn't touch edges
+    const latPad = (maxLat - minLat) * 0.15 || 0.0002
+    const lngPad = (maxLng - minLng) * 0.15 || 0.0002
+    const padMinLat = minLat - latPad
+    const padMaxLat = maxLat + latPad
+    const padMinLng = minLng - lngPad
+    const padMaxLng = maxLng + lngPad
+    const latRange = padMaxLat - padMinLat
+    const lngRange = padMaxLng - padMinLng
 
-    let tileLoadCount = 0
-    let tileErrorCount = 0
-
-    cartoLayer.on('tileload', () => {
-      tileLoadCount++
-      if (tileLoadCount >= 1) setTileStatus('ok')
-    })
-
-    cartoLayer.on('tileerror', () => {
-      tileErrorCount++
-      if (tileErrorCount >= 4 && tileLoadCount === 0) {
-        map.removeLayer(cartoLayer)
-        const osmLayer = L.tileLayer(OSM_FALLBACK, { maxZoom: 19 })
-        osmLayer.on('tileload', () => setTileStatus('ok'))
-        osmLayer.on('tileerror', () => setTileStatus('error'))
-        osmLayer.addTo(map)
-      }
-    })
-
-    cartoLayer.addTo(map)
-    mapRef.current = map
-
-    // Force recalculate size after mount + accordion animation
-    const t1 = setTimeout(() => map.invalidateSize(), 100)
-    const t2 = setTimeout(() => map.invalidateSize(), 400)
-    const t3 = setTimeout(() => map.invalidateSize(), 1000)
-
-    return () => {
-      clearTimeout(t1)
-      clearTimeout(t2)
-      clearTimeout(t3)
-      map.remove()
-      mapRef.current = null
-    }
-  }, [])
-
-  // Update route whenever points change
-  useEffect(() => {
-    const map = mapRef.current
-    if (!map) return
-
-    const latLngs: L.LatLngExpression[] = points.map(p => [p.latitude, p.longitude])
-
-    if (polylineRef.current) {
-      polylineRef.current.setLatLngs(latLngs)
-    } else if (latLngs.length >= 2) {
-      polylineRef.current = L.polyline(latLngs, {
-        color: '#22c55e',
-        weight: 3.5,
-        opacity: 0.85,
-        smoothFactor: 1,
-        lineCap: 'round',
-        lineJoin: 'round',
-      }).addTo(map)
-    }
-
-    if (latLngs.length >= 1) {
-      const startPos = latLngs[0] as [number, number]
-      if (startMarkerRef.current) {
-        startMarkerRef.current.setLatLng(startPos)
-      } else {
-        startMarkerRef.current = L.circleMarker(startPos, {
-          radius: 6,
-          color: '#22c55e',
-          fillColor: '#22c55e',
-          fillOpacity: 1,
-          weight: 2,
-        }).addTo(map)
-      }
-    }
-
-    if (latLngs.length >= 2) {
-      const endPos = latLngs[latLngs.length - 1] as [number, number]
-      if (endMarkerRef.current) {
-        endMarkerRef.current.setLatLng(endPos)
-      } else {
-        endMarkerRef.current = L.circleMarker(endPos, {
-          radius: 7,
-          color: '#22c55e',
-          fillColor: '#ffffff',
-          fillOpacity: 1,
-          weight: 2.5,
-        }).addTo(map)
-      }
-    }
-
-    if (latLngs.length >= 2) {
-      if (live) {
-        const lastPos = latLngs[latLngs.length - 1] as [number, number]
-        map.setView(lastPos, map.getZoom() < 15 ? 15 : map.getZoom(), { animate: true })
-      } else {
-        const bounds = L.latLngBounds(latLngs)
-        map.fitBounds(bounds, { padding: [20, 20], animate: true })
-      }
-    } else if (latLngs.length === 1) {
-      const pos = latLngs[0] as [number, number]
-      map.setView(pos, 16)
-    }
-  }, [points, live])
+    return { padMinLat, padMinLng, latRange, lngRange }
+  }, [points])
 
   if (points.length < 2 && !live) return null
 
   return (
-    <div className="relative mb-3 rounded-xl overflow-hidden" style={{ height, background: '#0a0a0a', border: '1px solid rgba(34,197,94,0.15)' }}>
-      <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
-      {tileStatus === 'loading' && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <span className="text-xs text-white/30">Carregando mapa...</span>
-        </div>
-      )}
-      {tileStatus === 'error' && (
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <span className="text-xs text-red-400/60">Falha ao carregar tiles</span>
-        </div>
-      )}
+    <div
+      className="mb-3 rounded-xl overflow-hidden"
+      style={{ height, background: '#0d1117', border: '1px solid rgba(34,197,94,0.15)' }}
+    >
+      <svg
+        viewBox={`0 0 400 ${height}`}
+        className="w-full h-full"
+        preserveAspectRatio="xMidYMid meet"
+        style={{ display: 'block' }}
+      >
+        {/* Grid lines */}
+        {Array.from({ length: GRID_LINES + 1 }).map((_, i) => {
+          const x = PAD + (i / GRID_LINES) * (400 - PAD * 2)
+          return <line key={`gv${i}`} x1={x} y1={PAD} x2={x} y2={height - PAD} stroke="rgba(255,255,255,0.04)" strokeWidth="0.5" />
+        })}
+        {Array.from({ length: Math.round(GRID_LINES * (height / 400)) + 1 }).map((_, i) => {
+          const totalH = Math.round(GRID_LINES * (height / 400))
+          const y = PAD + (i / totalH) * (height - PAD * 2)
+          return <line key={`gh${i}`} x1={PAD} y1={y} x2={400 - PAD} y2={y} stroke="rgba(255,255,255,0.04)" strokeWidth="0.5" />
+        })}
+
+        {data && points.length >= 2 && (() => {
+          const { padMinLat, padMinLng, latRange, lngRange } = data
+          const toX = (lng: number) => PAD + ((lng - padMinLng) / lngRange) * (400 - PAD * 2)
+          const toY = (lat: number) => height - PAD - ((lat - padMinLat) / latRange) * (height - PAD * 2)
+
+          const pathD = points
+            .map((p, i) => `${i === 0 ? 'M' : 'L'}${toX(p.longitude).toFixed(1)},${toY(p.latitude).toFixed(1)}`)
+            .join(' ')
+
+          const first = points[0]
+          const last = points[points.length - 1]
+          const lastX = toX(last.longitude)
+          const lastY = toY(last.latitude)
+
+          return (
+            <>
+              {/* Route glow */}
+              <path
+                d={pathD}
+                fill="none"
+                stroke="rgba(34,197,94,0.2)"
+                strokeWidth="8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              {/* Route line */}
+              <path
+                d={pathD}
+                fill="none"
+                stroke="#22c55e"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              {/* Start marker */}
+              <circle
+                cx={toX(first.longitude).toFixed(1)}
+                cy={toY(first.latitude).toFixed(1)}
+                r="5"
+                fill="#22c55e"
+                stroke="#0d1117"
+                strokeWidth="2"
+              />
+              {/* End / current position marker */}
+              <circle
+                cx={lastX.toFixed(1)}
+                cy={lastY.toFixed(1)}
+                r="6"
+                fill="#ffffff"
+                stroke="#22c55e"
+                strokeWidth="2.5"
+              />
+              {/* Pulse ring on current position when live */}
+              {live && (
+                <circle
+                  cx={lastX.toFixed(1)}
+                  cy={lastY.toFixed(1)}
+                  r="12"
+                  fill="none"
+                  stroke="rgba(34,197,94,0.4)"
+                  strokeWidth="1.5"
+                >
+                  <animate attributeName="r" from="8" to="18" dur="1.5s" repeatCount="indefinite" />
+                  <animate attributeName="opacity" from="0.6" to="0" dur="1.5s" repeatCount="indefinite" />
+                </circle>
+              )}
+            </>
+          )
+        })()}
+
+        {/* "Waiting for GPS" when live but < 2 points */}
+        {live && points.length < 2 && (
+          <text x="200" y={height / 2} textAnchor="middle" fill="rgba(255,255,255,0.2)" fontSize="11" fontFamily="system-ui">
+            Aguardando sinal GPS...
+          </text>
+        )}
+      </svg>
     </div>
   )
 }
