@@ -42,6 +42,11 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
     const [timeLeft, setTimeLeft] = useState(0);
     const [isFinished, setIsFinished] = useState(false);
     const [autoStartLocal, setAutoStartLocal] = useState(Boolean(autoStartEnabled));
+    // Local dismiss: hides the overlay IMMEDIATELY on START tap instead of
+    // waiting for the async React state update (setActiveSession → timerTargetTime=null).
+    // Without this, the overlay stays visible for 1-2 frames after tap, during which
+    // re-renders can interfere with the button's click handling on iOS WKWebView.
+    const [dismissed, setDismissed] = useState(false);
     const warnedRef = useRef(false);
     const notifyIdRef = useRef('');
     const soundIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -343,6 +348,7 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
             // Skip if user already clicked START manually
             if (startBusyRef.current) return;
             startBusyRef.current = true;
+            setDismissed(true); // Immediately hide overlay
             try {
                 if (notifyIdRef.current) {
                     endRestLiveActivity(notifyIdRef.current);
@@ -359,26 +365,23 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
         return () => clearTimeout(timeout);
     }, [isFinished, autoStartLocal]);
 
-    // Guard against double-tap on START button
+    // Guard against double-tap on START button (short window only)
     const startBusyRef = useRef(false);
 
-    // ── Reset startBusyRef when targetTime changes (new timer for a new set).
-    // Without this, if the overlay stays mounted when one timer transitions
-    // directly to the next (e.g., auto-start fires → handleTimerFinish +
-    // handleComplete both queue setActiveSession in the same React batch →
-    // timerTargetTime goes T1→T2 without passing through null → overlay
-    // doesn't unmount → startBusyRef stays true → START is permanently blocked).
+    // Reset local state when targetTime changes (new timer for a new set)
     useEffect(() => {
         startBusyRef.current = false;
+        setDismissed(false);
     }, [targetTime]);
 
-    if (!targetTime) return null;
+    // ── Early return: hide immediately on dismiss OR when no timer ──
+    if (!targetTime || dismissed) return null;
 
     const handleStart = () => {
         if (startBusyRef.current) return;
         startBusyRef.current = true;
-        // Safety: reset after 1.5s in case onStart fails to close the timer
-        setTimeout(() => { startBusyRef.current = false; }, 1500);
+        // Immediately hide the overlay — don't wait for async React state
+        setDismissed(true);
         try {
             if (notifyIdRef.current) {
                 endRestLiveActivity(notifyIdRef.current);
