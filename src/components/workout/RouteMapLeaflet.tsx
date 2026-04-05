@@ -4,15 +4,14 @@ import { useEffect, useRef } from 'react'
 import L from 'leaflet'
 import type { GeoTrackPoint } from '@/utils/geoUtils'
 
-// Inject Leaflet CSS once at runtime (avoids SSR/bundler issues with CSS imports)
+// Inject Leaflet CSS once at runtime — self-hosted to avoid CSP/COEP cross-origin issues
 if (typeof window !== 'undefined') {
   const LEAFLET_CSS_ID = 'leaflet-css'
   if (!document.getElementById(LEAFLET_CSS_ID)) {
     const link = document.createElement('link')
     link.id = LEAFLET_CSS_ID
     link.rel = 'stylesheet'
-    link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css'
-    link.crossOrigin = ''
+    link.href = '/leaflet.css'
     document.head.appendChild(link)
   }
 }
