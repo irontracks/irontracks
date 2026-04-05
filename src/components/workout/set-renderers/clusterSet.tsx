@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { parseTrainingNumber } from '@/utils/trainingNumber';
-import { Check, Pencil } from 'lucide-react';
+import { Check, MessageSquare, Pencil } from 'lucide-react';
 import { useWorkoutContext } from '../WorkoutContext';
 import { HelpHint } from '@/components/ui/HelpHint';
 import { HELP_TERMS } from '@/utils/help/terms';
@@ -26,6 +26,8 @@ export const ClusterSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: 
     clusterRefs,
     deloadSuggestions,
     reportHistory,
+    openNotesKeys,
+    toggleNotes,
   } = useWorkoutContext();
 
   const key = `${exIdx}-${setIdx}`;
@@ -115,6 +117,8 @@ export const ClusterSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: 
 
   const notation = plannedBlocks.length ? plannedBlocks.join('+') : '';
   const notesValue = String(log.notes ?? '');
+  const hasNotes = notesValue.trim().length > 0;
+  const isNotesOpen = openNotesKeys.has(key);
 
   return (
     <div key={key} className="space-y-2">
@@ -174,6 +178,9 @@ export const ClusterSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: 
               {notation ? `(${notation})` : ''} • Intra {intra || 0}s • Total: {total || 0} reps
             </span>
           </div>
+          <button type="button" onClick={() => toggleNotes(key)} aria-label="Observações" className={isNotesOpen || hasNotes ? 'inline-flex items-center justify-center rounded-lg p-2 text-yellow-500 bg-yellow-500/10 border border-yellow-500/40' : 'inline-flex items-center justify-center rounded-lg p-2 text-neutral-400 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'}>
+            <MessageSquare size={14} />
+          </button>
           <button
             type="button"
             disabled={!canDone}
@@ -263,17 +270,19 @@ export const ClusterSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: 
           })}
         </div>
       )}
-      <textarea
-        aria-label={`Observações – série ${setIdx + 1}`}
-        value={notesValue}
-        onChange={(e) => {
-          const v = e?.target?.value ?? '';
-          updateLog(key, { notes: v, advanced_config: cfg ?? log.advanced_config ?? null });
-        }}
-        placeholder="Observações da série"
-        rows={2}
-        className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
-      />
+      {isNotesOpen && (
+        <textarea
+          aria-label={`Observações – série ${setIdx + 1}`}
+          value={notesValue}
+          onChange={(e) => {
+            const v = e?.target?.value ?? '';
+            updateLog(key, { notes: v, advanced_config: cfg ?? log.advanced_config ?? null });
+          }}
+          placeholder="Observações da série"
+          rows={2}
+          className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+        />
+      )}
     </div>
   );
 };
