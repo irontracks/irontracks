@@ -362,11 +362,23 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
     // Guard against double-tap on START button
     const startBusyRef = useRef(false);
 
+    // ── Reset startBusyRef when targetTime changes (new timer for a new set).
+    // Without this, if the overlay stays mounted when one timer transitions
+    // directly to the next (e.g., auto-start fires → handleTimerFinish +
+    // handleComplete both queue setActiveSession in the same React batch →
+    // timerTargetTime goes T1→T2 without passing through null → overlay
+    // doesn't unmount → startBusyRef stays true → START is permanently blocked).
+    useEffect(() => {
+        startBusyRef.current = false;
+    }, [targetTime]);
+
     if (!targetTime) return null;
 
     const handleStart = () => {
         if (startBusyRef.current) return;
         startBusyRef.current = true;
+        // Safety: reset after 1.5s in case onStart fails to close the timer
+        setTimeout(() => { startBusyRef.current = false; }, 1500);
         try {
             if (notifyIdRef.current) {
                 endRestLiveActivity(notifyIdRef.current);
