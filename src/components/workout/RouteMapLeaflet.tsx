@@ -56,6 +56,7 @@ export default function RouteMapLeaflet({ points, height = 200, live }: RouteMap
       attribution: TILE_ATTR,
       maxZoom: 19,
       subdomains: 'abcd',
+      crossOrigin: true,
     }).addTo(map)
 
     mapRef.current = map
