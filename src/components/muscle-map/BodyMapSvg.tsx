@@ -1,6 +1,6 @@
 'use client'
 
-import React, { memo, useMemo } from 'react'
+import React, { memo, useCallback, useEffect, useMemo, useRef } from 'react'
 import type { MuscleId } from '@/utils/muscleMapConfig'
 
 type MuscleState = {
@@ -67,22 +67,109 @@ const ratioToOpacity = (ratio: number, isSelected: boolean) => {
   return isSelected ? Math.min(1, base + 0.2) : base
 }
 
+const CANVAS_SIZE = 640
+
+/** Shared image cache — survives re-renders and avoids redundant fetches */
+const imageCache = new Map<string, HTMLImageElement>()
+
+const loadImage = (src: string): Promise<HTMLImageElement> => {
+  const cached = imageCache.get(src)
+  if (cached?.complete && cached.naturalWidth > 0) return Promise.resolve(cached)
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    img.crossOrigin = 'anonymous'
+    img.onload = () => { imageCache.set(src, img); resolve(img) }
+    img.onerror = reject
+    img.src = src
+  })
+}
+
+const OVERLAY_FOLDER = '/muscle-overlays'
+
 const BodyMapSvg = memo(function BodyMapSvg({ view, muscles, onSelect, selected, gender }: Props) {
   const isFemale = gender === 'female'
   const overlays = view === 'front' ? FRONT_OVERLAYS : BACK_OVERLAYS
+
+  const layers = useMemo(() => dedup(overlays, muscles), [overlays, muscles])
+
+  const canvasRef = useRef<HTMLCanvasElement>(null)
+
+  // Build the layer descriptors for canvas rendering
+  const canvasLayers = useMemo(() => {
+    return layers
+      .map(({ file, muscleIds, maxRatio }) => {
+        const isSelected = muscleIds.some((id) => id === selected)
+        const opacity = ratioToOpacity(maxRatio, isSelected)
+        return { file, opacity, isSelected }
+      })
+      .filter((l) => l.opacity > 0)
+  }, [layers, selected])
+
+  // Draw all overlays onto a single canvas — eliminates multi-layer compositing bugs
+  const drawCanvas = useCallback(async () => {
+    const canvas = canvasRef.current
+    if (!canvas) return
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return
+
+    ctx.clearRect(0, 0, CANVAS_SIZE, CANVAS_SIZE)
+
+    for (const layer of canvasLayers) {
+      try {
+        const img = await loadImage(`${OVERLAY_FOLDER}/${layer.file}`)
+        ctx.globalAlpha = layer.opacity
+
+        if (layer.isSelected) {
+          // Simulate saturate(1.4) brightness(1.15) by drawing with higher alpha + overlay
+          ctx.filter = 'saturate(1.4) brightness(1.15)'
+        } else {
+          ctx.filter = 'none'
+        }
+
+        ctx.drawImage(img, 0, 0, CANVAS_SIZE, CANVAS_SIZE)
+      } catch {
+        // Skip images that fail to load
+      }
+    }
+
+    // Reset context state
+    ctx.globalAlpha = 1
+    ctx.filter = 'none'
+
+    // Draw glow effect for selected muscle
+    if (selected) {
+      const matchingLayer = canvasLayers.find((l) =>
+        layers.some((ll) => ll.file === l.file && ll.muscleIds.includes(selected))
+      )
+      if (matchingLayer) {
+        try {
+          const img = await loadImage(`${OVERLAY_FOLDER}/${matchingLayer.file}`)
+          ctx.globalAlpha = 0.4
+          ctx.filter = 'blur(6px) brightness(1.5)'
+          ctx.drawImage(img, 0, 0, CANVAS_SIZE, CANVAS_SIZE)
+          ctx.globalAlpha = 1
+          ctx.filter = 'none'
+        } catch {
+          // Glow is optional
+        }
+      }
+    }
+  }, [canvasLayers, layers, selected])
+
+  useEffect(() => {
+    drawCanvas()
+  }, [drawCanvas])
+
   const baseSrc = view === 'front'
     ? (isFemale ? '/body-front-female.png' : '/body-front.png')
     : (isFemale ? '/body-back-female.png' : '/body-back.png')
-  const overlayFolder = '/muscle-overlays'
-
-  const layers = useMemo(() => dedup(overlays, muscles), [overlays, muscles])
 
   return (
     <div
       className="relative w-full max-w-[280px] mx-auto select-none overflow-hidden rounded-2xl bg-black border border-neutral-800 aspect-square"
     >
 
-      {/* Base body (dark mannequin) — uses background-image to avoid iOS img+blend leaking */}
+      {/* Base body (dark mannequin) */}
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
@@ -93,47 +180,14 @@ const BodyMapSvg = memo(function BodyMapSvg({ view, muscles, onSelect, selected,
         }}
       />
 
-      {/* Muscle overlay layers — stacked with 'lighten' blend mode */}
-      {layers.map(({ file, muscleIds, maxRatio }) => {
-        const isSelected = muscleIds.some((id) => id === selected)
-        const opacity = ratioToOpacity(maxRatio, isSelected)
-        if (opacity <= 0) return null
-
-        return (
-          <div
-            key={`${overlayFolder}/${file}`}
-            className="absolute inset-0 pointer-events-none transition-opacity duration-500"
-            style={{
-              backgroundImage: `url(${overlayFolder}/${file})`,
-              backgroundSize: 'contain',
-              backgroundPosition: 'center',
-              backgroundRepeat: 'no-repeat',
-              opacity,
-              filter: isSelected ? 'saturate(1.4) brightness(1.15)' : 'none',
-            }}
-          />
-        )
-      })}
-
-      {/* Selected muscle glow ring effect */}
-      {selected && (() => {
-        const matchingLayer = layers.find((l) => l.muscleIds.includes(selected))
-        if (!matchingLayer || ratioToOpacity(matchingLayer.maxRatio, true) <= 0) return null
-        return (
-          <div
-            key={`glow-${matchingLayer.file}`}
-            className="absolute inset-0 pointer-events-none"
-            style={{
-              backgroundImage: `url(${overlayFolder}/${matchingLayer.file})`,
-              backgroundSize: 'contain',
-              backgroundPosition: 'center',
-              backgroundRepeat: 'no-repeat',
-              opacity: 0.4,
-              filter: 'blur(6px) brightness(1.5)',
-            }}
-          />
-        )
-      })()}
+      {/* All muscle overlays composited into a single canvas element */}
+      <canvas
+        ref={canvasRef}
+        width={CANVAS_SIZE}
+        height={CANVAS_SIZE}
+        aria-hidden="true"
+        className="absolute inset-0 w-full h-full pointer-events-none"
+      />
 
       {/* Invisible click areas (SVG hitboxes for each muscle group) */}
       <svg
