@@ -4,7 +4,7 @@ export const buildCspHeader = (nonce: string, isDev: boolean) => {
   const scriptSrc = isDev
     ? `'self' 'nonce-${nonce}' 'unsafe-inline' 'unsafe-eval'`
     : `'self' 'nonce-${nonce}'`
-  const styleSrc = `'self' 'unsafe-inline' https://fonts.googleapis.com`
+  const styleSrc = `'self' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com`
 
   return [
     `default-src 'self'`,
@@ -12,9 +12,9 @@ export const buildCspHeader = (nonce: string, isDev: boolean) => {
     `style-src ${styleSrc}`,
     `style-src-attr 'unsafe-inline'`,
     `font-src 'self' https://fonts.gstatic.com data:`,
-    `img-src 'self' data: blob: https://*.googleusercontent.com https://*.supabase.co https://*.supabase.in https://res.cloudinary.com https://i.ytimg.com https://img.youtube.com`,
+    `img-src 'self' data: blob: https://*.googleusercontent.com https://*.supabase.co https://*.supabase.in https://res.cloudinary.com https://i.ytimg.com https://img.youtube.com https://*.basemaps.cartocdn.com`,
     `media-src 'self' blob: https://*.supabase.co https://*.supabase.in https://res.cloudinary.com`,
-    `connect-src 'self' https://*.supabase.co https://*.supabase.in wss://*.supabase.co https://generativelanguage.googleapis.com https://api.mercadopago.com https://www.googleapis.com`,
+    `connect-src 'self' https://*.supabase.co https://*.supabase.in wss://*.supabase.co https://generativelanguage.googleapis.com https://api.mercadopago.com https://www.googleapis.com https://*.basemaps.cartocdn.com`,
     `frame-src 'none'`,
     `frame-ancestors 'none'`,
     `object-src 'none'`,
@@ -33,9 +33,10 @@ export const applySecurityHeaders = (response: NextResponse, nonce: string, isDe
   response.headers.set('X-DNS-Prefetch-Control', 'off')
   response.headers.set('X-Permitted-Cross-Domain-Policies', 'none')
   response.headers.set('Cross-Origin-Opener-Policy', 'same-origin-allow-popups')
-  // Spectre mitigation: isolate this document from cross-origin resources.
-  // Safe because the CSP already blocks frame-src, so no third-party iframes exist.
-  response.headers.set('Cross-Origin-Embedder-Policy', 'require-corp')
+  // Spectre mitigation: credentialless still isolates cross-origin resources
+  // but allows loading cross-origin images/tiles (e.g. Leaflet map tiles) that
+  // don't send Cross-Origin-Resource-Policy headers.
+  response.headers.set('Cross-Origin-Embedder-Policy', 'credentialless')
   response.headers.set('Cross-Origin-Resource-Policy', 'same-origin')
 
   if (!isDev) {

@@ -83,7 +83,7 @@ function estimateCalories(
 }
 
 export function useCardioTracking({ bodyWeightKg = 75 }: UseCardioTrackingOptions = {}): UseCardioTrackingResult {
-  const { startWatching, stopWatching, position, watching } = useGeoLocation()
+  const { startWatching, stopWatching, position } = useGeoLocation()
   const [isTracking, setIsTracking] = useState(false)
   const [isPaused, setIsPaused] = useState(false)
   const [metrics, setMetrics] = useState<CardioMetrics>(EMPTY_METRICS)
@@ -113,7 +113,7 @@ export function useCardioTracking({ bodyWeightKg = 75 }: UseCardioTrackingOption
     return () => {
       if (timerRef.current) clearInterval(timerRef.current)
     }
-  }, [isTracking, isPaused])
+  }, [isTracking, isPaused, bodyWeightKg])
 
   // Record new position when it changes
   useEffect(() => {
@@ -140,6 +140,9 @@ export function useCardioTracking({ bodyWeightKg = 75 }: UseCardioTrackingOption
         currentSpeed = segTime > 0 ? speedKmh(segDist, segTime) : 0
       }
 
+      // Ignore GPS spikes — anything above 45 km/h is unrealistic for cardio
+      if (currentSpeed > 45) currentSpeed = 0
+
       if (currentSpeed > maxSpeedRef.current) maxSpeedRef.current = currentSpeed
 
       setMetrics({
@@ -153,7 +156,7 @@ export function useCardioTracking({ bodyWeightKg = 75 }: UseCardioTrackingOption
 
       return updated
     })
-  }, [position, isTracking, isPaused])
+  }, [position, isTracking, isPaused, bodyWeightKg])
 
   const start = useCallback(() => {
     startTimeRef.current = Date.now()
