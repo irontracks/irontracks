@@ -4,20 +4,46 @@ import { useEffect, useRef, useState } from 'react'
 import L from 'leaflet'
 import type { GeoTrackPoint } from '@/utils/geoUtils'
 
-// Inject Leaflet CSS once at runtime — self-hosted to avoid cross-origin issues
+// Critical Leaflet CSS inlined — guarantees tiles render correctly without
+// depending on external CSS file loading (fixes blank map on iOS WKWebView)
+const LEAFLET_CRITICAL_CSS = `
+.leaflet-pane,.leaflet-tile,.leaflet-marker-icon,.leaflet-marker-shadow,
+.leaflet-tile-container,.leaflet-pane>svg,.leaflet-pane>canvas,
+.leaflet-zoom-box,.leaflet-image-layer,.leaflet-layer{position:absolute;left:0;top:0}
+.leaflet-container{overflow:hidden;-webkit-tap-highlight-color:transparent;
+font-size:12px;line-height:1.5;background:#0a0a0a}
+.leaflet-tile,.leaflet-marker-icon,.leaflet-marker-shadow{
+-webkit-user-select:none;user-select:none;-webkit-user-drag:none}
+.leaflet-tile{filter:inherit;visibility:hidden}
+.leaflet-tile-loaded{visibility:inherit}
+.leaflet-tile-pane{z-index:200}
+.leaflet-overlay-pane{z-index:400}
+.leaflet-shadow-pane{z-index:500}
+.leaflet-marker-pane{z-index:600}
+.leaflet-tooltip-pane{z-index:650}
+.leaflet-popup-pane{z-index:700}
+.leaflet-map-pane canvas{z-index:100}
+.leaflet-map-pane svg{z-index:200}
+.leaflet-tile-container{pointer-events:none}
+.leaflet-zoom-animated{-webkit-transform-origin:0 0;transform-origin:0 0}
+.leaflet-fade-anim .leaflet-tile,.leaflet-fade-anim .leaflet-popup{
+opacity:0;-webkit-transition:opacity 0.2s linear;transition:opacity 0.2s linear}
+.leaflet-fade-anim .leaflet-tile-loaded,.leaflet-fade-anim .leaflet-map-pane .leaflet-popup{opacity:1}
+.leaflet-control-container .leaflet-control-zoom{display:none}
+`
+
+// Inject critical CSS once
 if (typeof window !== 'undefined') {
-  const LEAFLET_CSS_ID = 'leaflet-css'
-  if (!document.getElementById(LEAFLET_CSS_ID)) {
-    const link = document.createElement('link')
-    link.id = LEAFLET_CSS_ID
-    link.rel = 'stylesheet'
-    link.href = '/leaflet.css'
-    document.head.appendChild(link)
+  const id = 'leaflet-critical-css'
+  if (!document.getElementById(id)) {
+    const style = document.createElement('style')
+    style.id = id
+    style.textContent = LEAFLET_CRITICAL_CSS
+    document.head.appendChild(style)
   }
 }
 
-// Tile providers — proxied through same origin via Next.js rewrites to bypass
-// all cross-origin restrictions in iOS WKWebView
+// Tile URL — proxied through same origin via Next.js rewrites
 const CARTO_DARK = '/map-tiles/carto/dark_all/{z}/{x}/{y}.png'
 const OSM_FALLBACK = '/map-tiles/osm/{z}/{x}/{y}.png'
 
@@ -46,9 +72,9 @@ export default function RouteMapLeaflet({ points, height = 200, live }: RouteMap
       scrollWheelZoom: false,
       doubleClickZoom: false,
       touchZoom: true,
+      fadeAnimation: true,
     }).setView([-23.55, -46.63], 13)
 
-    // Same-origin tiles via Next.js rewrite proxy — no cross-origin issues
     const cartoLayer = L.tileLayer(CARTO_DARK, { maxZoom: 19 })
 
     let tileLoadCount = 0
@@ -61,7 +87,6 @@ export default function RouteMapLeaflet({ points, height = 200, live }: RouteMap
 
     cartoLayer.on('tileerror', () => {
       tileErrorCount++
-      // If first 4 tiles all fail, switch to OSM fallback (also proxied)
       if (tileErrorCount >= 4 && tileLoadCount === 0) {
         map.removeLayer(cartoLayer)
         const osmLayer = L.tileLayer(OSM_FALLBACK, { maxZoom: 19 })
