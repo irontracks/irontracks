@@ -51,8 +51,29 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
   // updateLog calls (e.g., RPE input → OK click) causes the second call to
   // read a stale `prev` that was captured before the first update propagated,
   // erasing the user's typed values.
+  //
+  // DEEP MERGE instead of replace: when a parent re-render (e.g., from the 1-s
+  // sessionTicker) fires BETWEEN an eager logsRef write and React processing
+  // the corresponding setActiveSession, a plain `logsRef.current = logs` would
+  // clobber the eagerly-written fields (weight, reps, rpe, done…) because
+  // `logs` still reflects the old React state.  By merging React's `logs`
+  // ON TOP of the ref, eagerly-written fields survive until React catches up.
   const logsRef = useRef<Record<string, unknown>>(logs);
-  logsRef.current = logs; // synchronous — always current
+  {
+    const prev = logsRef.current;
+    const next: Record<string, unknown> = { ...prev };
+    for (const k of Object.keys(logs)) {
+      const fromRef = isObject(prev[k]) ? (prev[k] as Record<string, unknown>) : null;
+      const fromReact = isObject(logs[k]) ? (logs[k] as Record<string, unknown>) : null;
+      if (fromRef && fromReact) {
+        // React state wins for shared fields; ref keeps eagerly-written fields
+        next[k] = { ...fromRef, ...fromReact };
+      } else {
+        next[k] = logs[k];
+      }
+    }
+    logsRef.current = next;
+  }
   // propsRef: stable reference to latest props so callbacks can access them without rebuilding
   const propsRef = useRef(props);
   propsRef.current = props;

@@ -21,14 +21,27 @@ import { UnknownRecord, WorkoutExercise } from '../types';
 function useInputField(externalValue: string, onChange: (v: string) => void) {
   const [localValue, setLocalValue] = useState(externalValue);
   const isFocused = useRef(false);
+  // Track when the field was last blurred so we can protect against stale
+  // external values arriving before React processes the blur's state update.
+  const blurredAtRef = useRef(0);
 
   // When the external value changes (e.g. a teammate updates the log),
   // sync the local value ONLY if the field is not currently focused.
   useEffect(() => {
-    if (!isFocused.current) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect
-      setLocalValue(externalValue);
+    if (isFocused.current) return;
+    // Guard: if we JUST blurred and local has data but external is empty/different,
+    // the external value is likely stale (React hasn't processed our blur write yet).
+    // Wait for a render cycle before accepting the downgrade.
+    if (
+      localValue &&
+      !externalValue &&
+      Date.now() - blurredAtRef.current < 2000
+    ) {
+      return;
     }
+    setLocalValue(externalValue);
+  // localValue intentionally excluded — we only react to external changes
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [externalValue]);
 
   const handleChange = useCallback(
@@ -47,6 +60,7 @@ function useInputField(externalValue: string, onChange: (v: string) => void) {
   const handleBlur = useCallback(
     (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
       isFocused.current = false;
+      blurredAtRef.current = Date.now();
       // Flush the final value to the global log on blur so nothing is lost
       onChange(e.target.value);
     },
