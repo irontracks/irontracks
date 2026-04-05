@@ -144,6 +144,24 @@ export default function DashboardModals(props: DashboardModalsProps) {
         showProgressPhotos, setShowProgressPhotos,
     } = props
 
+    // ── Local 1-second ticker for the Session Floating Bar elapsed time.
+    // Previously sessionTicker was a useState in the parent (IronTracksAppClientImpl),
+    // causing the ENTIRE app — including ActiveWorkout and all NormalSet inputs —
+    // to re-render every second.  Now the parent passes a ref-backed value (always 0
+    // on mount), and we maintain our own local interval that ONLY re-renders
+    // DashboardModals.
+    const [localTicker, setLocalTicker] = React.useState(() => Date.now())
+    React.useEffect(() => {
+        if (!activeSession) return
+        const id = setInterval(() => {
+            try { if (typeof document !== 'undefined' && document.hidden) return } catch { /* */ }
+            setLocalTicker(Date.now())
+        }, 1000)
+        return () => clearInterval(id)
+    }, [activeSession])
+    // Use local ticker for display; fall back to prop for backward compat
+    const effectiveTicker = localTicker || sessionTicker
+
     // Partner exercise share — use hook directly since we're inside TeamWorkoutProvider
     let teamWorkoutCtx: ReturnType<typeof useTeamWorkout> | null = null
     try {
@@ -511,7 +529,7 @@ export default function DashboardModals(props: DashboardModalsProps) {
                             <div className="flex-1 min-w-0">
                                 <h3 className="font-bold text-white truncate">{(activeSession as Record<string, unknown>).workout && typeof (activeSession as Record<string, unknown>).workout === 'object' ? String(((activeSession as Record<string, unknown>).workout as Record<string, unknown>)?.title || 'Treino em andamento') : 'Treino em andamento'}</h3>
                                 <div className="flex items-center gap-3 text-xs text-neutral-300 mt-1">
-                                    <span className="font-mono text-yellow-500">{(() => { const startMs = parseStartedAtMs((activeSession as Record<string, unknown>).startedAt); const endMs = sessionTicker || startMs; const s = startMs > 0 ? Math.max(0, Math.floor((endMs - startMs) / 1000)) : 0; const m = Math.floor(s / 60), sec = s % 60; return `${m}:${String(sec).padStart(2, '0')}`; })()}</span>
+                                    <span className="font-mono text-yellow-500">{(() => { const startMs = parseStartedAtMs((activeSession as Record<string, unknown>).startedAt); const endMs = effectiveTicker || startMs; const s = startMs > 0 ? Math.max(0, Math.floor((endMs - startMs) / 1000)) : 0; const m = Math.floor(s / 60), sec = s % 60; return `${m}:${String(sec).padStart(2, '0')}`; })()}</span>
                                     <span className="text-neutral-500">tempo atual</span>
                                     <span className="opacity-30">•</span>
                                     <span className="font-mono text-neutral-200">{(() => { const workout = (activeSession as Record<string, unknown>).workout; const list = workout && typeof workout === 'object' && Array.isArray((workout as Record<string, unknown>).exercises) ? ((workout as Record<string, unknown>).exercises as unknown[]) : []; const total = list.reduce((acc: number, ex: unknown) => acc + calculateExerciseDuration((ex && typeof ex === 'object' ? (ex as Record<string, unknown>) : ({} as Record<string, unknown>))), 0); return `${toMinutesRounded(total)} min`; })()}</span>

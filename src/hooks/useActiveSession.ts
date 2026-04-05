@@ -30,7 +30,7 @@ export type UseActiveSessionReturn = {
     setActiveSession: React.Dispatch<React.SetStateAction<ActiveWorkoutSession | null>>
     suppressForeignFinishToastUntilRef: React.MutableRefObject<number>
     sessionTicker: number
-    setSessionTicker: React.Dispatch<React.SetStateAction<number>>
+    setSessionTicker: (v: number) => void
 
     // Editor de sessão ativa
     editActiveOpen: boolean
@@ -71,7 +71,14 @@ const isRecord = (v: unknown): v is Record<string, unknown> =>
 export function useActiveSession({ userId }: UseActiveSessionOptions): UseActiveSessionReturn {
     const [activeSession, setActiveSession] = useState<ActiveWorkoutSession | null>(null)
     const suppressForeignFinishToastUntilRef = useRef<number>(0)
-    const [sessionTicker, setSessionTicker] = useState(0)
+    // ── sessionTicker removed as STATE to eliminate 1-second re-render cascade.
+    // Previously, `useState(0)` + `setSessionTicker(Date.now())` every 1s caused
+    // IronTracksAppClientImpl to re-render, cascading to ActiveWorkout →
+    // controller → WorkoutProvider → ALL NormalSet components, clobbering input
+    // state on iOS WKWebView. DashboardModals (the only consumer) now runs its
+    // own local interval. setSessionTicker is kept as a no-op for backward compat.
+    const sessionTicker = 0
+    const setSessionTicker = useCallback((_v: number) => { /* no-op: ticker moved to DashboardModals */ }, [])
     const [editActiveOpen, setEditActiveOpen] = useState(false)
     const [editActiveDraft, setEditActiveDraft] = useState<Record<string, unknown> | null>(null)
     const editActiveBaseRef = useRef<Record<string, unknown> | null>(null)
