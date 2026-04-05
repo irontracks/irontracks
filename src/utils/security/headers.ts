@@ -4,7 +4,7 @@ export const buildCspHeader = (nonce: string, isDev: boolean) => {
   const scriptSrc = isDev
     ? `'self' 'nonce-${nonce}' 'unsafe-inline' 'unsafe-eval'`
     : `'self' 'nonce-${nonce}'`
-  const styleSrc = `'self' 'unsafe-inline' https://fonts.googleapis.com https://unpkg.com`
+  const styleSrc = `'self' 'unsafe-inline' https://fonts.googleapis.com`
 
   return [
     `default-src 'self'`,
@@ -33,11 +33,9 @@ export const applySecurityHeaders = (response: NextResponse, nonce: string, isDe
   response.headers.set('X-DNS-Prefetch-Control', 'off')
   response.headers.set('X-Permitted-Cross-Domain-Policies', 'none')
   response.headers.set('Cross-Origin-Opener-Policy', 'same-origin-allow-popups')
-  // Spectre mitigation: credentialless still isolates cross-origin resources
-  // but allows loading cross-origin images/tiles (e.g. Leaflet map tiles) that
-  // don't send Cross-Origin-Resource-Policy headers.
-  response.headers.set('Cross-Origin-Embedder-Policy', 'credentialless')
-  response.headers.set('Cross-Origin-Resource-Policy', 'same-origin')
+  // COEP removed: Safari/WKWebView does not support 'credentialless' and
+  // 'require-corp' blocks third-party map tiles (CartoDB). The CSP policy
+  // already restricts resource loading to whitelisted origins.
 
   if (!isDev) {
     response.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload')
