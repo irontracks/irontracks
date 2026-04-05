@@ -1,10 +1,13 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import dynamic from 'next/dynamic'
 import { ChevronDown, ChevronUp } from 'lucide-react'
 import { useCardioTracking } from '@/hooks/useCardioTracking'
 import { formatDistance, formatPace } from '@/utils/geoUtils'
-import RouteMapLeaflet from './RouteMapLeaflet'
+
+// MapLibre GL needs browser APIs (WebGL) — load client-side only
+const RouteMapLeaflet = dynamic(() => import('./RouteMapLeaflet'), { ssr: false })
 
 interface CardioGPSPanelProps {
   /** If provided, links the track to a workout */
