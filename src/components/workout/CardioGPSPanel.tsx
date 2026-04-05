@@ -1,13 +1,10 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
-import dynamic from 'next/dynamic'
 import { ChevronDown, ChevronUp } from 'lucide-react'
 import { useCardioTracking } from '@/hooks/useCardioTracking'
 import { formatDistance, formatPace } from '@/utils/geoUtils'
-
-// Leaflet requires browser APIs — must be loaded client-side only
-const RouteMapLeaflet = dynamic(() => import('./RouteMapLeaflet'), { ssr: false })
+import RouteMapLeaflet from './RouteMapLeaflet'
 
 interface CardioGPSPanelProps {
   /** If provided, links the track to a workout */
