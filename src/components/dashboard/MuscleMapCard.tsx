@@ -344,6 +344,7 @@ const MuscleMapCard = memo(function MuscleMapCard(props: Props) {
         data-tour="muscle-map"
         className="p-4 cursor-pointer select-none"
         role="button"
+        aria-label="Expandir mapa muscular"
         tabIndex={0}
         onClick={() => setExpanded((v) => !v)}
         onKeyDown={(e) => {
@@ -451,6 +452,7 @@ const MuscleMapCard = memo(function MuscleMapCard(props: Props) {
                 {period === 'day' ? (
                   <input
                     type="date"
+                    aria-label="Selecionar data"
                     value={selectedDate}
                     onChange={(e) => setSelectedDate(String(e.target.value || '').trim())}
                     onClick={(e) => e.stopPropagation()}
@@ -567,7 +569,7 @@ const MuscleMapCard = memo(function MuscleMapCard(props: Props) {
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
                 transition={{ duration: 0.25 }}
-                className="lg:col-span-1 bg-black rounded-2xl border border-neutral-800 p-3"
+                className="lg:col-span-1 bg-black rounded-2xl border border-neutral-800 p-3 overflow-hidden"
               >
                 <BodyMapSvg
                   view={view}
@@ -729,6 +731,7 @@ const MuscleMapCard = memo(function MuscleMapCard(props: Props) {
                         <button
                           key={m.id}
                           type="button"
+                          aria-label={`Selecionar ${m.label}`}
                           onClick={() => setSelected(m.id as Parameters<typeof setSelected>[0])}
                           className="rounded-xl border border-neutral-800 bg-black p-3 text-left hover:bg-neutral-950 transition-colors"
                         >
