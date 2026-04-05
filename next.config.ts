@@ -78,6 +78,20 @@ const nextConfig: NextConfig = {
       },
     ],
   },
+  // Proxy map tiles through same origin — avoids all cross-origin issues in
+  // iOS WKWebView (CSP, COEP, CORS). Tiles are served from /map-tiles/...
+  async rewrites() {
+    return [
+      {
+        source: '/map-tiles/carto/:path*',
+        destination: 'https://a.basemaps.cartocdn.com/:path*',
+      },
+      {
+        source: '/map-tiles/osm/:path*',
+        destination: 'https://tile.openstreetmap.org/:path*',
+      },
+    ]
+  },
   async headers() {
     const isDev = String(process.env.NODE_ENV || '').toLowerCase() !== 'production'
     const staticCache = isDev ? 'no-store, max-age=0' : 'public, max-age=31536000, immutable'

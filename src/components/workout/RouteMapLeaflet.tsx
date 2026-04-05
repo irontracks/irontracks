@@ -16,9 +16,10 @@ if (typeof window !== 'undefined') {
   }
 }
 
-// Tile providers — try CartoDB Dark first, fall back to OSM
-const CARTO_DARK = 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png'
-const OSM_STANDARD = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png'
+// Tile providers — proxied through same origin via Next.js rewrites to bypass
+// all cross-origin restrictions in iOS WKWebView
+const CARTO_DARK = '/map-tiles/carto/dark_all/{z}/{x}/{y}.png'
+const OSM_FALLBACK = '/map-tiles/osm/{z}/{x}/{y}.png'
 
 interface RouteMapLeafletProps {
   points: GeoTrackPoint[]
@@ -47,12 +48,8 @@ export default function RouteMapLeaflet({ points, height = 200, live }: RouteMap
       touchZoom: true,
     }).setView([-23.55, -46.63], 13)
 
-    // Try CartoDB Dark first
-    const cartoLayer = L.tileLayer(CARTO_DARK, {
-      maxZoom: 19,
-      subdomains: 'abcd',
-      crossOrigin: true,
-    })
+    // Same-origin tiles via Next.js rewrite proxy — no cross-origin issues
+    const cartoLayer = L.tileLayer(CARTO_DARK, { maxZoom: 19 })
 
     let tileLoadCount = 0
     let tileErrorCount = 0
@@ -64,14 +61,12 @@ export default function RouteMapLeaflet({ points, height = 200, live }: RouteMap
 
     cartoLayer.on('tileerror', () => {
       tileErrorCount++
-      // If first 4 tiles all fail, switch to OSM fallback
+      // If first 4 tiles all fail, switch to OSM fallback (also proxied)
       if (tileErrorCount >= 4 && tileLoadCount === 0) {
         map.removeLayer(cartoLayer)
-        const osmLayer = L.tileLayer(OSM_STANDARD, {
-          maxZoom: 19,
-          crossOrigin: true,
-        })
+        const osmLayer = L.tileLayer(OSM_FALLBACK, { maxZoom: 19 })
         osmLayer.on('tileload', () => setTileStatus('ok'))
+        osmLayer.on('tileerror', () => setTileStatus('error'))
         osmLayer.addTo(map)
       }
     })
