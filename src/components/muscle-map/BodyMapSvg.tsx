@@ -79,8 +79,8 @@ const BodyMapSvg = memo(function BodyMapSvg({ view, muscles, onSelect, selected,
 
   return (
     <div
-      className="relative w-full max-w-[280px] mx-auto select-none rounded-2xl bg-black border border-neutral-800 aspect-square"
-      style={{ overflow: 'hidden', contain: 'paint' }}
+      className="relative w-full max-w-[280px] mx-auto select-none rounded-2xl bg-black border border-neutral-800 aspect-square isolate"
+      style={{ overflow: 'hidden', contain: 'paint', clipPath: 'inset(0 round 16px)' }}
     >
 
       {/* Base body (dark mannequin) — uses background-image to avoid iOS img+blend leaking */}
