@@ -76,6 +76,11 @@ const BodyMapSvg = memo(function BodyMapSvg({ view, muscles, onSelect, selected,
     ? (isFemale ? '/body-front-female.png' : '/body-front.png')
     : (isFemale ? '/body-back-female.png' : '/body-back.png')
 
+  // Mask image: white silhouette of the body — overlays only show WITHIN the body shape
+  const maskSrc = view === 'front'
+    ? (isFemale ? '/body-front-female-mask.png' : '/body-front-mask.png')
+    : (isFemale ? '/body-back-female-mask.png' : '/body-back-mask.png')
+
   const layers = useMemo(() => dedup(overlays, muscles), [overlays, muscles])
 
   return (
@@ -94,35 +99,41 @@ const BodyMapSvg = memo(function BodyMapSvg({ view, muscles, onSelect, selected,
         }}
       />
 
-      {/* Muscle overlay layers */}
-      {layers.map(({ file, muscleIds, maxRatio }) => {
-        const isSelected = muscleIds.some((id) => id === selected)
-        const opacity = ratioToOpacity(maxRatio, isSelected)
-        if (opacity <= 0) return null
-
-        return (
-          <div
-            key={`${OVERLAY_FOLDER}/${file}`}
-            className="absolute inset-0 pointer-events-none transition-opacity duration-500"
-            style={{
-              backgroundImage: `url(${OVERLAY_FOLDER}/${file})`,
-              backgroundSize: 'contain',
-              backgroundPosition: 'center',
-              backgroundRepeat: 'no-repeat',
-              opacity,
-              filter: isSelected ? 'saturate(1.4) brightness(1.15)' : 'none',
-            }}
-          />
-        )
-      })}
-
-      {/* Vignette: fades overlay edges to black so stacked layers don't bleed visually */}
+      {/* Muscle overlay layers — masked by body silhouette so they only show within the body shape */}
       <div
-        className="absolute inset-0 pointer-events-none z-10"
+        className="absolute inset-0 pointer-events-none"
         style={{
-          background: 'radial-gradient(ellipse 60% 70% at 50% 42%, transparent 50%, rgba(0,0,0,0.7) 70%, rgba(0,0,0,0.95) 85%, black 100%)',
+          WebkitMaskImage: `url(${maskSrc})`,
+          maskImage: `url(${maskSrc})`,
+          WebkitMaskSize: 'contain',
+          maskSize: 'contain',
+          WebkitMaskPosition: 'center',
+          maskPosition: 'center',
+          WebkitMaskRepeat: 'no-repeat',
+          maskRepeat: 'no-repeat',
         }}
-      />
+      >
+        {layers.map(({ file, muscleIds, maxRatio }) => {
+          const isSelected = muscleIds.some((id) => id === selected)
+          const opacity = ratioToOpacity(maxRatio, isSelected)
+          if (opacity <= 0) return null
+
+          return (
+            <div
+              key={`${OVERLAY_FOLDER}/${file}`}
+              className="absolute inset-0 pointer-events-none transition-opacity duration-500"
+              style={{
+                backgroundImage: `url(${OVERLAY_FOLDER}/${file})`,
+                backgroundSize: 'contain',
+                backgroundPosition: 'center',
+                backgroundRepeat: 'no-repeat',
+                opacity,
+                filter: isSelected ? 'saturate(1.4) brightness(1.15)' : 'none',
+              }}
+            />
+          )
+        })}
+      </div>
 
       {/* Invisible click areas (SVG hitboxes for each muscle group) */}
       <svg

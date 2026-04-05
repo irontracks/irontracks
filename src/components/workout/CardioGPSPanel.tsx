@@ -1,10 +1,13 @@
 'use client'
 
 import { useCallback, useEffect, useState } from 'react'
+import dynamic from 'next/dynamic'
 import { ChevronDown, ChevronUp } from 'lucide-react'
 import { useCardioTracking } from '@/hooks/useCardioTracking'
 import { formatDistance, formatPace } from '@/utils/geoUtils'
-import type { GeoTrackPoint } from '@/utils/geoUtils'
+
+// Leaflet requires browser APIs — must be loaded client-side only
+const RouteMapLeaflet = dynamic(() => import('./RouteMapLeaflet'), { ssr: false })
 
 interface CardioGPSPanelProps {
   /** If provided, links the track to a workout */
@@ -117,8 +120,8 @@ export default function CardioGPSPanel({ workoutId, onSaved, bodyWeightKg }: Car
       {/* Collapsible content */}
       {isOpen && (
         <div className="px-4 pb-4">
-          {/* Route Map */}
-          <RouteMap points={trackPoints} />
+          {/* Route Map — Leaflet with dark tiles (Strava-style) */}
+          <RouteMapLeaflet points={trackPoints} height={200} live={isTracking} />
 
           {/* Metrics Grid */}
           <div className="grid grid-cols-3 gap-2 mb-3">
@@ -183,46 +186,6 @@ export default function CardioGPSPanel({ workoutId, onSaved, bodyWeightKg }: Car
           50% { opacity: 0.4; }
         }
       `}</style>
-    </div>
-  )
-}
-
-const SVG_W = 200
-const SVG_H = 80
-const SVG_PAD = 8
-
-function RouteMap({ points }: { points: GeoTrackPoint[] }) {
-  if (points.length < 2) return null
-
-  const lats = points.map(p => p.latitude)
-  const lngs = points.map(p => p.longitude)
-  const minLat = Math.min(...lats)
-  const maxLat = Math.max(...lats)
-  const minLng = Math.min(...lngs)
-  const maxLng = Math.max(...lngs)
-  const latRange = maxLat - minLat || 0.0001
-  const lngRange = maxLng - minLng || 0.0001
-
-  const toX = (lng: number) => SVG_PAD + ((lng - minLng) / lngRange) * (SVG_W - SVG_PAD * 2)
-  const toY = (lat: number) => SVG_H - SVG_PAD - ((lat - minLat) / latRange) * (SVG_H - SVG_PAD * 2)
-
-  const d = points
-    .map((p, i) => `${i === 0 ? 'M' : 'L'}${toX(p.longitude).toFixed(1)},${toY(p.latitude).toFixed(1)}`)
-    .join(' ')
-
-  const first = points[0]
-  const last = points[points.length - 1]
-
-  return (
-    <div
-      className="mb-3 rounded-xl overflow-hidden"
-      style={{ background: 'rgba(0,0,0,0.35)', border: '1px solid rgba(34,197,94,0.12)' }}
-    >
-      <svg viewBox={`0 0 ${SVG_W} ${SVG_H}`} className="w-full" style={{ height: 72, display: 'block' }}>
-        <path d={d} fill="none" stroke="rgba(34,197,94,0.75)" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-        <circle cx={toX(first.longitude).toFixed(1)} cy={toY(first.latitude).toFixed(1)} r="3" fill="#22c55e" />
-        <circle cx={toX(last.longitude).toFixed(1)} cy={toY(last.latitude).toFixed(1)} r="4" fill="white" stroke="#22c55e" strokeWidth="1.5" />
-      </svg>
     </div>
   )
 }
