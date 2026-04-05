@@ -80,7 +80,7 @@ const BodyMapSvg = memo(function BodyMapSvg({ view, muscles, onSelect, selected,
 
   return (
     <div
-      className="relative w-full max-w-[280px] mx-auto select-none overflow-hidden rounded-2xl bg-black border border-neutral-800 aspect-square"
+      className="relative w-full max-w-[280px] mx-auto select-none overflow-hidden rounded-2xl bg-black aspect-square"
     >
 
       {/* Base body (dark mannequin) */}
@@ -116,25 +116,13 @@ const BodyMapSvg = memo(function BodyMapSvg({ view, muscles, onSelect, selected,
         )
       })}
 
-      {/* Selected muscle glow ring effect */}
-      {selected && (() => {
-        const matchingLayer = layers.find((l) => l.muscleIds.includes(selected))
-        if (!matchingLayer || ratioToOpacity(matchingLayer.maxRatio, true) <= 0) return null
-        return (
-          <div
-            key={`glow-${matchingLayer.file}`}
-            className="absolute inset-0 pointer-events-none"
-            style={{
-              backgroundImage: `url(${OVERLAY_FOLDER}/${matchingLayer.file})`,
-              backgroundSize: 'contain',
-              backgroundPosition: 'center',
-              backgroundRepeat: 'no-repeat',
-              opacity: 0.4,
-              filter: 'blur(6px) brightness(1.5)',
-            }}
-          />
-        )
-      })()}
+      {/* Vignette: fades overlay edges to black so stacked layers don't bleed visually */}
+      <div
+        className="absolute inset-0 pointer-events-none z-10"
+        style={{
+          background: 'radial-gradient(ellipse 60% 70% at 50% 42%, transparent 50%, rgba(0,0,0,0.7) 70%, rgba(0,0,0,0.95) 85%, black 100%)',
+        }}
+      />
 
       {/* Invisible click areas (SVG hitboxes for each muscle group) */}
       <svg
@@ -191,7 +179,7 @@ const BodyMapSvg = memo(function BodyMapSvg({ view, muscles, onSelect, selected,
       </svg>
 
       {/* Inner shadow frame */}
-      <div className="absolute inset-0 pointer-events-none rounded-2xl shadow-[inset_0_0_20px_rgba(0,0,0,0.8)]" />
+      <div className="absolute inset-0 pointer-events-none rounded-2xl shadow-[inset_0_0_30px_rgba(0,0,0,0.95)]" />
     </div>
   )
 })
