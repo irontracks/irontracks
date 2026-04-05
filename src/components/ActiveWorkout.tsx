@@ -33,7 +33,14 @@ export default function ActiveWorkout(props: ActiveWorkoutProps) {
   const triggerExit = React.useCallback((cb: () => void) => {
     if (exitTimerRef.current) return; // already exiting — prevent double-tap
     setIsExiting(true);
-    exitTimerRef.current = setTimeout(cb, 280);
+    exitTimerRef.current = setTimeout(() => {
+      // ── Clear BEFORE calling cb so future attempts aren't permanently blocked.
+      // Previously the ref kept the old timeout ID after firing, causing
+      // `if (exitTimerRef.current) return` to block ALL subsequent calls —
+      // including cancel retries after a failed Finalizar.
+      exitTimerRef.current = null;
+      try { cb(); } catch (e) { console.error('[ActiveWorkout] triggerExit callback failed:', e); }
+    }, 280);
   }, []);
 
   // Compute startedAtMs for the timer provider (must be before early return — Rules of Hooks)
@@ -44,7 +51,7 @@ export default function ActiveWorkout(props: ActiveWorkoutProps) {
     try { const t = new Date(String(rawStartedAt ?? '')).getTime(); return Number.isFinite(t) ? t : 0; } catch { return 0; }
   }, [rawStartedAt]);
 
-  // Enhanced context injects _exitOnBack so WorkoutHeader can trigger animation
+  // Enhanced context injects _exitOnBack and cancelWorkout (direct, no animation)
   const enhancedController = React.useMemo((): WorkoutContextType => {
     const originalOnFinish = controller.onFinish as ((s: unknown, saved: boolean) => void) | undefined;
     return {
@@ -52,6 +59,20 @@ export default function ActiveWorkout(props: ActiveWorkoutProps) {
       onFinish: originalOnFinish
         ? (s: unknown, saved: boolean) => triggerExit(() => originalOnFinish(s, saved))
         : originalOnFinish,
+      // cancelWorkout bypasses triggerExit entirely — the cancel flow must
+      // NEVER be blocked by a stale exitTimerRef from a previous Finalizar
+      // attempt. It calls the original handler directly after a micro-delay
+      // to let the confirmation dialog fully unmount from the DOM.
+      cancelWorkout: originalOnFinish
+        ? () => {
+            // Clear any pending exit animation so it doesn't interfere
+            if (exitTimerRef.current) { clearTimeout(exitTimerRef.current); exitTimerRef.current = null; }
+            setIsExiting(true);
+            setTimeout(() => {
+              try { originalOnFinish(null, false); } catch (e) { console.error('[ActiveWorkout] cancelWorkout failed:', e); }
+            }, 100);
+          }
+        : undefined,
       ...(props.onBack ? { _exitOnBack: () => triggerExit(props.onBack!) } : {}),
     };
   }, [controller, props.onBack, triggerExit]);

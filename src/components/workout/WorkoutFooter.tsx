@@ -14,7 +14,7 @@ export default function WorkoutFooter() {
     finishing,
     finishWorkout,
     confirm,
-    onFinish,
+    cancelWorkout,
     completedSets,
     totalSets,
     remainingSets,
@@ -72,7 +72,7 @@ export default function WorkoutFooter() {
   return (
     <div className="fixed bottom-0 left-0 right-0 z-50 bg-neutral-950/95 backdrop-blur border-t border-neutral-800 px-4 md:px-6 py-3 pb-safe">
       <div className="max-w-6xl mx-auto flex items-center justify-between gap-2">
-        {/* Cancel button */}
+        {/* Cancel button — uses cancelWorkout (bypasses triggerExit) */}
         <button
           type="button"
           onClick={async () => {
@@ -81,8 +81,19 @@ export default function WorkoutFooter() {
             try {
               const ok = await confirm('Cancelar treino em andamento? (não salva no histórico)', 'Cancelar');
               if (!ok) { cancelBusyRef.current = false; return; }
-              if (typeof onFinish === 'function') onFinish(null, false);
-            } catch { cancelBusyRef.current = false; }
+              // cancelWorkout bypasses the exit animation guard (exitTimerRef)
+              // which can be permanently blocked after a failed Finalizar attempt.
+              if (typeof cancelWorkout === 'function') {
+                cancelWorkout();
+              } else {
+                console.error('[WorkoutFooter] cancelWorkout is not available');
+              }
+            } catch (e) {
+              console.error('[WorkoutFooter] cancel failed:', e);
+            } finally {
+              // Always reset after a delay so the user can retry if navigation fails
+              setTimeout(() => { cancelBusyRef.current = false; }, 1500);
+            }
           }}
           className="w-11 h-11 flex items-center justify-center rounded-xl bg-neutral-900 border border-neutral-700/50 text-neutral-500 hover:text-red-400 hover:border-red-500/30 active:scale-95 transition-all shrink-0"
           title="Cancelar treino"
