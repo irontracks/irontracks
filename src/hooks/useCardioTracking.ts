@@ -126,6 +126,13 @@ export function useCardioTracking({ bodyWeightKg = 75 }: UseCardioTrackingOption
     }
 
     setTrackPoints(prev => {
+      // Filter GPS drift: ignore points that moved less than 3 meters from last
+      if (prev.length > 0) {
+        const last = prev[prev.length - 1]
+        const drift = totalTrackDistance([last, newPoint])
+        if (drift < 3) return prev // skip — standing still or GPS noise
+      }
+
       const updated = [...prev, newPoint]
       const dist = totalTrackDistance(updated)
       const elapsed = Math.floor((Date.now() - startTimeRef.current - pausedDurationRef.current) / 1000)
