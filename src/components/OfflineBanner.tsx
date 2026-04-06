@@ -1,33 +1,34 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useState, useSyncExternalStore } from 'react'
 import { WifiOff, Wifi } from 'lucide-react'
 
+function subscribeToNetwork(callback: () => void) {
+    window.addEventListener('offline', callback)
+    window.addEventListener('online', callback)
+    return () => {
+        window.removeEventListener('offline', callback)
+        window.removeEventListener('online', callback)
+    }
+}
+
 export default function OfflineBanner() {
-    // Lazy initializer — correct way to read navigator.onLine on first render
-    const [isOffline, setIsOffline] = useState(() =>
-        typeof navigator !== 'undefined' ? !navigator.onLine : false
+    // useSyncExternalStore: server snapshot = false (avoids hydration mismatch),
+    // client snapshot reads actual navigator.onLine after hydration.
+    const isOffline = useSyncExternalStore(
+        subscribeToNetwork,
+        () => !navigator.onLine,
+        () => false,
     )
     const [justReconnected, setJustReconnected] = useState(false)
 
     useEffect(() => {
-        const handleOffline = () => {
-            setIsOffline(true)
-            setJustReconnected(false)
-        }
-
         const handleOnline = () => {
-            setIsOffline(false)
             setJustReconnected(true)
             setTimeout(() => setJustReconnected(false), 3000)
         }
-
-        window.addEventListener('offline', handleOffline)
         window.addEventListener('online', handleOnline)
-        return () => {
-            window.removeEventListener('offline', handleOffline)
-            window.removeEventListener('online', handleOnline)
-        }
+        return () => window.removeEventListener('online', handleOnline)
     }, [])
 
     if (!isOffline && !justReconnected) return null

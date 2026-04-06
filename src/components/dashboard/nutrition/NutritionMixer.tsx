@@ -562,7 +562,6 @@ export default function NutritionMixer({
             aria-label="Adicionar refeição"
             value={input}
             onChange={e => setInput(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (!isPending && !schemaMissing) handleSubmit() } }}
             disabled={isPending || !!schemaMissing}
             rows={2}
             className="mt-3 w-full rounded-xl bg-white/[0.04] border border-white/[0.08] px-4 py-3 text-sm text-white placeholder:text-neutral-600 focus:outline-none focus:border-yellow-500/30 focus:ring-1 focus:ring-yellow-500/20 resize-none transition"
