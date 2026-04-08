@@ -68,24 +68,31 @@ export default function WorkoutHeader() {
               {!isExecuting && (
                 <motion.div
                   className="flex items-center gap-2"
-                  initial={{ opacity: 0, width: 0 }}
-                  animate={{ opacity: 1, width: 'auto' }}
-                  exit={{ opacity: 0, width: 0 }}
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
                   transition={{ duration: 0.2, ease: 'easeInOut' }}
-                  style={{ overflow: 'hidden' }}
                 >
-                  {/* Primary action — always first */}
-                  <button
-                    type="button"
-                    onClick={() => setAddExerciseOpen(true)}
-                    className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-yellow-500 text-black hover:bg-yellow-400 transition-colors active:scale-95 whitespace-nowrap"
-                    title="Adicionar exercício extra"
+                  {/* Primary action with width collapse animation */}
+                  <motion.div
+                    initial={{ width: 0 }}
+                    animate={{ width: 'auto' }}
+                    exit={{ width: 0 }}
+                    transition={{ duration: 0.2, ease: 'easeInOut' }}
+                    style={{ overflow: 'hidden' }}
                   >
-                    <Plus size={16} />
-                    <span className="text-sm font-black hidden sm:inline">Exercício</span>
-                  </button>
+                    <button
+                      type="button"
+                      onClick={() => setAddExerciseOpen(true)}
+                      className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-yellow-500 text-black hover:bg-yellow-400 transition-colors active:scale-95 whitespace-nowrap"
+                      title="Adicionar exercício extra"
+                    >
+                      <Plus size={16} />
+                      <span className="text-sm font-black hidden sm:inline">Exercício</span>
+                    </button>
+                  </motion.div>
 
-                  {/* Overflow menu — secondary actions */}
+                  {/* Overflow menu — outside overflow:hidden so the dropdown isn't clipped */}
                   <div className="relative" ref={overflowRef}>
                     <button
                       type="button"
