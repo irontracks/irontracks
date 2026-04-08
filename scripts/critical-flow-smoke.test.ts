@@ -20,7 +20,7 @@ mustExist.forEach((rel) => {
 
 const finishRoute = fs.readFileSync(path.join(repoRoot, 'src/app/api/workouts/finish/route.ts'), 'utf8')
 assert.ok(finishRoute.includes('checkRateLimit'), 'finish should rate limit')
-assert.ok(finishRoute.includes('insertNotifications'), 'finish should notify')
+assert.ok(finishRoute.includes('notifyWorkoutFinished'), 'finish should notify')
 
 const reportComp = fs.readFileSync(path.join(repoRoot, 'src/components/WorkoutReport.tsx'), 'utf8')
 assert.ok(reportComp.includes('buildReportHTML'), 'report should build HTML')
