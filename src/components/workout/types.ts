@@ -15,6 +15,10 @@ export type WorkoutExercise = Omit<Partial<Exercise>, 'setDetails'> & {
   video_url?: string | null;
   exercise_id?: string;
   exercise_library_id?: string;
+  // snake_case aliases from DB
+  is_unilateral?: boolean;
+  side_rest_time?: number | string | null;
+  transition_time?: number | string | null;
 };
 
 export type WorkoutSetDetail = {

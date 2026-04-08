@@ -55,6 +55,9 @@ export interface Exercise {
   order?: number;
   workout_id?: string;
   _itx_exKey?: string; // Internal key for active session
+  isUnilateral?: boolean;
+  sideRestTime?: number | string | null;
+  transitionTime?: number | string | null;
 }
 
 export interface Workout {

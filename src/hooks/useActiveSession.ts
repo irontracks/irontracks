@@ -164,18 +164,17 @@ export function useActiveSession({ userId }: UseActiveSessionOptions): UseActive
      * setStartMs = now so the next set's execution time can be tracked.
      */
     const handleTimerFinish = useCallback((context?: unknown) => {
-        // 1. Close the timer UI
         setActiveSession((prev) => {
             if (!prev) return prev
-            // 2. Read key from context (prefer arg, fall back to stored timerContext)
             const ctx = context && typeof context === 'object' ? context as Record<string, unknown>
                 : prev.timerContext && typeof prev.timerContext === 'object' ? prev.timerContext as Record<string, unknown>
                     : null
             const key = ctx?.key ? String(ctx.key) : null
+            const kind = ctx?.kind ? String(ctx.kind) : ''
             const now = Date.now()
             let next = { ...prev, timerTargetTime: null as number | null, timerContext: null as unknown }
+
             if (key) {
-                // 3. Find restStartMs in current logs
                 const logs = prev.logs && typeof prev.logs === 'object' ? prev.logs as Record<string, unknown> : {}
                 const logEntry = logs[key] && typeof logs[key] === 'object' ? logs[key] as Record<string, unknown> : null
                 const restStartMs = logEntry && typeof logEntry.restStartMs === 'number' && logEntry.restStartMs > 0 ? logEntry.restStartMs : null
@@ -189,6 +188,35 @@ export function useActiveSession({ userId }: UseActiveSessionOptions): UseActive
                     logs: { ...logs, [key]: { ...(logEntry || {}), ...patch } },
                 } as typeof next
             }
+
+            // Chain transition timer after the last set's rest finishes
+            if (kind === 'rest' && key) {
+                const [exIdxStr, setIdxStr] = key.split('-')
+                const exIdx = Number(exIdxStr)
+                const setIdx = Number(setIdxStr)
+                const exercises = Array.isArray((prev.workout as Record<string, unknown>)?.exercises)
+                    ? (prev.workout as Record<string, unknown[]>).exercises as Record<string, unknown>[]
+                    : []
+                const exercise = exercises[exIdx]
+                if (exercise) {
+                    const setsHeader = parseInt(String(exercise.sets ?? '0'), 10) || 0
+                    const sdArr = Array.isArray(exercise.setDetails ?? exercise.set_details)
+                        ? (exercise.setDetails ?? exercise.set_details) as unknown[]
+                        : []
+                    const setsCount = Math.max(setsHeader, sdArr.length)
+                    const transitionTime = Number(exercise.transitionTime ?? exercise.transition_time ?? 0)
+                    const nextExercise = exercises[exIdx + 1] as Record<string, unknown> | undefined
+                    const nextName = nextExercise ? String(nextExercise.name || '') : ''
+                    if (setIdx === setsCount - 1 && transitionTime > 0 && nextName) {
+                        next = {
+                            ...next,
+                            timerTargetTime: now + transitionTime * 1000,
+                            timerContext: { kind: 'transition', key, exerciseName: nextName },
+                        } as typeof next
+                    }
+                }
+            }
+
             return next as ActiveWorkoutSession
         })
     }, [])

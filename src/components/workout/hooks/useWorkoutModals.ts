@@ -57,11 +57,14 @@ export function useWorkoutModals(collapsedKey: string | null) {
     // ---- Edit exercise ----
     const [editExerciseOpen, setEditExerciseOpen] = useState<boolean>(false);
     const [editExerciseIdx, setEditExerciseIdx] = useState<number | null>(null);
-    const [editExerciseDraft, setEditExerciseDraft] = useState<{ name: string; sets: string; restTime: string; method: string }>(() => ({
+    const [editExerciseDraft, setEditExerciseDraft] = useState<{ name: string; sets: string; restTime: string; method: string; isUnilateral?: boolean; sideRestTime?: string | null; transitionTime?: string | null }>(() => ({
         name: '',
         sets: '3',
         restTime: '60',
         method: 'Normal',
+        isUnilateral: false,
+        sideRestTime: '',
+        transitionTime: '',
     }));
 
     // ---- Organize ----

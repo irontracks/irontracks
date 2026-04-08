@@ -1,5 +1,7 @@
 'use client';
 
+/* eslint-disable jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions, jsx-a11y/control-has-associated-label */
+
 import React from 'react';
 import { ArrowDown, ArrowUp, Check, Clock, GripVertical, Loader2, Save, X } from 'lucide-react';
 import { Reorder, useDragControls } from 'framer-motion';
@@ -9,13 +11,6 @@ import { useWorkoutContext } from './WorkoutContext';
 import {
   buildBlocksByCount,
   isObject,
-  toNumber,
-  clampNumber,
-  roundToStep,
-  DELOAD_REDUCTION_MIN,
-  DELOAD_REDUCTION_MAX,
-  WEIGHT_ROUND_STEP,
-  DELOAD_SUGGEST_MODE,
 } from './utils';
 import { UnknownRecord } from './types';
 import { ModalsSimpleMethods } from './ModalsSimpleMethods';
@@ -128,43 +123,6 @@ export default function Modals() {
     startTimer,
     clusterRefs,
     saveClusterModal,
-    restPauseModal,
-    setRestPauseModal,
-    saveRestPauseModal,
-    dropSetModal,
-    setDropSetModal,
-    saveDropSetModal,
-    strippingModal,
-    setStrippingModal,
-    saveStrippingModal,
-    fst7Modal,
-    setFst7Modal,
-    saveFst7Modal,
-    heavyDutyModal,
-    setHeavyDutyModal,
-    saveHeavyDutyModal,
-    pontoZeroModal,
-    setPontoZeroModal,
-    savePontoZeroModal,
-    forcedRepsModal,
-    setForcedRepsModal,
-    saveForcedRepsModal,
-    negativeRepsModal,
-    setNegativeRepsModal,
-    saveNegativeRepsModal,
-    partialRepsModal,
-    setPartialRepsModal,
-    savePartialRepsModal,
-    sistema21Modal,
-    setSistema21Modal,
-    saveSistema21Modal,
-    waveModal,
-    setWaveModal,
-    saveWaveModal,
-    groupMethodModal,
-    setGroupMethodModal,
-    saveGroupMethodModal,
-    deloadSuggestions,
   } = useWorkoutContext();
 
   return (
@@ -561,6 +519,50 @@ export default function Modals() {
                   <option value="Bi-Set">Bi-Set</option>
                   <option value="Cardio">Cardio</option>
                 </select>
+              </div>
+
+              {/* Unilateral toggle */}
+              <div className="flex items-center justify-between rounded-xl bg-black/20 border border-neutral-700 px-3 py-2.5">
+                <div>
+                  <div className="text-sm font-black text-white">Exercício Unilateral</div>
+                  <div className="text-[11px] text-neutral-500">Executa em dois lados (L e R)</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setEditExerciseDraft((prev) => ({ ...prev, isUnilateral: !prev?.isUnilateral }))}
+                  className={`w-11 h-6 rounded-full transition-colors relative flex-shrink-0 ${editExerciseDraft?.isUnilateral ? 'bg-blue-500' : 'bg-neutral-700'}`}
+                  aria-label="Toggle unilateral"
+                >
+                  <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${editExerciseDraft?.isUnilateral ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                </button>
+              </div>
+
+              {/* Side rest + transition time */}
+              <div className="grid grid-cols-2 gap-3">
+                {editExerciseDraft?.isUnilateral && (
+                  <div>
+                    <label htmlFor="edit-exercise-side-rest" className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">Descanso entre lados (s)</label>
+                    <input
+                      id="edit-exercise-side-rest"
+                      inputMode="decimal"
+                      value={String(editExerciseDraft?.sideRestTime ?? '')}
+                      onChange={(e) => setEditExerciseDraft((prev) => ({ ...prev, sideRestTime: e?.target?.value ?? '' }))}
+                      className="mt-2 w-full bg-black/30 border border-neutral-700 rounded-xl px-3 py-3 text-sm text-white outline-none focus:ring-1 ring-blue-500 placeholder:text-neutral-600 placeholder:opacity-40"
+                      placeholder="15"
+                    />
+                  </div>
+                )}
+                <div className={editExerciseDraft?.isUnilateral ? '' : 'col-span-2'}>
+                  <label htmlFor="edit-exercise-transition" className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">Tempo de troca (s)</label>
+                  <input
+                    id="edit-exercise-transition"
+                    inputMode="decimal"
+                    value={String(editExerciseDraft?.transitionTime ?? '')}
+                    onChange={(e) => setEditExerciseDraft((prev) => ({ ...prev, transitionTime: e?.target?.value ?? '' }))}
+                    className="mt-2 w-full bg-black/30 border border-neutral-700 rounded-xl px-3 py-3 text-sm text-white outline-none focus:ring-1 ring-yellow-500 placeholder:text-neutral-600 placeholder:opacity-40"
+                    placeholder="0 = desativado"
+                  />
+                </div>
               </div>
             </div>
             <div className="p-4 border-t border-neutral-800 flex gap-2">

@@ -1,6 +1,6 @@
 import type { UnknownRecord, WorkoutExercise, WorkoutSetDetail } from '../types';
 import { isObject } from '../utils';
-import { collectExerciseSetInputs } from '../helpers/setPlanningHelpers';
+
 import { parseTrainingNumber } from '@/utils/trainingNumber';
 import { applyExerciseOrder, buildExerciseDraft, draftOrderKeys } from '@/lib/workoutReorder';
 
@@ -17,8 +17,8 @@ interface ExerciseCrudDeps {
   setCollapsed: React.Dispatch<React.SetStateAction<Set<number>>>;
   linkedWeightExercises: Set<number>;
   setLinkedWeightExercises: React.Dispatch<React.SetStateAction<Set<number>>>;
-  editExerciseDraft: { name: string; sets: string; restTime: string; method: string } | null;
-  setEditExerciseDraft: (v: { name: string; sets: string; restTime: string; method: string }) => void;
+  editExerciseDraft: { name: string; sets: string; restTime: string; method: string; isUnilateral?: boolean; sideRestTime?: string | null; transitionTime?: string | null } | null;
+  setEditExerciseDraft: (v: { name: string; sets: string; restTime: string; method: string; isUnilateral?: boolean; sideRestTime?: string | null; transitionTime?: string | null }) => void;
   editExerciseIdx: number | null;
   setEditExerciseIdx: (v: number | null) => void;
   editExerciseOpen: boolean;
@@ -44,18 +44,18 @@ interface ExerciseCrudDeps {
 
 export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
   const {
-    workout, exercises, logs, getLog,
-    collapsed, setCollapsed,
-    linkedWeightExercises, setLinkedWeightExercises,
+    workout, exercises, logs,
+    setCollapsed,
+    setLinkedWeightExercises,
     editExerciseDraft, setEditExerciseDraft,
     editExerciseIdx, setEditExerciseIdx,
-    editExerciseOpen, setEditExerciseOpen,
+    setEditExerciseOpen,
     addExerciseDraft, setAddExerciseDraft,
-    addExerciseOpen, setAddExerciseOpen,
+    setAddExerciseOpen,
     organizeDraft, setOrganizeDraft,
     organizeSaving, setOrganizeSaving,
-    organizeError, setOrganizeError,
-    organizeOpen, setOrganizeOpen,
+    setOrganizeError,
+    setOrganizeOpen,
     organizeDirty, organizeBaseKeysRef,
     onUpdateSession,
     alert, confirm,
@@ -177,8 +177,13 @@ export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
       const restTimeNum = parseTrainingNumber(ex?.restTime ?? ex?.rest_time);
       const restTime = typeof restTimeNum === 'number' && Number.isFinite(restTimeNum) && restTimeNum > 0 ? restTimeNum : DEFAULT_EXTRA_EXERCISE_REST_TIME_S;
       const method = String(ex?.method || 'Normal').trim() || 'Normal';
+      const isUnilateral = !!(ex?.isUnilateral ?? (ex as Record<string, unknown>)?.is_unilateral);
+      const sideRestTimeNum = parseTrainingNumber((ex as Record<string, unknown>)?.sideRestTime ?? (ex as Record<string, unknown>)?.side_rest_time);
+      const sideRestTime = typeof sideRestTimeNum === 'number' && sideRestTimeNum > 0 ? String(sideRestTimeNum) : '';
+      const transitionTimeNum = parseTrainingNumber((ex as Record<string, unknown>)?.transitionTime ?? (ex as Record<string, unknown>)?.transition_time);
+      const transitionTime = typeof transitionTimeNum === 'number' && transitionTimeNum > 0 ? String(transitionTimeNum) : '';
 
-      setEditExerciseDraft({ name, sets: String(setsCount), restTime: String(restTime), method });
+      setEditExerciseDraft({ name, sets: String(setsCount), restTime: String(restTime), method, isUnilateral, sideRestTime, transitionTime });
       setEditExerciseIdx(idx);
       setEditExerciseOpen(true);
     } catch (e: unknown) {
@@ -204,6 +209,11 @@ export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
     const restParsed = parseTrainingNumber(editExerciseDraft?.restTime);
     const restTime = typeof restParsed === 'number' && Number.isFinite(restParsed) && restParsed > 0 ? restParsed : null;
     const method = String(editExerciseDraft?.method || 'Normal').trim() || 'Normal';
+    const isUnilateral = !!(editExerciseDraft as Record<string, unknown>)?.isUnilateral;
+    const sideRestParsed = parseTrainingNumber((editExerciseDraft as Record<string, unknown>)?.sideRestTime);
+    const sideRestTime = typeof sideRestParsed === 'number' && sideRestParsed > 0 ? sideRestParsed : null;
+    const transitionParsed = parseTrainingNumber((editExerciseDraft as Record<string, unknown>)?.transitionTime);
+    const transitionTime = typeof transitionParsed === 'number' && transitionParsed > 0 ? transitionParsed : null;
 
     try {
       const nextExercises = [...exercises];
@@ -233,6 +243,9 @@ export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
         sets: desiredSets,
         restTime,
         setDetails: nextSetDetails,
+        isUnilateral,
+        sideRestTime,
+        transitionTime,
       };
 
       const nextLogs: Record<string, unknown> = { ...(logs && typeof logs === 'object' ? logs : {}) };
