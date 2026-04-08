@@ -46,24 +46,8 @@ export default function ExerciseList() {
       if (done >= count) completedNow.add(exIdx);
     });
 
-    // Detect newly completed exercises
-    const prev = prevCompletedRef.current;
-    let newlyCompleted = -1;
-    completedNow.forEach(idx => { if (!prev.has(idx)) newlyCompleted = idx; });
+    // Scroll is handled by normalSet.tsx after collapse — no duplicate scroll here.
     prevCompletedRef.current = completedNow;
-
-    if (newlyCompleted >= 0) {
-      // Find next incomplete exercise after the completed one
-      const nextIdx = exercises.findIndex((_, idx) => idx > newlyCompleted && !completedNow.has(idx));
-      if (nextIdx >= 0) {
-        requestAnimationFrame(() => {
-          try {
-            const el = document.querySelector(`[data-exercise-idx="${nextIdx}"]`);
-            el?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          } catch { }
-        });
-      }
-    }
   }, [exercises, logs]);
 
   const exerciseList = Array.isArray(exercises) ? exercises as Array<{ name?: string }> : [];
