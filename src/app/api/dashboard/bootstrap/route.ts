@@ -33,7 +33,7 @@ const hydrateWorkouts = async (supabase: SupabaseClient, rows: unknown[]) => {
       try {
         const { data } = await supabase
           .from('exercises')
-          .select('id, workout_id, name, notes, video_url, rest_time, cadence, method, "order"')
+          .select('id, workout_id, name, notes, video_url, rest_time, cadence, method, "order", is_unilateral, side_rest_time, transition_time')
           .in('workout_id', workoutIds)
           .order('order', { ascending: true })
           .limit(5000)

@@ -420,18 +420,23 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
     const redOffset = circ * extraProgress;
 
     const isOvertime = isFinished || extraSeconds > 0;
-    const ringColor = isOvertime ? '#ef4444' : '#eab308';  // red : yellow
-    const ringGlow = isOvertime ? 'rgba(239,68,68,0.5)' : 'rgba(234,179,8,0.4)';
+    const kind = String(context?.kind ?? '');
+    const isSideRest = kind === 'side_rest';
+    const isTransition = kind === 'transition';
+    // Ring color: blue for side-rest, orange for transition, yellow/red for normal rest
+    const baseRingColor = isSideRest ? '#3b82f6' : isTransition ? '#f97316' : '#eab308';
+    const ringColor = isOvertime ? '#ef4444' : baseRingColor;
+    const ringGlow = isOvertime ? 'rgba(239,68,68,0.5)' : isSideRest ? 'rgba(59,130,246,0.4)' : isTransition ? 'rgba(249,115,22,0.4)' : 'rgba(234,179,8,0.4)';
     const ringOffset = isOvertime ? redOffset : yellowOffset;
 
     return (
         <>
             {/* Finished flash */}
-            {isFinished && (
-                <div className="fixed inset-0 z-[2000] bg-green-600/90 backdrop-blur-sm flex flex-col items-center justify-center">
-                    <div className="text-7xl mb-4">💪</div>
-                    <h1 className="text-5xl font-black text-white uppercase tracking-tighter">BORA!</h1>
-                    <p className="text-white/80 font-bold mt-2 text-lg">Descanso finalizado</p>
+            {isFinished && !isTransition && (
+                <div className={`fixed inset-0 z-[2000] backdrop-blur-sm flex flex-col items-center justify-center ${isSideRest ? 'bg-blue-600/90' : 'bg-green-600/90'}`}>
+                    <div className="text-7xl mb-4">{isSideRest ? '🔄' : '💪'}</div>
+                    <h1 className="text-5xl font-black text-white uppercase tracking-tighter">{isSideRest ? 'TROCA!' : 'BORA!'}</h1>
+                    <p className="text-white/80 font-bold mt-2 text-lg">{isSideRest ? 'Agora o outro lado' : 'Descanso finalizado'}</p>
                 </div>
             )}
 
@@ -476,9 +481,9 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
                             </span>
                             <span
                                 className="text-[7px] font-black uppercase tracking-widest mt-0.5"
-                                style={{ color: isOvertime ? '#ef4444' : '#737373' }}
+                                style={{ color: isOvertime ? '#ef4444' : isSideRest ? '#3b82f6' : isTransition ? '#f97316' : '#737373' }}
                             >
-                                {isOvertime ? 'extra' : 'rest'}
+                                {isOvertime ? 'extra' : isSideRest ? 'lado' : isTransition ? 'troca' : 'rest'}
                             </span>
                         </div>
                     </div>
@@ -488,30 +493,43 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
                         {extraSeconds > 0 && (
                             <p className="text-xs font-black text-green-400 mb-1.5">{`+${formatDuration(extraSeconds)} além do planejado`}</p>
                         )}
+                        {isTransition && (
+                            <p className="text-xs font-black text-orange-400 mb-1.5 truncate">
+                                Vá para: {context?.exerciseName ?? 'próximo exercício'}
+                            </p>
+                        )}
                         <div className="flex gap-2">
                             <button
                                 onClick={handleStart}
-                                className="flex-1 py-2 bg-gradient-to-r from-yellow-500 to-amber-400 rounded-xl text-black font-black text-sm shadow-lg shadow-yellow-900/30 hover:shadow-yellow-500/40 transition-shadow active:scale-95"
-                            >
-                                START ▶
-                            </button>
-                            <button
-                                onClick={() => {
-                                    try {
-                                        setAutoStartLocal(prev => !prev);
-                                        if (typeof onToggleAutoStart === 'function') onToggleAutoStart();
-                                    } catch { }
-                                }}
-                                className={`px-3 py-2 rounded-xl text-xs font-black active:scale-95 transition-all border ${
-                                    autoStartLocal
-                                        ? 'bg-gradient-to-r from-yellow-500/20 to-amber-500/20 border-yellow-500/50 text-yellow-400 shadow-sm shadow-yellow-500/10'
-                                        : 'text-neutral-400 hover:text-white hover:border-yellow-500/30'
+                                className={`flex-1 py-2 rounded-xl text-black font-black text-sm shadow-lg active:scale-95 transition-shadow ${
+                                    isSideRest
+                                        ? 'bg-gradient-to-r from-blue-500 to-blue-400 shadow-blue-900/30 hover:shadow-blue-500/40'
+                                        : isTransition
+                                            ? 'bg-gradient-to-r from-orange-500 to-amber-400 shadow-orange-900/30 hover:shadow-orange-500/40'
+                                            : 'bg-gradient-to-r from-yellow-500 to-amber-400 shadow-yellow-900/30 hover:shadow-yellow-500/40'
                                 }`}
-                                style={!autoStartLocal ? { background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' } : undefined}
-                                aria-label={autoStartLocal ? 'Desativar auto-start' : 'Ativar auto-start'}
                             >
-                                {autoStartLocal ? 'AUTO ▶' : 'AUTO'}
+                                {isSideRest ? 'TROCAR LADO ▶' : isTransition ? 'CHEGUEI ✓' : 'START ▶'}
                             </button>
+                            {!isSideRest && !isTransition && (
+                                <button
+                                    onClick={() => {
+                                        try {
+                                            setAutoStartLocal(prev => !prev);
+                                            if (typeof onToggleAutoStart === 'function') onToggleAutoStart();
+                                        } catch { }
+                                    }}
+                                    className={`px-3 py-2 rounded-xl text-xs font-black active:scale-95 transition-all border ${
+                                        autoStartLocal
+                                            ? 'bg-gradient-to-r from-yellow-500/20 to-amber-500/20 border-yellow-500/50 text-yellow-400 shadow-sm shadow-yellow-500/10'
+                                            : 'text-neutral-400 hover:text-white hover:border-yellow-500/30'
+                                    }`}
+                                    style={!autoStartLocal ? { background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' } : undefined}
+                                    aria-label={autoStartLocal ? 'Desativar auto-start' : 'Ativar auto-start'}
+                                >
+                                    {autoStartLocal ? 'AUTO ▶' : 'AUTO'}
+                                </button>
+                            )}
                         </div>
                     </div>
                 </div>

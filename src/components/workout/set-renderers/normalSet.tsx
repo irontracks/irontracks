@@ -103,9 +103,17 @@ export const NormalSet = ({
   const plannedSet = getPlannedSet(ex, setIdx);
   const restTime = parseTrainingNumber(ex?.restTime ?? ex?.rest_time);
 
+  // Unilateral support
+  const isUnilateral = !!(ex?.isUnilateral ?? (ex as Record<string, unknown>)?.is_unilateral);
+  const sideRestTime = parseTrainingNumber((ex as Record<string, unknown>)?.sideRestTime ?? (ex as Record<string, unknown>)?.side_rest_time) ?? 15;
+  const activeSide   = log.activeSide === 'R' ? 'R' : 'L';
+  const lDone        = !!log.L_done;
+
   // External values (from global log state)
   const extWeight = String(log.weight ?? cfg?.weight ?? '');
   const extReps   = String(log.reps   ?? '');
+  const extLReps  = String(log.L_reps ?? log.reps ?? '');
+  const extRReps  = String(log.R_reps ?? '');
   const extRpe    = String(log.rpe    ?? '');
   const extNotes  = String(log.notes  ?? '');
   const done      = !!log.done;
@@ -134,6 +142,12 @@ export const NormalSet = ({
   const repsField = useInputField(extReps, (v) =>
     updateLog(key, { reps: v, advanced_config: cfg ?? log.advanced_config ?? null }),
   );
+  const lRepsField = useInputField(extLReps, (v) =>
+    updateLog(key, { L_reps: v }),
+  );
+  const rRepsField = useInputField(extRReps, (v) =>
+    updateLog(key, { R_reps: v }),
+  );
   const rpeField = useInputField(extRpe, (v) =>
     updateLog(key, { rpe: v, advanced_config: cfg ?? log.advanced_config ?? null }),
   );
@@ -147,15 +161,33 @@ export const NormalSet = ({
     'outline-none focus:ring-1 ring-yellow-500 focus:border-yellow-500/50 transition-all duration-200 ' +
     'placeholder:text-neutral-600 placeholder:text-xs focus:placeholder:opacity-0';
 
+  const collapseAndScroll = (delay: number) => {
+    setTimeout(() => {
+      try {
+        flushSync(() => {
+          setCollapsed?.((prev: Set<number>) => {
+            const next = new Set(prev);
+            next.add(exIdx);
+            return next;
+          });
+        });
+        const firstSetOfNext = document.querySelector<HTMLElement>(`[data-set-first="${exIdx + 1}"]`);
+        const nextCard = document.querySelector<HTMLElement>(`[data-exercise-idx="${exIdx + 1}"]`);
+        const target = firstSetOfNext ?? nextCard;
+        if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      } catch { /* silenced */ }
+    }, delay);
+  };
+
   const handleComplete = () => {
     // Prevent double-tap from toggling done back to false
     if (completeBusyRef.current) return;
     completeBusyRef.current = true;
     setTimeout(() => { completeBusyRef.current = false; }, 400);
 
-    const nowMs        = Date.now();
-    const startedRaw   = (log as UnknownRecord)?.startedAtMs;
-    const startedAtMs  =
+    const nowMs       = Date.now();
+    const startedRaw  = (log as UnknownRecord)?.startedAtMs;
+    const startedAtMs =
       typeof startedRaw === 'number'
         ? startedRaw
         : Number(String(startedRaw ?? '').trim());
@@ -164,6 +196,56 @@ export const NormalSet = ({
         ? Math.max(0, Math.round((nowMs - startedAtMs) / 1000))
         : 0;
 
+    // ── Unilateral: two-phase completion ─────────────────────────────
+    if (isUnilateral && !done) {
+      if (activeSide === 'L') {
+        // Complete L side → activate R
+        updateLog(key, {
+          L_done: true,
+          L_reps: lRepsField.value || log.reps,
+          activeSide: 'R',
+          advanced_config: cfg ?? log.advanced_config ?? null,
+        });
+        if (sideRestTime > 0) {
+          startTimer(sideRestTime, { kind: 'side_rest', key, restStartedAtMs: nowMs });
+        }
+        return;
+      }
+      // R side → complete the full set
+      updateLog(key, {
+        R_done: true,
+        R_reps: rRepsField.value,
+        done: true,
+        completedAtMs: nowMs,
+        executionSeconds,
+        advanced_config: cfg ?? log.advanced_config ?? null,
+      });
+      if (restTime && restTime > 0) {
+        const nextPlanned = getPlannedSet(ex, setIdx + 1);
+        const nextKey = nextPlanned ? `${exIdx}-${setIdx + 1}` : null;
+        startTimer(restTime, { kind: 'rest', key, nextKey, restStartedAtMs: nowMs });
+      }
+      if (setsCount != null && setIdx === setsCount - 1) {
+        collapseAndScroll(restTime && restTime > 0 ? 600 : 300);
+      }
+      return;
+    }
+
+    // ── Unilateral toggle-back (already done → reset both sides) ─────
+    if (isUnilateral && done) {
+      updateLog(key, {
+        done: false,
+        L_done: false,
+        R_done: false,
+        activeSide: 'L',
+        completedAtMs: null,
+        executionSeconds: null,
+        advanced_config: cfg ?? log.advanced_config ?? null,
+      });
+      return;
+    }
+
+    // ── Normal (non-unilateral) ───────────────────────────────────────
     const nextDone = !done;
     updateLog(key, {
       done: nextDone,
@@ -182,22 +264,7 @@ export const NormalSet = ({
     // flushSync forces React to apply the collapse before scrollIntoView so the
     // layout is stable and smooth scrolling lands on the correct exercise.
     if (nextDone && setsCount != null && setIdx === setsCount - 1) {
-      const delay = restTime && restTime > 0 ? 600 : 300;
-      setTimeout(() => {
-        try {
-          flushSync(() => {
-            setCollapsed?.((prev: Set<number>) => {
-              const next = new Set(prev);
-              next.add(exIdx);
-              return next;
-            });
-          });
-          const firstSetOfNext = document.querySelector<HTMLElement>(`[data-set-first="${exIdx + 1}"]`);
-          const nextCard = document.querySelector<HTMLElement>(`[data-exercise-idx="${exIdx + 1}"]`);
-          const target = firstSetOfNext ?? nextCard;
-          if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        } catch { /* silenced */ }
-      }, delay);
+      collapseAndScroll(restTime && restTime > 0 ? 600 : 300);
     }
   };
 
@@ -210,9 +277,29 @@ export const NormalSet = ({
           'rounded-xl border px-2.5 py-2 transition-all duration-300 shadow-sm',
           done
             ? 'bg-emerald-950/30 border-emerald-500/30'
-            : 'bg-neutral-900/50 border-neutral-800/80',
+            : isUnilateral && lDone
+              ? 'bg-blue-950/20 border-blue-500/30'
+              : 'bg-neutral-900/50 border-neutral-800/80',
         ].join(' ')}
       >
+        {/* Unilateral side indicator */}
+        {isUnilateral && !done && (
+          <div className="flex items-center gap-2 mb-1.5">
+            <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${
+              activeSide === 'L'
+                ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                : 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
+            }`}>
+              LADO {activeSide}
+            </span>
+            {lDone && (
+              <span className="text-[9px] text-blue-400/70 font-bold">
+                L ✓ {extLReps ? `${extLReps}r` : ''}
+              </span>
+            )}
+          </div>
+        )}
+
         {/*
           Layout (CSS grid, one line):
           [kg flex-3] [reps flex-2] [rpe flex-2] [💬 28px] [OK auto]
@@ -232,22 +319,50 @@ export const NormalSet = ({
             className={inputBase}
           />
 
-          {/* reps */}
+          {/* reps — side-aware when unilateral */}
           <div className="relative">
-            <input
-              inputMode="decimal"
-              aria-label={`Reps – série ${setIdx + 1}`}
-              value={repsField.value}
-              onChange={repsField.handleChange}
-              onFocus={repsField.handleFocus}
-              onBlur={repsField.handleBlur}
-              placeholder={repsPlaceholder}
-              className={`${inputBase} ${plannedReps ? 'pr-6' : ''}`}
-            />
-            {plannedReps && (
-              <span className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] font-mono text-neutral-500/60">
-                {plannedReps}
-              </span>
+            {isUnilateral ? (
+              activeSide === 'L' ? (
+                <input
+                  inputMode="decimal"
+                  aria-label={`Reps lado L – série ${setIdx + 1}`}
+                  value={lRepsField.value}
+                  onChange={lRepsField.handleChange}
+                  onFocus={lRepsField.handleFocus}
+                  onBlur={lRepsField.handleBlur}
+                  placeholder={repsPlaceholder}
+                  className={inputBase}
+                />
+              ) : (
+                <input
+                  inputMode="decimal"
+                  aria-label={`Reps lado R – série ${setIdx + 1}`}
+                  value={rRepsField.value}
+                  onChange={rRepsField.handleChange}
+                  onFocus={rRepsField.handleFocus}
+                  onBlur={rRepsField.handleBlur}
+                  placeholder={repsPlaceholder}
+                  className={inputBase}
+                />
+              )
+            ) : (
+              <>
+                <input
+                  inputMode="decimal"
+                  aria-label={`Reps – série ${setIdx + 1}`}
+                  value={repsField.value}
+                  onChange={repsField.handleChange}
+                  onFocus={repsField.handleFocus}
+                  onBlur={repsField.handleBlur}
+                  placeholder={repsPlaceholder}
+                  className={`${inputBase} ${plannedReps ? 'pr-6' : ''}`}
+                />
+                {plannedReps && (
+                  <span className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] font-mono text-neutral-500/60">
+                    {plannedReps}
+                  </span>
+                )}
+              </>
             )}
           </div>
 
@@ -292,11 +407,13 @@ export const NormalSet = ({
               'inline-flex items-center justify-center gap-1 h-9 px-3 rounded-xl font-black text-xs whitespace-nowrap active:scale-95 transition-all duration-150',
               done
                 ? 'bg-emerald-500 text-black shadow-sm shadow-emerald-500/30'
-                : 'bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 hover:border-yellow-500/40',
+                : isUnilateral && activeSide === 'R'
+                  ? 'bg-blue-600 text-white border border-blue-500/50 shadow-sm shadow-blue-900/30'
+                  : 'bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 hover:border-yellow-500/40',
             ].join(' ')}
           >
             <Check size={13} />
-            {done ? 'Feito' : 'OK'}
+            {done ? 'Feito' : isUnilateral ? `${activeSide} ✓` : 'OK'}
           </button>
         </div>
       </div>

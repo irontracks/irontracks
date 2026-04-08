@@ -499,7 +499,7 @@ export default function DashboardModals(props: DashboardModalsProps) {
                     context={activeSession.timerContext as unknown as Parameters<typeof import('@/components/workout/RestTimerOverlay').default>[0]['context']}
                     settings={settings as Record<string, unknown> | null}
                     onClose={handleCloseTimer}
-                    onFinish={(ctx) => { handleTimerFinish(ctx); handleCloseTimer(); }}
+                    onFinish={(ctx) => { handleTimerFinish(ctx); }}
                     onStart={handleStartFromRestTimer}
                     autoStartEnabled={Boolean((settings as Record<string, unknown> | null)?.restTimerAutoStart)}
                     onToggleAutoStart={() => {
