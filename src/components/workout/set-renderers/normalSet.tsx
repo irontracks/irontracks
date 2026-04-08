@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { flushSync } from 'react-dom';
 import { parseTrainingNumber } from '@/utils/trainingNumber';
 import { Check, MessageSquare } from 'lucide-react';
 import { useWorkoutContext } from '../WorkoutContext';
@@ -177,15 +178,19 @@ export const NormalSet = ({
       startTimer(restTime, { kind: 'rest', key, nextKey, restStartedAtMs: nowMs });
     }
 
-    // Auto-collapse + scroll to FIRST SET of next exercise when last set is done
+    // Auto-collapse + scroll to FIRST SET of next exercise when last set is done.
+    // flushSync forces React to apply the collapse before scrollIntoView so the
+    // layout is stable and smooth scrolling lands on the correct exercise.
     if (nextDone && setsCount != null && setIdx === setsCount - 1) {
       const delay = restTime && restTime > 0 ? 600 : 300;
       setTimeout(() => {
         try {
-          setCollapsed?.((prev: Set<number>) => {
-            const next = new Set(prev);
-            next.add(exIdx);
-            return next;
+          flushSync(() => {
+            setCollapsed?.((prev: Set<number>) => {
+              const next = new Set(prev);
+              next.add(exIdx);
+              return next;
+            });
           });
           const firstSetOfNext = document.querySelector<HTMLElement>(`[data-set-first="${exIdx + 1}"]`);
           const nextCard = document.querySelector<HTMLElement>(`[data-exercise-idx="${exIdx + 1}"]`);
