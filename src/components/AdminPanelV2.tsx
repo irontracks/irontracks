@@ -33,6 +33,7 @@ const AdminVipReports = dynamic(() => import('@/components/admin/AdminVipReports
 const RequestsTab = dynamic(() => import('@/components/admin/RequestsTab'), { ssr: false });
 const VipTab = dynamic(() => import('@/components/admin-panel/VipTab').then(m => ({ default: m.VipTab })), { ssr: false });
 const TeacherBillingTab = dynamic(() => import('@/components/admin-panel/TeacherBillingTab'), { ssr: false });
+const TeacherManualTab = dynamic(() => import('@/components/admin-panel/TeacherManualTab'), { ssr: false });
 import { Modals } from '@/components/admin-panel/Modals';
 import { logError } from '@/lib/logger';
 import type { AdminUser } from '@/types/admin';
@@ -127,10 +128,10 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
         TAB_LABELS = { ...TAB_LABELS, requests: 'SOLICITAÇÕES', teachers: 'PROFESSORES', videos: 'VÍDEOS', errors: 'FEEDBACK', vip: 'VIP GESTÃO', vip_reports: 'VIP REPORTS', system: 'FERRAMENTAS' };
     }
     if (isTeacher && !isAdmin) {
-        TAB_LABELS = { ...TAB_LABELS, priorities: 'PRIORIDADES', billing: 'COBRANÇAS' };
+        TAB_LABELS = { ...TAB_LABELS, priorities: 'PRIORIDADES', billing: 'COBRANÇAS', guide: 'GUIA' };
     }
     if (isAdmin) {
-        TAB_LABELS = { ...TAB_LABELS, priorities: 'PRIORIDADES', billing: 'COBRANÇAS' };
+        TAB_LABELS = { ...TAB_LABELS, priorities: 'PRIORIDADES', billing: 'COBRANÇAS', guide: 'GUIA' };
     }
 
     const tabKeys = Object.keys(TAB_LABELS);
@@ -164,6 +165,7 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
                     {tab === 'system' && !selectedStudent && <TabErrorBoundary name="Ferramentas"><SystemTab /></TabErrorBoundary>}
                     {tab === 'teachers' && isAdmin && !selectedStudent && <TabErrorBoundary name="Professores"><TeachersTab /></TabErrorBoundary>}
                     {tab === 'billing' && !selectedStudent && <TabErrorBoundary name="Cobranças"><TeacherBillingTab /></TabErrorBoundary>}
+                    {tab === 'guide' && !selectedStudent && <TabErrorBoundary name="Guia"><TeacherManualTab /></TabErrorBoundary>}
                     <StudentDetailPanel />
                 </div>
                 <Modals />

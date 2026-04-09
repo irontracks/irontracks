@@ -1,6 +1,6 @@
 'use client'
 
-import { AlertCircle, BarChart3, ChevronDown, ChevronRight, Crown, CreditCard, Dumbbell, MessageSquare, Play, Settings, UserCog, UserPlus, Users, X } from 'lucide-react'
+import { AlertCircle, BarChart3, BookOpen, ChevronDown, ChevronRight, Crown, CreditCard, Dumbbell, MessageSquare, Play, Settings, UserCog, UserPlus, Users, X } from 'lucide-react'
 
 type AdminPanelHeaderProps = {
   debugError: string | null
@@ -43,13 +43,14 @@ const buildMenuGroups = (tabKeys: string[]): MenuGroup[] => {
     errors: { key: 'errors', icon: <MessageSquare size={ICON_SIZE} />, subtitle: 'Feedbacks reportados' },
     system: { key: 'system', icon: <Settings size={ICON_SIZE} />, subtitle: 'Mensagens em massa e manutenção' },
     billing: { key: 'billing', icon: <CreditCard size={ICON_SIZE} />, subtitle: 'Planos de serviço e cobranças dos alunos' },
+    guide:   { key: 'guide',   icon: <BookOpen size={ICON_SIZE} />,  subtitle: 'Manual completo para professores' },
   }
 
   const groups: MenuGroup[] = []
   const available = new Set(tabKeys)
 
   // Group 1: Gestão
-  const gestao = ['dashboard', 'students', 'requests', 'teachers', 'priorities', 'billing'].filter(k => available.has(k))
+  const gestao = ['dashboard', 'students', 'requests', 'teachers', 'priorities', 'billing', 'guide'].filter(k => available.has(k))
   if (gestao.length > 0) groups.push({ label: 'Gestão', items: gestao.map(k => allItems[k]) })
 
   // Group 2: Conteúdo
