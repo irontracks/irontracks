@@ -22,17 +22,10 @@ import { UnknownRecord, WorkoutExercise } from '../types';
 function useInputField(externalValue: string, onChange: (v: string) => void) {
   const [localValue, setLocalValue] = useState(externalValue);
   const isFocused = useRef(false);
-  // Track when the field was last blurred so we can protect against stale
-  // external values arriving before React processes the blur's state update.
   const blurredAtRef = useRef(0);
 
-  // When the external value changes (e.g. a teammate updates the log),
-  // sync the local value ONLY if the field is not currently focused.
   useEffect(() => {
     if (isFocused.current) return;
-    // Guard: if we JUST blurred and local has data but external is empty/different,
-    // the external value is likely stale (React hasn't processed our blur write yet).
-    // Wait for a render cycle before accepting the downgrade.
     if (
       localValue &&
       !externalValue &&
@@ -62,7 +55,6 @@ function useInputField(externalValue: string, onChange: (v: string) => void) {
     (e: React.FocusEvent<HTMLInputElement | HTMLTextAreaElement>) => {
       isFocused.current = false;
       blurredAtRef.current = Date.now();
-      // Flush the final value to the global log on blur so nothing is lost
       onChange(e.target.value);
     },
     [onChange],
@@ -94,7 +86,6 @@ export const NormalSet = ({
     setCollapsed,
   } = useWorkoutContext();
 
-  // Guard against double-tap toggling the done state back
   const completeBusyRef = useRef(false);
 
   const key = `${exIdx}-${setIdx}`;
@@ -103,20 +94,28 @@ export const NormalSet = ({
   const plannedSet = getPlannedSet(ex, setIdx);
   const restTime = parseTrainingNumber(ex?.restTime ?? ex?.rest_time);
 
-  // Unilateral support
+  // Unilateral config
   const isUnilateral = !!(ex?.isUnilateral ?? (ex as Record<string, unknown>)?.is_unilateral);
   const sideRestTime = parseTrainingNumber((ex as Record<string, unknown>)?.sideRestTime ?? (ex as Record<string, unknown>)?.side_rest_time) ?? 15;
-  const activeSide   = log.activeSide === 'R' ? 'R' : 'L';
-  const lDone        = !!log.L_done;
 
-  // External values (from global log state)
+  // Set state
+  const lDone = !!log.L_done;
+  const rDone = !!log.R_done;
+  const done  = !!log.done;
+
+  // External values — non-unilateral
   const extWeight = String(log.weight ?? cfg?.weight ?? '');
   const extReps   = String(log.reps   ?? '');
-  const extLReps  = String(log.L_reps ?? log.reps ?? '');
-  const extRReps  = String(log.R_reps ?? '');
   const extRpe    = String(log.rpe    ?? '');
   const extNotes  = String(log.notes  ?? '');
-  const done      = !!log.done;
+
+  // External values — unilateral (L side pre-fills from shared weight; R side also)
+  const extLWeight = String(log.L_weight ?? log.weight ?? cfg?.weight ?? '');
+  const extRWeight = String(log.R_weight ?? log.weight ?? cfg?.weight ?? '');
+  const extLReps   = String(log.L_reps ?? log.reps ?? '');
+  const extRReps   = String(log.R_reps ?? log.reps ?? '');
+  const extLRpe    = String(log.L_rpe  ?? log.rpe  ?? '');
+  const extRRpe    = String(log.R_rpe  ?? log.rpe  ?? '');
 
   const plannedReps = String(plannedSet?.reps ?? ex?.reps ?? '').trim();
   const plannedRpe  = String(plannedSet?.rpe  ?? ex?.rpe  ?? '').trim();
@@ -131,22 +130,16 @@ export const NormalSet = ({
   const repsPlaceholder   = useWatermark && suggestion?.reps   != null ? String(suggestion.reps)   : 'Reps';
   const rpePlaceholder    = useWatermark && suggestion?.rpe    != null ? String(suggestion.rpe)    : 'RPE';
 
-  const notesId    = `notes-${key}`;
-  const hasNotes   = extNotes.trim().length > 0;
+  const notesId     = `notes-${key}`;
+  const hasNotes    = extNotes.trim().length > 0;
   const isNotesOpen = openNotesKeys.has(key);
 
-  // ── Local input fields with focus-aware sync ──────────────────────────
+  // ── Input fields — non-unilateral ────────────────────────────────────
   const weightField = useInputField(extWeight, (v) =>
     updateLog(key, { weight: v, advanced_config: cfg ?? log.advanced_config ?? null }),
   );
   const repsField = useInputField(extReps, (v) =>
     updateLog(key, { reps: v, advanced_config: cfg ?? log.advanced_config ?? null }),
-  );
-  const lRepsField = useInputField(extLReps, (v) =>
-    updateLog(key, { L_reps: v }),
-  );
-  const rRepsField = useInputField(extRReps, (v) =>
-    updateLog(key, { R_reps: v }),
   );
   const rpeField = useInputField(extRpe, (v) =>
     updateLog(key, { rpe: v, advanced_config: cfg ?? log.advanced_config ?? null }),
@@ -155,7 +148,15 @@ export const NormalSet = ({
     updateLog(key, { notes: v, advanced_config: cfg ?? log.advanced_config ?? null }),
   );
 
-  // Shared input style — left-aligned so text is always visible
+  // ── Input fields — unilateral ─────────────────────────────────────────
+  const lWeightField = useInputField(extLWeight, (v) => updateLog(key, { L_weight: v }));
+  const rWeightField = useInputField(extRWeight, (v) => updateLog(key, { R_weight: v }));
+  const lRepsField   = useInputField(extLReps,   (v) => updateLog(key, { L_reps: v }));
+  const rRepsField   = useInputField(extRReps,   (v) => updateLog(key, { R_reps: v }));
+  const lRpeField    = useInputField(extLRpe,    (v) => updateLog(key, { L_rpe: v }));
+  const rRpeField    = useInputField(extRRpe,    (v) => updateLog(key, { R_rpe: v }));
+
+  // Shared input style
   const inputBase =
     'w-full bg-black/40 border border-neutral-700/80 rounded-xl px-2.5 py-2 text-sm text-white ' +
     'outline-none focus:ring-1 ring-yellow-500 focus:border-yellow-500/50 transition-all duration-200 ' +
@@ -179,12 +180,100 @@ export const NormalSet = ({
     }, delay);
   };
 
-  const handleComplete = () => {
-    // Prevent double-tap from toggling done back to false
+  // ── Start rest timer after full set is done ───────────────────────────
+  const triggerSetDone = (nowMs: number) => {
+    if (restTime && restTime > 0) {
+      const nextPlanned = getPlannedSet(ex, setIdx + 1);
+      const nextKey = nextPlanned ? `${exIdx}-${setIdx + 1}` : null;
+      startTimer(restTime, { kind: 'rest', key, nextKey, restStartedAtMs: nowMs });
+    }
+    if (setsCount != null && setIdx === setsCount - 1) {
+      collapseAndScroll(restTime && restTime > 0 ? 600 : 300);
+    }
+  };
+
+  // ── Unilateral: complete L side ───────────────────────────────────────
+  const handleCompleteL = () => {
     if (completeBusyRef.current) return;
     completeBusyRef.current = true;
     setTimeout(() => { completeBusyRef.current = false; }, 400);
 
+    // eslint-disable-next-line react-hooks/purity
+    const nowMs = Date.now();
+
+    if (lDone) {
+      // Toggle back
+      updateLog(key, {
+        L_done: false,
+        done: false,
+        completedAtMs: null,
+        executionSeconds: null,
+        advanced_config: cfg ?? log.advanced_config ?? null,
+      });
+      return;
+    }
+
+    const willSetDone = rDone;
+    updateLog(key, {
+      L_done: true,
+      L_reps: lRepsField.value,
+      L_weight: lWeightField.value,
+      L_rpe: lRpeField.value,
+      ...(willSetDone ? { done: true, completedAtMs: nowMs, executionSeconds: 0 } : {}),
+      advanced_config: cfg ?? log.advanced_config ?? null,
+    });
+
+    // Side rest timer fires only when the other side isn't done yet
+    if (!rDone && sideRestTime > 0) {
+      startTimer(sideRestTime, { kind: 'side_rest', key, restStartedAtMs: nowMs });
+    }
+    if (willSetDone) triggerSetDone(nowMs);
+  };
+
+  // ── Unilateral: complete R side ───────────────────────────────────────
+  const handleCompleteR = () => {
+    if (completeBusyRef.current) return;
+    completeBusyRef.current = true;
+    setTimeout(() => { completeBusyRef.current = false; }, 400);
+
+    // eslint-disable-next-line react-hooks/purity
+    const nowMs = Date.now();
+
+    if (rDone) {
+      // Toggle back
+      updateLog(key, {
+        R_done: false,
+        done: false,
+        completedAtMs: null,
+        executionSeconds: null,
+        advanced_config: cfg ?? log.advanced_config ?? null,
+      });
+      return;
+    }
+
+    const willSetDone = lDone;
+    updateLog(key, {
+      R_done: true,
+      R_reps: rRepsField.value,
+      R_weight: rWeightField.value,
+      R_rpe: rRpeField.value,
+      ...(willSetDone ? { done: true, completedAtMs: nowMs, executionSeconds: 0 } : {}),
+      advanced_config: cfg ?? log.advanced_config ?? null,
+    });
+
+    if (!lDone && sideRestTime > 0) {
+      startTimer(sideRestTime, { kind: 'side_rest', key, restStartedAtMs: nowMs });
+    }
+    if (willSetDone) triggerSetDone(nowMs);
+  };
+
+  // ── Normal (non-unilateral) complete ─────────────────────────────────
+  const handleComplete = () => {
+    if (completeBusyRef.current) return;
+    completeBusyRef.current = true;
+    setTimeout(() => { completeBusyRef.current = false; }, 400);
+
+    // eslint-disable-next-line react-hooks/purity
     const nowMs       = Date.now();
     const startedRaw  = (log as UnknownRecord)?.startedAtMs;
     const startedAtMs =
@@ -196,56 +285,6 @@ export const NormalSet = ({
         ? Math.max(0, Math.round((nowMs - startedAtMs) / 1000))
         : 0;
 
-    // ── Unilateral: two-phase completion ─────────────────────────────
-    if (isUnilateral && !done) {
-      if (activeSide === 'L') {
-        // Complete L side → activate R
-        updateLog(key, {
-          L_done: true,
-          L_reps: lRepsField.value || log.reps,
-          activeSide: 'R',
-          advanced_config: cfg ?? log.advanced_config ?? null,
-        });
-        if (sideRestTime > 0) {
-          startTimer(sideRestTime, { kind: 'side_rest', key, restStartedAtMs: nowMs });
-        }
-        return;
-      }
-      // R side → complete the full set
-      updateLog(key, {
-        R_done: true,
-        R_reps: rRepsField.value,
-        done: true,
-        completedAtMs: nowMs,
-        executionSeconds,
-        advanced_config: cfg ?? log.advanced_config ?? null,
-      });
-      if (restTime && restTime > 0) {
-        const nextPlanned = getPlannedSet(ex, setIdx + 1);
-        const nextKey = nextPlanned ? `${exIdx}-${setIdx + 1}` : null;
-        startTimer(restTime, { kind: 'rest', key, nextKey, restStartedAtMs: nowMs });
-      }
-      if (setsCount != null && setIdx === setsCount - 1) {
-        collapseAndScroll(restTime && restTime > 0 ? 600 : 300);
-      }
-      return;
-    }
-
-    // ── Unilateral toggle-back (already done → reset both sides) ─────
-    if (isUnilateral && done) {
-      updateLog(key, {
-        done: false,
-        L_done: false,
-        R_done: false,
-        activeSide: 'L',
-        completedAtMs: null,
-        executionSeconds: null,
-        advanced_config: cfg ?? log.advanced_config ?? null,
-      });
-      return;
-    }
-
-    // ── Normal (non-unilateral) ───────────────────────────────────────
     const nextDone = !done;
     updateLog(key, {
       done: nextDone,
@@ -260,109 +299,84 @@ export const NormalSet = ({
       startTimer(restTime, { kind: 'rest', key, nextKey, restStartedAtMs: nowMs });
     }
 
-    // Auto-collapse + scroll to FIRST SET of next exercise when last set is done.
-    // flushSync forces React to apply the collapse before scrollIntoView so the
-    // layout is stable and smooth scrolling lands on the correct exercise.
     if (nextDone && setsCount != null && setIdx === setsCount - 1) {
       collapseAndScroll(restTime && restTime > 0 ? 600 : 300);
     }
   };
 
-  return (
-    <div className="space-y-1" key={key}>
-      {/* ── Single row ──────────────────────────────────────────────── */}
+  // ── Unilateral sub-row renderer ───────────────────────────────────────
+  const renderSideRow = (
+    side: 'L' | 'R',
+    sideDone: boolean,
+    wField: ReturnType<typeof useInputField>,
+    repsFld: ReturnType<typeof useInputField>,
+    rpeFld: ReturnType<typeof useInputField>,
+    onComplete: () => void,
+    isFirst: boolean,
+  ) => {
+    const isL = side === 'L';
+    const rowColor = done
+      ? 'bg-emerald-950/30 border-emerald-500/30'
+      : sideDone
+        ? 'bg-blue-950/20 border-blue-500/30'
+        : 'bg-neutral-900/50 border-neutral-800/80';
+
+    const badgeColor = isL
+      ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+      : 'bg-orange-500/20 text-orange-400 border border-orange-500/30';
+
+    const btnColor = done
+      ? 'bg-emerald-500 text-black shadow-sm shadow-emerald-500/30'
+      : sideDone
+        ? 'bg-emerald-600 text-white border border-emerald-500/50'
+        : isL
+          ? 'bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700'
+          : lDone
+            ? 'bg-blue-600 text-white border border-blue-500/50 shadow-sm shadow-blue-900/30'
+            : 'bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700';
+
+    return (
       <div
-        {...(setIdx === 0 ? { 'data-set-first': exIdx } : {})}
-        className={[
-          'rounded-xl border px-2.5 py-2 transition-all duration-300 shadow-sm',
-          done
-            ? 'bg-emerald-950/30 border-emerald-500/30'
-            : isUnilateral && lDone
-              ? 'bg-blue-950/20 border-blue-500/30'
-              : 'bg-neutral-900/50 border-neutral-800/80',
-        ].join(' ')}
+        {...(isFirst ? { 'data-set-first': exIdx } : {})}
+        className={`rounded-xl border px-2.5 py-2 transition-all duration-300 shadow-sm ${rowColor}`}
       >
-        {/* Unilateral side indicator */}
-        {isUnilateral && !done && (
-          <div className="flex items-center gap-2 mb-1.5">
-            <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${
-              activeSide === 'L'
-                ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
-                : 'bg-orange-500/20 text-orange-400 border border-orange-500/30'
-            }`}>
-              LADO {activeSide}
-            </span>
-            {lDone && (
-              <span className="text-[9px] text-blue-400/70 font-bold">
-                L ✓ {extLReps ? `${extLReps}r` : ''}
-              </span>
-            )}
-          </div>
-        )}
-
-        {/*
-          Layout (CSS grid, one line):
-          [kg flex-3] [reps flex-2] [rpe flex-2] [💬 28px] [OK auto]
-        */}
-        <div className="grid items-center gap-1.5"
-          style={{ gridTemplateColumns: '3fr 2fr 2fr 28px auto' }}>
-
-          {/* kg */}
+        <div className="flex items-center gap-2 mb-1.5">
+          <span className={`text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full ${badgeColor}`}>
+            LADO {side}
+          </span>
+          {sideDone && !done && (
+            <span className="text-[9px] text-blue-400/70 font-bold">✓</span>
+          )}
+        </div>
+        <div className="grid items-center gap-1.5" style={{ gridTemplateColumns: '3fr 2fr 2fr 28px auto' }}>
+          {/* Weight */}
           <input
             inputMode="decimal"
-            aria-label={`Peso em kg – série ${setIdx + 1}`}
-            value={weightField.value}
-            onChange={weightField.handleChange}
-            onFocus={weightField.handleFocus}
-            onBlur={weightField.handleBlur}
+            aria-label={`Peso lado ${side} – série ${setIdx + 1}`}
+            value={wField.value}
+            onChange={wField.handleChange}
+            onFocus={wField.handleFocus}
+            onBlur={wField.handleBlur}
             placeholder={weightPlaceholder}
             className={inputBase}
           />
 
-          {/* reps — side-aware when unilateral */}
+          {/* Reps */}
           <div className="relative">
-            {isUnilateral ? (
-              activeSide === 'L' ? (
-                <input
-                  inputMode="decimal"
-                  aria-label={`Reps lado L – série ${setIdx + 1}`}
-                  value={lRepsField.value}
-                  onChange={lRepsField.handleChange}
-                  onFocus={lRepsField.handleFocus}
-                  onBlur={lRepsField.handleBlur}
-                  placeholder={repsPlaceholder}
-                  className={inputBase}
-                />
-              ) : (
-                <input
-                  inputMode="decimal"
-                  aria-label={`Reps lado R – série ${setIdx + 1}`}
-                  value={rRepsField.value}
-                  onChange={rRepsField.handleChange}
-                  onFocus={rRepsField.handleFocus}
-                  onBlur={rRepsField.handleBlur}
-                  placeholder={repsPlaceholder}
-                  className={inputBase}
-                />
-              )
-            ) : (
-              <>
-                <input
-                  inputMode="decimal"
-                  aria-label={`Reps – série ${setIdx + 1}`}
-                  value={repsField.value}
-                  onChange={repsField.handleChange}
-                  onFocus={repsField.handleFocus}
-                  onBlur={repsField.handleBlur}
-                  placeholder={repsPlaceholder}
-                  className={`${inputBase} ${plannedReps ? 'pr-6' : ''}`}
-                />
-                {plannedReps && (
-                  <span className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] font-mono text-neutral-500/60">
-                    {plannedReps}
-                  </span>
-                )}
-              </>
+            <input
+              inputMode="decimal"
+              aria-label={`Reps lado ${side} – série ${setIdx + 1}`}
+              value={repsFld.value}
+              onChange={repsFld.handleChange}
+              onFocus={repsFld.handleFocus}
+              onBlur={repsFld.handleBlur}
+              placeholder={repsPlaceholder}
+              className={`${inputBase} ${plannedReps ? 'pr-6' : ''}`}
+            />
+            {plannedReps && (
+              <span className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] font-mono text-neutral-500/60">
+                {plannedReps}
+              </span>
             )}
           </div>
 
@@ -370,11 +384,11 @@ export const NormalSet = ({
           <div className="relative">
             <input
               inputMode="decimal"
-              aria-label={`RPE – série ${setIdx + 1}`}
-              value={rpeField.value}
-              onChange={rpeField.handleChange}
-              onFocus={rpeField.handleFocus}
-              onBlur={rpeField.handleBlur}
+              aria-label={`RPE lado ${side} – série ${setIdx + 1}`}
+              value={rpeFld.value}
+              onChange={rpeFld.handleChange}
+              onFocus={rpeFld.handleFocus}
+              onBlur={rpeFld.handleBlur}
               placeholder={rpePlaceholder}
               className={`${inputBase} text-yellow-400 border-yellow-500/25 placeholder:text-yellow-600/60 ${plannedRpe ? 'pr-6' : ''}`}
             />
@@ -385,40 +399,142 @@ export const NormalSet = ({
             )}
           </div>
 
-          {/* Notes toggle */}
-          <button
-            type="button"
-            aria-label={isNotesOpen ? 'Fechar observações' : 'Observações'}
-            onClick={() => toggleNotes(key)}
-            className={
-              isNotesOpen || hasNotes
-                ? 'w-7 h-7 inline-flex items-center justify-center rounded-lg text-yellow-500 bg-yellow-500/10 border border-yellow-500/40 hover:bg-yellow-500/15 transition duration-200'
-                : 'w-7 h-7 inline-flex items-center justify-center rounded-lg text-neutral-500 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'
-            }
-          >
-            <MessageSquare size={12} />
-          </button>
+          {/* Notes toggle (shared — only on L row) */}
+          {isL ? (
+            <button
+              type="button"
+              aria-label={isNotesOpen ? 'Fechar observações' : 'Observações'}
+              onClick={() => toggleNotes(key)}
+              className={
+                isNotesOpen || hasNotes
+                  ? 'w-7 h-7 inline-flex items-center justify-center rounded-lg text-yellow-500 bg-yellow-500/10 border border-yellow-500/40 hover:bg-yellow-500/15 transition duration-200'
+                  : 'w-7 h-7 inline-flex items-center justify-center rounded-lg text-neutral-500 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'
+              }
+            >
+              <MessageSquare size={12} />
+            </button>
+          ) : (
+            <div className="w-7" />
+          )}
 
-          {/* OK button */}
+          {/* Complete side button */}
           <button
             type="button"
-            onClick={handleComplete}
-            className={[
-              'inline-flex items-center justify-center gap-1 h-9 px-3 rounded-xl font-black text-xs whitespace-nowrap active:scale-95 transition-all duration-150',
-              done
-                ? 'bg-emerald-500 text-black shadow-sm shadow-emerald-500/30'
-                : isUnilateral && activeSide === 'R'
-                  ? 'bg-blue-600 text-white border border-blue-500/50 shadow-sm shadow-blue-900/30'
-                  : 'bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 hover:border-yellow-500/40',
-            ].join(' ')}
+            onClick={onComplete}
+            className={`inline-flex items-center justify-center gap-1 h-9 px-3 rounded-xl font-black text-xs whitespace-nowrap active:scale-95 transition-all duration-150 ${btnColor}`}
           >
             <Check size={13} />
-            {done ? 'Feito' : isUnilateral ? `${activeSide} ✓` : 'OK'}
+            {sideDone ? '✓' : `${side} ✓`}
           </button>
         </div>
       </div>
+    );
+  };
 
-      {/* Notes textarea */}
+  return (
+    <div className="space-y-1" key={key}>
+      {isUnilateral ? (
+        <>
+          {renderSideRow('L', lDone, lWeightField, lRepsField, lRpeField, handleCompleteL, setIdx === 0)}
+          {renderSideRow('R', rDone, rWeightField, rRepsField, rRpeField, handleCompleteR, false)}
+        </>
+      ) : (
+        /* ── Non-unilateral single row ─────────────────────────────── */
+        <div
+          {...(setIdx === 0 ? { 'data-set-first': exIdx } : {})}
+          className={[
+            'rounded-xl border px-2.5 py-2 transition-all duration-300 shadow-sm',
+            done
+              ? 'bg-emerald-950/30 border-emerald-500/30'
+              : 'bg-neutral-900/50 border-neutral-800/80',
+          ].join(' ')}
+        >
+          <div className="grid items-center gap-1.5"
+            style={{ gridTemplateColumns: '3fr 2fr 2fr 28px auto' }}>
+
+            {/* kg */}
+            <input
+              inputMode="decimal"
+              aria-label={`Peso em kg – série ${setIdx + 1}`}
+              value={weightField.value}
+              onChange={weightField.handleChange}
+              onFocus={weightField.handleFocus}
+              onBlur={weightField.handleBlur}
+              placeholder={weightPlaceholder}
+              className={inputBase}
+            />
+
+            {/* reps */}
+            <div className="relative">
+              <input
+                inputMode="decimal"
+                aria-label={`Reps – série ${setIdx + 1}`}
+                value={repsField.value}
+                onChange={repsField.handleChange}
+                onFocus={repsField.handleFocus}
+                onBlur={repsField.handleBlur}
+                placeholder={repsPlaceholder}
+                className={`${inputBase} ${plannedReps ? 'pr-6' : ''}`}
+              />
+              {plannedReps && (
+                <span className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] font-mono text-neutral-500/60">
+                  {plannedReps}
+                </span>
+              )}
+            </div>
+
+            {/* RPE */}
+            <div className="relative">
+              <input
+                inputMode="decimal"
+                aria-label={`RPE – série ${setIdx + 1}`}
+                value={rpeField.value}
+                onChange={rpeField.handleChange}
+                onFocus={rpeField.handleFocus}
+                onBlur={rpeField.handleBlur}
+                placeholder={rpePlaceholder}
+                className={`${inputBase} text-yellow-400 border-yellow-500/25 placeholder:text-yellow-600/60 ${plannedRpe ? 'pr-6' : ''}`}
+              />
+              {plannedRpe && (
+                <span className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] font-mono text-yellow-600/50">
+                  {plannedRpe}
+                </span>
+              )}
+            </div>
+
+            {/* Notes toggle */}
+            <button
+              type="button"
+              aria-label={isNotesOpen ? 'Fechar observações' : 'Observações'}
+              onClick={() => toggleNotes(key)}
+              className={
+                isNotesOpen || hasNotes
+                  ? 'w-7 h-7 inline-flex items-center justify-center rounded-lg text-yellow-500 bg-yellow-500/10 border border-yellow-500/40 hover:bg-yellow-500/15 transition duration-200'
+                  : 'w-7 h-7 inline-flex items-center justify-center rounded-lg text-neutral-500 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'
+              }
+            >
+              <MessageSquare size={12} />
+            </button>
+
+            {/* OK button */}
+            <button
+              type="button"
+              onClick={handleComplete}
+              className={[
+                'inline-flex items-center justify-center gap-1 h-9 px-3 rounded-xl font-black text-xs whitespace-nowrap active:scale-95 transition-all duration-150',
+                done
+                  ? 'bg-emerald-500 text-black shadow-sm shadow-emerald-500/30'
+                  : 'bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 hover:border-yellow-500/40',
+              ].join(' ')}
+            >
+              <Check size={13} />
+              {done ? 'Feito' : 'OK'}
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Notes textarea — shared between L and R */}
       {isNotesOpen && (
         <div className="px-1">
           <textarea
