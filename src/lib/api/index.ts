@@ -63,3 +63,9 @@ export type {
   TeacherPlanRow, TeacherPlansResult, TeacherMyPlanResult,
   TeacherCheckoutPayload, TeacherCheckoutResult,
 } from './teacher-billing'
+
+export { apiTeacherServicePlans, apiStudentBilling } from './student-billing'
+export type {
+  ServicePlan, BillingInterval, TrainingDay,
+  StudentSubscription, StudentCharge,
+} from './student-billing'

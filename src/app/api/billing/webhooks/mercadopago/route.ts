@@ -190,6 +190,62 @@ export async function POST(req: Request) {
 
       const meta = payment && typeof payment === 'object' ? { mercadopago: { raw: payment } } : { mercadopago: {} }
 
+      // ── student_plan: activate student subscription ───────────────────────────
+      // external_reference format: student_plan:teacherUserId:planId:studentUserId:subscriptionId
+      if (scope === 'student_plan' && userId) {
+        const [, , , subscriptionId] = externalRef.split(':')
+
+        if (status.toLowerCase() === 'approved' && subscriptionId) {
+          const now = new Date()
+
+          // Load subscription to get duration
+          const { data: sub } = await admin
+            .from('student_subscriptions')
+            .select('id, plan_id, student_service_plans(duration_days)')
+            .eq('id', subscriptionId)
+            .maybeSingle()
+
+          const planData = sub?.student_service_plans
+          const durationDays = Number(
+            (Array.isArray(planData) ? planData[0] : planData)?.duration_days ?? 30
+          )
+          const expires = new Date(now)
+          expires.setDate(expires.getDate() + durationDays)
+
+          const nextDue = new Date(expires)
+          nextDue.setDate(nextDue.getDate() - 5) // 5 days before expiry
+
+          await admin
+            .from('student_subscriptions')
+            .update({
+              status: 'active',
+              started_at: now.toISOString(),
+              expires_at: expires.toISOString(),
+              last_payment_at: now.toISOString(),
+              next_due_date: nextDue.toISOString().slice(0, 10),
+              provider_subscription_id: dataId,
+              updated_at: now.toISOString(),
+            })
+            .eq('id', subscriptionId)
+
+          // Mark charge as approved
+          await admin
+            .from('student_charges')
+            .update({ status: 'approved', paid_at: now.toISOString() })
+            .eq('provider_payment_id', dataId)
+        }
+
+        const revokeStatuses = ['refunded', 'cancelled', 'charged_back', 'chargedback']
+        if (revokeStatuses.includes(status.toLowerCase()) && subscriptionId) {
+          await admin
+            .from('student_subscriptions')
+            .update({ status: 'cancelled', updated_at: new Date().toISOString() })
+            .eq('id', subscriptionId)
+        }
+
+        return NextResponse.json({ ok: true })
+      }
+
       // ── teacher_plan: activate/renew plan on teacher row ─────────────────────
       if (scope === 'teacher_plan' && userId) {
         if (status.toLowerCase() === 'approved') {

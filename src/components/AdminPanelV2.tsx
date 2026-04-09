@@ -20,7 +20,7 @@ import { DashboardTab } from '@/components/admin-panel/DashboardTab';
 import { StudentsTab } from '@/components/admin-panel/StudentsTab';
 import { PrioritiesTab } from '@/components/admin-panel/PrioritiesTab';
 import dynamic from 'next/dynamic';
-import { X, Crown, Loader2 } from 'lucide-react';
+import { Crown, Loader2 } from 'lucide-react';
 
 // Lazy-load heavier tabs that are only used by admins
 const TeachersTab = dynamic(() => import('@/components/admin-panel/TeachersTab').then(m => ({ default: m.TeachersTab })), { ssr: false });
@@ -32,6 +32,7 @@ const StudentDetailPanel = dynamic(() => import('@/components/admin-panel/Studen
 const AdminVipReports = dynamic(() => import('@/components/admin/AdminVipReports'), { ssr: false });
 const RequestsTab = dynamic(() => import('@/components/admin/RequestsTab'), { ssr: false });
 const VipTab = dynamic(() => import('@/components/admin-panel/VipTab').then(m => ({ default: m.VipTab })), { ssr: false });
+const TeacherBillingTab = dynamic(() => import('@/components/admin-panel/TeacherBillingTab'), { ssr: false });
 import { Modals } from '@/components/admin-panel/Modals';
 import { logError } from '@/lib/logger';
 import type { AdminUser } from '@/types/admin';
@@ -126,10 +127,10 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
         TAB_LABELS = { ...TAB_LABELS, requests: 'SOLICITAÇÕES', teachers: 'PROFESSORES', videos: 'VÍDEOS', errors: 'FEEDBACK', vip: 'VIP GESTÃO', vip_reports: 'VIP REPORTS', system: 'FERRAMENTAS' };
     }
     if (isTeacher && !isAdmin) {
-        TAB_LABELS = { ...TAB_LABELS, priorities: 'PRIORIDADES' };
+        TAB_LABELS = { ...TAB_LABELS, priorities: 'PRIORIDADES', billing: 'COBRANÇAS' };
     }
     if (isAdmin) {
-        TAB_LABELS = { ...TAB_LABELS, priorities: 'PRIORIDADES' };
+        TAB_LABELS = { ...TAB_LABELS, priorities: 'PRIORIDADES', billing: 'COBRANÇAS' };
     }
 
     const tabKeys = Object.keys(TAB_LABELS);
@@ -162,6 +163,7 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
                     {tab === 'vip_reports' && !selectedStudent && <TabErrorBoundary name="VIP Reports"><AdminVipReports supabase={supabase} /></TabErrorBoundary>}
                     {tab === 'system' && !selectedStudent && <TabErrorBoundary name="Ferramentas"><SystemTab /></TabErrorBoundary>}
                     {tab === 'teachers' && isAdmin && !selectedStudent && <TabErrorBoundary name="Professores"><TeachersTab /></TabErrorBoundary>}
+                    {tab === 'billing' && !selectedStudent && <TabErrorBoundary name="Cobranças"><TeacherBillingTab /></TabErrorBoundary>}
                     <StudentDetailPanel />
                 </div>
                 <Modals />
