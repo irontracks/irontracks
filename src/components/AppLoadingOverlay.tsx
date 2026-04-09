@@ -35,7 +35,7 @@ export default function AppLoadingOverlay() {
 
   useEffect(() => {
     // Auto-dismiss immediately for pages that never fire the ready event
-    const skipPaths = ['/auth/', '/wait-', '/offline', '/privacy', '/marketplace', '/dashboard/']
+    const skipPaths = ['/auth/', '/wait-', '/offline', '/privacy', '/marketplace', '/dashboard/', '/para-professores']
     if (pathname && skipPaths.some((p) => pathname.startsWith(p))) {
       dismiss()
       return
