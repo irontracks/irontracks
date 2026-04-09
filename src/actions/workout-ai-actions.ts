@@ -8,7 +8,10 @@ export async function generatePostWorkoutInsights(
 ): Promise<ActionResult<Record<string, unknown>>> {
     try {
         const body = input && typeof input === 'object' ? (input as Record<string, unknown>) : {}
-        const json = await apiAi.postWorkoutInsights(body).catch((): null => null) as Record<string, unknown> | null
+        const json = await apiAi.postWorkoutInsights(body).catch((err: unknown): Record<string, unknown> => ({
+            ok: false,
+            error: err instanceof Error ? err.message : String(err),
+        })) as Record<string, unknown> | null
         if (!json?.ok) return { ok: false, error: (json?.error as string | undefined) || 'Falha ao gerar insights', upgradeRequired: json?.upgradeRequired } as ActionResult<Record<string, unknown>>
         return json as ActionResult<Record<string, unknown>>
     } catch (e) {
