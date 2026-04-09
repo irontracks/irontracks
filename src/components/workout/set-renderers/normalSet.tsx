@@ -305,6 +305,8 @@ export const NormalSet = ({
   };
 
   // ── Unilateral sub-row renderer ───────────────────────────────────────
+  // Notes button is intentionally NOT inside the grid — it sits below both rows
+  // to avoid aligning with exercise-footer buttons (DROP, etc.)
   const renderSideRow = (
     side: 'L' | 'R',
     sideDone: boolean,
@@ -314,14 +316,13 @@ export const NormalSet = ({
     onComplete: () => void,
     isFirst: boolean,
   ) => {
-    const isL = side === 'L';
     const rowColor = done
       ? 'bg-emerald-950/30 border-emerald-500/30'
       : sideDone
         ? 'bg-blue-950/20 border-blue-500/30'
         : 'bg-neutral-900/50 border-neutral-800/80';
 
-    const badgeColor = isL
+    const badgeColor = side === 'L'
       ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
       : 'bg-orange-500/20 text-orange-400 border border-orange-500/30';
 
@@ -329,11 +330,9 @@ export const NormalSet = ({
       ? 'bg-emerald-500 text-black shadow-sm shadow-emerald-500/30'
       : sideDone
         ? 'bg-emerald-600 text-white border border-emerald-500/50'
-        : isL
-          ? 'bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700'
-          : lDone
-            ? 'bg-blue-600 text-white border border-blue-500/50 shadow-sm shadow-blue-900/30'
-            : 'bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700';
+        : side === 'R' && lDone
+          ? 'bg-blue-600 text-white border border-blue-500/50 shadow-sm shadow-blue-900/30'
+          : 'bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700';
 
     return (
       <div
@@ -348,7 +347,8 @@ export const NormalSet = ({
             <span className="text-[9px] text-blue-400/70 font-bold">✓</span>
           )}
         </div>
-        <div className="grid items-center gap-1.5" style={{ gridTemplateColumns: '3fr 2fr 2fr 28px auto' }}>
+        {/* 4-column grid — no notes slot here; notes lives below both rows */}
+        <div className="grid items-center gap-1.5" style={{ gridTemplateColumns: '3fr 2fr 2fr auto' }}>
           {/* Weight */}
           <input
             inputMode="decimal"
@@ -399,24 +399,6 @@ export const NormalSet = ({
             )}
           </div>
 
-          {/* Notes toggle (shared — only on L row) */}
-          {isL ? (
-            <button
-              type="button"
-              aria-label={isNotesOpen ? 'Fechar observações' : 'Observações'}
-              onClick={() => toggleNotes(key)}
-              className={
-                isNotesOpen || hasNotes
-                  ? 'w-7 h-7 inline-flex items-center justify-center rounded-lg text-yellow-500 bg-yellow-500/10 border border-yellow-500/40 hover:bg-yellow-500/15 transition duration-200'
-                  : 'w-7 h-7 inline-flex items-center justify-center rounded-lg text-neutral-500 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'
-              }
-            >
-              <MessageSquare size={12} />
-            </button>
-          ) : (
-            <div className="w-7" />
-          )}
-
           {/* Complete side button */}
           <button
             type="button"
@@ -437,6 +419,22 @@ export const NormalSet = ({
         <>
           {renderSideRow('L', lDone, lWeightField, lRepsField, lRpeField, handleCompleteL, setIdx === 0)}
           {renderSideRow('R', rDone, rWeightField, rRepsField, rRpeField, handleCompleteR, false)}
+          {/* Notes button sits below both L+R rows — clear of exercise footer buttons */}
+          <div className="flex items-center justify-end px-0.5 -mt-0.5">
+            <button
+              type="button"
+              aria-label={isNotesOpen ? 'Fechar observações' : 'Observações'}
+              onClick={() => toggleNotes(key)}
+              className={
+                isNotesOpen || hasNotes
+                  ? 'inline-flex items-center gap-1.5 h-7 px-2.5 rounded-lg text-yellow-500 bg-yellow-500/10 border border-yellow-500/40 text-[11px] font-bold'
+                  : 'inline-flex items-center gap-1.5 h-7 px-2.5 rounded-lg text-neutral-500 bg-black/30 border border-neutral-700 text-[11px] font-bold hover:text-yellow-500'
+              }
+            >
+              <MessageSquare size={11} />
+              Obs
+            </button>
+          </div>
         </>
       ) : (
         /* ── Non-unilateral single row ─────────────────────────────── */
