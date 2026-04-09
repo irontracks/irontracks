@@ -190,6 +190,35 @@ export async function POST(req: Request) {
 
       const meta = payment && typeof payment === 'object' ? { mercadopago: { raw: payment } } : { mercadopago: {} }
 
+      // ── teacher_plan: activate/renew plan on teacher row ─────────────────────
+      if (scope === 'teacher_plan' && userId) {
+        if (status.toLowerCase() === 'approved') {
+          const now = new Date()
+          const end = new Date(now)
+          end.setMonth(end.getMonth() + 1) // monthly billing
+
+          await admin
+            .from('teachers')
+            .update({
+              plan_tier_key:        planId || 'free',
+              plan_status:          'active',
+              plan_valid_until:     end.toISOString(),
+              plan_subscription_id: dataId,
+            })
+            .eq('user_id', userId)
+        }
+
+        const revokeStatuses = ['refunded', 'cancelled', 'charged_back', 'chargedback']
+        if (revokeStatuses.includes(status.toLowerCase())) {
+          await admin
+            .from('teachers')
+            .update({ plan_tier_key: 'free', plan_status: 'cancelled', plan_valid_until: null })
+            .eq('user_id', userId)
+        }
+
+        return NextResponse.json({ ok: true })
+      }
+
       if (scope === 'vip' && userId) {
         const now = new Date()
         const { data: plan } = planId ? await admin.from('app_plans').select('id, interval').eq('id', planId).maybeSingle() : { data: null }

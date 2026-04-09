@@ -96,6 +96,20 @@ export async function POST(req: Request) {
       if (currentTeacher && currentTeacher !== auth.user.id) {
         return NextResponse.json({ ok: false, error: 'Aluno já pertence a outro professor.' }, { status: 403 })
       }
+
+      // Check plan limit — only when assigning a NEW student (not unassigning)
+      const isNewAssignment = teacher_user_id && (!currentTeacher || currentTeacher !== teacher_user_id)
+      if (isNewAssignment) {
+        const { data: canAdd, error: limitErr } = await admin.rpc('teacher_can_add_student', { p_teacher_user_id: teacher_user_id })
+        if (limitErr) return NextResponse.json({ ok: false, error: limitErr.message }, { status: 400 })
+        if (!canAdd) {
+          return NextResponse.json({
+            ok: false,
+            error: 'Limite de alunos atingido. Faça upgrade do seu plano para adicionar mais alunos.',
+            upgrade_required: true,
+          }, { status: 402 })
+        }
+      }
     }
 
     const { error } = await admin.from('students').update({ teacher_id: teacher_user_id }).eq('id', srow.id)
