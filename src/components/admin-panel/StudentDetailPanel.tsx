@@ -2,18 +2,18 @@
 
 import React, { useCallback, useState } from 'react';
 import {
-    X, ArrowLeft, Edit3, Dumbbell, History, Plus, Trash2, Video, Download,
+    X, ArrowLeft, Edit3, Trash2, Download,
     FileText, Loader2
 } from 'lucide-react';
 import HistoryList from '@/components/HistoryList';
 import AdminWorkoutEditor, { AdminWorkout } from '@/components/AdminWorkoutEditor';
-import { escapeHtml } from '@/utils/escapeHtml';
 import { parseJsonWithSchema } from '@/utils/zod';
 import { z } from 'zod';
 import { normalizeWorkoutTitle } from '@/utils/workoutTitle';
 import { updateWorkout } from '@/actions/workout-actions';
+import dynamic from 'next/dynamic';
 
-import type { AdminUser, AdminWorkoutTemplate } from '@/types/admin';
+import type { AdminUser } from '@/types/admin';
 import { useAdminPanel } from './AdminPanelContext';
 import { useDialog } from '@/contexts/DialogContext';
 import type { UnknownRecord } from '@/types/app'
@@ -23,9 +23,14 @@ import { StudentWorkoutsTab } from './StudentWorkoutsTab';
 import { StudentVideosTab } from './StudentVideosTab';
 import { StudentProfileTab } from './StudentProfileTab';
 
+const TeacherWorkoutMirror = dynamic(
+    () => import('@/components/teacher/TeacherWorkoutMirror').then(m => ({ default: m.TeacherWorkoutMirror })),
+    { ssr: false }
+);
+
 
 export const StudentDetailPanel: React.FC = () => {
-    const { alert, confirm } = useDialog();
+    const { alert } = useDialog();
 
     const {
         selectedStudent,
@@ -41,13 +46,6 @@ export const StudentDetailPanel: React.FC = () => {
         setSyncedWorkouts,
         syncedWorkouts,
         assessments,
-        studentCheckinsRows,
-        studentCheckinsLoading,
-        studentCheckinsError,
-        studentCheckinsRange,
-        setStudentCheckinsRange,
-        studentCheckinsFilter,
-        setStudentCheckinsFilter,
         executionVideoModalOpen,
         setExecutionVideoModalOpen,
         executionVideoModalUrl,
@@ -60,7 +58,6 @@ export const StudentDetailPanel: React.FC = () => {
         setExportOpen,
         historyOpen,
         setHistoryOpen,
-        templates,
         teachersList,
         isAdmin,
         user,
@@ -68,11 +65,7 @@ export const StudentDetailPanel: React.FC = () => {
         supabase,
         getAdminAuthHeaders,
         setUsersList,
-        handleUpdateStudentTeacher,
-        handleToggleStudentStatus,
         handleDeleteStudent,
-        // Bug #4 fix: using memoized versions from controller instead of inline re-definitions
-        handleEditStudent,
         handleSaveStudentEdit,
         handleExportPdf,
         handleExportJson,
@@ -131,12 +124,12 @@ export const StudentDetailPanel: React.FC = () => {
                             </div>
                             < div className="space-y-4" >
                                 <div>
-                                    <label className="block text-[11px] font-black uppercase tracking-widest text-neutral-500 mb-2" > Nome </label>
-                                    < input type="text" value={editedStudent.name || ''} onChange={(e) => setEditedStudent(prev => ({ ...prev, name: e.target.value }))} className="w-full min-h-[44px] bg-neutral-900/70 border border-neutral-800 rounded-xl px-3 py-2 text-white placeholder:text-neutral-600 focus:border-yellow-500 focus:outline-none" />
+                                    <label htmlFor="edit-student-name" className="block text-[11px] font-black uppercase tracking-widest text-neutral-500 mb-2" > Nome </label>
+                                    < input id="edit-student-name" aria-label="Nome do aluno" type="text" value={editedStudent.name || ''} onChange={(e) => setEditedStudent(prev => ({ ...prev, name: e.target.value }))} className="w-full min-h-[44px] bg-neutral-900/70 border border-neutral-800 rounded-xl px-3 py-2 text-white placeholder:text-neutral-600 focus:border-yellow-500 focus:outline-none" />
                                 </div>
                                 < div >
-                                    <label className="block text-[11px] font-black uppercase tracking-widest text-neutral-500 mb-2" > Email </label>
-                                    < input type="email" value={editedStudent.email || ''} onChange={(e) => setEditedStudent(prev => ({ ...prev, email: e.target.value }))} className="w-full min-h-[44px] bg-neutral-900/70 border border-neutral-800 rounded-xl px-3 py-2 text-white placeholder:text-neutral-600 focus:border-yellow-500 focus:outline-none" />
+                                    <label htmlFor="edit-student-email" className="block text-[11px] font-black uppercase tracking-widest text-neutral-500 mb-2" > Email </label>
+                                    < input id="edit-student-email" aria-label="Email do aluno" type="email" value={editedStudent.email || ''} onChange={(e) => setEditedStudent(prev => ({ ...prev, email: e.target.value }))} className="w-full min-h-[44px] bg-neutral-900/70 border border-neutral-800 rounded-xl px-3 py-2 text-white placeholder:text-neutral-600 focus:border-yellow-500 focus:outline-none" />
                                 </div>
                                 < div className="flex gap-3 pt-4" >
                                     <button onClick={handleSaveStudentEdit} className="flex-1 min-h-[44px] px-4 py-3 bg-yellow-500 hover:bg-yellow-400 text-black rounded-xl font-black transition-all duration-300 shadow-lg shadow-yellow-500/15 active:scale-95" > Salvar </button>
@@ -342,6 +335,16 @@ export const StudentDetailPanel: React.FC = () => {
                         >
                             Perfil
                         </button>
+                        <button
+                            type="button"
+                            onClick={() => setSubTab('live')}
+                            className={`flex-shrink-0 min-h-[44px] px-3 rounded-full font-black text-[10px] uppercase tracking-widest transition-all duration-300 active:scale-95 whitespace-nowrap ${subTab === 'live'
+                                ? 'bg-green-500 text-black shadow-lg shadow-green-500/20'
+                                : 'text-neutral-200'
+                                }`}
+                        >
+                            🔴 Ao Vivo
+                        </button>
                         {
                             executionVideoEnabled ? (
                                 <button
@@ -384,6 +387,11 @@ export const StudentDetailPanel: React.FC = () => {
                     !loading && subTab === 'profile' && (
                         <StudentProfileTab />
                     )}
+
+                {
+                    subTab === 'live' && (
+                        <TeacherWorkoutMirror />
+                    )}
             </div>
 
             {/* History Modal */}
@@ -409,8 +417,9 @@ export const StudentDetailPanel: React.FC = () => {
             {/* Edit Student Workout Modal */}
             {
                 editingStudentWorkout && (
-                    <div className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Editar treino do aluno" onClick={() => setEditingStudentWorkout(null)}>
-                        <div className="bg-neutral-900 w-full max-w-3xl rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4" role="presentation">
+                        <button type="button" className="absolute inset-0 bg-black/80 backdrop-blur-sm cursor-default" onClick={() => setEditingStudentWorkout(null)} aria-label="Fechar" />
+                        <div className="relative z-10 bg-neutral-900 w-full max-w-3xl rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" role="dialog" aria-modal="true" aria-label="Editar treino do aluno">
                             <div className="p-4 border-b border-neutral-800 flex justify-between items-center" >
                                 <h3 className="font-bold text-white" > Editar Treino do Aluno </h3>
                                 < button onClick={() => setEditingStudentWorkout(null)} className="px-3 py-1.5 hover:bg-neutral-800 rounded-full inline-flex items-center gap-2 text-neutral-300" > <ArrowLeft size={16} /><span className="text-xs font-bold">Voltar</span > </button>
@@ -472,8 +481,9 @@ export const StudentDetailPanel: React.FC = () => {
             {/* View Workout Modal */}
             {
                 viewWorkout && (
-                    <div className="fixed inset-0 z-[70] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Visualizar treino" onClick={() => setViewWorkout(null)}>
-                        <div className="bg-neutral-900 w-full max-w-3xl rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4" role="presentation">
+                        <button type="button" className="absolute inset-0 bg-black/80 backdrop-blur-sm cursor-default" onClick={() => setViewWorkout(null)} aria-label="Fechar" />
+                        <div className="relative z-10 bg-neutral-900 w-full max-w-3xl rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" role="dialog" aria-modal="true" aria-label="Visualizar treino">
                             <div className="p-4 border-b border-neutral-800 flex justify-between items-center" >
                                 <h3 className="font-bold text-white" > Treino: {normalizeWorkoutTitle(String((viewWorkout as UnknownRecord)?.name ?? ''))} </h3>
                                 < button onClick={() => setViewWorkout(null)} className="px-3 py-1.5 hover:bg-neutral-800 rounded-full inline-flex items-center gap-2 text-neutral-300" > <ArrowLeft size={16} /><span className="text-xs font-bold">Voltar</span > </button>
@@ -503,8 +513,9 @@ export const StudentDetailPanel: React.FC = () => {
             {/* Export Modal */}
             {
                 exportOpen && viewWorkout && (
-                    <div className="fixed inset-0 z-[80] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Exportar treino" onClick={() => setExportOpen(false)}>
-                        <div className="bg-neutral-900 w-full max-w-md rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4" role="presentation">
+                        <button type="button" className="absolute inset-0 bg-black/80 backdrop-blur-sm cursor-default" onClick={() => setExportOpen(false)} aria-label="Fechar" />
+                        <div className="relative z-10 bg-neutral-900 w-full max-w-md rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" role="dialog" aria-modal="true" aria-label="Exportar treino">
                             <div className="p-4 border-b border-neutral-800 flex justify-between items-center" >
                                 <h3 className="font-bold text-white" > Como deseja salvar ? </h3>
                                 < button onClick={() => setExportOpen(false)} className="px-3 py-1.5 hover:bg-neutral-800 rounded-full inline-flex items-center gap-2 text-neutral-300" > <ArrowLeft size={16} /><span className="text-xs font-bold">Voltar</span > </button>
@@ -524,8 +535,9 @@ export const StudentDetailPanel: React.FC = () => {
             {/* Execution Video Modal */}
             {
                 executionVideoModalOpen && executionVideoModalUrl ? (
-                    <div className="fixed inset-0 z-[80] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Vídeo de execução" onClick={() => { setExecutionVideoModalOpen(false); setExecutionVideoModalUrl(''); }}>
-                        <div className="bg-neutral-900 w-full max-w-3xl rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4" role="presentation">
+                        <button type="button" className="absolute inset-0 bg-black/80 backdrop-blur-sm cursor-default" onClick={() => { setExecutionVideoModalOpen(false); setExecutionVideoModalUrl(''); }} aria-label="Fechar" />
+                        <div className="relative z-10 bg-neutral-900 w-full max-w-3xl rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" role="dialog" aria-modal="true" aria-label="Vídeo de execução">
                             <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3" >
                                 <div className="font-black text-white" > Vídeo de execução </div>
                                 < button
@@ -538,7 +550,9 @@ export const StudentDetailPanel: React.FC = () => {
                                 </button>
                             </div>
                             < div className="p-4" >
-                                <video src={executionVideoModalUrl} controls className="w-full rounded-xl bg-black" />
+                                <video src={executionVideoModalUrl} controls aria-label="Vídeo de execução do exercício" className="w-full rounded-xl bg-black">
+                                    <track kind="captions" />
+                                </video>
                             </div>
                         </div>
                     </div>
