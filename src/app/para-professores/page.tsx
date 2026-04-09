@@ -619,14 +619,16 @@ export default function ParaProfessoresPage() {
             {plans.map((plan) => (
               <div
                 key={plan.id}
-                className={`relative rounded-2xl border p-5 flex flex-col ${
+                className={`relative rounded-2xl border flex flex-col ${
+                  plan.tag ? 'pt-8 px-5 pb-5' : 'p-5'
+                } ${
                   plan.highlight
                     ? 'bg-gradient-to-b from-yellow-500/15 to-amber-500/5 border-yellow-500/40 shadow-[0_0_40px_rgba(234,179,8,0.15)]'
                     : 'bg-neutral-900/50 border-neutral-800'
                 }`}
               >
                 {plan.tag && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                  <div className="absolute -top-3.5 left-1/2 -translate-x-1/2 whitespace-nowrap">
                     <span className="px-3 py-1 rounded-full bg-yellow-500 text-black text-[10px] font-black uppercase tracking-wide shadow-lg">
                       {plan.tag}
                     </span>
