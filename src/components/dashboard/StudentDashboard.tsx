@@ -31,6 +31,7 @@ import type { UnknownRecord } from '@/types/app'
 import dynamic from 'next/dynamic'
 
 const RecoveryScore = dynamic(() => import('./RecoveryScore'), { ssr: false })
+const StudentSubscriptionCard = dynamic(() => import('@/components/student/StudentSubscriptionCard'), { ssr: false })
 
 
 const isPlainRecord = (v: unknown): v is UnknownRecord => v !== null && typeof v === 'object' && !Array.isArray(v)
@@ -324,6 +325,8 @@ export default function StudentDashboard(props: Props) {
                   onClose={() => setEditListOpen(false)}
                 />
               )}
+
+              <StudentSubscriptionCard />
 
               {(showIronRank || showBadges || showNewRecordsCard) && (
               <IronRankCard

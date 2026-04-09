@@ -1,6 +1,6 @@
 'use client'
 
-import { AlertCircle, BarChart3, ChevronDown, ChevronRight, Crown, Dumbbell, FileText, MessageSquare, Play, Settings, UserCog, UserPlus, Users, X } from 'lucide-react'
+import { AlertCircle, BarChart3, ChevronDown, ChevronRight, Crown, CreditCard, Dumbbell, MessageSquare, Play, Settings, UserCog, UserPlus, Users, X } from 'lucide-react'
 
 type AdminPanelHeaderProps = {
   debugError: string | null
@@ -42,13 +42,14 @@ const buildMenuGroups = (tabKeys: string[]): MenuGroup[] => {
     vip: { key: 'vip', icon: <Crown size={ICON_SIZE} />, subtitle: 'Gestão de assinantes VIP' },
     errors: { key: 'errors', icon: <MessageSquare size={ICON_SIZE} />, subtitle: 'Feedbacks reportados' },
     system: { key: 'system', icon: <Settings size={ICON_SIZE} />, subtitle: 'Mensagens em massa e manutenção' },
+    billing: { key: 'billing', icon: <CreditCard size={ICON_SIZE} />, subtitle: 'Planos de serviço e cobranças dos alunos' },
   }
 
   const groups: MenuGroup[] = []
   const available = new Set(tabKeys)
 
   // Group 1: Gestão
-  const gestao = ['dashboard', 'students', 'requests', 'teachers', 'priorities'].filter(k => available.has(k))
+  const gestao = ['dashboard', 'students', 'requests', 'teachers', 'priorities', 'billing'].filter(k => available.has(k))
   if (gestao.length > 0) groups.push({ label: 'Gestão', items: gestao.map(k => allItems[k]) })
 
   // Group 2: Conteúdo
@@ -161,17 +162,24 @@ export const AdminPanelHeader = ({
       {moreTabsOpen && (
         <div
           className="md:hidden fixed inset-0 z-[60] flex items-start justify-center px-4 pt-[12vh]"
-          role="dialog"
-          aria-modal="true"
-          onClick={() => setMoreTabsOpen(false)}
+          role="presentation"
         >
-          {/* Premium blurred backdrop */}
-          <div className="absolute inset-0 bg-black/80 backdrop-blur-md" />
+          {/* Premium blurred backdrop — closes modal on click */}
+          <button
+            type="button"
+            className="absolute inset-0 bg-black/80 backdrop-blur-md cursor-default"
+            onClick={() => setMoreTabsOpen(false)}
+            onKeyDown={(e) => { if (e.key === 'Escape') setMoreTabsOpen(false) }}
+            aria-label="Fechar menu"
+          />
 
           {/* Modal card */}
           <div
+            role="dialog"
+            aria-modal="true"
+            aria-label="Menu de navegação"
+            tabIndex={-1}
             className="relative w-full max-w-md rounded-3xl overflow-hidden shadow-[0_32px_80px_rgba(0,0,0,0.8)] border border-white/[0.06] animate-in fade-in slide-in-from-top-4 duration-300"
-            onClick={(e) => e.stopPropagation()}
           >
             {/* Glassmorphism background layers */}
             <div className="absolute inset-0 bg-neutral-950/95 backdrop-blur-2xl" />
