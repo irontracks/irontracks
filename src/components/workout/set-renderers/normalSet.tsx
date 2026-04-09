@@ -447,8 +447,10 @@ export const NormalSet = ({
               : 'bg-neutral-900/50 border-neutral-800/80',
           ].join(' ')}
         >
+          {/* Order: peso | reps | rpe | OK | 💬
+              Notes is last so it never aligns with mid-row footer buttons (DROP etc.) */}
           <div className="grid items-center gap-1.5"
-            style={{ gridTemplateColumns: '3fr 2fr 2fr 28px auto' }}>
+            style={{ gridTemplateColumns: '3fr 2fr 2fr auto 28px' }}>
 
             {/* kg */}
             <input
@@ -500,20 +502,6 @@ export const NormalSet = ({
               )}
             </div>
 
-            {/* Notes toggle */}
-            <button
-              type="button"
-              aria-label={isNotesOpen ? 'Fechar observações' : 'Observações'}
-              onClick={() => toggleNotes(key)}
-              className={
-                isNotesOpen || hasNotes
-                  ? 'w-7 h-7 inline-flex items-center justify-center rounded-lg text-yellow-500 bg-yellow-500/10 border border-yellow-500/40 hover:bg-yellow-500/15 transition duration-200'
-                  : 'w-7 h-7 inline-flex items-center justify-center rounded-lg text-neutral-500 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'
-              }
-            >
-              <MessageSquare size={12} />
-            </button>
-
             {/* OK button */}
             <button
               type="button"
@@ -527,6 +515,20 @@ export const NormalSet = ({
             >
               <Check size={13} />
               {done ? 'Feito' : 'OK'}
+            </button>
+
+            {/* Notes toggle — rightmost, past OK, won't align with footer buttons */}
+            <button
+              type="button"
+              aria-label={isNotesOpen ? 'Fechar observações' : 'Observações'}
+              onClick={() => toggleNotes(key)}
+              className={
+                isNotesOpen || hasNotes
+                  ? 'w-7 h-7 inline-flex items-center justify-center rounded-lg text-yellow-500 bg-yellow-500/10 border border-yellow-500/40 hover:bg-yellow-500/15 transition duration-200'
+                  : 'w-7 h-7 inline-flex items-center justify-center rounded-lg text-neutral-500 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'
+              }
+            >
+              <MessageSquare size={12} />
             </button>
           </div>
         </div>
