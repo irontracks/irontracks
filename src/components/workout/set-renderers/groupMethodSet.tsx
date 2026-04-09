@@ -1,8 +1,8 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { parseTrainingNumber } from '@/utils/trainingNumber';
-import { Check, MessageSquare, Pencil } from 'lucide-react';
+import { Check, ChevronDown, MessageSquare, Pencil } from 'lucide-react';
 import { useWorkoutContext } from '../WorkoutContext';
 import {
   isObject,
@@ -22,12 +22,17 @@ const GROUP_METHOD_INFO: Record<string, string> = {
   'Pós-exaustão': 'Composto ANTES do isolador • Execute imediatamente',
 };
 
+const PER_SET_METHODS = ['Normal', 'Drop-Set', 'SST', 'Rest-Pause', 'Cluster', 'Stripping', 'Bi-Set', 'Super-Set'];
+
 export const GroupMethodSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: number; setIdx: number }) => {
   const { getLog, updateLog, setGroupMethodModal, openNotesKeys, toggleNotes, startTimer, getPlanConfig, reportHistory } = useWorkoutContext();
+  const [isPickerOpen, setIsPickerOpen] = useState(false);
   const key = `${exIdx}-${setIdx}`;
   const log = getLog(key);
   const cfg = getPlanConfig(ex, setIdx);
   const method = String(ex?.method || '').trim();
+  const perSetMethod = String(log.per_set_method || '').trim();
+  const effectiveMethod = perSetMethod || method;
   const weightValue = String(log.weight ?? (isObject(cfg) ? toNumber((cfg as UnknownRecord).weight) ?? '' : '') ?? '');
   const repsValue = String(log.reps ?? '');
   const rpeValue = String(log.rpe ?? '');
@@ -84,22 +89,29 @@ export const GroupMethodSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exI
         />
       </div>
       {/* Row 2: badge método + botões de ação */}
-      <div className="flex items-center gap-2 pl-10">
-        <span className="text-[10px] uppercase tracking-widest font-black text-yellow-500 flex-1 truncate">{method}</span>
+      <div className="flex items-center gap-1.5 pl-10">
         <button
           type="button"
-          title={GROUP_METHOD_INFO[method] ?? method}
-          onClick={() => setGroupMethodModal({ key, method, weight: weightValue, reps: repsValue, rpe: rpeValue, info: GROUP_METHOD_INFO[method] ?? '', error: '' })}
-          className="inline-flex items-center justify-center rounded-lg p-2 text-neutral-400 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200"
+          onClick={() => setIsPickerOpen(p => !p)}
+          className="inline-flex items-center gap-0.5 text-[10px] uppercase tracking-widest font-black text-yellow-500 hover:text-yellow-400 flex-1 truncate transition-colors"
         >
-          <MessageSquare size={14} />
+          {effectiveMethod}
+          <ChevronDown size={10} className={`transition-transform ${isPickerOpen ? 'rotate-180' : ''}`} />
         </button>
         <button
           type="button"
           onClick={() => toggleNotes(key)} aria-label="Observações"
-          className={isNotesOpen || hasNotes ? 'inline-flex items-center justify-center rounded-lg p-2 text-yellow-500 bg-yellow-500/10 border border-yellow-500/40' : 'inline-flex items-center justify-center rounded-lg p-2 text-neutral-400 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'}
+          className={isNotesOpen || hasNotes ? 'shrink-0 inline-flex items-center justify-center rounded-lg p-1.5 text-yellow-500 bg-yellow-500/10 border border-yellow-500/40' : 'shrink-0 inline-flex items-center justify-center rounded-lg p-1.5 text-neutral-400 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'}
         >
-          <Pencil size={14} />
+          <MessageSquare size={12} />
+        </button>
+        <button
+          type="button"
+          title={GROUP_METHOD_INFO[effectiveMethod] ?? effectiveMethod}
+          onClick={() => setGroupMethodModal({ key, method: effectiveMethod, weight: weightValue, reps: repsValue, rpe: rpeValue, info: GROUP_METHOD_INFO[effectiveMethod] ?? '', error: '' })}
+          className="shrink-0 inline-flex items-center justify-center rounded-lg p-1.5 text-neutral-400 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200"
+        >
+          <Pencil size={12} />
         </button>
         <button
           type="button"
@@ -115,6 +127,20 @@ export const GroupMethodSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exI
           <span className="text-xs">{done ? 'Feito' : 'Concluir'}</span>
         </button>
       </div>
+      {isPickerOpen && (
+        <div className="flex flex-wrap gap-1 pl-10 pb-1">
+          {PER_SET_METHODS.map(opt => (
+            <button
+              key={opt}
+              type="button"
+              onClick={() => { updateLog(key, { per_set_method: opt }); setIsPickerOpen(false); }}
+              className={`px-2 py-0.5 rounded-md text-[10px] font-black border transition-colors ${effectiveMethod === opt ? 'bg-yellow-500/20 border-yellow-500/40 text-yellow-400' : 'bg-neutral-900 border-neutral-700 text-neutral-400 hover:border-neutral-600 hover:text-neutral-300'}`}
+            >
+              {opt}
+            </button>
+          ))}
+        </div>
+      )}
       {isNotesOpen && (
         <textarea
           aria-label="Observações da série"

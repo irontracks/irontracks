@@ -162,6 +162,30 @@ function ExerciseCardInner({ ex, exIdx }: { ex: WorkoutExercise; exIdx: number }
     const log = getLog(key);
     const method = String(ex?.method || '').trim();
 
+    // Per-set method override — takes precedence over all automatic detection
+    const perSetMethod = String(log.per_set_method || '').trim();
+    if (perSetMethod === 'Normal') {
+      return <NormalSet key={key} ex={ex} exIdx={exIdx} setIdx={setIdx} setsCount={setsCount} />;
+    }
+    if (perSetMethod === 'Drop-Set') {
+      return <DropSetSet key={key} ex={ex} exIdx={exIdx} setIdx={setIdx} />;
+    }
+    if (perSetMethod === 'SST') {
+      return <RestPauseSet key={key} ex={ex} exIdx={exIdx} setIdx={setIdx} sstOverride={{ restSec: 10, miniCount: 3 }} />;
+    }
+    if (perSetMethod === 'Rest-Pause') {
+      return <RestPauseSet key={key} ex={ex} exIdx={exIdx} setIdx={setIdx} />;
+    }
+    if (perSetMethod === 'Cluster') {
+      return <ClusterSet key={key} ex={ex} exIdx={exIdx} setIdx={setIdx} />;
+    }
+    if (perSetMethod === 'Stripping') {
+      return <StrippingSet key={key} ex={ex} exIdx={exIdx} setIdx={setIdx} />;
+    }
+    if (perSetMethod === 'Bi-Set' || perSetMethod === 'Super-Set' || perSetMethod === 'Tri-Set' || perSetMethod === 'Giant-Set' || perSetMethod === 'Pré-exaustão' || perSetMethod === 'Pós-exaustão') {
+      return <GroupMethodSet key={key} ex={ex} exIdx={exIdx} setIdx={setIdx} />;
+    }
+
     // SST from description: override the method on the specific target set
     if (parsedSSTConfig && setIdx === parsedSSTConfig.targetSetIdx) {
       return (

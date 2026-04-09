@@ -3,7 +3,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { flushSync } from 'react-dom';
 import { parseTrainingNumber } from '@/utils/trainingNumber';
-import { Check, MessageSquare } from 'lucide-react';
+import { Check, ChevronDown, MessageSquare } from 'lucide-react';
 import { useWorkoutContext } from '../WorkoutContext';
 import {
   isObject,
@@ -87,6 +87,7 @@ export const NormalSet = ({
   } = useWorkoutContext();
 
   const completeBusyRef = useRef(false);
+  const [isPickerOpen, setIsPickerOpen] = useState(false);
 
   const key = `${exIdx}-${setIdx}`;
   const log = getLog(key);
@@ -531,6 +532,36 @@ export const NormalSet = ({
               {done ? 'Feito' : 'OK'}
             </button>
           </div>
+          {/* Per-set method picker */}
+          {!done && (
+            <div className="mt-1">
+              <button
+                type="button"
+                onClick={() => setIsPickerOpen(p => !p)}
+                className="inline-flex items-center gap-0.5 text-[10px] font-black uppercase tracking-widest text-neutral-600 hover:text-neutral-400 transition-colors"
+              >
+                {String(log.per_set_method || '').trim() || 'Normal'}
+                <ChevronDown size={9} className={`transition-transform ${isPickerOpen ? 'rotate-180' : ''}`} />
+              </button>
+              {isPickerOpen && (
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {['Normal', 'Drop-Set', 'SST', 'Rest-Pause', 'Cluster', 'Stripping', 'Bi-Set', 'Super-Set'].map(opt => {
+                    const current = String(log.per_set_method || '').trim() || 'Normal';
+                    return (
+                      <button
+                        key={opt}
+                        type="button"
+                        onClick={() => { updateLog(key, { per_set_method: opt === 'Normal' ? '' : opt, advanced_config: cfg ?? log.advanced_config ?? null }); setIsPickerOpen(false); }}
+                        className={`px-2 py-0.5 rounded-md text-[10px] font-black border transition-colors ${current === opt ? 'bg-yellow-500/20 border-yellow-500/40 text-yellow-400' : 'bg-neutral-900 border-neutral-700 text-neutral-400 hover:border-neutral-600 hover:text-neutral-300'}`}
+                      >
+                        {opt}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          )}
         </div>
       )}
 
