@@ -113,8 +113,8 @@ export const DropSetSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: 
           </div>
         ) : (
           /* ── Expanded row when not done ── */
-          <div className="flex items-center gap-2">
-            <div className="w-10 text-xs font-mono text-neutral-400">#{setIdx + 1}</div>
+          <div className="flex items-center gap-1">
+            <div className="w-7 text-xs font-mono text-neutral-400 shrink-0">#{setIdx + 1}</div>
             <button
               type="button"
               onClick={() => {
@@ -124,13 +124,13 @@ export const DropSetSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: 
                 }));
                 setDropSetModal({ key, label: modeLabel, stages: baseStages, error: '' });
               }}
-              className="shrink-0 bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none hover:border-yellow-500/60 hover:text-yellow-500 transition-colors inline-flex items-center justify-center gap-2"
+              className="shrink-0 bg-black/30 border border-neutral-700 rounded-lg px-2 py-2 text-sm text-white outline-none hover:border-yellow-500/60 hover:text-yellow-500 transition-colors inline-flex items-center justify-center gap-1.5"
             >
               <Pencil size={14} />
               <span className="text-xs font-black">Abrir</span>
             </button>
-            <div className="flex items-center gap-2 flex-1 min-w-0">
-              <span className="text-[10px] uppercase tracking-widest font-black text-yellow-500 inline-flex items-center gap-1 group">
+            <div className="flex items-center gap-1.5 flex-1 min-w-0 ml-1">
+              <span className="text-[10px] uppercase tracking-widest font-black text-yellow-500 inline-flex items-center gap-1 group shrink-0">
                 {modeLabel || 'Drop'}
                 <HelpHint
                   title={(stagesCount >= 3 ? HELP_TERMS.dropSetDuplo : HELP_TERMS.dropSet).title}
@@ -146,8 +146,8 @@ export const DropSetSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: 
               onClick={() => toggleNotes(key)} aria-label="Observações"
               className={
                 isNotesOpen || hasNotes
-                  ? 'inline-flex items-center justify-center rounded-lg p-2 text-yellow-500 bg-yellow-500/10 border border-yellow-500/40 hover:bg-yellow-500/15 transition duration-200'
-                  : 'inline-flex items-center justify-center rounded-lg p-2 text-neutral-400 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'
+                  ? 'shrink-0 inline-flex items-center justify-center rounded-lg p-1.5 text-yellow-500 bg-yellow-500/10 border border-yellow-500/40 hover:bg-yellow-500/15 transition duration-200'
+                  : 'shrink-0 inline-flex items-center justify-center rounded-lg p-1.5 text-neutral-400 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'
               }
             >
               <MessageSquare size={14} />
