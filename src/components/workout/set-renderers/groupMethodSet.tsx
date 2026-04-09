@@ -9,6 +9,7 @@ import {
   toNumber,
   normalizeExerciseKey,
 } from '../utils';
+
 import { UnknownRecord, WorkoutExercise } from '../types';
 
 // --- Group Method Set (Bi-Set / Super-Set / Tri-Set / Giant-Set / Pré-exaustão / Pós-exaustão) ---
@@ -33,6 +34,11 @@ export const GroupMethodSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exI
   const method = String(ex?.method || '').trim();
   const perSetMethod = String(log.per_set_method || '').trim();
   const effectiveMethod = perSetMethod || method;
+  const prevNote = (() => {
+    const entry = reportHistory?.exercises?.[normalizeExerciseKey(ex.name)];
+    const latest = entry?.items?.length ? [...entry.items].sort((a, b) => b.ts - a.ts)[0] : null;
+    return latest?.setNotes?.[setIdx] ?? null;
+  })();
   const weightValue = String(log.weight ?? (isObject(cfg) ? toNumber((cfg as UnknownRecord).weight) ?? '' : '') ?? '');
   const repsValue = String(log.reps ?? '');
   const rpeValue = String(log.rpe ?? '');
@@ -41,6 +47,7 @@ export const GroupMethodSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exI
   const notesValue = String(log.notes ?? '');
   const hasNotes = notesValue.trim().length > 0;
   const isNotesOpen = openNotesKeys.has(key);
+  const hasAnyNote = hasNotes || !!prevNote;
   const restTime = parseTrainingNumber(ex?.restTime ?? ex?.rest_time);
   const plannedSet = ex?.sets ? (Array.isArray(ex.sets) ? ex.sets[setIdx] : null) : null;
   const plannedReps = String(isObject(plannedSet) ? (plannedSet as UnknownRecord).reps ?? '' : ex?.reps ?? '').trim();
@@ -101,7 +108,7 @@ export const GroupMethodSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exI
         <button
           type="button"
           onClick={() => toggleNotes(key)} aria-label="Observações"
-          className={isNotesOpen || hasNotes ? 'shrink-0 inline-flex items-center justify-center rounded-lg p-1.5 text-yellow-500 bg-yellow-500/10 border border-yellow-500/40' : 'shrink-0 inline-flex items-center justify-center rounded-lg p-1.5 text-neutral-400 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'}
+          className={isNotesOpen || hasAnyNote ? 'shrink-0 inline-flex items-center justify-center rounded-lg p-1.5 text-yellow-500 bg-yellow-500/10 border border-yellow-500/40' : 'shrink-0 inline-flex items-center justify-center rounded-lg p-1.5 text-neutral-400 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'}
         >
           <MessageSquare size={12} />
         </button>
@@ -142,14 +149,22 @@ export const GroupMethodSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exI
         </div>
       )}
       {isNotesOpen && (
-        <textarea
-          aria-label="Observações da série"
-          value={notesValue}
-          onChange={(e) => updateLog(key, { notes: e?.target?.value ?? '' })}
-          placeholder="Observações da série"
-          rows={2}
-          className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
-        />
+        <div className="space-y-1.5">
+          {prevNote && (
+            <div className="flex items-start gap-1.5 px-2.5 py-1.5 rounded-lg bg-neutral-900/60 border border-neutral-800">
+              <span className="text-[9px] font-black uppercase tracking-widest text-neutral-600 shrink-0 mt-0.5">Anterior</span>
+              <p className="text-xs text-neutral-500 italic leading-snug">{prevNote}</p>
+            </div>
+          )}
+          <textarea
+            aria-label="Observações da série"
+            value={notesValue}
+            onChange={(e) => updateLog(key, { notes: e?.target?.value ?? '' })}
+            placeholder="Observações da série"
+            rows={2}
+            className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+          />
+        </div>
       )}
     </div>
   );

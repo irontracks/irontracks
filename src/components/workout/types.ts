@@ -75,6 +75,8 @@ export type ReportHistoryItem = {
   setReps?: number[] | null;
   /** RPE individual por série, na ordem de execução */
   setRpes?: number[] | null;
+  /** Observações individuais por série, na ordem de execução */
+  setNotes?: (string | null)[] | null;
 };
 
 export type ReportHistory = {

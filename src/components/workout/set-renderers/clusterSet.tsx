@@ -119,6 +119,12 @@ export const ClusterSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: 
   const notesValue = String(log.notes ?? '');
   const hasNotes = notesValue.trim().length > 0;
   const isNotesOpen = openNotesKeys.has(key);
+  const prevNote = (() => {
+    const entry = reportHistory?.exercises?.[normalizeExerciseKey(ex.name)];
+    const latest = entry?.items?.length ? [...entry.items].sort((a, b) => b.ts - a.ts)[0] : null;
+    return latest?.setNotes?.[setIdx] ?? null;
+  })();
+  const hasAnyNote = hasNotes || !!prevNote;
 
   return (
     <div key={key} className="space-y-2">
@@ -167,7 +173,7 @@ export const ClusterSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: 
             <Pencil size={14} />
             <span className="text-xs font-black hidden sm:inline">Abrir</span>
           </button>
-          <button type="button" onClick={() => toggleNotes(key)} aria-label="Observações" className={isNotesOpen || hasNotes ? 'inline-flex items-center justify-center rounded-lg p-1.5 text-yellow-500 bg-yellow-500/10 border border-yellow-500/40' : 'inline-flex items-center justify-center rounded-lg p-1.5 text-neutral-400 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'}>
+          <button type="button" onClick={() => toggleNotes(key)} aria-label="Observações" className={isNotesOpen || hasAnyNote ? 'inline-flex items-center justify-center rounded-lg p-1.5 text-yellow-500 bg-yellow-500/10 border border-yellow-500/40' : 'inline-flex items-center justify-center rounded-lg p-1.5 text-neutral-400 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'}>
             <MessageSquare size={12} />
           </button>
         </div>
@@ -271,17 +277,25 @@ export const ClusterSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: 
         </div>
       )}
       {isNotesOpen && (
-        <textarea
-          aria-label={`Observações – série ${setIdx + 1}`}
-          value={notesValue}
-          onChange={(e) => {
-            const v = e?.target?.value ?? '';
-            updateLog(key, { notes: v, advanced_config: cfg ?? log.advanced_config ?? null });
-          }}
-          placeholder="Observações da série"
-          rows={2}
-          className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
-        />
+        <div className="space-y-1.5">
+          {prevNote && (
+            <div className="flex items-start gap-1.5 px-2.5 py-1.5 rounded-lg bg-neutral-900/60 border border-neutral-800">
+              <span className="text-[9px] font-black uppercase tracking-widest text-neutral-600 shrink-0 mt-0.5">Anterior</span>
+              <p className="text-xs text-neutral-500 italic leading-snug">{prevNote}</p>
+            </div>
+          )}
+          <textarea
+            aria-label={`Observações – série ${setIdx + 1}`}
+            value={notesValue}
+            onChange={(e) => {
+              const v = e?.target?.value ?? '';
+              updateLog(key, { notes: v, advanced_config: cfg ?? log.advanced_config ?? null });
+            }}
+            placeholder="Observações da série"
+            rows={2}
+            className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+          />
+        </div>
       )}
     </div>
   );

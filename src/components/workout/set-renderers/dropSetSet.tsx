@@ -8,6 +8,7 @@ import { HelpHint } from '@/components/ui/HelpHint';
 import { HELP_TERMS } from '@/utils/help/terms';
 import {
   isObject,
+  normalizeExerciseKey,
 } from '../utils';
 import { UnknownRecord, WorkoutExercise } from '../types';
 
@@ -19,6 +20,7 @@ export const DropSetSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: 
     setDropSetModal,
     openNotesKeys,
     toggleNotes,
+    reportHistory,
   } = useWorkoutContext();
 
   const key = `${exIdx}-${setIdx}`;
@@ -57,6 +59,10 @@ export const DropSetSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: 
   const notesValue = String(log.notes ?? '');
   const hasNotes = notesValue.trim().length > 0;
   const isNotesOpen = openNotesKeys.has(key);
+  const histEntry = reportHistory?.exercises?.[normalizeExerciseKey(ex.name)];
+  const lastHistItem = histEntry?.items?.length ? [...histEntry.items].sort((a, b) => b.ts - a.ts)[0] : null;
+  const prevNote = lastHistItem?.setNotes?.[setIdx] ?? null;
+  const hasAnyNote = hasNotes || !!prevNote;
 
   const handleToggleDone = () => {
     const nextDone = !done;
@@ -95,7 +101,7 @@ export const DropSetSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: 
               type="button"
               onClick={() => toggleNotes(key)} aria-label="Observações"
               className={
-                isNotesOpen || hasNotes
+                isNotesOpen || hasAnyNote
                   ? 'w-7 h-7 inline-flex items-center justify-center rounded-lg text-yellow-500 bg-yellow-500/10 border border-yellow-500/40 hover:bg-yellow-500/15 transition duration-200'
                   : 'w-7 h-7 inline-flex items-center justify-center rounded-lg text-neutral-500 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'
               }
@@ -145,7 +151,7 @@ export const DropSetSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: 
               type="button"
               onClick={() => toggleNotes(key)} aria-label="Observações"
               className={
-                isNotesOpen || hasNotes
+                isNotesOpen || hasAnyNote
                   ? 'shrink-0 inline-flex items-center justify-center rounded-lg p-1.5 text-yellow-500 bg-yellow-500/10 border border-yellow-500/40 hover:bg-yellow-500/15 transition duration-200'
                   : 'shrink-0 inline-flex items-center justify-center rounded-lg p-1.5 text-neutral-400 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'
               }
@@ -176,17 +182,25 @@ export const DropSetSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: 
       )}
 
       {isNotesOpen && (
-        <textarea
-          value={notesValue}
-          onChange={(e) => {
-            const v = e?.target?.value ?? '';
-            updateLog(key, { notes: v });
-          }}
-          placeholder="Observações da série"
-          rows={2}
-          aria-label="Observações da série"
-          className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
-        />
+        <div className="space-y-1.5">
+          {prevNote && (
+            <div className="flex items-start gap-1.5 px-2.5 py-1.5 rounded-lg bg-neutral-900/60 border border-neutral-800">
+              <span className="text-[9px] font-black uppercase tracking-widest text-neutral-600 shrink-0 mt-0.5">Anterior</span>
+              <p className="text-xs text-neutral-500 italic leading-snug">{prevNote}</p>
+            </div>
+          )}
+          <textarea
+            value={notesValue}
+            onChange={(e) => {
+              const v = e?.target?.value ?? '';
+              updateLog(key, { notes: v });
+            }}
+            placeholder="Observações da série"
+            rows={2}
+            aria-label="Observações da série"
+            className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+          />
+        </div>
       )}
     </div>
   );
