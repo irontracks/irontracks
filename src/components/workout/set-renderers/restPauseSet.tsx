@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { parseTrainingNumber } from '@/utils/trainingNumber';
-import { Check, Pencil } from 'lucide-react';
+import { Check, MessageSquare, Pencil } from 'lucide-react';
 import { useWorkoutContext } from '../WorkoutContext';
 import { HelpHint } from '@/components/ui/HelpHint';
 import { HELP_TERMS } from '@/utils/help/terms';
@@ -28,6 +28,8 @@ export const RestPauseSet = ({
     startTimer,
     setRestPauseModal,
     deloadSuggestions,
+    openNotesKeys,
+    toggleNotes,
   } = useWorkoutContext();
 
   const key = `${exIdx}-${setIdx}`;
@@ -66,6 +68,8 @@ export const RestPauseSet = ({
     notesExternal,
     (v) => updateLog(key, { notes: v, advanced_config: cfg ?? log.advanced_config ?? null }),
   );
+  const hasNotes = notesExternal.trim().length > 0;
+  const isNotesOpen = openNotesKeys.has(key);
 
   const auto = isObject(plannedSet?.it_auto) ? (plannedSet.it_auto as UnknownRecord) : null;
   // SST override takes priority for the label
@@ -146,6 +150,16 @@ export const RestPauseSet = ({
             <Pencil size={14} />
             <span className="text-xs font-black hidden sm:inline">Abrir</span>
           </button>
+          <button
+            type="button"
+            onClick={() => toggleNotes(key)}
+            aria-label="Observações"
+            className={isNotesOpen || hasNotes
+              ? 'shrink-0 inline-flex items-center justify-center rounded-lg p-1.5 text-yellow-500 bg-yellow-500/10 border border-yellow-500/40'
+              : 'shrink-0 inline-flex items-center justify-center rounded-lg p-1.5 text-neutral-400 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'}
+          >
+            <MessageSquare size={12} />
+          </button>
         </div>
         <div className="flex flex-col sm:flex-row sm:items-center gap-2">
           <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -202,16 +216,18 @@ export const RestPauseSet = ({
           </button>
         </div>
       </div>
-      <textarea
-        aria-label={`Observações – série ${setIdx + 1}`}
-        value={notesField.value}
-        onChange={notesField.onChange}
-        onFocus={notesField.onFocus}
-        onBlur={notesField.onBlur}
-        placeholder="Observações da série"
-        rows={2}
-        className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
-      />
+      {isNotesOpen && (
+        <textarea
+          aria-label={`Observações – série ${setIdx + 1}`}
+          value={notesField.value}
+          onChange={notesField.onChange}
+          onFocus={notesField.onFocus}
+          onBlur={notesField.onBlur}
+          placeholder="Observações da série"
+          rows={2}
+          className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+        />
+      )}
     </div>
   );
 };
