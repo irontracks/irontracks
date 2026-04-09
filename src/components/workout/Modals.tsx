@@ -530,10 +530,11 @@ export default function Modals() {
                 <button
                   type="button"
                   onClick={() => setEditExerciseDraft((prev) => ({ ...prev, isUnilateral: !prev?.isUnilateral }))}
-                  className={`w-12 h-7 rounded-full transition-all duration-200 relative flex-shrink-0 ${editExerciseDraft?.isUnilateral ? 'bg-blue-500' : 'bg-neutral-700'}`}
+                  className={`w-12 h-7 rounded-full transition-all duration-200 relative flex-shrink-0 overflow-visible ${editExerciseDraft?.isUnilateral ? 'bg-blue-500' : 'bg-neutral-700'}`}
                   aria-label="Toggle unilateral"
+                  style={{ minWidth: '3rem' }}
                 >
-                  <span className={`absolute top-1 w-5 h-5 rounded-full bg-white shadow-md transition-transform duration-200 ${editExerciseDraft?.isUnilateral ? 'translate-x-6' : 'translate-x-1'}`} />
+                  <span className={`absolute top-1 left-0 w-5 h-5 rounded-full bg-white shadow-md transition-transform duration-200 ${editExerciseDraft?.isUnilateral ? 'translate-x-6' : 'translate-x-1'}`} />
                 </button>
               </div>
 
