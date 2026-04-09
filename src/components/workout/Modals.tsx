@@ -522,7 +522,7 @@ export default function Modals() {
               </div>
 
               {/* Unilateral toggle */}
-              <div className="flex items-center justify-between rounded-xl bg-black/20 border border-neutral-700 px-3 py-2.5">
+              <div className="flex items-center justify-between gap-3 py-0.5">
                 <div>
                   <div className="text-sm font-black text-white">Exercício Unilateral</div>
                   <div className="text-[11px] text-neutral-500">Executa em dois lados (L e R)</div>
@@ -530,10 +530,10 @@ export default function Modals() {
                 <button
                   type="button"
                   onClick={() => setEditExerciseDraft((prev) => ({ ...prev, isUnilateral: !prev?.isUnilateral }))}
-                  className={`w-11 h-6 rounded-full transition-colors relative flex-shrink-0 ${editExerciseDraft?.isUnilateral ? 'bg-blue-500' : 'bg-neutral-700'}`}
+                  className={`w-12 h-7 rounded-full transition-all duration-200 relative flex-shrink-0 ${editExerciseDraft?.isUnilateral ? 'bg-blue-500' : 'bg-neutral-700'}`}
                   aria-label="Toggle unilateral"
                 >
-                  <span className={`absolute top-0.5 w-5 h-5 rounded-full bg-white shadow transition-transform ${editExerciseDraft?.isUnilateral ? 'translate-x-5' : 'translate-x-0.5'}`} />
+                  <span className={`absolute top-1 w-5 h-5 rounded-full bg-white shadow-md transition-transform duration-200 ${editExerciseDraft?.isUnilateral ? 'translate-x-6' : 'translate-x-1'}`} />
                 </button>
               </div>
 
