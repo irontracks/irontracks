@@ -69,14 +69,14 @@ export default function ServiceWorkerRegister() {
 
       const interval = window.setInterval(() => {
         try {
-          registrationRef.current?.update()
+          registrationRef.current?.update().catch(() => null)
         } catch {}
       }, 15 * 60 * 1000)
 
       const onVisible = () => {
         if (document.visibilityState !== 'visible') return
         try {
-          registrationRef.current?.update()
+          registrationRef.current?.update().catch(() => null)
         } catch {}
       }
       document.addEventListener('visibilitychange', onVisible)
