@@ -2,6 +2,16 @@ import { withSentryConfig } from '@sentry/nextjs'
 import type { NextConfig } from 'next'
 
 const nextConfig: NextConfig = {
+  // ─── App version injected at build time (used by ServiceWorkerRegister) ───
+  // Falls back to VERCEL_GIT_COMMIT_SHA → VERCEL_DEPLOYMENT_ID → package version
+  env: {
+    NEXT_PUBLIC_APP_VERSION:
+      process.env.NEXT_PUBLIC_APP_VERSION ||
+      process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 8) ||
+      process.env.VERCEL_DEPLOYMENT_ID ||
+      require('./package.json').version,
+  },
+
   // ─── Gzip / Brotli compression for serverless responses ───────────────────
   compress: true,
 
