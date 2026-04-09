@@ -124,7 +124,7 @@ export const DropSetSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: 
                 }));
                 setDropSetModal({ key, label: modeLabel, stages: baseStages, error: '' });
               }}
-              className="w-24 bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none hover:border-yellow-500/60 hover:text-yellow-500 transition-colors inline-flex items-center justify-center gap-2"
+              className="shrink-0 bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none hover:border-yellow-500/60 hover:text-yellow-500 transition-colors inline-flex items-center justify-center gap-2"
             >
               <Pencil size={14} />
               <span className="text-xs font-black">Abrir</span>
