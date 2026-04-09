@@ -147,7 +147,7 @@ export function DashboardHeader({
                 </div>
                 <div className="flex items-center gap-3">
                     {syncBadge}
-                    {isCoach && <TeacherPlanSection />}
+                    {isCoach && <div className="hidden sm:block"><TeacherPlanSection /></div>}
                     <HeaderActionsMenu
                         user={user as AdminUser}
                         isCoach={isCoach}
