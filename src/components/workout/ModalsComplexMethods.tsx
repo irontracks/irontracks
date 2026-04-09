@@ -255,32 +255,8 @@ export function ModalsComplexMethods() {
                                     </div>
                                 ) : null}
 
-                                <div className="flex items-center justify-between gap-2">
+                                <div className="flex items-center gap-2">
                                     <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Etapas</div>
-                                    <div className="flex items-center gap-2">
-                                        <button
-                                            type="button"
-                                            onClick={() => {
-                                                const stages = Array.isArray(dropSetModal?.stages) ? dropSetModal.stages : [];
-                                                for (const st of stages) {
-                                                    const w = String(st?.weight ?? '').trim();
-                                                    if (w) {
-                                                        setDropSetModal((prev) => {
-                                                            if (!prev || typeof prev !== 'object') return prev;
-                                                            const list = Array.isArray(prev.stages) ? prev.stages : [];
-                                                            const nextStages = list.map((s) => (s && typeof s === 'object' ? { ...s, weight: w } : { weight: w, reps: null }));
-                                                            return { ...prev, stages: nextStages, error: '' };
-                                                        });
-                                                        return;
-                                                    }
-                                                }
-                                                try { window.alert('Preencha pelo menos 1 etapa com peso antes de linkar.'); } catch { }
-                                            }}
-                                            className="text-[10px] text-yellow-500 underline"
-                                        >
-                                            Linkar peso
-                                        </button>
-                                    </div>
                                 </div>
 
                                 {Array.isArray(dropSetModal?.stages) &&
