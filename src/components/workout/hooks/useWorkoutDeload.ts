@@ -111,7 +111,7 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
         if (!base) return null;
         const logsObj: UnknownRecord = isObject(base.logs) ? (base.logs as UnknownRecord) : {};
         // Coleta sets com índice para manter a ordenção correta
-        const indexedSets: Array<{ setIdx: number; weight: number | null; reps: number | null; rpe: number | null }> = [];
+        const indexedSets: Array<{ setIdx: number; weight: number | null; reps: number | null; rpe: number | null; notes: string | null }> = [];
         Object.entries(logsObj).forEach(([key, value]) => {
           try {
             const parts = String(key || '').split('-');
@@ -124,12 +124,13 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
             const weight = extractLogWeight(log);
             const reps = toNumber(log.reps ?? null);
             const rpe = toNumber(log.rpe ?? null);
+            const notes = typeof log.notes === 'string' && log.notes.trim() ? log.notes.trim() : null;
             const hasValues = weight != null || reps != null;
             const doneRaw = log.done ?? log.isDone ?? log.completed ?? null;
             const done = doneRaw == null ? true : doneRaw === true || String(doneRaw || '').toLowerCase() === 'true';
             if (!done && !hasValues) return;
             if (hasValues) {
-              indexedSets.push({ setIdx: sIdx, weight, reps, rpe });
+              indexedSets.push({ setIdx: sIdx, weight, reps, rpe, notes });
             }
           } catch { }
         });
@@ -172,6 +173,8 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
         const setRpes = indexedSets
           .map(s => s.rpe)
           .filter((v): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0);
+        const setNotes = indexedSets.map(s => s.notes ?? null);
+        const hasAnyNote = setNotes.some(n => n !== null);
         return {
           ts,
           avgWeight: avgWeight ?? null,
@@ -182,6 +185,7 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
           setWeights: setWeights.length > 0 ? setWeights : null,
           setReps: setReps.length > 0 ? setReps : null,
           setRpes: setRpes.length > 0 ? setRpes : null,
+          setNotes: hasAnyNote ? setNotes : null,
         };
       } catch (e) {
         logError('hook:useWorkoutDeload.buildHistoryEntry', e);

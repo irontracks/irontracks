@@ -8,6 +8,7 @@ import { useWorkoutContext } from '../WorkoutContext';
 import {
   isObject,
   DELOAD_SUGGEST_MODE,
+  normalizeExerciseKey,
 } from '../utils';
 import { UnknownRecord, WorkoutExercise } from '../types';
 
@@ -84,6 +85,7 @@ export const NormalSet = ({
     toggleNotes,
     deloadSuggestions,
     setCollapsed,
+    reportHistory,
   } = useWorkoutContext();
 
   const completeBusyRef = useRef(false);
@@ -134,6 +136,12 @@ export const NormalSet = ({
   const notesId     = `notes-${key}`;
   const hasNotes    = extNotes.trim().length > 0;
   const isNotesOpen = openNotesKeys.has(key);
+
+  // Previous session note for this set
+  const histEntry = reportHistory?.exercises?.[normalizeExerciseKey(ex.name)];
+  const lastItem = histEntry?.items?.length ? [...histEntry.items].sort((a, b) => b.ts - a.ts)[0] : null;
+  const prevNote = lastItem?.setNotes?.[setIdx] ?? null;
+  const hasAnyNote = hasNotes || !!prevNote;
 
   // ── Input fields — non-unilateral ────────────────────────────────────
   const weightField = useInputField(extWeight, (v) =>
@@ -459,7 +467,7 @@ export const NormalSet = ({
               aria-label={isNotesOpen ? 'Fechar observações' : 'Observações'}
               onClick={() => toggleNotes(key)}
               className={
-                isNotesOpen || hasNotes
+                isNotesOpen || hasAnyNote
                   ? 'w-7 h-7 inline-flex items-center justify-center rounded-lg text-yellow-500 bg-yellow-500/10 border border-yellow-500/40 hover:bg-yellow-500/15 transition duration-200'
                   : 'w-7 h-7 inline-flex items-center justify-center rounded-lg text-neutral-500 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'
               }
@@ -567,7 +575,13 @@ export const NormalSet = ({
 
       {/* Notes textarea — shared between L and R */}
       {isNotesOpen && (
-        <div className="px-1">
+        <div className="px-1 space-y-1.5">
+          {prevNote && (
+            <div className="flex items-start gap-1.5 px-2.5 py-1.5 rounded-lg bg-neutral-900/60 border border-neutral-800">
+              <span className="text-[9px] font-black uppercase tracking-widest text-neutral-600 shrink-0 mt-0.5">Anterior</span>
+              <p className="text-xs text-neutral-500 italic leading-snug">{prevNote}</p>
+            </div>
+          )}
           <textarea
             id={notesId}
             aria-label={`Observações – série ${setIdx + 1}`}
