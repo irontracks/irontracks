@@ -57,3 +57,9 @@ export { apiBilling } from './billing'
 export type {
   AppPlansResult, CheckoutResult, MercadoPagoSubscribeResult,
 } from './billing'
+
+export { apiTeacherBilling } from './teacher-billing'
+export type {
+  TeacherPlanRow, TeacherPlansResult, TeacherMyPlanResult,
+  TeacherCheckoutPayload, TeacherCheckoutResult,
+} from './teacher-billing'

@@ -8,7 +8,6 @@
 import { AdminUser, AdminTeacher } from '@/types/admin';
 import { sendBroadcastMessage, addTeacher, updateTeacher } from '@/actions/admin-actions';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import type { UnknownRecord } from '@/types/app'
 import { apiAdmin } from '@/lib/api'
 import { logError } from '@/lib/logger'
 import { safePg } from '@/utils/safePgFilter'
@@ -137,7 +136,13 @@ export function useAdminActions({
                 teacherUserId || null,
                 authHeaders
             ).catch(() => ({ ok: false, error: 'Falha na requisição' })) as Record<string, unknown>;
-            if (!json?.ok) throw new Error(String(json?.error || 'Falha ao atribuir professor'));
+            if (!json?.ok) {
+                if (json?.upgrade_required) {
+                    await alert('⚠️ Limite de alunos atingido!\n\nFaça upgrade do seu plano no painel para adicionar mais alunos. Use o botão "Upgrade" no cabeçalho ou na aba Visão Geral.', 'Plano Limitado')
+                    return
+                }
+                throw new Error(String(json?.error || 'Falha ao atribuir professor'))
+            }
             const nextTid = (json.teacher_user_id as string | null) ?? teacherUserId ?? null;
             setUsersList((prev) =>
                 prev.map((u) => (u.id === studentId ? { ...u, teacher_id: nextTid } : u))

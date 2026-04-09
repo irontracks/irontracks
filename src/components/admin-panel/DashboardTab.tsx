@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Bar, Doughnut } from 'react-chartjs-2';
 import {
     Chart as ChartJS,
@@ -10,8 +10,12 @@ import {
     Legend,
     ArcElement
 } from 'chart.js';
-import { Users, UserCheck, UserX, AlertTriangle, Clock } from 'lucide-react';
+import { Users, UserCheck, UserX, AlertTriangle, Clock, Zap } from 'lucide-react';
 import { useAdminPanel } from './AdminPanelContext';
+import { useTeacherPlan } from '@/hooks/useTeacherPlan';
+import dynamic from 'next/dynamic';
+
+const TeacherUpgradeModal = dynamic(() => import('@/components/teacher/TeacherUpgradeModal'), { ssr: false });
 
 ChartJS.register(
     CategoryScale,
@@ -36,6 +40,9 @@ export const DashboardTab: React.FC = () => {
         setSelectedStudent,
         setHistoryOpen
     } = useAdminPanel();
+
+    const planState = useTeacherPlan();
+    const [upgradeOpen, setUpgradeOpen] = useState(false);
 
     const chartOptions = {
         responsive: true,
@@ -132,6 +139,63 @@ export const DashboardTab: React.FC = () => {
                     </div>
                 </button>
             </div>
+
+            {/* ── Plano do Professor ────────────────────────────────────────── */}
+            {isTeacher && !planState.loading && (
+                <div
+                    className="rounded-2xl p-5 flex items-center justify-between gap-4"
+                    style={{ background: 'rgba(245,158,11,0.04)', border: '1px solid rgba(245,158,11,0.15)' }}
+                >
+                    <div className="flex items-center gap-4">
+                        <div className="p-2.5 bg-yellow-500/10 rounded-xl">
+                            <Zap size={20} className="text-yellow-500" />
+                        </div>
+                        <div>
+                            <p className="text-xs font-bold text-neutral-500 uppercase tracking-wider">Seu Plano</p>
+                            <p className="text-white font-black text-lg leading-tight">{planState.plan?.name ?? 'Free'}</p>
+                        </div>
+                        <div className="h-10 w-px bg-neutral-800" />
+                        <div>
+                            <p className="text-xs font-bold text-neutral-500 uppercase tracking-wider">Alunos</p>
+                            <p className="text-white font-black text-lg leading-tight">
+                                {planState.studentCount}
+                                <span className="text-neutral-500 font-normal text-sm ml-1">
+                                    / {planState.maxStudents === 0 ? '∞' : planState.maxStudents}
+                                </span>
+                            </p>
+                        </div>
+                        {planState.maxStudents > 0 && (
+                            <div className="w-24 h-1.5 rounded-full bg-neutral-800 overflow-hidden hidden sm:block">
+                                <div
+                                    className={`h-full rounded-full transition-all ${
+                                        !planState.canAddStudent ? 'bg-red-500' :
+                                        planState.studentCount / planState.maxStudents >= 0.8 ? 'bg-yellow-400' : 'bg-emerald-500'
+                                    }`}
+                                    style={{ width: `${Math.min(100, Math.round((planState.studentCount / planState.maxStudents) * 100))}%` }}
+                                />
+                            </div>
+                        )}
+                    </div>
+                    {(planState.plan?.tier_key ?? 'free') !== 'unlimited' && (
+                        <button
+                            type="button"
+                            onClick={() => setUpgradeOpen(true)}
+                            className="flex-shrink-0 flex items-center gap-1.5 px-4 py-2 rounded-xl bg-yellow-500 hover:bg-yellow-400 text-black font-bold text-sm transition-colors"
+                        >
+                            <Zap size={14} />
+                            Upgrade
+                        </button>
+                    )}
+                </div>
+            )}
+
+            {isTeacher && (
+                <TeacherUpgradeModal
+                    open={upgradeOpen}
+                    onClose={() => { setUpgradeOpen(false); planState.refetch(); }}
+                    planState={planState}
+                />
+            )}
 
             {/* Inbox do Coach */}
             {isTeacher && (

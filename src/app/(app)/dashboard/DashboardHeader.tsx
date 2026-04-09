@@ -1,9 +1,14 @@
 'use client'
 
-import React from 'react'
+import React, { useState } from 'react'
 import { Crown } from 'lucide-react'
 import HeaderActionsMenu from '@/components/HeaderActionsMenu'
 import type { AdminUser } from '@/types/admin'
+import { useTeacherPlan } from '@/hooks/useTeacherPlan'
+import TeacherPlanBadge from '@/components/teacher/TeacherPlanBadge'
+import dynamic from 'next/dynamic'
+
+const TeacherUpgradeModal = dynamic(() => import('@/components/teacher/TeacherUpgradeModal'), { ssr: false })
 
 interface SyncState {
     pending?: number
@@ -45,6 +50,22 @@ interface DashboardHeaderProps {
     onOfflineSyncOpen: () => void
     onAcceptCoach: () => Promise<void>
     onAddStory?: () => void        // ← triggers story creator from header long-press
+}
+
+// ── Self-contained section — only mounts when isCoach to avoid extra API calls ─
+function TeacherPlanSection() {
+    const planState = useTeacherPlan()
+    const [upgradeOpen, setUpgradeOpen] = useState(false)
+    return (
+        <>
+            <TeacherPlanBadge planState={planState} onUpgradeClick={() => setUpgradeOpen(true)} />
+            <TeacherUpgradeModal
+                open={upgradeOpen}
+                onClose={() => { setUpgradeOpen(false); planState.refetch() }}
+                planState={planState}
+            />
+        </>
+    )
 }
 
 export function DashboardHeader({
@@ -124,8 +145,9 @@ export function DashboardHeader({
                             )
                     )}
                 </div>
-                <div className="flex items-center gap-4">
+                <div className="flex items-center gap-3">
                     {syncBadge}
+                    {isCoach && <TeacherPlanSection />}
                     <HeaderActionsMenu
                         user={user as AdminUser}
                         isCoach={isCoach}
