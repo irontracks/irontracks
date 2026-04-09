@@ -5,6 +5,16 @@ import { getErrorMessage } from '@/utils/errorMessage'
 
 export const dynamic = 'force-dynamic'
 
+const ADMIN_PLAN = {
+  tier_key: 'unlimited',
+  name: 'Unlimited',
+  description: 'Plano admin — alunos ilimitados',
+  max_students: 0,
+  price_cents: 0,
+  currency: 'BRL',
+  sort_order: 99,
+}
+
 export async function GET() {
   try {
     const supabase = await createClient()
@@ -12,6 +22,25 @@ export async function GET() {
     if (!user) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
 
     const admin = createAdminClient()
+
+    // Admins always get Unlimited plan
+    const { data: profile } = await admin
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .maybeSingle()
+
+    if ((profile?.role as string | null) === 'admin') {
+      return NextResponse.json({
+        ok: true,
+        plan: ADMIN_PLAN,
+        status: 'active',
+        valid_until: null,
+        student_count: 0,
+        max_students: 0,
+        can_add_student: true,
+      })
+    }
 
     // Fetch teacher row with plan info
     const { data: teacher, error: tErr } = await admin

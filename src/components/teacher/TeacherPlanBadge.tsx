@@ -28,21 +28,25 @@ export default function TeacherPlanBadge({ planState, onUpgradeClick }: TeacherP
   const barColor = atLimit ? 'bg-red-500' : nearLimit ? 'bg-yellow-400' : 'bg-emerald-500'
 
   return (
-    <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-neutral-900 border border-neutral-800">
+    <button
+      type="button"
+      onClick={onUpgradeClick}
+      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl bg-neutral-900 border border-neutral-800 hover:border-neutral-700 transition-colors"
+    >
       {/* plan label */}
-      <span className={`text-xs font-semibold uppercase tracking-wide ${isFree ? 'text-neutral-400' : 'text-yellow-400'}`}>
+      <span className={`text-[11px] font-black uppercase tracking-wide ${isFree ? 'text-neutral-400' : 'text-yellow-400'}`}>
         {planName}
       </span>
 
       {/* student count */}
-      <div className="flex items-center gap-1 text-xs text-neutral-300">
-        <Users size={12} className="text-neutral-500" />
+      <div className="flex items-center gap-0.5 text-[11px] text-neutral-300">
+        <Users size={11} className="text-neutral-500" />
         <span>{studentCount}{isUnlimited ? '' : `/${maxStudents}`}</span>
       </div>
 
-      {/* progress bar */}
+      {/* progress bar — hidden on mobile to keep header compact */}
       {!isUnlimited && (
-        <div className="w-16 h-1.5 rounded-full bg-neutral-700 overflow-hidden">
+        <div className="hidden sm:block w-12 h-1.5 rounded-full bg-neutral-700 overflow-hidden">
           <div
             className={`h-full rounded-full transition-all ${barColor}`}
             style={{ width: `${pct}%` }}
@@ -50,16 +54,10 @@ export default function TeacherPlanBadge({ planState, onUpgradeClick }: TeacherP
         </div>
       )}
 
-      {/* upgrade CTA */}
+      {/* upgrade icon — always visible when approaching/at limit */}
       {(atLimit || nearLimit || isFree) && (
-        <button
-          onClick={onUpgradeClick}
-          className="flex items-center gap-1 text-xs font-semibold text-yellow-400 hover:text-yellow-300 transition-colors ml-1"
-        >
-          <Zap size={11} />
-          Upgrade
-        </button>
+        <Zap size={11} className="text-yellow-400 flex-shrink-0" />
       )}
-    </div>
+    </button>
   )
 }
