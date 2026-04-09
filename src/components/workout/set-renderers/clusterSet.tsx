@@ -167,6 +167,9 @@ export const ClusterSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: 
             <Pencil size={14} />
             <span className="text-xs font-black hidden sm:inline">Abrir</span>
           </button>
+          <button type="button" onClick={() => toggleNotes(key)} aria-label="Observações" className={isNotesOpen || hasNotes ? 'inline-flex items-center justify-center rounded-lg p-1.5 text-yellow-500 bg-yellow-500/10 border border-yellow-500/40' : 'inline-flex items-center justify-center rounded-lg p-1.5 text-neutral-400 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'}>
+            <MessageSquare size={12} />
+          </button>
         </div>
         <div className="flex flex-col sm:flex-row sm:items-center gap-2">
           <div className="flex items-center gap-2 flex-1 min-w-0">
@@ -178,9 +181,6 @@ export const ClusterSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: 
               {notation ? `(${notation})` : ''} • Intra {intra || 0}s • Total: {total || 0} reps
             </span>
           </div>
-          <button type="button" onClick={() => toggleNotes(key)} aria-label="Observações" className={isNotesOpen || hasNotes ? 'inline-flex items-center justify-center rounded-lg p-2 text-yellow-500 bg-yellow-500/10 border border-yellow-500/40' : 'inline-flex items-center justify-center rounded-lg p-2 text-neutral-400 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'}>
-            <MessageSquare size={14} />
-          </button>
           <button
             type="button"
             disabled={!canDone}
