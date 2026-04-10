@@ -23,8 +23,8 @@ import { StudentWorkoutsTab } from './StudentWorkoutsTab';
 import { StudentVideosTab } from './StudentVideosTab';
 import { StudentProfileTab } from './StudentProfileTab';
 
-const TeacherWorkoutMirror = dynamic(
-    () => import('@/components/teacher/TeacherWorkoutMirror').then(m => ({ default: m.TeacherWorkoutMirror })),
+const TeacherStudentWorkout = dynamic(
+    () => import('@/components/teacher/TeacherStudentWorkout').then(m => ({ default: m.TeacherStudentWorkout })),
     { ssr: false }
 );
 
@@ -390,7 +390,7 @@ export const StudentDetailPanel: React.FC = () => {
 
                 {
                     subTab === 'live' && (
-                        <TeacherWorkoutMirror />
+                        <TeacherStudentWorkout />
                     )}
             </div>
 

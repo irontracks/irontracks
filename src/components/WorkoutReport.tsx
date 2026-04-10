@@ -23,6 +23,7 @@ import { ReportExerciseCard } from '@/components/workout-report/ReportExerciseCa
 import { ReportHighlightsPanel } from '@/components/workout-report/ReportHighlightsPanel'
 import { ReportExerciseTable } from '@/components/workout-report/ReportExerciseTable'
 import { ReportTeamSection } from '@/components/workout-report/ReportTeamSection'
+import { ReportTimePanel } from '@/components/workout-report/ReportTimePanel'
 
 /** Skeleton placeholder for lazy-loaded report sections */
 const SectionSkeleton = () => (
@@ -107,7 +108,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose,
         applyState, setApplyState,
         sessionLogs, currentVolume, volumeDelta, volumeDeltaAbs, calories, outdoorBike,
         setsCompleted, setsPlanned, setCompletionPct,
-        reportMeta, reportTotals, reportRest, reportWeekly, reportLoadFlags,
+        reportMeta, reportTotals, reportRest, reportCadence, reportWeekly, reportLoadFlags,
         prevLogsMap, prevBaseMsMap,
         detectedPrs, prCount, allTimePrCount, historicalBestE1rm,
         muscleTrend, muscleTrend4w, exerciseTrend,
@@ -701,6 +702,11 @@ const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose,
                         reportLoadFlags={reportLoadFlags}
                     />
                 )}
+
+                <ReportTimePanel
+                    reportRest={reportRest}
+                    reportCadence={reportCadence}
+                />
 
                 <Suspense fallback={<SectionSkeleton />}>
                     {muscleTrend.status === 'ready' && muscleTrend.data && (

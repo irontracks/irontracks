@@ -101,6 +101,7 @@ export interface UseReportDataReturn {
   reportMeta: AnyObj | null
   reportTotals: AnyObj | null
   reportRest: AnyObj | null
+  reportCadence: AnyObj | null
   reportWeekly: AnyObj | null
   reportLoadFlags: AnyObj | null
   // Previous logs per exercise
@@ -390,6 +391,7 @@ export const useReportData = ({ session, previousSession, user, settings }: UseR
   const reportMeta = safeSession?.reportMeta && typeof safeSession.reportMeta === 'object' ? (safeSession.reportMeta as AnyObj) : null
   const reportTotals = reportMeta?.totals && typeof reportMeta.totals === 'object' ? (reportMeta.totals as AnyObj) : null
   const reportRest = reportMeta?.rest && typeof reportMeta.rest === 'object' ? (reportMeta.rest as AnyObj) : null
+  const reportCadence = reportMeta?.cadence && typeof reportMeta.cadence === 'object' ? (reportMeta.cadence as AnyObj) : null
   const reportWeekly = reportMeta?.weekly && typeof reportMeta.weekly === 'object' ? (reportMeta.weekly as AnyObj) : null
   const reportLoadFlags = reportMeta?.loadFlags && typeof reportMeta.loadFlags === 'object' ? (reportMeta.loadFlags as AnyObj) : null
 
@@ -549,7 +551,7 @@ export const useReportData = ({ session, previousSession, user, settings }: UseR
     applyState, setApplyState,
     sessionLogs, currentVolume, volumeDelta, volumeDeltaAbs, calories, outdoorBike,
     setsCompleted, setsPlanned, setCompletionPct,
-    reportMeta, reportTotals, reportRest, reportWeekly, reportLoadFlags,
+    reportMeta, reportTotals, reportRest, reportCadence, reportWeekly, reportLoadFlags,
     prevLogsMap, prevBaseMsMap,
     detectedPrs, prCount, allTimePrCount, historicalBestE1rm,
     muscleTrend, muscleTrend4w, exerciseTrend,
