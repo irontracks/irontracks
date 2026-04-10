@@ -59,9 +59,64 @@ const buildLogVolume = (logs: UnknownRecord, exerciseIndex: number) => {
   return { volumeKg: Math.round(volume * 10) / 10, sets, reps, avgWeight }
 }
 
-const buildLogTimes = (logs: UnknownRecord, exerciseIndex: number) => {
+/**
+ * Parses a cadence string ("4-0-2-0", "3010", "40X0") and returns total
+ * seconds per rep. Returns null if cadence is absent or unparseable.
+ */
+export const parseCadenceSecondsPerRep = (cadence: unknown): number | null => {
+  const s = String(cadence ?? '').trim()
+  if (!s) return null
+
+  // Dash-separated: "4-0-2-0" or "3-1-2"
+  if (s.includes('-')) {
+    const parts = s.split('-')
+    if (parts.length >= 2 && parts.length <= 4) {
+      let total = 0
+      let valid = true
+      for (const p of parts) {
+        const upper = p.trim().toUpperCase()
+        if (upper === 'X' || upper === '') continue // explosive = ~0
+        const n = parseInt(upper, 10)
+        if (!Number.isFinite(n)) { valid = false; break }
+        total += n
+      }
+      if (valid && total > 0) return total
+    }
+  }
+
+  // Concatenated 4-char tempo: "3010", "40X0"
+  if (/^[\dX]{4}$/i.test(s)) {
+    let total = 0
+    for (const c of s) {
+      if (c.toUpperCase() === 'X') continue
+      const n = parseInt(c, 10)
+      if (!Number.isFinite(n)) return null
+      total += n
+    }
+    return total > 0 ? total : null
+  }
+
+  return null
+}
+
+const REST_TOLERANCE = 0.20 // ±20 % counts as "on target"
+
+const buildLogTimes = (
+  logs: UnknownRecord,
+  exerciseIndex: number,
+  plannedRestSec: number | null = null,
+  cadenceSecPerRep: number | null = null,
+) => {
   let executionSeconds = 0
   let restSeconds = 0
+  let restSetsTracked = 0
+  let restOnTime = 0
+  let restTooShort = 0
+  let restTooLong = 0
+  let cadenceSetsChecked = 0
+  let cadenceExpectedSec = 0
+  let cadenceActualSec = 0
+
   Object.entries(logs).forEach(([key, value]) => {
     const parts = String(key || '').split('-')
     const eIdx = Number(parts[0])
@@ -73,9 +128,31 @@ const buildLogTimes = (logs: UnknownRecord, exerciseIndex: number) => {
     const exec = toNumber((value as UnknownRecord).executionSeconds ?? (value as UnknownRecord).execution_seconds)
     const rest = toNumber((value as UnknownRecord).restSeconds ?? (value as UnknownRecord).rest_seconds)
     if (exec > 0) executionSeconds += Math.round(exec)
-    if (rest > 0) restSeconds += Math.round(rest)
+    if (rest > 0) {
+      restSeconds += Math.round(rest)
+      restSetsTracked++
+      if (plannedRestSec && plannedRestSec > 0) {
+        const lo = plannedRestSec * (1 - REST_TOLERANCE)
+        const hi = plannedRestSec * (1 + REST_TOLERANCE)
+        if (rest < lo) restTooShort++
+        else if (rest > hi) restTooLong++
+        else restOnTime++
+      }
+    }
+    if (cadenceSecPerRep && cadenceSecPerRep > 0 && exec > 0) {
+      const reps = toNumber(value.reps)
+      if (reps > 0) {
+        cadenceSetsChecked++
+        cadenceExpectedSec += Math.round(cadenceSecPerRep * reps)
+        cadenceActualSec += Math.round(exec)
+      }
+    }
   })
-  return { executionSeconds, restSeconds }
+  return {
+    executionSeconds, restSeconds,
+    restSetsTracked, restOnTime, restTooShort, restTooLong,
+    cadenceSetsChecked, cadenceExpectedSec, cadenceActualSec,
+  }
 }
 
 const buildPrevByExercise = (prevSession: UnknownRecord) => {
@@ -180,6 +257,21 @@ export type ReportExerciseMetrics = {
   }
 }
 
+export type RestCompliance = {
+  setsTracked: number
+  onTime: number
+  tooShort: number
+  tooLong: number
+}
+
+export type CadenceCompliance = {
+  setsChecked: number
+  avgExpectedSec: number | null
+  avgActualSec: number | null
+  /** Ratio actual/expected × 100. 100 = perfeito. */
+  compliancePct: number | null
+}
+
 export type ReportMetrics = {
   generatedAt: string
   totals: {
@@ -196,7 +288,13 @@ export type ReportMetrics = {
   rest: {
     avgPlannedRestSec: number | null
     maxPlannedRestSec: number | null
+    /** Average actual rest recorded via timer (null if not tracked) */
+    avgActualRestSec: number | null
+    /** Per-set compliance (null if no planned rest or no tracking) */
+    compliance: RestCompliance | null
   }
+  /** Cadence analysis (null if no exercises had cadence defined) */
+  cadence: CadenceCompliance | null
   exerciseOrder: string[]
   exercises: ReportExerciseMetrics[]
 }
@@ -213,16 +311,27 @@ export const buildReportMetrics = (session: UnknownRecord, previousSession?: Unk
   let restSum = 0
   let restCount = 0
   let restMax: number | null = null
+  // Rest compliance accumulators
+  let actualRestSum = 0
+  let actualRestSetsTracked = 0
+  let complianceOnTime = 0
+  let complianceTooShort = 0
+  let complianceTooLong = 0
+  // Cadence compliance accumulators
+  let cadenceTotalExpected = 0
+  let cadenceTotalActual = 0
+  let cadenceSetsChecked = 0
 
   exercises.forEach((raw, index) => {
     if (!isObject(raw)) return
     const name = safeString(raw.name)
     if (!name) return
     const rest = resolveRestTime(raw)
+    const cadenceSecPerRep = parseCadenceSecondsPerRep(raw.cadence)
     const plannedSets = resolvePlannedSets(raw)
     const plannedReps = resolvePlannedReps(raw)
     const logVolume = buildLogVolume(logs, index)
-    const logTimes = buildLogTimes(logs, index)
+    const logTimes = buildLogTimes(logs, index, rest, cadenceSecPerRep)
     const executionMinutes = logTimes.executionSeconds > 0 ? Math.round((logTimes.executionSeconds / 60) * 10) / 10 : null
     const restMinutes = logTimes.restSeconds > 0 ? Math.round((logTimes.restSeconds / 60) * 10) / 10 : null
     exerciseOrder.push(name)
@@ -230,6 +339,21 @@ export const buildReportMetrics = (session: UnknownRecord, previousSession?: Unk
       restSum += rest
       restCount += 1
       restMax = restMax == null ? rest : Math.max(restMax, rest)
+    }
+    // Aggregate actual rest
+    if (logTimes.restSetsTracked > 0) {
+      actualRestSum += logTimes.restSeconds
+      actualRestSetsTracked += logTimes.restSetsTracked
+    }
+    // Aggregate rest compliance
+    complianceOnTime += logTimes.restOnTime
+    complianceTooShort += logTimes.restTooShort
+    complianceTooLong += logTimes.restTooLong
+    // Aggregate cadence compliance
+    if (logTimes.cadenceSetsChecked > 0) {
+      cadenceSetsChecked += logTimes.cadenceSetsChecked
+      cadenceTotalExpected += logTimes.cadenceExpectedSec
+      cadenceTotalActual += logTimes.cadenceActualSec
     }
     totalVolume += logVolume.volumeKg
     totalSets += logVolume.sets
@@ -260,6 +384,24 @@ export const buildReportMetrics = (session: UnknownRecord, previousSession?: Unk
     })
   })
 
+  const avgActualRestSec = actualRestSetsTracked > 0
+    ? Math.round(actualRestSum / actualRestSetsTracked)
+    : null
+
+  const hasRestCompliance = (complianceOnTime + complianceTooShort + complianceTooLong) > 0
+  const compliance: RestCompliance | null = hasRestCompliance
+    ? { setsTracked: complianceOnTime + complianceTooShort + complianceTooLong, onTime: complianceOnTime, tooShort: complianceTooShort, tooLong: complianceTooLong }
+    : null
+
+  const cadenceCompliance: CadenceCompliance | null = cadenceSetsChecked > 0 && cadenceTotalExpected > 0
+    ? {
+        setsChecked: cadenceSetsChecked,
+        avgExpectedSec: Math.round((cadenceTotalExpected / cadenceSetsChecked) * 10) / 10,
+        avgActualSec: Math.round((cadenceTotalActual / cadenceSetsChecked) * 10) / 10,
+        compliancePct: Math.round((cadenceTotalActual / cadenceTotalExpected) * 1000) / 10,
+      }
+    : null
+
   const report: ReportMetrics = {
     generatedAt: new Date().toISOString(),
     totals: {
@@ -267,13 +409,16 @@ export const buildReportMetrics = (session: UnknownRecord, previousSession?: Unk
       setsDone: totalSets,
       repsDone: totalReps,
       exercisesCount: metrics.length,
-    durationMinutes: 0,
-    densityKgPerMin: 0,
+      durationMinutes: 0,
+      densityKgPerMin: 0,
     },
     rest: {
       avgPlannedRestSec: restCount ? Math.round(restSum / restCount) : null,
       maxPlannedRestSec: restMax,
+      avgActualRestSec,
+      compliance,
     },
+    cadence: cadenceCompliance,
     exerciseOrder,
     exercises: metrics,
   }
