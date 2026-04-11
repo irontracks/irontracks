@@ -1,6 +1,5 @@
 import React, { useRef, useEffect } from 'react';
 import { MessageSquare, Check } from 'lucide-react';
-import { motion, useAnimationControls } from 'framer-motion';
 import { HelpHint } from '@/components/ui/HelpHint';
 import { useActiveWorkout } from './ActiveWorkoutContext';
 import { isObject, toNumber } from './utils';
@@ -63,34 +62,37 @@ export const SetInputRow: React.FC<Props> = ({ ex, exIdx, setIdx }) => {
     ? 'bg-emerald-500 text-black'
     : badgeColors[setIdx % badgeColors.length];
 
-  // Badge slam animation controller
-  const badgeControls = useAnimationControls();
-  const buttonControls = useAnimationControls();
+  // Badge/button slam animation via direct DOM class manipulation (avoids setState-in-effect lint rule)
   const prevDoneRef = useRef(done);
   const rowFlashRef = useRef<HTMLDivElement>(null);
+  const badgeRef = useRef<HTMLDivElement>(null);
+  const buttonRef = useRef<HTMLButtonElement>(null);
 
   useEffect(() => {
-    if (done && !prevDoneRef.current) {
-      // Just completed — trigger slam!
-      badgeControls.start({
-        scale: [1, 1.4, 0.9, 1.1, 1],
-        rotate: [0, -10, 8, -3, 0],
-        transition: { duration: 0.5, ease: 'easeOut' },
-      });
-      buttonControls.start({
-        scale: [1, 1.15, 1],
-        transition: { duration: 0.3, ease: 'easeOut' },
-      });
-      // Flash the row
-      if (rowFlashRef.current) {
-        rowFlashRef.current.style.boxShadow = 'inset 0 0 30px rgba(16,185,129,0.3), 0 0 20px rgba(16,185,129,0.15)';
-        setTimeout(() => {
-          if (rowFlashRef.current) rowFlashRef.current.style.boxShadow = '';
-        }, 600);
-      }
+    if (!done || prevDoneRef.current === done) {
+      prevDoneRef.current = done;
+      return;
     }
     prevDoneRef.current = done;
-  }, [done, badgeControls, buttonControls]);
+    // trigger slam via DOM — avoids setState cascade
+    const badge = badgeRef.current;
+    const button = buttonRef.current;
+    const row = rowFlashRef.current;
+    const timers: ReturnType<typeof setTimeout>[] = [];
+    if (badge) {
+      badge.classList.add('animate-badge-slam');
+      timers.push(setTimeout(() => badge.classList.remove('animate-badge-slam'), 500));
+    }
+    if (button) {
+      button.classList.add('animate-button-slam');
+      timers.push(setTimeout(() => button.classList.remove('animate-button-slam'), 300));
+    }
+    if (row) {
+      row.style.boxShadow = 'inset 0 0 30px rgba(16,185,129,0.3), 0 0 20px rgba(16,185,129,0.15)';
+      timers.push(setTimeout(() => { if (row) row.style.boxShadow = ''; }, 600));
+    }
+    return () => timers.forEach(clearTimeout);
+  }, [done]);
 
   // Shared input base class — unified palette (no RPE-specific color in idle state)
   const inputBase =
@@ -125,15 +127,15 @@ export const SetInputRow: React.FC<Props> = ({ ex, exIdx, setIdx }) => {
         {/* Row: badge | inputs | concluir | notes toggle */}
         <div className="flex items-center gap-2">
           {/* Set number badge — circular, premium, with slam animation */}
-          <motion.div
-            animate={badgeControls}
+          <div
+            ref={badgeRef}
             className={[
               'flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center font-black text-[11px] transition-all duration-300',
               badgeColor,
             ].join(' ')}
           >
             {done ? <Check size={12} /> : setIdx + 1}
-          </motion.div>
+          </div>
 
           {/* Inputs — 3-col on all sizes, compact */}
           <div className="flex-1 grid grid-cols-3 gap-1.5 min-w-0">
@@ -201,9 +203,8 @@ export const SetInputRow: React.FC<Props> = ({ ex, exIdx, setIdx }) => {
           </button>
 
           {/* Concluir button — full label, premium feel with slam */}
-          <motion.button
+          <button
             type="button"
-            animate={buttonControls}
             onClick={() => {
               const nextDone = !done;
               const now = Date.now();
@@ -232,6 +233,7 @@ export const SetInputRow: React.FC<Props> = ({ ex, exIdx, setIdx }) => {
                 startTimer(restTime, { kind: 'rest', key, exerciseName: String(ex?.name || '').trim() });
               }
             }}
+            ref={buttonRef}
             className={[
               'flex-shrink-0 inline-flex items-center justify-center gap-1.5 min-h-[36px] px-3 rounded-xl font-black text-xs active:scale-95 transition-all duration-150',
               done
@@ -241,7 +243,7 @@ export const SetInputRow: React.FC<Props> = ({ ex, exIdx, setIdx }) => {
           >
             <Check size={14} />
             <span className="whitespace-nowrap">{done ? 'Feito' : 'OK'}</span>
-          </motion.button>
+          </button>
         </div>
       </div>
 

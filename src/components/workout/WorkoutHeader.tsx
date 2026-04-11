@@ -1,7 +1,6 @@
 'use client';
 
 import React from 'react';
-import { AnimatePresence, motion } from 'framer-motion';
 import { Clock, GripVertical, MoreHorizontal, Plus, UserPlus } from 'lucide-react';
 import { BackButton } from '@/components/ui/BackButton';
 import InviteManager from '@/components/InviteManager';
@@ -64,76 +63,59 @@ export default function WorkoutHeader() {
             <BackButton onClick={exitOnBack} />
 
             {/* Action buttons — hidden during active set execution to reduce distraction */}
-            <AnimatePresence initial={false}>
-              {!isExecuting && (
-                <motion.div
-                  className="flex items-center gap-2"
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  exit={{ opacity: 0 }}
-                  transition={{ duration: 0.2, ease: 'easeInOut' }}
+            <div
+              className={`flex items-center gap-2 transition-opacity duration-200 ${isExecuting ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+            >
+              <button
+                type="button"
+                onClick={() => setAddExerciseOpen(true)}
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-yellow-500 text-black hover:bg-yellow-400 transition-colors active:scale-95 whitespace-nowrap"
+                title="Adicionar exercício extra"
+              >
+                <Plus size={16} />
+                <span className="text-sm font-black hidden sm:inline">Exercício</span>
+              </button>
+
+              {/* Overflow menu */}
+              <div className="relative" ref={overflowRef}>
+                <button
+                  type="button"
+                  onClick={() => setOverflowOpen(v => !v)}
+                  className="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-neutral-900 border border-neutral-800 text-neutral-400 hover:text-yellow-400 hover:border-yellow-500/30 hover:bg-neutral-800 transition-colors active:scale-95"
+                  title="Mais opções"
                 >
-                  {/* Primary action with width collapse animation */}
-                  <motion.div
-                    initial={{ width: 0 }}
-                    animate={{ width: 'auto' }}
-                    exit={{ width: 0 }}
-                    transition={{ duration: 0.2, ease: 'easeInOut' }}
-                    style={{ overflow: 'hidden' }}
-                  >
+                  <MoreHorizontal size={16} />
+                </button>
+
+                {overflowOpen && (
+                  <div className="absolute top-full left-0 mt-1.5 w-48 rounded-2xl bg-neutral-900 border border-neutral-800 shadow-2xl z-10 overflow-hidden animate-dropdown-in">
                     <button
                       type="button"
-                      onClick={() => setAddExerciseOpen(true)}
-                      className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-yellow-500 text-black hover:bg-yellow-400 transition-colors active:scale-95 whitespace-nowrap"
-                      title="Adicionar exercício extra"
+                      onClick={() => { openOrganizeModal(); setOverflowOpen(false); }}
+                      disabled={exercises.length < 2}
+                      className={[
+                        'w-full flex items-center gap-3 px-4 py-3 text-sm font-black text-left transition-colors',
+                        exercises.length < 2
+                          ? 'text-neutral-700 cursor-not-allowed'
+                          : 'text-yellow-400 hover:bg-neutral-800',
+                      ].join(' ')}
                     >
-                      <Plus size={16} />
-                      <span className="text-sm font-black hidden sm:inline">Exercício</span>
+                      <GripVertical size={15} />
+                      Organizar
                     </button>
-                  </motion.div>
-
-                  {/* Overflow menu — outside overflow:hidden so the dropdown isn't clipped */}
-                  <div className="relative" ref={overflowRef}>
+                    <div className="h-px bg-neutral-800" />
                     <button
                       type="button"
-                      onClick={() => setOverflowOpen(v => !v)}
-                      className="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-neutral-900 border border-neutral-800 text-neutral-400 hover:text-yellow-400 hover:border-yellow-500/30 hover:bg-neutral-800 transition-colors active:scale-95"
-                      title="Mais opções"
+                      onClick={() => { setInviteOpen(true); setOverflowOpen(false); }}
+                      className="w-full flex items-center gap-3 px-4 py-3 text-sm font-black text-left text-yellow-400 hover:bg-neutral-800 transition-colors"
                     >
-                      <MoreHorizontal size={16} />
+                      <UserPlus size={15} />
+                      Convidar
                     </button>
-
-                    {overflowOpen && (
-                      <div className="absolute top-full left-0 mt-1.5 w-48 rounded-2xl bg-neutral-900 border border-neutral-800 shadow-2xl z-10 overflow-hidden animate-dropdown-in">
-                        <button
-                          type="button"
-                          onClick={() => { openOrganizeModal(); setOverflowOpen(false); }}
-                          disabled={exercises.length < 2}
-                          className={[
-                            'w-full flex items-center gap-3 px-4 py-3 text-sm font-black text-left transition-colors',
-                            exercises.length < 2
-                              ? 'text-neutral-700 cursor-not-allowed'
-                              : 'text-yellow-400 hover:bg-neutral-800',
-                          ].join(' ')}
-                        >
-                          <GripVertical size={15} />
-                          Organizar
-                        </button>
-                        <div className="h-px bg-neutral-800" />
-                        <button
-                          type="button"
-                          onClick={() => { setInviteOpen(true); setOverflowOpen(false); }}
-                          className="w-full flex items-center gap-3 px-4 py-3 text-sm font-black text-left text-yellow-400 hover:bg-neutral-800 transition-colors"
-                        >
-                          <UserPlus size={15} />
-                          Convidar
-                        </button>
-                      </div>
-                    )}
                   </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
+                )}
+              </div>
+            </div>
           </div>
 
           <div className="min-w-0 flex-1">

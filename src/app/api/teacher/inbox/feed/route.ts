@@ -127,14 +127,28 @@ export async function GET(req: Request) {
       if (nm) studentNameById.set(uid, nm)
     }
 
-    const { data: lastWorkouts, error: lwErr } = await admin
-      .from('workouts')
-      .select('user_id, date')
-      .in('user_id', studentUserIds)
-      .eq('is_template', false)
-      .order('date', { ascending: false })
-      .limit(5000)
+    // ── Parallel fetch: lastWorkouts + workouts14 + checkins7 + states ──
+    const [
+      { data: lastWorkouts, error: lwErr },
+      { data: workouts14, error: w14Err },
+      checkins7Result,
+      { data: states, error: stStateErr },
+    ] = await Promise.all([
+      admin.from('workouts').select('user_id, date').in('user_id', studentUserIds)
+        .eq('is_template', false).order('date', { ascending: false }).limit(5000),
+      admin.from('workouts').select('id, user_id, date, exercises(id, sets(weight, reps, completed))')
+        .in('user_id', studentUserIds).eq('is_template', false).gte('date', since14.toISOString())
+        .order('date', { ascending: false }).limit(5000),
+      admin.from('workout_checkins').select('user_id, kind, energy, mood, soreness, answers, created_at')
+        .in('user_id', studentUserIds).gte('created_at', since7.toISOString())
+        .order('created_at', { ascending: false }).limit(20000),
+      admin.from('coach_inbox_states').select('coach_id, student_user_id, kind, status, snooze_until')
+        .eq('coach_id', requesterId).in('student_user_id', studentUserIds).limit(5000),
+    ])
+
     if (lwErr) return jsonError(400, lwErr.message)
+    if (w14Err) return jsonError(400, w14Err.message)
+    if (stStateErr) return jsonError(400, stStateErr.message)
 
     const lastWorkoutByUser = new Map<string, number>()
     for (const w of Array.isArray(lastWorkouts) ? lastWorkouts : []) {
@@ -146,16 +160,6 @@ export async function GET(req: Request) {
     }
 
     const volumeByUser = new Map<string, { v7: number; vPrev7: number }>()
-    const { data: workouts14, error: w14Err } = await admin
-      .from('workouts')
-      .select('id, user_id, date, exercises(id, sets(weight, reps, completed))')
-      .in('user_id', studentUserIds)
-      .eq('is_template', false)
-      .gte('date', since14.toISOString())
-      .order('date', { ascending: false })
-      .limit(5000)
-    if (w14Err) return jsonError(400, w14Err.message)
-
     for (const w of Array.isArray(workouts14) ? workouts14 : []) {
       const uid = String((w as Record<string, unknown>)?.user_id ?? '').trim()
       if (!uid) continue
@@ -189,15 +193,8 @@ export async function GET(req: Request) {
       { preEnergySum: number; preEnergyCount: number; preSorenessSum: number; preSorenessCount: number; preLowEnergyCount: number; postSatisfactionSum: number; postSatisfactionCount: number; postRpeSum: number; postRpeCount: number; highSorenessCount: number }
     >()
     try {
-      const { data: checkins7, error: cErr } = await admin
-        .from('workout_checkins')
-        .select('user_id, kind, energy, mood, soreness, answers, created_at')
-        .in('user_id', studentUserIds)
-        .gte('created_at', since7.toISOString())
-        .order('created_at', { ascending: false })
-        .limit(20000)
-      if (cErr) throw cErr
-      for (const r of Array.isArray(checkins7) ? checkins7 : []) {
+      if (checkins7Result.error) throw checkins7Result.error
+      for (const r of Array.isArray(checkins7Result.data) ? checkins7Result.data : []) {
         const uid = String((r as Record<string, unknown>)?.user_id ?? '').trim()
         if (!uid) continue
         const kind = String((r as Record<string, unknown>)?.kind ?? '').trim()
@@ -247,14 +244,6 @@ export async function GET(req: Request) {
         checkinsAggByUser.set(uid, prev)
       }
     } catch (e) { logWarn('teacher:inbox:feed:photo', 'silenced', e) }
-
-    const { data: states, error: stStateErr } = await admin
-      .from('coach_inbox_states')
-      .select('coach_id, student_user_id, kind, status, snooze_until')
-      .eq('coach_id', requesterId)
-      .in('student_user_id', studentUserIds)
-      .limit(5000)
-    if (stStateErr) return jsonError(400, stStateErr.message)
 
     const stateByKey = new Map<string, { status: string; snoozeUntil: number }>()
     for (const s of Array.isArray(states) ? states : []) {

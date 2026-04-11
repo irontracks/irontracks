@@ -1,7 +1,6 @@
 'use client';
 
 import React from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
 import { Save, X, Pause, Play, Zap } from 'lucide-react';
 import { useWorkoutContext } from './WorkoutContext';
 import { useWorkoutTimer } from './WorkoutTimerContext';
@@ -104,47 +103,39 @@ export default function WorkoutFooter() {
         {/* ── Timer display — center ── */}
         <div className="flex items-center gap-2.5 min-w-0">
           {/* Recovery ring — visible during active recovery */}
-          <AnimatePresence>
-            {hasRecovery && plannedRestSec > 0 && (
-              <motion.div
-                initial={{ opacity: 0, scale: 0.7 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.7 }}
-                transition={{ duration: 0.2 }}
-                className="shrink-0"
-              >
-                {(() => {
-                  const size = 36;
-                  const stroke = 3;
-                  const radius = (size - stroke) / 2;
-                  const circumference = 2 * Math.PI * radius;
-                  const offset = circumference - (recoveryRingPct / 100) * circumference;
-                  return (
-                    <div className="relative" style={{ width: size, height: size }}>
-                      <svg width={size} height={size} className="rotate-[-90deg]">
-                        <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth={stroke} />
-                        <circle
-                          cx={size / 2} cy={size / 2} r={radius} fill="none"
-                          stroke={recoveryRingColor}
-                          strokeWidth={stroke}
-                          strokeLinecap="round"
-                          strokeDasharray={circumference}
-                          strokeDashoffset={offset}
-                          style={{
-                            transition: 'stroke-dashoffset 0.9s linear, stroke 0.5s',
-                            filter: `drop-shadow(0 0 3px ${recoveryRingColor}90)`,
-                          }}
-                        />
-                      </svg>
-                      <span className="absolute inset-0 flex items-center justify-center text-[9px] font-black tabular-nums" style={{ color: recoveryRingColor }}>
-                        {recoverySeconds}
-                      </span>
-                    </div>
-                  );
-                })()}
-              </motion.div>
-            )}
-          </AnimatePresence>
+          <div
+            className={`shrink-0 transition-all duration-200 ${hasRecovery && plannedRestSec > 0 ? 'opacity-100 scale-100' : 'opacity-0 scale-75 w-0 overflow-hidden'}`}
+          >
+            {(() => {
+              const size = 36;
+              const stroke = 3;
+              const radius = (size - stroke) / 2;
+              const circumference = 2 * Math.PI * radius;
+              const offset = circumference - (recoveryRingPct / 100) * circumference;
+              return (
+                <div className="relative" style={{ width: size, height: size }}>
+                  <svg width={size} height={size} className="rotate-[-90deg]">
+                    <circle cx={size / 2} cy={size / 2} r={radius} fill="none" stroke="rgba(255,255,255,0.07)" strokeWidth={stroke} />
+                    <circle
+                      cx={size / 2} cy={size / 2} r={radius} fill="none"
+                      stroke={recoveryRingColor}
+                      strokeWidth={stroke}
+                      strokeLinecap="round"
+                      strokeDasharray={circumference}
+                      strokeDashoffset={offset}
+                      style={{
+                        transition: 'stroke-dashoffset 0.9s linear, stroke 0.5s',
+                        filter: `drop-shadow(0 0 3px ${recoveryRingColor}90)`,
+                      }}
+                    />
+                  </svg>
+                  <span className="absolute inset-0 flex items-center justify-center text-[9px] font-black tabular-nums" style={{ color: recoveryRingColor }}>
+                    {recoverySeconds}
+                  </span>
+                </div>
+              );
+            })()}
+          </div>
 
           {/* Time + label */}
           <div className="flex flex-col items-center min-w-0">
@@ -176,17 +167,7 @@ export default function WorkoutFooter() {
         {/* Finalizar — with glow celebration ring when allDone */}
         <div className="relative shrink-0">
           {allDone && !finishing && (
-            <motion.div
-              className="absolute inset-0 rounded-xl pointer-events-none"
-              animate={{
-                boxShadow: [
-                  '0 0 0px 0px rgba(251,191,36,0)',
-                  '0 0 16px 4px rgba(251,191,36,0.6)',
-                  '0 0 0px 0px rgba(251,191,36,0)',
-                ],
-              }}
-              transition={{ duration: 1.6, repeat: Infinity, ease: 'easeInOut' }}
-            />
+            <div className="absolute inset-0 rounded-xl pointer-events-none animate-pulse-glow" />
           )}
           <button
             type="button"

@@ -115,12 +115,27 @@ export async function GET(req: Request) {
 
     const allIds = [...new Set([userId, ...friendIds])]
 
-    // ── Profiles ───────────────────────────────────────────────────
-    const { data: profiles } = await admin
-      .from('profiles')
-      .select('id, display_name, photo_url, role')
-      .in('id', allIds)
-      .limit(500)
+    // ── Parallel fetch: profiles + week workouts + streak dates ───────
+    const monday = new Date()
+    monday.setDate(monday.getDate() - monday.getDay() + 1)
+    monday.setHours(0, 0, 0, 0)
+    const weekStart = monday.toISOString()
+
+    const streakWindowStart = new Date()
+    streakWindowStart.setDate(streakWindowStart.getDate() - 90)
+    const streakStart = streakWindowStart.toISOString()
+
+    const [{ data: profiles }, { data: weekWorkouts }, { data: streakDates }] = await Promise.all([
+      admin.from('profiles').select('id, display_name, photo_url, role').in('id', allIds).limit(500),
+      // Fetch in batches per user to avoid the massive 5k-row single query.
+      // With max 500 friends × ~7 workouts/week = ~3500 rows max realistic.
+      admin.from('workouts').select('user_id, notes').in('user_id', allIds).eq('is_template', false)
+        .gte('date', weekStart).order('date', { ascending: false }).limit(3500),
+      // A streak of 90+ consecutive days is extremely rare; this reduces
+      // the query from 10,000 rows to ~(friends × 90) max.
+      admin.from('workouts').select('user_id, date').in('user_id', allIds).eq('is_template', false)
+        .gte('date', streakStart).order('date', { ascending: false }).limit(5000),
+    ])
 
     const profileMap = new Map<string, { displayName: string; photoUrl: string | null; role: string | null }>()
     if (Array.isArray(profiles)) {
@@ -132,23 +147,6 @@ export async function GET(req: Request) {
         })
       }
     }
-
-    // ── Week workouts (count + volume) ─────────────────────────────
-    const monday = new Date()
-    monday.setDate(monday.getDate() - monday.getDay() + 1)
-    monday.setHours(0, 0, 0, 0)
-    const weekStart = monday.toISOString()
-
-    // Fetch in batches per user to avoid the massive 5k-row single query.
-    // With max 500 friends × ~7 workouts/week = ~3500 rows max realistic.
-    const { data: weekWorkouts } = await admin
-      .from('workouts')
-      .select('user_id, notes')
-      .in('user_id', allIds)
-      .eq('is_template', false)
-      .gte('date', weekStart)
-      .order('date', { ascending: false })
-      .limit(3500)
 
     const workoutRows = Array.isArray(weekWorkouts) ? weekWorkouts : []
 
@@ -165,22 +163,6 @@ export async function GET(req: Request) {
         if (vol > 0) volumeByUser.set(uid, (volumeByUser.get(uid) || 0) + vol)
       } catch (e) { logError('api:social:leaderboard:volume-calc', e) }
     }
-
-    // ── Streak (90-day window instead of unbounded) ────────────────
-    // A streak of 90+ consecutive days is extremely rare; this reduces
-    // the query from 10,000 rows to ~(friends × 90) max.
-    const streakWindowStart = new Date()
-    streakWindowStart.setDate(streakWindowStart.getDate() - 90)
-    const streakStart = streakWindowStart.toISOString()
-
-    const { data: streakDates } = await admin
-      .from('workouts')
-      .select('user_id, date')
-      .in('user_id', allIds)
-      .eq('is_template', false)
-      .gte('date', streakStart)
-      .order('date', { ascending: false })
-      .limit(5000)
 
     const datesByUser = new Map<string, Set<string>>()
     for (const row of Array.isArray(streakDates) ? streakDates : []) {

@@ -78,10 +78,10 @@ export async function apiFetch<T>(url: string, init?: RequestInit, _retries = 2)
 }
 
 /**
- * GET convenience — adds cache: 'no-store' for data freshness.
+ * GET convenience.
  */
 export function apiGet<T>(url: string, init?: RequestInit): Promise<T> {
-  return apiFetch<T>(url, { ...init, method: 'GET', cache: 'no-store' })
+  return apiFetch<T>(url, { ...init, method: 'GET' })
 }
 
 /**

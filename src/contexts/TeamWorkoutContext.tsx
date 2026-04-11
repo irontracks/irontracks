@@ -125,7 +125,7 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
         return out;
     };
 
-    const createJoinCode = async (workout: Record<string, unknown>, ttlMinutes = 90) => {
+    const createJoinCode = useCallback(async (workout: Record<string, unknown>, ttlMinutes = 90) => {
         try {
             if (!teamworkV2Enabled) return { ok: false, error: 'disabled' };
             if (!user?.id) throw new Error('Usuário inválido');
@@ -174,9 +174,9 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
         } catch (e: unknown) {
             return { ok: false, error: getErrorMessage(e) || String(e || '') };
         }
-    };
+    }, [supabase, teamworkV2Enabled, user, teamSession, setTeamSession]);
 
-    const leaveSession = async () => {
+    const leaveSession = useCallback(async () => {
         try {
             const sid = teamSession?.id ? String(teamSession.id) : '';
             const u = user as { id: string; email?: string | null; displayName?: string }
@@ -209,7 +209,7 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
             setTeamSession(null);
             broadcast.clearSharedLogs();
         }
-    };
+    }, [teamSession, user, broadcast, teamworkV2Enabled, supabase, setTeamSession]);
 
     // ── Auto-join from URL ──────────────────────────────────────────────────────
     useEffect(() => {
@@ -241,45 +241,61 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
     }, [joinByCode, onStartSession, teamworkV2Enabled, user?.id, session.joinHandledRef]);
 
     // ── Context value ───────────────────────────────────────────────────────────
+    const ctxValue = useMemo(() => ({
+        incomingInvites: invites.incomingInvites,
+        acceptedInviteNotice: invites.acceptedInviteNotice,
+        teamSession,
+        sendInvite: invites.sendInvite,
+        acceptInvite: invites.acceptInvite,
+        rejectInvite: invites.rejectInvite,
+        leaveSession,
+        createJoinCode,
+        joinByCode,
+        setPresenceStatus: presenceHook.setPresenceStatus,
+        presence: presenceHook.presence,
+        dismissAcceptedInvite: invites.dismissAcceptedInvite,
+        loading: session.loading,
+        presenceStatus: presenceHook.presenceStatus,
+        refetchInvites: invites.refetchInvites,
+        sharedLogs: broadcast.sharedLogs,
+        broadcastMyLog: broadcast.broadcastMyLog,
+        chatMessages: broadcast.chatMessages,
+        sendChatMessage: broadcast.sendChatMessage,
+        sessionPaused: broadcast.sessionPaused,
+        pauseSession: broadcast.pauseSession,
+        resumeSession: broadcast.resumeSession,
+        sendMultipleInvites: invites.sendMultipleInvites,
+        pendingChallenge: broadcast.pendingChallenge,
+        sendSetChallenge: broadcast.sendSetChallenge,
+        dismissChallenge: broadcast.dismissChallenge,
+        pendingWorkoutEdit: broadcast.pendingWorkoutEdit,
+        broadcastWorkoutEdit: broadcast.broadcastWorkoutEdit,
+        dismissWorkoutEdit: broadcast.dismissWorkoutEdit,
+        incomingExerciseShare: broadcast.incomingExerciseShare,
+        exerciseControlUpdates: broadcast.exerciseControlUpdates,
+        shareExerciseWithPartner: broadcast.shareExerciseWithPartner,
+        sendExerciseControlUpdate: broadcast.sendExerciseControlUpdate,
+        endExerciseShare: broadcast.endExerciseShare,
+        dismissExerciseShare: broadcast.dismissExerciseShare,
+    }), [
+        invites.incomingInvites, invites.acceptedInviteNotice, invites.sendInvite,
+        invites.acceptInvite, invites.rejectInvite, invites.dismissAcceptedInvite,
+        invites.refetchInvites, invites.sendMultipleInvites,
+        teamSession, leaveSession, createJoinCode, joinByCode,
+        presenceHook.setPresenceStatus, presenceHook.presence, presenceHook.presenceStatus,
+        session.loading,
+        broadcast.sharedLogs, broadcast.broadcastMyLog, broadcast.chatMessages,
+        broadcast.sendChatMessage, broadcast.sessionPaused, broadcast.pauseSession,
+        broadcast.resumeSession, broadcast.pendingChallenge, broadcast.sendSetChallenge,
+        broadcast.dismissChallenge, broadcast.pendingWorkoutEdit, broadcast.broadcastWorkoutEdit,
+        broadcast.dismissWorkoutEdit, broadcast.incomingExerciseShare,
+        broadcast.exerciseControlUpdates, broadcast.shareExerciseWithPartner,
+        broadcast.sendExerciseControlUpdate, broadcast.endExerciseShare,
+        broadcast.dismissExerciseShare,
+    ]);
+
     return (
-        <TeamWorkoutContext.Provider value={{
-            incomingInvites: invites.incomingInvites,
-            acceptedInviteNotice: invites.acceptedInviteNotice,
-            teamSession,
-            sendInvite: invites.sendInvite,
-            acceptInvite: invites.acceptInvite,
-            rejectInvite: invites.rejectInvite,
-            leaveSession,
-            createJoinCode,
-            joinByCode,
-            setPresenceStatus: presenceHook.setPresenceStatus,
-            presence: presenceHook.presence,
-            dismissAcceptedInvite: invites.dismissAcceptedInvite,
-            loading: session.loading,
-            presenceStatus: presenceHook.presenceStatus,
-            refetchInvites: invites.refetchInvites,
-            sharedLogs: broadcast.sharedLogs,
-            broadcastMyLog: broadcast.broadcastMyLog,
-            chatMessages: broadcast.chatMessages,
-            sendChatMessage: broadcast.sendChatMessage,
-            sessionPaused: broadcast.sessionPaused,
-            pauseSession: broadcast.pauseSession,
-            resumeSession: broadcast.resumeSession,
-            sendMultipleInvites: invites.sendMultipleInvites,
-            pendingChallenge: broadcast.pendingChallenge,
-            sendSetChallenge: broadcast.sendSetChallenge,
-            dismissChallenge: broadcast.dismissChallenge,
-            pendingWorkoutEdit: broadcast.pendingWorkoutEdit,
-            broadcastWorkoutEdit: broadcast.broadcastWorkoutEdit,
-            dismissWorkoutEdit: broadcast.dismissWorkoutEdit,
-            // Partner exercise control
-            incomingExerciseShare: broadcast.incomingExerciseShare,
-            exerciseControlUpdates: broadcast.exerciseControlUpdates,
-            shareExerciseWithPartner: broadcast.shareExerciseWithPartner,
-            sendExerciseControlUpdate: broadcast.sendExerciseControlUpdate,
-            endExerciseShare: broadcast.endExerciseShare,
-            dismissExerciseShare: broadcast.dismissExerciseShare,
-        }}>
+        <TeamWorkoutContext.Provider value={ctxValue}>
             {children}
         </TeamWorkoutContext.Provider>
     );

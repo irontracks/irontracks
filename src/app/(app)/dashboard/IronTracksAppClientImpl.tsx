@@ -70,7 +70,6 @@ import { useWorkoutEditor } from '@/hooks/useWorkoutEditor'
 import { useBootstrap } from '@/hooks/useBootstrap'
 import { useHealthKit } from '@/hooks/useHealthKit'
 import { saveWorkoutToHealth } from '@/utils/native/irontracksNative'
-import HealthWidget from '@/components/dashboard/HealthWidget'
 import { useNativeTimerActions } from '@/hooks/useNativeTimerActions'
 import { useAppEffects, isRecord, parseStartedAtMs } from '@/hooks/useAppEffects'
 import { useAppHandlers } from '@/hooks/useAppHandlers'
@@ -88,7 +87,8 @@ import type { AdminUser } from '@/types/admin'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { logError, logWarn, logInfo } from '@/lib/logger'
 import SectionErrorBoundary from '@/components/SectionErrorBoundary'
-import GymDetectToastWrapper from '@/components/dashboard/GymDetectToastWrapper'
+const HealthWidget = dynamic(() => import('@/components/dashboard/HealthWidget'), { ssr: false })
+const GymDetectToastWrapper = dynamic(() => import('@/components/dashboard/GymDetectToastWrapper'), { ssr: false })
 
 const AssessmentHistory = dynamic(() => import('@/components/assessment/AssessmentHistory'), { ssr: false });
 const VipHub = dynamic(() => import('@/components/VipHub'), { ssr: false });
