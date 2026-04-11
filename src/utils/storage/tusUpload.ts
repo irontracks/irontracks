@@ -1,4 +1,4 @@
-import * as tus from 'tus-js-client'
+import { Upload as TusUpload } from 'tus-js-client'
 import { createClient } from '@/utils/supabase/client'
 import { logInfo, logError, logWarn } from '@/lib/logger'
 
@@ -26,7 +26,7 @@ export async function uploadWithTus(
     }
     const endpoint = `${supabaseUrl}/storage/v1/upload/resumable`
 
-    const upload = new tus.Upload(file, {
+    const upload = new TusUpload(file, {
       endpoint,
       retryDelays: [0, 3000, 5000, 10000],
       headers: {

@@ -2,7 +2,6 @@
 
 import { memo, useCallback } from 'react'
 import Image from 'next/image'
-import { motion } from 'framer-motion'
 import { triggerHaptic } from '@/utils/native/irontracksNative'
 
 type DashboardTabsProps = {
@@ -41,34 +40,26 @@ export const DashboardTabs = memo(({
   const renderIndicator = (active: boolean) =>
     active ? (
       <>
-        <motion.div
-          layoutId="active-tab-indicator"
-          className="absolute inset-0 rounded-xl"
+        <div
+          className="absolute inset-0 rounded-xl transition-all duration-200"
           style={{
             background: 'linear-gradient(135deg, rgba(234,179,8,0.1) 0%, rgba(234,179,8,0.04) 100%)',
             border: '1px solid rgba(234,179,8,0.18)',
             boxShadow: '0 0 16px rgba(234,179,8,0.08), inset 0 1px 0 rgba(234,179,8,0.1)',
           }}
-          transition={{ type: 'spring', stiffness: 380, damping: 30 }}
         />
-        <motion.span
-          layoutId="active-tab-underline"
-          className="absolute bottom-[5px] left-1/2 -translate-x-1/2 h-[2px] w-5 rounded-full"
+        <span
+          className="absolute bottom-[5px] left-1/2 -translate-x-1/2 h-[2px] w-5 rounded-full transition-all duration-200"
           style={{
             background: 'linear-gradient(90deg, transparent, #eab308, transparent)',
             boxShadow: '0 0 8px rgba(234,179,8,0.6)',
           }}
-          transition={{ type: 'spring', stiffness: 380, damping: 30 }}
         />
       </>
     ) : null
 
   const renderIcon = (src: string, active: boolean, alt: string) => (
-    <motion.div
-      animate={{ scale: active ? 1.15 : 1, rotate: active ? 3 : 0 }}
-      transition={{ type: 'spring', stiffness: 400, damping: 20 }}
-      className="relative"
-    >
+    <div className={`relative transition-transform duration-200 ${active ? 'scale-[1.15] rotate-[3deg]' : ''}`}>
       <Image
         src={src}
         alt={alt}
@@ -79,7 +70,7 @@ export const DashboardTabs = memo(({
         }`}
         unoptimized
       />
-    </motion.div>
+    </div>
   )
 
   return (

@@ -65,8 +65,6 @@ export const viewport = {
   viewportFit: "cover",
 };
 
-export const dynamic = 'force-dynamic'
-
 export default async function RootLayout({ children }: { children: ReactNode }) {
   const headersList = await headers()
   const nonce = headersList?.get ? (headersList.get('x-nonce') || '') : ''

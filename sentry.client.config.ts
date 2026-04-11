@@ -16,9 +16,7 @@ Sentry.init({
   // false = não envia IP/user-agent por padrão (LGPD)
   sendDefaultPii: false,
 
-  integrations: [
-    Sentry.replayIntegration(),
-  ],
+  integrations: [],
 
   // Filtra erros esperados que não representam bugs reais
   beforeSend(event, hint) {
@@ -42,3 +40,8 @@ Sentry.init({
     return event
   },
 })
+
+// Replay carregado de forma lazy para não impactar o bundle inicial (~80KB)
+Sentry.lazyLoadIntegration('replayIntegration').then((integration) => {
+  Sentry.addIntegration(integration())
+}).catch(() => { /* silently ignore if blocked */ })

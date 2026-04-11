@@ -2,7 +2,6 @@
 
 import React from 'react'
 import NextImage from 'next/image'
-import { motion } from 'framer-motion'
 
 export type Badge = {
   id: string
@@ -32,12 +31,10 @@ export default function BadgesInline({ badges }: { badges: Badge[] }) {
       {safeBadges.map((badge, i) => {
         const { src, glow } = getBadgeImage(badge.id, badge.kind)
         return (
-          <motion.div
+          <div
             key={badge.id}
-            initial={{ opacity: 0, scale: 0.8, y: 8 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            transition={{ delay: i * 0.07, duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-            className="flex flex-col items-center gap-1.5 cursor-default select-none"
+            className="flex flex-col items-center gap-1.5 cursor-default select-none animate-in fade-in zoom-in-75 duration-300"
+            style={{ animationDelay: `${i * 70}ms`, animationFillMode: 'both' }}
           >
             {/* Medal image */}
             <div
@@ -60,7 +57,7 @@ export default function BadgesInline({ badges }: { badges: Badge[] }) {
             <span className="text-[10px] font-bold text-neutral-400 text-center leading-tight max-w-[60px]">
               {badge.label}
             </span>
-          </motion.div>
+          </div>
         )
       })}
     </div>

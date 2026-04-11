@@ -6,6 +6,8 @@ import { mapWorkoutRow } from '@/utils/mapWorkoutRow'
 
 interface UseBootstrapOptions {
   userId: string | undefined
+  /** When the server already provided workouts, skip the bootstrap fetch */
+  initialWorkoutsCount?: number
   setUser: React.Dispatch<React.SetStateAction<UserRecord | null>>
   setIsCoach: (v: boolean) => void
   setWorkouts: (w: Record<string, unknown>[]) => void
@@ -18,10 +20,11 @@ interface UseBootstrapOptions {
  * - coach flag
  * - initial workout list + stats
  *
- * Extracted from IronTracksAppClientImpl to keep the root component lean.
+ * Skip the fetch when the server already provided workouts via SSR props.
  */
 export function useBootstrap({
   userId,
+  initialWorkoutsCount = 0,
   setUser,
   setIsCoach,
   setWorkouts,
@@ -29,6 +32,8 @@ export function useBootstrap({
 }: UseBootstrapOptions) {
   useEffect(() => {
     if (!userId) return
+    // Server already provided data — no need for a redundant round-trip
+    if (initialWorkoutsCount > 0) return
     let cancelled = false
 
     const run = async () => {
@@ -99,5 +104,5 @@ export function useBootstrap({
     return () => {
       cancelled = true
     }
-  }, [userId, setIsCoach, setStats, setUser, setWorkouts])
+  }, [userId, initialWorkoutsCount, setIsCoach, setStats, setUser, setWorkouts])
 }

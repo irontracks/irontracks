@@ -353,7 +353,11 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
 
     // Bootstrap: fetch /api/dashboard/bootstrap and hydrate user, isCoach, workouts, stats
     // Extracted to useBootstrap hook for clarity.
-    useBootstrap({ userId: user?.id, setUser, setIsCoach, setWorkouts, setStats })
+    useBootstrap({
+      userId: user?.id,
+      initialWorkoutsCount: Array.isArray(initialWorkouts) ? (initialWorkouts as unknown[]).length : 0,
+      setUser, setIsCoach, setWorkouts, setStats,
+    })
 
 
     // fetchWorkouts, workouts, stats, studentFolders — handled by useWorkoutFetch hook above
