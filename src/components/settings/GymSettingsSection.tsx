@@ -58,6 +58,7 @@ export default function GymSettingsSection({ userId, supabase }: GymSettingsSect
 
   // Load gyms & settings
   useEffect(() => {
+    let cancelled = false
     const load = async () => {
       const [{ data: gymsData }, { data: settingsData }] = await Promise.allSettled([
         supabase.from('user_gyms').select('*').eq('user_id', userId).order('is_primary', { ascending: false }).limit(20),
@@ -66,11 +67,13 @@ export default function GymSettingsSection({ userId, supabase }: GymSettingsSect
         { data: Gym[] | null },
         { data: LocationSettings | null },
       ]
+      if (cancelled) return
       if (gymsData) setGyms(gymsData)
       if (settingsData) setSettings(settingsData)
       setLoading(false)
     }
     load()
+    return () => { cancelled = true }
   }, [userId, supabase])
 
   // Search gyms via Nominatim (OpenStreetMap) — debounced

@@ -13,11 +13,10 @@ import type { DashboardWorkout, DashboardExercise, DashboardSetDetail } from '@/
 // Re-export types so existing consumers don't break
 export type { DashboardWorkout, DashboardExercise, DashboardSetDetail }
 
-import StoriesBar from './StoriesBar'
+const StoriesBar = dynamic(() => import('./StoriesBar'), { ssr: false })
 const IronRankCard = dynamic(() => import('./IronRankCard'), { ssr: false })
 const MuscleMapCard = dynamic(() => import('./MuscleMapCard'), { ssr: false })
-
-import WorkoutCalendarModal from './WorkoutCalendarModal'
+const WorkoutCalendarModal = dynamic(() => import('./WorkoutCalendarModal'), { ssr: false })
 import { ProfileIncompleteBanner } from './ProfileIncompleteBanner'
 import { DashboardTabs } from './DashboardTabs'
 import { CheckinsModal } from './CheckinsModal'

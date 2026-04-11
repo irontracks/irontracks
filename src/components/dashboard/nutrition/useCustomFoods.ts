@@ -6,7 +6,7 @@
  * expected by parseInput so custom products are auto-recognized in the input.
  */
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { createClient } from '@/utils/supabase/client'
 
 export interface CustomFood {
@@ -61,9 +61,11 @@ export function useCustomFoods(userId: string | null | undefined) {
   const [error, setError] = useState<string | null>(null)
 
   const supabase = createClient()
+  const cancelledRef = useRef(false)
 
   const load = useCallback(async () => {
     if (!userId) return
+    cancelledRef.current = false
     setLoading(true)
     setError(null)
     try {
@@ -73,16 +75,20 @@ export function useCustomFoods(userId: string | null | undefined) {
         .eq('user_id', userId)
         .order('created_at', { ascending: false })
         .limit(50)
+      if (cancelledRef.current) return
       if (err) throw new Error(err.message)
       setFoods((data as CustomFood[]) || [])
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Erro ao carregar alimentos')
+      if (!cancelledRef.current) setError(e instanceof Error ? e.message : 'Erro ao carregar alimentos')
     } finally {
-      setLoading(false)
+      if (!cancelledRef.current) setLoading(false)
     }
   }, [userId, supabase])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => {
+    load()
+    return () => { cancelledRef.current = true }
+  }, [load])
 
   const saveFood = useCallback(async (draft: CustomFoodDraft): Promise<{ ok: boolean; error?: string }> => {
     if (!userId) return { ok: false, error: 'not_authenticated' }
