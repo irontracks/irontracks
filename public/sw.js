@@ -28,8 +28,8 @@ self.addEventListener('install', (event) => {
             })
         )
     )
-    // Take control immediately
-    self.skipWaiting()
+    // skipWaiting is triggered by the user via postMessage({ type: 'SKIP_WAITING' })
+    // to avoid taking control mid-session. See ServiceWorkerRegister.tsx.
 })
 
 // ─── Activate ─────────────────────────────────────────────────────────────────
@@ -48,6 +48,9 @@ self.addEventListener('activate', (event) => {
 
 // ─── Message handler (cache invalidation from main thread) ────────────────────
 self.addEventListener('message', (event) => {
+    if (event.data && event.data.type === 'SKIP_WAITING') {
+        self.skipWaiting()
+    }
     if (event.data && event.data.type === 'CACHE_INVALIDATE') {
         const pattern = event.data.pattern || ''
         caches.open(API_CACHE).then((cache) => {

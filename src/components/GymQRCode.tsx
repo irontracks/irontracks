@@ -13,7 +13,7 @@
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Copy, Download, Loader2, RefreshCw, X, QrCode, Check } from 'lucide-react'
-import * as QRCodeLib from 'qrcode'
+import { toCanvas as qrToCanvas } from 'qrcode'
 
 interface GymQRCodeProps {
   /** UUID of the gym owned by the current user */
@@ -33,7 +33,7 @@ export default function GymQRCode({ gymId, gymName, onClose }: GymQRCodeProps) {
   const renderQR = useCallback(async (url: string) => {
     if (!canvasRef.current || !url) return
     try {
-      await QRCodeLib.toCanvas(canvasRef.current, url, {
+      await qrToCanvas(canvasRef.current, url, {
         width: 280,
         margin: 2,
         color: { dark: '#000000', light: '#ffffff' },

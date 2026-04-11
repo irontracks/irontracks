@@ -78,7 +78,7 @@ export async function POST(req: Request) {
     // Fetch request details
     const { data: request, error: fetchError } = await admin
       .from('access_requests')
-      .select('*')
+      .select('id, status, requester_id, teacher_id, gym_id, message, created_at, email, full_name')
       .eq('id', requestId)
       .maybeSingle()
 

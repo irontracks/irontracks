@@ -64,7 +64,7 @@ export async function POST(req: Request) {
     // Fetch last 3 assessments
     const { data: assessments } = await admin
       .from('assessments')
-      .select('*')
+      .select('id, user_id, created_at, weight_kg, height_cm, body_fat_pct, muscle_mass_kg, notes, goals, measurements')
       .eq('user_id', body.studentId)
       .order('created_at', { ascending: false })
       .limit(3)

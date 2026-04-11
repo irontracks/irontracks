@@ -3,7 +3,6 @@
 import React, { memo, useEffect, useState } from 'react'
 import Image from 'next/image'
 import { Crown, X, ChevronRight } from 'lucide-react'
-import { motion } from 'framer-motion'
 import { getIronRankLeaderboard } from '@/actions/workout-actions'
 import BadgesInline, { type Badge } from './BadgesInline'
 import { getErrorMessage } from '@/utils/errorMessage'
@@ -149,13 +148,10 @@ const BadgesGallery = memo(function BadgesGallery({ badges, currentStreak, total
 
       {/* ─── Iron Rank Card ────────────────────────────────────────────── */}
       {showIronRank ? (
-        <motion.button
+        <button
           type="button"
           onClick={() => setRankOpen(true)}
-          initial={{ opacity: 0, y: -10 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-          className="w-full text-left cursor-pointer relative overflow-hidden rounded-2xl focus:outline-none focus:ring-2 focus:ring-yellow-500/30 group"
+          className="w-full text-left cursor-pointer relative overflow-hidden rounded-2xl focus:outline-none focus:ring-2 focus:ring-yellow-500/30 group animate-in fade-in slide-in-from-top-2 duration-300"
           style={{
             background: 'linear-gradient(135deg, rgba(234,179,8,0.08) 0%, rgba(12,12,12,0.92) 50%, rgba(234,179,8,0.04) 100%)',
             border: '1px solid rgba(234,179,8,0.22)',
@@ -164,6 +160,7 @@ const BadgesGallery = memo(function BadgesGallery({ badges, currentStreak, total
           }}
           aria-label="Abrir ranking Iron Rank"
         >
+
           {/* Shimmer accent line top */}
           <div className="absolute top-0 left-0 right-0 h-[2px]" style={{
             background: 'linear-gradient(90deg, transparent 0%, rgba(234,179,8,0.6) 40%, rgba(251,191,36,1) 50%, rgba(234,179,8,0.6) 60%, transparent 100%)',
@@ -224,15 +221,12 @@ const BadgesGallery = memo(function BadgesGallery({ badges, currentStreak, total
               {/* Progress bar */}
               <div className="h-2 rounded-full overflow-hidden"
                 style={{ background: 'rgba(255,255,255,0.06)', boxShadow: 'inset 0 1px 2px rgba(0,0,0,0.4)' }}>
-                <motion.div
-                  initial={{ width: 0 }}
-                  animate={{ width: `${progressPercent}%` }}
-                  transition={{ duration: 1.4, ease: 'easeOut' }}
-                  className="h-full rounded-full relative"
-                  style={{ background: 'linear-gradient(90deg, #92400e 0%, #d97706 40%, #fbbf24 80%, #fde68a 100%)' }}
+                <div
+                  className="h-full rounded-full relative transition-[width] duration-[1400ms] ease-out"
+                  style={{ width: `${progressPercent}%`, background: 'linear-gradient(90deg, #92400e 0%, #d97706 40%, #fbbf24 80%, #fde68a 100%)' }}
                 >
                   <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-[shimmer_2.5s_ease-in-out_infinite] rounded-full" />
-                </motion.div>
+                </div>
               </div>
 
               <div className="flex justify-between items-center mt-1.5">
@@ -241,7 +235,7 @@ const BadgesGallery = memo(function BadgesGallery({ badges, currentStreak, total
               </div>
             </div>
           </div>
-        </motion.button>
+        </button>
       ) : null}
 
       {/* Badges grid */}
@@ -257,11 +251,8 @@ const BadgesGallery = memo(function BadgesGallery({ badges, currentStreak, total
       {/* ─── Leaderboard modal ─────────────────────────────────────────── */}
       {showIronRank && rankOpen && (
         <div className="fixed inset-0 z-[1250] bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 pt-safe">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.96, y: 12 }}
-            animate={{ opacity: 1, scale: 1, y: 0 }}
-            transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
-            className="w-full max-w-lg overflow-hidden rounded-2xl"
+          <div
+            className="w-full max-w-lg overflow-hidden rounded-2xl animate-in fade-in zoom-in-95 slide-in-from-bottom-3 duration-200"
             style={{
               background: 'linear-gradient(160deg, rgba(20,20,20,0.98) 0%, rgba(12,12,12,0.98) 100%)',
               border: '1px solid rgba(234,179,8,0.2)',
@@ -373,7 +364,7 @@ const BadgesGallery = memo(function BadgesGallery({ badges, currentStreak, total
                 </div>
               )}
             </div>
-          </motion.div>
+          </div>
         </div>
       )}
     </div>

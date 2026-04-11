@@ -3,7 +3,6 @@
 import React, { memo, useEffect, useState } from 'react'
 import { Trophy, TrendingUp, X, ChevronDown, Zap, Flame, Dumbbell, Star } from 'lucide-react'
 import { getLatestWorkoutPrs } from '@/actions/workout-actions'
-import { motion, AnimatePresence } from 'framer-motion'
 import BadgesInline, { type Badge } from './BadgesInline'
 import { logError } from '@/lib/logger'
 
@@ -91,14 +90,10 @@ const RecentAchievements = memo(function RecentAchievements({ userId, badges, sh
   const bestTier = bestPr ? getTier(bestPr) : null
 
   return (
-    <AnimatePresence>
+    <>
       {visible && (
-        <motion.div
-          initial={{ opacity: 0, y: -12, scale: 0.98 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: -12, scale: 0.98 }}
-          transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-          className="relative overflow-hidden rounded-2xl mb-4 select-none"
+        <div
+          className="relative overflow-hidden rounded-2xl mb-4 select-none animate-in fade-in slide-in-from-top-3 zoom-in-[0.98] duration-300"
           style={{
             background: 'linear-gradient(135deg, rgba(234,179,8,0.08) 0%, rgba(12,12,12,0.92) 50%, rgba(234,179,8,0.04) 100%)',
             border: '1px solid rgba(234,179,8,0.22)',
@@ -168,9 +163,9 @@ const RecentAchievements = memo(function RecentAchievements({ userId, badges, sh
                 className="w-9 h-9 flex items-center justify-center rounded-xl transition-colors text-neutral-500 hover:text-neutral-200"
                 style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}
               >
-                <motion.span className="inline-flex" animate={{ rotate: expanded ? 180 : 0 }} transition={{ duration: 0.2 }}>
+                <span className={`inline-flex transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}>
                   <ChevronDown size={15} />
-                </motion.span>
+                </span>
               </button>
               <button
                 type="button"
@@ -213,15 +208,8 @@ const RecentAchievements = memo(function RecentAchievements({ userId, badges, sh
           )}
 
           {/* Expanded content */}
-          <AnimatePresence initial={false}>
-            {expanded && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: 'auto' }}
-                exit={{ opacity: 0, height: 0 }}
-                transition={{ duration: 0.25 }}
-                className="overflow-hidden"
-              >
+          {expanded && (
+              <div className="overflow-hidden animate-in fade-in duration-200">
                 <div className="px-3.5 pb-3.5 space-y-1.5 relative z-10">
                   {/* Divider */}
                   <div className="h-px mb-2" style={{
@@ -233,13 +221,12 @@ const RecentAchievements = memo(function RecentAchievements({ userId, badges, sh
                       const tier = getTier(pr)
                       const improved = countImprovements(pr) > 0
                       return (
-                        <motion.div
+                        <div
                           key={`${pr.exercise}-${idx}`}
-                          initial={{ opacity: 0, x: -8 }}
-                          animate={{ opacity: 1, x: 0 }}
-                          transition={{ delay: idx * 0.04 }}
-                          className="flex items-center gap-2 rounded-xl px-3 py-2"
+                          className="flex items-center gap-2 rounded-xl px-3 py-2 animate-in fade-in slide-in-from-left-2 duration-200"
                           style={{
+                            animationDelay: `${idx * 40}ms`,
+                            animationFillMode: 'both',
                             background: improved ? tier.accent : 'rgba(255,255,255,0.02)',
                             border: improved ? `1px solid ${tier.color}28` : '1px solid rgba(255,255,255,0.05)',
                           }}
@@ -251,7 +238,7 @@ const RecentAchievements = memo(function RecentAchievements({ userId, badges, sh
                             <MetricBadge label="REPS" value={formatNum(pr.reps, 0)} highlight={!!pr.improved?.reps} />
                             <MetricBadge label="VOL" value={`${formatNum(Math.round(pr.volume), 0)}kg`} highlight={!!pr.improved?.volume} />
                           </div>
-                        </motion.div>
+                        </div>
                       )
                     })
                   ) : (
@@ -281,12 +268,11 @@ const RecentAchievements = memo(function RecentAchievements({ userId, badges, sh
                     </div>
                   )}
                 </div>
-              </motion.div>
+              </div>
             )}
-          </AnimatePresence>
-        </motion.div>
+        </div>
       )}
-    </AnimatePresence>
+    </>
   )
 })
 

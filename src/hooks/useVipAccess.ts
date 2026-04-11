@@ -34,35 +34,22 @@ export function useVipAccess({ userId, initialRole }: UseVipAccessOptions = {}) 
 
   const [vipStatus, setVipStatus] = useState<VipStatus | null>(null);
 
-  // Fetch /api/vip/status for detailed limits/usage
-  useEffect(() => {
-    if (!userId) return;
-    fetch('/api/vip/status')
-      .then((r) => r.json())
-      .then((d: unknown) => {
-        if (d && typeof d === 'object' && (d as Record<string, unknown>).ok) {
-          setVipStatus(d as VipStatus);
-        }
-      })
-      .catch(() => { /* silently ignore */ });
-  }, [userId]);
-
-  // Fetch /api/vip/access for the boolean gate
+  // Single fetch that covers both the boolean gate and detailed limits/usage.
+  // /api/vip/access already returns entitlement + role; /api/vip/status returns tier + limits + usage.
+  // We use /api/vip/status as the single source because it's a superset.
   useEffect(() => {
     if (!userId) return;
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch('/api/vip/access', {
-          method: 'GET',
-          credentials: 'include',
-          cache: 'no-store',
-        });
+        const res = await fetch('/api/vip/status', { credentials: 'include', cache: 'no-store' });
         const json = await res.json().catch((): unknown => null);
         if (cancelled) return;
         const j = json && typeof json === 'object' ? (json as Record<string, unknown>) : null;
         if (j?.ok) {
-          setVipAccess({ loaded: true, hasVip: !!j.hasVip });
+          setVipStatus(j as VipStatus);
+          const hasVip = String(j.tier ?? '').toLowerCase() !== 'free';
+          setVipAccess({ loaded: true, hasVip });
           return;
         }
         setVipAccess((prev) => ({ loaded: true, hasVip: prev.hasVip }));

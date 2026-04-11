@@ -31,7 +31,7 @@ export async function GET() {
     const admin = createAdminClient()
     const { data, error } = await admin
       .from('student_service_plans')
-      .select('*')
+      .select('id, name, description, price_cents, billing_interval, duration_days, sessions_per_week, session_duration_minutes, training_days, notes, is_active, created_at, teacher_user_id')
       .eq('teacher_user_id', user.id)
       .order('created_at', { ascending: false })
 

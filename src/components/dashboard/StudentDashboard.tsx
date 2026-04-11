@@ -13,10 +13,9 @@ import type { DashboardWorkout, DashboardExercise, DashboardSetDetail } from '@/
 // Re-export types so existing consumers don't break
 export type { DashboardWorkout, DashboardExercise, DashboardSetDetail }
 
-// Eagerly imported — no Suspense flash on entry
-import IronRankCard from './IronRankCard'
 import StoriesBar from './StoriesBar'
-import MuscleMapCard from './MuscleMapCard'
+const IronRankCard = dynamic(() => import('./IronRankCard'), { ssr: false })
+const MuscleMapCard = dynamic(() => import('./MuscleMapCard'), { ssr: false })
 
 import WorkoutCalendarModal from './WorkoutCalendarModal'
 import { ProfileIncompleteBanner } from './ProfileIncompleteBanner'

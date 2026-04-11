@@ -122,8 +122,10 @@ export function InAppNotificationsProvider(props: InAppNotificationsProviderProp
     };
   }, [supabase, userIdProp, authUserId]);
 
-  const settingsApi = useUserSettings(resolvedUserId);
-  const settings = (props?.settings && typeof props.settings === 'object' ? props.settings : null) || settingsApi?.settings || null;
+  // Use settings from parent when available; only call hook when not provided
+  const hasSettingsProp = props?.settings !== null && props?.settings !== undefined && typeof props.settings === 'object'
+  const settingsApi = useUserSettings(hasSettingsProp ? '' : resolvedUserId)
+  const settings = hasSettingsProp ? (props.settings as Record<string, unknown>) : (settingsApi?.settings || null)
 
   const [toastQueue, setToastQueue] = useState<NormalizedToast[]>([]);
   const lastKeyRef = useRef({ key: '', at: 0 });
