@@ -3,7 +3,7 @@
 	"appName": "IronTracks",
 	"webDir": "out",
 	"server": {
-		"url": "https://www.irontracks.com.br"
+		"url": "https://irontracks.com.br"
 	},
 	"packageClassList": [
 		"SignInWithApple",
