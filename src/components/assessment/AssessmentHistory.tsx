@@ -353,8 +353,24 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
           })();
 
           return (
-            <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label={editAssessmentId ? 'Editar avaliação' : 'Nova avaliação'} onClick={() => { setShowForm(false); setEditAssessmentId(null); }}>
-              <div className="bg-neutral-900 w-full max-w-3xl rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div
+              className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+              role="button"
+              tabIndex={-1}
+              aria-label={editAssessmentId ? 'Fechar edição de avaliação' : 'Fechar nova avaliação'}
+              onClick={() => { setShowForm(false); setEditAssessmentId(null); }}
+              onKeyDown={(e) => { if (e.key === 'Escape') { setShowForm(false); setEditAssessmentId(null); } }}
+            >
+              <div
+                role="none"
+                className="bg-neutral-900 w-full max-w-3xl rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden"
+                onClick={(e) => e.stopPropagation()}
+              >
+              <div
+                role="dialog"
+                aria-modal="true"
+                aria-label={editAssessmentId ? 'Editar avaliação' : 'Nova avaliação'}
+              >
                 <div className="p-4 border-b border-neutral-800 flex justify-between items-center">
                   <h3 className="font-bold text-white">{editAssessmentId ? 'Editar Avaliação' : 'Nova Avaliação'}</h3>
                   <button onClick={() => { setShowForm(false); setEditAssessmentId(null); }} className="p-2 hover:bg-neutral-800 rounded-full" aria-label="Fechar"><X className="w-5 h-5 text-neutral-400" /></button>
@@ -368,6 +384,7 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
                     onCancel={() => { setShowForm(false); setEditAssessmentId(null); }}
                   />
                 </div>
+              </div>
               </div>
             </div>
           );

@@ -42,7 +42,7 @@ export const MuscleTrend4wPanel = ({ data, muscleById, buildSparklinePoints }: M
                     <td className="px-3 py-2 font-semibold text-white">{label}</td>
                     <td className="px-3 py-2 text-right font-mono text-neutral-200">{row.last.toFixed(1)}</td>
                     <td className="px-3 py-2 text-right">
-                      <svg width="120" height="24" viewBox="0 0 120 24">
+                      <svg width="120" height="24" viewBox="0 0 120 24" aria-label={`Tendência de ${label}`} role="img">
                         <polyline fill="none" stroke="#eab308" strokeWidth="2" points={points} />
                       </svg>
                     </td>

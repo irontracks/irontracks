@@ -54,6 +54,9 @@ export function useTeamBroadcast({
     const [exerciseControlUpdates, setExerciseControlUpdates] = useState<ExerciseControlUpdate[]>([])
 
     // ── Broadcast channel for real-time log sharing between teammates ─────────
+    const soundOptsRef = useRef(soundOpts)
+    useEffect(() => { soundOptsRef.current = soundOpts }, [soundOpts])
+
     useEffect(() => {
         if (!teamSession?.id || !user?.id) {
             setSharedLogs({})
@@ -166,7 +169,7 @@ export function useTeamBroadcast({
                 try {
                     notify({ id: `workout_edit:${fromUid}:${Date.now()}`, type: 'team_workout_edit', senderName: edit.fromName, displayName: edit.fromName, photoURL: null, text: `${edit.fromName} editou o treino. Aceitar as mudanças?` })
                 } catch { }
-                try { playStartSound(soundOpts); } catch { }
+                try { playStartSound(soundOptsRef.current); } catch { }
             })
             // ─ Partner exercise share ───────────────────────────────────────
             .on('broadcast', { event: 'exercise_share_request' }, (msg) => {
@@ -188,7 +191,7 @@ export function useTeamBroadcast({
                 try {
                     notify({ id: `exercise_share:${fromUid}:${Date.now()}`, type: 'team_exercise_share', senderName: share.fromName, displayName: share.fromName, photoURL: null, text: `${share.fromName} compartilhou ${String(share.exercise?.name || 'exercício')} com você! 🏋️` })
                 } catch { }
-                try { playStartSound(soundOpts) } catch { }
+                try { playStartSound(soundOptsRef.current) } catch { }
             })
             .on('broadcast', { event: 'exercise_control_update' }, (msg) => {
                 const payload = msg?.payload && typeof msg.payload === 'object' ? msg.payload as Record<string, unknown> : null
@@ -221,7 +224,7 @@ export function useTeamBroadcast({
             try { supabase.removeChannel(ch) } catch { }
             teamBroadcastChannelRef.current = null
         }
-    }, [supabase, teamSession?.id, user?.id, notify])
+    }, [supabase, teamSession?.id, user?.id, notify, setPresence])
 
     const broadcastMyLog = useCallback((exIdx: number, sIdx: number, weight: string, reps: string) => {
         const ch = teamBroadcastChannelRef.current

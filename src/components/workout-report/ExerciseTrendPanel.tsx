@@ -33,7 +33,7 @@ export const ExerciseTrendPanel = ({ data, buildSparklinePoints }: ExerciseTrend
                   <td className="px-3 py-2 font-semibold text-white">{row.name}</td>
                   <td className="px-3 py-2 text-right font-mono text-neutral-200">{Number(last).toLocaleString('pt-BR')}</td>
                   <td className="px-3 py-2 text-right">
-                    <svg width="120" height="24" viewBox="0 0 120 24">
+                    <svg width="120" height="24" viewBox="0 0 120 24" aria-label={`Tendência de ${row.name}`} role="img">
                       <polyline fill="none" stroke="#22c55e" strokeWidth="2" points={points} />
                     </svg>
                   </td>

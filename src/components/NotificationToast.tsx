@@ -150,7 +150,11 @@ export default function NotificationToast({
 
   return (
     <div
+      role="button"
+      tabIndex={0}
+      aria-label="Fechar notificação"
       onClick={handleRootClick}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleRootClick() }}
       className={`w-[360px] max-w-[calc(100vw-2rem)] bg-gradient-to-r ${cfg.bg} border border-neutral-700/80 border-l-4 ${cfg.border} rounded-xl shadow-2xl cursor-pointer backdrop-blur-md overflow-hidden`}
       style={{
         animation: exiting

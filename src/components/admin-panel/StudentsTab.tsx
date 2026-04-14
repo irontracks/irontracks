@@ -198,6 +198,7 @@ export const StudentsTab: React.FC = () => {
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" size={18} />
                     <input
                         type="text"
+                        aria-label="Buscar alunos"
                         placeholder="Buscar alunos..."
                         value={studentQuery}
                         onChange={(e) => setStudentQuery(e.target.value)}

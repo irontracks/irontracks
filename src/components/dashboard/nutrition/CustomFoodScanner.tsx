@@ -32,10 +32,13 @@ const CONFIDENCE_LABEL: Record<string, string> = {
 }
 
 function NumInput({ label, value, onChange }: { label: string; value: number; onChange: (v: number) => void }) {
+  const inputId = `num-input-${label.replace(/\s+/g, '-').toLowerCase()}`
   return (
     <div className="flex flex-col gap-1">
-      <label className="text-[10px] uppercase tracking-widest text-neutral-400">{label}</label>
+      <label htmlFor={inputId} className="text-[10px] uppercase tracking-widest text-neutral-400">{label}</label>
       <input
+        id={inputId}
+        aria-label={label}
         type="number"
         min="0"
         step="0.1"
@@ -155,6 +158,7 @@ const CustomFoodScanner = memo(function CustomFoodScanner({ saving, onSave, onCl
         ref={fileRef}
         type="file"
         accept="image/*"
+        aria-label="Selecionar foto do rótulo nutricional"
         className="sr-only"
         onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); e.target.value = '' }}
       />
@@ -196,8 +200,10 @@ const CustomFoodScanner = memo(function CustomFoodScanner({ saving, onSave, onCl
 
           {/* Name */}
           <div className="flex flex-col gap-1">
-            <label className="text-[10px] uppercase tracking-widest text-neutral-400">Nome do produto *</label>
+            <label htmlFor="custom-food-name" className="text-[10px] uppercase tracking-widest text-neutral-400">Nome do produto *</label>
             <input
+              id="custom-food-name"
+              aria-label="Nome do produto"
               value={name}
               onChange={e => setName(e.target.value)}
               placeholder="Ex: Whey True WPI"
@@ -207,9 +213,11 @@ const CustomFoodScanner = memo(function CustomFoodScanner({ saving, onSave, onCl
 
           {/* Aliases */}
           <div className="flex flex-col gap-2">
-            <label className="text-[10px] uppercase tracking-widest text-neutral-400">Apelidos (para reconhecimento rápido)</label>
+            <label htmlFor="custom-food-alias" className="text-[10px] uppercase tracking-widest text-neutral-400">Apelidos (para reconhecimento rápido)</label>
             <div className="flex gap-2">
               <input
+                id="custom-food-alias"
+                aria-label="Apelido do alimento"
                 value={aliasInput}
                 onChange={e => setAliasInput(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addAlias())}

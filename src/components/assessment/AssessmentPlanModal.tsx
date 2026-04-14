@@ -51,8 +51,20 @@ export function AssessmentPlanModal({ assessment, planState, onClose, onRegenera
   const badge = buildBadge(s)
 
   return (
-    <div className="fixed inset-0 z-[80] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={onClose}>
-      <div className="bg-neutral-900 w-full max-w-3xl rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+    <div
+      className="fixed inset-0 z-[80] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+      role="button"
+      tabIndex={-1}
+      aria-label="Fechar modal"
+      onClick={onClose}
+      onKeyDown={(e) => { if (e.key === 'Escape') onClose() }}
+    >
+      <div
+        role="none"
+        className="bg-neutral-900 w-full max-w-3xl rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div role="dialog" aria-modal="true" aria-label="Plano tático">
         <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
           <div className="min-w-0">
             <div className="text-[11px] uppercase tracking-widest text-neutral-500 font-bold truncate">Plano Tático</div>
@@ -135,6 +147,7 @@ export function AssessmentPlanModal({ assessment, planState, onClose, onRegenera
               </button>
             </div>
           </div>
+        </div>
         </div>
       </div>
     </div>

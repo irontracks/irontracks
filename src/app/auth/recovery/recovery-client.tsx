@@ -175,9 +175,11 @@ export default function AuthRecoveryClient() {
 
           <form onSubmit={onSubmit} className="space-y-4">
             <div className="space-y-1">
-              <label className="text-xs font-bold text-neutral-400 uppercase">Nova senha</label>
+              <label htmlFor="new-password" className="text-xs font-bold text-neutral-400 uppercase">Nova senha</label>
               <div className="relative">
                 <input
+                  id="new-password"
+                  aria-label="Nova senha"
                   required
                   type={showPassword ? 'text' : 'password'}
                   value={password}
@@ -197,8 +199,10 @@ export default function AuthRecoveryClient() {
             </div>
 
             <div className="space-y-1">
-              <label className="text-xs font-bold text-neutral-400 uppercase">Confirmar senha</label>
+              <label htmlFor="confirm-password" className="text-xs font-bold text-neutral-400 uppercase">Confirmar senha</label>
               <input
+                id="confirm-password"
+                aria-label="Confirmar senha"
                 required
                 type={showPassword ? 'text' : 'password'}
                 value={password2}

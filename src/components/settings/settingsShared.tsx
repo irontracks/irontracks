@@ -9,11 +9,12 @@ export const isObject = (v: unknown): v is Record<string, unknown> =>
 
 import React from 'react'
 
-export const ToggleSwitch = ({ checked, onChange, disabled }: { checked: boolean; onChange: () => void; disabled?: boolean }) => (
+export const ToggleSwitch = ({ checked, onChange, disabled, label }: { checked: boolean; onChange: () => void; disabled?: boolean; label?: string }) => (
     <button
         type="button"
         role="switch"
         aria-checked={checked}
+        aria-label={label ?? (checked ? 'Ativado' : 'Desativado')}
         disabled={disabled}
         onClick={onChange}
         className="relative flex-shrink-0 w-12 h-6 rounded-full transition-all duration-300 border-0 focus-visible:outline-none disabled:opacity-50 disabled:cursor-not-allowed"

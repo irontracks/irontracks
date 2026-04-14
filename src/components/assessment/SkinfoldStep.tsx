@@ -162,7 +162,7 @@ export const SkinfoldStep: React.FC<SkinfoldStepProps> = ({
           <div className="flex items-center justify-between">
             <div className="flex items-center">
               <Ruler className="w-4 h-4 text-neutral-400 mr-2" />
-              <label className="block text-sm font-bold text-neutral-300">{s.label}</label>
+              <div className="block text-sm font-bold text-neutral-300">{s.label}</div>
             </div>
             <span className="text-xs font-medium px-2 py-1 rounded bg-neutral-700 text-neutral-300">{s.location}</span>
           </div>
@@ -170,11 +170,12 @@ export const SkinfoldStep: React.FC<SkinfoldStepProps> = ({
           {/* Bilateral inputs */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs text-neutral-500 mb-1">Esquerdo</label>
+              <div className="block text-xs text-neutral-500 mb-1">Esquerdo</div>
               <div className="relative">
                 <input
                   type="text"
                   inputMode="decimal"
+                  aria-label={`${s.label} esquerdo`}
                   value={String(leftVal)}
                   onChange={(e) => handleNumberInput(bilateral.left, e.target.value)}
                   placeholder={s.placeholder}
@@ -186,11 +187,12 @@ export const SkinfoldStep: React.FC<SkinfoldStepProps> = ({
               </div>
             </div>
             <div>
-              <label className="block text-xs text-neutral-500 mb-1">Direito</label>
+              <div className="block text-xs text-neutral-500 mb-1">Direito</div>
               <div className="relative">
                 <input
                   type="text"
                   inputMode="decimal"
+                  aria-label={`${s.label} direito`}
                   value={String(rightVal)}
                   onChange={(e) => handleNumberInput(bilateral.right, e.target.value)}
                   placeholder={s.placeholder}
@@ -232,13 +234,15 @@ export const SkinfoldStep: React.FC<SkinfoldStepProps> = ({
           <div className="flex items-center justify-between">
             <div className="flex items-center">
               <Ruler className="w-4 h-4 text-neutral-400 mr-2" />
-              <label className="block text-sm font-bold text-neutral-300">{s.label}</label>
+              <label htmlFor={`skinfold-${String(s.field)}`} className="block text-sm font-bold text-neutral-300">{s.label}</label>
             </div>
             <span className="text-xs font-medium px-2 py-1 rounded bg-neutral-700 text-neutral-300">{s.location}</span>
           </div>
 
           <div className="relative">
             <input
+              id={`skinfold-${String(s.field)}`}
+              aria-label={`${s.label} em milímetros`}
               type="text"
               inputMode="decimal"
               value={formData[s.field]}
@@ -366,10 +370,12 @@ export const SkinfoldStep: React.FC<SkinfoldStepProps> = ({
 
       {/* Observações */}
       <div className="space-y-2">
-        <label className="block text-sm font-bold text-neutral-300">
+        <label htmlFor="skinfold-observations" className="block text-sm font-bold text-neutral-300">
           Observações sobre as dobras (opcional)
         </label>
         <textarea
+          id="skinfold-observations"
+          aria-label="Observações sobre as dobras cutâneas"
           value={formData.observations}
           onChange={(e) => updateFormData({ observations: e.target.value })}
           rows={3}

@@ -43,7 +43,14 @@ export const WorkoutToolsPanel = memo(function WorkoutToolsPanel({
     return (
         <>
             {/* Backdrop */}
-            <div className="fixed inset-0 z-40" onClick={onClose} />
+            <div
+              className="fixed inset-0 z-40"
+              role="button"
+              tabIndex={-1}
+              aria-label="Fechar ferramentas"
+              onClick={onClose}
+              onKeyDown={(e) => { if (e.key === 'Escape') onClose() }}
+            />
 
             {/* ── Premium Tools Panel ─────────────────────────────── */}
             <div className="absolute right-0 mt-2 w-72 z-50 animate-in fade-in slide-in-from-top-2 duration-200">
@@ -84,6 +91,8 @@ export const WorkoutToolsPanel = memo(function WorkoutToolsPanel({
 
                         {/* Scanner de Treino */}
                         <button
+                            type="button"
+                            aria-label="Scanner de Treino"
                             onClick={() => { onClose(); onOpenIronScanner() }}
                             className="group w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl hover:bg-gradient-to-r hover:from-orange-500/10 hover:to-transparent transition-all duration-150 active:scale-[0.98]"
                         >
@@ -104,6 +113,8 @@ export const WorkoutToolsPanel = memo(function WorkoutToolsPanel({
 
                         {/* Importar JSON */}
                         <button
+                            type="button"
+                            aria-label="Importar JSON"
                             onClick={() => { onClose(); onOpenJsonImport() }}
                             className="group w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl hover:bg-gradient-to-r hover:from-purple-500/10 hover:to-transparent transition-all duration-150 active:scale-[0.98]"
                         >

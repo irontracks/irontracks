@@ -153,6 +153,7 @@ const MealRemindersEditor = memo(function MealRemindersEditor({ onClose }: Props
               {/* Toggle */}
               <button
                 type="button"
+                aria-label={r.enabled ? 'Desativar lembrete' : 'Ativar lembrete'}
                 onClick={() => updateReminder(i, { enabled: !r.enabled })}
                 className={`shrink-0 w-8 h-4 rounded-full border transition-all ${r.enabled ? 'bg-yellow-400 border-yellow-400' : 'bg-neutral-800 border-neutral-700'}`}
               >
@@ -162,6 +163,7 @@ const MealRemindersEditor = memo(function MealRemindersEditor({ onClose }: Props
               {/* Time */}
               <input
                 type="time"
+                aria-label="Horário do lembrete"
                 value={toTime(r.hour, r.minute)}
                 onChange={e => { const t = fromTime(e.target.value); updateReminder(i, t) }}
                 className="w-20 bg-transparent text-sm font-semibold text-white focus:outline-none"
@@ -170,6 +172,7 @@ const MealRemindersEditor = memo(function MealRemindersEditor({ onClose }: Props
               {/* Label */}
               <input
                 type="text"
+                aria-label="Nome do lembrete"
                 value={r.label}
                 maxLength={40}
                 onChange={e => updateReminder(i, { label: e.target.value })}

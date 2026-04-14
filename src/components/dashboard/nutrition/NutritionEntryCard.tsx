@@ -77,6 +77,7 @@ function NutritionEntryCard({
       {/* Clickable header */}
       <button
         type="button"
+        aria-label={isExpanded ? 'Recolher detalhes' : 'Expandir detalhes'}
         onClick={() => onToggleExpand(isExpanded ? '' : item.id)}
         className="w-full p-4 flex items-center justify-between gap-3 text-left hover:bg-white/[0.02] active:bg-white/[0.04] transition-colors"
       >
@@ -128,9 +129,14 @@ function NutritionEntryCard({
 
           {/* Inline edit form */}
           {editingId === item.id ? (
-            <div className="mt-3 space-y-2" onClick={(e) => e.stopPropagation()}>
+            <div
+              className="mt-3 space-y-2"
+              role="none"
+              onClick={(e) => e.stopPropagation()}
+            >
               <input
                 type="text"
+                aria-label="Nome da refeição"
                 value={editDraft.food_name}
                 onChange={(e) => onEditDraftChange((d) => ({ ...d, food_name: e.target.value }))}
                 className="w-full h-9 rounded-xl bg-neutral-800/60 border border-neutral-700/50 px-3 text-sm text-white placeholder:text-neutral-500 outline-none focus:border-yellow-500/40"
@@ -139,12 +145,13 @@ function NutritionEntryCard({
               <div className="grid grid-cols-4 gap-1.5">
                 {(['calories', 'protein', 'carbs', 'fat'] as const).map((field) => (
                   <div key={field}>
-                    <label className="text-[9px] uppercase text-neutral-500 block mb-0.5">
+                    <div className="text-[9px] uppercase text-neutral-500 block mb-0.5">
                       {field === 'calories' ? 'Kcal' : field === 'protein' ? 'Prot' : field === 'carbs' ? 'Carb' : 'Gord'}
-                    </label>
+                    </div>
                     <input
                       type="number"
                       min={0}
+                      aria-label={field === 'calories' ? 'Calorias' : field === 'protein' ? 'Proteína' : field === 'carbs' ? 'Carboidratos' : 'Gordura'}
                       value={editDraft[field]}
                       onChange={(e) => onEditDraftChange((d) => ({ ...d, [field]: Number(e.target.value) || 0 }))}
                       className="w-full h-8 rounded-lg bg-neutral-800/60 border border-neutral-700/50 px-2 text-xs text-white text-center outline-none focus:border-yellow-500/40"
