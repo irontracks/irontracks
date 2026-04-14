@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import Image from 'next/image'
 
 interface GymPerson {
   user_id: string
@@ -61,9 +62,11 @@ export default function GymPresenceCard({ gymId, gymName }: GymPresenceCardProps
               style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}
             >
               {person.avatar_url ? (
-                <img
+                <Image
                   src={person.avatar_url}
                   alt=""
+                  width={28}
+                  height={28}
                   className="h-7 w-7 rounded-full object-cover"
                 />
               ) : (
