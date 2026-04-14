@@ -1,4 +1,4 @@
-import { logError, logWarn, logInfo } from '@/lib/logger'
+import { logWarn } from '@/lib/logger'
 interface RenderOptions {
     videoElement: HTMLVideoElement;
     trimRange: [number, number];
@@ -175,7 +175,7 @@ export class VideoCompositor {
 
         // GESTURE-DEPENDENT SETUP MUST BE SYNCHRONOUS AT THE TOP OF THE FUNCTION
         const originalMuted = videoElement.muted;
-        const originalCurrentTime = videoElement.currentTime;
+        const _originalCurrentTime = videoElement.currentTime;
         const originalVolume = videoElement.volume;
         const originalLoop = videoElement.loop;
 

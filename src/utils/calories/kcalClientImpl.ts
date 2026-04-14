@@ -78,7 +78,7 @@ export const calculateTotalVolume = (logs: unknown) => {
 // ── B: improved fallback — same MET model as the local estimate ───────────────
 export const computeFallbackKcal = ({
   session,
-  volume,
+  volume: _volume,
   weightKg,
   biologicalSex,
 }: {

@@ -1,6 +1,5 @@
-import { createClient } from '@/utils/supabase/server'
 import { SupabaseClient } from '@supabase/supabase-js'
-import { logError, logWarn, logInfo } from '@/lib/logger'
+import { logError, logWarn } from '@/lib/logger'
 import { getWeeklyResetStart } from './weekReset'
 import { safePg } from '@/utils/safePgFilter'
 
