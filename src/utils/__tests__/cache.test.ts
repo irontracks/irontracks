@@ -7,10 +7,20 @@ vi.mock('@/lib/logger', () => ({
   logInfo: vi.fn(),
 }))
 
+// Mock env module so getUpstashConfig can be tested without process.env timing issues.
+// env.upstash values are set at module import time; using vi.hoisted avoids hoisting issues.
+const mockUpstash = vi.hoisted(() => ({ restUrl: '', restToken: '' }))
+vi.mock('@/utils/env', () => ({
+  env: {
+    supabase: { url: '', anonKey: '', serviceRoleKey: '' },
+    upstash: mockUpstash,
+  },
+}))
+
 // Ensure no Upstash config — tests exercise the local in-memory layer only
 beforeEach(() => {
-  delete process.env.UPSTASH_REDIS_REST_URL
-  delete process.env.UPSTASH_REDIS_REST_TOKEN
+  mockUpstash.restUrl = ''
+  mockUpstash.restToken = ''
 })
 
 import {
@@ -30,19 +40,16 @@ describe('getUpstashConfig', () => {
   })
 
   it('returns null when env vars are empty strings', () => {
-    process.env.UPSTASH_REDIS_REST_URL = ''
-    process.env.UPSTASH_REDIS_REST_TOKEN = ''
+    mockUpstash.restUrl = ''
+    mockUpstash.restToken = ''
     expect(getUpstashConfig()).toBeNull()
   })
 
   it('returns config when both env vars are set', () => {
-    process.env.UPSTASH_REDIS_REST_URL = 'https://redis.example.com'
-    process.env.UPSTASH_REDIS_REST_TOKEN = 'token123'
+    mockUpstash.restUrl = 'https://redis.example.com'
+    mockUpstash.restToken = 'token123'
     const cfg = getUpstashConfig()
     expect(cfg).toEqual({ url: 'https://redis.example.com', token: 'token123' })
-    // cleanup
-    delete process.env.UPSTASH_REDIS_REST_URL
-    delete process.env.UPSTASH_REDIS_REST_TOKEN
   })
 })
 
