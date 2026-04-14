@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { cacheDelete } from '@/utils/cache'
+import { env } from '@/utils/env'
 
 /**
  * Maps Apple/RevenueCat product identifiers to app_plans.id values.
@@ -47,9 +48,7 @@ interface RevenueCatWebhookPayload {
   event: RevenueCatEvent
 }
 
-const WEBHOOK_AUTH_KEY = String(
-  process.env.REVENUECAT_WEBHOOK_AUTH_KEY || '',
-).trim()
+const WEBHOOK_AUTH_KEY = env.revenuecat.webhookAuthKey.trim()
 
 const ACTIVE_EVENTS = new Set([
   'INITIAL_PURCHASE',

@@ -12,6 +12,7 @@ import { resolveCanonicalExerciseName } from '@/utils/exerciseCanonical'
 import { MUSCLE_GROUPS } from '@/utils/muscleMapConfig'
 import { buildHeuristicExerciseMap } from '@/utils/exerciseMuscleHeuristics'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { env } from '@/utils/env'
 import {
   toStr,
   extractJsonFromModelText,
@@ -40,7 +41,7 @@ const ZodBodySchema = z
   })
   .strip()
 
-const MODEL = process.env.GOOGLE_GENERATIVE_AI_MODEL_ID || 'gemini-2.5-flash'
+const MODEL = env.gemini.modelId
 
 const AiExerciseMuscleMapSchema = z
   .object({
@@ -199,7 +200,7 @@ export async function POST(req: Request) {
     const body = parsedBody.data!
     const refreshCache = Boolean(body?.refreshCache ?? body?.refresh)
     const refreshAi = Boolean(body?.refreshAi)
-    const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY
+    const apiKey = env.gemini.apiKey
     const now = new Date()
     const requested = body?.weekStart ? new Date(String(body.weekStart)) : now
     const weekStart = startOfWeekUtc(Number.isFinite(requested.getTime()) ? requested : now)

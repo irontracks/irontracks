@@ -8,6 +8,7 @@ import { requireUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { parseJsonBody } from '@/utils/zod'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
+import { env } from '@/utils/env'
 
 export const dynamic = 'force-dynamic'
 
@@ -37,7 +38,7 @@ export async function GET() {
     .select('id', { count: 'exact', head: true })
     .eq('referrer_id', auth.user.id)
 
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://www.irontracks.com.br'
+  const baseUrl = env.app.baseUrl || 'https://www.irontracks.com.br'
   const referralUrl = `${baseUrl}/r/${code}`
 
   return NextResponse.json({

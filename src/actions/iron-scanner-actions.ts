@@ -4,6 +4,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import { parseJsonWithSchema } from "@/utils/zod";
 import { z } from "zod";
 import { createClient } from "@/utils/supabase/server";
+import { env } from '@/utils/env'
 
 type IronScannerExercise = {
   name: string;
@@ -22,7 +23,7 @@ type IronScannerResponse = {
 };
 
 const IRON_SCANNER_MODEL =
-  process.env.GOOGLE_GENERATIVE_AI_MODEL_ID || "gemini-2.5-flash";
+  env.gemini.modelId;
 const MAX_FILE_SIZE_BYTES = 5 * 1024 * 1024;
 
 export async function processWorkoutImage(formData: FormData): Promise<IronScannerResponse> {
@@ -32,7 +33,7 @@ export async function processWorkoutImage(formData: FormData): Promise<IronScann
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return { ok: false, error: 'Não autenticado' }
 
-    const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY;
+    const apiKey = env.gemini.apiKey;
     if (!apiKey) {
       return {
         ok: false,

@@ -7,10 +7,11 @@ import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { parseJsonBody } from '@/utils/zod'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { logInfo, logError } from '@/lib/logger'
+import { env } from '@/utils/env'
 
 export const dynamic = 'force-dynamic'
 
-const MODEL = process.env.GOOGLE_GENERATIVE_AI_MODEL_ID || 'gemini-2.5-flash'
+const MODEL = env.gemini.modelId
 
 const safeArray = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : [])
 
@@ -63,7 +64,7 @@ export async function POST(req: Request) {
     const messages = normalizeMessages(body.messages)
     const context = body.context ?? null
 
-    const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY
+    const apiKey = env.gemini.apiKey
     if (!apiKey) {
       return NextResponse.json(
         {

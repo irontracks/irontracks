@@ -11,6 +11,7 @@ import { resolveCanonicalExerciseName } from '@/utils/exerciseCanonical'
 import { MUSCLE_GROUPS } from '@/utils/muscleMapConfig'
 import { buildHeuristicExerciseMap } from '@/utils/exerciseMuscleHeuristics'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { env } from '@/utils/env'
 
 export const dynamic = 'force-dynamic'
 
@@ -24,7 +25,7 @@ const ZodBodySchema = z
   })
   .strip()
 
-const MODEL = process.env.GOOGLE_GENERATIVE_AI_MODEL_ID || 'gemini-2.5-flash'
+const MODEL = env.gemini.modelId
 
 const AiExerciseMuscleMapSchema = z
   .object({
@@ -290,7 +291,7 @@ export async function POST(req: Request) {
     const maxAi = Number.isFinite(maxAiRaw) ? clamp(maxAiRaw, 0, 800) : 300
     const batchLimitRaw = Number(body?.batchLimit)
     const batchLimit = Number.isFinite(batchLimitRaw) ? clamp(batchLimitRaw, 10, 80) : 40
-    const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY
+    const apiKey = env.gemini.apiKey
 
     const { startIso, endIso } = localDayRangeUtc(date, tzOffsetMinutes)
 

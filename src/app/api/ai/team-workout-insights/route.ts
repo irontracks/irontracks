@@ -4,10 +4,11 @@ import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { parseJsonBody } from '@/utils/zod'
+import { env } from '@/utils/env'
 
 export const dynamic = 'force-dynamic'
 
-const TEAM_AI_MODEL = process.env.GOOGLE_GENERATIVE_AI_MODEL_ID || 'gemini-2.5-flash'
+const TEAM_AI_MODEL = env.gemini.modelId
 
 const ZodBody = z.object({
     sessionId: z.string().optional(),
@@ -50,7 +51,7 @@ export async function POST(req: Request) {
             return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429, headers: { 'Retry-After': String(rl.retryAfterSeconds) } })
         }
 
-        const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY
+        const apiKey = env.gemini.apiKey
         if (!apiKey) {
             return NextResponse.json({ ok: false, error: 'IA não configurada.' }, { status: 400 })
         }

@@ -6,10 +6,11 @@ import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { parseJsonBody, parseJsonWithSchema } from '@/utils/zod'
 import { sanitizeAiInput } from '@/lib/nutrition/security'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { env } from '@/utils/env'
 
 export const dynamic = 'force-dynamic'
 
-const MODEL = process.env.GOOGLE_GENERATIVE_AI_MODEL_ID || 'gemini-2.5-flash'
+const MODEL = env.gemini.modelId
 
 const BodySchema = z.object({
   text: z.string().min(1).max(800),
@@ -60,7 +61,7 @@ export async function POST(req: Request) {
     if (parsedBody.response) return parsedBody.response
     const { text, existingExercises } = parsedBody.data!
 
-    const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY
+    const apiKey = env.gemini.apiKey
     if (!apiKey) return NextResponse.json({ ok: false, error: 'ai_not_configured' }, { status: 500 })
 
     const sanitized = sanitizeAiInput(text)

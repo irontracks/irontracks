@@ -10,6 +10,7 @@ import { normalizeExerciseName } from '@/utils/normalizeExerciseName'
 import { resolveCanonicalExerciseName } from '@/utils/exerciseCanonical'
 import { MUSCLE_GROUPS } from '@/utils/muscleMapConfig'
 import { buildHeuristicExerciseMap } from '@/utils/exerciseMuscleHeuristics'
+import { env } from '@/utils/env'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,7 +20,7 @@ const ZodBodySchema = z
   })
   .strip()
 
-const MODEL = process.env.GOOGLE_GENERATIVE_AI_MODEL_ID || 'gemini-2.5-flash'
+const MODEL = env.gemini.modelId
 
 const safeJsonParse = (raw: string) => parseJsonWithSchema(raw, z.unknown())
 
@@ -148,7 +149,7 @@ export async function POST(req: Request) {
       await admin.from('exercise_muscle_maps').upsert(rows, { onConflict: 'user_id,exercise_key' })
     }
 
-    const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY
+    const apiKey = env.gemini.apiKey
     if (!apiKey) {
       return NextResponse.json({ ok: true, items: heuristicItems })
     }

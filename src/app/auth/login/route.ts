@@ -4,6 +4,7 @@ import { cookies } from 'next/headers'
 import { getSupabaseCookieOptions } from '@/utils/supabase/cookieOptions'
 import { z } from 'zod'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { env } from '@/utils/env'
 
 export const dynamic = 'force-dynamic'
 
@@ -50,7 +51,7 @@ export async function GET(request: Request) {
   const nextCookieName = 'it.auth.next'; const nextCookieMaxAgeSeconds = 60 * 5
   const safeOrigin = resolvePublicOrigin(request)
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL; const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  const supabaseUrl = env.supabase.url; const supabaseAnonKey = env.supabase.anonKey
   if (!supabaseUrl || !supabaseAnonKey) {
     return NextResponse.redirect(new URL('/auth/error?error=missing_env', safeOrigin))
   }

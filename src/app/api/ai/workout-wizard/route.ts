@@ -8,10 +8,11 @@ import { parseJsonBody, parseJsonWithSchema } from '@/utils/zod'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { logError } from '@/lib/logger'
 import { applyWizardConsistency, buildProgressionTargets } from '@/utils/workoutWizardGenerator'
+import { env } from '@/utils/env'
 
 export const dynamic = 'force-dynamic'
 
-const MODEL = process.env.GOOGLE_GENERATIVE_AI_MODEL_ID || 'gemini-2.5-flash'
+const MODEL = env.gemini.modelId
 
 const safeJsonParse = (raw: unknown) => parseJsonWithSchema(raw, z.unknown())
 
@@ -296,7 +297,7 @@ export async function POST(req: Request) {
     if (parsedBody.response) return parsedBody.response
     const { answers, mode } = parsedBody.data!
 
-    const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY
+    const apiKey = env.gemini.apiKey
     if (!apiKey) {
       return NextResponse.json(
         {

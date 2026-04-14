@@ -6,6 +6,7 @@ import { checkVipFeatureAccess, incrementVipUsage } from '@/utils/vip/limits'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
+import { env } from '@/utils/env'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,7 +17,7 @@ export const dynamic = 'force-dynamic'
  * Analyzes the user's sessions from the past 7 days.
  * ────────────────────────────────────────────────────────── */
 
-const MODEL_ID = process.env.GOOGLE_GENERATIVE_AI_MODEL_ID || 'gemini-2.5-flash'
+const MODEL_ID = env.gemini.modelId
 
 const safeJsonParse = (raw: string) => parseJsonWithSchema(raw.trim(), z.unknown())
 
@@ -52,7 +53,7 @@ export async function POST(req: Request) {
       }, { status: 403 })
     }
 
-    const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY
+    const apiKey = env.gemini.apiKey
     if (!apiKey) return NextResponse.json({ ok: false, error: 'AI não configurada' }, { status: 400 })
 
     // Fetch last 7 days of sessions

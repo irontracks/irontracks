@@ -12,6 +12,7 @@ import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { parseJsonBody } from '@/utils/zod'
+import { env } from '@/utils/env'
 
 export const dynamic = 'force-dynamic'
 
@@ -32,7 +33,7 @@ export async function GET(req: NextRequest) {
 
   if (error || !gym) return NextResponse.json({ ok: false, error: 'gym_not_found' }, { status: 404 })
 
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://www.irontracks.com.br'
+  const baseUrl = env.app.baseUrl || 'https://www.irontracks.com.br'
   const checkinUrl = `${baseUrl}/checkin?token=${gym.qr_token}`
 
   return NextResponse.json({ ok: true, gym_id: gym.id, name: gym.name, qr_token: gym.qr_token, checkinUrl })
@@ -59,7 +60,7 @@ export async function POST(req: NextRequest) {
 
   if (error || !gym) return NextResponse.json({ ok: false, error: 'gym_not_found' }, { status: 404 })
 
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://www.irontracks.com.br'
+  const baseUrl = env.app.baseUrl || 'https://www.irontracks.com.br'
   const checkinUrl = `${baseUrl}/checkin?token=${gym.qr_token}`
 
   return NextResponse.json({ ok: true, gym_id: gym.id, name: gym.name, qr_token: gym.qr_token, checkinUrl })

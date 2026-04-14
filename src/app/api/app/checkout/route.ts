@@ -8,12 +8,13 @@ import { parseJsonBody } from '@/utils/zod'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { logError, logWarn } from '@/lib/logger'
+import { env } from '@/utils/env'
 
 export const dynamic = 'force-dynamic'
 
 const resolveBaseUrl = (req: Request) => {
-  const env = (process.env.APP_BASE_URL || '').trim().replace(/\/$/, '')
-  if (env) return env
+  const appBaseUrl = env.app.baseUrl.trim().replace(/\/$/, '')
+  if (appBaseUrl) return appBaseUrl
   const origin = (req.headers.get('origin') || '').trim().replace(/\/$/, '')
   if (origin) return origin
   return 'http://localhost:3000'
@@ -149,7 +150,7 @@ export async function POST(req: Request) {
     const baseUrl = resolveBaseUrl(req)
     const idDigits = onlyDigits(cpfCnpj)
     const idType = idDigits.length === 14 ? 'CNPJ' : 'CPF'
-    const pixKey = (process.env.MERCADOPAGO_PIX_KEY || '').trim() || undefined
+    const pixKey = env.mercadopago.pixKey.trim() || undefined
     let payment: Record<string, unknown>
     try {
       const paymentBody: Record<string, unknown> = {

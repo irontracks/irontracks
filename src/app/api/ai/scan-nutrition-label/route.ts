@@ -14,10 +14,11 @@ import { requireUser } from '@/utils/auth/route'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { parseJsonWithSchema } from '@/utils/zod'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { env } from '@/utils/env'
 
 export const dynamic = 'force-dynamic'
 
-const MODEL = process.env.GOOGLE_GENERATIVE_AI_MODEL_ID || 'gemini-2.5-flash'
+const MODEL = env.gemini.modelId
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024 // 5 MB
 
 const LabelSchema = z.object({
@@ -89,7 +90,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: 'invalid_image_type' }, { status: 400 })
     }
 
-    const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY
+    const apiKey = env.gemini.apiKey
     if (!apiKey) return NextResponse.json({ ok: false, error: 'ai_not_configured' }, { status: 500 })
 
     const arrayBuffer = await file.arrayBuffer()

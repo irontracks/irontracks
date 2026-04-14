@@ -5,14 +5,14 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type { User } from '@supabase/supabase-js'
 import { safePg, safePgLike } from '@/utils/safePgFilter'
 import { logError } from '@/lib/logger'
+import { env } from '@/utils/env'
 
 export type IrontracksRole = 'admin' | 'teacher' | 'user'
 export type RouteAuthFail = { ok: false; response: NextResponse<{ ok: false; error: string }>; supabase?: undefined; user?: undefined; role?: undefined }
 export type RouteAuthOk = { ok: true; supabase: SupabaseClient; user: User; role: IrontracksRole; response?: undefined }
 
 const getAdminEmail = () => {
-  const envEmail = (process.env.IRONTRACKS_ADMIN_EMAIL || process.env.ADMIN_EMAIL || '').trim().toLowerCase()
-  return envEmail || ''
+  return env.security.adminEmail.trim().toLowerCase()
 }
 
 export const jsonError = (status: number, error: string) => {
@@ -20,7 +20,7 @@ export const jsonError = (status: number, error: string) => {
 }
 
 export const getInternalSecret = () => {
-  return (process.env.IRONTRACKS_INTERNAL_SECRET || '').trim()
+  return env.security.internalSecret.trim()
 }
 
 export const hasValidInternalSecret = (req: Request) => {

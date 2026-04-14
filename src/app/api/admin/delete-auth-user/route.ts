@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { logError } from '@/lib/logger'
+import { env } from '@/utils/env'
 
 const BodySchema = z.object({
     user_id: z.string().trim().min(1, 'user_id required'),
@@ -38,7 +39,7 @@ export async function POST(req: Request) {
         // Check that caller is admin or teacher
         const callerId = caller.user.id
         const callerEmail = String(caller.user.email || '').trim().toLowerCase()
-        const adminEmail = (process.env.IRONTRACKS_ADMIN_EMAIL || process.env.ADMIN_EMAIL || '').trim().toLowerCase()
+        const adminEmail = env.security.adminEmail.trim().toLowerCase()
         let isAllowed = false
 
         // Check env admin email

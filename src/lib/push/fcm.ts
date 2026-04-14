@@ -10,13 +10,14 @@
 import * as crypto from 'crypto'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { logInfo, logError, logWarn } from '@/lib/logger'
+import { env } from '@/utils/env'
 
 // ─── Configuration ──────────────────────────────────────────────────────────
 
 function getFcmConfig() {
-    const projectId = String(process.env.FCM_PROJECT_ID || '').trim()
-    const clientEmail = String(process.env.FCM_CLIENT_EMAIL || '').trim()
-    const privateKey = String(process.env.FCM_PRIVATE_KEY || '').trim()
+    const projectId = env.fcm.projectId.trim()
+    const clientEmail = env.fcm.clientEmail.trim()
+    const privateKey = env.fcm.privateKey.trim()
     if (!projectId || !clientEmail || !privateKey) return null
     return { projectId, clientEmail, privateKey }
 }

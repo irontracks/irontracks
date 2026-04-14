@@ -4,6 +4,7 @@ import { createHash, randomUUID } from 'crypto'
 import { requireUser } from '@/utils/auth/route'
 import { parseJsonBody } from '@/utils/zod'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
+import { env } from '@/utils/env'
 
 // R3#1: Client no longer controls folder or publicId — they are built server-side
 const BodySchema = z.object({
@@ -22,9 +23,9 @@ export async function POST(req: Request) {
   if (parsed.response) return parsed.response
   const { purpose } = parsed.data!
 
-  const cloudName = process.env.CLOUDINARY_CLOUD_NAME
-  const apiKey = process.env.CLOUDINARY_API_KEY
-  const apiSecret = process.env.CLOUDINARY_API_SECRET
+  const cloudName = env.cloudinary.cloudName
+  const apiKey = env.cloudinary.apiKey
+  const apiSecret = env.cloudinary.apiSecret
   if (!cloudName || !apiKey || !apiSecret) {
     return NextResponse.json({ ok: false, error: 'Cloudinary not configured' }, { status: 503 })
   }

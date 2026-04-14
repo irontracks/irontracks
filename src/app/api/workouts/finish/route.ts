@@ -11,6 +11,7 @@ import { cacheSetNx, cacheDeletePattern } from '@/utils/cache'
 import { buildReportMetrics, buildWeeklyVolumeStats, buildTrainingLoadFlags } from '@/utils/report/reportMetrics'
 import { logWarn, logError } from '@/lib/logger'
 import { notifyWorkoutFinished } from '@/lib/social/workoutNotifications'
+import { env } from '@/utils/env'
 
 const LogEntrySchema = z
   .object({
@@ -172,8 +173,8 @@ export async function POST(request: Request) {
         //
         // Differentiate: if Upstash is not configured at all, this is case A.
         const upstashConfigured = Boolean(
-          String(process.env.UPSTASH_REDIS_REST_URL || '').trim() &&
-          String(process.env.UPSTASH_REDIS_REST_TOKEN || '').trim()
+          env.upstash.restUrl.trim() &&
+          env.upstash.restToken.trim()
         )
         if (!upstashConfigured) {
           // Upstash offline — fail-closed protects integrity; tell client to retry

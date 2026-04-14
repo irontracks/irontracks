@@ -11,12 +11,13 @@ import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { sendPushToAllPlatforms } from '@/lib/push/sender'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { env } from '@/utils/env'
 
 export const dynamic = 'force-dynamic'
 
 export async function POST(req: Request) {
   try {
-    const cronSecret = process.env.CRON_SECRET
+    const cronSecret = env.security.cronSecret
     if (cronSecret) {
       const auth = req.headers.get('authorization')
       if (auth !== `Bearer ${cronSecret}`) {

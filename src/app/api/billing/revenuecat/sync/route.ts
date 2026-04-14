@@ -3,6 +3,7 @@ import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { cacheDelete } from '@/utils/cache'
+import { env } from '@/utils/env'
 
 /**
  * Maps Apple/RevenueCat product identifiers to app_plans.id values.
@@ -28,7 +29,7 @@ export function resolveDbPlanId(productId: string): string {
 export const dynamic = 'force-dynamic'
 
 const getRevenueCatSubscriber = async (appUserId: string) => {
-  const secret = String(process.env.REVENUECAT_SECRET_API_KEY || process.env.REVENUECAT_SECRET_KEY || '').trim()
+  const secret = env.revenuecat.secretKey.trim()
   if (!secret) throw new Error('revenuecat_secret_missing')
   const url = `https://api.revenuecat.com/v1/subscribers/${encodeURIComponent(appUserId)}`
   const res = await fetch(url, {
@@ -61,7 +62,7 @@ export async function POST() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
 
-    const entitlementId = String(process.env.REVENUECAT_ENTITLEMENT_ID || 'vip').trim() || 'vip'
+    const entitlementId = env.revenuecat.entitlementId.trim() || 'vip'
     const payload = await getRevenueCatSubscriber(user.id)
     const subscriber = payload?.subscriber && typeof payload.subscriber === 'object' ? payload.subscriber : null
     const entitlements = subscriber?.entitlements && typeof subscriber.entitlements === 'object' ? subscriber.entitlements : {}

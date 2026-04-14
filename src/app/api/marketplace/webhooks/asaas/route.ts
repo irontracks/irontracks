@@ -5,6 +5,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { parseJsonBody } from '@/utils/zod'
 import { cacheDelete } from '@/utils/cache'
 import { logWarn } from '@/lib/logger'
+import { env } from '@/utils/env'
 
 export const dynamic = 'force-dynamic'
 
@@ -42,7 +43,7 @@ const BodySchema = z
   .passthrough()
 
 export async function POST(req: Request) {
-  const secret = (process.env.ASAAS_WEBHOOK_SECRET || '').trim()
+  const secret = env.asaas.webhookSecret.trim()
   const provided = (req.headers.get('x-webhook-secret') || '').trim()
   if (!secret) {
     return NextResponse.json({ ok: false, error: 'webhook_not_configured' }, { status: 500 })

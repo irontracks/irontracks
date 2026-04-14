@@ -8,6 +8,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { normalizeExerciseName } from '@/utils/normalizeExerciseName'
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { env } from '@/utils/env'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -18,7 +19,7 @@ const ZodBodySchema = z
   })
   .strip()
 
-const MODEL_ID = process.env.GOOGLE_GENERATIVE_AI_MODEL_ID || 'gemini-2.5-flash'
+const MODEL_ID = env.gemini.modelId
 
 const JsonSchema = z.object({ items: z.array(z.record(z.unknown())).optional() }).passthrough()
 
@@ -43,7 +44,7 @@ const extractJson = (raw: string) => {
 }
 
 async function resolveWithGemini(items: Array<{ normalized: string; alias: string; candidates: string[] }>) {
-  const apiKey = String(process.env.GOOGLE_GENERATIVE_AI_API_KEY || '').trim()
+  const apiKey = String(env.gemini.apiKey || '').trim()
   if (!apiKey) throw new Error('missing_gemini_key')
 
   const genAI = new GoogleGenerativeAI(apiKey)

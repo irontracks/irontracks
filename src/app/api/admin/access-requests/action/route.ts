@@ -8,6 +8,7 @@ import { logError, logWarn } from '@/lib/logger'
 import { safePgLike } from '@/utils/safePgFilter'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { cacheDeletePattern } from '@/utils/cache'
+import { env } from '@/utils/env'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,8 +20,8 @@ const ZodBodySchema = z
   .strip()
 
 const sendApprovalEmail = async (toEmail: string, fullName: string, accountAlreadyCreated: boolean) => {
-  const apiKey = String(process.env.RESEND_API_KEY || '').trim()
-  const from = String(process.env.RESEND_FROM || '').trim()
+  const apiKey = env.resend.apiKey.trim()
+  const from = env.resend.from.trim()
   const to = String(toEmail || '').trim()
   if (!apiKey || !from || !to) return
 

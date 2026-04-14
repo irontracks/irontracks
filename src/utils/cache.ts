@@ -1,4 +1,5 @@
 import { logWarn } from '@/lib/logger'
+import { env } from '@/utils/env'
 
 type CacheEntry = {
   value: string
@@ -9,8 +10,8 @@ const localStore = new Map<string, CacheEntry>()
 
 export const getUpstashConfig = () => {
   try {
-    const url = String(process.env.UPSTASH_REDIS_REST_URL || '').trim()
-    const token = String(process.env.UPSTASH_REDIS_REST_TOKEN || '').trim()
+    const url = env.upstash.restUrl.trim()
+    const token = env.upstash.restToken.trim()
     if (!url || !token) return null
     return { url, token }
   } catch {

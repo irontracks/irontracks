@@ -5,6 +5,7 @@ import { requireUser, jsonError } from '@/utils/auth/route'
 import { parseJsonBody } from '@/utils/zod'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
+import { env } from '@/utils/env'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -15,7 +16,7 @@ const ZodBodySchema = z
   })
   .strip()
 
-const isEnabled = () => String(process.env.ENABLE_EXECUTION_VIDEO || '').trim().toLowerCase() === 'true'
+const isEnabled = () => env.features.executionVideo
 
 export async function POST(req: Request) {
   if (!isEnabled()) return jsonError(404, 'disabled')
