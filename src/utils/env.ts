@@ -4,11 +4,13 @@
 
 const isDev = process.env.NODE_ENV === 'development'
 const isProd = process.env.NODE_ENV === 'production'
+// Next.js sets NEXT_PHASE during `next build` — env vars may not exist yet
+const isBuildPhase = process.env.NEXT_PHASE === 'phase-production-build'
 
 function requireEnv(key: string, fallback?: string): string {
   const val = process.env[key] ?? fallback ?? ''
-  if (!val && isProd) {
-    // Em produção: lançar erro (vai aparecer no Sentry)
+  if (!val && isProd && !isBuildPhase) {
+    // Em produção runtime: lançar erro (vai aparecer no Sentry)
     throw new Error(`[env] Variável obrigatória ausente: ${key}`)
   }
   if (!val && isDev) {
