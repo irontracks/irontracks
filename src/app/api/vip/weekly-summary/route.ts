@@ -4,6 +4,7 @@ import { checkVipFeatureAccess, getVipPlanLimits } from '@/utils/vip/limits'
 import { parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
 import { cacheGet, cacheSet } from '@/utils/cache'
+import { checkRateLimitAsync } from '@/utils/rateLimit'
 
 export const dynamic = 'force-dynamic'
 
@@ -104,6 +105,14 @@ export async function GET() {
   const plan = await getVipPlanLimits(supabase, user.id)
   if (!plan?.limits?.analytics) {
     return NextResponse.json({ ok: false, error: 'vip_required', upgradeRequired: true }, { status: 403 })
+  }
+
+  const rl = await checkRateLimitAsync(`vip-weekly-summary:${user.id}`, 5, 3_600_000)
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { ok: false, error: 'rate_limit_exceeded' },
+      { status: 429, headers: { 'Retry-After': String(rl.retryAfterSeconds) } },
+    )
   }
 
   try {
