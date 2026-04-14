@@ -38,6 +38,7 @@
     "scan:async:critical": "node scripts/scan-async-loading.mjs --only-critical",
     "scan:console": "node scripts/scan-console.mjs",
     "scan:all": "node scripts/scan-secrets.mjs && node scripts/scan-a11y.mjs && node scripts/scan-async-loading.mjs --only-critical && node scripts/scan-buttons-static.mjs --only-critical",
+    "check:env": "npx tsx scripts/check-env.ts",
     "prepare": "husky"
   },
   "lint-staged": {
