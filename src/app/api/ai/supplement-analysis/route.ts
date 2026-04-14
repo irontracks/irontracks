@@ -13,6 +13,7 @@ import { checkVipFeatureAccess, incrementVipUsage } from '@/utils/vip/limits'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { parseJsonBody } from '@/utils/zod'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { env } from '@/utils/env'
 
 export const dynamic = 'force-dynamic'
 
@@ -83,8 +84,8 @@ Retorne SOMENTE um JSON válido com a seguinte estrutura:
 Inclua no máximo 6 suplementos, ordenados por prioridade. Seja específico e baseado em evidências científicas.`
 
   try {
-    const genai = new GoogleGenerativeAI(process.env.GOOGLE_GENERATIVE_AI_API_KEY || '')
-    const model = genai.getGenerativeModel({ model: process.env.GOOGLE_GENERATIVE_AI_MODEL_ID || 'gemini-2.5-flash' })
+    const genai = new GoogleGenerativeAI(env.gemini.apiKey || '')
+    const model = genai.getGenerativeModel({ model: env.gemini.modelId })
     const result = await model.generateContent(prompt)
     const text = result.response.text()
 

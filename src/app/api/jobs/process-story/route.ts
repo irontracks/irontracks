@@ -14,6 +14,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { dequeueStoryJobs, getQueueDepth, type StoryJobPayload } from '@/lib/queue/storyQueue'
 import { logError, logInfo, logWarn } from '@/lib/logger'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { env } from '@/utils/env'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -24,7 +25,7 @@ const JOBS_PER_BATCH = 5
 
 /** Verify the request comes from Vercel Cron or an authorised internal caller. */
 function isAuthorised(req: Request): boolean {
-    const secret = process.env.CRON_SECRET
+    const secret = env.security.cronSecret
     if (!secret) return false
     const auth = req.headers.get('authorization') ?? ''
     return auth === `Bearer ${secret}`

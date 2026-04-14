@@ -1,4 +1,5 @@
 import { logError, logWarn } from '@/lib/logger'
+import { env } from '@/utils/env'
 
 export type RateLimitResult = {
   allowed: boolean
@@ -38,7 +39,7 @@ const getStore = (): Map<string, Entry> => {
  *   → we take index -(1) from the right = "vercelEdge" wait, depth of 1 means
  *     the rightmost proxy is trusted, so we take the IP *before* it = "realClient".
  */
-const TRUSTED_PROXY_DEPTH = Math.max(1, Number(process.env.TRUSTED_PROXY_DEPTH ?? 1))
+const TRUSTED_PROXY_DEPTH = env.security.trustedProxyDepth
 
 /** Basic IPv4 / IPv6 format guard (not full validation, just sanity check). */
 const IP_RE = /^([\d.]{7,15}|([\da-f]{0,4}:){2,7}[\da-f]{0,4})$/i
@@ -104,8 +105,8 @@ export const checkRateLimit = (key: string, max: number, windowMs: number): Rate
 
 const getUpstashConfig = () => {
   try {
-    const url = String(process.env.UPSTASH_REDIS_REST_URL || '').trim()
-    const token = String(process.env.UPSTASH_REDIS_REST_TOKEN || '').trim()
+    const url = env.upstash.restUrl.trim()
+    const token = env.upstash.restToken.trim()
     if (!url || !token) return null
     return { url, token }
   } catch {

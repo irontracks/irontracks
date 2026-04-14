@@ -5,6 +5,7 @@ import { requireUser } from '@/utils/auth/route'
 import { checkVipFeatureAccess, incrementVipUsage } from '@/utils/vip/limits'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { parseJsonBody, parseJsonWithSchema } from '@/utils/zod'
+import { env } from '@/utils/env'
 
 export const dynamic = 'force-dynamic'
 
@@ -16,7 +17,7 @@ export const dynamic = 'force-dynamic'
  * weight, training schedule, and food preferences.
  * ────────────────────────────────────────────────────────── */
 
-const MODEL_ID = process.env.GOOGLE_GENERATIVE_AI_MODEL_ID || 'gemini-2.5-flash'
+const MODEL_ID = env.gemini.modelId
 
 const ZodBody = z.object({
   goal: z.string().optional().default('hipertrofia'),
@@ -60,7 +61,7 @@ export async function POST(req: Request) {
       }, { status: 403 })
     }
 
-    const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY
+    const apiKey = env.gemini.apiKey
     if (!apiKey) return NextResponse.json({ ok: false, error: 'AI não configurada' }, { status: 400 })
 
     const parsed = await parseJsonBody(req, ZodBody)

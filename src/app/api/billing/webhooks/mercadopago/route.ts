@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { mercadopagoRequest } from '@/lib/mercadopago'
 import { parseJsonBody } from '@/utils/zod'
+import { env } from '@/utils/env'
 
 export const dynamic = 'force-dynamic'
 
@@ -67,7 +68,7 @@ const BodySchema = z
   .passthrough()
 
 export async function POST(req: Request) {
-  const secret = (process.env.MERCADOPAGO_WEBHOOK_SECRET || '').trim()
+  const secret = env.mercadopago.webhookSecret.trim()
   if (!secret) {
     return NextResponse.json({ ok: false, error: 'webhook_not_configured' }, { status: 500 })
   }

@@ -8,10 +8,11 @@ import { parseJsonBody } from '@/utils/zod'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { logInfo, logError } from '@/lib/logger'
 import { safePg } from '@/utils/safePgFilter'
+import { env } from '@/utils/env'
 
 export const dynamic = 'force-dynamic'
 
-const MODEL = process.env.GOOGLE_GENERATIVE_AI_MODEL_ID || 'gemini-2.5-flash'
+const MODEL = env.gemini.modelId
 
 const BodySchema = z
   .object({
@@ -101,7 +102,7 @@ export async function POST(req: Request) {
     if (parsedBody.response) return parsedBody.response
     const { message, mode } = parsedBody.data!
 
-    const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY
+    const apiKey = env.gemini.apiKey
     if (!apiKey) {
       return NextResponse.json(
         { ok: false, error: 'API de IA não configurada. Configure GOOGLE_GENERATIVE_AI_API_KEY na Vercel e faça Redeploy.' },

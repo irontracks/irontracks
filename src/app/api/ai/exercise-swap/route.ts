@@ -4,6 +4,7 @@ import { GoogleGenerativeAI } from '@google/generative-ai'
 import { requireUser } from '@/utils/auth/route'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { parseJsonBody, parseJsonWithSchema } from '@/utils/zod'
+import { env } from '@/utils/env'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,7 +24,7 @@ const ZodBody = z.object({
   reason: z.string().optional(), // e.g. "equipment busy", "pain", "variety"
 }).strip()
 
-const MODEL_ID = process.env.GOOGLE_GENERATIVE_AI_MODEL_ID || 'gemini-2.5-flash'
+const MODEL_ID = env.gemini.modelId
 
 const extractJson = (text: string) => {
   const t = text.trim()
@@ -53,7 +54,7 @@ export async function POST(req: Request) {
       )
     }
 
-    const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY
+    const apiKey = env.gemini.apiKey
     if (!apiKey) {
       return NextResponse.json({ ok: false, error: 'AI não configurada' }, { status: 400 })
     }

@@ -4,6 +4,7 @@ import { cookies } from 'next/headers'
 import { z } from 'zod'
 import { getSupabaseCookieOptions } from '@/utils/supabase/cookieOptions'
 import { warmupCacheForUser } from '@/utils/cacheWarmup'
+import { env } from '@/utils/env'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -65,8 +66,8 @@ export async function GET(request: Request) {
     return NextResponse.redirect(new URL(`/auth/error?error=${encodeURIComponent(rawError)}`, safeOrigin))
   }
 
-  const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  const supabaseUrl = env.supabase.url
+  const supabaseAnonKey = env.supabase.anonKey
   if (!supabaseUrl || !supabaseAnonKey) {
     return NextResponse.redirect(new URL('/auth/error?error=missing_env', safeOrigin))
   }

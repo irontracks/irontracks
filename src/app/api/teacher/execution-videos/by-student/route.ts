@@ -4,11 +4,12 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { requireRole, jsonError } from '@/utils/auth/route'
 import { parseSearchParams } from '@/utils/zod'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { env } from '@/utils/env'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-const isEnabled = () => String(process.env.ENABLE_EXECUTION_VIDEO || '').trim().toLowerCase() === 'true'
+const isEnabled = () => env.features.executionVideo
 
 const QuerySchema = z.object({
   student_id: z.string().uuid('student_id inválido'),

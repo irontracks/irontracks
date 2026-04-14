@@ -2,12 +2,13 @@ import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { hasValidInternalSecret } from '@/utils/auth/route'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { env } from '@/utils/env'
 
 export const dynamic = 'force-dynamic'
 
 const isAuthorized = (req: Request) => {
   const authHeader = req.headers.get('authorization')
-  if (authHeader === `Bearer ${process.env.CRON_SECRET}`) return true
+  if (authHeader === `Bearer ${env.security.cronSecret}`) return true
   if (hasValidInternalSecret(req)) return true
   // Query param ?secret= removed — secrets in URLs leak to access logs and Referer headers
   return false

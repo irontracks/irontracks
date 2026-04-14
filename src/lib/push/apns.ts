@@ -11,14 +11,15 @@ import * as crypto from 'crypto'
 import * as http2 from 'http2'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { logInfo, logError, logWarn } from '@/lib/logger'
+import { env } from '@/utils/env'
 
 // ─── Configuration ──────────────────────────────────────────────────────────
 
 function getApnsConfig() {
-    const keyId = String(process.env.APNS_KEY_ID || '').trim()
-    const teamId = String(process.env.APNS_TEAM_ID || '').trim()
-    const keyP8 = String(process.env.APNS_KEY_P8 || '').trim()
-    const bundleId = String(process.env.APNS_BUNDLE_ID || 'com.irontracks.app').trim()
+    const keyId = env.apns.keyId.trim()
+    const teamId = env.apns.teamId.trim()
+    const keyP8 = env.apns.keyP8.trim()
+    const bundleId = env.apns.bundleId.trim()
     if (!keyId || !teamId || !keyP8) return null
     return { keyId, teamId, keyP8, bundleId }
 }
@@ -99,7 +100,7 @@ async function sendOneApnsPush(
 
             // Xcode debug builds use development provisioning profile → sandbox tokens
             // Set APNS_PRODUCTION=true in Vercel env only for TestFlight/App Store builds
-            const isProduction = String(process.env.APNS_PRODUCTION || '').trim().toLowerCase() === 'true'
+            const isProduction = env.apns.production
             const host = isProduction
                 ? 'https://api.push.apple.com'
                 : 'https://api.sandbox.push.apple.com'

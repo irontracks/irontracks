@@ -1,6 +1,7 @@
 import { getErrorMessage } from '@/utils/errorMessage'
 import { parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
+import { env } from '@/utils/env'
 type MercadoPagoError = {
   message?: string
   error?: string
@@ -16,9 +17,9 @@ export type MercadoPagoRequestOptions = {
 }
 
 export async function mercadopagoRequest<T>(options: MercadoPagoRequestOptions): Promise<T> {
-  const baseUrl = (process.env.MERCADOPAGO_BASE_URL || 'https://api.mercadopago.com').replace(/\/$/, '')
-  const accessToken = (process.env.MERCADOPAGO_ACCESS_TOKEN || '').trim()
-  const userAgent = (process.env.MERCADOPAGO_USER_AGENT || 'IronTracks').trim()
+  const baseUrl = env.mercadopago.baseUrl.replace(/\/$/, '')
+  const accessToken = env.mercadopago.accessToken.trim()
+  const userAgent = (env.mercadopago.userAgent || 'IronTracks').trim()
   if (!accessToken) {
     throw new Error('mercadopago_access_token_missing')
   }

@@ -7,6 +7,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { checkVipFeatureAccess, incrementVipUsage } from '@/utils/vip/limits'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { parseJsonBody, parseJsonWithSchema } from '@/utils/zod'
+import { env } from '@/utils/env'
 
 export const dynamic = 'force-dynamic'
 
@@ -19,7 +20,7 @@ const ZodBodySchema = z
   })
   .strip()
 
-const POST_WORKOUT_MODEL = process.env.GOOGLE_GENERATIVE_AI_MODEL_ID || 'gemini-2.5-flash'
+const POST_WORKOUT_MODEL = env.gemini.modelId
 
 const safeJsonParse = (raw: string) => parseJsonWithSchema(raw, z.unknown())
 
@@ -181,7 +182,7 @@ export async function POST(req: Request) {
         }, { status: 403 });
     }
 
-    const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY
+    const apiKey = env.gemini.apiKey
     if (!apiKey) {
       return NextResponse.json(
         {

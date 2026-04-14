@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { sendPushToUsers } from '@/lib/push/apns'
 import { createAdminClient } from '@/utils/supabase/admin'
+import { env } from '@/utils/env'
 
 export const dynamic = 'force-dynamic'
 
@@ -32,10 +33,10 @@ export async function GET() {
 
         // ── 1. Check env vars ──────────────────────────────────────────────────
         const cfg = {
-            APNS_KEY_ID: Boolean(process.env.APNS_KEY_ID?.trim()),
-            APNS_TEAM_ID: Boolean(process.env.APNS_TEAM_ID?.trim()),
-            APNS_KEY_P8: Boolean(process.env.APNS_KEY_P8?.trim()),
-            APNS_BUNDLE_ID: String(process.env.APNS_BUNDLE_ID || '(not set — using com.irontracks.app)'),
+            APNS_KEY_ID: Boolean(env.apns.keyId.trim()),
+            APNS_TEAM_ID: Boolean(env.apns.teamId.trim()),
+            APNS_KEY_P8: Boolean(env.apns.keyP8.trim()),
+            APNS_BUNDLE_ID: env.apns.bundleId || '(not set — using com.irontracks.app)',
         }
         const cfgOk = cfg.APNS_KEY_ID && cfg.APNS_TEAM_ID && cfg.APNS_KEY_P8
 

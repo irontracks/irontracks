@@ -17,6 +17,7 @@ import {
   buildWorkoutPlan,
 } from '@/utils/vip/periodization'
 import { vipPeriodizationExerciseSeed } from '@/data/vipPeriodizationExercises'
+import { env } from '@/utils/env'
 
 export const dynamic = 'force-dynamic'
 
@@ -36,7 +37,7 @@ const BodySchema = z
   })
   .strict()
 
-const MODEL_ID = process.env.GOOGLE_GENERATIVE_AI_MODEL_ID || 'gemini-2.5-flash'
+const MODEL_ID = env.gemini.modelId
 
 const safeString = (v: unknown) => {
   try {
@@ -145,7 +146,7 @@ const ensureExerciseLibrarySeeded = async (admin: ReturnType<typeof createAdminC
 }
 
 const generateProgramOverviewWithGemini = async (q: VipPeriodizationQuestionnaire, split: string) => {
-  const apiKey = process.env.GOOGLE_GENERATIVE_AI_API_KEY
+  const apiKey = env.gemini.apiKey
   if (!apiKey) return null
   const genAI = new GoogleGenerativeAI(apiKey)
   const model = genAI.getGenerativeModel({ model: MODEL_ID })

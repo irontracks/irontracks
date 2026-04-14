@@ -1,6 +1,7 @@
 import { getErrorMessage } from '@/utils/errorMessage'
 import { parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
+import { env } from '@/utils/env'
 type AsaasError = {
   errors?: { code?: string; description?: string }[]
   message?: string
@@ -13,9 +14,9 @@ export type AsaasRequestOptions = {
 }
 
 export async function asaasRequest<T>(options: AsaasRequestOptions): Promise<T> {
-  const baseUrl = (process.env.ASAAS_BASE_URL || 'https://api.asaas.com/v3').replace(/\/$/, '')
-  const apiKey = process.env.ASAAS_API_KEY
-  const userAgent = (process.env.ASAAS_USER_AGENT || 'IronTracks').trim()
+  const baseUrl = env.asaas.baseUrl.replace(/\/$/, '')
+  const apiKey = env.asaas.apiKey
+  const userAgent = (env.asaas.userAgent || 'IronTracks').trim()
   if (!apiKey) {
     throw new Error('asaas_api_key_missing')
   }

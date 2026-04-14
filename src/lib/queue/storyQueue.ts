@@ -8,6 +8,8 @@
  * Operations: RPUSH to enqueue (tail), LPOP to dequeue (head) → FIFO.
  */
 
+import { env } from '@/utils/env'
+
 export interface StoryJobPayload {
     storyId: string
     mediaPath: string
@@ -18,8 +20,8 @@ export interface StoryJobPayload {
 }
 
 function getUpstashCfg(): { url: string; token: string } | null {
-    const url = String(process.env.UPSTASH_REDIS_REST_URL || '').trim()
-    const token = String(process.env.UPSTASH_REDIS_REST_TOKEN || '').trim()
+    const url = env.upstash.restUrl.trim()
+    const token = env.upstash.restToken.trim()
     if (!url || !token) return null
     return { url, token }
 }

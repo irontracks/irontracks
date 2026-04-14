@@ -1,8 +1,9 @@
 import { GoogleGenerativeAI } from '@google/generative-ai'
 import { parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
+import { env } from '@/utils/env'
 
-const VIDEO_AI_MODEL_ID = process.env.GOOGLE_GENERATIVE_AI_MODEL_ID || 'gemini-2.5-flash'
+const VIDEO_AI_MODEL_ID = env.gemini.modelId || 'gemini-2.5-flash'
 
 const extractJson = (raw: string) => {
   const text = String(raw || '').trim()
@@ -25,7 +26,7 @@ const extractJson = (raw: string) => {
 }
 
 export async function getVideoQueriesFromGemini(exerciseName: string) {
-  const apiKey = String(process.env.GOOGLE_GENERATIVE_AI_API_KEY || '').trim()
+  const apiKey = env.gemini.apiKey.trim()
   if (!apiKey) throw new Error('missing_gemini_key')
 
   const name = String(exerciseName || '').trim()
@@ -57,7 +58,7 @@ export async function getVideoQueriesFromGemini(exerciseName: string) {
 }
 
 export async function searchYouTubeCandidates(query: string, maxResults = 5) {
-  const apiKey = String(process.env.YOUTUBE_API_KEY || '').trim()
+  const apiKey = env.youtube.apiKey.trim()
   if (!apiKey) throw new Error('missing_youtube_key')
 
   const q = String(query || '').trim()
