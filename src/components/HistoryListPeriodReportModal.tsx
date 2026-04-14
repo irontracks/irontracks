@@ -108,11 +108,14 @@ export function HistoryListPeriodReportModal({
             onClick={onClose}
         >
             <div
+                role="none"
+                className="bg-neutral-900 w-full max-w-lg rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden"
+                onClick={(e) => e.stopPropagation()}
+            >
+            <div
                 role="dialog"
                 aria-modal="true"
                 aria-label={typeLabel}
-                className="bg-neutral-900 w-full max-w-lg rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden"
-                onClick={(e) => e.stopPropagation()}
             >
                 {/* Header */}
                 <div className="p-4 border-b border-neutral-800 bg-gradient-to-r from-neutral-900 to-neutral-900/60">
@@ -268,6 +271,7 @@ export function HistoryListPeriodReportModal({
                         <div className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold mb-1">Texto para compartilhar</div>
                         <textarea
                             readOnly
+                            aria-label="Texto para compartilhar"
                             value={buildShareText(periodReport)}
                             className="w-full bg-neutral-950 border border-neutral-800 rounded-xl p-3 text-sm text-neutral-100 outline-none h-32 resize-none"
                         />
@@ -313,6 +317,7 @@ export function HistoryListPeriodReportModal({
                         Compartilhar
                     </button>
                 </div>
+            </div>
             </div>
         </div>
     );

@@ -127,8 +127,12 @@ export default function GuidedTour({
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/65 backdrop-blur-sm transition-opacity duration-300"
+        role="button"
+        tabIndex={-1}
+        aria-label="Fechar tour"
         style={{ opacity: isVisible ? 1 : 0 }}
         onClick={handleCancel}
+        onKeyDown={(e) => { if (e.key === 'Escape') handleCancel() }}
       />
 
       {/* Bottom sheet */}

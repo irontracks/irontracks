@@ -49,9 +49,9 @@ export const CardioFields: React.FC<CardioFieldsProps> = ({
         <>
             <div className="grid grid-cols-2 gap-4">
                 <div>
-                    <label className="text-[10px] text-neutral-500 uppercase font-bold text-center block mb-1">
+                    <div className="text-[10px] text-neutral-500 uppercase font-bold text-center block mb-1">
                         {isBikeOutdoor ? 'Tempo (minutos) (opcional)' : 'Tempo (minutos)'}
-                    </label>
+                    </div>
                     <input
                         type="number"
                         min={isBikeOutdoor ? undefined : 1}
@@ -63,7 +63,7 @@ export const CardioFields: React.FC<CardioFieldsProps> = ({
                     />
                 </div>
                 <div>
-                    <label className="text-[10px] text-yellow-500 uppercase font-bold text-center block mb-1">Intensidade</label>
+                    <div className="text-[10px] text-yellow-500 uppercase font-bold text-center block mb-1">Intensidade</div>
                     <input
                         type="number"
                         min="1"
@@ -78,7 +78,7 @@ export const CardioFields: React.FC<CardioFieldsProps> = ({
 
             <div className="mt-4 pt-4 border-t border-neutral-800">
                 <div className="flex items-center justify-between mb-3">
-                    <label className="text-[10px] font-bold text-neutral-400 uppercase">Configurações Avançadas</label>
+                    <div className="text-[10px] font-bold text-neutral-400 uppercase">Configurações Avançadas</div>
                     <label className="text-[10px] font-bold text-white uppercase cursor-pointer select-none flex items-center gap-2">
                         Modo HIT
                         <input
@@ -95,7 +95,7 @@ export const CardioFields: React.FC<CardioFieldsProps> = ({
                     <div className="bg-neutral-900/50 p-3 rounded-xl border border-neutral-800 mb-3 animate-in slide-in-from-top-2">
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                             <div>
-                                <label className="text-[10px] text-green-400 uppercase font-bold block mb-1">Trabalho (s)</label>
+                                <div className="text-[10px] text-green-400 uppercase font-bold block mb-1">Trabalho (s)</div>
                                 <input
                                     type="number"
                                     aria-label="Segundos de trabalho no HIT"
@@ -106,7 +106,7 @@ export const CardioFields: React.FC<CardioFieldsProps> = ({
                                 />
                             </div>
                             <div>
-                                <label className="text-[10px] text-red-400 uppercase font-bold block mb-1">Descanso (s)</label>
+                                <div className="text-[10px] text-red-400 uppercase font-bold block mb-1">Descanso (s)</div>
                                 <input
                                     type="number"
                                     aria-label="Segundos de descanso no HIT"
@@ -117,7 +117,7 @@ export const CardioFields: React.FC<CardioFieldsProps> = ({
                                 />
                             </div>
                             <div>
-                                <label className="text-[10px] text-neutral-400 uppercase font-bold block mb-1">Rounds</label>
+                                <div className="text-[10px] text-neutral-400 uppercase font-bold block mb-1">Rounds</div>
                                 <input
                                     type="number"
                                     aria-label="Número de rounds do HIT"
@@ -128,7 +128,7 @@ export const CardioFields: React.FC<CardioFieldsProps> = ({
                                 />
                             </div>
                             <div>
-                                <label className="text-[10px] text-neutral-400 uppercase font-bold block mb-1">Nível</label>
+                                <div className="text-[10px] text-neutral-400 uppercase font-bold block mb-1">Nível</div>
                                 <select
                                     value={config.hitIntensity ?? 'high'}
                                     onChange={(e) => updateCardioConfig('hitIntensity', e.target.value)}
@@ -161,7 +161,7 @@ export const CardioFields: React.FC<CardioFieldsProps> = ({
                     </summary>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3 animate-in slide-in-from-top-2 duration-200 bg-neutral-900/30 p-3 rounded-xl">
                         <div>
-                            <label className="text-[10px] text-neutral-500 uppercase font-bold block mb-1">Inclinação (%)</label>
+                            <div className="text-[10px] text-neutral-500 uppercase font-bold block mb-1">Inclinação (%)</div>
                             <input
                                 type="number"
                                 aria-label="Inclinação da esteira em porcentagem"
@@ -172,7 +172,7 @@ export const CardioFields: React.FC<CardioFieldsProps> = ({
                             />
                         </div>
                         <div>
-                            <label className="text-[10px] text-neutral-500 uppercase font-bold block mb-1">Velocidade</label>
+                            <div className="text-[10px] text-neutral-500 uppercase font-bold block mb-1">Velocidade</div>
                             <input
                                 type="number"
                                 step="0.1"
@@ -184,7 +184,7 @@ export const CardioFields: React.FC<CardioFieldsProps> = ({
                             />
                         </div>
                         <div>
-                            <label className="text-[10px] text-neutral-500 uppercase font-bold block mb-1">Carga/Nível</label>
+                            <div className="text-[10px] text-neutral-500 uppercase font-bold block mb-1">Carga/Nível</div>
                             <input
                                 type="number"
                                 aria-label="Carga ou nível de resistência do equipamento"
@@ -195,7 +195,7 @@ export const CardioFields: React.FC<CardioFieldsProps> = ({
                             />
                         </div>
                         <div>
-                            <label className="text-[10px] text-neutral-500 uppercase font-bold block mb-1">FC Alvo (BPM)</label>
+                            <div className="text-[10px] text-neutral-500 uppercase font-bold block mb-1">FC Alvo (BPM)</div>
                             <input
                                 type="number"
                                 aria-label="Frequência cardíaca alvo em BPM"

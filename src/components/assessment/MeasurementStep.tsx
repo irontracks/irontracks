@@ -92,20 +92,21 @@ export const MeasurementStep: React.FC<MeasurementStepProps> = ({
       <div className="space-y-3">
         <div className="flex items-center">
           <Ruler className="w-4 h-4 text-yellow-500 mr-2" />
-          <label className="block text-sm font-bold text-neutral-300">
+          <div className="block text-sm font-bold text-neutral-300">
             {m.label}
-          </label>
+          </div>
           <span className="ml-2 text-xs text-neutral-500">(cm)</span>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
           {/* Esquerdo */}
           <div>
-            <label className="block text-xs text-neutral-500 mb-1">Esquerdo</label>
+            <div className="block text-xs text-neutral-500 mb-1">Esquerdo</div>
             <div className="relative">
               <input
                 type="text"
                 inputMode="decimal"
+                aria-label={`${m.label} esquerdo`}
                 value={String(leftVal)}
                 onChange={(e) => handleNumberInput(bilateral.left, e.target.value)}
                 placeholder={m.placeholder}
@@ -122,11 +123,12 @@ export const MeasurementStep: React.FC<MeasurementStepProps> = ({
 
           {/* Direito */}
           <div>
-            <label className="block text-xs text-neutral-500 mb-1">Direito</label>
+            <div className="block text-xs text-neutral-500 mb-1">Direito</div>
             <div className="relative">
               <input
                 type="text"
                 inputMode="decimal"
+                aria-label={`${m.label} direito`}
                 value={String(rightVal)}
                 onChange={(e) => handleNumberInput(bilateral.right, e.target.value)}
                 placeholder={m.placeholder}
@@ -158,7 +160,7 @@ export const MeasurementStep: React.FC<MeasurementStepProps> = ({
     <div className="space-y-3">
       <div className="flex items-center">
         <Ruler className="w-4 h-4 text-yellow-500 mr-2" />
-        <label className="block text-sm font-bold text-neutral-300">
+        <label htmlFor={`field-${String(m.field)}`} className="block text-sm font-bold text-neutral-300">
           {m.label}
         </label>
         <span className="ml-2 text-xs text-neutral-500">(cm)</span>
@@ -166,6 +168,8 @@ export const MeasurementStep: React.FC<MeasurementStepProps> = ({
 
       <div className="relative">
         <input
+          id={`field-${String(m.field)}`}
+          aria-label={`${m.label} em centímetros`}
           type="text"
           inputMode="decimal"
           value={formData[m.field]}
@@ -268,10 +272,12 @@ export const MeasurementStep: React.FC<MeasurementStepProps> = ({
 
       {/* Observações */}
       <div className="space-y-2">
-        <label className="block text-sm font-bold text-neutral-300">
+        <label htmlFor="measurement-observations" className="block text-sm font-bold text-neutral-300">
           Observações (opcional)
         </label>
         <textarea
+          id="measurement-observations"
+          aria-label="Observações sobre as medições"
           value={formData.observations}
           onChange={(e) => updateFormData({ observations: e.target.value })}
           rows={3}

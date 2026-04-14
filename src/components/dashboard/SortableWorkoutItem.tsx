@@ -32,6 +32,7 @@ export const SortableWorkoutItem = memo(function SortableWorkoutItem({
             </div>
             <div className="w-10 text-xs font-mono text-neutral-500">#{index + 1}</div>
             <input
+                aria-label="Título do treino"
                 value={item.title}
                 onChange={(e) => onChangeTitle(item.id, e.target.value)}
                 disabled={saving}

@@ -122,6 +122,7 @@ const GlobalDialog = () => {
 						<input
 							key={`${dialog.type}:${dialog.title}:${dialog.message}:${dialog.defaultValue ?? ''}`}
 							ref={inputRef}
+							aria-label={dialog.title || 'Campo de entrada'}
 							defaultValue={dialog.defaultValue ?? ''}
 							onKeyDown={(e) => e.key === 'Enter' && handleConfirm()}
 							className="w-full bg-neutral-950 border border-neutral-800 rounded-xl p-3 text-white text-center font-bold outline-none focus:border-purple-500 transition-colors mt-2"

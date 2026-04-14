@@ -29,10 +29,15 @@ export function EditWorkoutListModal({
   return (
     <div
       className="fixed inset-0 z-[1200] flex items-center justify-center p-4 pt-safe"
+      role="button"
+      tabIndex={-1}
+      aria-label="Fechar modal"
       style={{ background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(16px)' }}
       onClick={() => !savingListEdits && onClose()}
+      onKeyDown={(e) => { if (e.key === 'Escape' && !savingListEdits) onClose() }}
     >
       <div
+        role="none"
         className="w-full max-w-2xl rounded-2xl overflow-hidden"
         style={{
           background: 'rgba(10,10,10,0.99)',

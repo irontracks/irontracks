@@ -147,7 +147,7 @@ export default function AISuggestionBadge({
 
   // Suggestion available — compact or expanded
   return (
-    <div className="mt-2" onClick={(e) => e.stopPropagation()}>
+    <div className="mt-2" role="none" onClick={(e) => e.stopPropagation()}>
       {/* Compact suggestion bar */}
       <button
         type="button"

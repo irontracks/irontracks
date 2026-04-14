@@ -56,15 +56,19 @@ export function AccessibleModal({
             aria-hidden="true"
         >
             <div
-                ref={focusTrapRef}
-                role="dialog"
-                aria-modal="true"
-                aria-label={ariaLabel}
-                aria-labelledby={ariaLabelledBy}
+                role="none"
                 className={className}
                 onClick={(e) => e.stopPropagation()}
             >
-                {children}
+                <div
+                    ref={focusTrapRef}
+                    role="dialog"
+                    aria-modal="true"
+                    aria-label={ariaLabel}
+                    aria-labelledby={ariaLabelledBy}
+                >
+                    {children}
+                </div>
             </div>
         </div>
     )

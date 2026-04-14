@@ -47,11 +47,13 @@ export const BasicInfoStep: React.FC<BasicInfoStepProps> = ({
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Data da Avaliação */}
         <div className="space-y-2">
-          <label className="block text-sm font-bold text-neutral-300">
+          <label htmlFor="assessment_date" className="block text-sm font-bold text-neutral-300">
             <Calendar className="w-4 h-4 inline mr-2 text-yellow-500" />
             Data da Avaliação *
           </label>
           <input
+            id="assessment_date"
+            aria-label="Data da Avaliação"
             type="date"
             value={formData.assessment_date}
             onChange={(e) => handleInputChange('assessment_date', e.target.value)}
@@ -67,12 +69,14 @@ export const BasicInfoStep: React.FC<BasicInfoStepProps> = ({
 
         {/* Peso */}
         <div className="space-y-2">
-          <label className="block text-sm font-bold text-neutral-300">
+          <label htmlFor="weight" className="block text-sm font-bold text-neutral-300">
             <Weight className="w-4 h-4 inline mr-2 text-yellow-500" />
             Peso (kg) *
           </label>
           <div className="relative">
             <input
+              id="weight"
+              aria-label="Peso em quilogramas"
               type="text"
               inputMode="decimal"
               value={formData.weight}
@@ -91,12 +95,14 @@ export const BasicInfoStep: React.FC<BasicInfoStepProps> = ({
 
         {/* Altura */}
         <div className="space-y-2">
-          <label className="block text-sm font-bold text-neutral-300">
+          <label htmlFor="height" className="block text-sm font-bold text-neutral-300">
             <Ruler className="w-4 h-4 inline mr-2 text-yellow-500" />
             Altura (cm) *
           </label>
           <div className="relative">
             <input
+              id="height"
+              aria-label="Altura em centímetros"
               type="text"
               inputMode="decimal"
               value={formData.height}
@@ -115,12 +121,14 @@ export const BasicInfoStep: React.FC<BasicInfoStepProps> = ({
 
         {/* Idade */}
         <div className="space-y-2">
-          <label className="block text-sm font-bold text-neutral-300">
+          <label htmlFor="age" className="block text-sm font-bold text-neutral-300">
             <User className="w-4 h-4 inline mr-2 text-yellow-500" />
             Idade (anos) *
           </label>
           <div className="relative">
             <input
+              id="age"
+              aria-label="Idade em anos"
               type="text"
               inputMode="numeric"
               value={formData.age}
@@ -139,16 +147,17 @@ export const BasicInfoStep: React.FC<BasicInfoStepProps> = ({
 
         {/* Gênero */}
         <div className="space-y-2 md:col-span-2">
-          <label className="block text-sm font-bold text-neutral-300">
+          <div className="block text-sm font-bold text-neutral-300">
             <User className="w-4 h-4 inline mr-2 text-yellow-500" />
             Gênero *
-          </label>
+          </div>
           <div className="flex space-x-4">
             <label className="flex items-center cursor-pointer">
               <input
                 type="radio"
                 name="gender"
                 value="M"
+                aria-label="Masculino"
                 checked={formData.gender === 'M'}
                 onChange={(e) => handleInputChange('gender', e.target.value)}
                 className="mr-2 text-yellow-500 focus:ring-yellow-500 bg-neutral-800 border-neutral-600"
@@ -160,6 +169,7 @@ export const BasicInfoStep: React.FC<BasicInfoStepProps> = ({
                 type="radio"
                 name="gender"
                 value="F"
+                aria-label="Feminino"
                 checked={formData.gender === 'F'}
                 onChange={(e) => handleInputChange('gender', e.target.value)}
                 className="mr-2 text-yellow-500 focus:ring-yellow-500 bg-neutral-800 border-neutral-600"

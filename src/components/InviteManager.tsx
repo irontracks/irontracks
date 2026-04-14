@@ -283,12 +283,12 @@ const InviteManager = ({ isOpen, onClose, onInvite }: InviteManagerProps) => {
                     <div className="relative">
                         <Search className="absolute left-3 top-3 text-neutral-500" size={18} />
                         <input
+                            aria-label="Buscar atleta"
                             value={searchTerm}
                             onChange={e => setSearchTerm(e.target.value)}
                             placeholder="Buscar atleta..."
                             className="w-full pl-10 pr-4 py-3 rounded-xl border text-white outline-none transition-all placeholder:text-neutral-600 focus:border-yellow-500/40"
                             style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }}
-                            autoFocus
                         />
                     </div>
                 </div>
