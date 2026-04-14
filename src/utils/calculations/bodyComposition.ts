@@ -326,7 +326,7 @@ export const validateAssessmentValues = (assessment: Partial<Assessment>): boole
     }
 
     return true;
-  } catch (error) {
+  } catch {
     return false;
   }
 };
@@ -368,7 +368,7 @@ export const safeCalculateSumSkinfolds = (assessment: Partial<Assessment>): numb
     }
 
     return validSkinfolds.reduce((sum, value) => sum + value, 0);
-  } catch (error) {
+  } catch {
     return null;
   }
 };

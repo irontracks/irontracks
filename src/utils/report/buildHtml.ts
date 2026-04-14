@@ -7,7 +7,7 @@ import {
   normalizeExerciseKey,
   calculateTotalVolume,
 } from '@/utils/report/formatters'
-import { estimateCaloriesMet, MET_LIGHT, DEFAULT_BODY_WEIGHT_KG } from '@/utils/calories/metEstimate'
+import { estimateCaloriesMet } from '@/utils/calories/metEstimate'
 
 
 const getSetTag = (log: unknown): string | null => {

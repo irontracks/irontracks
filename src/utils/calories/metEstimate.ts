@@ -462,7 +462,7 @@ export const estimateCaloriesMet = (
 
   // ── 1. Compute total volume (with bodyweight equivalent) ─────────────────
   let totalVolume = 0
-  let totalReps = 0
+  let _totalReps = 0
   for (const [logKey, v] of Object.entries(sessionLogs)) {
     if (!v || typeof v !== 'object') continue
     const obj = v as AnyObj
@@ -483,7 +483,7 @@ export const estimateCaloriesMet = (
           const b = block as AnyObj
           const blockW = Number(String(b?.weight ?? '').replace(',', '.'))
           const br = parseReps(String(b?.reps ?? ''))
-          if (blockW > 0 && br > 0) { totalVolume += blockW * br; totalReps += br }
+          if (blockW > 0 && br > 0) { totalVolume += blockW * br; _totalReps += br }
         }
         continue
       }
@@ -501,7 +501,7 @@ export const estimateCaloriesMet = (
 
     if (w > 0 && r > 0) {
       totalVolume += w * r
-      totalReps += r
+      _totalReps += r
     }
   }
 
