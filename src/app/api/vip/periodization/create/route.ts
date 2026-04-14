@@ -4,6 +4,7 @@ import crypto from 'crypto'
 
 import { parseJsonBody, parseJsonWithSchema } from '@/utils/zod'
 import { requireUser } from '@/utils/auth/route'
+import { checkRateLimitAsync } from '@/utils/rateLimit'
 // NEEDS ADMIN: RLS bypass required for cross-user data operations
 import { createAdminClient } from '@/utils/supabase/admin'
 import { checkVipFeatureAccess } from '@/utils/vip/limits'
@@ -187,6 +188,14 @@ export async function POST(req: Request) {
       return NextResponse.json(
         { ok: false, error: 'limit_reached', upgradeRequired: true, message: 'Limite de gerações do Wizard atingido. Faça upgrade para continuar.' },
         { status: 403 },
+      )
+    }
+
+    const rl = await checkRateLimitAsync(`vip-periodization:${userId}`, 3, 3_600_000)
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { ok: false, error: 'rate_limit_exceeded' },
+        { status: 429, headers: { 'Retry-After': String(rl.retryAfterSeconds) } },
       )
     }
 

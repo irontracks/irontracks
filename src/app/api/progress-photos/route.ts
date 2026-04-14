@@ -7,6 +7,7 @@ import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { parseJsonBody } from '@/utils/zod'
+import { checkRateLimitAsync } from '@/utils/rateLimit'
 
 export const dynamic = 'force-dynamic'
 
@@ -37,6 +38,14 @@ export async function GET() {
 export async function POST(req: NextRequest) {
   const auth = await requireUser()
   if (!auth.ok) return auth.response
+
+  const rl = await checkRateLimitAsync(`progress-photos:${auth.user.id}`, 10, 60_000)
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { ok: false, error: 'rate_limit_exceeded' },
+      { status: 429, headers: { 'Retry-After': String(rl.retryAfterSeconds) } },
+    )
+  }
 
   const parsed = await parseJsonBody(req, PostSchema)
   if (parsed.response) return parsed.response

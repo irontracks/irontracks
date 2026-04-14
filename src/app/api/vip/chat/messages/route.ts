@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
 import { checkVipFeatureAccess, getVipPlanLimits } from '@/utils/vip/limits'
 import { parseJsonBody } from '@/utils/zod'
+import { checkRateLimitAsync } from '@/utils/rateLimit'
 
 export const dynamic = 'force-dynamic'
 
@@ -57,6 +58,14 @@ export async function POST(req: Request) {
     return NextResponse.json(
       { ok: false, error: 'limit_reached', upgradeRequired: true, message: 'Limite de mensagens atingido. Faça upgrade para continuar.' },
       { status: 403 },
+    )
+  }
+
+  const rl = await checkRateLimitAsync(`vip-chat:${user.id}`, 20, 60_000)
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { ok: false, error: 'rate_limit_exceeded' },
+      { status: 429, headers: { 'Retry-After': String(rl.retryAfterSeconds) } },
     )
   }
 
