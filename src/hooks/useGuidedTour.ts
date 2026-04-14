@@ -36,6 +36,10 @@ interface UseGuidedTourReturn {
   logTourEvent: (event: unknown, payload: unknown) => Promise<void>
   upsertTourFlags: (patch: unknown) => Promise<{ ok: boolean; error?: string }>
   writeLocalTourDismissal: (uid: unknown, status: unknown) => void
+  /** Call when user completes all tour steps */
+  handleTourComplete: () => Promise<void>
+  /** Call when user skips the tour (also used for cancel) */
+  handleTourDismiss: (reason: 'skipped' | 'cancelled') => Promise<void>
 }
 
 export function useGuidedTour({
@@ -284,6 +288,29 @@ export function useGuidedTour({
     wasTourSeenEver,
   ])
 
+  // ─── High-level tour action callbacks ────────────────────────────────────
+  const handleTourComplete = useCallback(async () => {
+    setTourOpen(false)
+    setTourBoot((prev) => ({ ...prev, completed: true, skipped: false }))
+    try { writeLocalTourDismissal(userId, 'completed') } catch { /* best-effort */ }
+    const res = await upsertTourFlags({ tour_completed_at: new Date().toISOString(), tour_skipped_at: null })
+    if (!res?.ok) {
+      logWarn('useGuidedTour', 'Falha ao persistir flags do tour (completed). Mantendo fallback local.', res)
+    }
+    await logTourEvent('tour_completed', { version: TOUR_VERSION })
+  }, [userId, writeLocalTourDismissal, upsertTourFlags, logTourEvent])
+
+  const handleTourDismiss = useCallback(async (reason: 'skipped' | 'cancelled') => {
+    setTourOpen(false)
+    setTourBoot((prev) => ({ ...prev, completed: false, skipped: true }))
+    try { writeLocalTourDismissal(userId, 'skipped') } catch { /* best-effort */ }
+    const res = await upsertTourFlags({ tour_skipped_at: new Date().toISOString(), tour_completed_at: null })
+    if (!res?.ok) {
+      logWarn('useGuidedTour', `Falha ao persistir flags do tour (${reason}). Mantendo fallback local.`, res)
+    }
+    await logTourEvent(`tour_${reason}`, { version: TOUR_VERSION })
+  }, [userId, writeLocalTourDismissal, upsertTourFlags, logTourEvent])
+
   return {
     tourOpen,
     setTourOpen,
@@ -293,5 +320,7 @@ export function useGuidedTour({
     logTourEvent,
     upsertTourFlags,
     writeLocalTourDismissal,
+    handleTourComplete,
+    handleTourDismiss,
   }
 }
