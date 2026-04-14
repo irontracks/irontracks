@@ -127,7 +127,7 @@ export default function FeedCard({
       </button>
 
       {/* Content */}
-      <div className="flex-1 min-w-0" onClick={() => onProfileClick?.(item.senderId)}>
+      <div className="flex-1 min-w-0" role="button" tabIndex={0} onClick={() => onProfileClick?.(item.senderId)} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onProfileClick?.(item.senderId) }}>
         <div className="flex items-center gap-2 mb-0.5">
           <span className="text-sm font-black text-white truncate">{name}</span>
           <span className="text-[10px] text-neutral-600 flex-shrink-0">{timeAgo(item.createdAt)}</span>

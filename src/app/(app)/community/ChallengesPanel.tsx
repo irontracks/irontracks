@@ -169,6 +169,7 @@ export default function ChallengesPanel({
                 <div className="flex-1">
                   <label className="text-[10px] text-neutral-500 uppercase tracking-wider font-bold">Meta</label>
                   <input
+                    aria-label="Meta do desafio"
                     type="number"
                     min={1}
                     max={100}
@@ -180,6 +181,7 @@ export default function ChallengesPanel({
                 <div className="flex-1">
                   <label className="text-[10px] text-neutral-500 uppercase tracking-wider font-bold">Prazo (dias)</label>
                   <input
+                    aria-label="Prazo em dias"
                     type="number"
                     min={1}
                     max={30}
