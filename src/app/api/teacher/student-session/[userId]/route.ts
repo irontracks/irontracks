@@ -1,9 +1,15 @@
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { requireRoleOrBearer } from '@/utils/auth/route'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { parseJsonBody } from '@/utils/zod'
 
 export const dynamic = 'force-dynamic'
+
+const PatchBodySchema = z.object({
+  state: z.record(z.unknown()),
+}).strip()
 
 async function verifyAccess(req: Request, userId: string) {
   if (!userId) return { ok: false as const, response: NextResponse.json({ ok: false, error: 'missing userId' }, { status: 400 }) }
@@ -68,10 +74,10 @@ export async function PATCH(
     const access = await verifyAccess(req, userId)
     if (!access.ok) return access.response
 
-    const body = await req.json() as { state: unknown }
-    if (!body?.state) return NextResponse.json({ ok: false, error: 'missing state' }, { status: 400 })
+    const parsedBody = await parseJsonBody(req, PatchBodySchema)
+    if (parsedBody.response) return parsedBody.response
+    const { state } = parsedBody.data!
 
-    const state = body.state as Record<string, unknown>
     const startedAtRaw = state?.startedAt
     const startedAtMs = typeof startedAtRaw === 'number'
       ? startedAtRaw
