@@ -138,7 +138,11 @@ export function useWorkoutCrud({
                     const pre = preCheckin && typeof preCheckin === 'object'
                         ? (preCheckin as Record<string, unknown>)
                         : ({} as Record<string, unknown>)
-                    const energyN = Number(pre.energy)
+                    // Map mood selection to numeric energy (1-5 scale)
+                    const moodToEnergy: Record<string, number> = { great: 5, normal: 3, tired: 1 }
+                    const moodRaw = String(pre.mood || '').toLowerCase()
+                    const energyFromMood = moodToEnergy[moodRaw] ?? undefined
+                    const energyN = Number(pre.energy || energyFromMood)
                     const sorenessN = Number(pre.soreness)
                     const timeN = Number(pre.timeMinutes)
                     const supabase = createClient()
@@ -152,6 +156,7 @@ export function useWorkoutCrud({
                         soreness: Number.isFinite(sorenessN) && sorenessN >= 0 && sorenessN <= 10 ? Math.round(sorenessN) : null,
                         notes: String(pre.notes || '').trim() ? String(pre.notes || '').trim() : null,
                         answers: {
+                            mood: moodRaw || null,
                             time_minutes: Number.isFinite(timeN) && timeN > 0 ? Math.round(timeN) : null,
                             body_weight_kg: Number.isFinite(weightKgN) && weightKgN >= 20 && weightKgN <= 300 ? Math.round(weightKgN * 10) / 10 : null,
                         },
