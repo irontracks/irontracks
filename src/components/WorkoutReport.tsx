@@ -2,7 +2,7 @@
 import React, { useRef, useState, useEffect, useMemo, Suspense } from 'react';
 import dynamic from 'next/dynamic';
 import NextImage from 'next/image';
-import { Download, ArrowLeft, FileText, Code, Share2 } from 'lucide-react';
+import { Download, ArrowLeft, FileText, Code, Share2, Save } from 'lucide-react';
 import { buildReportHTML } from '@/utils/report/buildHtml';
 import { fetchLogoDataUrl } from '@/utils/report/fetchLogoDataUrl';
 import { workoutPlanHtml } from '@/utils/report/templates';
@@ -78,15 +78,18 @@ interface WorkoutReportProps {
     onClose: () => void
     settings?: AnyObj | null
     onUpgrade?: () => void
+    onSaveToTemplate?: (workout: AnyObj) => Promise<{ ok: boolean; mode?: string; error?: string }>
 }
 
-const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose, settings, onUpgrade }: WorkoutReportProps) => {
+const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose, settings, onUpgrade, onSaveToTemplate }: WorkoutReportProps) => {
     const safeSession = session && typeof session === 'object' ? (session as AnyObj) : null;
     const reportRef = useRef<HTMLDivElement | null>(null);
     const [showExportMenu, setShowExportMenu] = useState(false);
     const [showStory, setShowStory] = useState(false);
     const [showShareCard, setShowShareCard] = useState(false);
     const [sharing, setSharing] = useState(false);
+    const [savingTemplate, setSavingTemplate] = useState(false);
+    const [templateSaved, setTemplateSaved] = useState(false);
     const storiesV2Enabled = useMemo(() => isFeatureEnabled(settings, FEATURE_KEYS.storiesV2), [settings]);
     const [_showStoryPrompt, setShowStoryPrompt] = useState(false);
 
@@ -619,6 +622,60 @@ const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose,
                                         <Code size={16} className="text-yellow-500" />
                                         <span className="font-bold">Salvar JSON</span>
                                     </button>
+                                    {onSaveToTemplate && (
+                                        <button
+                                            disabled={savingTemplate || templateSaved}
+                                            onClick={async () => {
+                                                setShowExportMenu(false)
+                                                if (!safeSession) return
+                                                setSavingTemplate(true)
+                                                try {
+                                                    const exercises = Array.isArray(safeSession.exercises) ? safeSession.exercises as AnyObj[] : []
+                                                    const logsObj = safeSession.logs && typeof safeSession.logs === 'object'
+                                                        ? (safeSession.logs as Record<string, AnyObj>)
+                                                        : {}
+                                                    const updatedExercises = exercises.map((ex, exIdx) => {
+                                                        const setsCount = Number(ex.sets) || (Array.isArray(ex.setDetails) ? (ex.setDetails as unknown[]).length : 1)
+                                                        const newSetDetails: AnyObj[] = []
+                                                        for (let s = 0; s < setsCount; s++) {
+                                                            const log = logsObj[`${exIdx}-${s}`]
+                                                            if (log && log.done) {
+                                                                newSetDetails.push({
+                                                                    weight: log.weight ?? null,
+                                                                    reps: log.reps ?? ex.reps ?? null,
+                                                                })
+                                                            } else {
+                                                                const existing = Array.isArray(ex.setDetails) ? (ex.setDetails as AnyObj[])[s] : undefined
+                                                                newSetDetails.push(existing ?? { weight: null, reps: ex.reps ?? null })
+                                                            }
+                                                        }
+                                                        return { ...ex, setDetails: newSetDetails, sets: setsCount }
+                                                    })
+                                                    const workout: AnyObj = {
+                                                        id: safeSession.originWorkoutId ?? null,
+                                                        title: safeSession.workoutTitle ?? 'Treino',
+                                                        exercises: updatedExercises,
+                                                    }
+                                                    const res = await onSaveToTemplate(workout)
+                                                    if (res?.ok) {
+                                                        setTemplateSaved(true)
+                                                    } else {
+                                                        logError('WorkoutReport.saveTemplate', res?.error || 'Falha desconhecida')
+                                                    }
+                                                } catch (e) {
+                                                    logError('WorkoutReport.saveTemplate', e)
+                                                } finally {
+                                                    setSavingTemplate(false)
+                                                }
+                                            }}
+                                            className="w-full flex items-center gap-2 px-4 py-3 text-left text-sm text-neutral-200 hover:bg-neutral-900 border-t border-neutral-800 disabled:opacity-50"
+                                        >
+                                            <Save size={16} className={templateSaved ? 'text-green-500' : 'text-yellow-500'} />
+                                            <span className="font-bold">
+                                                {templateSaved ? 'Salvo no treino ✓' : savingTemplate ? 'Salvando…' : 'Salvar no treino'}
+                                            </span>
+                                        </button>
+                                    )}
                                 </div>
                             )}
                         </div>

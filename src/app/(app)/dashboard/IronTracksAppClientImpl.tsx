@@ -905,6 +905,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                             settings={userSettingsApi?.settings ?? null}
                                             onUpgrade={() => openVipView()}
                                             onClose={() => setView(reportBackView || 'dashboard')}
+                                            onSaveToTemplate={handlePersistWorkoutTemplateFromSession}
                                         />
                                     </SectionErrorBoundary>
                                 </div>
