@@ -18,8 +18,9 @@ const nextConfig: NextConfig = {
   // ─── Tree-shake heavy libs at build time (reduces JS bundle size) ─────────
   // lucide-react: saves ~200kb by only importing icons actually used
   // chart.js / react-chartjs-2: only bundles chart types imported
-   
-  ...({ optimizePackageImports: ['lucide-react', 'chart.js', 'react-chartjs-2', '@tanstack/react-virtual'] } as any),
+  experimental: {
+    optimizePackageImports: ['lucide-react', 'chart.js', 'react-chartjs-2', '@tanstack/react-virtual'],
+  },
 
   // tsc roda localmente via `npm run deploy` antes de cada push.
   // Desabilitar no build do Vercel evita checagem duplicada (~40-60s por deploy).
@@ -144,8 +145,10 @@ export default withSentryConfig(nextConfig, {
   project: "javascript-nextjs",
   silent: !process.env.CI,
   tunnelRoute: "/monitoring",
-  disableLogger: true,
-  automaticVercelMonitors: false,
+  webpack: {
+    treeshake: { removeDebugLogging: true },
+    automaticVercelMonitors: false,
+  },
   // Desabilita geração de source maps no build do Vercel (~30-50s economizados).
   // Sentry ainda captura erros em produção; stack traces mostram código minificado.
   sourcemaps: { disable: true },
