@@ -26,7 +26,15 @@ export const ReportCheckinPanel = ({ preCheckin, postCheckin, recommendations }:
                     <div className="mt-2 grid grid-cols-2 gap-3 text-sm">
                         <div>
                             <div className="text-[10px] font-black uppercase tracking-widest text-neutral-500">Energia</div>
-                            <div className="font-black text-white">{preCheckin?.energy != null && String(preCheckin.energy) !== '' ? String(preCheckin.energy) : '—'}</div>
+                            <div className="font-black text-white">{(() => {
+                                const e = preCheckin?.energy
+                                if (e == null || String(e) === '') return '—'
+                                const n = Number(e)
+                                if (n >= 5) return '💪 Ótimo'
+                                if (n >= 3) return '😐 Normal'
+                                if (n >= 1) return '😴 Cansado'
+                                return String(e)
+                            })()}</div>
                         </div>
                         <div>
                             <div className="text-[10px] font-black uppercase tracking-widest text-neutral-500">Dor</div>
