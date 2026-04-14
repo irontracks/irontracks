@@ -10,6 +10,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { buildHeuristicExerciseMap } from '@/utils/exerciseMuscleHeuristics'
 import { normalizeExerciseName } from '@/utils/normalizeExerciseName'
 import type { MuscleId } from '@/utils/muscleMapConfig'
+import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 
 export const dynamic = 'force-dynamic'
 
@@ -21,9 +22,12 @@ const ANTAGONIST_PAIRS = [
   { a: 'delts_front', b: 'delts_rear', labelA: 'Deltoide frontal', labelB: 'Deltoide posterior' },
 ] as const
 
-export async function GET() {
+export async function GET(req: Request) {
   const auth = await requireUser()
   if (!auth.ok) return auth.response
+  const ip = getRequestIp(req)
+  const rl = await checkRateLimitAsync(`analysis:muscle-balance:${auth.user.id}:${ip}`, 30, 60_000)
+  if (!rl.allowed) return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 })
 
   const admin = createAdminClient()
   const since = new Date(Date.now() - 28 * 24 * 60 * 60 * 1000).toISOString()

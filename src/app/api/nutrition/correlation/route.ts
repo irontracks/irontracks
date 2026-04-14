@@ -10,14 +10,18 @@
 import { NextResponse } from 'next/server'
 import { requireUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
+import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 
 export const dynamic = 'force-dynamic'
 
 const isoDate = (d: Date) => d.toISOString().slice(0, 10)
 
-export async function GET() {
+export async function GET(req: Request) {
   const auth = await requireUser()
   if (!auth.ok) return auth.response
+  const ip = getRequestIp(req)
+  const rl = await checkRateLimitAsync(`nutrition:correlation:${auth.user.id}:${ip}`, 30, 60_000)
+  if (!rl.allowed) return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 })
 
   const admin = createAdminClient()
   const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000)

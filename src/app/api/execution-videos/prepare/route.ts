@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { requireUser, jsonError } from '@/utils/auth/route'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -39,6 +40,9 @@ export async function POST(req: Request) {
 
   const auth = await requireUser()
   if (!auth.ok) return auth.response
+  const ip = getRequestIp(req)
+  const rl = await checkRateLimitAsync(`execution-videos:prepare:${auth.user.id}:${ip}`, 5, 60_000)
+  if (!rl.allowed) return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 })
 
   try {
     const parsedBody = await parseJsonBody(req, ZodBodySchema)
