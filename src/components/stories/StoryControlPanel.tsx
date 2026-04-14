@@ -1,10 +1,10 @@
 'use client'
 
 import React from 'react'
-import { Layout, Move, RotateCcw, Crown, Download, Loader2, CheckCircle2, AlertCircle, Scissors } from 'lucide-react'
+import { Layout, Move, RotateCcw, Crown, Download, Loader2, CheckCircle2, AlertCircle } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import VideoTrimmer from '@/components/stories/VideoTrimmer'
-import { STORY_LAYOUTS, LivePositions, DEFAULT_LIVE_POSITIONS } from '../storyComposerUtils'
+import { STORY_LAYOUTS, LivePositions } from '../storyComposerUtils'
 
 interface StoryControlPanelProps {
     layout: string
@@ -30,8 +30,8 @@ interface StoryControlPanelProps {
 }
 
 export function StoryControlPanel({
-    layout, onSelectLayout, livePositions, onResetPositions,
-    showTrimmer, setShowTrimmer, isVideo, videoDuration, trimRange, setTrimRange,
+    layout, onSelectLayout, onResetPositions,
+    showTrimmer, isVideo, videoDuration, trimRange, setTrimRange,
     previewTime, videoRef, busy, busyAction, busySubAction, uploadProgress,
     error, info, onPost, onShare,
 }: StoryControlPanelProps) {

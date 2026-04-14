@@ -1,6 +1,4 @@
 'use client'
-// Focus trap for accessibility
-import { useFocusTrap } from '@/hooks/useFocusTrap';
 
 import React from 'react';
 import { X } from 'lucide-react';
@@ -57,16 +55,15 @@ export function AssessmentHistoryModal({
     return (
         <div
             className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4"
-            onClick={onClose}
-         role="dialog" aria-modal="true" aria-label="AssessmentHistory">
+            role="dialog" aria-modal="true" aria-label="AssessmentHistory">
+            <div role="presentation" className="fixed inset-0" onClick={onClose} />
             <div
-                className="w-full max-w-3xl rounded-2xl border shadow-2xl overflow-hidden"
+                className="w-full max-w-3xl rounded-2xl border shadow-2xl overflow-hidden relative z-10"
                 style={{
                     background: 'linear-gradient(160deg, rgba(20,18,10,0.98) 0%, rgba(10,10,10,0.99) 40%)',
                     borderColor: 'rgba(234,179,8,0.12)',
                     boxShadow: '0 32px 64px -16px rgba(0,0,0,0.8), inset 0 1px 0 rgba(234,179,8,0.1)',
                 }}
-                onClick={(e) => e.stopPropagation()}
             >
                 {/* Header */}
                 <div className="p-4 border-b flex justify-between items-center relative" style={{ borderColor: 'rgba(255,255,255,0.06)' }}>

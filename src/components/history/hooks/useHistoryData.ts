@@ -8,7 +8,7 @@ import { logError } from '@/lib/logger';
 import {
     WorkoutLog, WorkoutSummary, WorkoutTemplate, ManualExercise,
     NewWorkoutState, HistoryListProps,
-    WorkoutLogSchema, ExerciseIdSchema, SetLiteSchema,
+    ExerciseIdSchema, SetLiteSchema,
     isRecord, parseRawSession,
 } from '@/components/historyListTypes';
 

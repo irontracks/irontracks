@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { logWarn } from '@/lib/logger'
 import { createAdminClient } from '@/utils/supabase/admin'
-import { getInternalSecret, hasValidInternalSecret } from '@/utils/auth/route'
+import { hasValidInternalSecret } from '@/utils/auth/route'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'

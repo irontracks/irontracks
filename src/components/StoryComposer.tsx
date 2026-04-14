@@ -38,12 +38,12 @@ export default function StoryComposer({ open, session, onClose, calories }: Stor
 
   const {
     inputRef, videoRef,
-    selectedFile, mediaKind, backgroundUrl, backgroundImage,
+    mediaKind, backgroundUrl, backgroundImage,
     busy, busyAction, busySubAction, uploadProgress, isExporting,
     error, info, showSafeGuide, setShowSafeGuide,
     layout, livePositions, setLivePositions,
     draggingKey, saveImageUrl, setSaveImageUrl,
-    showTrimmer, setShowTrimmer, videoDuration, trimRange, setTrimRange, previewTime, setPreviewTime,
+    showTrimmer, setShowTrimmer, videoDuration, trimRange, setTrimRange, previewTime,
     metrics: rawMetrics,
     loadMedia, onSelectLayout,
     onPiecePointerDown, onPiecePointerMove, onPiecePointerUp,
@@ -225,6 +225,7 @@ export default function StoryComposer({ open, session, onClose, calories }: Stor
                       <video
                         key={backgroundUrl || 'no-video'}
                         ref={videoRef}
+                        aria-label="Prévia do vídeo"
                         crossOrigin="anonymous"
                         src={backgroundUrl || undefined}
                         className="absolute inset-0 w-full h-full object-cover bg-black"
@@ -232,7 +233,7 @@ export default function StoryComposer({ open, session, onClose, calories }: Stor
                       />
                     )}
 
-                    <canvas ref={previewCanvasRef} width={CANVAS_W} height={CANVAS_H} className="absolute inset-0 w-full h-full object-contain pointer-events-none" />
+                    <canvas ref={previewCanvasRef} aria-label="Canvas de prévia da story" width={CANVAS_W} height={CANVAS_H} className="absolute inset-0 w-full h-full object-contain pointer-events-none" />
 
                     {showSafeGuide && (
                       <div className="absolute inset-0 pointer-events-none z-10">
@@ -294,9 +295,11 @@ export default function StoryComposer({ open, session, onClose, calories }: Stor
                                 transformOrigin: 'center center',
                               }}
                             >
-                              <img
+                              <NextImage
                                 src={stk.src}
                                 alt={stk.alt}
+                                width={BASE_SIZE}
+                                height={BASE_SIZE}
                                 draggable={false}
                                 className="w-full h-full object-contain drop-shadow-2xl pointer-events-none"
                               />
@@ -346,7 +349,7 @@ export default function StoryComposer({ open, session, onClose, calories }: Stor
                       <Upload size={16} className="text-yellow-500" />
                       {isVideo ? 'TROCAR' : 'TROCAR FOTO'}
                       <input
-                        ref={inputRef} type="file" accept="image/*,video/*" className="sr-only"
+                        ref={inputRef} type="file" aria-label="Trocar mídia" accept="image/*,video/*" className="sr-only"
                         onChange={(e) => { const f = e.target.files?.[0] || null; if (inputRef.current) inputRef.current.value = ''; loadMedia(f) }}
                       />
                     </label>

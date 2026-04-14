@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useMemo, useRef, useState } from 'react';
-import { Video, X, StopCircle, Check, Loader2, Upload, AlertCircle } from 'lucide-react';
+import { Video, Upload } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 import { useDialog } from '@/contexts/DialogContext';
 import { VideoCompositor } from '@/lib/video/VideoCompositor';
@@ -343,6 +343,7 @@ export default function ExecutionVideoCapture(props: ExecutionVideoCaptureProps)
       <input
         ref={inputRef}
         type="file"
+        aria-label="Gravar vídeo de execução"
         accept="video/*"
         capture="environment"
         onChange={onChange}

@@ -22,7 +22,7 @@ const BodySchema = z.object({
   reminders: z.array(ReminderSchema).max(10),
 })
 
-export async function GET(req: Request) {
+export async function GET(_req: Request) {
   try {
     const auth = await requireUser()
     if (!auth.ok) return auth.response

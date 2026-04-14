@@ -34,7 +34,7 @@ export function useTeamInvites({
     teamworkV2Enabled,
     soundOpts,
     notify,
-    onStartSession,
+    onStartSession: _onStartSession,
 }: UseTeamInvitesParams) {
     const [incomingInvites, setIncomingInvites] = useState<IncomingInvite[]>([])
     const [acceptedInviteNotice, setAcceptedInviteNotice] = useState<AcceptedInviteNotice | null>(null)
@@ -195,7 +195,7 @@ export function useTeamInvites({
 
         const safeUserId = String(user.id);
         let mounted = true;
-        const refetch = async () => {
+        const _refetch = async () => {
             try {
                 const { data } = await supabase
                     .from('invites')

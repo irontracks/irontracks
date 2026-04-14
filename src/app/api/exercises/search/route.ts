@@ -4,7 +4,7 @@ import { parseSearchParams } from '@/utils/zod'
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { normalizeExerciseName } from '@/utils/normalizeExerciseName'
-import { safePg, safePgLike } from '@/utils/safePgFilter'
+import { safePgLike } from '@/utils/safePgFilter'
 import { cacheGet, cacheSet } from '@/utils/cache'
 
 // Cache TTL: 120s (resultados de busca mudam raramente durante uma sessão)

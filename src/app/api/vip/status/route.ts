@@ -1,12 +1,11 @@
 import { NextResponse } from 'next/server'
 import { requireUser } from '@/utils/auth/route'
-import { createClient } from '@/utils/supabase/server'
 import { checkVipFeatureAccess, getVipPlanLimits } from '@/utils/vip/limits'
 import { cacheGet, cacheSet } from '@/utils/cache'
 
 export const dynamic = 'force-dynamic'
 
-export async function GET(req: Request) {
+export async function GET(_req: Request) {
   try {
     const auth = await requireUser()
     if (!auth.ok) return auth.response

@@ -6,7 +6,6 @@ import type { UnknownRecord } from '@/types/app';
 
 export function StudentCheckinsTab() {
     const {
-        selectedStudent,
         studentCheckinsRows,
         studentCheckinsLoading,
         studentCheckinsError,

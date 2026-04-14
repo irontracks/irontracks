@@ -94,7 +94,7 @@ export function useWorkoutCrud({
     editActiveAddExerciseRef,
     setEditActiveDraft,
     setEditActiveOpen,
-    inAppNotify,
+    inAppNotify: _inAppNotify,
 }: UseWorkoutCrudOptions): UseWorkoutCrudReturn {
 
     const handleStartSession = useCallback(async (workout: unknown) => {

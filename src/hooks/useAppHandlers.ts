@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useCallback } from 'react'
-import { logError } from '@/lib/logger'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { ActiveSession, Exercise, UserRecord } from '@/types/app'
 

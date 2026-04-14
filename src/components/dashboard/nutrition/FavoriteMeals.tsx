@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState } from 'react'
 import type { FavoriteMeal } from './useFavoriteMeals'
 
 type Props = {
@@ -58,7 +58,7 @@ export default function FavoriteMeals({ favorites, loading, onSelect, onDelete, 
           ) : (
             <div className="flex items-center gap-2 mt-2">
               <input
-                autoFocus
+                aria-label="Nome da refeição favorita"
                 value={savingName}
                 onChange={(e) => setSavingName(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') handleSave() }}

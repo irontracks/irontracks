@@ -3,7 +3,6 @@
 import React from 'react'
 import NextImage from 'next/image'
 
-type AnyObj = Record<string, unknown>
 
 interface ReportHighlightsPanelProps {
   prCount: number

@@ -1,12 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/admin'
-import { getInternalSecret, hasValidInternalSecret } from '@/utils/auth/route'
+import { hasValidInternalSecret } from '@/utils/auth/route'
 import { getErrorMessage } from '@/utils/errorMessage'
-
-import { z } from 'zod'
-
-const QuerySchema = z.object({ secret: z.string().optional() })
-
 
 export const dynamic = 'force-dynamic'
 

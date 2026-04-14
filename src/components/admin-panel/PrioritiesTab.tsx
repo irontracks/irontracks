@@ -3,7 +3,7 @@ import { useAdminPanel } from './AdminPanelContext';
 import { AlertTriangle } from 'lucide-react';
 
 export const PrioritiesTab: React.FC = () => {
-    const { prioritiesItems, prioritiesLoading } = useAdminPanel();
+    useAdminPanel();
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500">

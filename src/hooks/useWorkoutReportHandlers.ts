@@ -47,7 +47,7 @@ export function useWorkoutReportHandlers({
     calories,
     setIsGenerating,
     pdfUrl,
-    setPdfUrl,
+    setPdfUrl: _setPdfUrl,
     onUpgrade,
 }: UseWorkoutReportHandlersParams) {
     const [showExportMenu, setShowExportMenu] = useState(false)

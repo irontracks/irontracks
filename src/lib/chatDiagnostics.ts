@@ -5,7 +5,7 @@ import { safePg } from '@/utils/safePgFilter'
 export async function runChatDiagnostics(supabase: SupabaseClient, userId: string) {
   const report: { ok: boolean; steps: Record<string, unknown>[]; error?: string } = { ok: true, steps: [] }
   try {
-    const { data: me, error: meErr } = await supabase
+    const { data: _me, error: meErr } = await supabase
       .from('profiles')
       .select('id, display_name, photo_url, last_seen')
       .eq('id', userId)

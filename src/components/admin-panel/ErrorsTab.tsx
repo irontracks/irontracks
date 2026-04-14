@@ -1,7 +1,6 @@
 import React from 'react';
 import { useAdminPanel } from './AdminPanelContext';
 import { AlertTriangle, CheckCircle, Search, Filter } from 'lucide-react';
-import { ErrorReport } from '@/types/admin';
 
 export const ErrorsTab: React.FC = () => {
     const {
@@ -15,8 +14,8 @@ export const ErrorsTab: React.FC = () => {
         // Vou adicionar placeholders
     } = useAdminPanel();
 
-    const handleResolveError = (id: string) => { alert('Resolver erro em implementação'); };
-    const handleDeleteError = (id: string) => { alert('Excluir erro em implementação'); };
+    const handleResolveError = (_id: string) => { alert('Resolver erro em implementação'); };
+    const handleDeleteError = (_id: string) => { alert('Excluir erro em implementação'); };
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
@@ -25,6 +24,7 @@ export const ErrorsTab: React.FC = () => {
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" size={18} />
                     <input
                         type="text"
+                        aria-label="Buscar erros"
                         placeholder="Buscar erros..."
                         value={errorsQuery}
                         onChange={(e) => setErrorsQuery(e.target.value)}

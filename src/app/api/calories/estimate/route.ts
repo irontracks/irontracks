@@ -16,14 +16,6 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import { safePg } from '@/utils/safePgFilter'
 import {
   estimateCaloriesMet,
-  estimateDurationFromLogs,
-  selectBaseMet,
-  getExerciseComplexityFactor,
-  getRpeMultiplier,
-  getEpocFactor,
-  getStyleFactor,
-  detectTrainingStyle,
-  MET_REST,
   DEFAULT_BODY_WEIGHT_KG,
   getBodyweightFraction,
 } from '@/utils/calories/metEstimate'

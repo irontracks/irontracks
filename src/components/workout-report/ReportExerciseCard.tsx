@@ -1,6 +1,5 @@
 'use client'
 import React from 'react'
-import { normalizeExerciseKey } from '@/utils/report/formatters'
 
 type AnyObj = Record<string, unknown>
 

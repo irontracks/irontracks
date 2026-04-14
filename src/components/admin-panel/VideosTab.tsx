@@ -1,6 +1,6 @@
 import React from 'react';
 import { useAdminPanel } from './AdminPanelContext';
-import { Video, RefreshCw, AlertTriangle, CheckCircle, Clock } from 'lucide-react';
+import { Video, RefreshCw } from 'lucide-react';
 
 export const VideosTab: React.FC = () => {
     const {
@@ -56,6 +56,7 @@ export const VideosTab: React.FC = () => {
                 <div className="space-y-4">
                     <div className="flex gap-2">
                         <input
+                            aria-label="Nome do exercício"
                             value={videoExerciseName}
                             onChange={(e) => setVideoExerciseName(e.target.value)}
                             placeholder="Nome do exercício (opcional)"

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Search, Plus, Edit, Download, Trash2, BookOpen } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, BookOpen } from 'lucide-react';
 import { useAdminPanel } from './AdminPanelContext';
 import { AdminWorkoutTemplate } from '@/types/admin';
 import { normalizeWorkoutTitle } from '@/utils/workoutTitle';
@@ -18,7 +18,7 @@ export const TemplatesTab: React.FC = () => {
 
     // Como handleDeleteTemplate não estava no hook, vou adicionar depois. 
     // Por enquanto, deixo comentado ou uso uma função placeholder.
-    const handleDeleteTemplate = (id: string) => {
+    const handleDeleteTemplate = (_id: string) => {
         alert('Funcionalidade de excluir template em implementação.');
     };
 
@@ -42,6 +42,7 @@ export const TemplatesTab: React.FC = () => {
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" size={18} />
                     <input
                         type="text"
+                        aria-label="Buscar templates"
                         placeholder="Buscar templates..."
                         value={templateQuery}
                         onChange={(e) => setTemplateQuery(e.target.value)}

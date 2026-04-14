@@ -1,6 +1,6 @@
 'use client'
 import React, { useState, useRef, useEffect, useCallback } from 'react'
-import { MessageCircle, Send, X, ChevronDown } from 'lucide-react'
+import { MessageCircle, Send, ChevronDown } from 'lucide-react'
 import Image from 'next/image'
 import { useTeamWorkout } from '@/contexts/TeamWorkoutContext'
 
@@ -21,14 +21,13 @@ interface TeamChatDrawerProps {
 }
 
 const QUICK_REACTIONS = ['🔥', '💪', '👏', '🏆', '😤', '💀']
-const MAX_MESSAGES = 60
 
 /**
  * TeamChatDrawer — real-time team workout chat using Supabase Realtime broadcast.
  * Renders as a floating button (💬) that opens a chat drawer during a team session.
  * Messages are ephemeral (in-memory only, broadcast via the team_logs channel).
  */
-export function TeamChatDrawer({ myUserId, myDisplayName, myPhotoURL, participants }: TeamChatDrawerProps) {
+export function TeamChatDrawer({ myUserId, myPhotoURL, participants }: TeamChatDrawerProps) {
     const { teamSession, chatMessages, sendChatMessage } = useTeamWorkout() as unknown as {
         teamSession: { id: string } | null
         chatMessages: ChatMessage[]
@@ -184,6 +183,7 @@ export function TeamChatDrawer({ myUserId, myDisplayName, myPhotoURL, participan
                     <div className="flex items-center gap-2 px-3 py-3 shrink-0" style={{ borderTop: '1px solid rgba(255,255,255,0.06)' }}>
                         <input
                             type="text"
+                            aria-label="Mensagem"
                             value={input}
                             onChange={e => setInput(e.target.value)}
                             onKeyDown={handleKeyDown}

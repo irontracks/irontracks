@@ -30,7 +30,7 @@ import {
   calculateSumSkinfolds
 } from '@/utils/calculations/bodyComposition';
 import { getErrorMessage } from '@/utils/errorMessage';
-import { logError, logWarn, logInfo } from '@/lib/logger'
+import { logError } from '@/lib/logger'
 import { safePg, safePgLike } from '@/utils/safePgFilter'
 
 interface UseAssessmentReturn {

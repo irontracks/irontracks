@@ -1,7 +1,7 @@
 'use client'
 
-import React, { useState, useEffect, useCallback } from 'react'
-import { TrendingUp, Target, Loader2, ChevronDown, ChevronUp } from 'lucide-react'
+import React, { useState } from 'react'
+import { TrendingUp, Target, ChevronDown, ChevronUp } from 'lucide-react'
 
 /* ──────────────────────────────────────────────────────────
  * PRPrediction
@@ -68,7 +68,7 @@ function predictWeeksToTarget(
 }
 
 export default function PRPrediction({
-  exerciseName,
+  exerciseName: _exerciseName,
   currentMax,
   history,
   unit = 'kg',

@@ -1,7 +1,7 @@
 'use client'
 
-import React, { useState, useCallback } from 'react'
-import { Scale, Loader2, TrendingDown, TrendingUp, Minus, AlertTriangle } from 'lucide-react'
+import React, { useState } from 'react'
+import { Scale, TrendingDown, TrendingUp, Minus, AlertTriangle } from 'lucide-react'
 
 /* ──────────────────────────────────────────────────────────
  * MuscleBalanceCard

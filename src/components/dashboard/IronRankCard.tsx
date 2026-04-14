@@ -172,7 +172,7 @@ const IronRankCard = memo(function IronRankCard({
     }, [rankOpen])
 
     // ── Derived ────────────────────────────────────────────────────────────────
-    const totalImproved = prs.filter(pr => countImprovements(pr) > 0).length
+
     const bestPr = prs.length > 0 ? [...prs].sort((a, b) => countImprovements(b) - countImprovements(a))[0] : null
     const bestTier = bestPr ? getTier(bestPr) : null
     const withinWeek = (() => {
@@ -554,16 +554,6 @@ const IronRankCard = memo(function IronRankCard({
 
 // ─── Sub-components ───────────────────────────────────────────────────────────
 
-function StatChip({ icon, label, value }: { icon: React.ReactNode; label: string; value: string }) {
-    return (
-        <div className="flex items-center gap-1 px-2 py-1.5 rounded-lg"
-            style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
-            {icon}
-            <span className="text-[9px] text-neutral-600 font-bold">{label}</span>
-            <span className="text-[10px] font-black text-white ml-auto">{value}</span>
-        </div>
-    )
-}
 
 function MetricBadge({ label, value, highlight }: { label: string; value: string; highlight: boolean }) {
     return (

@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import Image from 'next/image';
 import {
     Search, UserPlus, Mail, ChevronLeft, Edit3, Users,
     Dumbbell, Clock, AlertCircle, Loader2, BookOpen,
@@ -14,10 +15,11 @@ const TeacherAvatar = ({ teacher, size = 'md' }: { teacher: AdminTeacher; size?:
     const char = String(teacher.name || teacher.email || '?').charAt(0).toUpperCase();
     if (teacher.photo_url) {
         return (
-            <img
+            <Image
                 src={teacher.photo_url}
                 alt={teacher.name || ''}
-                loading="lazy"
+                width={64}
+                height={64}
                 className={`${sizes[size]} rounded-2xl object-cover border border-yellow-500/30 shadow-lg shadow-yellow-500/10`}
             />
         );
@@ -44,7 +46,10 @@ const TeacherCard = ({
 
     return (
         <div
+            role="button"
+            tabIndex={0}
             onClick={onClick}
+            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onClick() }}
             className="group relative bg-neutral-900/60 border border-neutral-800/80 rounded-3xl p-5 cursor-pointer transition-all duration-300 hover:border-yellow-500/40 hover:bg-neutral-900/90 hover:shadow-[0_8px_40px_rgba(234,179,8,0.08)] active:scale-[0.99] overflow-hidden"
         >
             {/* Subtle glow bg */}
@@ -388,7 +393,7 @@ export const TeachersTab: React.FC = () => {
                             { label: 'Treinos', value: teacherTemplatesRows.length, icon: Dumbbell, color: 'blue' },
                             { label: 'Histórico', value: teacherHistoryRows.length, icon: BookOpen, color: 'violet' },
                             { label: 'Alertas', value: teacherInboxItems.length, icon: AlertCircle, color: 'red' },
-                        ].map(({ label, value, icon: Icon, color }) => (
+                        ].map(({ label, value, color }) => (
                             <div key={label} className="text-center">
                                 <div className={`text-xl font-black ${color === 'yellow' ? 'text-yellow-400'
                                     : color === 'blue' ? 'text-blue-400'
@@ -510,6 +515,7 @@ export const TeachersTab: React.FC = () => {
                 <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500" />
                 <input
                     type="text"
+                    aria-label="Buscar professor por nome ou e-mail"
                     placeholder="Buscar professor por nome ou e-mail…"
                     value={teacherQuery}
                     onChange={(e) => setTeacherQuery(e.target.value)}

@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useRef } from 'react'
+import { useEffect, useRef } from 'react'
 import { useStableSupabaseClient } from '@/hooks/useStableSupabaseClient'
-import { logError, logWarn } from '@/lib/logger'
+import { logError } from '@/lib/logger'
 import type { AdminUser, AdminTeacher, AdminWorkoutTemplate } from '@/types/admin'
 import type { UnknownRecord } from '@/types/app'
 import type { WorkoutExercise } from '@/types/workout'
@@ -8,8 +8,6 @@ import { adminFetchJson } from '@/utils/admin/adminFetch'
 import { safePg, safePgLike } from '@/utils/safePgFilter'
 import { workoutTitleKey, normalizeWorkoutTitle } from '@/utils/workoutTitle'
 import { getErrorMessage } from '@/utils/errorMessage'
-import { z } from 'zod'
-import { parseJsonWithSchema } from '@/utils/zod'
 import { apiAdmin, apiWorkouts } from '@/lib/api'
 
 interface AdminDataFetchersDeps {
@@ -55,7 +53,7 @@ interface AdminDataFetchersDeps {
 export function useAdminDataFetchers(deps: AdminDataFetchersDeps) {
     const supabase = useStableSupabaseClient()
     const {
-        user, isAdmin, isTeacher, selectedStudent, tab, subTab,
+        user, isAdmin, isTeacher, selectedStudent, tab,
         registering, teachersList, addingTeacher, editingTeacher,
         getAdminAuthHeaders, loadedStudentInfo,
         setUsersList, setTeachersList, setTemplates, setStudentWorkouts,
@@ -88,7 +86,7 @@ export function useAdminDataFetchers(deps: AdminDataFetchersDeps) {
             }
         };
         testConnection();
-    }, [supabase]);
+    }, [supabase, setDebugError]);
 
     // fetchStudents
     useEffect(() => {

@@ -1,6 +1,4 @@
 'use client'
-// Focus trap for accessibility
-import { useFocusTrap } from '@/hooks/useFocusTrap'
 
 import { X } from 'lucide-react'
 import type { UnknownRecord } from '@/types/app'
@@ -101,7 +99,7 @@ export const CheckinsModal = ({
             const postRows = rows.filter((r) => String(r?.kind || '').trim() === 'post')
             const preAvgEnergy = avg(preRows.map((r) => toNumberOrNull(r?.energy)))
             const preAvgSoreness = avg(preRows.map((r) => toNumberOrNull(r?.soreness)))
-            const preAvgTime = avg(
+            const _preAvgTime = avg(
               preRows.map((r) => {
                 const answers: UnknownRecord = isPlainRecord(r?.answers) ? r.answers : {}
                 return toNumberOrNull(answers?.time_minutes ?? answers?.timeMinutes)

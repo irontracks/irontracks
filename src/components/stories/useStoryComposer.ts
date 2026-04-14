@@ -23,7 +23,6 @@ import {
     extFromMime,
     guessMediaKind,
     formatDatePt,
-    formatDuration,
     calculateTotalVolume,
     fitCover,
     clampPctWithSize,
@@ -274,7 +273,7 @@ export function useStoryComposer({ open, session, onClose, caloriesOverride }: U
             setBackgroundImage(img)
             setInfo('')
         } catch { setError('Não foi possível carregar a mídia.'); setInfo('') }
-    }, [open, backgroundUrl])
+    }, [open, backgroundUrl, mediaLoadIdRef])
 
     // Live layout drag handlers
     const getSizeForKey = useCallback((key: string) => {

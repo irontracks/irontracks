@@ -3,7 +3,7 @@ import { getVipPlanLimits } from '@/utils/vip/limits'
 import { getWeeklyResetStart } from '@/utils/vip/weekReset'
 import { NextResponse } from 'next/server'
 import { getErrorMessage } from '@/utils/errorMessage'
-import { logError, logWarn, logInfo } from '@/lib/logger'
+import { logError } from '@/lib/logger'
 
 export const dynamic = 'force-dynamic'
 
