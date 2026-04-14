@@ -52,9 +52,12 @@ export function HistoryListEditModal({
 }: EditModalProps) {
     return (
         <div
-            role="presentation"
+            role="button"
+            tabIndex={-1}
+            aria-label="Fechar modal"
             className="fixed inset-0 z-[70] bg-black/85 backdrop-blur-md flex items-center justify-center p-4"
-            onClick={onClose}
+            onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+            onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}
         >
             <div
                 role="dialog"
@@ -66,7 +69,6 @@ export function HistoryListEditModal({
                     borderColor: 'rgba(234,179,8,0.12)',
                     boxShadow: '0 32px 64px -16px rgba(0,0,0,0.8), inset 0 1px 0 rgba(234,179,8,0.1)',
                 }}
-                onClick={(e) => e.stopPropagation()}
             >
                 <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-yellow-500/40 to-transparent" />
                 <div className="p-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
@@ -76,8 +78,9 @@ export function HistoryListEditModal({
                 <div className="p-4 space-y-3 max-h-[70vh] overflow-y-auto">
                     <div className="grid grid-cols-2 gap-2">
                         <div>
-                            <label className="text-[10px] uppercase font-bold text-neutral-500">Título</label>
+                            <div className="text-[10px] uppercase font-bold text-neutral-500">Título</div>
                             <input
+                                aria-label="Título"
                                 value={editTitle}
                                 onChange={(e) => setEditTitle(e.target.value)}
                                 className="w-full rounded-xl p-3 text-white outline-none border focus:border-yellow-500/40 transition-all"
@@ -85,8 +88,9 @@ export function HistoryListEditModal({
                             />
                         </div>
                         <div>
-                            <label className="text-[10px] uppercase font-bold text-neutral-500">Duração (min)</label>
+                            <div className="text-[10px] uppercase font-bold text-neutral-500">Duração (min)</div>
                             <input
+                                aria-label="Duração (min)"
                                 type="number"
                                 value={editDuration}
                                 onChange={(e) => setEditDuration(e.target.value)}
@@ -97,8 +101,9 @@ export function HistoryListEditModal({
                     </div>
 
                     <div>
-                        <label className="text-[10px] uppercase font-bold text-neutral-500">Data e Hora</label>
+                        <div className="text-[10px] uppercase font-bold text-neutral-500">Data e Hora</div>
                         <input
+                            aria-label="Data e Hora"
                             type="datetime-local"
                             value={editDate}
                             onChange={(e) => setEditDate(e.target.value)}
@@ -108,8 +113,9 @@ export function HistoryListEditModal({
                     </div>
 
                     <div>
-                        <label className="text-[10px] uppercase font-bold text-neutral-500">Notas</label>
+                        <div className="text-[10px] uppercase font-bold text-neutral-500">Notas</div>
                         <textarea
+                            aria-label="Notas"
                             value={editNotes}
                             onChange={(e) => setEditNotes(e.target.value)}
                         className="w-full rounded-xl p-3 text-white outline-none h-20 resize-none border focus:border-yellow-500/40 transition-all"
@@ -123,8 +129,9 @@ export function HistoryListEditModal({
                                 <p className="text-sm font-bold text-white">{ex.name}</p>
                                 <div className="grid grid-cols-4 gap-2">
                                     <div>
-                                        <label className="text-[10px] text-neutral-500">Sets</label>
+                                        <div className="text-[10px] text-neutral-500">Sets</div>
                                         <input
+                                            aria-label="Sets"
                                             type="number"
                                             value={ex.sets}
                                             onChange={(e) => updateEditExercise(idx, 'sets', e.target.value)}
@@ -132,24 +139,27 @@ export function HistoryListEditModal({
                                         />
                                     </div>
                                     <div>
-                                        <label className="text-[10px] text-neutral-500">Reps</label>
+                                        <div className="text-[10px] text-neutral-500">Reps</div>
                                         <input
+                                            aria-label="Reps"
                                             value={ex.reps || ''}
                                             onChange={(e) => updateEditExercise(idx, 'reps', e.target.value)}
                                             className="w-full bg-neutral-900 rounded p-2 text-center text-sm"
                                         />
                                     </div>
                                     <div>
-                                        <label className="text-[10px] text-neutral-500">Cadência</label>
+                                        <div className="text-[10px] text-neutral-500">Cadência</div>
                                         <input
+                                            aria-label="Cadência"
                                             value={ex.cadence || ''}
                                             onChange={(e) => updateEditExercise(idx, 'cadence', e.target.value)}
                                             className="w-full bg-neutral-900 rounded p-2 text-center text-sm"
                                         />
                                     </div>
                                     <div>
-                                        <label className="text-[10px] text-neutral-500">Descanso (s)</label>
+                                        <div className="text-[10px] text-neutral-500">Descanso (s)</div>
                                         <input
+                                            aria-label="Descanso (s)"
                                             type="number"
                                             value={ex.restTime || 0}
                                             onChange={(e) => updateEditExercise(idx, 'restTime', e.target.value)}
@@ -158,11 +168,12 @@ export function HistoryListEditModal({
                                     </div>
                                 </div>
                                 <div>
-                                    <label className="text-[10px] text-neutral-500">Pesos por série (kg)</label>
+                                    <div className="text-[10px] text-neutral-500">Pesos por série (kg)</div>
                                     <div className="grid grid-cols-4 gap-2">
                                         {Array.from({ length: Number(ex.sets) || 0 }).map((_, sIdx) => (
                                             <input
                                                 key={sIdx}
+                                                aria-label={`Peso série ${sIdx + 1}`}
                                                 value={String(ex.weights?.[sIdx] ?? '')}
                                                 onChange={(e) => updateEditExercise(idx, 'weight', [sIdx, e.target.value])}
                                                 className="w-full bg-neutral-900 rounded p-2 text-center text-sm"
@@ -172,11 +183,12 @@ export function HistoryListEditModal({
                                     </div>
                                 </div>
                                 <div>
-                                    <label className="text-[10px] text-neutral-500">Reps por série</label>
+                                    <div className="text-[10px] text-neutral-500">Reps por série</div>
                                     <div className="grid grid-cols-4 gap-2">
                                         {Array.from({ length: Number(ex.sets) || 0 }).map((_, sIdx) => (
                                             <input
                                                 key={sIdx}
+                                                aria-label={`Reps série ${sIdx + 1}`}
                                                 value={String(ex.repsPerSet?.[sIdx] ?? '')}
                                                 onChange={(e) => updateEditExercise(idx, 'rep', [sIdx, e.target.value])}
                                                 className="w-full bg-neutral-900 rounded p-2 text-center text-sm"
