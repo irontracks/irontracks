@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
+import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 
 export const dynamic = 'force-dynamic'
 
@@ -15,6 +16,10 @@ const checkinSchema = z.object({
 export async function POST(req: Request) {
   const auth = await requireUser()
   if (!auth.ok) return auth.response
+
+  const ip = getRequestIp(req)
+  const rl = await checkRateLimitAsync(`gps:checkin:${auth.user.id}:${ip}`, 5, 60_000)
+  if (!rl.allowed) return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 })
 
   const body = await req.json().catch(() => null)
   const parsed = checkinSchema.safeParse(body)
