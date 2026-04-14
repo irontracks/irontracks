@@ -8,7 +8,6 @@ import { getErrorMessage } from '@/utils/errorMessage'
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-const isKind = (v: string) => v === 'churn_risk' || v === 'volume_drop' || v === 'load_spike' || v === 'checkins_alert'
 
 const BodySchema = z
   .object({

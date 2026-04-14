@@ -10,7 +10,7 @@ interface UseTeamSessionParams {
     teamworkV2Enabled: boolean
 }
 
-export function useTeamSession({ user, supabase, teamworkV2Enabled }: UseTeamSessionParams) {
+export function useTeamSession({ supabase }: UseTeamSessionParams) {
     const [teamSession, setTeamSession] = useState<TeamSession | null>(null)
     const [loading, setLoading] = useState(false)
     const joinHandledRef = useRef(new Set())

@@ -3,9 +3,6 @@ import { processWorkoutImage } from "@/actions/iron-scanner-actions";
 import { requireUser } from "@/utils/auth/route";
 import { checkRateLimitAsync, getRequestIp } from "@/utils/rateLimit";
 
-import { z } from 'zod'
-
-
 export const runtime = "nodejs";
 
 export async function POST(req: NextRequest) {

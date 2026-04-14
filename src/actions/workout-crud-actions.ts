@@ -2,8 +2,6 @@ import { createClient } from '@/utils/supabase/client'
 import { normalizeWorkoutTitle } from '@/utils/workoutTitle'
 import { trackUserEvent } from '@/lib/telemetry/userActivity'
 import type { ActionResult } from '@/types/actions'
-import { parseJsonWithSchema } from '@/utils/zod'
-import { z } from 'zod'
 import { cacheDeletePattern } from '@/utils/cache'
 import { logError } from '@/lib/logger'
 
@@ -33,7 +31,6 @@ export const safeIso = (v: unknown): string | null => {
     }
 }
 
-const safeJsonParse = (raw: unknown): unknown => parseJsonWithSchema(raw, z.unknown())
 
 export const buildExercisesPayload = (workout: unknown): unknown[] => {
     const w = workout && typeof workout === 'object' ? (workout as Record<string, unknown>) : ({} as Record<string, unknown>)

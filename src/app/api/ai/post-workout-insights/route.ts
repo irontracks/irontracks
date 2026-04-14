@@ -171,7 +171,7 @@ export async function POST(req: Request) {
     }
 
     // Check VIP Limits (Counts as Insights Weekly)
-    const { allowed, currentUsage, limit, tier } = await checkVipFeatureAccess(supabase, userId, 'insights_weekly');
+    const { allowed, limit, tier } = await checkVipFeatureAccess(supabase, userId, 'insights_weekly');
     if (!allowed) {
         return NextResponse.json({ 
             ok: false,

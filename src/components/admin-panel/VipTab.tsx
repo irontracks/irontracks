@@ -4,8 +4,8 @@ import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { apiAdmin } from '@/lib/api'
 import {
     Crown, Search, Loader2, Filter, RefreshCw,
-    UserPlus, XCircle, ChevronDown, Calendar, Shield,
-    Zap, Star, Trophy, AlertCircle, Check, Users
+    UserPlus, XCircle, Calendar, Shield,
+    Zap, Star, Trophy, AlertCircle
 } from 'lucide-react'
 
 // ─── Types ────────────────────────────────────────────────────────
@@ -86,8 +86,9 @@ const GrantModal = ({ open, onClose, onGrant }: {
     }
 
     return (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(16px)' }} role="dialog" aria-modal="true" aria-label="Conceder acesso VIP" onClick={onClose}>
-            <div className="rounded-3xl w-full max-w-md p-6 space-y-5" style={{ background: 'rgba(10,10,10,0.99)', border: '1px solid rgba(234,179,8,0.2)', boxShadow: '0 0 40px rgba(234,179,8,0.07), 0 32px 80px rgba(0,0,0,0.7)' }} onClick={e => e.stopPropagation()}>
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(16px)' }} role="dialog" aria-modal="true" aria-label="Conceder acesso VIP">
+            <div role="presentation" className="fixed inset-0" onClick={onClose} />
+            <div className="rounded-3xl w-full max-w-md p-6 space-y-5 relative z-10" style={{ background: 'rgba(10,10,10,0.99)', border: '1px solid rgba(234,179,8,0.2)', boxShadow: '0 0 40px rgba(234,179,8,0.07), 0 32px 80px rgba(0,0,0,0.7)' }}>
                 {/* Header */}
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -107,8 +108,10 @@ const GrantModal = ({ open, onClose, onGrant }: {
                 {/* Form */}
                 <div className="space-y-4">
                     <div>
-                        <label className="text-[11px] font-black uppercase tracking-widest text-neutral-500 mb-1.5 block">E-mail do usuário</label>
+                        <label htmlFor="vip-email" className="text-[11px] font-black uppercase tracking-widest text-neutral-500 mb-1.5 block">E-mail do usuário</label>
                         <input
+                            id="vip-email"
+                            aria-label="E-mail do usuário"
                             type="email"
                             value={email}
                             onChange={e => setEmail(e.target.value)}
@@ -118,7 +121,7 @@ const GrantModal = ({ open, onClose, onGrant }: {
                     </div>
 
                     <div>
-                        <label className="text-[11px] font-black uppercase tracking-widest text-neutral-500 mb-1.5 block">Plano</label>
+                        <p className="text-[11px] font-black uppercase tracking-widest text-neutral-500 mb-1.5 block">Plano</p>
                         <div className="grid grid-cols-3 gap-2">
                             {(['vip_start', 'vip_pro', 'vip_elite'] as const).map(p => {
                                 const cfg = TIER_CONFIG[p]
@@ -141,7 +144,7 @@ const GrantModal = ({ open, onClose, onGrant }: {
                     </div>
 
                     <div>
-                        <label className="text-[11px] font-black uppercase tracking-widest text-neutral-500 mb-1.5 block">Duração (dias)</label>
+                        <p className="text-[11px] font-black uppercase tracking-widest text-neutral-500 mb-1.5 block">Duração (dias)</p>
                         <div className="flex gap-2">
                             {[7, 14, 30, 90, 365].map(d => (
                                 <button
@@ -319,6 +322,7 @@ export const VipTab: React.FC = () => {
                     <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500" />
                     <input
                         type="text"
+                        aria-label="Buscar VIP por nome ou e-mail"
                         placeholder="Buscar VIP por nome ou e-mail…"
                         value={query}
                         onChange={e => setQuery(e.target.value)}

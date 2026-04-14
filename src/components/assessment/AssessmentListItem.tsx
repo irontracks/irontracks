@@ -47,7 +47,7 @@ export const skinfoldFields = [
 // ────────────────────────────────────────────────────────────────
 
 function AiPlanSection({
-  assessment,
+  assessment: _assessment,
   planState,
   planAnchorRef,
 }: {

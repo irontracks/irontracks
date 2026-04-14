@@ -3,7 +3,6 @@ import dynamic from 'next/dynamic'
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Image from 'next/image'
-import { Plus } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
 const StoryViewer = dynamic(() => import('@/components/stories/StoryViewer'), { ssr: false })
 const StoryCreatorModal = dynamic(() => import('@/components/stories/StoryCreatorModal'), { ssr: false })
@@ -22,7 +21,7 @@ const initials = (name: string) => {
 export default function StoriesBar({
   currentUserId,
   onMyStoryStateChange,
-  onAddStory: externalAddStory,
+  onAddStory: _externalAddStory,
 }: {
   currentUserId?: string
   /** Called whenever user's own story state changes: (hasActiveStory) */

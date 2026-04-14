@@ -1,7 +1,6 @@
 import React from 'react';
 import { Trash2, Plus, ArrowLeft, Link2, Play } from 'lucide-react';
 import { useDialog } from '@/contexts/DialogContext';
-import { parseExerciseNotesToSetOverrides } from '@/utils/training/notesMethodParser';
 import { HelpHint } from '@/components/ui/HelpHint';
 import { HELP_TERMS } from '@/utils/help/terms';
 import { WorkoutHeader } from './ExerciseEditor/EditorHeader';
@@ -13,7 +12,6 @@ import { resolveCanonicalExerciseName } from '@/utils/exerciseCanonical';
 
 const REST_PAUSE_DEFAULT_PAUSE_SEC = 20;
 
-const isRecord = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v);
 
 interface ExerciseEditorProps {
     workout: Workout;
@@ -24,7 +22,7 @@ interface ExerciseEditorProps {
 }
 
 const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCancel, onChange, onSaved }) => {
-    const { confirm, alert, closeDialog, showLoading } = useDialog();
+    useDialog();
     const [saving, setSaving] = React.useState(false);
     const [scannerLoading, setScannerLoading] = React.useState(false);
     const [scannerError, setScannerError] = React.useState('');
@@ -222,10 +220,11 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
                                 <ArrowLeft size={16} />
                                 <span>Voltar</span>
                             </button>
-                            <label className="text-xs font-bold text-neutral-500 uppercase">Nome do Treino</label>
+                            <p className="text-xs font-bold text-neutral-500 uppercase">Nome do Treino</p>
                         </div>
                     </div>
                     <input
+                        aria-label="Nome do Treino"
                         value={workout.title || ''}
                         onChange={e => onChange?.({ ...workout, title: e.target.value })}
                         className="w-full bg-neutral-800 text-xl font-bold p-4 rounded-xl border border-neutral-700 outline-none focus:border-yellow-500 text-white placeholder-neutral-600 transition-colors"
@@ -235,7 +234,7 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
 
                 <div className="space-y-4">
                     <div className="flex items-center justify-between">
-                        <label className="text-xs font-bold text-neutral-500 uppercase">Exercícios ({workout.exercises?.length || 0})</label>
+                        <p className="text-xs font-bold text-neutral-500 uppercase">Exercícios ({workout.exercises?.length || 0})</p>
                     </div>
 
                     {(workout.exercises || []).map((exercise, index) => {
@@ -293,8 +292,9 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
                                     <div className="space-y-4 pr-0 pt-6">
                                         {exerciseType === 'cardio' ? (
                                             <div>
-                                                <label className="text-[10px] text-neutral-500 uppercase font-bold mb-1 block">Modalidade</label>
+                                                <p className="text-[10px] text-neutral-500 uppercase font-bold mb-1 block">Modalidade</p>
                                                 <select
+                                                    aria-label="Modalidade"
                                                     value={exercise.name || ''}
                                                     onChange={e => updateExercise(index, 'name', e.target.value)}
                                                     className="w-full bg-neutral-900 font-bold text-white text-lg p-3 rounded-xl border border-neutral-700 outline-none focus:border-blue-500 transition-colors appearance-none"
@@ -307,6 +307,7 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
                                         ) : (
                                             <div>
                                                 <input
+                                                    aria-label="Nome do exercício"
                                                     value={exercise.name || ''}
                                                     onChange={e => updateExercise(index, 'name', e.target.value)}
                                                     className="w-full bg-transparent font-bold text-white text-lg border-b border-neutral-700 pb-2 focus:border-yellow-500 outline-none placeholder-neutral-600 transition-colors"
@@ -330,9 +331,10 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
 
                                         <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
                                             <div>
-                                                <label className="text-[10px] text-neutral-500 uppercase font-bold text-center block mb-1">Sets</label>
+                                                <p className="text-[10px] text-neutral-500 uppercase font-bold text-center block mb-1">Sets</p>
                                                 <div className="flex items-center gap-1">
                                                     <input
+                                                        aria-label="Número de sets"
                                                         type="number"
                                                         value={setsCount || ''}
                                                         onChange={e => updateExercise(index, 'sets', e.target.value)}
@@ -348,8 +350,9 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
                                                 </div>
                                             </div>
                                             <div>
-                                                <label className="text-[10px] text-neutral-500 uppercase font-bold text-center block mb-1">Reps</label>
+                                                <p className="text-[10px] text-neutral-500 uppercase font-bold text-center block mb-1">Reps</p>
                                                 <input
+                                                    aria-label="Repetições"
                                                     type="text"
                                                     value={exercise.reps ? String(exercise.reps) : ''}
                                                     onChange={e => updateExercise(index, 'reps', e.target.value)}
@@ -357,11 +360,12 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
                                                 />
                                             </div>
                                             <div>
-                                                <label className="text-[10px] text-yellow-500 uppercase font-bold text-center block mb-1 inline-flex items-center justify-center gap-1 group">
+                                                <p className="text-[10px] text-yellow-500 uppercase font-bold text-center block mb-1 inline-flex items-center justify-center gap-1 group">
                                                     RPE
                                                     <HelpHint title={HELP_TERMS.rpe.title} text={HELP_TERMS.rpe.text} tooltip={HELP_TERMS.rpe.tooltip} className="h-4 w-4 text-[10px]" />
-                                                </label>
+                                                </p>
                                                 <input
+                                                    aria-label="RPE"
                                                     type="number"
                                                     value={exercise.rpe ? String(exercise.rpe) : ''}
                                                     onChange={e => updateExercise(index, 'rpe', e.target.value)}
@@ -370,8 +374,9 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
                                                 />
                                             </div>
                                             <div>
-                                                <label className="text-[10px] text-neutral-500 uppercase font-bold text-center block mb-1">Rest(s)</label>
+                                                <p className="text-[10px] text-neutral-500 uppercase font-bold text-center block mb-1">Rest(s)</p>
                                                 <input
+                                                    aria-label="Descanso em segundos"
                                                     type="number"
                                                     value={(exercise.restTime ?? '')}
                                                     onChange={e => updateExercise(index, 'restTime', e.target.value)}
@@ -379,11 +384,12 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
                                                 />
                                             </div>
                                             <div>
-                                                <label className="text-[10px] text-neutral-500 uppercase font-bold text-center block mb-1 inline-flex items-center justify-center gap-1 group">
+                                                <p className="text-[10px] text-neutral-500 uppercase font-bold text-center block mb-1 inline-flex items-center justify-center gap-1 group">
                                                     Cad
                                                     <HelpHint title={HELP_TERMS.cadence.title} text={HELP_TERMS.cadence.text} tooltip={HELP_TERMS.cadence.tooltip} className="h-4 w-4 text-[10px]" />
-                                                </label>
+                                                </p>
                                                 <input
+                                                    aria-label="Cadência"
                                                     type="text"
                                                     value={exercise.cadence || ''}
                                                     onChange={e => updateExercise(index, 'cadence', e.target.value)}
@@ -391,7 +397,7 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
                                                 />
                                             </div>
                                             <div>
-                                                <label className="text-[10px] text-neutral-500 uppercase font-bold text-center block mb-1 inline-flex items-center justify-center gap-1 group">
+                                                <p className="text-[10px] text-neutral-500 uppercase font-bold text-center block mb-1 inline-flex items-center justify-center gap-1 group">
                                                     Método
                                                     {(() => {
                                                         const m = String(safeMethod || 'Normal');
@@ -407,8 +413,9 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
                                                                             : null;
                                                         return term ? <HelpHint title={term.title} text={term.text} tooltip={term.tooltip} className="h-4 w-4 text-[10px]" /> : null;
                                                     })()}
-                                                </label>
+                                                </p>
                                                 <select
+                                                    aria-label="Método de treino"
                                                     value={safeMethod || 'Normal'}
                                                     onChange={e => updateExercise(index, 'method', e.target.value)}
                                                     className="w-full bg-neutral-900 rounded-lg p-2 text-center text-[10px] font-bold text-white h-[36px] outline-none focus:ring-1 ring-yellow-500"
@@ -433,7 +440,7 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
 
                                                 <div>
                                                     <div className="flex items-center justify-between gap-3 mb-1">
-                                                        <label className="text-[10px] text-blue-400 uppercase font-bold block">Vídeo Demonstração (URL)</label>
+                                                        <p className="text-[10px] text-blue-400 uppercase font-bold block">Vídeo Demonstração (URL)</p>
                                                         {String(exercise.videoUrl || '').trim() ? (
                                                             <button
                                                                 type="button"
@@ -455,6 +462,7 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
                                                         ) : null}
                                                     </div>
                                                     <input
+                                                        aria-label="URL do vídeo de demonstração"
                                                         value={exercise.videoUrl || ''}
                                                         onChange={e => updateExercise(index, 'videoUrl', e.target.value)}
                                                         className="w-full bg-blue-500/5 border border-blue-500/20 rounded-lg p-2 text-xs text-blue-200 focus:border-blue-500 outline-none placeholder-blue-500/30 transition-colors"
@@ -462,8 +470,9 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
                                                     />
                                                 </div>
                                                 <div>
-                                                    <label className="text-[10px] text-neutral-500 uppercase font-bold mb-1 block">Notas</label>
+                                                    <p className="text-[10px] text-neutral-500 uppercase font-bold mb-1 block">Notas</p>
                                                     <textarea
+                                                        aria-label="Notas do exercício"
                                                         value={exercise.notes || ''}
                                                         onChange={e => updateExercise(index, 'notes', e.target.value)}
                                                         className="w-full bg-neutral-900 rounded-lg p-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500 min-h-[60px] resize-none"

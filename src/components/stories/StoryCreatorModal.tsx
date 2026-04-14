@@ -1,13 +1,12 @@
 'use client'
-// Focus trap for accessibility
-import { useFocusTrap } from '@/hooks/useFocusTrap';
 
 import { useState, useRef, useEffect, type ChangeEvent } from 'react';
-import { X, Type, Smile, Scissors, Sparkles, Send, Loader2, Play, Pause, ChevronLeft, ChevronRight, Crown } from 'lucide-react';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
+import { X, Type, Smile, Scissors, Sparkles, Loader2, Play, ChevronLeft, ChevronRight, Crown } from 'lucide-react';
 import Image from 'next/image';
 import { motion } from 'framer-motion';
 import { VideoCompositor } from '@/lib/video/VideoCompositor';
-import { logError, logWarn, logInfo } from '@/lib/logger'
+import { logError, logWarn } from '@/lib/logger'
 
 const FILTERS = [
     { name: 'Normal', class: '' },
@@ -80,7 +79,7 @@ export default function StoryCreatorModal({ isOpen, onClose, onPost }: StoryCrea
     const [compressionError, setCompressionError] = useState('');
 
     const videoRef = useRef<HTMLVideoElement | null>(null);
-    const canvasRef = useRef<HTMLCanvasElement | null>(null);
+    const _canvasRef = useRef<HTMLCanvasElement | null>(null);
     const containerRef = useRef<HTMLDivElement | null>(null);
     const fileInputRef = useRef<HTMLInputElement | null>(null);
     const [posting, setPosting] = useState(false);
@@ -213,12 +212,11 @@ export default function StoryCreatorModal({ isOpen, onClose, onPost }: StoryCrea
         setActiveTool(null);
     };
 
-    const updateOverlayPos = (id: number, info: unknown) => {
+    const _updateOverlayPos = (_id: number, _info: unknown) => {
         // info.point is relative to viewport, we need percentage of container
         if (!containerRef.current) return;
-        const rect = containerRef.current.getBoundingClientRect();
         // Calculate center of element based on drag
-        // Framer motion drag gives us delta or point. 
+        // Framer motion drag gives us delta or point.
         // A simpler way with framer motion is to update state onDragEnd
     };
 
@@ -527,7 +525,6 @@ export default function StoryCreatorModal({ isOpen, onClose, onPost }: StoryCrea
                             {activeTool === 'text' && (
                                 <div className="bg-black/80 backdrop-blur-md rounded-2xl p-4 animate-in slide-in-from-bottom-10">
                                     <input
-                                        autoFocus
                                         value={textInput}
                                         onChange={e => setTextInput(e.target.value)}
                                         placeholder="Digite algo..."

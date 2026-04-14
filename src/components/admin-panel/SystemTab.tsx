@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ShieldAlert, Download, Upload, Trash2, MessageSquare, Database, RefreshCw, ChevronDown, FileText } from 'lucide-react';
+import { ShieldAlert, Download, Upload, Trash2, MessageSquare, Database, ChevronDown, FileText } from 'lucide-react';
 import { useAdminPanel } from './AdminPanelContext';
 import { apiAdmin } from '@/lib/api';
 
@@ -17,23 +17,16 @@ export const SystemTab: React.FC = () => {
         setDangerWorkoutsConfirm,
         systemExporting,
         systemImporting,
-        systemFileInputRef,
         broadcastTitle,
         setBroadcastTitle,
         broadcastMsg,
         setBroadcastMsg,
         sendingBroadcast,
         handleSendBroadcast,
-        exerciseAliasesReview,
-        exerciseAliasesLoading,
-        exerciseAliasesError,
-        exerciseAliasesBackfillLoading,
-        exerciseAliasesNotice,
         usersList,
         getAdminAuthHeaders,
         handleExportSystem,
         handleImportSystem,
-        runDangerAction,
     } = useAdminPanel();
 
     const [grantEmail, setGrantEmail] = useState('');
@@ -201,11 +194,6 @@ export const SystemTab: React.FC = () => {
         };
     }, [grantUserId, grantEmail, loadVipStatus]);
 
-    // handleUpdateAliases placeholder (aliases backfill not yet implemented in controller)
-    const handleUpdateAliases = async () => {
-        alert('Funcionalidade de aliases em implementação');
-    };
-
     if (!isAdmin) return <div className="p-4 text-red-500">Acesso negado.</div>;
 
     return (
@@ -232,6 +220,7 @@ export const SystemTab: React.FC = () => {
                     <div className="relative">
                         <input
                             type="file"
+                            aria-label="Restaurar backup do sistema"
                             accept=".json"
                             onChange={handleImportSystem}
                             disabled={systemImporting}
@@ -259,6 +248,7 @@ export const SystemTab: React.FC = () => {
                 </h3>
                 <div className="space-y-3">
                     <input
+                        aria-label="Título do aviso"
                         value={broadcastTitle}
                         onChange={(e) => setBroadcastTitle(e.target.value)}
                         placeholder="Título do aviso"
@@ -266,6 +256,7 @@ export const SystemTab: React.FC = () => {
                         style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
                     />
                     <textarea
+                        aria-label="Mensagem para todos os usuários"
                         value={broadcastMsg}
                         onChange={(e) => setBroadcastMsg(e.target.value)}
                         placeholder="Mensagem para todos os usuários..."
@@ -290,8 +281,9 @@ export const SystemTab: React.FC = () => {
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div className="flex flex-col gap-2">
-                        <label className="text-[11px] font-black uppercase tracking-widest text-neutral-500">Aluno cadastrado</label>
+                        <label htmlFor="sys-student-select" className="text-[11px] font-black uppercase tracking-widest text-neutral-500">Aluno cadastrado</label>
                         <select
+                            id="sys-student-select"
                             value={selectedStudentKey}
                             onChange={(e) => handleSelectStudent(e.target.value)}
                             className="w-full rounded-xl px-4 py-3 text-white focus:border-yellow-500 focus:outline-none transition-colors"
@@ -306,8 +298,10 @@ export const SystemTab: React.FC = () => {
                         </select>
                     </div>
                     <div className="flex flex-col gap-2">
-                        <label className="text-[11px] font-black uppercase tracking-widest text-neutral-500">Email do aluno</label>
+                        <label htmlFor="sys-grant-email" className="text-[11px] font-black uppercase tracking-widest text-neutral-500">Email do aluno</label>
                         <input
+                            id="sys-grant-email"
+                            aria-label="Email do aluno"
                             value={grantEmail}
                             onChange={(e) => setGrantEmail(e.target.value)}
                             placeholder="ex: aluno@email.com"
@@ -316,8 +310,10 @@ export const SystemTab: React.FC = () => {
                         />
                     </div>
                     <div className="flex flex-col gap-2">
-                        <label className="text-[11px] font-black uppercase tracking-widest text-neutral-500">user_id do aluno</label>
+                        <label htmlFor="sys-grant-userid" className="text-[11px] font-black uppercase tracking-widest text-neutral-500">user_id do aluno</label>
                         <input
+                            id="sys-grant-userid"
+                            aria-label="user_id do aluno"
                             value={grantUserId}
                             onChange={(e) => setGrantUserId(e.target.value)}
                             placeholder="UUID do usuário (opcional)"
@@ -326,8 +322,9 @@ export const SystemTab: React.FC = () => {
                         />
                     </div>
                     <div className="flex flex-col gap-2">
-                        <label className="text-[11px] font-black uppercase tracking-widest text-neutral-500">Plano da degustação</label>
+                        <label htmlFor="sys-grant-plan" className="text-[11px] font-black uppercase tracking-widest text-neutral-500">Plano da degustação</label>
                         <select
+                            id="sys-grant-plan"
                             value={grantPlan}
                             onChange={(e) => setGrantPlan(e.target.value as 'vip_start' | 'vip_pro' | 'vip_elite')}
                             className="w-full rounded-xl px-4 py-3 text-white focus:border-yellow-500 focus:outline-none transition-colors"
@@ -339,8 +336,10 @@ export const SystemTab: React.FC = () => {
                         </select>
                     </div>
                     <div className="flex flex-col gap-2">
-                        <label className="text-[11px] font-black uppercase tracking-widest text-neutral-500">Dias de degustação</label>
+                        <label htmlFor="sys-grant-days" className="text-[11px] font-black uppercase tracking-widest text-neutral-500">Dias de degustação</label>
                         <input
+                            id="sys-grant-days"
+                            aria-label="Dias de degustação"
                             value={grantDays}
                             onChange={(e) => setGrantDays(Number(e.target.value) || 1)}
                             type="number"
@@ -484,6 +483,7 @@ export const SystemTab: React.FC = () => {
                             </div>
                             <div className="flex gap-2">
                                 <input
+                                    aria-label="Confirmar apagar alunos"
                                     value={dangerStudentsConfirm}
                                     onChange={(e) => setDangerStudentsConfirm(e.target.value)}
                                     placeholder="Digite APAGAR"
@@ -508,6 +508,7 @@ export const SystemTab: React.FC = () => {
                             </div>
                             <div className="flex gap-2">
                                 <input
+                                    aria-label="Confirmar apagar professores"
                                     value={dangerTeachersConfirm}
                                     onChange={(e) => setDangerTeachersConfirm(e.target.value)}
                                     placeholder="Digite APAGAR"
@@ -532,6 +533,7 @@ export const SystemTab: React.FC = () => {
                             </div>
                             <div className="flex gap-2">
                                 <input
+                                    aria-label="Confirmar apagar treinos"
                                     value={dangerWorkoutsConfirm}
                                     onChange={(e) => setDangerWorkoutsConfirm(e.target.value)}
                                     placeholder="Digite APAGAR"

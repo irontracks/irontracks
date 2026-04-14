@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Zap, X, Heart, Flame, TrendingUp, Trophy } from 'lucide-react'
 
 /* ──────────────────────────────────────────────────────────
@@ -129,8 +129,6 @@ export default function MotivationalPushCard({
   if (dismissed) return null
 
   const msg = getMotivation(daysSinceLastTraining, weeklySessionCount, currentStreak, userName)
-  const IconComponent = msg.icon
-
   const bgGradient = msg.type === 'comeback'
     ? 'from-red-950/40 to-orange-950/30 border-red-500/20'
     : msg.type === 'celebrate'

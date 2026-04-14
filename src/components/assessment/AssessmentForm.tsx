@@ -3,17 +3,15 @@
 
 import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { 
-  User, 
-  Ruler, 
-  Calendar, 
-  Weight, 
-  Camera, 
-  FileText, 
-  Save, 
-  ArrowLeft, 
+import {
+  User,
+  Ruler,
+  Camera,
+  FileText,
+  Save,
+  ArrowLeft,
   ArrowRight,
-  AlertCircle 
+  AlertCircle
 } from 'lucide-react';
 import type { LucideProps } from 'lucide-react';
 
@@ -25,7 +23,7 @@ import { MeasurementStep } from './MeasurementStep';
 import { SkinfoldStep } from './SkinfoldStep';
 import PhotoUploadStep from './PhotoUploadStep';
 import ResultsPreview from './ResultsPreview';
-import { logError, logWarn, logInfo } from '@/lib/logger'
+import { logError } from '@/lib/logger'
 import { parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
 
@@ -397,6 +395,7 @@ export const AssessmentForm: React.FC<AssessmentFormProps> = ({
             <React.Fragment key={step.id}>
               <button
                 onClick={() => handleStepClick(index)}
+                aria-label={step.id}
                 className={`flex-shrink-0 flex items-center justify-center w-10 h-10 rounded-full border-2 transition-all duration-200 ${
                   index <= currentStep
                     ? 'bg-yellow-500 border-yellow-500 text-black'

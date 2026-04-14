@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { generatePeriodReportInsights } from '@/actions/workout-actions';
 import { buildPeriodReportHtml } from '@/utils/report/buildPeriodReportHtml';
 import { PeriodStats } from '@/types/workout';
-import { PeriodReport, PeriodAiState, PeriodPdfState, WorkoutSummary, isRecord, parseRawSession, RawSessionObjectSchema } from '@/components/historyListTypes';
+import { PeriodReport, PeriodAiState, PeriodPdfState, WorkoutSummary, isRecord, RawSessionObjectSchema } from '@/components/historyListTypes';
 import { toDateMs, calculateTotalVolumeFromLogs } from './useHistoryData';
 
 const REPORT_DAYS_WEEK = 7;

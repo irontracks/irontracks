@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { HistorySummaryCard } from '@/components/history/HistorySummaryCard';
 import { HistoryEmptyState, HistoryEmptyPeriod } from '@/components/history/HistoryEmptyStates';
 import {
@@ -11,8 +11,6 @@ import {
 import { useWindowVirtualizer } from '@tanstack/react-virtual';
 import WorkoutReport from '@/components/WorkoutReport';
 import { useDialog } from '@/contexts/DialogContext';
-import { FEATURE_KEYS, isFeatureEnabled } from '@/utils/featureFlags';
-import { SkeletonList } from '@/components/ui/Skeleton';
 import { HistoryListManualModal } from '@/components/HistoryListManualModal';
 import { HistoryListPeriodReportModal } from '@/components/HistoryListPeriodReportModal';
 import { HistoryListEditModal } from '@/components/HistoryListEditModal';
@@ -32,12 +30,12 @@ const HistoryList: React.FC<HistoryListProps> = ({
     // ── Data hook ────────────────────────────────────────────────────────────
     const data = useHistoryData({ user, settings, targetId, targetEmail, vipLimits });
     const {
-        history, loading, supabase,
+        loading, supabase,
         range, setRange, rangeLabel, historyItems, filteredHistory, visibleHistory, blockedCount, summary,
         showManual, setShowManual, manualDate, setManualDate, manualDuration, setManualDuration,
         manualNotes, setManualNotes, manualTab, setManualTab,
         availableWorkouts, selectedTemplate, setSelectedTemplate,
-        newWorkout, manualExercises, normalizeEditorWorkout, editorWorkout,
+        manualExercises, normalizeEditorWorkout, editorWorkout,
         updateManualExercise, saveManualExisting, saveManualNew,
     } = data;
 
@@ -198,7 +196,11 @@ const HistoryList: React.FC<HistoryListProps> = ({
                                         )}
 
                                         <div
+                                            role="button"
+                                            tabIndex={0}
+                                            aria-label="Ver detalhes do treino"
                                             onClick={() => isSelectionMode ? toggleItemSelection(session.id) : openSession(session, onViewReport)}
+                                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { isSelectionMode ? toggleItemSelection(session.id) : openSession(session, onViewReport) } }}
                                             className={`relative rounded-2xl cursor-pointer transition-all duration-300 overflow-hidden ${isSelectionMode ? (isSelected ? 'shadow-lg shadow-yellow-500/10' : '') : 'hover:shadow-lg hover:shadow-black/30 group'}`}
                                         >
                                             <div className={`absolute left-0 top-0 bottom-0 w-[3px] rounded-l-2xl transition-colors duration-300 ${isSelected ? 'bg-yellow-500' : 'bg-yellow-500/30 group-hover:bg-yellow-500/60'}`} />
@@ -259,7 +261,7 @@ const HistoryList: React.FC<HistoryListProps> = ({
 
                         {/* VIP Locked Sessions */}
                         {blockedCount > 0 && (
-                            <div className="bg-neutral-950/50 border border-yellow-500/20 rounded-2xl p-6 text-center space-y-3 relative overflow-hidden group cursor-pointer" onClick={onUpgrade}>
+                            <div role="button" tabIndex={0} aria-label="Desbloquear histórico VIP" className="bg-neutral-950/50 border border-yellow-500/20 rounded-2xl p-6 text-center space-y-3 relative overflow-hidden group cursor-pointer" onClick={onUpgrade} onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onUpgrade?.() }}>
                                 <div className="absolute inset-0 bg-gradient-to-b from-yellow-500/5 to-transparent pointer-events-none" />
                                 <div className="relative z-10 flex flex-col items-center gap-2">
                                     <div className="w-12 h-12 rounded-full bg-neutral-900 border border-neutral-800 flex items-center justify-center mb-1 group-hover:scale-110 transition-transform duration-300">
@@ -328,8 +330,8 @@ const HistoryList: React.FC<HistoryListProps> = ({
 
             {/* Report overlay */}
             {selectedSession && (
-                <div className="fixed inset-0 z-[1200] bg-neutral-900 overflow-y-auto pt-safe" onClick={() => setSelectedSession(null)}>
-                    <div onClick={(e) => e.stopPropagation()}>
+                <div role="presentation" className="fixed inset-0 z-[1200] bg-neutral-900 overflow-y-auto pt-safe" onClick={() => setSelectedSession(null)}>
+                    <div role="presentation" onClick={(e) => e.stopPropagation()}>
                         <WorkoutReport
                             session={selectedSession} previousSession={null}
                             user={user} isVip={false} settings={settings}

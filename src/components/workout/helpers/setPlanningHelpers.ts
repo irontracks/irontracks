@@ -108,7 +108,7 @@ export const collectExerciseSetInputs = (ex: WorkoutExercise, exIdx: number, get
     return { setsCount, sets };
 };
 
-export const collectExercisePlannedInputs = (ex: WorkoutExercise, exIdx: number) => {
+export const collectExercisePlannedInputs = (ex: WorkoutExercise, _exIdx: number) => {
     const setsHeader = Math.max(0, Number.parseInt(String(ex?.sets ?? '0'), 10) || 0);
     const sdArr: unknown[] = Array.isArray(ex.setDetails) ? (ex.setDetails as unknown[]) : Array.isArray(ex.set_details) ? (ex.set_details as unknown[]) : [];
     const setsCount = Math.max(setsHeader, Array.isArray(sdArr) ? sdArr.length : 0);

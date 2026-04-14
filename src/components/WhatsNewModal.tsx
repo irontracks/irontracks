@@ -1,6 +1,4 @@
 'use client'
-// Focus trap for accessibility
-import { useFocusTrap } from '@/hooks/useFocusTrap'
 
 import React, { useEffect } from 'react'
 import { X } from 'lucide-react'

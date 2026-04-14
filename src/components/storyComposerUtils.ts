@@ -202,7 +202,7 @@ export const calculateTotalVolume = (logs: Record<string, unknown>): number => {
 
 export const computeKcal = ({
     session,
-    volume,
+    volume: _volume,
 }: {
     session: SessionLite;
     volume: number;

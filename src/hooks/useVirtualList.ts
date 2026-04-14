@@ -13,7 +13,7 @@
  */
 'use client'
 
-import { useState, useEffect, useCallback, useMemo, useRef, type RefObject } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 
 export interface UseVirtualListOptions {
   /** Height of each item in pixels */

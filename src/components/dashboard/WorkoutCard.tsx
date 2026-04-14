@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useState, useRef, useCallback } from 'react'
-import { Play, Share2, Pencil, Trash2, Loader2, Undo2 } from 'lucide-react'
+import { Share2, Pencil, Trash2, Loader2, Undo2 } from 'lucide-react'
 import type { DashboardWorkout } from '@/types/dashboard'
 import { isPeriodizedWorkoutFullyLoaded } from '@/hooks/usePeriodizedWorkouts'
 
@@ -140,6 +140,8 @@ export function WorkoutCard({
   return (
     <div
       key={workoutKey}
+      role="button"
+      tabIndex={0}
       className={[
         'rounded-xl p-4 border-l-4 transition-all group relative overflow-hidden cursor-pointer shadow-sm shadow-black/30',
         `bg-gradient-to-r ${accent.gradient} via-neutral-800/80 to-neutral-800`,
@@ -148,6 +150,7 @@ export function WorkoutCard({
         density === 'compact' ? 'p-3' : 'p-4',
       ].join(' ')}
       onClick={handleClick}
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleClick() }}
     >
       <div className="relative z-10">
         {isActive && (

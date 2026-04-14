@@ -22,7 +22,6 @@ export const useAdminStudentOps = ({
     subTab,
     isAdmin,
     supabase,
-    user,
     getAdminAuthHeaders,
     setTeachersList,
     setUsersList,

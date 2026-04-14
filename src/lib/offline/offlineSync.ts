@@ -1,6 +1,6 @@
 
 import { kvGet, kvSet, queuePut, queueGetAll, queueDelete } from './idb';
-import { logError, logWarn, logInfo } from '@/lib/logger'
+import { logError, logWarn } from '@/lib/logger'
 
 const CACHE_KEY_WORKOUTS = 'offline_workouts_cache';
 
@@ -32,7 +32,7 @@ export const isOnline = () => {
   return typeof navigator !== 'undefined' && navigator.onLine;
 };
 
-export const cacheSetWorkouts = async (workouts: unknown, opts: unknown = null) => {
+export const cacheSetWorkouts = async (workouts: unknown, _opts: unknown = null) => {
   try {
     await kvSet(CACHE_KEY_WORKOUTS, workouts);
   } catch (e) {
@@ -40,10 +40,10 @@ export const cacheSetWorkouts = async (workouts: unknown, opts: unknown = null) 
   }
 };
 
-export const cacheGetWorkouts = async (opts: unknown = null) => {
+export const cacheGetWorkouts = async (_opts: unknown = null) => {
   try {
     return await kvGet(CACHE_KEY_WORKOUTS);
-  } catch (e) {
+  } catch {
     return null;
   }
 };
@@ -52,14 +52,14 @@ export const getPendingCount = async () => {
   try {
     const all = await queueGetAll();
     return Array.isArray(all) ? all.length : 0;
-  } catch (e) {
+  } catch {
     return 0;
   }
 };
 
 const STALE_JOB_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
 
-export const getOfflineQueueSummary = async ({ userId }: { userId?: string } = {}) => {
+export const getOfflineQueueSummary = async ({ userId: _userId }: { userId?: string } = {}) => {
   try {
     const all = await queueGetAll();
     const rawJobs = Array.isArray(all) ? (all as OfflineJob[]) : [];
@@ -109,7 +109,7 @@ export const getOfflineQueueSummary = async ({ userId }: { userId?: string } = {
   }
 };
 
-export const clearOfflineJobs = async ({ userId }: { userId?: string } = {}) => {
+export const clearOfflineJobs = async ({ userId: _userId }: { userId?: string } = {}) => {
   try {
     const all = await queueGetAll();
     if (Array.isArray(all)) {
@@ -138,13 +138,13 @@ export const bumpOfflineJob = async ({ id }: { id: string }) => {
   }
 };
 
-export const flushOfflineQueue = async ({ max = 50, force = false } = {}) => {
+export const flushOfflineQueue = async ({ max: _max = 50, force = false } = {}) => {
   if (!isOnline() && !force) return { processed: 0, errors: 0 };
 
   let all: unknown = [];
   try {
     all = await queueGetAll();
-  } catch (e) {
+  } catch {
     return { processed: 0, errors: 0 };
   }
 

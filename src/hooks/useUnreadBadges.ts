@@ -10,7 +10,7 @@
  */
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { logError } from '@/lib/logger'
 

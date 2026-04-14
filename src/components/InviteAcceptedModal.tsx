@@ -1,4 +1,3 @@
-import { useFocusTrap } from '@/hooks/useFocusTrap'
 import React from 'react';
 import { Users } from 'lucide-react';
 import Image from 'next/image';

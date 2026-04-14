@@ -1,9 +1,8 @@
 'use server'
 
 import { createAdminClient } from '@/utils/supabase/admin'
-import { createClient } from '@/utils/supabase/server'
 import { requireRole } from '@/utils/auth/route'
-import { logError, logWarn, logInfo } from '@/lib/logger'
+import { logError } from '@/lib/logger'
 import { sendPushToAllPlatforms as sendPushToUsers } from '@/lib/push/sender'
 
 type AdminResult = { success: true;[key: string]: unknown } | { success?: never; error: string;[key: string]: unknown }
@@ -434,10 +433,8 @@ export async function getStudentWorkouts(studentId: string): Promise<AdminResult
         const adminDb = createAdminClient();
 
         let targetId = studentId;
-        let isAuthUser = false;
         const { data: maybeProfile } = await adminDb.from('profiles').select('id').eq('id', studentId).maybeSingle();
         if (maybeProfile?.id) {
-            isAuthUser = true;
             targetId = maybeProfile.id;
         } else {
             const { data: srow } = await adminDb
@@ -446,10 +443,8 @@ export async function getStudentWorkouts(studentId: string): Promise<AdminResult
                 .or(`id.eq.${safePg(studentId)},user_id.eq.${safePg(studentId)}`)
                 .maybeSingle();
             if (srow?.user_id) {
-                isAuthUser = true;
                 targetId = srow.user_id;
             } else if (srow?.id) {
-                isAuthUser = false;
                 targetId = srow.id;
             }
         }

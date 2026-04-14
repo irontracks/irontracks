@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useGeoLocation } from './useGeoLocation'
 import { isWithinRadius, findNearestGym } from '@/utils/geoUtils'
-import type { GeoPoint } from '@/utils/geoUtils'
 
 interface Gym {
   id: string

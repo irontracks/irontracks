@@ -14,7 +14,6 @@ import {
     getFatMassKg,
     getLeanMassKg,
     getMeasurementCm,
-    getSum7Mm,
 } from './assessmentUtils';
 
 // ── Date formatting helpers ─────────────────────────────────────────────────

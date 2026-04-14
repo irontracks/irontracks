@@ -20,7 +20,7 @@ interface PhotoPreview {
   type: 'front' | 'side' | 'back';
 }
 
-export default function PhotoUploadStep({ formData, onUpdate, onNext, onBack }: PhotoUploadStepProps) {
+export default function PhotoUploadStep({ onNext, onBack }: PhotoUploadStepProps) {
   const [photos, setPhotos] = useState<PhotoPreview[]>([]);
   const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -162,8 +162,12 @@ export default function PhotoUploadStep({ formData, onUpdate, onNext, onBack }: 
                 </div>
               ) : (
                 <div
+                  role="button"
+                  tabIndex={0}
+                  aria-label="Área de soltar arquivo"
                   className={`border-2 border-dashed rounded-xl p-8 text-center transition-colors ${isDragging ? 'border-yellow-500 bg-yellow-500/10' : 'border-neutral-700 hover:border-neutral-600'
                     }`}
+                  onKeyDown={() => {}}
                   onDragOver={handleDragOver}
                   onDragLeave={handleDragLeave}
                   onDrop={(e) => handleDrop(e, type)}
@@ -195,6 +199,7 @@ export default function PhotoUploadStep({ formData, onUpdate, onNext, onBack }: 
       <input
         ref={fileInputRef}
         type="file"
+        aria-label="Selecionar foto"
         accept="image/*"
         className="hidden"
       />
