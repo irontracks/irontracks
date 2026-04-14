@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import Image from 'next/image';
 import { motion } from 'framer-motion';
 
 interface StoryComposerIosSavePanelProps {
@@ -45,15 +46,18 @@ export function StoryComposerIosSavePanel({
                 </p>
             </div>
 
-            {/* The image — inline style overrides Capacitor's -webkit-touch-callout:none — blob URL, next/image não suporta */}
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img
+            {/* The image — inline style overrides Capacitor's -webkit-touch-callout:none */}
+            <Image
                 src={saveImageUrl}
                 alt="Story para salvar"
-                loading="lazy"
+                unoptimized
+                width={0}
+                height={0}
                 className="rounded-2xl shadow-2xl max-h-[60vh] w-auto"
                 style={
                     {
+                        width: 'auto',
+                        height: 'auto',
                         WebkitTouchCallout: 'default',
                         WebkitUserSelect: 'auto',
                         userSelect: 'auto',
