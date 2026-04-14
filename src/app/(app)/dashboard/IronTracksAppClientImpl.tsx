@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 
 import { createClient } from '@/utils/supabase/client';
-import { createWorkout } from '@/actions/workout-actions';
 
 import LoadingScreen from '@/components/LoadingScreen';
 const ActiveWorkout = dynamic(() => import('@/components/ActiveWorkout'), { ssr: false });
@@ -31,8 +30,6 @@ import ErrorReporterProvider from '@/components/ErrorReporterProvider';
 import { DialogProvider, useDialog } from '@/contexts/DialogContext';
 import GlobalDialog from '@/components/GlobalDialog';
 import { toMinutesRounded, calculateExerciseDuration } from '@/utils/pacing';
-import { formatProgramWorkoutTitle } from '@/utils/workoutTitle'
-import { BackButton } from '@/components/ui/BackButton';
 import DashboardModals from './DashboardModals';
 const StudentDashboard = dynamic(() => import('@/components/dashboard/StudentDashboard'), { ssr: false });
 const WorkoutWizardModal = dynamic(() => import('@/components/dashboard/WorkoutWizardModal'), { ssr: false });
@@ -40,7 +37,6 @@ const ExpressWorkoutModal = dynamic(() => import('@/components/dashboard/Express
 const SettingsModal = dynamic(() => import('@/components/SettingsModal'), { ssr: false });
 import { useUserSettings } from '@/hooks/useUserSettings'
 const WhatsNewModal = dynamic(() => import('@/components/WhatsNewModal'), { ssr: false })
-import { generateWorkoutFromWizard } from '@/utils/workoutAutoGenerator'
 const GuidedTour = dynamic(() => import('@/components/onboarding/GuidedTour'), { ssr: false })
 const NutritionOverlay = dynamic(() => import('@/components/dashboard/nutrition/NutritionOverlay'), { ssr: false })
 import { getTourSteps } from '@/utils/tourSteps'
@@ -73,19 +69,19 @@ import { saveWorkoutToHealth } from '@/utils/native/irontracksNative'
 import { useNativeTimerActions } from '@/hooks/useNativeTimerActions'
 import { useAppEffects, isRecord, parseStartedAtMs } from '@/hooks/useAppEffects'
 import { useAppHandlers } from '@/hooks/useAppHandlers'
+import { useWorkoutWizard } from '@/hooks/useWorkoutWizard'
 
 
 import {
     DirectChatState,
     ActiveSession,
     ActiveWorkoutSession,
+    Exercise,
     Workout,
     UserRecord,
-    TourState
 } from '@/types/app';
 import type { AdminUser } from '@/types/admin'
-import { getErrorMessage } from '@/utils/errorMessage'
-import { logError, logWarn, logInfo } from '@/lib/logger'
+import { logError } from '@/lib/logger'
 import SectionErrorBoundary from '@/components/SectionErrorBoundary'
 const HealthWidget = dynamic(() => import('@/components/dashboard/HealthWidget'), { ssr: false })
 const GymDetectToastWrapper = dynamic(() => import('@/components/dashboard/GymDetectToastWrapper'), { ssr: false })
@@ -241,12 +237,10 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
     const {
         tourOpen,
         setTourOpen,
-        tourBoot,
-        setTourBoot,
         TOUR_VERSION,
         logTourEvent,
-        upsertTourFlags,
-        writeLocalTourDismissal,
+        handleTourComplete,
+        handleTourDismiss,
     } = useGuidedTour({
         userId: user?.id,
         userRole: user?.role ? String(user.role) : null,
@@ -460,20 +454,34 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
     }, [appleHealthEnabled, handleFinishSession, refetchHealth])
 
     // Normalização de títulos e exercícios — extraído para useWorkoutNormalize
+    const programTitleStartDay = userSettingsApi?.settings && typeof userSettingsApi.settings === 'object'
+        ? Number((userSettingsApi.settings as Record<string, unknown>).programTitleStartDay) || undefined
+        : undefined
     const {
         handleNormalizeAiWorkoutTitles,
         handleApplyTitleRule,
         handleNormalizeExercises,
     } = useWorkoutNormalize({
         workouts,
-        programTitleStartDay: userSettingsApi?.settings && typeof userSettingsApi.settings === 'object'
-            ? Number((userSettingsApi.settings as Record<string, unknown>).programTitleStartDay) || undefined
-            : undefined,
+        programTitleStartDay,
         fetchWorkouts,
         alert,
         confirm,
     })
 
+    // Workout wizard generate/save/useDraft — extracted to useWorkoutWizard
+    const {
+        handleWizardGenerate,
+        handleWizardSaveDrafts,
+        handleWizardUseDraft,
+    } = useWorkoutWizard({
+        setCurrentWorkout: setCurrentWorkout as (v: ActiveSession | null) => void,
+        setView,
+        setCreateWizardOpen,
+        fetchWorkouts,
+        alert,
+        programTitleStartDay: programTitleStartDay ?? null,
+    })
 
     const {
         hideVipOnIos,
@@ -515,6 +523,63 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
     const handleOpenProfile = useCallback(() => {
         setView('profile')
     }, [setView])
+
+    const handleOpenAdmin = useCallback(() => {
+        if (typeof window !== 'undefined') {
+            const url = new URL(window.location.href)
+            url.searchParams.delete('view')
+            window.history.replaceState({}, '', url)
+        }
+        const tab = (() => {
+            try { const url = new URL(window.location.href); const c = String(url.searchParams.get('tab') || '').trim(); if (c) return c } catch { /* ignore */ }
+            try { const s = String(sessionStorage.getItem('irontracks_admin_panel_tab') || '').trim(); if (s) return s } catch { /* ignore */ }
+            return 'dashboard'
+        })()
+        openAdminPanel(tab)
+        setView('admin')
+    }, [openAdminPanel, setView])
+
+    const handleAcceptCoach = useCallback(async () => {
+        try {
+            const r = await fetch('/api/teachers/accept', { method: 'POST' })
+            const j = await r.json() as Record<string, unknown>
+            if (j?.ok) { setCoachPending(false); await alert('Conta ativada!') }
+            else { await alert('Falha ao ativar: ' + (j?.error || '')) }
+        } catch (e) {
+            const m = e instanceof Error ? e.message : String(e)
+            await alert('Erro: ' + m)
+        }
+    }, [alert])
+
+    const handleSelectChannel = useCallback((c: unknown) => {
+        const ch = isRecord(c) ? c : {}
+        const channelId = String(ch.channel_id ?? ch.channelId ?? '')
+        const otherUserId = String(ch.other_user_id ?? ch.otherUserId ?? ch.user_id ?? ch.userId ?? '')
+        const otherUserName = String(ch.other_user_name ?? ch.otherUserName ?? ch.displayName ?? '')
+        const photoUrlRaw = ch.other_user_photo ?? ch.otherUserPhoto ?? ch.photoUrl ?? null
+        const photoUrl = photoUrlRaw != null ? String(photoUrlRaw) : null
+        setDirectChat({
+            channelId,
+            userId: otherUserId,
+            displayName: otherUserName || undefined,
+            photoUrl,
+            other_user_id: otherUserId,
+            other_user_name: otherUserName || undefined,
+            other_user_photo: photoUrl,
+        })
+        setView('directChat')
+    }, [setView])
+
+    const handleExpressUseDraft = useCallback((draft: { title: string; exercises: unknown[] }) => {
+        try {
+            const title = String(draft?.title || '').trim() || 'Treino Express'
+            const exercises = (Array.isArray(draft?.exercises) ? draft.exercises : []) as Exercise[]
+            setCurrentWorkout({ title, exercises } as unknown as ActiveSession)
+            setView('edit')
+        } finally {
+            setExpressWorkoutOpen(false)
+        }
+    }, [setCurrentWorkout, setView])
 
     useEffect(() => {
         if (!hideVipOnIos) return;
@@ -605,39 +670,10 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                     } catch { }
                                 },
                             }}
-                            onEvent={(name: unknown, payload: unknown) => {
-                                logTourEvent(name, payload)
-                            }}
-                            onComplete={async () => {
-                                setTourOpen(false)
-                                setTourBoot((prev: TourState) => ({ ...prev, completed: true, skipped: false }))
-                                try { writeLocalTourDismissal(user?.id, 'completed') } catch { }
-                                const res = await upsertTourFlags({ tour_completed_at: new Date().toISOString(), tour_skipped_at: null })
-                                if (!res?.ok) {
-                                    logWarn('warn', 'Falha ao persistir flags do tour (completed). Mantendo fallback local.', res)
-                                }
-                                await logTourEvent('tour_completed', { version: TOUR_VERSION })
-                            }}
-                            onSkip={async () => {
-                                setTourOpen(false)
-                                setTourBoot((prev: TourState) => ({ ...prev, completed: false, skipped: true }))
-                                try { writeLocalTourDismissal(user?.id, 'skipped') } catch { }
-                                const res = await upsertTourFlags({ tour_skipped_at: new Date().toISOString(), tour_completed_at: null })
-                                if (!res?.ok) {
-                                    logWarn('warn', 'Falha ao persistir flags do tour (skipped). Mantendo fallback local.', res)
-                                }
-                                await logTourEvent('tour_skipped', { version: TOUR_VERSION })
-                            }}
-                            onCancel={async () => {
-                                setTourOpen(false)
-                                setTourBoot((prev: TourState) => ({ ...prev, completed: false, skipped: true }))
-                                try { writeLocalTourDismissal(user?.id, 'skipped') } catch { }
-                                const res = await upsertTourFlags({ tour_skipped_at: new Date().toISOString(), tour_completed_at: null })
-                                if (!res?.ok) {
-                                    logWarn('warn', 'Falha ao persistir flags do tour (cancelled). Mantendo fallback local.', res)
-                                }
-                                await logTourEvent('tour_cancelled', { version: TOUR_VERSION })
-                            }}
+                            onEvent={logTourEvent}
+                            onComplete={handleTourComplete}
+                            onSkip={() => handleTourDismiss('skipped')}
+                            onCancel={() => handleTourDismiss('cancelled')}
                         />
 
                         {/* Header — extracted to DashboardHeader */}
@@ -657,11 +693,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                             coachPending={coachPending}
                             onGoHome={() => setView('dashboard')}
                             onOpenVip={openVipView}
-                            onOpenAdmin={() => {
-                                if (typeof window !== 'undefined') { const url = new URL(window.location.href); url.searchParams.delete('view'); window.history.replaceState({}, '', url) }
-                                const tab = (() => { try { const url = new URL(window.location.href); const c = String(url.searchParams.get('tab') || '').trim(); if (c) return c } catch { } try { const s = String(sessionStorage.getItem('irontracks_admin_panel_tab') || '').trim(); if (s) return s } catch { } return 'dashboard' })()
-                                openAdminPanel(tab); setView('admin')
-                            }}
+                            onOpenAdmin={handleOpenAdmin}
                             onOpenChatList={handleOpenChatList}
                             onOpenGlobalChat={handleOpenGlobalChat}
                             onOpenHistory={handleOpenHistory}
@@ -673,7 +705,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                             onOpenProfile={handleOpenProfile}
                             onLogout={handleLogout}
                             onOfflineSyncOpen={() => setOfflineSyncOpen(true)}
-                            onAcceptCoach={async () => { try { const r = await fetch('/api/teachers/accept', { method: 'POST' }); const j = await r.json(); if (j?.ok) { setCoachPending(false); await alert('Conta ativada!') } else { await alert('Falha ao ativar: ' + (j?.error || '')) } } catch (e) { const m = e instanceof Error ? e.message : String(e); await alert('Erro: ' + m) } }}
+                            onAcceptCoach={handleAcceptCoach}
                         />
 
                         {/* Main Content */}
@@ -760,16 +792,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                             <ExpressWorkoutModal
                                 isOpen={expressWorkoutOpen}
                                 onClose={() => setExpressWorkoutOpen(false)}
-                                onUseDraft={(draft) => {
-                                    try {
-                                        const title = String(draft?.title || '').trim() || 'Treino Express'
-                                        const exercises = (Array.isArray(draft?.exercises) ? draft.exercises : []) as import('@/types/app').Exercise[]
-                                        setCurrentWorkout({ title, exercises })
-                                        setView('edit')
-                                    } finally {
-                                        setExpressWorkoutOpen(false)
-                                    }
-                                }}
+                                onUseDraft={handleExpressUseDraft}
                             />
 
                             {nutritionOpen ? (
@@ -783,77 +806,9 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                 isOpen={createWizardOpen}
                                 onClose={() => setCreateWizardOpen(false)}
                                 onManual={() => openManualWorkoutEditor()}
-                                onGenerate={async (answers, options) => {
-                                    const mode = String(options?.mode || 'single').trim().toLowerCase();
-                                    try {
-                                        const res = await fetch('/api/ai/workout-wizard', {
-                                            method: 'POST',
-                                            headers: { 'Content-Type': 'application/json' },
-                                            body: JSON.stringify({ answers, mode }),
-                                        })
-                                        const data = await res.json().catch((): unknown => null)
-                                        if (!res.ok) {
-                                            const msg = data?.error ? String(data.error) : 'Falha ao gerar treino com IA.'
-                                            throw new Error(msg)
-                                        }
-                                        if (mode === 'program') {
-                                            const drafts = Array.isArray(data?.drafts) ? data.drafts : null
-                                            if (drafts && drafts.length) return { drafts }
-                                            if (data?.ok === false && Array.isArray(data?.drafts) && data.drafts.length) return { drafts: data.drafts }
-                                            throw new Error(data?.error ? String(data.error) : 'Resposta inválida da IA.')
-                                        }
-                                        const draft = data?.draft && typeof data.draft === 'object' ? data.draft : null
-                                        if (draft?.exercises && Array.isArray(draft.exercises) && draft.exercises.length > 0) return draft
-                                        if (data?.ok === false && data?.draft) return data.draft
-                                        throw new Error(data?.error ? String(data.error) : 'Resposta inválida da IA.')
-                                    } catch (e: unknown) {
-                                        const msg = getErrorMessage(e)
-                                        const lower = msg.toLowerCase()
-                                        const isConfig = lower.includes('api de ia não configurada') || lower.includes('google_generative_ai_api_key')
-                                        if (isConfig) throw e
-                                        if (mode === 'program') {
-                                            const days = Math.max(2, Math.min(6, Number(answers?.daysPerWeek || 3) || 3))
-                                            const drafts: Array<Record<string, unknown>> = [];
-                                            for (let i = 0; i < days; i++) {
-                                                drafts.push(generateWorkoutFromWizard(answers, i))
-                                            }
-                                            return { drafts }
-                                        }
-                                        return generateWorkoutFromWizard(answers, 0)
-                                    }
-                                }}
-                                onSaveDrafts={async (drafts) => {
-                                    const list = Array.isArray(drafts) ? drafts : []
-                                    if (!list.length) return
-                                    try {
-                                        for (let i = 0; i < list.length; i += 1) {
-                                            const d = list[i]
-                                            const baseTitle = String(d?.title || 'Treino').trim() || 'Treino'
-                                            const finalTitle = formatProgramWorkoutTitle(baseTitle, i, { startDay: userSettingsApi?.settings?.programTitleStartDay })
-                                            const exercises = Array.isArray(d?.exercises) ? d.exercises : []
-                                            const res = await createWorkout({ title: finalTitle, exercises })
-                                            if (!res?.ok) throw new Error(String(res?.error || 'Falha ao salvar treino'))
-                                        }
-                                        try {
-                                            await fetchWorkouts()
-                                        } catch (e) { logError('IronTracksApp.refetchAfterSaveDrafts', e) }
-                                        setCreateWizardOpen(false)
-                                        await alert(`Plano salvo: ${list.length} treinos criados.`)
-                                    } catch (e: unknown) {
-                                        const msg = getErrorMessage(e)
-                                        await alert('Erro ao salvar plano: ' + msg)
-                                    }
-                                }}
-                                onUseDraft={(draft) => {
-                                    try {
-                                        const title = String(draft?.title || '').trim() || 'Treino'
-                                        const exercises = (Array.isArray(draft?.exercises) ? draft.exercises : []) as import('@/types/app').Exercise[]
-                                        setCurrentWorkout({ title, exercises })
-                                        setView('edit')
-                                    } finally {
-                                        setCreateWizardOpen(false)
-                                    }
-                                }}
+                                onGenerate={handleWizardGenerate}
+                                onSaveDrafts={handleWizardSaveDrafts}
+                                onUseDraft={handleWizardUseDraft}
                             />
 
                             {view === 'edit' && (
@@ -978,58 +933,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                     </SectionErrorBoundary>
                                 </div>
                             )}
-                            {showExportModal && exportWorkout && (
-                                <div className="fixed inset-0 z-[1200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" role="button" tabIndex={-1} aria-label="Fechar exportação" onClick={() => setShowExportModal(false)} onKeyDown={(e) => { if (e.key === 'Escape') setShowExportModal(false) }}>
-                                    <div className="bg-neutral-900 w-full max-w-md rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
-                                        <div className="p-4 border-b border-neutral-800 flex justify-between items-center">
-                                            <h3 className="font-bold text-white">Como deseja exportar?</h3>
-                                            <BackButton onClick={() => setShowExportModal(false)} className="bg-transparent hover:bg-neutral-800 text-neutral-300" />
-                                        </div>
-                                        <div className="p-4 space-y-3">
-                                            <button onClick={handleExportPdf} className="w-full px-4 py-3 bg-yellow-500 text-black font-bold rounded-xl">Baixar PDF</button>
-                                            <button onClick={handleExportJson} className="w-full px-4 py-3 bg-neutral-800 border border-neutral-700 text-neutral-200 font-bold rounded-xl">Baixar JSON</button>
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
-
-                            {openStudent && (
-                                <div className="fixed inset-0 z-[1200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" role="button" tabIndex={-1} aria-label="Fechar estudante" onClick={() => setOpenStudent(null)} onKeyDown={(e) => { if (e.key === 'Escape') setOpenStudent(null) }}>
-                                    <div className="bg-neutral-900 w-full max-w-md rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
-                                        <div className="p-4 border-b border-neutral-800 flex justify-between items-center">
-                                            <h3 className="font-bold text-white">Treinos de {String((isRecord(openStudent) ? openStudent.name : '') ?? '')}</h3>
-                                            <BackButton onClick={() => setOpenStudent(null)} className="bg-transparent hover:bg-neutral-800 text-neutral-300" />
-                                        </div>
-                                        <div className="p-4 space-y-2 max-h-[70vh] overflow-y-auto">
-                                            {(() => {
-                                                const s = isRecord(openStudent) ? openStudent : {}
-                                                const list = Array.isArray(s.workouts) ? s.workouts : []
-                                                if (list.length !== 0) return null
-                                                return (
-                                                    <p className="text-neutral-500 text-sm">Nenhum treino encontrado.</p>
-                                                )
-                                            })()}
-                                            {(() => {
-                                                const s = isRecord(openStudent) ? openStudent : {}
-                                                const list = Array.isArray(s.workouts) ? s.workouts : []
-                                                return list.map((w: unknown, idx: number) => {
-                                                    const wo = w && typeof w === 'object' ? (w as Record<string, unknown>) : ({} as Record<string, unknown>)
-                                                    const id = String(wo?.id || '').trim() || `w-${idx}`
-                                                    const exCount = Array.isArray(wo?.exercises) ? (wo.exercises as unknown[]).length : 0
-                                                    return (
-                                                        <div key={id} className="p-3 rounded-xl border border-neutral-700 bg-neutral-800">
-                                                            <div className="flex items-center justify-between">
-                                                                <span className="text-white font-bold text-sm">{String(wo?.title || '')}</span>
-                                                                <span className="text-xs text-neutral-400">{exCount} exercícios</span>
-                                                            </div>
-                                                        </div>
-                                                    )
-                                                })
-                                            })()}
-                                        </div>
-                                    </div>
-                                </div>
-                            )}
+                            {/* Export modal + OpenStudent modal rendered by DashboardModals */}
 
                             {view === 'chat' && (
                                 <div className="absolute inset-0 z-50 bg-neutral-900">
@@ -1052,24 +956,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                     <ChatListScreen
                                         user={user as AdminUser}
                                         onClose={() => setView('dashboard')}
-                                        onSelectChannel={(c: unknown) => {
-                                            const ch = isRecord(c) ? c : {}
-                                            const channelId = String(ch.channel_id ?? ch.channelId ?? '')
-                                            const otherUserId = String(ch.other_user_id ?? ch.otherUserId ?? ch.user_id ?? ch.userId ?? '')
-                                            const otherUserName = String(ch.other_user_name ?? ch.otherUserName ?? ch.displayName ?? '')
-                                            const photoUrlRaw = ch.other_user_photo ?? ch.otherUserPhoto ?? ch.photoUrl ?? null
-                                            const photoUrl = photoUrlRaw != null ? String(photoUrlRaw) : null
-                                            setDirectChat({
-                                                channelId,
-                                                userId: otherUserId,
-                                                displayName: otherUserName || undefined,
-                                                photoUrl,
-                                                other_user_id: otherUserId,
-                                                other_user_name: otherUserName || undefined,
-                                                other_user_photo: photoUrl,
-                                            })
-                                            setView('directChat')
-                                        }}
+                                        onSelectChannel={handleSelectChannel}
                                     />
                                 </div>
                             )}
