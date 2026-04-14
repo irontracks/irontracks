@@ -310,6 +310,7 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
               >
                 <Search size={15} className="text-neutral-500 flex-shrink-0" />
                 <input
+                  aria-label="Buscar usuários"
                   value={query}
                   onChange={(e) => setQuery(e.target.value)}
                   className="bg-transparent outline-none text-sm text-white flex-1 placeholder-neutral-600"

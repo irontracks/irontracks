@@ -979,7 +979,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                 </div>
                             )}
                             {showExportModal && exportWorkout && (
-                                <div className="fixed inset-0 z-[1200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowExportModal(false)}>
+                                <div className="fixed inset-0 z-[1200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" role="button" tabIndex={-1} aria-label="Fechar exportação" onClick={() => setShowExportModal(false)} onKeyDown={(e) => { if (e.key === 'Escape') setShowExportModal(false) }}>
                                     <div className="bg-neutral-900 w-full max-w-md rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
                                         <div className="p-4 border-b border-neutral-800 flex justify-between items-center">
                                             <h3 className="font-bold text-white">Como deseja exportar?</h3>
@@ -994,7 +994,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                             )}
 
                             {openStudent && (
-                                <div className="fixed inset-0 z-[1200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setOpenStudent(null)}>
+                                <div className="fixed inset-0 z-[1200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" role="button" tabIndex={-1} aria-label="Fechar estudante" onClick={() => setOpenStudent(null)} onKeyDown={(e) => { if (e.key === 'Escape') setOpenStudent(null) }}>
                                     <div className="bg-neutral-900 w-full max-w-md rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
                                         <div className="p-4 border-b border-neutral-800 flex justify-between items-center">
                                             <h3 className="font-bold text-white">Treinos de {String((isRecord(openStudent) ? openStudent.name : '') ?? '')}</h3>

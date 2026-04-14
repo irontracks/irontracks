@@ -117,8 +117,7 @@ export const StudentWorkoutsTab: React.FC = () => {
                             {toolsPanelOpen && (
                                 <>
                                     {/* Backdrop */}
-                                    {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */}
-                                    <div className="fixed inset-0 z-40" onClick={() => setToolsPanelOpen(false)} />
+                                    <div className="fixed inset-0 z-40" role="button" tabIndex={-1} aria-label="Fechar painel" onClick={() => setToolsPanelOpen(false)} onKeyDown={(e) => { if (e.key === 'Escape') setToolsPanelOpen(false) }} />
 
                                     {/* Dropdown panel */}
                                     <div className="absolute right-0 mt-2 w-72 z-50 animate-in fade-in slide-in-from-top-2 duration-200">

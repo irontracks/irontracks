@@ -397,8 +397,7 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded, open:
             {isOpen && (
                 <>
                     {/* Backdrop */}
-                    {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */}
-                    <div className="fixed inset-0 z-40" onClick={() => setIsOpen(false)} />
+                    <div className="fixed inset-0 z-40" role="button" tabIndex={-1} aria-label="Fechar notificações" onClick={() => setIsOpen(false)} onKeyDown={(e) => { if (e.key === 'Escape') setIsOpen(false) }} />
 
                     {/* Panel */}
                     <div className="absolute right-0 top-13 w-[340px] z-50 animate-in fade-in slide-in-from-top-2 duration-200">

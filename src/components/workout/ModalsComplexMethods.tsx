@@ -335,7 +335,7 @@ export function ModalsComplexMethods() {
                     ? (strippingModal.stages as Array<{ weight: string | null; reps: number | null }>)
                     : [];
                 return (
-                    <div className="fixed inset-0 z-[1400] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe" onClick={() => setStrippingModal(null)}>
+                    <div className="fixed inset-0 z-[1400] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe" role="button" tabIndex={-1} aria-label="Fechar modal Stripping" onClick={() => setStrippingModal(null)} onKeyDown={(e) => { if (e.key === 'Escape') setStrippingModal(null) }}>
                         <div className="w-full max-w-2xl bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
                             <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
                                 <div className="min-w-0">
@@ -377,7 +377,7 @@ export function ModalsComplexMethods() {
                     : Array.from({ length: 7 }).map(() => ({ weight: null, reps: null }));
                 const intraSec = parseTrainingNumber(fst7Modal.intra_sec) ?? 30;
                 return (
-                    <div className="fixed inset-0 z-[1400] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe" onClick={() => setFst7Modal(null)}>
+                    <div className="fixed inset-0 z-[1400] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe" role="button" tabIndex={-1} aria-label="Fechar modal FST-7" onClick={() => setFst7Modal(null)} onKeyDown={(e) => { if (e.key === 'Escape') setFst7Modal(null) }}>
                         <div className="w-full max-w-2xl bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
                             <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
                                 <div className="min-w-0">
@@ -425,7 +425,7 @@ export function ModalsComplexMethods() {
                     ? (waveModal.waves as Array<{ heavy: number | null; medium: number | null; ultra: number | null }>)
                     : [{ heavy: 3, medium: 5, ultra: 2 }, { heavy: 3, medium: 5, ultra: 2 }];
                 return (
-                    <div className="fixed inset-0 z-[1400] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe" onClick={() => setWaveModal(null)}>
+                    <div className="fixed inset-0 z-[1400] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe" role="button" tabIndex={-1} aria-label="Fechar modal Wave" onClick={() => setWaveModal(null)} onKeyDown={(e) => { if (e.key === 'Escape') setWaveModal(null) }}>
                         <div className="w-full max-w-2xl bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
                             <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
                                 <div className="min-w-0">

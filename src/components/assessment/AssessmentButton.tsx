@@ -224,7 +224,7 @@ export default function AssessmentButton({
 
   if (showForm) {
     return (
-      <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 pt-20" onClick={() => setShowForm(false)}>
+      <div className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4 pt-20" role="button" tabIndex={-1} aria-label="Fechar avaliação" onClick={() => setShowForm(false)} onKeyDown={(e) => { if (e.key === 'Escape') setShowForm(false) }}>
         <div
           className="max-w-4xl w-full max-h-[90vh] overflow-y-auto relative custom-scrollbar rounded-2xl border shadow-2xl"
           style={{

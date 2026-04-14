@@ -419,7 +419,7 @@ export default function DashboardModals(props: DashboardModalsProps) {
 
             {/* Export Modal */}
             {showExportModal && exportWorkout && (
-                <div className="fixed inset-0 z-[1200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setShowExportModal(false)}>
+                <div className="fixed inset-0 z-[1200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" role="button" tabIndex={-1} aria-label="Fechar exportação" onClick={() => setShowExportModal(false)} onKeyDown={(e) => { if (e.key === 'Escape') setShowExportModal(false) }}>
                     <div className="bg-neutral-900 w-full max-w-md rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
                         <div className="p-4 border-b border-neutral-800 flex justify-between items-center">
                             <h3 className="font-bold text-white">Como deseja exportar?</h3>
@@ -435,7 +435,7 @@ export default function DashboardModals(props: DashboardModalsProps) {
 
             {/* Open Student */}
             {openStudent && (
-                <div className="fixed inset-0 z-[1200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" onClick={() => setOpenStudent(null)}>
+                <div className="fixed inset-0 z-[1200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4" role="button" tabIndex={-1} aria-label="Fechar estudante" onClick={() => setOpenStudent(null)} onKeyDown={(e) => { if (e.key === 'Escape') setOpenStudent(null) }}>
                     <div className="bg-neutral-900 w-full max-w-md rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
                         <div className="p-4 border-b border-neutral-800 flex justify-between items-center">
                             <h3 className="font-bold text-white">Treinos de {String((isRecord(openStudent) ? (openStudent as Record<string, unknown>).name : '') ?? '')}</h3>
