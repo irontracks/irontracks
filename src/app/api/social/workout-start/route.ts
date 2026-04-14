@@ -10,6 +10,7 @@ import {
 } from '@/lib/social/notifyFollowers'
 import { parseJsonBody } from '@/utils/zod'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 
 export const dynamic = 'force-dynamic'
 
@@ -25,6 +26,10 @@ export async function POST(req: Request) {
   try {
     const auth = await requireUser()
     if (!auth.ok) return auth.response
+
+    const ip = getRequestIp(req)
+    const rl = await checkRateLimitAsync(`social:workout-start:${auth.user.id}:${ip}`, 10, 60_000)
+    if (!rl.allowed) return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 })
 
     const parsedBody = await parseJsonBody(req, BodySchema)
     if (parsedBody.response) return parsedBody.response

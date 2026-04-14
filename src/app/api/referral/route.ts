@@ -7,6 +7,7 @@ import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { parseJsonBody } from '@/utils/zod'
+import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 
 export const dynamic = 'force-dynamic'
 
@@ -53,6 +54,10 @@ const BodySchema = z.object({ code: z.string().min(1).max(20) })
 export async function POST(req: NextRequest) {
   const auth = await requireUser()
   if (!auth.ok) return auth.response
+
+  const ip = getRequestIp(req)
+  const rl = await checkRateLimitAsync(`referral:register:${auth.user.id}:${ip}`, 3, 3_600_000)
+  if (!rl.allowed) return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 })
 
   const parsed = await parseJsonBody(req, BodySchema)
   if (parsed.response) return parsed.response

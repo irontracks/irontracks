@@ -5,6 +5,7 @@ import { requireRole, jsonError } from '@/utils/auth/route'
 import { z } from 'zod'
 import { parseJsonBody } from '@/utils/zod'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -19,6 +20,10 @@ const BodySchema = z
 export async function POST(req: Request) {
   const auth = await requireRole(['admin', 'teacher'])
   if (!auth.ok) return auth.response
+
+  const ip = getRequestIp(req)
+  const rl = await checkRateLimitAsync(`teacher:inbox:send:${auth.user.id}:${ip}`, 20, 60_000)
+  if (!rl.allowed) return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 })
 
   try {
     const parsedBody = await parseJsonBody(req, BodySchema)
