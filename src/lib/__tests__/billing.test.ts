@@ -1,7 +1,32 @@
 /**
  * Tests for billing utility functions.
  */
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
+
+// env.security values are frozen at module import time via requireEnv/optionalEnv.
+// We mock @/utils/env so hasValidInternalSecret can be tested with dynamic secrets.
+const mockSecurity = vi.hoisted(() => ({
+  cronSecret: '',
+  internalSecret: '',
+  adminEmail: '',
+  trustedProxyDepth: 1,
+}))
+vi.mock('@/utils/env', () => ({
+  env: {
+    supabase: { url: '', anonKey: '', serviceRoleKey: '' },
+    upstash: { restUrl: '', restToken: '' },
+    security: mockSecurity,
+    features: { executionVideo: false, storageProvider: 'supabase', marketplaceFeePercent: 10 },
+    youtube: { apiKey: '' },
+  },
+}))
+vi.mock('@/lib/logger', () => ({
+  logError: vi.fn(),
+  logWarn: vi.fn(),
+  logInfo: vi.fn(),
+}))
+vi.mock('@/utils/supabase/server', () => ({ createClient: vi.fn() }))
+vi.mock('@/utils/supabase/admin', () => ({ createAdminClient: vi.fn() }))
 
 // resolveDbPlanId maps RevenueCat product identifiers to app_plans.id values
 describe('resolveDbPlanId', () => {
@@ -94,7 +119,7 @@ describe('requireRoleOrBearer auth flow', () => {
 
   it('hasValidInternalSecret returns false when secret is empty', async () => {
     const { hasValidInternalSecret } = await import('@/utils/auth/route')
-    delete process.env.IRONTRACKS_INTERNAL_SECRET
+    mockSecurity.internalSecret = ''
     const req = new Request('http://localhost/test', {
       headers: { 'x-internal-secret': 'anything' },
     })
@@ -103,22 +128,22 @@ describe('requireRoleOrBearer auth flow', () => {
 
   it('hasValidInternalSecret returns true when secret matches', async () => {
     const { hasValidInternalSecret } = await import('@/utils/auth/route')
-    process.env.IRONTRACKS_INTERNAL_SECRET = 'my-secret'
+    mockSecurity.internalSecret = 'my-secret'
     const req = new Request('http://localhost/test', {
       headers: { 'x-internal-secret': 'my-secret' },
     })
     expect(hasValidInternalSecret(req)).toBe(true)
-    delete process.env.IRONTRACKS_INTERNAL_SECRET
+    mockSecurity.internalSecret = ''
   })
 
   it('hasValidInternalSecret returns false for wrong secret', async () => {
     const { hasValidInternalSecret } = await import('@/utils/auth/route')
-    process.env.IRONTRACKS_INTERNAL_SECRET = 'correct-secret'
+    mockSecurity.internalSecret = 'correct-secret'
     const req = new Request('http://localhost/test', {
       headers: { 'x-internal-secret': 'wrong-secret' },
     })
     expect(hasValidInternalSecret(req)).toBe(false)
-    delete process.env.IRONTRACKS_INTERNAL_SECRET
+    mockSecurity.internalSecret = ''
   })
 })
 
