@@ -97,6 +97,7 @@ const AdminWorkoutEditor: React.FC<AdminWorkoutEditorProps> = ({ initialData, on
                 <h3 className="font-bold text-white">{workout?.id ? 'Editar' : 'Novo'}</h3>
             </div>
             <input
+                aria-label="Nome do Treino"
                 value={workout.title}
                 onChange={e => setWorkout((prev) => ({ ...prev, title: e.target.value }))}
                 className="w-full bg-neutral-800 text-xl font-bold p-4 rounded-xl mb-4 border border-neutral-700 outline-none text-white"
@@ -122,6 +123,7 @@ const AdminWorkoutEditor: React.FC<AdminWorkoutEditorProps> = ({ initialData, on
                         </button>
                         <div className="space-y-3 pr-8">
                             <input
+                                aria-label="Nome do Exercício"
                                 value={ex.name}
                                 onChange={e => updateExercise(idx, 'name', e.target.value)}
                                 className="w-full bg-transparent font-bold text-white border-b border-neutral-600 pb-1 outline-none"
@@ -129,9 +131,10 @@ const AdminWorkoutEditor: React.FC<AdminWorkoutEditorProps> = ({ initialData, on
                             />
                             <div className="grid grid-cols-6 gap-2 text-center mb-2">
                                 <div className="col-span-1">
-                                    <label className="text-[10px] text-neutral-500 block">Sets</label>
+                                    <div className="text-[10px] text-neutral-500 block">Sets</div>
                                     <div className="flex items-center gap-1">
                                         <input
+                                            aria-label="Sets"
                                             type="number"
                                             value={ex.sets}
                                             onChange={e => updateExercise(idx, 'sets', e.target.value)}
@@ -147,16 +150,18 @@ const AdminWorkoutEditor: React.FC<AdminWorkoutEditorProps> = ({ initialData, on
                                     </div>
                                 </div>
                                 <div className="col-span-1">
-                                    <label className="text-[10px] text-neutral-500 block">Reps</label>
+                                    <div className="text-[10px] text-neutral-500 block">Reps</div>
                                     <input
+                                        aria-label="Reps"
                                         value={ex.reps}
                                         onChange={e => updateExercise(idx, 'reps', e.target.value)}
                                         className="w-full bg-neutral-900 rounded p-2 text-center text-sm text-white outline-none"
                                     />
                                 </div>
                                 <div className="col-span-1">
-                                    <label className="text-[10px] text-yellow-500 font-bold block">RPE</label>
+                                    <div className="text-[10px] text-yellow-500 font-bold block">RPE</div>
                                     <input
+                                        aria-label="RPE"
                                         type="number"
                                         value={ex.rpe}
                                         onChange={e => updateExercise(idx, 'rpe', e.target.value)}
@@ -165,8 +170,9 @@ const AdminWorkoutEditor: React.FC<AdminWorkoutEditorProps> = ({ initialData, on
                                     />
                                 </div>
                                 <div className="col-span-1">
-                                    <label className="text-[10px] text-neutral-500 block">Rest(s)</label>
+                                    <div className="text-[10px] text-neutral-500 block">Rest(s)</div>
                                     <input
+                                        aria-label="Rest(s)"
                                         type="number"
                                         value={ex.restTime}
                                         onChange={e => updateExercise(idx, 'restTime', e.target.value)}
@@ -174,16 +180,18 @@ const AdminWorkoutEditor: React.FC<AdminWorkoutEditorProps> = ({ initialData, on
                                     />
                                 </div>
                                 <div className="col-span-1">
-                                    <label className="text-[10px] text-neutral-500 block">Cad</label>
+                                    <div className="text-[10px] text-neutral-500 block">Cad</div>
                                     <input
+                                        aria-label="Cadência"
                                         value={ex.cadence}
                                         onChange={e => updateExercise(idx, 'cadence', e.target.value)}
                                         className="w-full bg-neutral-900 rounded p-2 text-center text-sm text-white outline-none"
                                     />
                                 </div>
                                 <div className="col-span-1">
-                                    <label className="text-[10px] text-neutral-500 block">Método</label>
+                                    <div className="text-[10px] text-neutral-500 block">Método</div>
                                     <select
+                                        aria-label="Método"
                                         value={['warm-up', 'warm_up', 'warmup'].includes(String(ex.method || '').toLowerCase()) ? 'Normal' : (ex.method || 'Normal')}
                                         onChange={e => updateExercise(idx, 'method', e.target.value)}
                                         className="w-full bg-neutral-900 rounded p-2 text-center text-[10px] h-[38px] outline-none text-white"
@@ -198,8 +206,9 @@ const AdminWorkoutEditor: React.FC<AdminWorkoutEditorProps> = ({ initialData, on
                             </div>
 
                             <div className="mb-2">
-                                <label className="text-[10px] text-blue-400 flex items-center gap-1 mb-1">🎥 VÍDEO DEMONSTRAÇÃO (URL)</label>
+                                <div className="text-[10px] text-blue-400 flex items-center gap-1 mb-1">🎥 VÍDEO DEMONSTRAÇÃO (URL)</div>
                                 <input
+                                    aria-label="URL do vídeo de demonstração"
                                     value={ex.videoUrl || ''}
                                     onChange={e => updateExercise(idx, 'videoUrl', e.target.value)}
                                     className="w-full bg-blue-500/5 border border-blue-500/20 rounded p-2 text-xs text-blue-200 outline-none"
@@ -207,8 +216,9 @@ const AdminWorkoutEditor: React.FC<AdminWorkoutEditorProps> = ({ initialData, on
                                 />
                             </div>
                             <div>
-                                <label className="text-[10px] font-bold text-yellow-500 flex items-center gap-1 mb-1"><Megaphone size={10} /> COACH</label>
+                                <div className="text-[10px] font-bold text-yellow-500 flex items-center gap-1 mb-1"><Megaphone size={10} /> COACH</div>
                                 <input
+                                    aria-label="Instrução do coach"
                                     value={ex.coachNotes || ''}
                                     onChange={e => updateExercise(idx, 'coachNotes', e.target.value)}
                                     className="w-full bg-yellow-500/10 border border-yellow-500/30 rounded p-2 text-sm text-yellow-200 outline-none"

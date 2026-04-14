@@ -56,8 +56,11 @@ export const Modals: React.FC = () => {
                         </h3>
                         <div className="space-y-3">
                             <div>
-                                <label className="text-xs text-neutral-500 uppercase font-bold">Nome Completo</label>
+                                <label htmlFor="new-student-name" className="text-xs text-neutral-500 uppercase font-bold">Nome Completo</label>
                                 <input
+                                    id="new-student-name"
+                                    type="text"
+                                    aria-label="Nome Completo"
                                     value={newStudent.name}
                                     onChange={e => setNewStudent({ ...newStudent, name: e.target.value })}
                                     className="w-full p-3 rounded-xl text-white border focus:border-yellow-500/40 outline-none transition-all"
@@ -65,8 +68,11 @@ export const Modals: React.FC = () => {
                                 />
                             </div>
                             <div>
-                                <label className="text-xs text-neutral-500 uppercase font-bold">Email</label>
+                                <label htmlFor="new-student-email" className="text-xs text-neutral-500 uppercase font-bold">Email</label>
                                 <input
+                                    id="new-student-email"
+                                    type="email"
+                                    aria-label="Email"
                                     value={newStudent.email}
                                     onChange={e => setNewStudent({ ...newStudent, email: e.target.value })}
                                     className="w-full p-3 rounded-xl text-white border focus:border-yellow-500/40 outline-none transition-all"
@@ -94,8 +100,11 @@ export const Modals: React.FC = () => {
                         </h3>
                         <div className="space-y-3">
                             <div>
-                                <label className="text-xs text-neutral-500 uppercase font-bold">Nome Completo</label>
+                                <label htmlFor="new-teacher-name" className="text-xs text-neutral-500 uppercase font-bold">Nome Completo</label>
                                 <input
+                                    id="new-teacher-name"
+                                    type="text"
+                                    aria-label="Nome Completo"
                                     value={newTeacher.name}
                                     onChange={e => setNewTeacher({ ...newTeacher, name: e.target.value })}
                                     className="w-full p-3 rounded-xl text-white border focus:border-yellow-500/40 outline-none transition-all"
@@ -103,8 +112,11 @@ export const Modals: React.FC = () => {
                                 />
                             </div>
                             <div>
-                                <label className="text-xs text-neutral-500 uppercase font-bold">Email</label>
+                                <label htmlFor="new-teacher-email" className="text-xs text-neutral-500 uppercase font-bold">Email</label>
                                 <input
+                                    id="new-teacher-email"
+                                    type="email"
+                                    aria-label="Email"
                                     value={newTeacher.email}
                                     onChange={e => setNewTeacher({ ...newTeacher, email: e.target.value })}
                                     className="w-full p-3 rounded-xl text-white border focus:border-yellow-500/40 outline-none transition-all"
@@ -112,8 +124,11 @@ export const Modals: React.FC = () => {
                                 />
                             </div>
                             <div>
-                                <label className="text-xs text-neutral-500 uppercase font-bold">Telefone</label>
+                                <label htmlFor="new-teacher-phone" className="text-xs text-neutral-500 uppercase font-bold">Telefone</label>
                                 <input
+                                    id="new-teacher-phone"
+                                    type="tel"
+                                    aria-label="Telefone"
                                     value={newTeacher.phone}
                                     onChange={e => setNewTeacher({ ...newTeacher, phone: e.target.value })}
                                     className="w-full p-3 rounded-xl text-white border focus:border-yellow-500/40 outline-none transition-all"
@@ -141,8 +156,11 @@ export const Modals: React.FC = () => {
                         </h3>
                         <div className="space-y-3">
                             <div>
-                                <label className="text-xs text-neutral-500 uppercase font-bold">Nome Completo</label>
+                                <label htmlFor="edit-teacher-name" className="text-xs text-neutral-500 uppercase font-bold">Nome Completo</label>
                                 <input
+                                    id="edit-teacher-name"
+                                    type="text"
+                                    aria-label="Nome Completo"
                                     value={editingTeacher.name}
                                     onChange={e => setEditingTeacher({ ...editingTeacher, name: e.target.value })}
                                     className="w-full p-3 rounded-xl text-white border focus:border-yellow-500/40 outline-none transition-all"
@@ -150,8 +168,11 @@ export const Modals: React.FC = () => {
                                 />
                             </div>
                             <div>
-                                <label className="text-xs text-neutral-500 uppercase font-bold">Email</label>
+                                <label htmlFor="edit-teacher-email" className="text-xs text-neutral-500 uppercase font-bold">Email</label>
                                 <input
+                                    id="edit-teacher-email"
+                                    type="email"
+                                    aria-label="Email"
                                     value={editingTeacher.email}
                                     onChange={e => setEditingTeacher({ ...editingTeacher, email: e.target.value })}
                                     className="w-full p-3 rounded-xl text-white border focus:border-yellow-500/40 outline-none transition-all"
@@ -159,8 +180,11 @@ export const Modals: React.FC = () => {
                                 />
                             </div>
                             <div>
-                                <label className="text-xs text-neutral-500 uppercase font-bold">Telefone</label>
+                                <label htmlFor="edit-teacher-phone" className="text-xs text-neutral-500 uppercase font-bold">Telefone</label>
                                 <input
+                                    id="edit-teacher-phone"
+                                    type="tel"
+                                    aria-label="Telefone"
                                     value={editingTeacher.phone || ''}
                                     onChange={e => setEditingTeacher({ ...editingTeacher, phone: e.target.value })}
                                     className="w-full p-3 rounded-xl text-white border focus:border-yellow-500/40 outline-none transition-all"
@@ -180,8 +204,8 @@ export const Modals: React.FC = () => {
 
             {/* Execution Video Modal */}
             {executionVideoModalOpen && executionVideoModalUrl && (
-                <div className="fixed inset-0 z-[80] bg-black/85 backdrop-blur-md flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Vídeo de execução" onClick={() => { setExecutionVideoModalOpen(false); setExecutionVideoModalUrl(''); }}>
-                    <div className="w-full max-w-3xl rounded-2xl border shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 relative" style={{ background: 'linear-gradient(160deg, rgba(20,18,10,0.98) 0%, rgba(10,10,10,0.99) 40%)', borderColor: 'rgba(234,179,8,0.12)', boxShadow: '0 32px 64px -16px rgba(0,0,0,0.8), inset 0 1px 0 rgba(234,179,8,0.1)' }} onClick={(e) => e.stopPropagation()}>
+                <div className="fixed inset-0 z-[80] bg-black/85 backdrop-blur-md flex items-center justify-center p-4" role="button" tabIndex={-1} aria-label="Fechar modal de vídeo" onClick={(e) => { if (e.target === e.currentTarget) { setExecutionVideoModalOpen(false); setExecutionVideoModalUrl(''); } }} onKeyDown={(e) => { if (e.key === 'Escape') { setExecutionVideoModalOpen(false); setExecutionVideoModalUrl(''); } }}>
+                    <div className="w-full max-w-3xl rounded-2xl border shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 relative" role="dialog" aria-modal="true" aria-label="Vídeo de execução" style={{ background: 'linear-gradient(160deg, rgba(20,18,10,0.98) 0%, rgba(10,10,10,0.99) 40%)', borderColor: 'rgba(234,179,8,0.12)', boxShadow: '0 32px 64px -16px rgba(0,0,0,0.8), inset 0 1px 0 rgba(234,179,8,0.1)' }}>
                         <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-yellow-500/40 to-transparent" />
                         <div className="p-4 flex items-center justify-between gap-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
                             <div className="text-xs font-black uppercase tracking-[0.2em] text-yellow-500/80">Vídeo de execução</div>
@@ -196,7 +220,9 @@ export const Modals: React.FC = () => {
                             </button>
                         </div>
                         <div className="p-4">
-                            <video src={executionVideoModalUrl} controls className="w-full rounded-xl bg-black" />
+                            <video src={executionVideoModalUrl} controls aria-label="Vídeo de execução do exercício" className="w-full rounded-xl bg-black">
+                                <track kind="captions" />
+                            </video>
                         </div>
                     </div>
                 </div>
@@ -204,8 +230,8 @@ export const Modals: React.FC = () => {
 
             {/* Template Editor Modal */}
             {editingTemplate && (
-                <div className="fixed inset-0 z-[70] bg-black/85 backdrop-blur-md flex items-center justify-center p-4" role="dialog" aria-modal="true" aria-label="Editar treino" onClick={() => setEditingTemplate(null)}>
-                    <div className="w-full max-w-3xl rounded-2xl border shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 relative" style={{ background: 'linear-gradient(160deg, rgba(20,18,10,0.98) 0%, rgba(10,10,10,0.99) 40%)', borderColor: 'rgba(234,179,8,0.12)', boxShadow: '0 32px 64px -16px rgba(0,0,0,0.8), inset 0 1px 0 rgba(234,179,8,0.1)' }} onClick={(e) => e.stopPropagation()}>
+                <div className="fixed inset-0 z-[70] bg-black/85 backdrop-blur-md flex items-center justify-center p-4" role="button" tabIndex={-1} aria-label="Fechar modal de edição" onClick={(e) => { if (e.target === e.currentTarget) setEditingTemplate(null); }} onKeyDown={(e) => { if (e.key === 'Escape') setEditingTemplate(null); }}>
+                    <div className="w-full max-w-3xl rounded-2xl border shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200 relative" role="dialog" aria-modal="true" aria-label="Editar treino" style={{ background: 'linear-gradient(160deg, rgba(20,18,10,0.98) 0%, rgba(10,10,10,0.99) 40%)', borderColor: 'rgba(234,179,8,0.12)', boxShadow: '0 32px 64px -16px rgba(0,0,0,0.8), inset 0 1px 0 rgba(234,179,8,0.1)' }}>
                         <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-yellow-500/40 to-transparent" />
                         <div className="p-4 flex justify-between items-center" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
                             <h3 className="text-xs font-black uppercase tracking-[0.2em] text-yellow-500/80">Editar Treino</h3>

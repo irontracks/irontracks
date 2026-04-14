@@ -78,9 +78,12 @@ export function HistoryListManualModal({
 }: ManualModalProps) {
     return (
         <div
-            role="presentation"
+            role="button"
+            tabIndex={-1}
+            aria-label="Fechar modal"
             className="fixed inset-0 z-[70] bg-black/85 backdrop-blur-md flex items-center justify-center p-4"
-            onClick={onClose}
+            onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+            onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}
         >
             <div
                 role="dialog"
@@ -92,7 +95,6 @@ export function HistoryListManualModal({
                     borderColor: 'rgba(234,179,8,0.12)',
                     boxShadow: '0 32px 64px -16px rgba(0,0,0,0.8), inset 0 1px 0 rgba(234,179,8,0.1)',
                 }}
-                onClick={(e) => e.stopPropagation()}
             >
                 <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-yellow-500/40 to-transparent" />
                 <div className="p-4 flex items-center justify-between gap-2" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
@@ -129,8 +131,9 @@ export function HistoryListManualModal({
 
                 <div className="p-4 space-y-3 max-h-[70vh] overflow-y-auto">
                     <div>
-                        <label className="text-[10px] uppercase font-bold text-neutral-500">Data e Hora</label>
+                        <div className="text-[10px] uppercase font-bold text-neutral-500">Data e Hora</div>
                         <input
+                            aria-label="Data e Hora"
                             type="datetime-local"
                             value={manualDate}
                             onChange={(e) => setManualDate(e.target.value)}
@@ -139,8 +142,9 @@ export function HistoryListManualModal({
                         />
                     </div>
                     <div>
-                        <label className="text-[10px] uppercase font-bold text-neutral-500">Duração (min)</label>
+                        <div className="text-[10px] uppercase font-bold text-neutral-500">Duração (min)</div>
                         <input
+                            aria-label="Duração (min)"
                             type="number"
                             value={manualDuration}
                             onChange={(e) => setManualDuration(e.target.value)}
@@ -149,8 +153,9 @@ export function HistoryListManualModal({
                         />
                     </div>
                     <div>
-                        <label className="text-[10px] uppercase font-bold text-neutral-500">Notas</label>
+                        <div className="text-[10px] uppercase font-bold text-neutral-500">Notas</div>
                         <textarea
+                            aria-label="Notas"
                             value={manualNotes}
                             onChange={(e) => setManualNotes(e.target.value)}
                             className="w-full bg-neutral-800 border border-neutral-700 rounded-xl p-3 text-white outline-none h-20 resize-none"
@@ -159,8 +164,9 @@ export function HistoryListManualModal({
 
                     {manualTab === 'existing' && (
                         <div className="space-y-2">
-                            <label className="text-[10px] uppercase font-bold text-neutral-500">Selecionar Treino</label>
+                            <div className="text-[10px] uppercase font-bold text-neutral-500">Selecionar Treino</div>
                             <select
+                                aria-label="Selecionar Treino"
                                 value={selectedTemplate?.id || ''}
                                 onChange={async (e) => {
                                     const id = e.target.value;
@@ -188,28 +194,29 @@ export function HistoryListManualModal({
                                             <p className="text-sm font-bold text-white">{ex.name}</p>
                                             <div className="grid grid-cols-4 gap-2">
                                                 <div>
-                                                    <label className="text-[10px] text-neutral-500">Sets</label>
-                                                    <input type="number" value={ex.sets} onChange={(e) => updateManualExercise(idx, 'sets', e.target.value)} className="w-full bg-neutral-900 rounded p-2 text-center text-sm" />
+                                                    <div className="text-[10px] text-neutral-500">Sets</div>
+                                                    <input aria-label="Sets" type="number" value={ex.sets} onChange={(e) => updateManualExercise(idx, 'sets', e.target.value)} className="w-full bg-neutral-900 rounded p-2 text-center text-sm" />
                                                 </div>
                                                 <div>
-                                                    <label className="text-[10px] text-neutral-500">Reps</label>
-                                                    <input value={ex.reps || ''} onChange={(e) => updateManualExercise(idx, 'reps', e.target.value)} className="w-full bg-neutral-900 rounded p-2 text-center text-sm" />
+                                                    <div className="text-[10px] text-neutral-500">Reps</div>
+                                                    <input aria-label="Reps" value={ex.reps || ''} onChange={(e) => updateManualExercise(idx, 'reps', e.target.value)} className="w-full bg-neutral-900 rounded p-2 text-center text-sm" />
                                                 </div>
                                                 <div>
-                                                    <label className="text-[10px] text-neutral-500">Cadência</label>
-                                                    <input value={ex.cadence || ''} onChange={(e) => updateManualExercise(idx, 'cadence', e.target.value)} className="w-full bg-neutral-900 rounded p-2 text-center text-sm" />
+                                                    <div className="text-[10px] text-neutral-500">Cadência</div>
+                                                    <input aria-label="Cadência" value={ex.cadence || ''} onChange={(e) => updateManualExercise(idx, 'cadence', e.target.value)} className="w-full bg-neutral-900 rounded p-2 text-center text-sm" />
                                                 </div>
                                                 <div>
-                                                    <label className="text-[10px] text-neutral-500">Descanso (s)</label>
-                                                    <input type="number" value={ex.restTime || 0} onChange={(e) => updateManualExercise(idx, 'restTime', e.target.value)} className="w-full bg-neutral-900 rounded p-2 text-center text-sm" />
+                                                    <div className="text-[10px] text-neutral-500">Descanso (s)</div>
+                                                    <input aria-label="Descanso (s)" type="number" value={ex.restTime || 0} onChange={(e) => updateManualExercise(idx, 'restTime', e.target.value)} className="w-full bg-neutral-900 rounded p-2 text-center text-sm" />
                                                 </div>
                                             </div>
                                             <div>
-                                                <label className="text-[10px] text-neutral-500">Pesos por série (kg)</label>
+                                                <div className="text-[10px] text-neutral-500">Pesos por série (kg)</div>
                                                 <div className="grid grid-cols-4 gap-2">
                                                     {Array.from({ length: Number(ex.sets) || 0 }).map((_, sIdx) => (
                                                         <input
                                                             key={sIdx}
+                                                            aria-label={`Peso série ${sIdx + 1}`}
                                                             value={String(ex.weights?.[sIdx] ?? '')}
                                                             onChange={(e) => updateManualExercise(idx, 'weight', [sIdx, e.target.value])}
                                                             className="w-full bg-neutral-900 rounded p-2 text-center text-sm text-white outline-none focus:ring-1 ring-yellow-500 placeholder:text-neutral-600 placeholder:opacity-40 focus:placeholder:opacity-0"
@@ -219,11 +226,12 @@ export function HistoryListManualModal({
                                                 </div>
                                             </div>
                                             <div>
-                                                <label className="text-[10px] text-neutral-500">Reps por série</label>
+                                                <div className="text-[10px] text-neutral-500">Reps por série</div>
                                                 <div className="grid grid-cols-4 gap-2">
                                                     {Array.from({ length: Number(ex.sets) || 0 }).map((_, sIdx) => (
                                                         <input
                                                             key={sIdx}
+                                                            aria-label={`Reps série ${sIdx + 1}`}
                                                             value={String(ex.repsPerSet?.[sIdx] ?? '')}
                                                             onChange={(e) => updateManualExercise(idx, 'rep', [sIdx, e.target.value])}
                                                             className="w-full bg-neutral-900 rounded p-2 text-center text-sm text-white outline-none focus:ring-1 ring-yellow-500 placeholder:text-neutral-600 placeholder:opacity-40 focus:placeholder:opacity-0"
