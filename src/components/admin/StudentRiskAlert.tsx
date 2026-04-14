@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useMemo } from 'react'
+import Image from 'next/image'
 import { AlertTriangle, Clock, TrendingDown, ChevronDown, ChevronUp, User, Activity } from 'lucide-react'
 
 /* ──────────────────────────────────────────────────────────
@@ -81,12 +82,15 @@ export default function StudentRiskAlert({
           {atRisk.map((student) => (
             <div
               key={student.id}
+              role="button"
+              tabIndex={0}
               className={`flex items-center gap-3 p-3 rounded-xl border ${riskColor(student.riskLevel)} cursor-pointer hover:opacity-90 active:scale-[0.99] transition-all`}
               onClick={() => onContactStudent?.(student.id)}
+              onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') onContactStudent?.(student.id) }}
             >
               <div className="w-8 h-8 rounded-full bg-neutral-800 border border-neutral-700 flex items-center justify-center shrink-0 overflow-hidden">
                 {student.avatarUrl ? (
-                  <img src={student.avatarUrl} alt="" className="w-full h-full object-cover" />
+                  <Image src={student.avatarUrl} alt="" width={32} height={32} className="w-full h-full object-cover" />
                 ) : (
                   <User size={14} className="text-neutral-500" />
                 )}

@@ -1,6 +1,7 @@
 'use client'
 
 import React, { memo, useMemo, useState } from 'react'
+import Image from 'next/image'
 import type { AssessmentFormData } from '@/types/assessment'
 
 /* ──────────────────────────────────────────────────────────
@@ -136,27 +137,22 @@ const BodyMeasurementMap = memo(function BodyMeasurementMap({ formData, bodyFatP
       <div className="relative" style={{ aspectRatio: '1 / 1.3' }}>
 
         {/* Body image — large, blended */}
-        <img
-          src={bodyType.src}
-          alt=""
-          loading="lazy"
-          draggable={false}
+        <div
           className="absolute pointer-events-none select-none"
-          style={{
-            left: '12%',
-            top: '0',
-            width: '76%',
-            height: '100%',
-            objectFit: 'contain',
-            mixBlendMode: 'lighten',
-            opacity: 0.65,
-          }}
-          onError={(e) => {
-            // Fallback to default body images
-            const fb = isFemale ? '/body-types/female-athletic.png' : '/body-types/male-athletic.png'
-            if (e.currentTarget.src !== fb) e.currentTarget.src = fb
-          }}
-        />
+          style={{ left: '12%', top: '0', width: '76%', height: '100%' }}
+        >
+          <Image
+            src={bodyType.src}
+            alt=""
+            fill
+            draggable={false}
+            className="object-contain"
+            style={{
+              mixBlendMode: 'lighten',
+              opacity: 0.65,
+            }}
+          />
+        </div>
 
         {/* Warm ambient glow */}
         <div

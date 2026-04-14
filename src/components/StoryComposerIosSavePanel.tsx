@@ -45,7 +45,8 @@ export function StoryComposerIosSavePanel({
                 </p>
             </div>
 
-            {/* The image — inline style overrides Capacitor's -webkit-touch-callout:none */}
+            {/* The image — inline style overrides Capacitor's -webkit-touch-callout:none — blob URL, next/image não suporta */}
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
                 src={saveImageUrl}
                 alt="Story para salvar"
