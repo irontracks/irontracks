@@ -50,8 +50,8 @@ export default function WorkoutHeader() {
   return (
     <>
       <div
-        className="bg-neutral-950 border-b border-neutral-800 px-4 md:px-6 pb-1 flex-shrink-0 relative"
-        style={{ paddingTop: 'max(env(safe-area-inset-top), 0px)' }}
+        className="bg-neutral-950 border-b border-neutral-800 px-4 md:px-6 flex-shrink-0 relative"
+        style={{ paddingTop: 'max(calc(env(safe-area-inset-top) - 8px), 8px)' }}
       >
         {/* Fills status bar area with same color — no transparent strip */}
         <div
