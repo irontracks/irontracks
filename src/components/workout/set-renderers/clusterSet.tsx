@@ -126,117 +126,160 @@ export const ClusterSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: 
   })();
   const hasAnyNote = hasNotes || !!prevNote;
 
+  const savedWeight = String(log.weight ?? cfg?.weight ?? '').trim();
+  const summaryText = `${savedWeight ? savedWeight + 'kg' : '—'} • ${blocks.map(b => b ?? '?').join('+')} = ${total} reps`;
+
+  // Undo: called from the "Feito" button to toggle done back to false
+  const handleUndo = () => {
+    updateLog(key, {
+      done: false,
+      completedAtMs: null,
+      executionSeconds: null,
+      reps: String(total || ''),
+      cluster: {
+        planned: { total_reps: totalRepsPlanned ?? null, cluster_size: clusterSize ?? null, intra_rest_sec: intra ?? null },
+        blocks,
+        last_rest_after_block: Number.isFinite(lastRestAfterBlock) ? lastRestAfterBlock : null,
+      },
+      advanced_config: cfg ?? log.advanced_config ?? null,
+    });
+  };
+
   return (
-    <div key={key} className="space-y-2">
-      <div className="rounded-xl bg-neutral-900/50 border border-neutral-800/80 px-3 py-2.5 space-y-2 shadow-sm shadow-black/20">
-        <div className="flex items-center gap-2">
-          <div className="w-10 text-xs font-mono text-neutral-400">#{setIdx + 1}</div>
-          <input
-            inputMode="decimal"
-            aria-label={`Peso em kg – série ${setIdx + 1}`}
-            value={String(log?.weight ?? cfg?.weight ?? '')}
-            onChange={(e) => {
-              const v = e?.target?.value ?? '';
-              updateLog(key, { weight: v, advanced_config: cfg ?? log.advanced_config ?? null });
-            }}
-            placeholder={weightPlaceholder}
-            className="w-24 bg-black/30 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white placeholder:text-neutral-500/70 outline-none focus:ring-1 ring-yellow-500"
-          />
-          <button
-            type="button"
-            onClick={() => {
-              const baseWeight = String(log?.weight ?? cfg?.weight ?? '').trim();
-              const baseRpe = String(log?.rpe ?? '').trim();
-              const planned = {
-                total_reps: totalRepsPlanned ?? null,
-                cluster_size: clusterSize ?? null,
-                intra_rest_sec: intra ?? null,
-              };
-              const plannedBlocksModal = buildPlannedBlocks(totalRepsPlanned, clusterSize);
-              const restsByGap = plannedBlocksModal.length > 1 ? Array.from({ length: plannedBlocksModal.length - 1 }).map(() => intra) : [];
-              const blocksInput = plannedBlocksModal.map((plannedBlock, idx) => ({ planned: plannedBlock, weight: baseWeight, reps: blocks?.[idx] ?? null }));
-              setClusterModal({
-                key,
-                planned,
-                plannedBlocks: plannedBlocksModal,
-                intra,
-                restsByGap,
-                blocks: blocksInput,
-                baseWeight,
-                rpe: baseRpe,
-                cfg: cfg ?? log.advanced_config ?? null,
-                error: '',
-              });
-            }}
-            className="bg-black/30 border border-neutral-700 rounded-xl px-2 sm:px-3 py-2 text-sm text-white outline-none hover:border-yellow-500/60 hover:text-yellow-500 transition-colors inline-flex items-center justify-center gap-2"
-          >
-            <Pencil size={14} />
-            <span className="text-xs font-black hidden sm:inline">Abrir</span>
-          </button>
-          <button type="button" onClick={() => toggleNotes(key)} aria-label="Observações" className={isNotesOpen || hasAnyNote ? 'inline-flex items-center justify-center rounded-lg p-1.5 text-yellow-500 bg-yellow-500/10 border border-yellow-500/40' : 'inline-flex items-center justify-center rounded-lg p-1.5 text-neutral-400 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'}>
-            <MessageSquare size={12} />
-          </button>
-        </div>
-        <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-          <div className="flex items-center gap-2 flex-1 min-w-0">
-            <span className="text-[10px] uppercase tracking-widest font-black text-yellow-500 inline-flex items-center gap-1 group">
+    <div key={key} className="space-y-1">
+      <div
+        className={[
+          'rounded-xl border transition-all duration-300 shadow-sm shadow-black/20',
+          done ? 'px-2.5 py-2 bg-emerald-950/30 border-emerald-500/30' : 'px-3 py-2.5 space-y-2 bg-neutral-900/50 border-neutral-800/80',
+        ].join(' ')}
+      >
+        {done ? (
+          <div className="flex items-center gap-2">
+            <div className="w-10 text-xs font-mono text-neutral-400 shrink-0">#{setIdx + 1}</div>
+            <span className="text-[10px] uppercase tracking-widest font-black text-emerald-400 inline-flex items-center gap-1 shrink-0">
               Cluster
-              <HelpHint title={HELP_TERMS.cluster.title} text={HELP_TERMS.cluster.text} tooltip={HELP_TERMS.cluster.tooltip} className="h-4 w-4 text-[10px]" />
             </span>
-            <span className="text-xs text-neutral-400 whitespace-normal">
-              {notation ? `(${notation})` : ''} • Intra {intra || 0}s • Total: {total || 0} reps
-            </span>
+            <span className="text-xs text-neutral-300 truncate flex-1 min-w-0">{summaryText}</span>
+            <button
+              type="button"
+              onClick={() => toggleNotes(key)} aria-label="Observações"
+              className={isNotesOpen || hasAnyNote ? 'w-7 h-7 inline-flex items-center justify-center rounded-lg text-yellow-500 bg-yellow-500/10 border border-yellow-500/40' : 'w-7 h-7 inline-flex items-center justify-center rounded-lg text-neutral-500 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'}
+            >
+              <MessageSquare size={12} />
+            </button>
+            <button
+              type="button"
+              onClick={handleUndo}
+              className="inline-flex items-center justify-center gap-1 h-9 px-3 rounded-xl font-black text-xs whitespace-nowrap active:scale-95 transition-all duration-150 bg-emerald-500 text-black shadow-sm shadow-emerald-500/30"
+            >
+              <Check size={13} />
+              Feito
+            </button>
           </div>
-          <button
-            type="button"
-            disabled={!canDone}
-            onClick={() => {
-              const nowMs = Date.now();
-              const startedRaw = (log as UnknownRecord)?.startedAtMs;
-              const startedAtMs = typeof startedRaw === 'number' ? startedRaw : Number(String(startedRaw ?? '').trim());
-              const executionSeconds =
-                Number.isFinite(startedAtMs) && startedAtMs > 0 ? Math.max(0, Math.round((nowMs - startedAtMs) / 1000)) : 0;
-              const nextDone = !done;
-              updateLog(key, {
-                done: nextDone,
-                completedAtMs: nextDone ? nowMs : null,
-                executionSeconds: nextDone ? executionSeconds : null,
-                reps: String(total || ''),
-                cluster: {
-                  planned: { total_reps: totalRepsPlanned ?? null, cluster_size: clusterSize ?? null, intra_rest_sec: intra ?? null },
-                  blocks,
-                  last_rest_after_block: Number.isFinite(lastRestAfterBlock) ? lastRestAfterBlock : null,
-                },
-                advanced_config: cfg ?? log.advanced_config ?? null,
-              });
-              if (nextDone && restTime && restTime > 0) {
-                const nextPlanned = getPlannedSet(ex, setIdx + 1);
-                const nextKey = nextPlanned
-                  ? `${exIdx}-${setIdx + 1}`
-                  : exercises[exIdx + 1] != null ? `${exIdx + 1}-0` : null;
-                startTimer(restTime, {
-                  kind: 'rest',
-                  key,
-                  nextKey,
-                  restStartedAtMs: nowMs,
-                });
-              }
-            }}
-            className={
-              canDone
-                ? done
-                  ? 'inline-flex items-center justify-center gap-2 min-h-[40px] px-3 py-2 rounded-xl bg-emerald-500 text-black font-black shadow-sm shadow-emerald-500/30 active:scale-95 transition duration-150 sm:w-auto'
-                  : 'inline-flex items-center justify-center gap-2 min-h-[40px] px-3 py-2 rounded-xl bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 font-black hover:bg-yellow-500/20 hover:border-yellow-500/50 active:scale-95 transition duration-150 sm:w-auto'
-                : 'inline-flex items-center justify-center gap-2 min-h-[40px] px-3 py-2 rounded-xl bg-neutral-800/40 border border-neutral-800 text-neutral-500 font-bold cursor-not-allowed sm:w-auto'
-            }
-          >
-            <Check size={16} />
-            <span className="text-xs">{done ? 'Feito' : 'Concluir'}</span>
-          </button>
-        </div>
+        ) : (
+          <>
+            <div className="flex items-center gap-2">
+              <div className="w-10 text-xs font-mono text-neutral-400">#{setIdx + 1}</div>
+              <input
+                inputMode="decimal"
+                aria-label={`Peso em kg – série ${setIdx + 1}`}
+                value={String(log?.weight ?? cfg?.weight ?? '')}
+                onChange={(e) => {
+                  const v = e?.target?.value ?? '';
+                  updateLog(key, { weight: v, advanced_config: cfg ?? log.advanced_config ?? null });
+                }}
+                placeholder={weightPlaceholder}
+                className="w-24 bg-black/30 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white placeholder:text-neutral-500/70 outline-none focus:ring-1 ring-yellow-500"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  const baseWeight = String(log?.weight ?? cfg?.weight ?? '').trim();
+                  const baseRpe = String(log?.rpe ?? '').trim();
+                  const planned = {
+                    total_reps: totalRepsPlanned ?? null,
+                    cluster_size: clusterSize ?? null,
+                    intra_rest_sec: intra ?? null,
+                  };
+                  const plannedBlocksModal = buildPlannedBlocks(totalRepsPlanned, clusterSize);
+                  const restsByGap = plannedBlocksModal.length > 1 ? Array.from({ length: plannedBlocksModal.length - 1 }).map(() => intra) : [];
+                  const blocksInput = plannedBlocksModal.map((plannedBlock, idx) => ({ planned: plannedBlock, weight: baseWeight, reps: blocks?.[idx] ?? null }));
+                  setClusterModal({
+                    key,
+                    planned,
+                    plannedBlocks: plannedBlocksModal,
+                    intra,
+                    restsByGap,
+                    blocks: blocksInput,
+                    baseWeight,
+                    rpe: baseRpe,
+                    cfg: cfg ?? log.advanced_config ?? null,
+                    error: '',
+                  });
+                }}
+                className="bg-black/30 border border-neutral-700 rounded-xl px-2 sm:px-3 py-2 text-sm text-white outline-none hover:border-yellow-500/60 hover:text-yellow-500 transition-colors inline-flex items-center justify-center gap-2"
+              >
+                <Pencil size={14} />
+                <span className="text-xs font-black hidden sm:inline">Abrir</span>
+              </button>
+              <button type="button" onClick={() => toggleNotes(key)} aria-label="Observações" className={isNotesOpen || hasAnyNote ? 'inline-flex items-center justify-center rounded-lg p-1.5 text-yellow-500 bg-yellow-500/10 border border-yellow-500/40' : 'inline-flex items-center justify-center rounded-lg p-1.5 text-neutral-400 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'}>
+                <MessageSquare size={12} />
+              </button>
+            </div>
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                <span className="text-[10px] uppercase tracking-widest font-black text-yellow-500 inline-flex items-center gap-1 group">
+                  Cluster
+                  <HelpHint title={HELP_TERMS.cluster.title} text={HELP_TERMS.cluster.text} tooltip={HELP_TERMS.cluster.tooltip} className="h-4 w-4 text-[10px]" />
+                </span>
+                <span className="text-xs text-neutral-400 whitespace-normal">
+                  {notation ? `(${notation})` : ''} • Intra {intra || 0}s • Total: {total || 0} reps
+                </span>
+              </div>
+              <button
+                type="button"
+                disabled={!canDone}
+                onClick={() => {
+                  const nowMs = Date.now();
+                  const startedRaw = (log as UnknownRecord)?.startedAtMs;
+                  const startedAtMs = typeof startedRaw === 'number' ? startedRaw : Number(String(startedRaw ?? '').trim());
+                  const executionSeconds =
+                    Number.isFinite(startedAtMs) && startedAtMs > 0 ? Math.max(0, Math.round((nowMs - startedAtMs) / 1000)) : 0;
+                  updateLog(key, {
+                    done: true,
+                    completedAtMs: nowMs,
+                    executionSeconds,
+                    reps: String(total || ''),
+                    cluster: {
+                      planned: { total_reps: totalRepsPlanned ?? null, cluster_size: clusterSize ?? null, intra_rest_sec: intra ?? null },
+                      blocks,
+                      last_rest_after_block: Number.isFinite(lastRestAfterBlock) ? lastRestAfterBlock : null,
+                    },
+                    advanced_config: cfg ?? log.advanced_config ?? null,
+                  });
+                  if (restTime && restTime > 0) {
+                    const nextPlanned = getPlannedSet(ex, setIdx + 1);
+                    const nextKey = nextPlanned
+                      ? `${exIdx}-${setIdx + 1}`
+                      : exercises[exIdx + 1] != null ? `${exIdx + 1}-0` : null;
+                    startTimer(restTime, { kind: 'rest', key, nextKey, restStartedAtMs: nowMs });
+                  }
+                }}
+                className={
+                  canDone
+                    ? 'inline-flex items-center justify-center gap-2 min-h-[40px] px-3 py-2 rounded-xl bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 font-black hover:bg-yellow-500/20 hover:border-yellow-500/50 active:scale-95 transition duration-150 sm:w-auto'
+                    : 'inline-flex items-center justify-center gap-2 min-h-[40px] px-3 py-2 rounded-xl bg-neutral-800/40 border border-neutral-800 text-neutral-500 font-bold cursor-not-allowed sm:w-auto'
+                }
+              >
+                <Check size={16} />
+                <span className="text-xs">Concluir</span>
+              </button>
+            </div>
+          </>
+        )}
       </div>
 
-      {plannedBlocks.length > 0 && (
+      {!done && plannedBlocks.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {plannedBlocks.map((planned, idx) => {
             const current = blocks?.[idx] ?? null;

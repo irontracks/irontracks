@@ -2,9 +2,10 @@
 /* eslint-disable jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions, jsx-a11y/control-has-associated-label */
 
 import React from 'react';
-import { Clock, Save, X } from 'lucide-react';
+import { Check, Clock, Save, X } from 'lucide-react';
 import { parseTrainingNumber } from '@/utils/trainingNumber';
 import { useWorkoutContext } from './WorkoutContext';
+import { useWorkoutTimer } from './WorkoutTimerContext';
 import { isObject, buildBlocksByCount } from './utils';
 import { UnknownRecord } from './types';
 
@@ -27,6 +28,15 @@ export function ModalsComplexMethods() {
         startTimer,
         deloadSuggestions,
     } = useWorkoutContext();
+
+    // Ticker drives the 1-second check that turns rest buttons green when done
+    const { ticker } = useWorkoutTimer();
+    // Maps "{modalKey}-{kind}-{idx}" → timestamp when the user tapped the rest button
+    const [restStartedAt, setRestStartedAt] = React.useState<Record<string, number>>({});
+    const isRestDone = (btnKey: string, sec: number) => {
+        const t = restStartedAt[btnKey];
+        return t != null && ticker - t >= sec * 1000;
+    };
 
     return (
         <>
@@ -135,17 +145,27 @@ export function ModalsComplexMethods() {
                                                 <div className="text-[10px] uppercase tracking-widest font-bold text-neutral-400">Mini {idx + 1}</div>
                                                 {!isLast ? <div className="text-[10px] font-mono text-neutral-500">Descanso {safeRestSec}s</div> : <div />}
                                             </div>
-                                            {!isLast && safeRestSec ? (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => { startTimer(safeRestSec, { kind: 'rest_pause', key: modal.key, miniIndex: idx }); }}
-                                                    className="absolute top-3 right-3 inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 hover:bg-neutral-800 active:scale-95 transition-transform z-10"
-                                                    aria-label={`Iniciar descanso ${safeRestSec}s`}
-                                                >
-                                                    <Clock size={14} className="text-yellow-500" />
-                                                    <span className="text-xs font-black">{safeRestSec}s</span>
-                                                </button>
-                                            ) : null}
+                                            {!isLast && safeRestSec ? (() => {
+                                                const btnKey = `${String(modal.key || '')}-rp-${idx}`;
+                                                const timerDone = isRestDone(btnKey, safeRestSec);
+                                                return (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            startTimer(safeRestSec, { kind: 'rest_pause', key: modal.key, miniIndex: idx });
+                                                            setRestStartedAt(prev => ({ ...prev, [btnKey]: Date.now() }));
+                                                        }}
+                                                        className={timerDone
+                                                            ? 'absolute top-3 right-3 inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-500 text-black active:scale-95 transition-transform z-10'
+                                                            : 'absolute top-3 right-3 inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 hover:bg-neutral-800 active:scale-95 transition-transform z-10'
+                                                        }
+                                                        aria-label={timerDone ? 'Descanso concluído' : `Iniciar descanso ${safeRestSec}s`}
+                                                    >
+                                                        {timerDone ? <Check size={14} /> : <Clock size={14} className="text-yellow-500" />}
+                                                        <span className="text-xs font-black">{timerDone ? 'OK' : `${safeRestSec}s`}</span>
+                                                    </button>
+                                                );
+                                            })() : null}
                                             <div className="mt-2 grid grid-cols-2 gap-2">
                                                 <input
                                                     inputMode="decimal"
@@ -651,19 +671,27 @@ export function ModalsComplexMethods() {
                                                 <div className="text-[10px] uppercase tracking-widest font-bold text-neutral-400">Bloco {idx + 1}</div>
                                                 {plannedLabel ? <div className="text-[10px] font-mono text-neutral-500">plan {plannedLabel}</div> : <div />}
                                             </div>
-                                            {!isLast && safeRestSec ? (
-                                                <button
-                                                    type="button"
-                                                    onClick={() => {
-                                                        startTimer(safeRestSec, { kind: 'cluster', key: modal.key, blockIndex: idx });
-                                                    }}
-                                                    className="absolute top-3 right-3 inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 hover:bg-neutral-800 active:scale-95 transition-transform z-10"
-                                                    aria-label={`Iniciar descanso ${safeRestSec}s`}
-                                                >
-                                                    <Clock size={14} className="text-yellow-500" />
-                                                    <span className="text-xs font-black">{safeRestSec}s</span>
-                                                </button>
-                                            ) : null}
+                                            {!isLast && safeRestSec ? (() => {
+                                                const btnKey = `${String(modal.key || '')}-cl-${idx}`;
+                                                const timerDone = isRestDone(btnKey, safeRestSec);
+                                                return (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            startTimer(safeRestSec, { kind: 'cluster', key: modal.key, blockIndex: idx });
+                                                            setRestStartedAt(prev => ({ ...prev, [btnKey]: Date.now() }));
+                                                        }}
+                                                        className={timerDone
+                                                            ? 'absolute top-3 right-3 inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-500 text-black active:scale-95 transition-transform z-10'
+                                                            : 'absolute top-3 right-3 inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 hover:bg-neutral-800 active:scale-95 transition-transform z-10'
+                                                        }
+                                                        aria-label={timerDone ? 'Descanso concluído' : `Iniciar descanso ${safeRestSec}s`}
+                                                    >
+                                                        {timerDone ? <Check size={14} /> : <Clock size={14} className="text-yellow-500" />}
+                                                        <span className="text-xs font-black">{timerDone ? 'OK' : `${safeRestSec}s`}</span>
+                                                    </button>
+                                                );
+                                            })() : null}
                                             <div className="mt-2 grid grid-cols-2 gap-2">
                                                 <input
                                                     inputMode="decimal"
