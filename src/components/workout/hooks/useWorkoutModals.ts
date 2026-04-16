@@ -66,6 +66,21 @@ export function useWorkoutModals(collapsedKey: string | null) {
         sideRestTime: '',
         transitionTime: '',
     }));
+    const [editExerciseOriginal, setEditExerciseOriginal] = useState<{ name: string; sets: string; restTime: string; method: string; isUnilateral?: boolean; sideRestTime?: string | null; transitionTime?: string | null } | null>(null);
+    const [persistToPlan, setPersistToPlan] = useState<boolean>(false);
+
+    const editExerciseHasChanges = useMemo(() => {
+        if (!editExerciseOriginal || !editExerciseDraft) return false;
+        return (
+            editExerciseDraft.name !== editExerciseOriginal.name ||
+            editExerciseDraft.sets !== editExerciseOriginal.sets ||
+            editExerciseDraft.restTime !== editExerciseOriginal.restTime ||
+            editExerciseDraft.method !== editExerciseOriginal.method ||
+            !!editExerciseDraft.isUnilateral !== !!editExerciseOriginal.isUnilateral ||
+            (editExerciseDraft.sideRestTime ?? '') !== (editExerciseOriginal.sideRestTime ?? '') ||
+            (editExerciseDraft.transitionTime ?? '') !== (editExerciseOriginal.transitionTime ?? '')
+        );
+    }, [editExerciseDraft, editExerciseOriginal]);
 
     // ---- Organize ----
     const [organizeOpen, setOrganizeOpen] = useState<boolean>(false);
@@ -126,6 +141,9 @@ export function useWorkoutModals(collapsedKey: string | null) {
         editExerciseOpen, setEditExerciseOpen,
         editExerciseIdx, setEditExerciseIdx,
         editExerciseDraft, setEditExerciseDraft,
+        editExerciseOriginal, setEditExerciseOriginal,
+        persistToPlan, setPersistToPlan,
+        editExerciseHasChanges,
         // Organize
         organizeOpen, setOrganizeOpen,
         organizeDraft, setOrganizeDraft,

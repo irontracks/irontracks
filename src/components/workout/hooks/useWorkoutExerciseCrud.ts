@@ -19,6 +19,11 @@ interface ExerciseCrudDeps {
   setLinkedWeightExercises: React.Dispatch<React.SetStateAction<Set<number>>>;
   editExerciseDraft: { name: string; sets: string; restTime: string; method: string; isUnilateral?: boolean; sideRestTime?: string | null; transitionTime?: string | null } | null;
   setEditExerciseDraft: (v: { name: string; sets: string; restTime: string; method: string; isUnilateral?: boolean; sideRestTime?: string | null; transitionTime?: string | null }) => void;
+  setEditExerciseOriginal: (v: { name: string; sets: string; restTime: string; method: string; isUnilateral?: boolean; sideRestTime?: string | null; transitionTime?: string | null } | null) => void;
+  persistToPlan: boolean;
+  setPersistToPlan: (v: boolean) => void;
+  editExerciseHasChanges: boolean;
+  onPersistWorkoutTemplate?: ((workout: UnknownRecord) => void) | undefined;
   editExerciseIdx: number | null;
   setEditExerciseIdx: (v: number | null) => void;
   editExerciseOpen: boolean;
@@ -48,6 +53,10 @@ export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
     setCollapsed,
     setLinkedWeightExercises,
     editExerciseDraft, setEditExerciseDraft,
+    setEditExerciseOriginal,
+    persistToPlan, setPersistToPlan,
+    editExerciseHasChanges,
+    onPersistWorkoutTemplate,
     editExerciseIdx, setEditExerciseIdx,
     setEditExerciseOpen,
     addExerciseDraft, setAddExerciseDraft,
@@ -183,7 +192,10 @@ export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
       const transitionTimeNum = parseTrainingNumber((ex as Record<string, unknown>)?.transitionTime ?? (ex as Record<string, unknown>)?.transition_time);
       const transitionTime = typeof transitionTimeNum === 'number' && transitionTimeNum > 0 ? String(transitionTimeNum) : '';
 
-      setEditExerciseDraft({ name, sets: String(setsCount), restTime: String(restTime), method, isUnilateral, sideRestTime, transitionTime });
+      const snapshot = { name, sets: String(setsCount), restTime: String(restTime), method, isUnilateral, sideRestTime, transitionTime };
+      setEditExerciseDraft(snapshot);
+      setEditExerciseOriginal(snapshot);
+      setPersistToPlan(false);
       setEditExerciseIdx(idx);
       setEditExerciseOpen(true);
     } catch (e: unknown) {
@@ -258,6 +270,9 @@ export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
       }
 
       onUpdateSession({ workout: { ...workout, exercises: nextExercises }, logs: nextLogs });
+      if (persistToPlan && editExerciseHasChanges && typeof onPersistWorkoutTemplate === 'function') {
+        onPersistWorkoutTemplate({ ...workout, exercises: nextExercises } as UnknownRecord);
+      }
       setEditExerciseOpen(false);
       setEditExerciseIdx(null);
     } catch (e: unknown) {
