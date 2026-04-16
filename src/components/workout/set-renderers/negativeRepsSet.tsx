@@ -6,11 +6,12 @@ import { Check, MessageSquare, Pencil } from 'lucide-react';
 import { useWorkoutContext } from '../WorkoutContext';
 import {
   isObject,
+  normalizeExerciseKey,
 } from '../utils';
 import { UnknownRecord, WorkoutExercise } from '../types';
 
 export const NegativeRepsSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: number; setIdx: number }) => {
-  const { getLog, updateLog, setNegativeRepsModal, openNotesKeys, toggleNotes, startTimer } = useWorkoutContext();
+  const { getLog, updateLog, setNegativeRepsModal, openNotesKeys, toggleNotes, startTimer, reportHistory } = useWorkoutContext();
   const key = `${exIdx}-${setIdx}`;
   const log = getLog(key);
   const nr = isObject(log.negative_reps) ? (log.negative_reps as UnknownRecord) : null;
@@ -23,6 +24,10 @@ export const NegativeRepsSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; ex
   const hasNotes = notesValue.trim().length > 0;
   const isNotesOpen = openNotesKeys.has(key);
   const restTime = parseTrainingNumber(ex?.restTime ?? ex?.rest_time);
+  const histEntry = reportHistory?.exercises?.[normalizeExerciseKey(ex.name)];
+  const lastItem = histEntry?.items?.length ? [...histEntry.items].sort((a, b) => b.ts - a.ts)[0] : null;
+  const prevNote = lastItem?.setNotes?.[setIdx] ?? null;
+  const hasAnyNote = hasNotes || !!prevNote;
   const summaryText = `${savedWeight ? savedWeight + 'kg' : '—'} • ${reps ?? '?'} reps • ${eccentricSec ?? '?'}s/rep`;
 
   const handleToggleDone = () => {
@@ -47,7 +52,7 @@ export const NegativeRepsSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; ex
             <button
               type="button"
               onClick={() => toggleNotes(key)} aria-label="Observações"
-              className={isNotesOpen || hasNotes ? 'w-7 h-7 inline-flex items-center justify-center rounded-lg text-yellow-500 bg-yellow-500/10 border border-yellow-500/40' : 'w-7 h-7 inline-flex items-center justify-center rounded-lg text-neutral-500 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'}
+              className={isNotesOpen || hasAnyNote ? 'w-7 h-7 inline-flex items-center justify-center rounded-lg text-yellow-500 bg-yellow-500/10 border border-yellow-500/40' : 'w-7 h-7 inline-flex items-center justify-center rounded-lg text-neutral-500 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'}
             >
               <MessageSquare size={12} />
             </button>
@@ -75,7 +80,7 @@ export const NegativeRepsSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; ex
               <span className="text-[10px] uppercase tracking-widest font-black text-yellow-500">Negativas</span>
               <span className="text-xs text-neutral-400 truncate">{canDone ? `${savedWeight}kg • ${reps} reps • ${eccentricSec}s/rep` : 'Abra o modal para preencher'}</span>
             </div>
-            <button type="button" onClick={() => toggleNotes(key)} aria-label="Observações" className={isNotesOpen || hasNotes ? 'inline-flex items-center justify-center rounded-lg p-2 text-yellow-500 bg-yellow-500/10 border border-yellow-500/40' : 'inline-flex items-center justify-center rounded-lg p-2 text-neutral-400 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'}>
+            <button type="button" onClick={() => toggleNotes(key)} aria-label="Observações" className={isNotesOpen || hasAnyNote ? 'inline-flex items-center justify-center rounded-lg p-2 text-yellow-500 bg-yellow-500/10 border border-yellow-500/40' : 'inline-flex items-center justify-center rounded-lg p-2 text-neutral-400 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'}>
               <MessageSquare size={14} />
             </button>
             <button
@@ -91,7 +96,17 @@ export const NegativeRepsSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; ex
         )}
       </div>
       {!done && !canDone && <div className="pl-12 text-[11px] text-neutral-500 font-semibold">Preencha peso, reps e tempo excêntrico no modal.</div>}
-      {isNotesOpen && <textarea value={notesValue} onChange={(e) => updateLog(key, { notes: e?.target?.value ?? '' })} placeholder="Observações da série" rows={2} aria-label="Observações da série" className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500" />}
+      {isNotesOpen && (
+        <div className="space-y-1.5">
+          {prevNote && (
+            <div className="flex items-start gap-1.5 px-2.5 py-1.5 rounded-lg bg-neutral-900/60 border border-neutral-800">
+              <span className="text-[9px] font-black uppercase tracking-widest text-neutral-600 shrink-0 mt-0.5">Anterior</span>
+              <p className="text-xs text-neutral-500 italic leading-snug">{prevNote}</p>
+            </div>
+          )}
+          <textarea value={notesValue} onChange={(e) => updateLog(key, { notes: e?.target?.value ?? '' })} placeholder="Observações da série" rows={2} aria-label="Observações da série" className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500" />
+        </div>
+      )}
     </div>
   );
 };
