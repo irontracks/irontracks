@@ -184,6 +184,7 @@ export const GroupMethodSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exI
           </>
         )}
       </div>
+      {!done && !canDone && <div className="pl-12 text-[11px] text-neutral-500 font-semibold">Preencha peso e reps para concluir.</div>}
       {isNotesOpen && (
         <div className="space-y-1.5">
           {prevNote && (

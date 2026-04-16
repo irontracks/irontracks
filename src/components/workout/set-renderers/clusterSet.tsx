@@ -279,6 +279,7 @@ export const ClusterSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: 
         )}
       </div>
 
+      {!done && !canDone && <div className="pl-12 text-[11px] text-neutral-500 font-semibold">Preencha as reps de todos os blocos para concluir.</div>}
       {!done && plannedBlocks.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {plannedBlocks.map((planned, idx) => {
