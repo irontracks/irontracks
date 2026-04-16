@@ -299,6 +299,9 @@ export const NormalSet = ({
       done: nextDone,
       completedAtMs:    nextDone ? nowMs : null,
       executionSeconds: nextDone ? executionSeconds : null,
+      // restStartMs saved here so handleTimerFinish can compute restSeconds
+      // for the workout report (reads log.restStartMs, not the timer context)
+      restStartMs:      nextDone && restTime && restTime > 0 ? nowMs : null,
       advanced_config:  cfg ?? log.advanced_config ?? null,
     });
 

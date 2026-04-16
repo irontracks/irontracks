@@ -431,9 +431,15 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
 
     return (
         <>
-            {/* Finished flash */}
+            {/* Finished flash — pointer capture prevents accidental taps on workout modal below */}
             {isFinished && !isTransition && (
-                <div className={`fixed inset-0 z-[2000] backdrop-blur-sm flex flex-col items-center justify-center ${isSideRest ? 'bg-blue-600/90' : 'bg-green-600/90'}`}>
+                <div
+                    role="presentation"
+                    className={`fixed inset-0 z-[2000] backdrop-blur-sm flex flex-col items-center justify-center ${isSideRest ? 'bg-blue-600/90' : 'bg-green-600/90'}`}
+                    onClick={(e) => e.stopPropagation()}
+                    onPointerDown={(e) => e.stopPropagation()}
+                    onTouchStart={(e) => e.stopPropagation()}
+                >
                     <div className="text-7xl mb-4">{isSideRest ? '🔄' : '💪'}</div>
                     <h1 className="text-5xl font-black text-white uppercase tracking-tighter">{isSideRest ? 'TROCA!' : 'BORA!'}</h1>
                     <p className="text-white/80 font-bold mt-2 text-lg">{isSideRest ? 'Agora o outro lado' : 'Descanso finalizado'}</p>
