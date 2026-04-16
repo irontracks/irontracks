@@ -113,114 +113,150 @@ export const RestPauseSet = ({
   // canDone: requires at least 1 mini AND all minis have positive reps
   const canDone = miniSets > 0 && minis.length > 0 && minis.every((v) => typeof v === 'number' && Number.isFinite(v) && v > 0);
 
+  const summaryText = `${weightField.value ? weightField.value + 'kg' : '—'} • ${minis.map(m => m ?? '?').join('+')} = ${total} reps`;
+
+  // Undo: called from the "Feito" button to toggle done back to false
+  const handleUndo = () => {
+    updateLog(key, {
+      done: false,
+      completedAtMs: null,
+      executionSeconds: null,
+      reps: String(total || ''),
+      rest_pause: { ...rp, activation_reps: 0, mini_reps: minis },
+      advanced_config: cfg ?? log.advanced_config ?? null,
+    });
+  };
+
   return (
-    <div key={key} className="space-y-2">
-      <div className="rounded-xl bg-neutral-900/50 border border-neutral-800/80 px-3 py-2.5 space-y-2 shadow-sm shadow-black/20">
-        <div className="flex items-center gap-2">
-          <div className="w-10 text-xs font-mono text-neutral-400">#{setIdx + 1}</div>
-          <input
-            inputMode="decimal"
-            aria-label={`Peso em kg – série ${setIdx + 1}`}
-            value={weightField.value}
-            onChange={weightField.onChange}
-            onFocus={weightField.onFocus}
-            onBlur={weightField.onBlur}
-            placeholder={weightPlaceholder}
-            className="w-24 bg-black/30 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white placeholder:text-neutral-500/70 outline-none focus:ring-1 ring-yellow-500"
-          />
-          <button
-            type="button"
-            onClick={() => {
-              const baseWeight = String(log?.weight ?? cfg?.weight ?? '').trim();
-              const baseRpe = String(log?.rpe ?? '').trim();
-              const minisInput = Array.from({ length: miniSets }).map((_, idx) => {
-                const v = minisArrRaw?.[idx];
-                const n = parseTrainingNumber(v);
-                return n != null && n > 0 ? n : null;
-              });
-              setRestPauseModal({
-                key,
-                label: modeLabel,
-                pauseSec,
-                miniSets,
-                weight: baseWeight,
-                activationReps: null,
-                minis: minisInput,
-                rpe: baseRpe,
-                cfg: cfg ?? null,
-                error: '',
-              });
-            }}
-            className="bg-black/30 border border-neutral-700 rounded-xl px-2 sm:px-3 py-2 text-sm text-white outline-none hover:border-yellow-500/60 hover:text-yellow-500 transition-colors inline-flex items-center justify-center gap-2"
-          >
-            <Pencil size={14} />
-            <span className="text-xs font-black hidden sm:inline">Abrir</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => toggleNotes(key)}
-            aria-label="Observações"
-            className={isNotesOpen || hasAnyNote
-              ? 'shrink-0 inline-flex items-center justify-center rounded-lg p-1.5 text-yellow-500 bg-yellow-500/10 border border-yellow-500/40'
-              : 'shrink-0 inline-flex items-center justify-center rounded-lg p-1.5 text-neutral-400 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'}
-          >
-            <MessageSquare size={12} />
-          </button>
-        </div>
-        <div className="flex flex-col sm:flex-row sm:items-center gap-2">
-          <div className="flex items-center gap-2 flex-1 min-w-0">
-            <span className="text-[10px] uppercase tracking-widest font-black text-yellow-500 inline-flex items-center gap-1 group">
-              {modeLabel === 'SST' ? 'SST' : 'Rest-P'}
-              <HelpHint
-                title={(modeLabel === 'SST' ? HELP_TERMS.sst : HELP_TERMS.restPause).title}
-                text={(modeLabel === 'SST' ? HELP_TERMS.sst : HELP_TERMS.restPause).text}
-                tooltip={(modeLabel === 'SST' ? HELP_TERMS.sst : HELP_TERMS.restPause).tooltip}
-                className="h-4 w-4 text-[10px]"
-              />
-            </span>
-            <span className="text-xs text-neutral-400 whitespace-normal">{modeLabel === 'SST' ? 'SST' : 'REST-P'} • Intra {pauseSec || 0}s • Total: {total || 0} reps</span>
+    <div key={key} className="space-y-1">
+      <div
+        className={[
+          'rounded-xl border transition-all duration-300 shadow-sm shadow-black/20',
+          done ? 'px-2.5 py-2 bg-emerald-950/30 border-emerald-500/30' : 'px-3 py-2.5 space-y-2 bg-neutral-900/50 border-neutral-800/80',
+        ].join(' ')}
+      >
+        {done ? (
+          <div className="flex items-center gap-2">
+            <div className="w-10 text-xs font-mono text-neutral-400 shrink-0">#{setIdx + 1}</div>
+            <span className="text-[10px] uppercase tracking-widest font-black text-emerald-400 shrink-0">{modeLabel === 'SST' ? 'SST' : 'Rest-P'}</span>
+            <span className="text-xs text-neutral-300 truncate flex-1 min-w-0">{summaryText}</span>
+            <button
+              type="button"
+              onClick={() => toggleNotes(key)} aria-label="Observações"
+              className={isNotesOpen || hasAnyNote ? 'w-7 h-7 inline-flex items-center justify-center rounded-lg text-yellow-500 bg-yellow-500/10 border border-yellow-500/40' : 'w-7 h-7 inline-flex items-center justify-center rounded-lg text-neutral-500 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'}
+            >
+              <MessageSquare size={12} />
+            </button>
+            <button
+              type="button"
+              onClick={handleUndo}
+              className="inline-flex items-center justify-center gap-1 h-9 px-3 rounded-xl font-black text-xs whitespace-nowrap active:scale-95 transition-all duration-150 bg-emerald-500 text-black shadow-sm shadow-emerald-500/30"
+            >
+              <Check size={13} />
+              Feito
+            </button>
           </div>
-          <button
-            type="button"
-            disabled={!canDone}
-            onClick={() => {
-              const nowMs = Date.now();
-              const startedRaw = (log as UnknownRecord)?.startedAtMs;
-              const startedAtMs = typeof startedRaw === 'number' ? startedRaw : Number(String(startedRaw ?? '').trim());
-              const executionSeconds =
-                Number.isFinite(startedAtMs) && startedAtMs > 0 ? Math.max(0, Math.round((nowMs - startedAtMs) / 1000)) : 0;
-              const nextDone = !done;
-              updateLog(key, {
-                done: nextDone,
-                completedAtMs: nextDone ? nowMs : null,
-                executionSeconds: nextDone ? executionSeconds : null,
-                reps: String(total || ''),
-                rest_pause: { ...rp, activation_reps: 0, mini_reps: minis },
-                advanced_config: cfg ?? log.advanced_config ?? null,
-              });
-              if (nextDone && restTime && restTime > 0) {
-                const nextPlanned = getPlannedSet(ex, setIdx + 1);
-                const nextKey = nextPlanned ? `${exIdx}-${setIdx + 1}` : null;
-                startTimer(restTime, {
-                  kind: 'rest',
-                  key,
-                  nextKey,
-                  restStartedAtMs: nowMs,
-                });
-              }
-            }}
-            className={
-              canDone
-                ? done
-                  ? 'inline-flex items-center justify-center gap-2 min-h-[40px] px-3 py-2 rounded-xl bg-yellow-500 text-black font-black shadow-yellow-500/20 shadow-sm active:scale-95 transition duration-150 sm:w-auto'
-                  : 'inline-flex items-center justify-center gap-2 min-h-[40px] px-3 py-2 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 font-bold hover:bg-neutral-700 active:scale-95 transition duration-150 sm:w-auto'
-                : 'inline-flex items-center justify-center gap-2 min-h-[40px] px-3 py-2 rounded-xl bg-neutral-800/40 border border-neutral-800 text-neutral-500 font-bold cursor-not-allowed sm:w-auto'
-            }
-          >
-            <Check size={16} />
-            <span className="text-xs">{done ? 'Feito' : 'Concluir'}</span>
-          </button>
-        </div>
+        ) : (
+          <>
+            <div className="flex items-center gap-2">
+              <div className="w-10 text-xs font-mono text-neutral-400">#{setIdx + 1}</div>
+              <input
+                inputMode="decimal"
+                aria-label={`Peso em kg – série ${setIdx + 1}`}
+                value={weightField.value}
+                onChange={weightField.onChange}
+                onFocus={weightField.onFocus}
+                onBlur={weightField.onBlur}
+                placeholder={weightPlaceholder}
+                className="w-24 bg-black/30 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white placeholder:text-neutral-500/70 outline-none focus:ring-1 ring-yellow-500"
+              />
+              <button
+                type="button"
+                onClick={() => {
+                  const baseWeight = String(log?.weight ?? cfg?.weight ?? '').trim();
+                  const baseRpe = String(log?.rpe ?? '').trim();
+                  const minisInput = Array.from({ length: miniSets }).map((_, idx) => {
+                    const v = minisArrRaw?.[idx];
+                    const n = parseTrainingNumber(v);
+                    return n != null && n > 0 ? n : null;
+                  });
+                  setRestPauseModal({
+                    key,
+                    label: modeLabel,
+                    pauseSec,
+                    miniSets,
+                    weight: baseWeight,
+                    activationReps: null,
+                    minis: minisInput,
+                    rpe: baseRpe,
+                    cfg: cfg ?? null,
+                    error: '',
+                  });
+                }}
+                className="bg-black/30 border border-neutral-700 rounded-xl px-2 sm:px-3 py-2 text-sm text-white outline-none hover:border-yellow-500/60 hover:text-yellow-500 transition-colors inline-flex items-center justify-center gap-2"
+              >
+                <Pencil size={14} />
+                <span className="text-xs font-black hidden sm:inline">Abrir</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => toggleNotes(key)}
+                aria-label="Observações"
+                className={isNotesOpen || hasAnyNote
+                  ? 'shrink-0 inline-flex items-center justify-center rounded-lg p-1.5 text-yellow-500 bg-yellow-500/10 border border-yellow-500/40'
+                  : 'shrink-0 inline-flex items-center justify-center rounded-lg p-1.5 text-neutral-400 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'}
+              >
+                <MessageSquare size={12} />
+              </button>
+            </div>
+            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                <span className="text-[10px] uppercase tracking-widest font-black text-yellow-500 inline-flex items-center gap-1 group">
+                  {modeLabel === 'SST' ? 'SST' : 'Rest-P'}
+                  <HelpHint
+                    title={(modeLabel === 'SST' ? HELP_TERMS.sst : HELP_TERMS.restPause).title}
+                    text={(modeLabel === 'SST' ? HELP_TERMS.sst : HELP_TERMS.restPause).text}
+                    tooltip={(modeLabel === 'SST' ? HELP_TERMS.sst : HELP_TERMS.restPause).tooltip}
+                    className="h-4 w-4 text-[10px]"
+                  />
+                </span>
+                <span className="text-xs text-neutral-400 whitespace-normal">{modeLabel === 'SST' ? 'SST' : 'REST-P'} • Intra {pauseSec || 0}s • Total: {total || 0} reps</span>
+              </div>
+              <button
+                type="button"
+                disabled={!canDone}
+                onClick={() => {
+                  const nowMs = Date.now();
+                  const startedRaw = (log as UnknownRecord)?.startedAtMs;
+                  const startedAtMs = typeof startedRaw === 'number' ? startedRaw : Number(String(startedRaw ?? '').trim());
+                  const executionSeconds =
+                    Number.isFinite(startedAtMs) && startedAtMs > 0 ? Math.max(0, Math.round((nowMs - startedAtMs) / 1000)) : 0;
+                  updateLog(key, {
+                    done: true,
+                    completedAtMs: nowMs,
+                    executionSeconds,
+                    reps: String(total || ''),
+                    rest_pause: { ...rp, activation_reps: 0, mini_reps: minis },
+                    advanced_config: cfg ?? log.advanced_config ?? null,
+                  });
+                  if (restTime && restTime > 0) {
+                    const nextPlanned = getPlannedSet(ex, setIdx + 1);
+                    const nextKey = nextPlanned ? `${exIdx}-${setIdx + 1}` : null;
+                    startTimer(restTime, { kind: 'rest', key, nextKey, restStartedAtMs: nowMs });
+                  }
+                }}
+                className={
+                  canDone
+                    ? 'inline-flex items-center justify-center gap-2 min-h-[40px] px-3 py-2 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 font-bold hover:bg-neutral-700 active:scale-95 transition duration-150 sm:w-auto'
+                    : 'inline-flex items-center justify-center gap-2 min-h-[40px] px-3 py-2 rounded-xl bg-neutral-800/40 border border-neutral-800 text-neutral-500 font-bold cursor-not-allowed sm:w-auto'
+                }
+              >
+                <Check size={16} />
+                <span className="text-xs">Concluir</span>
+              </button>
+            </div>
+          </>
+        )}
       </div>
       {isNotesOpen && (
         <div className="space-y-1.5">
