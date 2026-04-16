@@ -33,7 +33,11 @@ export default function WorkoutFooter() {
     resumeSession: () => void
   }
   const inTeamSession = !!teamCtx?.teamSession?.id
-  const isPaused = inTeamSession && !!teamCtx?.sessionPaused
+  const teamPaused = inTeamSession && !!teamCtx?.sessionPaused
+
+  // Solo pause/resume — freezes display timer locally (team uses broadcast instead)
+  const { isPaused: timerPaused, togglePause } = useWorkoutTimer()
+  const isPaused = teamPaused || timerPaused
 
   const allSets = totalSets;
   const allDone = allSets > 0 && completedSets >= allSets;
@@ -147,21 +151,26 @@ export default function WorkoutFooter() {
             </span>
           </div>
 
-          {/* Team pause/resume — only for team sessions */}
-          {inTeamSession && (
-            <button
-              type="button"
-              onClick={() => isPaused ? teamCtx.resumeSession() : teamCtx.pauseSession()}
-              className={[
-                'w-8 h-8 flex items-center justify-center rounded-lg shrink-0 transition-all active:scale-90',
-                isPaused
-                  ? 'bg-yellow-500 text-black'
-                  : 'bg-neutral-800 border border-neutral-700 text-neutral-300',
-              ].join(' ')}
-            >
-              {isPaused ? <Play size={12} /> : <Pause size={12} />}
-            </button>
-          )}
+          {/* Pause/resume — team broadcasts to teammates; solo freezes local timer */}
+          <button
+            type="button"
+            onClick={() => {
+              if (inTeamSession) {
+                teamPaused ? teamCtx.resumeSession() : teamCtx.pauseSession()
+              } else {
+                togglePause()
+              }
+            }}
+            className={[
+              'w-8 h-8 flex items-center justify-center rounded-lg shrink-0 transition-all active:scale-90',
+              isPaused
+                ? 'bg-yellow-500 text-black'
+                : 'bg-neutral-800 border border-neutral-700 text-neutral-300',
+            ].join(' ')}
+            title={isPaused ? 'Retomar treino' : 'Pausar treino'}
+          >
+            {isPaused ? <Play size={12} /> : <Pause size={12} />}
+          </button>
         </div>
 
         {/* Finalizar — with glow celebration ring when allDone */}
