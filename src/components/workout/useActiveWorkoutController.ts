@@ -316,7 +316,15 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
       if (teamSession?.id && typeof broadcastWorkoutEdit === 'function') {
         // Small delay to allow state to settle before serialising
         setTimeout(() => {
-          try { broadcastWorkoutEdit(updatedWorkout); } catch { }
+          try {
+            // updatedWorkout is a session patch: { workout: { exercises: [...] } }
+            // broadcastWorkoutEdit must receive the raw workout object so that
+            // handleAcceptWorkoutEdit on the receiver can read .exercises directly
+            const rawWorkout = (typeof updatedWorkout.workout === 'object' && updatedWorkout.workout !== null)
+              ? updatedWorkout.workout as UnknownRecord
+              : updatedWorkout;
+            broadcastWorkoutEdit(rawWorkout);
+          } catch { }
         }, 300);
       }
     },
