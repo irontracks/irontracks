@@ -12,6 +12,17 @@
 
 # testing
 /coverage
+/test-results
+/playwright-report
+/.playwright-mcp
+
+# dev/debug screenshots soltos na raiz (não versionar)
+/test_*.png
+/prod_*.png
+/paywall_*.png
+/review_screenshot.png
+/vercel_*.png
+/tmp_screenshot_*.txt
 
 # next.js
 /.next/
