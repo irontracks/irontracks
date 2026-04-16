@@ -699,7 +699,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                             onOpenHistory={handleOpenHistory}
                             onOpenNotifications={handleOpenNotifications}
                             onOpenSchedule={() => router.push('/dashboard/schedule')}
-                            onOpenWallet={() => openVipView()}
+                            onOpenWallet={() => { openAdminPanel('billing'); setView('admin'); }}
                             onOpenSettings={() => setSettingsOpen(true)}
                             onOpenTour={handleOpenTour}
                             onOpenProfile={handleOpenProfile}

@@ -293,26 +293,25 @@ export function useLoginScreen() {
                 if (isTeacher && !cref) throw new Error('CREF é obrigatório para cadastro de professor.')
                 const cleanPhone = emailData.phone.replace(/\D/g, '')
                 if (cleanPhone.length < 10) throw new Error('Telefone inválido (mínimo 10 dígitos com DDD).')
-                // Step 1: Create auth user first — the handle_new_user trigger creates the profile.
-                // If this fails, we never create the access_request (no orphan records).
+                // Step 1: Create access_request FIRST so the whitelist trigger allows the signUp.
+                // The t_enforce_invite_whitelist trigger runs BEFORE INSERT on auth.users and only
+                // allows emails that already have a pending access_request. Without this, signUp
+                // fails with "Database error saving new user" before the request is ever created.
+                const accessReqJson = await apiAuth.createAccessRequest({
+                    email, full_name: emailData.fullName, phone: emailData.phone,
+                    birth_date: emailData.birthDate, role_requested: isTeacher ? 'teacher' : 'student',
+                    cref: isTeacher ? cref : null,
+                })
+                if (!accessReqJson?.ok) {
+                    throw new Error((accessReqJson?.error as string | undefined) || 'Falha ao registrar solicitação de acesso.')
+                }
+                // Step 2: Create auth user — the whitelist trigger will now find the pending
+                // access_request and allow the insert.
                 const { error: signUpError } = await supabase.auth.signUp({
                     email, password,
                     options: { data: { full_name: emailData.fullName, display_name: emailData.fullName, phone: emailData.phone, birth_date: emailData.birthDate, role_requested: isTeacher ? 'teacher' : 'student', cref: isTeacher ? cref : null } }
                 })
                 if (signUpError) throw signUpError
-                // Step 2: Create the access_request so the admin sees it in the panel.
-                // If this fails after a successful signUp, the user still exists — they will show
-                // up as a pending_profile in the admin panel and the admin can approve from there.
-                try {
-                    const json = await apiAuth.createAccessRequest({ email, full_name: emailData.fullName, phone: emailData.phone, birth_date: emailData.birthDate, role_requested: isTeacher ? 'teacher' : 'student', cref: isTeacher ? cref : null })
-                    if (!json?.ok) {
-                        // Log but don't block — user was created, admin can still find them
-                        const errMsg = (json?.error as string | undefined) || 'Falha ao registrar solicitação'
-                        logError('signup', 'createAccessRequest failed after signUp:', errMsg)
-                    }
-                } catch (e: unknown) {
-                    logError('signup', 'createAccessRequest threw after signUp:', e)
-                }
                 if (rememberMe) localStorage.setItem('it_remembered_email', email)
                 holdLoading = true; window.location.replace('/wait-approval')
             } else if (authMode === 'recover') {
