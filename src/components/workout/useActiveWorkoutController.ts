@@ -13,6 +13,7 @@ import { useTeamWorkout } from '@/contexts/TeamWorkoutContext';
 import {
   ActiveWorkoutProps,
   UnknownRecord,
+  WorkoutDraft,
   WorkoutExercise,
 } from './types';
 import { isObject } from './utils';
@@ -101,6 +102,9 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     editExerciseOpen, setEditExerciseOpen,
     editExerciseIdx, setEditExerciseIdx,
     editExerciseDraft, setEditExerciseDraft,
+    setEditExerciseOriginal,
+    persistToPlan, setPersistToPlan,
+    editExerciseHasChanges,
     organizeOpen, setOrganizeOpen,
     organizeDraft, setOrganizeDraft,
     organizeSaving, setOrganizeSaving,
@@ -302,6 +306,12 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     collapsed, setCollapsed,
     linkedWeightExercises, setLinkedWeightExercises,
     editExerciseDraft, setEditExerciseDraft,
+    setEditExerciseOriginal,
+    persistToPlan, setPersistToPlan,
+    editExerciseHasChanges,
+    onPersistWorkoutTemplate: propsRef.current.onPersistWorkoutTemplate
+      ? (w: UnknownRecord) => { propsRef.current.onPersistWorkoutTemplate?.(w as WorkoutDraft); }
+      : undefined,
     editExerciseIdx, setEditExerciseIdx,
     editExerciseOpen, setEditExerciseOpen,
     addExerciseDraft, setAddExerciseDraft,
@@ -500,6 +510,9 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     setEditExerciseIdx,
     editExerciseDraft,
     setEditExerciseDraft,
+    editExerciseHasChanges,
+    persistToPlan,
+    setPersistToPlan,
     linkedWeightExercises,
     toggleLinkWeights,
 

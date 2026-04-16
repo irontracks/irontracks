@@ -109,6 +109,9 @@ export default function Modals() {
     setEditExerciseIdx,
     editExerciseDraft,
     setEditExerciseDraft,
+    editExerciseHasChanges,
+    persistToPlan,
+    setPersistToPlan,
     saveEditExercise,
     organizeOpen,
     requestCloseOrganize,
@@ -566,6 +569,25 @@ export default function Modals() {
                 </div>
               </div>
             </div>
+
+            {/* Persist to plan toggle — only shown when draft differs from original */}
+            {editExerciseHasChanges && (
+              <div className="mx-4 mb-3 flex items-center justify-between gap-3 px-3 py-2.5 rounded-xl bg-emerald-950/40 border border-emerald-500/25">
+                <div className="min-w-0">
+                  <div className="text-sm font-black text-emerald-300">Atualizar plano de treino</div>
+                  <div className="text-[11px] text-emerald-600 leading-snug">Salvar alteração permanentemente no plano</div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setPersistToPlan(!persistToPlan)}
+                  className={`w-12 h-7 rounded-full transition-all duration-200 relative flex-shrink-0 overflow-visible ${persistToPlan ? 'bg-emerald-500' : 'bg-neutral-700'}`}
+                  aria-label="Toggle atualizar plano de treino"
+                  style={{ minWidth: '3rem' }}
+                >
+                  <span className={`absolute top-1 left-0 w-5 h-5 rounded-full bg-white shadow-md transition-transform duration-200 ${persistToPlan ? 'translate-x-6' : 'translate-x-1'}`} />
+                </button>
+              </div>
+            )}
             <div className="p-4 border-t border-neutral-800 flex gap-2">
               <button
                 type="button"
