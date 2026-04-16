@@ -51,7 +51,7 @@ export default function WorkoutHeader() {
     <>
       <div
         className="bg-neutral-950 border-b border-neutral-800 px-4 md:px-6 flex-shrink-0 relative"
-        style={{ paddingTop: 'max(calc(env(safe-area-inset-top) - 30px), 4px)' }}
+        style={{ paddingTop: 'max(calc(env(safe-area-inset-top) - 40px), 4px)' }}
       >
         <div className="max-w-6xl mx-auto flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
