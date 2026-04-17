@@ -9,7 +9,9 @@ export default async function MarketplacePage() {
   const ua = String(h.get('user-agent') || '')
   const isIos = /iPad|iPhone|iPod/i.test(ua)
   const isCapacitor = /Capacitor/i.test(ua)
-  const shouldHideVip = isIos && isCapacitor
+  const iapEnabled = String(process.env.NEXT_PUBLIC_ENABLE_IAP || '').trim().toLowerCase() === 'true'
+  // Only hide when we have no IAP path for iOS — the client handles Apple IAP via RevenueCat.
+  const shouldHideVip = isIos && isCapacitor && !iapEnabled
   if (shouldHideVip) {
     return (
       <div className="min-h-screen bg-neutral-950 text-white flex items-center justify-center p-6">
