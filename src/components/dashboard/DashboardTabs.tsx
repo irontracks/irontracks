@@ -12,6 +12,7 @@ type DashboardTabsProps = {
   vipLabel: string
   vipLocked: boolean
   showNutritionTab?: boolean
+  nutritionActive?: boolean
   onOpenNutrition?: () => void
 }
 
@@ -28,6 +29,7 @@ export const DashboardTabs = memo(({
   vipLabel,
   vipLocked,
   showNutritionTab,
+  nutritionActive,
   onOpenNutrition,
 }: DashboardTabsProps) => {
   const changeTab = useCallback((next: 'dashboard' | 'assessments' | 'community' | 'vip') => {
@@ -41,7 +43,7 @@ export const DashboardTabs = memo(({
   }, [onOpenNutrition])
 
   const tabCls = (active: boolean) =>
-    `flex-1 min-w-0 min-h-[52px] px-1 sm:px-3 rounded-xl text-[10px] sm:text-xs uppercase tracking-wider whitespace-nowrap leading-none transition-colors duration-200 flex flex-col items-center justify-center gap-[5px] relative z-10 ${active
+    `flex-1 min-w-0 min-h-[52px] px-1 sm:px-3 rounded-xl text-[10px] sm:text-xs uppercase tracking-tight sm:tracking-wider whitespace-nowrap leading-none overflow-hidden transition-colors duration-200 flex flex-col items-center justify-center gap-[5px] relative z-10 ${active
       ? 'text-yellow-400 font-black'
       : 'text-neutral-500 hover:text-neutral-300 font-bold'
     }`
@@ -132,10 +134,11 @@ export const DashboardTabs = memo(({
                 type="button"
                 onClick={openNutrition}
                 data-tour="tab-nutrition"
-                className={tabCls(false)}
+                className={tabCls(!!nutritionActive)}
                 aria-label="Abrir Nutrição"
               >
-                {renderIcon('/icons/tab-nutricao.png', false, 'Nutrição')}
+                {renderIndicator(!!nutritionActive)}
+                {renderIcon('/icons/tab-nutricao.png', !!nutritionActive, 'Nutrição')}
                 <span>Nutrição</span>
               </button>
             )}

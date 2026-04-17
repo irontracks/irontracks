@@ -67,6 +67,7 @@ type Props = {
   vipLocked?: boolean
   vipEnabled?: boolean
   showNutritionTab?: boolean
+  nutritionActive?: boolean
   onOpenNutrition?: () => void
   settings?: {
     dashboardDensity?: 'compact' | 'comfortable'
@@ -284,6 +285,7 @@ export default function StudentDashboard(props: Props) {
             vipLabel={vipLabel}
             vipLocked={vipLocked}
             showNutritionTab={!!props.showNutritionTab}
+            nutritionActive={!!props.nutritionActive}
             onOpenNutrition={props.onOpenNutrition}
           />
 
