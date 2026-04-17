@@ -760,6 +760,8 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                     vipLabel="VIP"
                                     vipLocked={hideVipOnIos ? true : !vipAccess?.hasVip}
                                     vipEnabled={!hideVipOnIos}
+                                    showNutritionTab={!!vipAccess?.hasVip}
+                                    onOpenNutrition={() => setNutritionOpen(true)}
                                     settings={userSettingsApi?.settings ?? null}
                                     onCreateWorkout={handleCreateWorkout}
                                     onExpressWorkout={() => setExpressWorkoutOpen(true)}
