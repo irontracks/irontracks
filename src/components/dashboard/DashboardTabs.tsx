@@ -2,6 +2,7 @@
 
 import { memo, useCallback } from 'react'
 import Image from 'next/image'
+import { UtensilsCrossed } from 'lucide-react'
 import { triggerHaptic } from '@/utils/native/irontracksNative'
 
 type DashboardTabsProps = {
@@ -11,6 +12,8 @@ type DashboardTabsProps = {
   showVipTab: boolean
   vipLabel: string
   vipLocked: boolean
+  showNutritionTab?: boolean
+  onOpenNutrition?: () => void
 }
 
 const tabs = [
@@ -25,11 +28,18 @@ export const DashboardTabs = memo(({
   showVipTab,
   vipLabel,
   vipLocked,
+  showNutritionTab,
+  onOpenNutrition,
 }: DashboardTabsProps) => {
   const changeTab = useCallback((next: 'dashboard' | 'assessments' | 'community' | 'vip') => {
     triggerHaptic('light').catch(() => { })
     onChangeView(next)
   }, [onChangeView])
+
+  const openNutrition = useCallback(() => {
+    triggerHaptic('light').catch(() => { })
+    onOpenNutrition?.()
+  }, [onOpenNutrition])
 
   const tabCls = (active: boolean) =>
     `flex-1 min-h-[52px] px-2 sm:px-3 rounded-xl text-[11px] sm:text-xs uppercase tracking-wider whitespace-nowrap leading-none transition-colors duration-200 flex flex-col items-center justify-center gap-[5px] relative z-10 ${active
@@ -115,6 +125,23 @@ export const DashboardTabs = memo(({
                 {renderIndicator(view === 'community')}
                 {renderIcon('/icons/tab-comunidade.png', view === 'community', 'Comunidade')}
                 <span>Comunidade</span>
+              </button>
+            )}
+
+            {showNutritionTab && (
+              <button
+                type="button"
+                onClick={openNutrition}
+                data-tour="tab-nutrition"
+                className={tabCls(false)}
+                aria-label="Abrir Nutrição"
+              >
+                <div className="relative transition-transform duration-200">
+                  <div className="w-[22px] h-[22px] rounded-[4px] bg-neutral-900 border border-neutral-800/60 grid place-items-center brightness-75 grayscale-[30%] transition-all duration-300">
+                    <UtensilsCrossed size={14} className="text-yellow-500/80" />
+                  </div>
+                </div>
+                <span>Nutrição</span>
               </button>
             )}
 
