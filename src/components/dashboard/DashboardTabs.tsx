@@ -41,7 +41,7 @@ export const DashboardTabs = memo(({
   }, [onOpenNutrition])
 
   const tabCls = (active: boolean) =>
-    `flex-1 min-h-[52px] px-2 sm:px-3 rounded-xl text-[11px] sm:text-xs uppercase tracking-wider whitespace-nowrap leading-none transition-colors duration-200 flex flex-col items-center justify-center gap-[5px] relative z-10 ${active
+    `flex-1 min-w-0 min-h-[52px] px-1 sm:px-3 rounded-xl text-[10px] sm:text-xs uppercase tracking-wider whitespace-nowrap leading-none transition-colors duration-200 flex flex-col items-center justify-center gap-[5px] relative z-10 ${active
       ? 'text-yellow-400 font-black'
       : 'text-neutral-500 hover:text-neutral-300 font-bold'
     }`
@@ -91,7 +91,7 @@ export const DashboardTabs = memo(({
           style={{ background: 'linear-gradient(135deg, rgba(255,255,255,0.07) 0%, rgba(255,255,255,0.02) 100%)' }}
         >
           <div
-            className="rounded-[14px] p-1 flex gap-1 relative"
+            className="rounded-[14px] p-1 flex gap-0.5 sm:gap-1 relative"
             style={{
               background: 'linear-gradient(160deg, rgba(18,18,18,0.99) 0%, rgba(10,10,10,0.99) 100%)',
               backdropFilter: 'blur(20px)',
