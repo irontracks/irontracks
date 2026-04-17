@@ -2,7 +2,6 @@
 
 import { memo, useCallback } from 'react'
 import Image from 'next/image'
-import { UtensilsCrossed } from 'lucide-react'
 import { triggerHaptic } from '@/utils/native/irontracksNative'
 
 type DashboardTabsProps = {
@@ -136,11 +135,7 @@ export const DashboardTabs = memo(({
                 className={tabCls(false)}
                 aria-label="Abrir Nutrição"
               >
-                <div className="relative transition-transform duration-200">
-                  <div className="w-[22px] h-[22px] rounded-[4px] bg-neutral-900 border border-neutral-800/60 grid place-items-center brightness-75 grayscale-[30%] transition-all duration-300">
-                    <UtensilsCrossed size={14} className="text-yellow-500/80" />
-                  </div>
-                </div>
+                {renderIcon('/icons/tab-nutricao.png', false, 'Nutrição')}
                 <span>Nutrição</span>
               </button>
             )}
