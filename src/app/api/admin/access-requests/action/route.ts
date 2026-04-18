@@ -76,10 +76,13 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: 'internal_error' }, { status: 500 })
     }
 
-    // Fetch request details
+    // Fetch request details — select only columns that exist in access_requests.
+    // Historical note: the previous select referenced nonexistent columns
+    // (requester_id, teacher_id, gym_id, message) causing every approve/reject
+    // to fail with a 500 before even reaching the RPC.
     const { data: request, error: fetchError } = await admin
       .from('access_requests')
-      .select('id, status, requester_id, teacher_id, gym_id, message, created_at, email, full_name')
+      .select('id, status, created_at, email, full_name')
       .eq('id', requestId)
       .maybeSingle()
 
