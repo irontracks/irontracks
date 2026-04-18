@@ -39,8 +39,14 @@ const QuerySchema = z
     next: z
       .preprocess((v) => (typeof v === 'string' ? v : ''), z.string())
       .optional(),
+    // Provider must be EXPLICIT — no default. Previously defaulted to 'google'
+    // which meant any navigation to /auth/login (even internal redirects from
+    // e.g. /wait-approval when session not yet present) dumped the user on the
+    // Google OAuth screen. Now missing provider falls through to the landing
+    // page handler below.
     provider: z
-      .preprocess((v) => (typeof v === 'string' ? v.trim().toLowerCase() : ''), z.enum(['google', 'apple']).catch('google')),
+      .preprocess((v) => (typeof v === 'string' ? v.trim().toLowerCase() : ''), z.enum(['google', 'apple']))
+      .optional(),
   })
   .passthrough()
 
@@ -50,6 +56,17 @@ export async function GET(request: Request) {
   const next = q.next ?? '/dashboard'; const provider = q.provider
   const nextCookieName = 'it.auth.next'; const nextCookieMaxAgeSeconds = 60 * 5
   const safeOrigin = resolvePublicOrigin(request)
+
+  // No explicit OAuth provider — send the user to the landing/login page
+  // instead of auto-triggering Google OAuth. This prevents server redirects
+  // (e.g. /wait-approval → /auth/login) from dumping users on Google's screen.
+  if (!provider) {
+    const target = new URL('/', safeOrigin)
+    if (next && next !== '/dashboard') {
+      target.searchParams.set('next', next)
+    }
+    return NextResponse.redirect(target)
+  }
 
   const supabaseUrl = env.supabase.url; const supabaseAnonKey = env.supabase.anonKey
   if (!supabaseUrl || !supabaseAnonKey) {
