@@ -1,5 +1,7 @@
 import { logError, logWarn } from '@/lib/logger'
 import { env } from '@/utils/env'
+import { Ratelimit } from '@upstash/ratelimit'
+import { Redis } from '@upstash/redis'
 
 export type RateLimitResult = {
   allowed: boolean
@@ -36,12 +38,7 @@ const getStore = (): Map<string, Entry> => {
  * a client cannot spoof its IP by injecting extra values at the left of the list.
  *
  * Example with depth=1 and XFF = "realClient, vercelEdge":
- *   → skip 1 rightmost trusted proxy (vercelEdge) → take parts[parts.length - 1 - 1]
- *     = parts[0] = "realClient"
- *
- * Example with depth=1 and XFF = "attacker, realClient, vercelEdge":
- *   → skip 1 rightmost trusted proxy → take parts[3 - 1 - 1] = parts[1] = "realClient"
- *     (attacker at the leftmost is untrusted and ignored)
+ *   → skip 1 rightmost trusted proxy → parts[parts.length - 1 - 1] = parts[0] = realClient
  */
 const TRUSTED_PROXY_DEPTH = env.security.trustedProxyDepth
 
@@ -53,15 +50,6 @@ export const getRequestIp = (req: Request): string => {
     const xff = String(req.headers.get('x-forwarded-for') || '').trim()
     if (xff) {
       const parts = xff.split(',').map((s) => s.trim()).filter(Boolean)
-      // Take the IP that is TRUSTED_PROXY_DEPTH positions from the right end.
-      // e.g. depth=1 → skip 1 rightmost proxy → take parts[parts.length - 1 - 1].
-      // If depth >= parts.length we fall back to the leftmost IP (best effort).
-      //
-      // Off-by-one fix: previous version had `-(TRUSTED_PROXY_DEPTH - 1)` which
-      // for depth=1 degraded to taking the rightmost proxy itself — the Vercel
-      // edge IP, which varies per request/POP. That meant every request from
-      // the same client was bucketed separately, silently breaking rate-limit
-      // against burst attacks. See Finding #54 in the repo history.
       const idx = Math.max(0, parts.length - 1 - TRUSTED_PROXY_DEPTH)
       const candidate = parts[idx] ?? ''
       if (IP_RE.test(candidate)) return candidate
@@ -71,7 +59,6 @@ export const getRequestIp = (req: Request): string => {
     const real = String(req.headers.get('x-real-ip') || '').trim()
     if (real && IP_RE.test(real)) return real
   } catch {}
-  // Unknown IP → still rate-limited (all unknowns share a bucket)
   return 'unknown'
 }
 
@@ -111,7 +98,17 @@ export const checkRateLimit = (key: string, max: number, windowMs: number): Rate
   }
 }
 
-// ── Upstash Redis (distributed) rate limiter ──────────────────────────────────
+// ── Upstash Ratelimit (distributed) ──────────────────────────────────────────
+//
+// Migrated from a hand-rolled EVAL fetch to the official @upstash/ratelimit
+// library (Finding #54). The custom implementation worked in sequential
+// testing but produced {400: 60, 429: 0} in parallel burst against Vercel
+// fluid-compute (vs {400: 20, 429: 40} in local `npm run dev` — see #54
+// last comment). The library handles cold-start warmup, multi-region
+// replication, and concurrent requests in a battle-tested way.
+//
+// The public API (checkRateLimitAsync, getRequestIp, RateLimitResult) is
+// preserved so no caller needs to change.
 
 const getUpstashConfig = () => {
   try {
@@ -124,59 +121,59 @@ const getUpstashConfig = () => {
   }
 }
 
-const normalizeRateLimit = (countRaw: unknown, ttlRaw: unknown, max: number, windowMs: number): RateLimitResult => {
-  const now = Date.now()
-  const count = Number(countRaw) || 0
-  const ttl = Number(ttlRaw)
-  const ttlMs = Number.isFinite(ttl) && ttl > 0 ? ttl : windowMs
-  const resetAt = now + ttlMs
-  const remaining = Math.max(0, max - count)
-  return {
-    allowed: count <= max,
-    remaining,
-    resetAt,
-    retryAfterSeconds: Math.ceil(ttlMs / 1000),
+type RateLimitGlobals = {
+  __irontracksRateLimitRedis?: Redis
+  __irontracksRateLimitInstances?: Map<string, Ratelimit>
+}
+
+const getRedis = (): Redis | null => {
+  const cfg = getUpstashConfig()
+  if (!cfg) return null
+  const g = globalThis as unknown as RateLimitGlobals
+  if (!g.__irontracksRateLimitRedis) {
+    g.__irontracksRateLimitRedis = new Redis({ url: cfg.url, token: cfg.token })
   }
+  return g.__irontracksRateLimitRedis
+}
+
+const getRatelimitFor = (max: number, windowMs: number): Ratelimit | null => {
+  const redis = getRedis()
+  if (!redis) return null
+  const g = globalThis as unknown as RateLimitGlobals
+  if (!g.__irontracksRateLimitInstances) {
+    g.__irontracksRateLimitInstances = new Map()
+  }
+  const cacheKey = `${max}:${windowMs}`
+  const cached = g.__irontracksRateLimitInstances.get(cacheKey)
+  if (cached) return cached
+  const rl = new Ratelimit({
+    redis,
+    limiter: Ratelimit.slidingWindow(max, `${windowMs} ms`),
+    analytics: false,
+    prefix: 'rl',
+  })
+  g.__irontracksRateLimitInstances.set(cacheKey, rl)
+  return rl
 }
 
 export const checkRateLimitAsync = async (key: string, max: number, windowMs: number): Promise<RateLimitResult> => {
-  const cfg = getUpstashConfig()
-  if (!cfg) return checkRateLimit(key, max, windowMs)
+  const rl = getRatelimitFor(max, windowMs)
+  if (!rl) return checkRateLimit(key, max, windowMs)
 
-  // Upstash is available → switch backend indicator (idempotent assignment)
   RATE_LIMIT_BACKEND = 'redis'
 
   try {
-    const body = {
-      script: `local v=redis.call('INCR',KEYS[1]); if v==1 then redis.call('PEXPIRE',KEYS[1],ARGV[1]); end; local ttl=redis.call('PTTL',KEYS[1]); return {v, ttl};`,
-      keys: [key],
-      args: [String(windowMs)],
+    const result = await rl.limit(key)
+    const now = Date.now()
+    const resetAt = typeof result.reset === 'number' && result.reset > 0 ? result.reset : now + windowMs
+    return {
+      allowed: result.success,
+      remaining: Math.max(0, result.remaining),
+      resetAt,
+      retryAfterSeconds: Math.max(1, Math.ceil((resetAt - now) / 1000)),
     }
-    // cache: 'no-store' is critical — Next.js otherwise may cache identical
-    // POST bodies across requests (observed: 60 HTTP requests to a handler
-    // returning 60 × count=1 because the fetch layer reused one response).
-    // next: revalidate:0 as belt-and-suspenders for the Next.js data cache.
-    const res = await fetch(`${cfg.url}/eval`, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${cfg.token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(body),
-      cache: 'no-store',
-      next: { revalidate: 0 },
-    } as RequestInit)
-    const json = await res.json().catch((): null => null)
-    const result = json && typeof json === 'object' ? (json as Record<string, unknown>).result : null
-    if (Array.isArray(result) && result.length >= 2) {
-      return normalizeRateLimit(result[0], result[1], max, windowMs)
-    }
-    if (Array.isArray(json) && json.length >= 2) {
-      return normalizeRateLimit(json[0], json[1], max, windowMs)
-    }
-    return checkRateLimit(key, max, windowMs)
   } catch (e) {
-    logError('checkRateLimitAsync.redis', e)
+    logError('checkRateLimitAsync.ratelimit', e)
     return checkRateLimit(key, max, windowMs)
   }
 }
