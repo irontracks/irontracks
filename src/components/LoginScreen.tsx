@@ -88,6 +88,7 @@ const LoginScreen = () => {
     const {
         isLoading,
         errorMsg, setErrorMsg,
+        successMsg,
         authMode, setAuthMode,
         showNoAccountModal, setShowNoAccountModal,
         showPassword, setShowPassword,
@@ -513,6 +514,12 @@ const LoginScreen = () => {
                 {errorMsg && (
                     <div className="mt-6 p-4 bg-red-500/10 border border-red-500/20 rounded-xl w-full text-center animate-shake">
                         <p className="text-red-400 text-xs font-bold tracking-wide break-words">{errorMsg}</p>
+                    </div>
+                )}
+
+                {successMsg && (
+                    <div className="mt-6 p-4 bg-green-500/10 border border-green-500/30 rounded-xl w-full text-center">
+                        <p className="text-green-400 text-xs font-bold tracking-wide break-words leading-relaxed">{successMsg}</p>
                     </div>
                 )}
 
