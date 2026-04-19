@@ -1,5 +1,6 @@
 import { logError, logWarn } from '@/lib/logger'
 import { env } from '@/utils/env'
+import * as Sentry from '@sentry/nextjs'
 
 export type RateLimitResult = {
   allowed: boolean
@@ -141,7 +142,15 @@ const normalizeRateLimit = (countRaw: unknown, ttlRaw: unknown, max: number, win
 
 export const checkRateLimitAsync = async (key: string, max: number, windowMs: number): Promise<RateLimitResult> => {
   const cfg = getUpstashConfig()
-  if (!cfg) return checkRateLimit(key, max, windowMs)
+  if (!cfg) {
+    // Surface this fallback to Sentry — the memory-mode bucket is per-instance
+    // so in Vercel parallel-function runtime it silently breaks rate-limiting.
+    Sentry.captureMessage('rateLimit: fell back to memory mode — Upstash config missing', {
+      level: 'error',
+      tags: { rate_limit_fallback: 'memory_config_missing', key_prefix: key.split(':')[0] },
+    })
+    return checkRateLimit(key, max, windowMs)
+  }
 
   // Upstash is available → switch backend indicator (idempotent assignment)
   RATE_LIMIT_BACKEND = 'redis'
@@ -174,9 +183,18 @@ export const checkRateLimitAsync = async (key: string, max: number, windowMs: nu
     if (Array.isArray(json) && json.length >= 2) {
       return normalizeRateLimit(json[0], json[1], max, windowMs)
     }
+    // Surface unexpected response shape to Sentry
+    Sentry.captureMessage('rateLimit: Upstash returned unexpected shape', {
+      level: 'error',
+      tags: { rate_limit_fallback: 'memory_bad_shape', key_prefix: key.split(':')[0] },
+      extra: { status: res.status, jsonShape: typeof json, hasResult: 'result' in (json || {}) },
+    })
     return checkRateLimit(key, max, windowMs)
   } catch (e) {
     logError('checkRateLimitAsync.redis', e)
+    Sentry.captureException(e, {
+      tags: { rate_limit_fallback: 'memory_fetch_error', key_prefix: key.split(':')[0] },
+    })
     return checkRateLimit(key, max, windowMs)
   }
 }
