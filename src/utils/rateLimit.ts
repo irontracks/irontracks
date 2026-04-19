@@ -152,6 +152,10 @@ export const checkRateLimitAsync = async (key: string, max: number, windowMs: nu
       keys: [key],
       args: [String(windowMs)],
     }
+    // cache: 'no-store' is critical — Next.js otherwise may cache identical
+    // POST bodies across requests (observed: 60 HTTP requests to a handler
+    // returning 60 × count=1 because the fetch layer reused one response).
+    // next: revalidate:0 as belt-and-suspenders for the Next.js data cache.
     const res = await fetch(`${cfg.url}/eval`, {
       method: 'POST',
       headers: {
@@ -159,7 +163,9 @@ export const checkRateLimitAsync = async (key: string, max: number, windowMs: nu
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(body),
-    })
+      cache: 'no-store',
+      next: { revalidate: 0 },
+    } as RequestInit)
     const json = await res.json().catch((): null => null)
     const result = json && typeof json === 'object' ? (json as Record<string, unknown>).result : null
     if (Array.isArray(result) && result.length >= 2) {
