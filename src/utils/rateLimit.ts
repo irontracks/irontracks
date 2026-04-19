@@ -152,6 +152,16 @@ export const checkRateLimitAsync = async (key: string, max: number, windowMs: nu
     return checkRateLimit(key, max, windowMs)
   }
 
+  // DIAG #54: breadcrumb every call with the key — Sentry will show if the
+  // key varies between concurrent requests from the same client. Remove
+  // once root cause is understood.
+  Sentry.addBreadcrumb({
+    category: 'rate-limit',
+    level: 'info',
+    message: 'checkRateLimitAsync',
+    data: { key, max, windowMs },
+  })
+
   // Upstash is available → switch backend indicator (idempotent assignment)
   RATE_LIMIT_BACKEND = 'redis'
 
@@ -178,7 +188,17 @@ export const checkRateLimitAsync = async (key: string, max: number, windowMs: nu
     const json = await res.json().catch((): null => null)
     const result = json && typeof json === 'object' ? (json as Record<string, unknown>).result : null
     if (Array.isArray(result) && result.length >= 2) {
-      return normalizeRateLimit(result[0], result[1], max, windowMs)
+      const rl = normalizeRateLimit(result[0], result[1], max, windowMs)
+      // DIAG #54: log every rate-limit evaluation as a Sentry message so we
+      // can see exactly which key each of the 60 smoke requests is using.
+      if (key.startsWith('ai:exercise-chat:')) {
+        Sentry.captureMessage('rateLimit:probe', {
+          level: 'info',
+          tags: { probe: 'exercise-chat' },
+          extra: { key, count: result[0], remaining: rl.remaining, allowed: rl.allowed },
+        })
+      }
+      return rl
     }
     if (Array.isArray(json) && json.length >= 2) {
       return normalizeRateLimit(json[0], json[1], max, windowMs)
