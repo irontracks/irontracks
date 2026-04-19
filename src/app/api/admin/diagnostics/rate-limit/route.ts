@@ -21,53 +21,33 @@ export async function GET(req: NextRequest) {
   if (!auth.ok) return auth.response
 
   const url = new URL(req.url)
-  const n = Math.min(30, Math.max(1, Number(url.searchParams.get('n') || '5')))
+  const n = Math.min(60, Math.max(1, Number(url.searchParams.get('n') || '5')))
+  const parallel = url.searchParams.get('parallel') === 'true'
 
   const detectedIp = getRequestIp(req)
-  const stableKey = `diag:probe:${auth.user.id}`
+  const stableKey = `diag:probe:${auth.user.id}:${randomBytes(3).toString('hex')}`
+  const handlerKey = `ai:exercise-chat:${auth.user.id}:${detectedIp}:${randomBytes(3).toString('hex')}`
 
-  // Also simulate the EXACT key shape the /api/ai/exercise-chat handler uses,
-  // with max=20 (same cap) so we can see if rate-limit blocks mid-burst.
-  const handlerKey = `ai:exercise-chat:${auth.user.id}:${detectedIp}`
-  const samples = []
-  const handlerSamples = []
-  for (let i = 0; i < n; i++) {
+  const makeCall = async (iter: number, key: string, max: number) => {
     const t0 = Date.now()
     try {
-      const result = await checkRateLimitAsync(stableKey, 1000, 60_000)
-      samples.push({
-        iter: i,
-        ok: true,
-        ms: Date.now() - t0,
-        remaining: result.remaining,
-        allowed: result.allowed,
-      })
+      const result = await checkRateLimitAsync(key, max, 60_000)
+      return { iter, ok: true, ms: Date.now() - t0, remaining: result.remaining, allowed: result.allowed }
     } catch (e) {
-      samples.push({
-        iter: i,
-        ok: false,
-        ms: Date.now() - t0,
-        error: e instanceof Error ? e.message : String(e),
-      })
+      return { iter, ok: false, ms: Date.now() - t0, error: e instanceof Error ? e.message : String(e) }
     }
+  }
 
-    const t1 = Date.now()
-    try {
-      const hr = await checkRateLimitAsync(handlerKey, 20, 60_000)
-      handlerSamples.push({
-        iter: i,
-        ok: true,
-        ms: Date.now() - t1,
-        remaining: hr.remaining,
-        allowed: hr.allowed,
-      })
-    } catch (e) {
-      handlerSamples.push({
-        iter: i,
-        ok: false,
-        ms: Date.now() - t1,
-        error: e instanceof Error ? e.message : String(e),
-      })
+  let samples, handlerSamples
+  if (parallel) {
+    samples = await Promise.all(Array.from({ length: n }, (_, i) => makeCall(i, stableKey, 1000)))
+    handlerSamples = await Promise.all(Array.from({ length: n }, (_, i) => makeCall(i, handlerKey, 20)))
+  } else {
+    samples = []
+    handlerSamples = []
+    for (let i = 0; i < n; i++) {
+      samples.push(await makeCall(i, stableKey, 1000))
+      handlerSamples.push(await makeCall(i, handlerKey, 20))
     }
   }
 
@@ -78,10 +58,12 @@ export async function GET(req: NextRequest) {
       stableKey,
       handlerKey,
       max: 1000,
+      parallel,
       samples,
       handlerSamples,
-      handlerAllowedCount: handlerSamples.filter(s => 'allowed' in s && s.allowed).length,
-      handlerDeniedCount: handlerSamples.filter(s => 'allowed' in s && !s.allowed).length,
+      handlerAllowedCount: handlerSamples.filter((s: { allowed?: boolean }) => s.allowed === true).length,
+      handlerDeniedCount: handlerSamples.filter((s: { allowed?: boolean }) => s.allowed === false).length,
+      handlerFailedCount: handlerSamples.filter((s: { ok?: boolean }) => s.ok === false).length,
       firstRemaining: samples[0] && 'remaining' in samples[0] ? samples[0].remaining : null,
       lastRemaining: samples[samples.length - 1] && 'remaining' in samples[samples.length - 1] ? (samples[samples.length - 1] as { remaining?: number }).remaining : null,
       upstashConfigured: !!env.upstash.restUrl.trim() && !!env.upstash.restToken.trim(),
