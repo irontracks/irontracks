@@ -50,18 +50,16 @@ test.describe('Signup flow', () => {
     let userId: string | null = null
 
     try {
-      // 1. Admin approved this email beforehand. Use status='accepted' (legacy
-      //    canonical value) because:
-      //      - enforce_invite_whitelist_v2 BEFORE trigger on auth.users accepts
-      //        only 'pending' or 'accepted' — not 'approved'.
-      //      - link_user_and_profile_v2 AFTER trigger looks for status='accepted'
-      //        to mark the profile as is_approved=true.
-      //    (The newer handle_new_user trigger uses 'approved' — harmless drift
-      //    between the two triggers; link_user_and_profile_v2 wins via ON CONFLICT.)
+      // 1. Admin approved this email beforehand. Use status='approved' —
+      //    the canonical value written by the approve_access_request RPC.
+      //    Migration 20260419110000 normalized all three auth.users triggers
+      //    (enforce_invite_whitelist_v2, handle_new_user, link_user_and_profile_v2)
+      //    to accept both 'approved' and 'accepted'. This test exercises the
+      //    'approved' path end-to-end as a regression guard.
       const { error: arErr } = await admin.from('access_requests').insert({
         email,
         full_name: fullName,
-        status: 'accepted',
+        status: 'approved',
         role_requested: 'student',
       })
       expect(arErr, `access_requests insert error: ${arErr?.message}`).toBeFalsy()
@@ -78,26 +76,18 @@ test.describe('Signup flow', () => {
       expect(created?.user?.id).toBeTruthy()
       userId = created!.user!.id
 
-      // 3. handle_new_user trigger should have created a profile row.
+      // 3. Triggers should have created the profile AND marked it approved
+      //    automatically (regression guard for migration 20260419110000 —
+      //    previously this was broken because link_user_and_profile_v2 preserved
+      //    is_approved=false after handle_new_user wrote it).
       const { data: profile, error: pErr } = await admin
         .from('profiles')
-        .select('id, email, is_approved, approval_status, role')
+        .select('id, email, is_approved, role')
         .eq('id', userId)
         .maybeSingle()
       expect(pErr, `profile lookup error: ${pErr?.message}`).toBeFalsy()
       expect(profile, 'profile row should exist after signup trigger').toBeTruthy()
-
-      // Explicitly mark approved via service_role — equivalent to what the
-      // approve_access_request RPC does in the real admin-approval flow.
-      // (The existing trigger stack has drift: handle_new_user looks for
-      // status='approved' while link_user_and_profile_v2 looks for 'accepted',
-      // and the v2 ON CONFLICT DO UPDATE preserves is_approved=false once
-      // handle_new_user set it. Known tech debt — not in scope for this test.)
-      const { error: approveErr } = await admin
-        .from('profiles')
-        .update({ is_approved: true, approval_status: 'approved', approved_at: new Date().toISOString() })
-        .eq('id', userId)
-      expect(approveErr, `profile approval error: ${approveErr?.message}`).toBeFalsy()
+      expect(profile?.is_approved, 'approved access_request should auto-mark profile.is_approved=true').toBe(true)
 
       // 4. Sign in using a Node Supabase client to obtain a real session,
       //    then inject it into the browser's localStorage. This is equivalent
