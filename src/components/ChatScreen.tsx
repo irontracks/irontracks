@@ -233,26 +233,7 @@ const ChatScreen = ({ user, onClose }: ChatScreenProps) => {
                 setActiveChannel({ id: gid, name: 'Iron Lounge', type: 'global' });
                 setView('chat');
             } else {
-                const { data: newGlobal, error: createError } = await supabase
-                    .from('chat_channels')
-                    .insert({ type: 'global' })
-                    .select('id')
-                    .single();
-
-                if (createError) {
-                    if (createError.code === '23505') {
-                        return openGlobalChat();
-                    }
-                    throw createError;
-                }
-
-                if (newGlobal) {
-                    setGlobalChannel(newGlobal);
-                    setActiveChannel({ id: newGlobal.id, name: 'Iron Lounge', type: 'global' });
-                    setView('chat');
-                } else {
-                    throw new Error("Unknown error creating global channel");
-                }
+                throw new Error('Canal global indisponível. Tente novamente em instantes.');
             }
         } catch (e: unknown) {
             const msg = (getErrorMessage(e) ?? String(e ?? '')).trim();
@@ -262,7 +243,7 @@ const ChatScreen = ({ user, onClose }: ChatScreenProps) => {
         } finally {
             setOpeningChat(false);
         }
-    }, [fetchGlobalId, globalChannel, openingChat, supabase])
+    }, [fetchGlobalId, globalChannel, openingChat])
 
     useEffect(() => {
         if (globalChannel && view === 'list') {
@@ -502,16 +483,10 @@ const ChatScreen = ({ user, onClose }: ChatScreenProps) => {
             return;
         }
         try {
-            const { data: channel, error: cErr } = await supabase.from('chat_channels').insert({ type: 'private' }).select().single();
-            if (cErr) throw cErr;
-
-            await supabase.from('chat_members').insert([
-                { channel_id: channel.id, user_id: safeUserId },
-                { channel_id: channel.id, user_id: String(invite.sender_id ?? '') }
-            ]);
-
-            await supabase.from('chat_invites').update({ status: 'accepted' }).eq('id', String(invite.id ?? ''));
-
+            const inviteId = String(invite.id ?? '').trim();
+            if (!inviteId) throw new Error('Convite inválido');
+            const { error } = await supabase.rpc('accept_chat_invite', { p_invite_id: inviteId });
+            if (error) throw error;
             await loadData();
         } catch (e) {
             logError('error', e);
