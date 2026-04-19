@@ -105,3 +105,12 @@ android/capacitor-cordova-android-plugins/
 **/* 2.css
 **/* 2.json
 **/* 2.txt
+
+# RevenueCat dashboard DOM snapshots (not IaC, have no value checked in)
+/rc-*.yml
+
+# ios-native (Tuist) generated files and Xcode user state
+ios-native/Derived/
+ios-native/**/xcuserdata/
+ios-native/**/xcshareddata/swiftpm/
+ios-native/DerivedData/
