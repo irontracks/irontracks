@@ -26,7 +26,11 @@ export async function GET(req: NextRequest) {
   const detectedIp = getRequestIp(req)
   const stableKey = `diag:probe:${auth.user.id}`
 
+  // Also simulate the EXACT key shape the /api/ai/exercise-chat handler uses,
+  // with max=20 (same cap) so we can see if rate-limit blocks mid-burst.
+  const handlerKey = `ai:exercise-chat:${auth.user.id}:${detectedIp}`
   const samples = []
+  const handlerSamples = []
   for (let i = 0; i < n; i++) {
     const t0 = Date.now()
     try {
@@ -46,6 +50,25 @@ export async function GET(req: NextRequest) {
         error: e instanceof Error ? e.message : String(e),
       })
     }
+
+    const t1 = Date.now()
+    try {
+      const hr = await checkRateLimitAsync(handlerKey, 20, 60_000)
+      handlerSamples.push({
+        iter: i,
+        ok: true,
+        ms: Date.now() - t1,
+        remaining: hr.remaining,
+        allowed: hr.allowed,
+      })
+    } catch (e) {
+      handlerSamples.push({
+        iter: i,
+        ok: false,
+        ms: Date.now() - t1,
+        error: e instanceof Error ? e.message : String(e),
+      })
+    }
   }
 
   return NextResponse.json(
@@ -53,8 +76,12 @@ export async function GET(req: NextRequest) {
       backend: RATE_LIMIT_BACKEND,
       detectedIp,
       stableKey,
+      handlerKey,
       max: 1000,
       samples,
+      handlerSamples,
+      handlerAllowedCount: handlerSamples.filter(s => 'allowed' in s && s.allowed).length,
+      handlerDeniedCount: handlerSamples.filter(s => 'allowed' in s && !s.allowed).length,
       firstRemaining: samples[0] && 'remaining' in samples[0] ? samples[0].remaining : null,
       lastRemaining: samples[samples.length - 1] && 'remaining' in samples[samples.length - 1] ? (samples[samples.length - 1] as { remaining?: number }).remaining : null,
       upstashConfigured: !!env.upstash.restUrl.trim() && !!env.upstash.restToken.trim(),
