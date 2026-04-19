@@ -64,7 +64,6 @@ export async function GET(req: Request) {
     ok: true,
     cutoffIso,
     stories: { expired: 0, storageRemoved: 0, deletedRows: 0 },
-    chat: { expiredMessages: 0, storageRemoved: 0, deletedRows: 0 },
     direct: { expiredMessages: 0, storageRemoved: 0, deletedRows: 0 },
   }
 
@@ -97,7 +96,9 @@ export async function GET(req: Request) {
     metadata: { cutoffIso, deleted: result.stories.deletedRows },
   })
 
-  const cleanupChatTable = async (table: 'messages' | 'direct_messages', bucket: 'chat-media') => {
+  // Cleanup only runs on direct_messages — the old `messages` table was
+  // deleted in migration 20260419200000 (chat_channels dead system removed).
+  const cleanupChatTable = async (table: 'direct_messages', bucket: 'chat-media') => {
     const { data: rows, error: selErr } = await admin
       .from(table)
       .select('id, content, created_at')
@@ -130,27 +131,20 @@ export async function GET(req: Request) {
     if (paths.length) {
       for (const part of chunk(Array.from(new Set(paths)), 100)) {
         const { data } = await admin.storage.from(bucket).remove(part)
-        const removed = Array.isArray(data) ? data.length : 0
-        if (table === 'messages') result.chat.storageRemoved += removed
-        else result.direct.storageRemoved += removed
+        result.direct.storageRemoved += Array.isArray(data) ? data.length : 0
       }
     }
 
     if (ids.length) {
       for (const part of chunk(ids, 100)) {
         const { error } = await admin.from(table).delete().in('id', part)
-        if (!error) {
-          if (table === 'messages') result.chat.deletedRows += part.length
-          else result.direct.deletedRows += part.length
-        }
+        if (!error) result.direct.deletedRows += part.length
       }
     }
 
-    if (table === 'messages') result.chat.expiredMessages += ids.length
-    else result.direct.expiredMessages += ids.length
+    result.direct.expiredMessages += ids.length
   }
 
-  await cleanupChatTable('messages', 'chat-media')
   await cleanupChatTable('direct_messages', 'chat-media')
 
   await admin.from('audit_events').insert({
@@ -159,7 +153,6 @@ export async function GET(req: Request) {
     entity_type: 'cron',
     metadata: {
       cutoffIso,
-      messagesDeleted: result.chat.deletedRows,
       directDeleted: result.direct.deletedRows,
     },
   })

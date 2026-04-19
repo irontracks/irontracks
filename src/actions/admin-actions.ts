@@ -488,8 +488,7 @@ export async function exportAllData(): Promise<AdminResult & { data?: unknown }>
         const { data: students } = await adminDb.from('students').select('*').limit(2000)
         const { data: assessments } = await adminDb.from('assessments').select('*').limit(2000)
         const { data: notifications } = await adminDb.from('notifications').select('*').limit(5000)
-        const { data: chat_channels } = await adminDb.from('chat_channels').select('*').limit(1000)
-        const { data: messages } = await adminDb.from('messages').select('*').limit(5000)
+        // chat_channels + messages removed — dead system deleted in 20260419200000
         const { data: invites } = await adminDb.from('invites').select('*').limit(1000)
         const { data: team_sessions } = await adminDb.from('team_sessions').select('*').limit(1000)
 
@@ -506,8 +505,6 @@ export async function exportAllData(): Promise<AdminResult & { data?: unknown }>
             students: students || [],
             assessments: assessments || [],
             notifications: notifications || [],
-            chat_channels: chat_channels || [],
-            messages: messages || [],
             invites: invites || [],
             team_sessions: team_sessions || [],
             workouts: (Array.isArray(workouts) ? workouts : []).map((w: Record<string, unknown>) => ({
@@ -562,22 +559,12 @@ export async function importAllData(json: Record<string, unknown>): Promise<Admi
         const students = toRows(json?.students)
         const assessments = toRows(json?.assessments)
         const notifications = toRows(json?.notifications)
-        const chat_channels = toRows(json?.chat_channels)
-        const messages = toRows(json?.messages)
         const invites = toRows(json?.invites)
         const team_sessions = toRows(json?.team_sessions)
         const workouts = Array.isArray(json?.workouts) ? (json.workouts as AnyRow[]) : []
 
         const totalRecords = profiles.length + teachers.length + students.length + assessments.length + workouts.length
         if (totalRecords === 0) return { error: 'Nenhum dado válido encontrado no arquivo de importação.' }
-
-        if (chat_channels.length) {
-            const batchSize = 500
-            for (let i = 0; i < chat_channels.length; i += batchSize) {
-                const batch = chat_channels.slice(i, i + batchSize)
-                await adminDb.from('chat_channels').upsert(batch, { onConflict: 'id' })
-            }
-        }
 
         if (team_sessions.length) {
             const batchSize = 500
@@ -772,14 +759,6 @@ export async function importAllData(json: Record<string, unknown>): Promise<Admi
             for (let i = 0; i < notifications.length; i += batchSize) {
                 const batch = notifications.slice(i, i + batchSize)
                 await adminDb.from('notifications').upsert(batch, { onConflict: 'id' })
-            }
-        }
-
-        if (messages.length) {
-            const batchSize = 500
-            for (let i = 0; i < messages.length; i += batchSize) {
-                const batch = messages.slice(i, i + batchSize)
-                await adminDb.from('messages').upsert(batch, { onConflict: 'id' })
             }
         }
 
