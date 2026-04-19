@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { sendPushToAllPlatforms as sendPushToUsers } from '@/lib/push/sender'
+import { logError } from '@/lib/logger'
 
 export const dynamic = 'force-dynamic'
 
@@ -51,10 +52,15 @@ export async function POST(req: Request) {
     // Only allow the notification if sender and receiver already share a private
     // channel (i.e. the invite was accepted). Otherwise any authenticated user
     // could post in-app notifications to any user_id (phishing vector).
-    const { data: shares } = await admin.rpc('users_share_private_channel', {
+    const { data: shares, error: sharesError } = await admin.rpc('users_share_private_channel', {
       p_a: user.id,
       p_b: receiverId,
     })
+
+    if (sharesError) {
+      logError('notifications:direct-message', 'users_share_private_channel RPC failed:', sharesError)
+      return NextResponse.json({ ok: false, error: 'internal_error' }, { status: 500 })
+    }
 
     if (shares !== true) {
       return NextResponse.json({ ok: false, error: 'forbidden' }, { status: 403 })
