@@ -13,6 +13,7 @@ import { NextResponse, NextRequest } from 'next/server'
 import { requireRole } from '@/utils/auth/route'
 import { checkRateLimitAsync, RATE_LIMIT_BACKEND, getRequestIp } from '@/utils/rateLimit'
 import { env } from '@/utils/env'
+import { randomBytes } from 'crypto'
 
 export const dynamic = 'force-dynamic'
 
