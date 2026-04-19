@@ -490,6 +490,14 @@ const ChatScreen = ({ user, onClose }: ChatScreenProps) => {
             await loadData();
         } catch (e) {
             logError('error', e);
+            const raw = (getErrorMessage(e) ?? '').toUpperCase();
+            let userMsg = 'Não foi possível aceitar o convite. Tente novamente.';
+            if (raw.includes('INVITE_NOT_FOUND')) userMsg = 'Este convite não existe mais.';
+            else if (raw.includes('INVITE_NOT_PENDING')) userMsg = 'Este convite já foi processado.';
+            else if (raw.includes('FORBIDDEN')) userMsg = 'Você não tem permissão para aceitar este convite.';
+            else if (raw.includes('SELF_INVITE')) userMsg = 'Não é possível aceitar um convite enviado a si mesmo.';
+            else if (raw.includes('UNAUTHENTICATED')) userMsg = 'Sessão inválida. Faça login novamente.';
+            await alertRef.current(userMsg);
         }
     };
 
