@@ -54,7 +54,7 @@ const BASE_STEPS: TourStep[] = [
 const COMMUNITY_STEP: TourStep = {
   id: 'community',
   emoji: '🤝',
-  title: 'Iron Lounge',
+  title: 'Comunidade',
   body: 'Conecte-se com outros atletas. Curta conquistas, troque experiências e faça parte de uma comunidade de alta performance.',
 }
 

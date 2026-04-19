@@ -12,7 +12,6 @@ import {
   LogOut,
   MessageSquare,
   Sparkles,
-  Users,
   Crown,
 } from 'lucide-react'
 import { isIosNative } from '@/utils/platform'
@@ -30,7 +29,6 @@ interface HeaderActionsMenuProps {
   onAddStory?: () => void       // ← opens story creator on long press
   onOpenAdmin?: () => void
   onOpenChatList?: () => void
-  onOpenGlobalChat?: () => void
   onOpenHistory?: () => void
   onOpenNotifications?: () => void
   onLogout?: () => void
@@ -127,7 +125,6 @@ export default function HeaderActionsMenu({
   onAddStory,
   onOpenAdmin,
   onOpenChatList,
-  onOpenGlobalChat,
   onOpenHistory,
   onOpenNotifications,
   onLogout,
@@ -379,11 +376,6 @@ export default function HeaderActionsMenu({
                   ) : undefined
                 }
                 onClick={() => { onOpenChatList?.(); close() }}
-              />
-              <MenuItem
-                icon={<Users size={14} className="text-neutral-400" />}
-                label="Iron Lounge"
-                onClick={() => { onOpenGlobalChat?.(); close() }}
               />
 
               <Divider />
