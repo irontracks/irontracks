@@ -35,9 +35,13 @@ const getStore = (): Map<string, Entry> => {
  * The `X-Forwarded-For` header is read **right-to-left** by this depth so that
  * a client cannot spoof its IP by injecting extra values at the left of the list.
  *
+ * Example with depth=1 and XFF = "realClient, vercelEdge":
+ *   → skip 1 rightmost trusted proxy (vercelEdge) → take parts[parts.length - 1 - 1]
+ *     = parts[0] = "realClient"
+ *
  * Example with depth=1 and XFF = "attacker, realClient, vercelEdge":
- *   → we take index -(1) from the right = "vercelEdge" wait, depth of 1 means
- *     the rightmost proxy is trusted, so we take the IP *before* it = "realClient".
+ *   → skip 1 rightmost trusted proxy → take parts[3 - 1 - 1] = parts[1] = "realClient"
+ *     (attacker at the leftmost is untrusted and ignored)
  */
 const TRUSTED_PROXY_DEPTH = env.security.trustedProxyDepth
 
@@ -50,9 +54,15 @@ export const getRequestIp = (req: Request): string => {
     if (xff) {
       const parts = xff.split(',').map((s) => s.trim()).filter(Boolean)
       // Take the IP that is TRUSTED_PROXY_DEPTH positions from the right end.
-      // e.g. depth=1 → skip the rightmost (the edge proxy itself) → take parts[parts.length - 1 - 1]
+      // e.g. depth=1 → skip 1 rightmost proxy → take parts[parts.length - 1 - 1].
       // If depth >= parts.length we fall back to the leftmost IP (best effort).
-      const idx = Math.max(0, parts.length - 1 - (TRUSTED_PROXY_DEPTH - 1))
+      //
+      // Off-by-one fix: previous version had `-(TRUSTED_PROXY_DEPTH - 1)` which
+      // for depth=1 degraded to taking the rightmost proxy itself — the Vercel
+      // edge IP, which varies per request/POP. That meant every request from
+      // the same client was bucketed separately, silently breaking rate-limit
+      // against burst attacks. See Finding #54 in the repo history.
+      const idx = Math.max(0, parts.length - 1 - TRUSTED_PROXY_DEPTH)
       const candidate = parts[idx] ?? ''
       if (IP_RE.test(candidate)) return candidate
     }
