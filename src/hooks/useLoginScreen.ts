@@ -105,6 +105,7 @@ export function useLoginScreen() {
     })
 
     const [errorMsg, setErrorMsg] = useState('')
+    const [successMsg, setSuccessMsg] = useState('')
     const [recoverCooldownUntil, setRecoverCooldownUntil] = useState(0)
     const [cooldownTick, setCooldownTick] = useState(0)
     const [recoveryCode, setRecoveryCode] = useState('')
@@ -269,7 +270,7 @@ export function useLoginScreen() {
     const handleEmailAuth = useCallback(async (e: React.FormEvent) => {
         e.preventDefault()
         if (authMode === 'recover' && recoverCooldownLeft > 0) { setErrorMsg(`Aguarde ${recoverCooldownLeft}s para tentar novamente.`); return }
-        setIsLoading(true); setErrorMsg('')
+        setIsLoading(true); setErrorMsg(''); setSuccessMsg('')
         let holdLoading = false
         try {
             const supabase = createClient()
@@ -319,7 +320,7 @@ export function useLoginScreen() {
                 // link before logging in. Redirecting to /wait-approval in that case
                 // would bounce them back to `/` with no feedback.
                 if (!signUpData?.session) {
-                    alert('Cadastro enviado com sucesso!\n\n1. Verifique seu e-mail e clique no link de confirmação.\n2. Aguarde a aprovação do administrador.\n3. Depois de aprovado, entre com o e-mail e senha cadastrados.')
+                    setSuccessMsg('Cadastro enviado com sucesso! Verifique seu e-mail para confirmar e aguarde a aprovação do administrador. Depois é só fazer login aqui.')
                     setAuthMode('login')
                     setEmailData(prev => ({ ...prev, password: '', confirmPassword: '' }))
                 } else {
@@ -381,6 +382,7 @@ export function useLoginScreen() {
     return {
         isLoading, setIsLoading,
         errorMsg, setErrorMsg,
+        successMsg, setSuccessMsg,
         authMode, setAuthMode,
         showNoAccountModal, setShowNoAccountModal,
         showPassword, setShowPassword,
