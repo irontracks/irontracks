@@ -47,6 +47,19 @@ export async function POST(req: Request) {
     }
 
     const admin = createAdminClient()
+
+    // Only allow the notification if sender and receiver already share a private
+    // channel (i.e. the invite was accepted). Otherwise any authenticated user
+    // could post in-app notifications to any user_id (phishing vector).
+    const { data: shares } = await admin.rpc('users_share_private_channel', {
+      p_a: user.id,
+      p_b: receiverId,
+    })
+
+    if (shares !== true) {
+      return NextResponse.json({ ok: false, error: 'forbidden' }, { status: 403 })
+    }
+
     const { data: prefRow } = await admin
       .from('user_settings')
       .select('preferences')
