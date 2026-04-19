@@ -160,10 +160,8 @@ export async function canUploadToChatMediaPath(userId: string, channelId: string
     if (direct?.id) return true
   } catch (e) { logError('canUploadToChatMediaPath.directChannel', e) }
 
-  try {
-    const { data: member } = await admin.from('chat_members').select('id').eq('channel_id', cid).eq('user_id', uid).maybeSingle()
-    if (member?.id) return true
-  } catch (e) { logError('canUploadToChatMediaPath.chatMember', e) }
+  // chat_members fallback removed — the chat_channels system was deleted in
+  // migration 20260419200000. The only active chat uses direct_channels.
 
   return false
 }
