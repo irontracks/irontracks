@@ -38,7 +38,6 @@ interface DashboardHeaderProps {
     onOpenVip: () => void
     onOpenAdmin: () => void
     onOpenChatList: () => void
-    onOpenGlobalChat: () => void
     onOpenHistory: () => void
     onOpenNotifications: () => void
     onOpenSchedule: () => void
@@ -72,7 +71,7 @@ export function DashboardHeader({
     isCoach, user, hasUnreadChat, hasUnreadNotification, hasActiveStory,
     hideVipOnIos, vipAccess, syncState, userSettings,
     isHeaderVisible, coachPending,
-    onGoHome, onOpenVip, onOpenAdmin, onOpenChatList, onOpenGlobalChat,
+    onGoHome, onOpenVip, onOpenAdmin, onOpenChatList,
     onOpenHistory, onOpenNotifications, onOpenSchedule, onOpenWallet,
     onOpenSettings, onOpenTour, onOpenProfile, onLogout, onOfflineSyncOpen, onAcceptCoach,
     onAddStory,
@@ -157,7 +156,6 @@ export function DashboardHeader({
                         onAddStory={onAddStory}
                         onOpenAdmin={onOpenAdmin}
                         onOpenChatList={onOpenChatList}
-                        onOpenGlobalChat={onOpenGlobalChat}
                         onOpenHistory={onOpenHistory}
                         onOpenNotifications={onOpenNotifications}
                         onOpenSchedule={onOpenSchedule}

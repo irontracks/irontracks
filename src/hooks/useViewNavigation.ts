@@ -55,16 +55,8 @@ export function useViewNavigation({
     startViewTransition(() => setView('history'))
   }, [startViewTransition, setView])
 
-  const handleOpenChat = useCallback(() => {
-    startViewTransition(() => setView('chat'))
-  }, [startViewTransition, setView])
-
   const handleOpenChatList = useCallback(() => {
     startViewTransition(() => setView('chatList'))
-  }, [startViewTransition, setView])
-
-  const handleOpenGlobalChat = useCallback(() => {
-    startViewTransition(() => setView('globalChat'))
   }, [startViewTransition, setView])
 
   const handleOpenNotifications = useCallback(() => {
@@ -84,9 +76,7 @@ export function useViewNavigation({
     startViewTransition,
     openVipView,
     handleOpenHistory,
-    handleOpenChat,
     handleOpenChatList,
-    handleOpenGlobalChat,
     handleOpenNotifications,
     handleOpenTour,
   }

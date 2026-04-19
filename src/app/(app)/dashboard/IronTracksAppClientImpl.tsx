@@ -15,7 +15,6 @@ import { DashboardHeader } from './DashboardHeader';
 
 // Heavy components — loaded only when needed
 const AdminPanelV2 = dynamic(() => import('@/components/AdminPanelV2'), { ssr: false });
-const ChatScreen = dynamic(() => import('@/components/ChatScreen'), { ssr: false });
 const ChatListScreen = dynamic(() => import('@/components/ChatListScreen'), { ssr: false });
 const ChatDirectScreen = dynamic(() => import('@/components/ChatDirectScreen'), { ssr: false });
 const HistoryList = dynamic(() => import('@/components/HistoryList'), { ssr: false });
@@ -487,9 +486,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         hideVipOnIos,
         openVipView,
         handleOpenHistory,
-        handleOpenChat,
         handleOpenChatList,
-        handleOpenGlobalChat,
         handleOpenNotifications,
         handleOpenTour,
     } = useViewNavigation({
@@ -646,7 +643,6 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
             <InAppNotificationsProvider
                 userId={user?.id || undefined}
                 settings={userSettingsApi?.settings ?? null}
-                onOpenMessages={handleOpenChat}
                 onOpenNotifications={handleOpenNotifications}
             >
                 <InAppNotifyBinder bind={bindInAppNotify} />
@@ -695,7 +691,6 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                             onOpenVip={openVipView}
                             onOpenAdmin={handleOpenAdmin}
                             onOpenChatList={handleOpenChatList}
-                            onOpenGlobalChat={handleOpenGlobalChat}
                             onOpenHistory={handleOpenHistory}
                             onOpenNotifications={handleOpenNotifications}
                             onOpenSchedule={() => router.push('/dashboard/schedule')}
@@ -938,22 +933,6 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                 </div>
                             )}
                             {/* Export modal + OpenStudent modal rendered by DashboardModals */}
-
-                            {view === 'chat' && (
-                                <div className="absolute inset-0 z-50 bg-neutral-900">
-                                    <SectionErrorBoundary section="Chat" fullScreen onReset={() => setView('dashboard')}>
-                                        <ChatScreen user={user as AdminUser} onClose={() => setView('dashboard')} />
-                                    </SectionErrorBoundary>
-                                </div>
-                            )}
-
-                            {view === 'globalChat' && (
-                                <div className="absolute inset-0 z-50 bg-neutral-900">
-                                    <SectionErrorBoundary section="Chat Global" fullScreen onReset={() => setView('dashboard')}>
-                                        <ChatScreen user={user as AdminUser} onClose={() => setView('dashboard')} />
-                                    </SectionErrorBoundary>
-                                </div>
-                            )}
 
                             {view === 'chatList' && (
                                 <div className="absolute inset-0 z-50 bg-neutral-900">

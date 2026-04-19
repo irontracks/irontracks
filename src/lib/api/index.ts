@@ -11,7 +11,6 @@ export { ApiError, apiFetch, apiGet, apiPost } from './_fetch'
 export type { ApiResponse } from './_fetch'
 
 export { apiChat } from './chat'
-export type { ChatMessage, SendMessagePayload, MessagesResult, GlobalChannelResult } from './chat'
 
 export { apiStorage } from './storage'
 export type { SignedUploadResult, PrepareVideoResult } from './storage'
