@@ -110,7 +110,9 @@ android/capacitor-cordova-android-plugins/
 /rc-*.yml
 
 # ios-native (Tuist) generated files and Xcode user state
-ios-native/Derived/
+ios-native/**/Derived/
 ios-native/**/xcuserdata/
 ios-native/**/xcshareddata/swiftpm/
 ios-native/DerivedData/
+ios-native/build/
+ios-native/.build/
