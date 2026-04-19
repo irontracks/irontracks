@@ -320,6 +320,7 @@ export default function AssessmentButton({
             accept="application/json"
             className="hidden"
             onChange={handleImportFileChange}
+            aria-label="Importar arquivo JSON de avaliação"
           />
           {!isIosNativeApp ? (
             <input
@@ -329,6 +330,7 @@ export default function AssessmentButton({
               multiple
               className="hidden"
               onChange={handleScanFileChange}
+              aria-label="Escanear avaliação (foto ou PDF)"
             />
           ) : null}
         </div>
@@ -397,6 +399,7 @@ export default function AssessmentButton({
           multiple
           className="hidden"
           onChange={handleScanFileChange}
+          aria-label="Escanear avaliação (foto ou PDF)"
         />
       ) : null}
     </div>

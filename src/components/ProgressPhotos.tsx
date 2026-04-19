@@ -243,7 +243,6 @@ function UploadModal({ onClose, onUploaded }: UploadModalProps) {
             </button>
           )}
 
-          {/* eslint-disable-next-line jsx-a11y/control-has-associated-label */}
           <input
             ref={fileRef}
             type="file"
@@ -251,6 +250,7 @@ function UploadModal({ onClose, onUploaded }: UploadModalProps) {
             capture="environment"
             className="hidden"
             onChange={handleChange}
+            aria-label="Selecionar foto de progresso"
           />
 
           {/* Kind selector */}
