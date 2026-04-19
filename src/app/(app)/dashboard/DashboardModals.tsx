@@ -205,7 +205,7 @@ export default function DashboardModals(props: DashboardModalsProps) {
                             <button type="button" onClick={() => setShowCompleteProfile(false)} className="w-9 h-9 rounded-full bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center text-neutral-400 hover:text-white transition-colors" aria-label="Fechar"><X size={18} /></button>
                         </div>
                         <label className="block text-xs font-bold uppercase tracking-widest text-neutral-500 mb-2">Nome de Exibição</label>
-                        <input value={profileDraftName} onChange={(e) => setProfileDraftName(e.target.value)} placeholder="Ex: João Silva" className="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-yellow-500" />
+                        <input value={profileDraftName} onChange={(e) => setProfileDraftName(e.target.value)} placeholder="Ex: João Silva" className="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-yellow-500"  aria-label="Ex: João Silva"/>
                         <div className="flex gap-2 mt-5">
                             <button type="button" onClick={() => setShowCompleteProfile(false)} disabled={savingProfile} className="flex-1 p-3 bg-neutral-800 rounded-xl font-bold text-neutral-300 disabled:opacity-50">Cancelar</button>
                             <button type="button" onClick={handleSaveProfile} disabled={savingProfile} className="flex-1 p-3 bg-yellow-500 rounded-xl font-black text-black disabled:opacity-50">{savingProfile ? 'Salvando...' : 'Salvar'}</button>
@@ -219,7 +219,7 @@ export default function DashboardModals(props: DashboardModalsProps) {
                 <div className="fixed inset-0 z-[70] bg-black/80 flex items-center justify-center p-4">
                     <div className="bg-neutral-900 p-6 rounded-2xl w-full max-w-sm border border-neutral-800">
                         <h3 className="font-bold text-white mb-4">Importar Treino (Código)</h3>
-                        <input value={importCode} onChange={e => setImportCode(e.target.value)} placeholder="Cole o código do treino aqui" className="w-full bg-neutral-800 p-4 rounded-xl mb-4 text-white font-mono text-center uppercase" />
+                        <input value={importCode} onChange={e => setImportCode(e.target.value)} placeholder="Cole o código do treino aqui" className="w-full bg-neutral-800 p-4 rounded-xl mb-4 text-white font-mono text-center uppercase"  aria-label="Cole o código do treino aqui"/>
                         <div className="flex gap-2">
                             <button onClick={() => setShowImportModal(false)} className="flex-1 p-3 bg-neutral-800 rounded-xl font-bold text-neutral-400">Cancelar</button>
                             <button onClick={handleImportWorkout} className="flex-1 p-3 bg-blue-600 rounded-xl font-bold text-white">Importar</button>
@@ -237,7 +237,7 @@ export default function DashboardModals(props: DashboardModalsProps) {
                         <p className="text-neutral-400 text-sm mb-6">Selecione o arquivo .json que você salvou anteriormente.</p>
                         <label className="block w-full cursor-pointer bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-xl transition-colors">
                             Selecionar Arquivo
-                            <input type="file" accept=".json" onChange={handleJsonUpload} className="hidden" />
+                            <input type="file" accept=".json" onChange={handleJsonUpload} className="hidden" aria-label="Selecionar arquivo de backup JSON" />
                         </label>
                         <button onClick={() => setShowJsonImportModal(false)} className="mt-4 text-neutral-500 text-sm hover:text-white">Cancelar</button>
                     </div>
@@ -622,7 +622,7 @@ export default function DashboardModals(props: DashboardModalsProps) {
                                         value={String((preCheckinDraft as Record<string, unknown>)?.weight ?? '')}
                                         onChange={(e) => setPreCheckinDraft({ ...(preCheckinDraft || {}), weight: e.target.value })}
                                         className="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-yellow-500"
-                                    />
+                                     aria-label="Ex: 85.0"/>
                                     <p className="mt-1.5 text-[11px] text-yellow-500/70 leading-snug">
                                         ⚡ Preencher melhora a precisão do gasto calórico no relatório final.
                                     </p>

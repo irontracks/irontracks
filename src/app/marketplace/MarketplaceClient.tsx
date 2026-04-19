@@ -668,19 +668,19 @@ export default function MarketplaceClient() {
                       placeholder="Nome completo"
                       value={payerName}
                       onChange={(e) => setPayerName(e.target.value)}
-                    />
+                     aria-label="Nome completo"/>
                     <input
                       className="w-full rounded-xl bg-neutral-950 border border-neutral-800 px-4 py-3 text-white font-medium focus:outline-none focus:border-yellow-500 transition-colors"
                       placeholder="Celular (DDD + número)"
                       value={mobilePhone}
                       onChange={(e) => setMobilePhone(e.target.value)}
-                    />
+                     aria-label="Celular (DDD + número)"/>
                     <input
                       className="w-full rounded-xl bg-neutral-950 border border-neutral-800 px-4 py-3 text-white font-medium focus:outline-none focus:border-yellow-500 transition-colors"
                       placeholder="CPF ou CNPJ"
                       value={cpfCnpj}
                       onChange={(e) => setCpfCnpj(e.target.value)}
-                    />
+                     aria-label="CPF ou CNPJ"/>
                   </div>
 
                   <div className="space-y-3 pt-2">

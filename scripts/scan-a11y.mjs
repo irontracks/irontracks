@@ -128,16 +128,50 @@ for (const filePath of allFiles) {
 
     // ── 3. <input> sem label associado ───────────────────────────────────────
     if (!ONLY_CRIT) {
-        const inputRe = /<input\b([^>]*?)(?:\/>|>)/gs
-        while ((m = inputRe.exec(source)) !== null) {
-            const attrs   = m[1]
-            const lineNum = source.slice(0, m.index).split('\n').length
+        // Brace-aware extractor — respeita expressões JSX {(e) => ...} dentro
+        // dos atributos, que continham `>` e quebravam o regex anterior.
+        const collectInputAttrs = () => {
+            const out = []
+            let i = 0
+            while (i < source.length) {
+                const idx = source.indexOf('<input', i)
+                if (idx === -1) break
+                const next = source[idx + 6]
+                if (next && /[A-Za-z0-9]/.test(next)) { i = idx + 6; continue }
+                let j = idx + 6
+                let depth = 0
+                let inStr = null
+                while (j < source.length) {
+                    const c = source[j]
+                    if (inStr) {
+                        if (c === '\\') { j += 2; continue }
+                        if (c === inStr) inStr = null
+                        j++; continue
+                    }
+                    if (c === '"' || c === "'" || c === '`') { inStr = c; j++; continue }
+                    if (c === '{') { depth++; j++; continue }
+                    if (c === '}') { depth--; j++; continue }
+                    if (depth === 0 && c === '>') {
+                        out.push({
+                            attrs: source.slice(idx + 6, j),
+                            lineNum: source.slice(0, idx).split('\n').length,
+                        })
+                        i = j + 1
+                        break
+                    }
+                    j++
+                }
+                if (j >= source.length) break
+            }
+            return out
+        }
 
+        for (const { attrs, lineNum } of collectInputAttrs()) {
             // Pula: hidden, checkbox/radio (geralmente embrulhados em label)
             if (/type=\{?['"`]hidden['"`]\}?/.test(attrs)) continue
             if (/type=\{?['"`](?:checkbox|radio)['"`]\}?/.test(attrs)) continue
 
-            const hasLabel = /aria-label=|aria-labelledby=|id=/.test(attrs)
+            const hasLabel = /aria-label=|aria-labelledby=|\bid=/.test(attrs)
             const hasSpread = attrs.includes('{...')
             if (!hasLabel && !hasSpread) {
                 findings.push({

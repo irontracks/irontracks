@@ -390,7 +390,7 @@ export default function CoachChatModal({
                                 className="flex-1 rounded-xl px-4 py-3 text-white placeholder:text-neutral-500 focus:outline-none transition-all"
                                 style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}
                                 disabled={isLoading}
-                            />
+                             aria-label="Digite sua mensagem..."/>
                             <button
                                 onClick={handleSend}
                                 disabled={!input.trim() || isLoading}
