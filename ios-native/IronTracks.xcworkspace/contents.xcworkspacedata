@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Workspace
+   version = "1.0">
+   <FileRef
+      location = "group:IronTracks.xcodeproj">
+   </FileRef>
+   <Group
+      location = "group:Extensions"
+      name = "Extensions">
+      <FileRef
+         location = "group:IronTracksWatch/IronTracksWatch.xcodeproj">
+      </FileRef>
+      <FileRef
+         location = "group:IronTracksWidgets/IronTracksWidgets.xcodeproj">
+      </FileRef>
+      <FileRef
+         location = "group:NotificationService/NotificationService.xcodeproj">
+      </FileRef>
+   </Group>
+</Workspace>

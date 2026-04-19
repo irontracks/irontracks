@@ -1,0 +1,899 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 55;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		036AEA2029111DADE8A95D75 /* Health in Frameworks */ = {isa = PBXBuildFile; productRef = D521A3F3D6464A85D5C300D0 /* Health */; };
+		1893CC8D2C1B75854D9E25AD /* Settings in Frameworks */ = {isa = PBXBuildFile; productRef = B1B889DDB5E445196F358067 /* Settings */; };
+		1E09298A048C9817ED32E4D6 /* Analytics in Frameworks */ = {isa = PBXBuildFile; productRef = 7A288690C8E4E8C323D0BEFF /* Analytics */; };
+		20DC1FE10361F42286B404E8 /* Networking in Frameworks */ = {isa = PBXBuildFile; productRef = 1AC60023DDE8D8F5903C80CF /* Networking */; };
+		28C5CEC0EEE2E8DA74D71502 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5DED55E0E74FE984DC5CA185 /* ContentView.swift */; };
+		3BF9D42075172981A3EB8977 /* IronTracksAppTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = DA4D2BE750306541F0E5A1A6 /* IronTracksAppTests.swift */; };
+		3FA3A6ABEB77B6A3E01A5BD2 /* TuistAssets+IronTracks.swift in Sources */ = {isa = PBXBuildFile; fileRef = 806E3866504508B99AB2518D /* TuistAssets+IronTracks.swift */; };
+		449EB3FABB98B4428212A419 /* SupabaseClient in Frameworks */ = {isa = PBXBuildFile; productRef = EE8D6ECC1B0CE2AF9A39D499 /* SupabaseClient */; };
+		4D73128B6CB434251A0A6984 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = A33E65656B24A81DA952FCEE /* Assets.xcassets */; };
+		6262BC50114D5F046DA3BEC1 /* IronTracksWatch.app in Dependencies */ = {isa = PBXBuildFile; fileRef = BE60E88FE755276A9FA9C21A /* IronTracksWatch.app */; };
+		6B0C3FA77926D23ABB1462AD /* Nuke in Frameworks */ = {isa = PBXBuildFile; productRef = 03E7091A070A9B1590E00D7C /* Nuke */; };
+		702898EA05CBB723AEEB4FDA /* LiveActivities in Frameworks */ = {isa = PBXBuildFile; productRef = DF4810BA104185CEEFE5B3D1 /* LiveActivities */; };
+		71515BECBDFEB1AB60EAFCA0 /* Nutrition in Frameworks */ = {isa = PBXBuildFile; productRef = E399D623086AE82DDD687824 /* Nutrition */; };
+		7174BA6FC1D327B89F6667CD /* TuistBundle+IronTracks.swift in Sources */ = {isa = PBXBuildFile; fileRef = 516592117C330B4C6C8D46C5 /* TuistBundle+IronTracks.swift */; };
+		74058F16175B3DA7BA5FB980 /* IronTracksWidgets.appex in Dependencies */ = {isa = PBXBuildFile; fileRef = 5F0CF9CB42F145F055DD879A /* IronTracksWidgets.appex */; };
+		794F0D199224D0C4B34D5E00 /* AuthFeature in Frameworks */ = {isa = PBXBuildFile; productRef = 02CB74099F35E9D0EC17DC5D /* AuthFeature */; };
+		899F6737FC81CD657F483339 /* IronTracksWidgets.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 5F0CF9CB42F145F055DD879A /* IronTracksWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		96E4D6BFE313937D23A905F3 /* Workouts in Frameworks */ = {isa = PBXBuildFile; productRef = 7C4FB95ABE93A90E1B1086DC /* Workouts */; };
+		A813306376C4559D10C9E5BC /* NotificationService.appex in Dependencies */ = {isa = PBXBuildFile; fileRef = 5EF55F3D8A4B32CACA8CF4A0 /* NotificationService.appex */; };
+		B8AE7BD07D2EF97F955CDF04 /* IronTracksApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = B07BD4823497320BF21C50E8 /* IronTracksApp.swift */; };
+		BC1E347A9118B32DC4B6611E /* DataStore in Frameworks */ = {isa = PBXBuildFile; productRef = AF7790A005214D26FB54D044 /* DataStore */; };
+		C5EA2524B69641709CDCD4AD /* VIP in Frameworks */ = {isa = PBXBuildFile; productRef = B49B3C640903726E027DAB19 /* VIP */; };
+		CA1FAE556A351AD1791F50AC /* RevenueCatWrapper in Frameworks */ = {isa = PBXBuildFile; productRef = 078ACCF57A51E1E52A69D1BD /* RevenueCatWrapper */; };
+		CCED7AA4510032AA6A53D0EC /* Dashboard in Frameworks */ = {isa = PBXBuildFile; productRef = 3F2224352376F69163BFFB53 /* Dashboard */; };
+		D90C5CB5826E72272E62C98B /* NotificationService.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 5EF55F3D8A4B32CACA8CF4A0 /* NotificationService.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		F22CEE90E49EF21154320ECD /* Shortcuts in Frameworks */ = {isa = PBXBuildFile; productRef = 98687851CDFAC41439F02EFC /* Shortcuts */; };
+		F6B4502BEC82FD7C6C05A2AE /* DesignSystem in Frameworks */ = {isa = PBXBuildFile; productRef = 8AD5D26B07287BAF35D845F1 /* DesignSystem */; };
+		F80CEDECF4D045835D5B7259 /* Social in Frameworks */ = {isa = PBXBuildFile; productRef = 453F8FFB14C071833374458A /* Social */; };
+		FB8FBDC23A737EC4B997E742 /* Watch in Frameworks */ = {isa = PBXBuildFile; productRef = DB5390B063F39B9C0743F7F2 /* Watch */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		86599DC653660470E1A17591 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = ABA5971A29F0590851F57880 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = A84F8F09333F4BE5757BDA88;
+			remoteInfo = IronTracks;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		43560A2EA607EC5DBD3E9CC3 /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		65AA69976F7A669889372B2D /* Embed Frameworks */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 10;
+			files = (
+			);
+			name = "Embed Frameworks";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		AE8F5DAB78786BFBBD8B25A7 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstSubfolderSpec = 13;
+			files = (
+				899F6737FC81CD657F483339 /* IronTracksWidgets.appex in Embed Foundation Extensions */,
+				D90C5CB5826E72272E62C98B /* NotificationService.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BC0C19F3BA48483DA651AE41 /* Dependencies */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 8;
+			dstSubfolderSpec = 16;
+			files = (
+				6262BC50114D5F046DA3BEC1 /* IronTracksWatch.app in Dependencies */,
+				74058F16175B3DA7BA5FB980 /* IronTracksWidgets.appex in Dependencies */,
+				A813306376C4559D10C9E5BC /* NotificationService.appex in Dependencies */,
+			);
+			name = Dependencies;
+			runOnlyForDeploymentPostprocessing = 1;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		1E07A98E5F01F421D7C86D4B /* IronTracksTests-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "IronTracksTests-Info.plist"; sourceTree = "<group>"; };
+		2479097917B75376D4F05F21 /* DataStore */ = {isa = PBXFileReference; lastKnownFileType = folder; name = DataStore; path = Packages/Core/DataStore; sourceTree = "<group>"; };
+		2715743DE521B8AE015B740E /* IronTracks.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = IronTracks.entitlements; sourceTree = "<group>"; };
+		3C37BC8522401A3A7C998A82 /* IronTracksTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = IronTracksTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		4485C71D09367098FBC7B317 /* Nutrition */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Nutrition; path = Packages/Features/Nutrition; sourceTree = "<group>"; };
+		4D9747F9D0684EE526ECEFCA /* VIP */ = {isa = PBXFileReference; lastKnownFileType = folder; name = VIP; path = Packages/Features/VIP; sourceTree = "<group>"; };
+		516592117C330B4C6C8D46C5 /* TuistBundle+IronTracks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TuistBundle+IronTracks.swift"; sourceTree = "<group>"; };
+		5441F05404EB625710286615 /* RCWrapper */ = {isa = PBXFileReference; lastKnownFileType = folder; name = RCWrapper; path = Packages/Core/RCWrapper; sourceTree = "<group>"; };
+		5AD41368F0000B738EC0B58E /* Analytics */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Analytics; path = Packages/Core/Analytics; sourceTree = "<group>"; };
+		5DED55E0E74FE984DC5CA185 /* ContentView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		5EF55F3D8A4B32CACA8CF4A0 /* NotificationService.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = NotificationService.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		5F0CF9CB42F145F055DD879A /* IronTracksWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = IronTracksWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		64B46453FE491A96EEDDBDF3 /* Settings */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Settings; path = Packages/Features/Settings; sourceTree = "<group>"; };
+		73735AD073D6EEAEBD6FE736 /* Health */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Health; path = Packages/Integrations/Health; sourceTree = "<group>"; };
+		7FA67605EB8443B704600300 /* IronTracks-Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist; path = "IronTracks-Info.plist"; sourceTree = "<group>"; };
+		806E3866504508B99AB2518D /* TuistAssets+IronTracks.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = "TuistAssets+IronTracks.swift"; sourceTree = "<group>"; };
+		86929C11218AC4D65F198C3A /* Workouts */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Workouts; path = Packages/Features/Workouts; sourceTree = "<group>"; };
+		978495CBB4DC98634FF6CFBC /* LiveActivities */ = {isa = PBXFileReference; lastKnownFileType = folder; name = LiveActivities; path = Packages/Integrations/LiveActivities; sourceTree = "<group>"; };
+		9D41A2B723250B1E85E71554 /* Networking */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Networking; path = Packages/Core/Networking; sourceTree = "<group>"; };
+		A33E65656B24A81DA952FCEE /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		A4621AAFE5523362311C4236 /* DesignSystem */ = {isa = PBXFileReference; lastKnownFileType = folder; name = DesignSystem; path = Packages/DesignSystem; sourceTree = "<group>"; };
+		A690904459673616D5E01A30 /* Watch */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Watch; path = Packages/Integrations/Watch; sourceTree = "<group>"; };
+		B07BD4823497320BF21C50E8 /* IronTracksApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IronTracksApp.swift; sourceTree = "<group>"; };
+		B65C10F43417C33DB8002BA6 /* IronTracks.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = IronTracks.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		BE60E88FE755276A9FA9C21A /* IronTracksWatch.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = IronTracksWatch.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		CE100069C9CD4B0C9F1E584E /* SupabaseClient */ = {isa = PBXFileReference; lastKnownFileType = folder; name = SupabaseClient; path = Packages/Core/SupabaseClient; sourceTree = "<group>"; };
+		D0A4229ADB1D9A082FAD3FD1 /* Social */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Social; path = Packages/Features/Social; sourceTree = "<group>"; };
+		D2FA1BF747002C833CD8929C /* Shortcuts */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Shortcuts; path = Packages/Integrations/Shortcuts; sourceTree = "<group>"; };
+		DA4D2BE750306541F0E5A1A6 /* IronTracksAppTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IronTracksAppTests.swift; sourceTree = "<group>"; };
+		E1C006A55AA6996DC5623259 /* Auth */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Auth; path = Packages/Features/Auth; sourceTree = "<group>"; };
+		F26B2275118587754425CE23 /* Dashboard */ = {isa = PBXFileReference; lastKnownFileType = folder; name = Dashboard; path = Packages/Features/Dashboard; sourceTree = "<group>"; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		500EA299A98BB0400493BBBC /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A494164C41EB13926D3332ED /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				6B0C3FA77926D23ABB1462AD /* Nuke in Frameworks */,
+				20DC1FE10361F42286B404E8 /* Networking in Frameworks */,
+				449EB3FABB98B4428212A419 /* SupabaseClient in Frameworks */,
+				BC1E347A9118B32DC4B6611E /* DataStore in Frameworks */,
+				CA1FAE556A351AD1791F50AC /* RevenueCatWrapper in Frameworks */,
+				1E09298A048C9817ED32E4D6 /* Analytics in Frameworks */,
+				F6B4502BEC82FD7C6C05A2AE /* DesignSystem in Frameworks */,
+				794F0D199224D0C4B34D5E00 /* AuthFeature in Frameworks */,
+				CCED7AA4510032AA6A53D0EC /* Dashboard in Frameworks */,
+				96E4D6BFE313937D23A905F3 /* Workouts in Frameworks */,
+				71515BECBDFEB1AB60EAFCA0 /* Nutrition in Frameworks */,
+				F80CEDECF4D045835D5B7259 /* Social in Frameworks */,
+				C5EA2524B69641709CDCD4AD /* VIP in Frameworks */,
+				1893CC8D2C1B75854D9E25AD /* Settings in Frameworks */,
+				036AEA2029111DADE8A95D75 /* Health in Frameworks */,
+				FB8FBDC23A737EC4B997E742 /* Watch in Frameworks */,
+				702898EA05CBB723AEEB4FDA /* LiveActivities in Frameworks */,
+				F22CEE90E49EF21154320ECD /* Shortcuts in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		0E7CFFC9034A6B13336F4162 /* Packages */ = {
+			isa = PBXGroup;
+			children = (
+				5AD41368F0000B738EC0B58E /* Analytics */,
+				E1C006A55AA6996DC5623259 /* Auth */,
+				F26B2275118587754425CE23 /* Dashboard */,
+				2479097917B75376D4F05F21 /* DataStore */,
+				A4621AAFE5523362311C4236 /* DesignSystem */,
+				73735AD073D6EEAEBD6FE736 /* Health */,
+				978495CBB4DC98634FF6CFBC /* LiveActivities */,
+				9D41A2B723250B1E85E71554 /* Networking */,
+				4485C71D09367098FBC7B317 /* Nutrition */,
+				5441F05404EB625710286615 /* RCWrapper */,
+				64B46453FE491A96EEDDBDF3 /* Settings */,
+				D2FA1BF747002C833CD8929C /* Shortcuts */,
+				D0A4229ADB1D9A082FAD3FD1 /* Social */,
+				CE100069C9CD4B0C9F1E584E /* SupabaseClient */,
+				4D9747F9D0684EE526ECEFCA /* VIP */,
+				A690904459673616D5E01A30 /* Watch */,
+				86929C11218AC4D65F198C3A /* Workouts */,
+			);
+			name = Packages;
+			sourceTree = "<group>";
+		};
+		32C6FDC7288C938979206EF9 /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				5DED55E0E74FE984DC5CA185 /* ContentView.swift */,
+				B07BD4823497320BF21C50E8 /* IronTracksApp.swift */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		37C3F441184683D92554AF26 /* Derived */ = {
+			isa = PBXGroup;
+			children = (
+				8C06B1966F72300162FBC244 /* Entitlements */,
+				A725CD5D1491F2803544B0AE /* InfoPlists */,
+				6BC78B766085BD622F405E8E /* Sources */,
+			);
+			path = Derived;
+			sourceTree = "<group>";
+		};
+		3A157EF8D0AF584A298F4CC4 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				B65C10F43417C33DB8002BA6 /* IronTracks.app */,
+				3C37BC8522401A3A7C998A82 /* IronTracksTests.xctest */,
+				BE60E88FE755276A9FA9C21A /* IronTracksWatch.app */,
+				5F0CF9CB42F145F055DD879A /* IronTracksWidgets.appex */,
+				5EF55F3D8A4B32CACA8CF4A0 /* NotificationService.appex */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		3D3C387846C0B06C628F6376 /* Project */ = {
+			isa = PBXGroup;
+			children = (
+				E18850F4B23EA91CB49A3706 /* App */,
+				37C3F441184683D92554AF26 /* Derived */,
+			);
+			name = Project;
+			sourceTree = "<group>";
+		};
+		6BC78B766085BD622F405E8E /* Sources */ = {
+			isa = PBXGroup;
+			children = (
+				806E3866504508B99AB2518D /* TuistAssets+IronTracks.swift */,
+				516592117C330B4C6C8D46C5 /* TuistBundle+IronTracks.swift */,
+			);
+			path = Sources;
+			sourceTree = "<group>";
+		};
+		8C06B1966F72300162FBC244 /* Entitlements */ = {
+			isa = PBXGroup;
+			children = (
+				2715743DE521B8AE015B740E /* IronTracks.entitlements */,
+			);
+			path = Entitlements;
+			sourceTree = "<group>";
+		};
+		9BC36933A6EDC664C03FF5A9 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				A33E65656B24A81DA952FCEE /* Assets.xcassets */,
+			);
+			path = Resources;
+			sourceTree = "<group>";
+		};
+		A725CD5D1491F2803544B0AE /* InfoPlists */ = {
+			isa = PBXGroup;
+			children = (
+				7FA67605EB8443B704600300 /* IronTracks-Info.plist */,
+				1E07A98E5F01F421D7C86D4B /* IronTracksTests-Info.plist */,
+			);
+			path = InfoPlists;
+			sourceTree = "<group>";
+		};
+		E18850F4B23EA91CB49A3706 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				9BC36933A6EDC664C03FF5A9 /* Resources */,
+				32C6FDC7288C938979206EF9 /* Sources */,
+				FB6A7FE002AEEB0BB706DFB2 /* Tests */,
+			);
+			path = App;
+			sourceTree = "<group>";
+		};
+		F81D8CFFDFCA6C0202FB41C7 = {
+			isa = PBXGroup;
+			children = (
+				3A157EF8D0AF584A298F4CC4 /* Products */,
+				3D3C387846C0B06C628F6376 /* Project */,
+				0E7CFFC9034A6B13336F4162 /* Packages */,
+			);
+			sourceTree = "<group>";
+		};
+		FB6A7FE002AEEB0BB706DFB2 /* Tests */ = {
+			isa = PBXGroup;
+			children = (
+				DA4D2BE750306541F0E5A1A6 /* IronTracksAppTests.swift */,
+			);
+			path = Tests;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		71FDA9EBFA9BD61D5700E9D6 /* IronTracksTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 455023BBC6AB1C82F5A99160 /* Build configuration list for PBXNativeTarget "IronTracksTests" */;
+			buildPhases = (
+				A44E94203E579FDD7CB3BF3A /* Sources */,
+				7318B34C1029E6FCCDB3971B /* Resources */,
+				500EA299A98BB0400493BBBC /* Frameworks */,
+				65AA69976F7A669889372B2D /* Embed Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				93380B43958B781E69D0BD93 /* PBXTargetDependency */,
+			);
+			name = IronTracksTests;
+			packageProductDependencies = (
+			);
+			productName = IronTracksTests;
+			productReference = 3C37BC8522401A3A7C998A82 /* IronTracksTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		A84F8F09333F4BE5757BDA88 /* IronTracks */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 3D4F444D72E95936A529F6E0 /* Build configuration list for PBXNativeTarget "IronTracks" */;
+			buildPhases = (
+				784CAEB20E80D60B1B0FD403 /* Sources */,
+				8D3C4341522FEA09B824C403 /* Resources */,
+				AE8F5DAB78786BFBBD8B25A7 /* Embed Foundation Extensions */,
+				A494164C41EB13926D3332ED /* Frameworks */,
+				43560A2EA607EC5DBD3E9CC3 /* Embed Frameworks */,
+				BC0C19F3BA48483DA651AE41 /* Dependencies */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = IronTracks;
+			packageProductDependencies = (
+				03E7091A070A9B1590E00D7C /* Nuke */,
+				1AC60023DDE8D8F5903C80CF /* Networking */,
+				EE8D6ECC1B0CE2AF9A39D499 /* SupabaseClient */,
+				AF7790A005214D26FB54D044 /* DataStore */,
+				078ACCF57A51E1E52A69D1BD /* RevenueCatWrapper */,
+				7A288690C8E4E8C323D0BEFF /* Analytics */,
+				8AD5D26B07287BAF35D845F1 /* DesignSystem */,
+				02CB74099F35E9D0EC17DC5D /* AuthFeature */,
+				3F2224352376F69163BFFB53 /* Dashboard */,
+				7C4FB95ABE93A90E1B1086DC /* Workouts */,
+				E399D623086AE82DDD687824 /* Nutrition */,
+				453F8FFB14C071833374458A /* Social */,
+				B49B3C640903726E027DAB19 /* VIP */,
+				B1B889DDB5E445196F358067 /* Settings */,
+				D521A3F3D6464A85D5C300D0 /* Health */,
+				DB5390B063F39B9C0743F7F2 /* Watch */,
+				DF4810BA104185CEEFE5B3D1 /* LiveActivities */,
+				98687851CDFAC41439F02EFC /* Shortcuts */,
+			);
+			productName = IronTracks;
+			productReference = B65C10F43417C33DB8002BA6 /* IronTracks.app */;
+			productType = "com.apple.product-type.application";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		ABA5971A29F0590851F57880 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = YES;
+				ORGANIZATIONNAME = IronTracks;
+				TargetAttributes = {
+					71FDA9EBFA9BD61D5700E9D6 = {
+						TestTargetID = A84F8F09333F4BE5757BDA88;
+					};
+				};
+			};
+			buildConfigurationList = C852C07F9F9E6FA6B3BA3A72 /* Build configuration list for PBXProject "IronTracks" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				Base,
+				en,
+			);
+			mainGroup = F81D8CFFDFCA6C0202FB41C7;
+			packageReferences = (
+				54C27638ED70E7DFF7A5145C /* XCRemoteSwiftPackageReference "Nuke" */,
+				EF81DBA8642943486BFC9B77 /* XCLocalSwiftPackageReference "Packages/Core/Analytics" */,
+				F2D08CEF9B0AAD76CE6555A8 /* XCLocalSwiftPackageReference "Packages/Core/DataStore" */,
+				31FC505D1DE149EBBE312B52 /* XCLocalSwiftPackageReference "Packages/Core/Networking" */,
+				629622CD4CCAB0A3EBAD54F8 /* XCLocalSwiftPackageReference "Packages/Core/RCWrapper" */,
+				B5913CC971C02A452B896A23 /* XCLocalSwiftPackageReference "Packages/Core/SupabaseClient" */,
+				2D780D619069BA62CA24AA08 /* XCLocalSwiftPackageReference "Packages/DesignSystem" */,
+				46FD2B783E45AE4ED64D57F3 /* XCLocalSwiftPackageReference "Packages/Features/Auth" */,
+				EFEAA1A819CD8DA44E5BD95F /* XCLocalSwiftPackageReference "Packages/Features/Dashboard" */,
+				CF4C61B3535C61525F1FF6C9 /* XCLocalSwiftPackageReference "Packages/Features/Nutrition" */,
+				2E8D7C67338AC1A607FAF33D /* XCLocalSwiftPackageReference "Packages/Features/Settings" */,
+				450214EE1943F44FF897AEA3 /* XCLocalSwiftPackageReference "Packages/Features/Social" */,
+				70087F0BD3B7E181F0BB71A3 /* XCLocalSwiftPackageReference "Packages/Features/VIP" */,
+				1DC327E7266D4367D853E2C4 /* XCLocalSwiftPackageReference "Packages/Features/Workouts" */,
+				6BBFC495F0626B3FFBA60D4E /* XCLocalSwiftPackageReference "Packages/Integrations/Health" */,
+				7377A60F088F0956D2005DA4 /* XCLocalSwiftPackageReference "Packages/Integrations/LiveActivities" */,
+				B83375CFF9FDE2A7026D5608 /* XCLocalSwiftPackageReference "Packages/Integrations/Shortcuts" */,
+				5AE59179FE5D8CF9458ED1F4 /* XCLocalSwiftPackageReference "Packages/Integrations/Watch" */,
+			);
+			productRefGroup = 3A157EF8D0AF584A298F4CC4 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				A84F8F09333F4BE5757BDA88 /* IronTracks */,
+				71FDA9EBFA9BD61D5700E9D6 /* IronTracksTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		7318B34C1029E6FCCDB3971B /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		8D3C4341522FEA09B824C403 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				4D73128B6CB434251A0A6984 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		784CAEB20E80D60B1B0FD403 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				28C5CEC0EEE2E8DA74D71502 /* ContentView.swift in Sources */,
+				B8AE7BD07D2EF97F955CDF04 /* IronTracksApp.swift in Sources */,
+				3FA3A6ABEB77B6A3E01A5BD2 /* TuistAssets+IronTracks.swift in Sources */,
+				7174BA6FC1D327B89F6667CD /* TuistBundle+IronTracks.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		A44E94203E579FDD7CB3BF3A /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				3BF9D42075172981A3EB8977 /* IronTracksAppTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		93380B43958B781E69D0BD93 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = IronTracks;
+			target = A84F8F09333F4BE5757BDA88 /* IronTracks */;
+			targetProxy = 86599DC653660470E1A17591 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		00896C0A272E1F61486469ED /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = 5XLC55D3YR;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		55FF0FD5C3A25C3DD776A0A4 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Derived/Entitlements/IronTracks.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				ENABLE_PREVIEWS = YES;
+				INFOPLIST_FILE = "Derived/InfoPlists/IronTracks-Info.plist";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-L$(DT_TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME)",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.irontracks.app.native;
+				PRODUCT_NAME = IronTracks;
+				SDKROOT = iphoneos;
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = (
+					"$(inherited)",
+					DEBUG,
+				);
+				SWIFT_COMPILATION_MODE = singlefile;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		AB370A84288C7D157D026958 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_FILE = "Derived/InfoPlists/IronTracksTests-Info.plist";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-L$(DT_TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME)",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.irontracks.app.native.tests;
+				PRODUCT_NAME = IronTracksTests;
+				SDKROOT = iphoneos;
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/IronTracks.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/IronTracks";
+				TEST_TARGET_NAME = IronTracks;
+			};
+			name = Release;
+		};
+		C8D3605E9EB9907669E40002 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ANALYZER_LOCALIZABILITY_NONLOCALIZED = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++14";
+				CLANG_CXX_LIBRARY = "libc++";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				CODE_SIGN_STYLE = Automatic;
+				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = 5XLC55D3YR;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu11;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				MTL_ENABLE_DEBUG_INFO = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		DF0C4C9C21A54478474425DF /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = Derived/Entitlements/IronTracks.entitlements;
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				ENABLE_PREVIEWS = YES;
+				INFOPLIST_FILE = "Derived/InfoPlists/IronTracks-Info.plist";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-L$(DT_TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME)",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.irontracks.app.native;
+				PRODUCT_NAME = IronTracks;
+				SDKROOT = iphoneos;
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		ECCEB3D2F54ACCC73F496E83 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_IDENTITY = "iPhone Developer";
+				INFOPLIST_FILE = "Derived/InfoPlists/IronTracksTests-Info.plist";
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@loader_path/Frameworks",
+				);
+				OTHER_LDFLAGS = (
+					"$(inherited)",
+					"-L$(DT_TOOLCHAIN_DIR)/usr/lib/swift/$(PLATFORM_NAME)",
+				);
+				PRODUCT_BUNDLE_IDENTIFIER = com.irontracks.app.native.tests;
+				PRODUCT_NAME = IronTracksTests;
+				SDKROOT = iphoneos;
+				SUPPORTS_MACCATALYST = NO;
+				SUPPORTS_MAC_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SUPPORTS_XR_DESIGNED_FOR_IPHONE_IPAD = NO;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = (
+					"$(inherited)",
+					DEBUG,
+				);
+				SWIFT_COMPILATION_MODE = singlefile;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				TARGETED_DEVICE_FAMILY = "1,2";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/IronTracks.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/IronTracks";
+				TEST_TARGET_NAME = IronTracks;
+			};
+			name = Debug;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		3D4F444D72E95936A529F6E0 /* Build configuration list for PBXNativeTarget "IronTracks" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				55FF0FD5C3A25C3DD776A0A4 /* Debug */,
+				DF0C4C9C21A54478474425DF /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		455023BBC6AB1C82F5A99160 /* Build configuration list for PBXNativeTarget "IronTracksTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				ECCEB3D2F54ACCC73F496E83 /* Debug */,
+				AB370A84288C7D157D026958 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		C852C07F9F9E6FA6B3BA3A72 /* Build configuration list for PBXProject "IronTracks" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				C8D3605E9EB9907669E40002 /* Debug */,
+				00896C0A272E1F61486469ED /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		1DC327E7266D4367D853E2C4 /* XCLocalSwiftPackageReference "Packages/Features/Workouts" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/Features/Workouts;
+		};
+		2D780D619069BA62CA24AA08 /* XCLocalSwiftPackageReference "Packages/DesignSystem" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/DesignSystem;
+		};
+		2E8D7C67338AC1A607FAF33D /* XCLocalSwiftPackageReference "Packages/Features/Settings" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/Features/Settings;
+		};
+		31FC505D1DE149EBBE312B52 /* XCLocalSwiftPackageReference "Packages/Core/Networking" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/Core/Networking;
+		};
+		450214EE1943F44FF897AEA3 /* XCLocalSwiftPackageReference "Packages/Features/Social" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/Features/Social;
+		};
+		46FD2B783E45AE4ED64D57F3 /* XCLocalSwiftPackageReference "Packages/Features/Auth" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/Features/Auth;
+		};
+		5AE59179FE5D8CF9458ED1F4 /* XCLocalSwiftPackageReference "Packages/Integrations/Watch" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/Integrations/Watch;
+		};
+		629622CD4CCAB0A3EBAD54F8 /* XCLocalSwiftPackageReference "Packages/Core/RCWrapper" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/Core/RCWrapper;
+		};
+		6BBFC495F0626B3FFBA60D4E /* XCLocalSwiftPackageReference "Packages/Integrations/Health" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/Integrations/Health;
+		};
+		70087F0BD3B7E181F0BB71A3 /* XCLocalSwiftPackageReference "Packages/Features/VIP" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/Features/VIP;
+		};
+		7377A60F088F0956D2005DA4 /* XCLocalSwiftPackageReference "Packages/Integrations/LiveActivities" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/Integrations/LiveActivities;
+		};
+		B5913CC971C02A452B896A23 /* XCLocalSwiftPackageReference "Packages/Core/SupabaseClient" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/Core/SupabaseClient;
+		};
+		B83375CFF9FDE2A7026D5608 /* XCLocalSwiftPackageReference "Packages/Integrations/Shortcuts" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/Integrations/Shortcuts;
+		};
+		CF4C61B3535C61525F1FF6C9 /* XCLocalSwiftPackageReference "Packages/Features/Nutrition" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/Features/Nutrition;
+		};
+		EF81DBA8642943486BFC9B77 /* XCLocalSwiftPackageReference "Packages/Core/Analytics" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/Core/Analytics;
+		};
+		EFEAA1A819CD8DA44E5BD95F /* XCLocalSwiftPackageReference "Packages/Features/Dashboard" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/Features/Dashboard;
+		};
+		F2D08CEF9B0AAD76CE6555A8 /* XCLocalSwiftPackageReference "Packages/Core/DataStore" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = Packages/Core/DataStore;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCRemoteSwiftPackageReference section */
+		54C27638ED70E7DFF7A5145C /* XCRemoteSwiftPackageReference "Nuke" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/kean/Nuke.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 12.8.0;
+			};
+		};
+/* End XCRemoteSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		02CB74099F35E9D0EC17DC5D /* AuthFeature */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = AuthFeature;
+		};
+		03E7091A070A9B1590E00D7C /* Nuke */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = Nuke;
+		};
+		078ACCF57A51E1E52A69D1BD /* RevenueCatWrapper */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = RevenueCatWrapper;
+		};
+		1AC60023DDE8D8F5903C80CF /* Networking */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = Networking;
+		};
+		3F2224352376F69163BFFB53 /* Dashboard */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = Dashboard;
+		};
+		453F8FFB14C071833374458A /* Social */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = Social;
+		};
+		7A288690C8E4E8C323D0BEFF /* Analytics */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = Analytics;
+		};
+		7C4FB95ABE93A90E1B1086DC /* Workouts */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = Workouts;
+		};
+		8AD5D26B07287BAF35D845F1 /* DesignSystem */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = DesignSystem;
+		};
+		98687851CDFAC41439F02EFC /* Shortcuts */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = Shortcuts;
+		};
+		AF7790A005214D26FB54D044 /* DataStore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = DataStore;
+		};
+		B1B889DDB5E445196F358067 /* Settings */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = Settings;
+		};
+		B49B3C640903726E027DAB19 /* VIP */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = VIP;
+		};
+		D521A3F3D6464A85D5C300D0 /* Health */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = Health;
+		};
+		DB5390B063F39B9C0743F7F2 /* Watch */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = Watch;
+		};
+		DF4810BA104185CEEFE5B3D1 /* LiveActivities */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = LiveActivities;
+		};
+		E399D623086AE82DDD687824 /* Nutrition */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = Nutrition;
+		};
+		EE8D6ECC1B0CE2AF9A39D499 /* SupabaseClient */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = SupabaseClient;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = ABA5971A29F0590851F57880 /* Project object */;
+}
