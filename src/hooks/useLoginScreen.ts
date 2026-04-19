@@ -307,13 +307,26 @@ export function useLoginScreen() {
                 }
                 // Step 2: Create auth user — the whitelist trigger will now find the pending
                 // access_request and allow the insert.
-                const { error: signUpError } = await supabase.auth.signUp({
+                const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
                     email, password,
                     options: { data: { full_name: emailData.fullName, display_name: emailData.fullName, phone: emailData.phone, birth_date: emailData.birthDate, role_requested: isTeacher ? 'teacher' : 'student', cref: isTeacher ? cref : null } }
                 })
                 if (signUpError) throw signUpError
                 if (rememberMe) localStorage.setItem('it_remembered_email', email)
-                holdLoading = true; window.location.replace('/wait-approval')
+
+                // If Supabase has "Confirm email" enabled, signUp creates the user but
+                // does not return a session — the user needs to click the confirmation
+                // link before logging in. Redirecting to /wait-approval in that case
+                // would bounce them back to `/` with no feedback.
+                if (!signUpData?.session) {
+                    alert('Cadastro enviado com sucesso!\n\n1. Verifique seu e-mail e clique no link de confirmação.\n2. Aguarde a aprovação do administrador.\n3. Depois de aprovado, entre com o e-mail e senha cadastrados.')
+                    setAuthMode('login')
+                    setEmailData(prev => ({ ...prev, password: '', confirmPassword: '' }))
+                } else {
+                    // Email confirmation disabled in Supabase — user is logged in right away.
+                    holdLoading = true
+                    window.location.replace('/wait-approval')
+                }
             } else if (authMode === 'recover') {
                 const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: window.location.origin + '/auth/recovery' })
                 if (error) throw error
