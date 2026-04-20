@@ -5,6 +5,8 @@ import { useActiveWorkout } from './ActiveWorkoutContext';
 import { isObject, toNumber } from './utils';
 import { UnknownRecord } from './types';
 import { triggerHaptic } from '@/utils/native/irontracksNative';
+import { isPlank } from '@/utils/exerciseTracking';
+import { PlankSetInput } from './PlankSetInput';
 
 type Props = {
   ex: UnknownRecord;
@@ -24,6 +26,8 @@ export const SetInputRow: React.FC<Props> = ({ ex, exIdx, setIdx }) => {
     startTimer,
     HELP_TERMS,
   } = useActiveWorkout();
+
+  const exerciseName = String(ex?.name ?? '')
 
   const key = `${exIdx}-${setIdx}`;
   const log = getLog(key);
@@ -93,6 +97,11 @@ export const SetInputRow: React.FC<Props> = ({ ex, exIdx, setIdx }) => {
     }
     return () => timers.forEach(clearTimeout);
   }, [done]);
+
+  // Delegate to PlankSetInput for isometric exercises — must be after all hooks
+  if (isPlank(exerciseName)) {
+    return <PlankSetInput ex={ex} exIdx={exIdx} setIdx={setIdx} />
+  }
 
   // Shared input base class — unified palette (no RPE-specific color in idle state)
   const inputBase =
