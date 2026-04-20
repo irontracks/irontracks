@@ -1,6 +1,6 @@
 import React, { useState, useRef, useCallback } from 'react'
-import { Play, Square } from 'lucide-react'
-import { useActiveWorkout } from './ActiveWorkoutContext'
+import { Check, Play, Square } from 'lucide-react'
+import { useWorkoutContext } from './WorkoutContext'
 import { UnknownRecord } from './types'
 
 type Props = {
@@ -10,7 +10,7 @@ type Props = {
 }
 
 export const PlankSetInput: React.FC<Props> = ({ ex, exIdx, setIdx }) => {
-  const { getLog, updateLog, startTimer, getPlannedSet, settings } = useActiveWorkout()
+  const { getLog, updateLog, startTimer, getPlannedSet, settings } = useWorkoutContext()
 
   const key = `${exIdx}-${setIdx}`
   const weightInputId = `plank-weight-${key}`
@@ -82,6 +82,9 @@ export const PlankSetInput: React.FC<Props> = ({ ex, exIdx, setIdx }) => {
 
   const secondsNum = Number(targetSeconds)
   const canStart = Number.isFinite(secondsNum) && secondsNum > 0
+  const done = !!log.done
+  const loggedDuration =
+    typeof log.durationSeconds === 'number' && log.durationSeconds > 0 ? log.durationSeconds : null
 
   if (isRunning) {
     return (
@@ -101,11 +104,18 @@ export const PlankSetInput: React.FC<Props> = ({ ex, exIdx, setIdx }) => {
     )
   }
 
+  const containerClass = done
+    ? 'rounded-xl border px-3 py-2.5 bg-emerald-950/30 border-emerald-500/30 space-y-2'
+    : 'rounded-xl border px-3 py-2.5 bg-neutral-900/50 border-neutral-800/80 space-y-2'
+  const badgeClass = done
+    ? 'flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center font-black text-[11px] bg-emerald-500 text-black'
+    : 'flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center font-black text-[11px] bg-yellow-500 text-black'
+
   return (
-    <div className="rounded-xl border px-3 py-2.5 bg-neutral-900/50 border-neutral-800/80 space-y-2">
+    <div className={containerClass}>
       <div className="flex items-center gap-2">
-        <div className="flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center font-black text-[11px] bg-yellow-500 text-black">
-          {setIdx + 1}
+        <div className={badgeClass}>
+          {done ? <Check size={12} /> : setIdx + 1}
         </div>
         <div className="flex-1 grid grid-cols-2 gap-1.5 min-w-0">
           <div>
@@ -151,15 +161,22 @@ export const PlankSetInput: React.FC<Props> = ({ ex, exIdx, setIdx }) => {
         </p>
       )}
 
-      <button
-        type="button"
-        onClick={handleStart}
-        disabled={!canStart}
-        className="w-full inline-flex items-center justify-center gap-2 py-2.5 rounded-xl font-black text-sm bg-yellow-500 text-black disabled:bg-neutral-800 disabled:text-neutral-600 transition-all duration-200"
-      >
-        <Play size={16} />
-        Iniciar {canStart ? `(${secondsNum}s)` : ''}
-      </button>
+      {done ? (
+        <div className="w-full inline-flex items-center justify-center gap-2 py-2.5 rounded-xl font-black text-sm bg-emerald-500/20 border border-emerald-500/40 text-emerald-300">
+          <Check size={16} />
+          Concluída {loggedDuration !== null ? `(${loggedDuration}s)` : ''}
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={handleStart}
+          disabled={!canStart}
+          className="w-full inline-flex items-center justify-center gap-2 py-2.5 rounded-xl font-black text-sm bg-yellow-500 text-black disabled:bg-neutral-800 disabled:text-neutral-600 transition-all duration-200"
+        >
+          <Play size={16} />
+          Iniciar {canStart ? `(${secondsNum}s)` : ''}
+        </button>
+      )}
     </div>
   )
 }
