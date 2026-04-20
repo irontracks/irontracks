@@ -170,9 +170,15 @@ export const NormalSet = ({
   const lRpeField    = useInputField(extLRpe,    (v) => updateLog(key, { L_rpe: v }));
   const rRpeField    = useInputField(extRRpe,    (v) => updateLog(key, { R_rpe: v }));
 
-  // Shared input style
+  // Shared input style — weight column (3fr, roomy)
   const inputBase =
     'w-full bg-black/40 border border-neutral-700/80 rounded-xl px-2.5 py-2 text-sm text-white ' +
+    'outline-none focus:ring-1 ring-yellow-500 focus:border-yellow-500/50 transition-all duration-200 ' +
+    'placeholder:text-neutral-600 placeholder:text-xs focus:placeholder:opacity-0';
+  // Compact variant for reps/RPE (narrow 2fr columns) — reduced padding so
+  // 5-char placeholders like "10-12" fit without truncation.
+  const inputCompact =
+    'w-full bg-black/40 border border-neutral-700/80 rounded-xl px-1.5 py-2 text-sm text-white text-center ' +
     'outline-none focus:ring-1 ring-yellow-500 focus:border-yellow-500/50 transition-all duration-200 ' +
     'placeholder:text-neutral-600 placeholder:text-xs focus:placeholder:opacity-0';
 
@@ -378,8 +384,7 @@ export const NormalSet = ({
             className={inputBase}
           />
 
-          {/* Reps — unilateral columns are narrow: use plannedReps AS placeholder
-               instead of stacking an overlay that would collide with "Reps". */}
+          {/* Reps — plannedReps becomes the placeholder (narrow column, compact padding) */}
           <input
             inputMode="decimal"
             aria-label={`Reps lado ${side} – série ${setIdx + 1}`}
@@ -388,10 +393,10 @@ export const NormalSet = ({
             onFocus={repsFld.handleFocus}
             onBlur={repsFld.handleBlur}
             placeholder={plannedReps || repsPlaceholder}
-            className={inputBase}
+            className={inputCompact}
           />
 
-          {/* RPE — same treatment as reps (narrow column, no overlay) */}
+          {/* RPE — same treatment as reps */}
           <input
             inputMode="decimal"
             aria-label={`RPE lado ${side} – série ${setIdx + 1}`}
@@ -400,7 +405,7 @@ export const NormalSet = ({
             onFocus={rpeFld.handleFocus}
             onBlur={rpeFld.handleBlur}
             placeholder={plannedRpe || rpePlaceholder}
-            className={`${inputBase} text-yellow-400 border-yellow-500/25 placeholder:text-yellow-600/60`}
+            className={`${inputCompact} text-yellow-400 border-yellow-500/25 placeholder:text-yellow-600/60`}
           />
 
           {/* Complete side button */}
@@ -482,43 +487,29 @@ export const NormalSet = ({
               className={inputBase}
             />
 
-            {/* reps */}
-            <div className="relative">
-              <input
-                inputMode="decimal"
-                aria-label={`Reps – série ${setIdx + 1}`}
-                value={repsField.value}
-                onChange={repsField.handleChange}
-                onFocus={repsField.handleFocus}
-                onBlur={repsField.handleBlur}
-                placeholder={repsPlaceholder}
-                className={`${inputBase} ${plannedReps ? 'pr-6' : ''}`}
-              />
-              {plannedReps && (
-                <span className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] font-mono text-neutral-500/60">
-                  {plannedReps}
-                </span>
-              )}
-            </div>
+            {/* reps — plannedReps becomes the placeholder (narrow column, compact padding) */}
+            <input
+              inputMode="decimal"
+              aria-label={`Reps – série ${setIdx + 1}`}
+              value={repsField.value}
+              onChange={repsField.handleChange}
+              onFocus={repsField.handleFocus}
+              onBlur={repsField.handleBlur}
+              placeholder={plannedReps || repsPlaceholder}
+              className={inputCompact}
+            />
 
-            {/* RPE */}
-            <div className="relative">
-              <input
-                inputMode="decimal"
-                aria-label={`RPE – série ${setIdx + 1}`}
-                value={rpeField.value}
-                onChange={rpeField.handleChange}
-                onFocus={rpeField.handleFocus}
-                onBlur={rpeField.handleBlur}
-                placeholder={rpePlaceholder}
-                className={`${inputBase} text-yellow-400 border-yellow-500/25 placeholder:text-yellow-600/60 ${plannedRpe ? 'pr-6' : ''}`}
-              />
-              {plannedRpe && (
-                <span className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] font-mono text-yellow-600/50">
-                  {plannedRpe}
-                </span>
-              )}
-            </div>
+            {/* RPE — same treatment as reps */}
+            <input
+              inputMode="decimal"
+              aria-label={`RPE – série ${setIdx + 1}`}
+              value={rpeField.value}
+              onChange={rpeField.handleChange}
+              onFocus={rpeField.handleFocus}
+              onBlur={rpeField.handleBlur}
+              placeholder={plannedRpe || rpePlaceholder}
+              className={`${inputCompact} text-yellow-400 border-yellow-500/25 placeholder:text-yellow-600/60`}
+            />
 
             {/* OK button */}
             <button
