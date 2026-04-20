@@ -166,7 +166,7 @@ function ExerciseCardInner({ ex, exIdx }: { ex: WorkoutExercise; exIdx: number }
 
     // Isometric exercises (Prancha/Plank) use time-based input instead of reps
     if (isPlank(String(ex?.name ?? ''))) {
-      return <PlankSetInput key={key} ex={ex as UnknownRecord} exIdx={exIdx} setIdx={setIdx} />;
+      return <PlankSetInput key={key} ex={ex as UnknownRecord} exIdx={exIdx} setIdx={setIdx} setsCount={setsCount} />;
     }
 
     // Per-set method override — takes precedence over all automatic detection

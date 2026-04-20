@@ -1,4 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react'
+import { flushSync } from 'react-dom'
 import { Check, Play, Square } from 'lucide-react'
 import { useWorkoutContext } from './WorkoutContext'
 import { UnknownRecord } from './types'
@@ -7,10 +8,11 @@ type Props = {
   ex: UnknownRecord
   exIdx: number
   setIdx: number
+  setsCount?: number
 }
 
-export const PlankSetInput: React.FC<Props> = ({ ex, exIdx, setIdx }) => {
-  const { getLog, updateLog, startTimer, getPlannedSet, settings } = useWorkoutContext()
+export const PlankSetInput: React.FC<Props> = ({ ex, exIdx, setIdx, setsCount }) => {
+  const { getLog, updateLog, startTimer, getPlannedSet, settings, setCollapsed } = useWorkoutContext()
 
   const key = `${exIdx}-${setIdx}`
   const weightInputId = `plank-weight-${key}`
@@ -46,6 +48,30 @@ export const PlankSetInput: React.FC<Props> = ({ ex, exIdx, setIdx }) => {
   const inputBase =
     'w-full bg-black/40 border border-neutral-700/80 rounded-xl px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500 focus:border-yellow-500/50'
 
+  const collapseAndScroll = useCallback((delay: number) => {
+    setTimeout(() => {
+      try {
+        flushSync(() => {
+          setCollapsed?.((prev: Set<number>) => {
+            const next = new Set(prev)
+            next.add(exIdx)
+            return next
+          })
+        })
+        const firstSetOfNext = document.querySelector<HTMLElement>(`[data-set-first="${exIdx + 1}"]`)
+        const nextCard = document.querySelector<HTMLElement>(`[data-exercise-idx="${exIdx + 1}"]`)
+        const target = firstSetOfNext ?? nextCard
+        target?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      } catch { /* silenced */ }
+    }, delay)
+  }, [setCollapsed, exIdx])
+
+  const maybeCollapseIfLastSet = useCallback(() => {
+    if (setsCount != null && setIdx === setsCount - 1) {
+      collapseAndScroll(600)
+    }
+  }, [setsCount, setIdx, collapseAndScroll])
+
   const handleStart = useCallback(() => {
     const sec = Number(targetSeconds)
     if (!Number.isFinite(sec) || sec <= 0) return
@@ -64,9 +90,10 @@ export const PlankSetInput: React.FC<Props> = ({ ex, exIdx, setIdx }) => {
           done: true,
         })
         setIsRunning(false)
+        maybeCollapseIfLastSet()
       },
     })
-  }, [targetSeconds, startTimer, key, ex, updateLog, weight])
+  }, [targetSeconds, startTimer, key, ex, updateLog, weight, maybeCollapseIfLastSet])
 
   const handleStop = useCallback(() => {
     const elapsedMs = Date.now() - startedAtRef.current
@@ -78,7 +105,8 @@ export const PlankSetInput: React.FC<Props> = ({ ex, exIdx, setIdx }) => {
       done: true,
     })
     setIsRunning(false)
-  }, [key, updateLog, weight])
+    maybeCollapseIfLastSet()
+  }, [key, updateLog, weight, maybeCollapseIfLastSet])
 
   const secondsNum = Number(targetSeconds)
   const canStart = Number.isFinite(secondsNum) && secondsNum > 0
