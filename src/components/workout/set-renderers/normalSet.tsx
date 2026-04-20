@@ -5,6 +5,7 @@ import { flushSync } from 'react-dom';
 import { parseTrainingNumber } from '@/utils/trainingNumber';
 import { Check, ChevronDown, MessageSquare } from 'lucide-react';
 import { useWorkoutContext } from '../WorkoutContext';
+import { isUnilateralByName } from '@/utils/exerciseTracking';
 import {
   isObject,
   DELOAD_SUGGEST_MODE,
@@ -97,8 +98,12 @@ export const NormalSet = ({
   const plannedSet = getPlannedSet(ex, setIdx);
   const restTime = parseTrainingNumber(ex?.restTime ?? ex?.rest_time);
 
-  // Unilateral config
-  const isUnilateral = !!(ex?.isUnilateral ?? (ex as Record<string, unknown>)?.is_unilateral);
+  // Unilateral config — explicit flag, with fallback to name detection
+  // (catches templates created before the flag existed or imported without it)
+  const explicitUnilateral = ex?.isUnilateral ?? (ex as Record<string, unknown>)?.is_unilateral;
+  const isUnilateral = explicitUnilateral != null
+    ? !!explicitUnilateral
+    : isUnilateralByName(typeof ex?.name === 'string' ? ex.name : null);
   const sideRestTime = parseTrainingNumber((ex as Record<string, unknown>)?.sideRestTime ?? (ex as Record<string, unknown>)?.side_rest_time) ?? 15;
 
   // Set state
@@ -373,43 +378,30 @@ export const NormalSet = ({
             className={inputBase}
           />
 
-          {/* Reps */}
-          <div className="relative">
-            <input
-              inputMode="decimal"
-              aria-label={`Reps lado ${side} – série ${setIdx + 1}`}
-              value={repsFld.value}
-              onChange={repsFld.handleChange}
-              onFocus={repsFld.handleFocus}
-              onBlur={repsFld.handleBlur}
-              placeholder={repsPlaceholder}
-              className={`${inputBase} ${plannedReps ? 'pr-6' : ''}`}
-            />
-            {plannedReps && (
-              <span className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] font-mono text-neutral-500/60">
-                {plannedReps}
-              </span>
-            )}
-          </div>
+          {/* Reps — unilateral columns are narrow: use plannedReps AS placeholder
+               instead of stacking an overlay that would collide with "Reps". */}
+          <input
+            inputMode="decimal"
+            aria-label={`Reps lado ${side} – série ${setIdx + 1}`}
+            value={repsFld.value}
+            onChange={repsFld.handleChange}
+            onFocus={repsFld.handleFocus}
+            onBlur={repsFld.handleBlur}
+            placeholder={plannedReps || repsPlaceholder}
+            className={inputBase}
+          />
 
-          {/* RPE */}
-          <div className="relative">
-            <input
-              inputMode="decimal"
-              aria-label={`RPE lado ${side} – série ${setIdx + 1}`}
-              value={rpeFld.value}
-              onChange={rpeFld.handleChange}
-              onFocus={rpeFld.handleFocus}
-              onBlur={rpeFld.handleBlur}
-              placeholder={rpePlaceholder}
-              className={`${inputBase} text-yellow-400 border-yellow-500/25 placeholder:text-yellow-600/60 ${plannedRpe ? 'pr-6' : ''}`}
-            />
-            {plannedRpe && (
-              <span className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] font-mono text-yellow-600/50">
-                {plannedRpe}
-              </span>
-            )}
-          </div>
+          {/* RPE — same treatment as reps (narrow column, no overlay) */}
+          <input
+            inputMode="decimal"
+            aria-label={`RPE lado ${side} – série ${setIdx + 1}`}
+            value={rpeFld.value}
+            onChange={rpeFld.handleChange}
+            onFocus={rpeFld.handleFocus}
+            onBlur={rpeFld.handleBlur}
+            placeholder={plannedRpe || rpePlaceholder}
+            className={`${inputBase} text-yellow-400 border-yellow-500/25 placeholder:text-yellow-600/60`}
+          />
 
           {/* Complete side button */}
           <button
