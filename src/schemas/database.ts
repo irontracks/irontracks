@@ -77,6 +77,7 @@ export const SetRowSchema = z.object({
   completed: z.boolean().default(false),
   is_warmup: z.boolean().nullable(),
   advanced_config: z.unknown().nullable(),
+  duration_seconds: z.number().int().positive().nullable(),
 })
 export const SetSchema = SetRowSchema.transform((row) => ({
   id: row.id,
@@ -88,6 +89,7 @@ export const SetSchema = SetRowSchema.transform((row) => ({
   completed: row.completed,
   isWarmup: row.is_warmup,
   advancedConfig: row.advanced_config,
+  durationSeconds: row.duration_seconds,
 }))
 export type SetRow = z.infer<typeof SetRowSchema>
 export type Set = z.infer<typeof SetSchema>

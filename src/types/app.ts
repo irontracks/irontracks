@@ -31,6 +31,7 @@ export interface SetDetail {
   isWarmup: boolean;
   advancedConfig: AdvancedConfig | AdvancedConfig[] | null;
   completed?: boolean;
+  durationSeconds?: number | null;
   it_auto?: {
     source: string;
     kind: string;

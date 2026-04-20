@@ -10,6 +10,7 @@ export const SetDetailSchema = z.object({
     is_warmup: z.boolean().optional(),
     completed: z.boolean().optional(),
     advanced_config: z.unknown().nullable().optional(),
+    duration_seconds: z.number().int().positive().nullable().optional(),
 })
 export type SetDetail = z.infer<typeof SetDetailSchema>
 
@@ -100,6 +101,7 @@ export interface WorkoutSet {
     isWarmup: boolean
     advancedConfig?: unknown
     completed?: boolean
+    durationSeconds?: number | null
 }
 
 export interface CheckinRow {
