@@ -2,12 +2,12 @@ import { render, screen, fireEvent } from '@testing-library/react'
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { PlankSetInput } from '../PlankSetInput'
 
-// Mock do ActiveWorkoutContext
+// Mock do WorkoutContext (mesmo hook usado pelos outros set-renderers)
 const mockStartTimer = vi.fn()
 const mockUpdateLog = vi.fn()
 
-vi.mock('../ActiveWorkoutContext', () => ({
-  useActiveWorkout: () => ({
+vi.mock('../WorkoutContext', () => ({
+  useWorkoutContext: () => ({
     getLog: () => ({}),
     updateLog: mockUpdateLog,
     startTimer: mockStartTimer,
@@ -55,8 +55,8 @@ describe('PlankSetInput', () => {
 describe('PlankSetInput — sem peso cadastrado', () => {
   it('mostra mensagem pedindo para cadastrar peso no perfil', () => {
     // Override mock: settings sem bodyWeightKg
-    vi.doMock('../ActiveWorkoutContext', () => ({
-      useActiveWorkout: () => ({
+    vi.doMock('../WorkoutContext', () => ({
+      useWorkoutContext: () => ({
         getLog: () => ({}),
         updateLog: vi.fn(),
         startTimer: vi.fn(),
@@ -74,8 +74,8 @@ describe('PlankSetInput — sem peso cadastrado', () => {
 
   it('campo peso fica vazio quando bodyWeightKg é null', async () => {
     // Re-mock com bodyWeightKg null usando vi.mock isolado por importação dinâmica
-    vi.doMock('../ActiveWorkoutContext', () => ({
-      useActiveWorkout: () => ({
+    vi.doMock('../WorkoutContext', () => ({
+      useWorkoutContext: () => ({
         getLog: () => ({}),
         updateLog: vi.fn(),
         startTimer: vi.fn(),
