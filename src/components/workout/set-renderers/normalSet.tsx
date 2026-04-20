@@ -422,10 +422,37 @@ export const NormalSet = ({
     );
   };
 
+  // Column header — only on the first set of each exercise, so the user learns
+  // what each input means. After the first set, header is hidden to save space.
+  const renderUnilateralHeader = () => (
+    <div
+      className="grid items-center gap-1.5 px-2.5 text-[9px] uppercase tracking-widest text-neutral-500 font-bold"
+      style={{ gridTemplateColumns: '3fr 2fr 2fr auto' }}
+    >
+      <span>Peso (kg)</span>
+      <span className="text-center">Reps</span>
+      <span className="text-center">RPE</span>
+      <span className="w-14" />
+    </div>
+  );
+  const renderBilateralHeader = () => (
+    <div
+      className="grid items-center gap-1.5 px-2.5 text-[9px] uppercase tracking-widest text-neutral-500 font-bold"
+      style={{ gridTemplateColumns: '28px 3fr 2fr 2fr auto' }}
+    >
+      <span />
+      <span>Peso (kg)</span>
+      <span className="text-center">Reps</span>
+      <span className="text-center">RPE</span>
+      <span className="w-14" />
+    </div>
+  );
+
   return (
     <div className="space-y-1" key={key}>
       {isUnilateral ? (
         <>
+          {setIdx === 0 && renderUnilateralHeader()}
           {renderSideRow('L', lDone, lWeightField, lRepsField, lRpeField, handleCompleteL, setIdx === 0)}
           {renderSideRow('R', rDone, rWeightField, rRepsField, rRpeField, handleCompleteR, false)}
           {/* Notes button sits below both L+R rows — clear of exercise footer buttons */}
@@ -447,6 +474,8 @@ export const NormalSet = ({
         </>
       ) : (
         /* ── Non-unilateral single row ─────────────────────────────── */
+        <>
+        {setIdx === 0 && renderBilateralHeader()}
         <div
           {...(setIdx === 0 ? { 'data-set-first': exIdx } : {})}
           className={[
@@ -557,6 +586,7 @@ export const NormalSet = ({
             </div>
           )}
         </div>
+        </>
       )}
 
       {/* Notes textarea — shared between L and R */}
