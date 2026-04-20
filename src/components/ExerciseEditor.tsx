@@ -487,6 +487,7 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
                                                 setDetails={setDetails}
                                                 safeMethod={safeMethod}
                                                 exerciseIndex={index}
+                                                exerciseName={exercise.name || ''}
                                                 onUpdateSetDetail={updateSetDetail}
                                             />
                                         )}
