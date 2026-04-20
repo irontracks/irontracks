@@ -62,8 +62,8 @@ Helper único `isPlank(exerciseName: string): boolean` em `src/utils/exerciseTra
 - `src/types/supabase.ts` — regerado via MCP Supabase após a migration
 - `src/components/workout/SetInputRow.tsx` — delega para `PlankSetInput` se `isPlank`
 - `src/components/ExerciseEditor/SetDetailsSection.tsx` — troca "Reps" por "Tempo alvo (s)" se `isPlank`
-- `src/components/workout/WorkoutTimerContext.tsx` — estado ganha campo `mode: 'rest' | 'plank'`
-- `src/components/workout/RestTimerOverlay.tsx` — ajusta copy/título conforme `mode` (renomear pra `WorkoutTimerOverlay.tsx` na mesma PR)
+- `src/components/workout/ActiveWorkoutContext.tsx` (e componentes vinculados) — `startTimer` aceita `kind: 'rest' | 'plank'` e callback `onComplete`
+- `src/components/workout/RestTimerOverlay.tsx` — copy/título condicional conforme `context.kind`
 - Todos os locais que hoje montam string "X reps × Y kg" passam a usar `formatSetSummary`. Durante implementação, o plano vai mapear cada ocorrência via `grep` e listá-las explicitamente.
 
 **Princípio de isolamento:** `PlankSetInput` é um componente fechado — recebe props (exercício, série atual, peso corporal do usuário, callback de salvar), gerencia timer internamente, retorna `{ weight, duration_seconds }`. Pode ser testado em isolamento, e o `SetInputRow` não precisa saber nada sobre timer ou tempo.
@@ -166,19 +166,18 @@ Helper `formatSetSummary(set, exercise)` centraliza a formatação. Qualquer loc
 
 ## 7. Timer (reuso da infra existente)
 
-**Não criar `ExecutionTimerOverlay` novo.** O `WorkoutTimerContext` + `RestTimerOverlay` já fazem countdown, som, vibração, notificação nativa via Capacitor e background task (tela trancada). A diferença é só semântica.
+**Não criar novo overlay de timer.** O `RestTimerOverlay` + a função `startTimer(seconds, context)` exposta pelo `ActiveWorkoutContext` já fazem countdown, som, vibração, notificação nativa via Capacitor e funcionam em background (tela trancada). A diferença é só semântica.
 
 **Mudanças:**
-- `WorkoutTimerContext`: estado ganha `mode: 'rest' | 'plank'` e `onComplete?: () => void`.
-- `RestTimerOverlay` (renomear para `WorkoutTimerOverlay.tsx`): copy do título muda conforme `mode` ("Descanso" vs "Prancha").
-- Som, vibração, notificação, comportamento em background — tudo compartilhado.
+- `ActiveWorkoutContext.startTimer(seconds, context)`: `context.kind` hoje aceita `'rest'`; passa a aceitar `'plank'` também. O context ganha campo opcional `onComplete?: () => void` chamado quando o timer zera.
+- `RestTimerOverlay`: o copy do título e labels usa `context.kind` para decidir entre "Descanso" e "Prancha". A lógica de timing, som, vibração, background — fica inalterada.
 
 **Fluxo:**
-1. `PlankSetInput` → `startTimer({ seconds: meta, mode: 'plank', onComplete: () => saveSet(...) })`
-2. `WorkoutTimerContext` inicia countdown idêntico ao rest.
-3. `WorkoutTimerOverlay` ajusta título conforme `mode`.
-4. Ao zerar: dispara `onComplete` (salva série) + som/vibração/notificação existentes.
-5. Em background (app minimizado ou tela trancada): timer continua e alerta via notificação local.
+1. `PlankSetInput` chama `startTimer(meta, { kind: 'plank', key, exerciseName, onComplete: saveSet })`
+2. `RestTimerOverlay` aparece e renderiza com copy de "Prancha".
+3. Ao zerar: dispara `onComplete` (salva série com `duration_seconds = meta`) + som/vibração/notificação existentes.
+4. Se o usuário clica "Parar" dentro do `PlankSetInput` antes do fim: salva série com `duration_seconds = meta - timeLeft` e cancela o timer.
+5. Em background (app minimizado ou tela trancada): timer continua e alerta via notificação local — herdado do rest timer.
 
 **Por que não criar overlay novo:** duplicaria lógica crítica de timing em iOS/Android, que historicamente é sensível. Menos arquivos, menos duplicação.
 
