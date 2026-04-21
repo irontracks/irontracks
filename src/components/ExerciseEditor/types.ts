@@ -27,6 +27,7 @@ export interface SetDetail {
     reps: string | number | null
     rpe: number | null
     weight: number | null
+    durationSeconds?: number | null
     is_warmup?: boolean
     isWarmup?: boolean
     advanced_config?: AdvancedConfig | AdvancedConfig[] | null

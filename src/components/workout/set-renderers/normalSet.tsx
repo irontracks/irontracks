@@ -5,6 +5,7 @@ import { flushSync } from 'react-dom';
 import { parseTrainingNumber } from '@/utils/trainingNumber';
 import { Check, ChevronDown, MessageSquare } from 'lucide-react';
 import { useWorkoutContext } from '../WorkoutContext';
+import { isUnilateralByName } from '@/utils/exerciseTracking';
 import {
   isObject,
   DELOAD_SUGGEST_MODE,
@@ -97,8 +98,12 @@ export const NormalSet = ({
   const plannedSet = getPlannedSet(ex, setIdx);
   const restTime = parseTrainingNumber(ex?.restTime ?? ex?.rest_time);
 
-  // Unilateral config
-  const isUnilateral = !!(ex?.isUnilateral ?? (ex as Record<string, unknown>)?.is_unilateral);
+  // Unilateral config — explicit flag, with fallback to name detection
+  // (catches templates created before the flag existed or imported without it)
+  const explicitUnilateral = ex?.isUnilateral ?? (ex as Record<string, unknown>)?.is_unilateral;
+  const isUnilateral = explicitUnilateral != null
+    ? !!explicitUnilateral
+    : isUnilateralByName(typeof ex?.name === 'string' ? ex.name : null);
   const sideRestTime = parseTrainingNumber((ex as Record<string, unknown>)?.sideRestTime ?? (ex as Record<string, unknown>)?.side_rest_time) ?? 15;
 
   // Set state
@@ -165,9 +170,15 @@ export const NormalSet = ({
   const lRpeField    = useInputField(extLRpe,    (v) => updateLog(key, { L_rpe: v }));
   const rRpeField    = useInputField(extRRpe,    (v) => updateLog(key, { R_rpe: v }));
 
-  // Shared input style
+  // Shared input style — weight column (3fr, roomy)
   const inputBase =
     'w-full bg-black/40 border border-neutral-700/80 rounded-xl px-2.5 py-2 text-sm text-white ' +
+    'outline-none focus:ring-1 ring-yellow-500 focus:border-yellow-500/50 transition-all duration-200 ' +
+    'placeholder:text-neutral-600 placeholder:text-xs focus:placeholder:opacity-0';
+  // Compact variant for reps/RPE (narrow 2fr columns) — reduced padding so
+  // 5-char placeholders like "10-12" fit without truncation.
+  const inputCompact =
+    'w-full bg-black/40 border border-neutral-700/80 rounded-xl px-1.5 py-2 text-sm text-white text-center ' +
     'outline-none focus:ring-1 ring-yellow-500 focus:border-yellow-500/50 transition-all duration-200 ' +
     'placeholder:text-neutral-600 placeholder:text-xs focus:placeholder:opacity-0';
 
@@ -373,43 +384,29 @@ export const NormalSet = ({
             className={inputBase}
           />
 
-          {/* Reps */}
-          <div className="relative">
-            <input
-              inputMode="decimal"
-              aria-label={`Reps lado ${side} – série ${setIdx + 1}`}
-              value={repsFld.value}
-              onChange={repsFld.handleChange}
-              onFocus={repsFld.handleFocus}
-              onBlur={repsFld.handleBlur}
-              placeholder={repsPlaceholder}
-              className={`${inputBase} ${plannedReps ? 'pr-6' : ''}`}
-            />
-            {plannedReps && (
-              <span className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] font-mono text-neutral-500/60">
-                {plannedReps}
-              </span>
-            )}
-          </div>
+          {/* Reps — plannedReps becomes the placeholder (narrow column, compact padding) */}
+          <input
+            inputMode="decimal"
+            aria-label={`Reps lado ${side} – série ${setIdx + 1}`}
+            value={repsFld.value}
+            onChange={repsFld.handleChange}
+            onFocus={repsFld.handleFocus}
+            onBlur={repsFld.handleBlur}
+            placeholder={plannedReps || repsPlaceholder}
+            className={inputCompact}
+          />
 
-          {/* RPE */}
-          <div className="relative">
-            <input
-              inputMode="decimal"
-              aria-label={`RPE lado ${side} – série ${setIdx + 1}`}
-              value={rpeFld.value}
-              onChange={rpeFld.handleChange}
-              onFocus={rpeFld.handleFocus}
-              onBlur={rpeFld.handleBlur}
-              placeholder={rpePlaceholder}
-              className={`${inputBase} text-yellow-400 border-yellow-500/25 placeholder:text-yellow-600/60 ${plannedRpe ? 'pr-6' : ''}`}
-            />
-            {plannedRpe && (
-              <span className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] font-mono text-yellow-600/50">
-                {plannedRpe}
-              </span>
-            )}
-          </div>
+          {/* RPE — same treatment as reps */}
+          <input
+            inputMode="decimal"
+            aria-label={`RPE lado ${side} – série ${setIdx + 1}`}
+            value={rpeFld.value}
+            onChange={rpeFld.handleChange}
+            onFocus={rpeFld.handleFocus}
+            onBlur={rpeFld.handleBlur}
+            placeholder={plannedRpe || rpePlaceholder}
+            className={`${inputCompact} text-yellow-400 border-yellow-500/25 placeholder:text-yellow-600/60`}
+          />
 
           {/* Complete side button */}
           <button
@@ -425,10 +422,37 @@ export const NormalSet = ({
     );
   };
 
+  // Column header — only on the first set of each exercise, so the user learns
+  // what each input means. After the first set, header is hidden to save space.
+  const renderUnilateralHeader = () => (
+    <div
+      className="grid items-center gap-1.5 px-2.5 text-[9px] uppercase tracking-widest text-neutral-500 font-bold"
+      style={{ gridTemplateColumns: '3fr 2fr 2fr auto' }}
+    >
+      <span>Peso (kg)</span>
+      <span className="text-center">Reps</span>
+      <span className="text-center">RPE</span>
+      <span className="w-14" />
+    </div>
+  );
+  const renderBilateralHeader = () => (
+    <div
+      className="grid items-center gap-1.5 px-2.5 text-[9px] uppercase tracking-widest text-neutral-500 font-bold"
+      style={{ gridTemplateColumns: '28px 3fr 2fr 2fr auto' }}
+    >
+      <span />
+      <span>Peso (kg)</span>
+      <span className="text-center">Reps</span>
+      <span className="text-center">RPE</span>
+      <span className="w-14" />
+    </div>
+  );
+
   return (
     <div className="space-y-1" key={key}>
       {isUnilateral ? (
         <>
+          {setIdx === 0 && renderUnilateralHeader()}
           {renderSideRow('L', lDone, lWeightField, lRepsField, lRpeField, handleCompleteL, setIdx === 0)}
           {renderSideRow('R', rDone, rWeightField, rRepsField, rRpeField, handleCompleteR, false)}
           {/* Notes button sits below both L+R rows — clear of exercise footer buttons */}
@@ -450,6 +474,8 @@ export const NormalSet = ({
         </>
       ) : (
         /* ── Non-unilateral single row ─────────────────────────────── */
+        <>
+        {setIdx === 0 && renderBilateralHeader()}
         <div
           {...(setIdx === 0 ? { 'data-set-first': exIdx } : {})}
           className={[
@@ -490,43 +516,29 @@ export const NormalSet = ({
               className={inputBase}
             />
 
-            {/* reps */}
-            <div className="relative">
-              <input
-                inputMode="decimal"
-                aria-label={`Reps – série ${setIdx + 1}`}
-                value={repsField.value}
-                onChange={repsField.handleChange}
-                onFocus={repsField.handleFocus}
-                onBlur={repsField.handleBlur}
-                placeholder={repsPlaceholder}
-                className={`${inputBase} ${plannedReps ? 'pr-6' : ''}`}
-              />
-              {plannedReps && (
-                <span className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] font-mono text-neutral-500/60">
-                  {plannedReps}
-                </span>
-              )}
-            </div>
+            {/* reps — plannedReps becomes the placeholder (narrow column, compact padding) */}
+            <input
+              inputMode="decimal"
+              aria-label={`Reps – série ${setIdx + 1}`}
+              value={repsField.value}
+              onChange={repsField.handleChange}
+              onFocus={repsField.handleFocus}
+              onBlur={repsField.handleBlur}
+              placeholder={plannedReps || repsPlaceholder}
+              className={inputCompact}
+            />
 
-            {/* RPE */}
-            <div className="relative">
-              <input
-                inputMode="decimal"
-                aria-label={`RPE – série ${setIdx + 1}`}
-                value={rpeField.value}
-                onChange={rpeField.handleChange}
-                onFocus={rpeField.handleFocus}
-                onBlur={rpeField.handleBlur}
-                placeholder={rpePlaceholder}
-                className={`${inputBase} text-yellow-400 border-yellow-500/25 placeholder:text-yellow-600/60 ${plannedRpe ? 'pr-6' : ''}`}
-              />
-              {plannedRpe && (
-                <span className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-[9px] font-mono text-yellow-600/50">
-                  {plannedRpe}
-                </span>
-              )}
-            </div>
+            {/* RPE — same treatment as reps */}
+            <input
+              inputMode="decimal"
+              aria-label={`RPE – série ${setIdx + 1}`}
+              value={rpeField.value}
+              onChange={rpeField.handleChange}
+              onFocus={rpeField.handleFocus}
+              onBlur={rpeField.handleBlur}
+              placeholder={plannedRpe || rpePlaceholder}
+              className={`${inputCompact} text-yellow-400 border-yellow-500/25 placeholder:text-yellow-600/60`}
+            />
 
             {/* OK button */}
             <button
@@ -574,6 +586,7 @@ export const NormalSet = ({
             </div>
           )}
         </div>
+        </>
       )}
 
       {/* Notes textarea — shared between L and R */}

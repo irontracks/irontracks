@@ -154,6 +154,48 @@ describe('mapWorkoutRow', () => {
     })
   })
 
+  describe('unilateral flag preservation', () => {
+    it('maps is_unilateral → isUnilateral when true', () => {
+      const row = {
+        exercises: [{
+          id: 'e1', name: 'Cadeira flexora unilateral', order: 1,
+          is_unilateral: true, side_rest_time: 30, transition_time: null,
+          sets: [],
+        }],
+      }
+      const r = mapWorkoutRow(row)
+      const exs = r.exercises as { isUnilateral: boolean; sideRestTime: number | null; transitionTime: number | null }[]
+      expect(exs[0].isUnilateral).toBe(true)
+      expect(exs[0].sideRestTime).toBe(30)
+      expect(exs[0].transitionTime).toBeNull()
+    })
+
+    it('maps is_unilateral → isUnilateral false when absent', () => {
+      const row = {
+        exercises: [{
+          id: 'e1', name: 'Supino', order: 1, sets: [],
+        }],
+      }
+      const r = mapWorkoutRow(row)
+      const exs = r.exercises as { isUnilateral: boolean }[]
+      expect(exs[0].isUnilateral).toBe(false)
+    })
+
+    it('preserves sideRestTime and transitionTime independently', () => {
+      const row = {
+        exercises: [{
+          id: 'e1', name: 'Ex', order: 1,
+          is_unilateral: true, side_rest_time: 45, transition_time: 10,
+          sets: [],
+        }],
+      }
+      const r = mapWorkoutRow(row)
+      const exs = r.exercises as { sideRestTime: number; transitionTime: number }[]
+      expect(exs[0].sideRestTime).toBe(45)
+      expect(exs[0].transitionTime).toBe(10)
+    })
+  })
+
   describe('edge cases', () => {
     it('handles null input', () => {
       const r = mapWorkoutRow(null)

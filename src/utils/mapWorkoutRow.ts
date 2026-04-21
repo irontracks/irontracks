@@ -79,6 +79,9 @@ export const mapWorkoutRow = (w: unknown): Record<string, unknown> => {
                     reps: repsHeader,
                     rpe: rpeHeader,
                     setDetails,
+                    isUnilateral: !!e.is_unilateral,
+                    sideRestTime: e.side_rest_time ?? null,
+                    transitionTime: e.transition_time ?? null,
                 }
             } catch (mapErr) {
                 logError('Erro ao mapear exercício', {
