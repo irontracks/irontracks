@@ -34,6 +34,35 @@ function parseJsonWithSchema<T>(raw: string, schema: z.ZodType<T>): T | null {
     }
 }
 
+/**
+ * Strip a stale rest-timer target from a hydrated session.
+ *
+ * `timerTargetTime` is an absolute timestamp (ms since epoch). When the app is
+ * killed / backgrounded / restored a non-trivial amount of time later, the
+ * persisted timestamp ends up in the PAST — which the RestTimerOverlay reads
+ * on its first tick as `remaining = targetTime - now < 0`, setting
+ * `isFinished = true` immediately and dumping the user on the green "BORA!"
+ * screen with a growing overtime counter BEFORE they've even interacted with
+ * the app.
+ *
+ * Follow-up clicks on OK in this corrupted state appeared to "not start a
+ * timer" because the overlay was still stuck finished from the stale target,
+ * or because Realtime echo delivered the expired state back from another
+ * device and overwrote the fresh `now + duration` value.
+ *
+ * Rule: if the persisted `timerTargetTime` is within 5s of now, or in the
+ * past, drop it. 5s slack covers legitimate near-live resumes (foregrounding
+ * during a rest) while cutting out every stale value.
+ */
+function sanitizeRestoredSession(session: Record<string, unknown>): Record<string, unknown> {
+    const raw = session.timerTargetTime
+    const t = typeof raw === 'number' && Number.isFinite(raw) ? raw : 0
+    if (t > 0 && t <= Date.now() + 5000) {
+        return { ...session, timerTargetTime: null, timerContext: null }
+    }
+    return session
+}
+
 // Unique identifier for this browser tab / WKWebView instance. Persisted in
 // localStorage so it survives iOS WKWebView context suspensions (the OS can
 // kill & recreate the JS context when the app backgrounds). Without persistence,
@@ -139,12 +168,13 @@ export function useSessionSync({
                     // WKWebView may reconnect Realtime after app resume and deliver
                     // stale events that would otherwise pass the guard (ref = 0).
                     lastLocalUpsertAtRef.current = Math.max(lastLocalUpsertAtRef.current, localSavedAt)
-                    setActiveSession(parsed as unknown as ActiveWorkoutSession)
+                    const clean = sanitizeRestoredSession(parsed as Record<string, unknown>)
+                    setActiveSession(clean as unknown as ActiveWorkoutSession)
                     setView('active')
 
                     if (!localStorage.getItem(scopedKey)) {
                         try {
-                            localStorage.setItem(scopedKey, JSON.stringify(parsed))
+                            localStorage.setItem(scopedKey, JSON.stringify(clean))
                             localStorage.removeItem('activeSession')
                         } catch (e) { logError('hook:useSessionSync.migrateLocalStorage', e) }
                     }
@@ -168,10 +198,11 @@ export function useSessionSync({
                     const idbSavedAt = Number(idbSession._idbSavedAt || idbSession._savedAt || 0)
                     localSavedAt = idbSavedAt
                     lastLocalUpsertAtRef.current = Math.max(lastLocalUpsertAtRef.current, idbSavedAt)
-                    setActiveSession(idbSession as unknown as ActiveWorkoutSession)
+                    const clean = sanitizeRestoredSession(idbSession as Record<string, unknown>)
+                    setActiveSession(clean as unknown as ActiveWorkoutSession)
                     setView('active')
                     // Also re-populate localStorage from IDB
-                    try { localStorage.setItem(scopedKey, JSON.stringify(idbSession)) } catch { }
+                    try { localStorage.setItem(scopedKey, JSON.stringify(clean)) } catch { }
                     logWarn('useSessionSync', 'Session recovered from IDB (localStorage was empty)')
                 }
             } catch (e) { logWarn('useSessionSync', 'IDB recovery failed (non-fatal)', e) }
@@ -204,7 +235,8 @@ export function useSessionSync({
                 if (updatedAtMs <= localSavedAt) return
 
                 lastLocalUpsertAtRef.current = Math.max(lastLocalUpsertAtRef.current, updatedAtMs)
-                setActiveSession(state)
+                const cleanState = sanitizeRestoredSession(state as Record<string, unknown>)
+                setActiveSession(cleanState as ActiveWorkoutSession)
                 setView('active')
                 try {
                     localStorage.setItem(scopedKey, JSON.stringify(state))
