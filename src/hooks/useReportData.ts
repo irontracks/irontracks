@@ -15,6 +15,7 @@ import { useRef, useState, useEffect, useMemo } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { getKcalEstimate } from '@/utils/calories/kcalClient'
 import { normalizeExerciseKey, calculateTotalVolume } from '@/utils/report/formatters'
+import { isSetCompleted } from '@/utils/report/setCompletion'
 import { estimateCaloriesMet, getBodyweightFraction, DEFAULT_BODY_WEIGHT_KG } from '@/utils/calories/metEstimate'
 import { useCheckins } from './useCheckins'
 import { usePreviousSessionData } from './usePreviousSessionData'
@@ -450,11 +451,7 @@ export const useReportData = ({ session, previousSession, user, settings }: UseR
         for (let sIdx = 0; sIdx < setCount; sIdx++) {
           const key = `${exIdx}-${sIdx}`
           const log = sessionLogs[key]
-          if (!log || typeof log !== 'object') continue
-          const obj = log as AnyObj
-          const w = Number(String(obj?.weight ?? '').replace(',', '.'))
-          const r = Number(String(obj?.reps ?? '').replace(',', '.'))
-          if ((w > 0 || r > 0)) completed++
+          if (isSetCompleted(log)) completed++
         }
       })
       return {

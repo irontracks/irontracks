@@ -11,6 +11,7 @@ interface RestTimerContext {
     exerciseId?: string;
     exerciseName?: string;
     setId?: string;
+    onComplete?: (finalDurationSeconds?: number) => void;
 }
 
 interface RestTimerSettings {
@@ -39,6 +40,10 @@ interface RestTimerOverlayProps {
 }
 
 const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context, onFinish, onStart, onClose: _onClose, settings, autoStartEnabled, onToggleAutoStart }) => {
+    const isPlankMode = context?.kind === 'plank'
+    const overlayTitle = isPlankMode ? 'Prancha' : 'Descanso'
+    const finishedLabel = isPlankMode ? 'Tempo concluído!' : 'Descanso finalizado'
+
     const [timeLeft, setTimeLeft] = useState(0);
     const [isFinished, setIsFinished] = useState(false);
     const [autoStartLocal, setAutoStartLocal] = useState(Boolean(autoStartEnabled));
@@ -263,6 +268,9 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
                             tag: 'timer_finished'
                         });
                     }
+                    if (typeof onCompleteRef.current === 'function') {
+                        onCompleteRef.current();
+                    }
                 }
             } else {
                 setTimeLeft(remaining);
@@ -331,9 +339,11 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
     const onStartRef = useRef(onStart);
     const onFinishRef = useRef(onFinish);
     const contextRef = useRef(context);
+    const onCompleteRef = useRef(context?.onComplete);
     onStartRef.current = onStart;
     onFinishRef.current = onFinish;
     contextRef.current = context;
+    onCompleteRef.current = context?.onComplete;
 
     useEffect(() => {
         if (!isFinished) {
@@ -442,7 +452,7 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
                 >
                     <div className="text-7xl mb-4">{isSideRest ? '🔄' : '💪'}</div>
                     <h1 className="text-5xl font-black text-white uppercase tracking-tighter">{isSideRest ? 'TROCA!' : 'BORA!'}</h1>
-                    <p className="text-white/80 font-bold mt-2 text-lg">{isSideRest ? 'Agora o outro lado' : 'Descanso finalizado'}</p>
+                    <p className="text-white/80 font-bold mt-2 text-lg">{isSideRest ? 'Agora o outro lado' : finishedLabel}</p>
                 </div>
             )}
 
@@ -489,7 +499,7 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
                                 className="text-[7px] font-black uppercase tracking-widest mt-0.5"
                                 style={{ color: isOvertime ? '#ef4444' : isSideRest ? '#3b82f6' : isTransition ? '#f97316' : '#737373' }}
                             >
-                                {isOvertime ? 'extra' : isSideRest ? 'lado' : isTransition ? 'troca' : 'rest'}
+                                {isOvertime ? 'extra' : isSideRest ? 'lado' : isTransition ? 'troca' : overlayTitle.toLowerCase()}
                             </span>
                         </div>
                     </div>

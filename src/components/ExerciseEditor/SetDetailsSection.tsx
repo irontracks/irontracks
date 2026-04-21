@@ -3,11 +3,13 @@
 import React from 'react'
 import { Trash2 } from 'lucide-react'
 import type { AdvancedConfig, SetDetail } from './types'
+import { isPlank } from '@/utils/exerciseTracking'
 
 interface SetDetailsSectionProps {
     setDetails: SetDetail[]
     safeMethod: string
     exerciseIndex: number
+    exerciseName?: string
     onUpdateSetDetail: (exerciseIdx: number, setIdx: number, patch: Partial<SetDetail>) => void
 }
 
@@ -15,8 +17,10 @@ export const SetDetailsSection: React.FC<SetDetailsSectionProps> = ({
     setDetails,
     safeMethod,
     exerciseIndex,
+    exerciseName = '',
     onUpdateSetDetail,
 }) => {
+    const isIsoPlank = isPlank(exerciseName)
     if (setDetails.length === 0) return null
 
     return (
@@ -83,22 +87,37 @@ export const SetDetailsSection: React.FC<SetDetailsSectionProps> = ({
                         )) && (
                                 <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2">
                                     <div>
-                                        <div className="text-[10px] text-neutral-500 uppercase font-bold">Carga (kg)</div>
+                                        <div className="text-[10px] text-neutral-500 uppercase font-bold">
+                                            {isIsoPlank ? 'Peso corporal (kg)' : 'Carga (kg)'}
+                                        </div>
                                         <input
                                             type="number"
-                                            aria-label={`Carga em kg para série ${setIdx + 1}`}
+                                            aria-label={`${isIsoPlank ? 'Peso corporal' : 'Carga'} em kg para série ${setIdx + 1}`}
                                             value={(s?.weight ?? '')}
                                             onChange={(e) => onUpdateSetDetail(exerciseIndex, setIdx, { weight: e.target.value === '' ? null : Number(e.target.value) })}
                                             className="w-full bg-black/30 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
                                         />
                                     </div>
                                     <div>
-                                        <div className="text-[10px] text-neutral-500 uppercase font-bold">Reps</div>
+                                        <div className="text-[10px] text-neutral-500 uppercase font-bold">
+                                            {isIsoPlank ? 'Tempo alvo (s)' : 'Reps'}
+                                        </div>
                                         <input
                                             type="text"
-                                            aria-label={`Repetições para série ${setIdx + 1}`}
-                                            value={(s?.reps ?? '')}
-                                            onChange={(e) => onUpdateSetDetail(exerciseIndex, setIdx, { reps: e.target.value })}
+                                            inputMode={isIsoPlank ? 'numeric' : 'decimal'}
+                                            aria-label={isIsoPlank ? `Tempo alvo em segundos para série ${setIdx + 1}` : `Repetições para série ${setIdx + 1}`}
+                                            value={isIsoPlank ? String(s?.durationSeconds ?? '') : String(s?.reps ?? '')}
+                                            onChange={(e) => {
+                                                const v = e.target.value
+                                                if (isIsoPlank) {
+                                                    onUpdateSetDetail(exerciseIndex, setIdx, {
+                                                        durationSeconds: v === '' ? null : Number(v),
+                                                        reps: null,
+                                                    })
+                                                } else {
+                                                    onUpdateSetDetail(exerciseIndex, setIdx, { reps: v })
+                                                }
+                                            }}
                                             className="w-full bg-black/30 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
                                         />
                                     </div>

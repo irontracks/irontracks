@@ -25,6 +25,8 @@ import { HELP_TERMS } from '@/utils/help/terms';
 import { parseTrainingNumber } from '@/utils/trainingNumber';
 import { isObject, isClusterConfig, isRestPauseConfig } from './utils';
 import { WorkoutExercise, UnknownRecord } from './types';
+import { isPlank } from '@/utils/exerciseTracking';
+import { PlankSetInput } from './PlankSetInput';
 import ExecutionVideoCapture from '@/components/ExecutionVideoCapture';
 import { logError, logInfo } from '@/lib/logger'
 import { useTeamWorkout } from '@/contexts/TeamWorkoutContext'
@@ -161,6 +163,11 @@ function ExerciseCardInner({ ex, exIdx }: { ex: WorkoutExercise; exIdx: number }
     const key = `${exIdx}-${setIdx}`;
     const log = getLog(key);
     const method = String(ex?.method || '').trim();
+
+    // Isometric exercises (Prancha/Plank) use time-based input instead of reps
+    if (isPlank(String(ex?.name ?? ''))) {
+      return <PlankSetInput key={key} ex={ex as UnknownRecord} exIdx={exIdx} setIdx={setIdx} setsCount={setsCount} />;
+    }
 
     // Per-set method override — takes precedence over all automatic detection
     const perSetMethod = String(log.per_set_method || '').trim();
