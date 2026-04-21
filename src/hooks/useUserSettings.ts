@@ -55,7 +55,24 @@ export function useUserSettings(userId: string | null | undefined) {
         const cachedRaw = window.localStorage.getItem(`${STORAGE_KEY}.${safeUserId}`) || ''
         const cached = cachedRaw ? safeJsonParse(cachedRaw) : null
         if (cached && typeof cached === 'object') {
-          setSettings((prev) => ({ ...prev, ...(cached as Partial<UserSettings>) }))
+          // One-time migration: force restTimerAutoStart OFF in cached settings.
+          // The overlay's auto-start feature was removed entirely because it was
+          // misfiring ("START disparou sozinho"). Any stale `true` value in
+          // localStorage from the old AUTO button would still be read by the
+          // old-cached-bundle clients and could trigger the buggy code path
+          // before the Supabase-synced `false` arrives. We overwrite both the
+          // in-memory cache and persisted cache to make the cleanup sticky.
+          const cachedObj = cached as Record<string, unknown>
+          if (cachedObj.restTimerAutoStart === true) {
+            cachedObj.restTimerAutoStart = false
+            try {
+              window.localStorage.setItem(
+                `${STORAGE_KEY}.${safeUserId}`,
+                JSON.stringify(cachedObj),
+              )
+            } catch { }
+          }
+          setSettings((prev) => ({ ...prev, ...(cachedObj as Partial<UserSettings>) }))
           setLoaded(true)
         }
       }

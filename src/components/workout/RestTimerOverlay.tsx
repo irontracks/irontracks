@@ -51,14 +51,6 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
 
     const [timeLeft, setTimeLeft] = useState(0);
     const [isFinished, setIsFinished] = useState(false);
-    // Auto-start ALWAYS begins OFF for every rest timer, regardless of the
-    // `autoStartEnabled` prop fed from settings. This prevents the "START
-    // disparou sozinho" class of bug where the user had accidentally toggled
-    // AUTO once (the button is right next to START) and thereafter every
-    // single rest auto-advanced without a tap. The AUTO button on the overlay
-    // now only affects THIS timer — the global setting is ignored on mount
-    // and the button no longer writes back to settings.
-    const [autoStartLocal, setAutoStartLocal] = useState(false);
     // Local dismiss: hides the overlay IMMEDIATELY on START tap instead of
     // waiting for the async React state update (setActiveSession → timerTargetTime=null).
     // Without this, the overlay stays visible for 1-2 frames after tap, during which
@@ -69,7 +61,6 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
     const soundIntervalRef = useRef<NodeJS.Timeout | null>(null);
     const vibrateIntervalRef = useRef<NodeJS.Timeout | null>(null);
     const alarmActiveRef = useRef(false);
-    const autoStartFiredRef = useRef(false);
     const wakeLockRef = useRef<{ release: () => Promise<void> } | null>(null);
     const hasNotifiedRef = useRef(false);
     // Capture total rest seconds on mount so the ring can compute % remaining
@@ -346,58 +337,20 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
         };
     }, [targetTime]);
 
-    // ── Auto-Start: automatically trigger START when timer finishes ──────────
-    // Use refs for callbacks/context to avoid dependency churn cancelling the timeout
-    const onStartRef = useRef(onStart);
-    const onFinishRef = useRef(onFinish);
-    const contextRef = useRef(context);
+    // Auto-start feature was fully removed. The entire "fire START automatically
+    // after 500ms" path is gone — user MUST tap START explicitly. This closes
+    // every possible route for the "START disparou sozinho" bug class, including
+    // the paths that couldn't be reached by mere state-reset fixes (stale cached
+    // JS bundles via the service worker, stale settings in the DB, race
+    // conditions on iOS WKWebView between touch events and the 500ms timeout,
+    // etc.). Restoring auto-start in the future should require an opt-in UI in
+    // Settings that can't be triggered by an accidental overlay tap.
+    //
+    // onCompleteRef is kept below because the timer tick callback still needs
+    // to call context?.onComplete when the rest finishes (external observers,
+    // e.g. analytics or Apple Watch sync).
     const onCompleteRef = useRef(context?.onComplete);
-    onStartRef.current = onStart;
-    onFinishRef.current = onFinish;
-    contextRef.current = context;
     onCompleteRef.current = context?.onComplete;
-
-    // Mirror autoStartLocal into a ref so the effect below can read the current
-    // value WITHOUT having `autoStartLocal` in its dependency list. Previously,
-    // toggling the "AUTO" button AFTER the timer had already finished would
-    // re-trigger this effect, schedule a 500ms setTimeout, and auto-advance the
-    // set on the user's behalf — i.e. START "executed alone" right after the
-    // user tapped what they thought was just a preference toggle for the next
-    // rest. The decision to auto-start must be locked at the moment the timer
-    // transitions to isFinished=true; later toggles are for the NEXT rest only.
-    const autoStartLocalRef = useRef(autoStartLocal);
-    autoStartLocalRef.current = autoStartLocal;
-
-    useEffect(() => {
-        if (!isFinished) {
-            autoStartFiredRef.current = false;
-            return;
-        }
-        if (autoStartFiredRef.current) return;
-        // Lock the decision NOW — any later toggle of AUTO is ignored for this rest.
-        autoStartFiredRef.current = true;
-        if (!autoStartLocalRef.current) return;
-        // Small delay so the "BORA!" flash is visible before advancing
-        const timeout = setTimeout(() => {
-            // Skip if user already clicked START manually
-            if (startBusyRef.current) return;
-            startBusyRef.current = true;
-            setDismissed(true); // Immediately hide overlay
-            try {
-                if (notifyIdRef.current) {
-                    endRestLiveActivity(notifyIdRef.current);
-                }
-                stopAlarm(true);
-                if (typeof onStartRef.current === 'function') onStartRef.current(contextRef.current);
-                else if (typeof onFinishRef.current === 'function') onFinishRef.current(contextRef.current);
-            } catch {
-                try {
-                    if (typeof onFinishRef.current === 'function') onFinishRef.current(contextRef.current);
-                } catch { }
-            }
-        }, 500);
-        return () => clearTimeout(timeout);
-    }, [isFinished]);
 
     // Guard against double-tap on START button (short window only)
     const startBusyRef = useRef(false);
@@ -563,29 +516,8 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
                             >
                                 {isSideRest ? 'TROCAR LADO ▶' : isTransition ? 'CHEGUEI ✓' : 'START ▶'}
                             </button>
-                            {!isSideRest && !isTransition && (
-                                <button
-                                    onClick={() => {
-                                        // Only toggle local state — do NOT write to settings.
-                                        // Persisting this via onToggleAutoStart was causing auto-start
-                                        // to stick ON across future sessions after a single accidental
-                                        // tap. If the user wants persistent auto-start they can enable
-                                        // it in the Settings screen explicitly.
-                                        try {
-                                            setAutoStartLocal(prev => !prev);
-                                        } catch { }
-                                    }}
-                                    className={`px-3 py-2 rounded-xl text-xs font-black active:scale-95 transition-all border ${
-                                        autoStartLocal
-                                            ? 'bg-gradient-to-r from-yellow-500/20 to-amber-500/20 border-yellow-500/50 text-yellow-400 shadow-sm shadow-yellow-500/10'
-                                            : 'text-neutral-400 hover:text-white hover:border-yellow-500/30'
-                                    }`}
-                                    style={!autoStartLocal ? { background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' } : undefined}
-                                    aria-label={autoStartLocal ? 'Desativar auto-start' : 'Ativar auto-start'}
-                                >
-                                    {autoStartLocal ? 'AUTO ▶' : 'AUTO'}
-                                </button>
-                            )}
+                            {/* AUTO button was removed — auto-start feature no longer exists
+                                in the overlay. User must tap START explicitly. */}
                         </div>
                     </div>
                 </div>
