@@ -17,7 +17,9 @@ export const dynamic = 'force-dynamic'
  * weight, training schedule, and food preferences.
  * ────────────────────────────────────────────────────────── */
 
-const MODEL_ID = env.gemini.modelId
+// Heavy generation route — uses the FAST model to stay under Vercel's 30s
+// serverless timeout. gemini-1.5-pro was timing out on full meal-plan output.
+const MODEL_ID = env.gemini.fastModelId
 
 const ZodBody = z.object({
   goal: z.string().optional().default('hipertrofia'),
@@ -100,7 +102,14 @@ export async function POST(req: Request) {
     ].filter(Boolean).join('\n')
 
     const genAI = new GoogleGenerativeAI(apiKey)
-    const model = genAI.getGenerativeModel({ model: MODEL_ID })
+    const model = genAI.getGenerativeModel({
+      model: MODEL_ID,
+      generationConfig: {
+        maxOutputTokens: 4096,
+        temperature: 0.7,
+        responseMimeType: 'application/json',
+      },
+    })
     const result = await model.generateContent(prompt)
     const text = (await result?.response?.text()) || ''
     const parsed2 = extractJson(text)

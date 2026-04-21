@@ -46,6 +46,11 @@ export const env = {
   gemini: {
     get apiKey() { return requireEnv('GOOGLE_GENERATIVE_AI_API_KEY') },
     get modelId() { return optionalEnv('GOOGLE_GENERATIVE_AI_MODEL_ID', 'gemini-1.5-pro') },
+    // Fast model for heavy/long generations (meal plans, workout routines) that
+    // were timing out against Vercel's 30s serverless limit when run on
+    // gemini-1.5-pro. gemini-1.5-flash is ~3x faster with comparable quality
+    // for structured JSON output.
+    get fastModelId() { return optionalEnv('GOOGLE_GENERATIVE_AI_FAST_MODEL_ID', 'gemini-1.5-flash') },
   },
 
   // ── RevenueCat ────────────────────────────────────────────
