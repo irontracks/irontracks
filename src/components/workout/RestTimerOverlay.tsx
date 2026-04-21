@@ -345,14 +345,26 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
     contextRef.current = context;
     onCompleteRef.current = context?.onComplete;
 
+    // Mirror autoStartLocal into a ref so the effect below can read the current
+    // value WITHOUT having `autoStartLocal` in its dependency list. Previously,
+    // toggling the "AUTO" button AFTER the timer had already finished would
+    // re-trigger this effect, schedule a 500ms setTimeout, and auto-advance the
+    // set on the user's behalf — i.e. START "executed alone" right after the
+    // user tapped what they thought was just a preference toggle for the next
+    // rest. The decision to auto-start must be locked at the moment the timer
+    // transitions to isFinished=true; later toggles are for the NEXT rest only.
+    const autoStartLocalRef = useRef(autoStartLocal);
+    autoStartLocalRef.current = autoStartLocal;
+
     useEffect(() => {
         if (!isFinished) {
             autoStartFiredRef.current = false;
             return;
         }
-        if (!autoStartLocal) return;
         if (autoStartFiredRef.current) return;
+        // Lock the decision NOW — any later toggle of AUTO is ignored for this rest.
         autoStartFiredRef.current = true;
+        if (!autoStartLocalRef.current) return;
         // Small delay so the "BORA!" flash is visible before advancing
         const timeout = setTimeout(() => {
             // Skip if user already clicked START manually
@@ -373,7 +385,7 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
             }
         }, 500);
         return () => clearTimeout(timeout);
-    }, [isFinished, autoStartLocal]);
+    }, [isFinished]);
 
     // Guard against double-tap on START button (short window only)
     const startBusyRef = useRef(false);
