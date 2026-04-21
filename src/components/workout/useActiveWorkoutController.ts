@@ -254,17 +254,51 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
       if (typeof propsRef.current?.onStartTimer !== 'function') return;
       const s = Number(seconds);
       if (!Number.isFinite(s) || s <= 0) return;
-      // Auto-inject exerciseName from key ("exIdx-setIdx") if not already provided
+      // Auto-inject exerciseName + nextSetLabel from key ("exIdx-setIdx") if not already provided
       const ctx = isObject(context) ? { ...(context as Record<string, unknown>) } : {};
-      if (!ctx.exerciseName) {
-        const key = String(ctx.key || '').trim();
-        const exIdx = key ? Number(key.split('-')[0]) : NaN;
-        const currentExercises = propsRef.current?.session?.workout?.exercises;
-        const exArr = Array.isArray(currentExercises) ? currentExercises : [];
-        if (Number.isFinite(exIdx) && exIdx >= 0 && exArr[exIdx]) {
-          ctx.exerciseName = String(exArr[exIdx]?.name || '').trim() || undefined;
+      const key = String(ctx.key || '').trim();
+      const keyParts = key ? key.split('-').map((p) => Number(p)) : [];
+      const currentExIdx = keyParts[0];
+      const currentSetIdx = keyParts[1];
+      const currentExercises = propsRef.current?.session?.workout?.exercises;
+      const exArr = Array.isArray(currentExercises) ? currentExercises : [];
+
+      if (Number.isFinite(currentExIdx) && currentExIdx >= 0 && exArr[currentExIdx]) {
+        const currentEx = exArr[currentExIdx] as Record<string, unknown>;
+        if (!ctx.exerciseName) {
+          ctx.exerciseName = String(currentEx?.name || '').trim() || undefined;
+        }
+
+        // Compute nextSetLabel: what set/exercise comes AFTER the one the user
+        // just completed. Used by the BORA overlay to show "3ª série de Supino"
+        // or "1ª série de Agachamento" so users know what's next without having
+        // to close the overlay.
+        if (!ctx.nextSetLabel && Number.isFinite(currentSetIdx) && currentSetIdx >= 0) {
+          const setsHeader = Math.max(0, Number.parseInt(String(currentEx?.sets ?? '0'), 10) || 0);
+          const sdRaw = currentEx?.setDetails ?? (currentEx as Record<string, unknown>)?.set_details;
+          const sdLen = Array.isArray(sdRaw) ? sdRaw.length : 0;
+          const setsCount = Math.max(setsHeader, sdLen);
+
+          if (currentSetIdx + 1 < setsCount) {
+            // Next set of the SAME exercise
+            const name = String(currentEx?.name || '').trim();
+            ctx.nextSetLabel = name
+              ? `${currentSetIdx + 2}ª série de ${name}`
+              : `${currentSetIdx + 2}ª série`;
+          } else {
+            // Move to next exercise's first set
+            const nextEx = exArr[currentExIdx + 1] as Record<string, unknown> | undefined;
+            if (nextEx) {
+              const nextName = String(nextEx?.name || '').trim();
+              ctx.nextSetLabel = nextName
+                ? `1ª série de ${nextName}`
+                : '1ª série do próximo exercício';
+            }
+            // else: last set of last exercise — leave nextSetLabel undefined
+          }
         }
       }
+
       propsRef.current.onStartTimer(s, ctx);
     } catch { }
   }, []);

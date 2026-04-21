@@ -11,6 +11,12 @@ interface RestTimerContext {
     exerciseId?: string;
     exerciseName?: string;
     setId?: string;
+    /** Pre-formatted label shown on the BORA screen. Examples:
+     *  - "3ª série de Supino Reto" (next set of same exercise)
+     *  - "1ª série de Agachamento" (first set of next exercise)
+     *  - undefined when there is no next set (last set of last exercise)
+     */
+    nextSetLabel?: string;
     onComplete?: (finalDurationSeconds?: number) => void;
 }
 
@@ -457,14 +463,23 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
             {isFinished && !isTransition && (
                 <div
                     role="presentation"
-                    className={`fixed inset-0 z-[2000] backdrop-blur-sm flex flex-col items-center justify-center ${isSideRest ? 'bg-blue-600/90' : 'bg-green-600/90'}`}
+                    className={`fixed inset-0 z-[2000] backdrop-blur-sm flex flex-col items-center justify-center px-6 ${isSideRest ? 'bg-blue-600/90' : 'bg-green-600/90'}`}
                     onClick={(e) => e.stopPropagation()}
                     onPointerDown={(e) => e.stopPropagation()}
                     onTouchStart={(e) => e.stopPropagation()}
                 >
                     <div className="text-7xl mb-4">{isSideRest ? '🔄' : '💪'}</div>
                     <h1 className="text-5xl font-black text-white uppercase tracking-tighter">{isSideRest ? 'TROCA!' : 'BORA!'}</h1>
-                    <p className="text-white/80 font-bold mt-2 text-lg">{isSideRest ? 'Agora o outro lado' : finishedLabel}</p>
+                    {isSideRest ? (
+                        <p className="text-white/80 font-bold mt-2 text-lg">Agora o outro lado</p>
+                    ) : context?.nextSetLabel ? (
+                        <>
+                            <p className="text-white/70 font-bold mt-2 text-sm uppercase tracking-widest">Próxima</p>
+                            <p className="text-white font-black mt-1 text-2xl text-center leading-tight">{context.nextSetLabel}</p>
+                        </>
+                    ) : (
+                        <p className="text-white/80 font-bold mt-2 text-lg">{finishedLabel}</p>
+                    )}
                 </div>
             )}
 
