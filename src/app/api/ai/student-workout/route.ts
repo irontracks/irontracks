@@ -17,7 +17,9 @@ export const dynamic = 'force-dynamic'
  * student based on their profile, assessments, and history.
  * ────────────────────────────────────────────────────────── */
 
-const MODEL_ID = env.gemini.modelId
+// Heavy generation route — uses the FAST model to stay under Vercel's 30s
+// serverless timeout.
+const MODEL_ID = env.gemini.fastModelId
 
 const ZodBody = z.object({
   studentId: z.string().min(1),
@@ -122,7 +124,14 @@ export async function POST(req: Request) {
     ].filter(Boolean).join('\n')
 
     const genAI = new GoogleGenerativeAI(apiKey)
-    const model = genAI.getGenerativeModel({ model: MODEL_ID })
+    const model = genAI.getGenerativeModel({
+      model: MODEL_ID,
+      generationConfig: {
+        maxOutputTokens: 4096,
+        temperature: 0.7,
+        responseMimeType: 'application/json',
+      },
+    })
     const result = await model.generateContent(prompt)
     const text = (await result?.response?.text()) || ''
     const parsed2 = extractJson(text)

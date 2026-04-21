@@ -12,7 +12,10 @@ import { env } from '@/utils/env'
 
 export const dynamic = 'force-dynamic'
 
-const MODEL = env.gemini.modelId
+// Heavy generation route — uses the FAST model to stay under Vercel's 30s
+// serverless function timeout. gemini-1.5-pro was consistently timing out on
+// full workout-routine generation.
+const MODEL = env.gemini.fastModelId
 
 const safeJsonParse = (raw: unknown) => parseJsonWithSchema(raw, z.unknown())
 
@@ -335,7 +338,15 @@ export async function POST(req: Request) {
     ].join('\n')
 
     const genAI = new GoogleGenerativeAI(apiKey)
-    const model = genAI.getGenerativeModel({ model: MODEL })
+    const model = genAI.getGenerativeModel({
+      model: MODEL,
+      generationConfig: {
+        // Cap output so a stuck / runaway generation returns instead of timing out
+        maxOutputTokens: 4096,
+        temperature: 0.7,
+        responseMimeType: 'application/json',
+      },
+    })
     const result = await model.generateContent([{ text: prompt }] as Parameters<typeof model.generateContent>[0])
     const text = String((await result?.response?.text()) || '')
     const parsed = extractJsonFromModelText(text)
