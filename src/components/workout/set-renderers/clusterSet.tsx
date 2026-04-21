@@ -194,7 +194,7 @@ export const ClusterSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: 
               <button
                 type="button"
                 onClick={() => {
-                  const baseWeight = String(log?.weight ?? cfg?.weight ?? '').trim();
+                  const baseWeight = String(log?.weight ?? cfg?.weight ?? plannedWeight ?? '').trim();
                   const baseRpe = String(log?.rpe ?? '').trim();
                   const planned = {
                     total_reps: totalRepsPlanned ?? null,
