@@ -553,7 +553,7 @@ export function ModalsComplexMethods() {
                                                 const plannedBlocks = Array.isArray(prev?.plannedBlocks) ? prev.plannedBlocks : [];
                                                 const restsByGap = Array.isArray(prev?.restsByGap) ? prev.restsByGap : [];
                                                 const baseWeight = String(prev?.baseWeight ?? '').trim();
-                                                const blocks = plannedBlocks.map((p) => ({ planned: p, weight: baseWeight, reps: null as number | null }));
+                                                const blocks = plannedBlocks.map((p) => ({ planned: p, weight: baseWeight, reps: (p ?? null) as number | null }));
                                                 return { ...prev, restsByGap, blocks, error: '' };
                                             });
                                         }}
