@@ -45,14 +45,20 @@ interface RestTimerOverlayProps {
     onToggleAutoStart?: () => void;
 }
 
-const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context, onFinish, onStart, onClose: _onClose, settings, autoStartEnabled, onToggleAutoStart }) => {
+const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context, onFinish, onStart, onClose: _onClose, settings, autoStartEnabled: _autoStartEnabled, onToggleAutoStart: _onToggleAutoStart }) => {
     const isPlankMode = context?.kind === 'plank'
-    const overlayTitle = isPlankMode ? 'Prancha' : 'Descanso'
     const finishedLabel = isPlankMode ? 'Tempo concluído!' : 'Descanso finalizado'
 
     const [timeLeft, setTimeLeft] = useState(0);
     const [isFinished, setIsFinished] = useState(false);
-    const [autoStartLocal, setAutoStartLocal] = useState(Boolean(autoStartEnabled));
+    // Auto-start ALWAYS begins OFF for every rest timer, regardless of the
+    // `autoStartEnabled` prop fed from settings. This prevents the "START
+    // disparou sozinho" class of bug where the user had accidentally toggled
+    // AUTO once (the button is right next to START) and thereafter every
+    // single rest auto-advanced without a tap. The AUTO button on the overlay
+    // now only affects THIS timer — the global setting is ignored on mount
+    // and the button no longer writes back to settings.
+    const [autoStartLocal, setAutoStartLocal] = useState(false);
     // Local dismiss: hides the overlay IMMEDIATELY on START tap instead of
     // waiting for the async React state update (setActiveSession → timerTargetTime=null).
     // Without this, the overlay stays visible for 1-2 frames after tap, during which
@@ -523,10 +529,13 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
                                     : formatDuration(baseSeconds)}
                             </span>
                             <span
-                                className="text-[7px] font-black uppercase tracking-widest mt-0.5"
-                                style={{ color: isOvertime ? '#ef4444' : isSideRest ? '#3b82f6' : isTransition ? '#f97316' : '#737373' }}
+                                className="text-[6px] font-black uppercase mt-0.5 leading-none"
+                                style={{
+                                    color: isOvertime ? '#ef4444' : isSideRest ? '#3b82f6' : isTransition ? '#f97316' : '#737373',
+                                    letterSpacing: '0.02em',
+                                }}
                             >
-                                {isOvertime ? 'extra' : isSideRest ? 'lado' : isTransition ? 'troca' : overlayTitle.toLowerCase()}
+                                {isOvertime ? 'extra' : isSideRest ? 'lado' : isTransition ? 'troca' : (isPlankMode ? 'prancha' : 'desc')}
                             </span>
                         </div>
                     </div>
@@ -557,9 +566,13 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
                             {!isSideRest && !isTransition && (
                                 <button
                                     onClick={() => {
+                                        // Only toggle local state — do NOT write to settings.
+                                        // Persisting this via onToggleAutoStart was causing auto-start
+                                        // to stick ON across future sessions after a single accidental
+                                        // tap. If the user wants persistent auto-start they can enable
+                                        // it in the Settings screen explicitly.
                                         try {
                                             setAutoStartLocal(prev => !prev);
-                                            if (typeof onToggleAutoStart === 'function') onToggleAutoStart();
                                         } catch { }
                                     }}
                                     className={`px-3 py-2 rounded-xl text-xs font-black active:scale-95 transition-all border ${
