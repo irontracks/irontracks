@@ -319,10 +319,16 @@ export function useSessionSync({
                                 if (incomingSavedAt > 0 && incomingSavedAt <= lastLocalUpsertAtRef.current) {
                                     return
                                 }
-                                // Genuinely foreign update from another device — apply it
-                                setActiveSession(state as unknown as ActiveWorkoutSession)
+                                // Genuinely foreign update from another device — apply it.
+                                // Sanitize stale rest-timer targets: a realtime echo from another
+                                // device (or from this device before a background/kill cycle) can
+                                // arrive with a timerTargetTime that's already in the past, which
+                                // makes the overlay dump the user straight on the "BORA!" screen
+                                // with an overtime counter the instant they open a workout.
+                                const cleanRealtime = sanitizeRestoredSession(state as Record<string, unknown>)
+                                setActiveSession(cleanRealtime as unknown as ActiveWorkoutSession)
                                 setView('active')
-                                try { localStorage.setItem(`irontracks.activeSession.v2.${uid}`, JSON.stringify(state)) } catch { }
+                                try { localStorage.setItem(`irontracks.activeSession.v2.${uid}`, JSON.stringify(cleanRealtime)) } catch { }
                             }
                         } catch (e) { logError('hook:useSessionSync.realtimeHandler', e) }
                     }
