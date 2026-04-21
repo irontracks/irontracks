@@ -45,7 +45,13 @@ export default function ServiceWorkerRegister() {
 
       const register = async () => {
         const swUrl = `/sw.js?v=${encodeURIComponent(appVersion)}`
-        const reg = await navigator.serviceWorker.register(swUrl)
+        // updateViaCache: 'none' tells the browser to NEVER use its HTTP cache
+        // when fetching the service worker file itself. Without this flag
+        // WebKit (iOS Safari + Capacitor WKWebView) caches sw.js for up to
+        // 24h, meaning deploys can take a full day to reach installed clients.
+        // Combined with the dynamic /sw.js route returning fresh content per
+        // deploy, this guarantees the update check actually sees changes.
+        const reg = await navigator.serviceWorker.register(swUrl, { updateViaCache: 'none' })
         registrationRef.current = reg
 
         if (reg.waiting) {
