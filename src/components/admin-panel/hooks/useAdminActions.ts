@@ -125,17 +125,31 @@ export function useAdminActions({
         }
     };
 
-    const handleUpdateStudentTeacher = async (studentId: string, teacherUserId: string | null) => {
+    const handleUpdateStudentTeacher = async (
+        studentId: string,
+        teacherUserId: string | null,
+        extras?: { email?: string | null }
+    ) => {
         try {
             // Route through the API which validates teacher_user_id against profiles before
             // updating students.teacher_id, avoiding the students_teacher_id_fkey FK violation
             // that occurred when passing teachers.id (PK) instead of teachers.user_id (profiles FK).
+            //
+            // Passing `email` as a fallback identifier is critical: when the AdminUser row
+            // was built from the profiles fallback (no real `students` row yet), `studentId`
+            // is the profile UUID — `eq('students.id', profileId)` won't find anything, and
+            // without an email the server returns 404 "student not found" and the panel
+            // would surface a meaningless "Falha na requisição".
             const authHeaders = await getAdminAuthHeaders();
-            const json = await apiAdmin.assignTeacher(
+            // Let apiAdmin.assignTeacher's thrown ApiError bubble up with the server's real
+            // message (e.g. "student not found", "teacher profile not found", "Limite de alunos
+            // atingido") so the user sees WHY it failed instead of a generic network message.
+            const json = (await apiAdmin.assignTeacher(
                 studentId,
                 teacherUserId || null,
-                authHeaders
-            ).catch(() => ({ ok: false, error: 'Falha na requisição' })) as Record<string, unknown>;
+                authHeaders,
+                extras?.email || undefined,
+            )) as Record<string, unknown>;
             if (!json?.ok) {
                 if (json?.upgrade_required) {
                     await alert('⚠️ Limite de alunos atingido!\n\nFaça upgrade do seu plano no painel para adicionar mais alunos. Use o botão "Upgrade" no cabeçalho ou na aba Visão Geral.', 'Plano Limitado')

@@ -143,8 +143,16 @@ export const StudentsTab: React.FC = () => {
                             value={s.teacher_id || ''}
                             onChange={(e) => {
                                 e.stopPropagation();
-                                // Pass user_id (profiles.id), not t.id (teachers table PK)
-                                handleUpdateStudentTeacher(s.id, e.target.value || null);
+                                // Pass user_id (profiles.id), not t.id (teachers table PK).
+                                // Also forward the student email so the server can resolve the
+                                // row by email when `s.id` is actually a profile UUID (happens
+                                // when AdminUser came from the profiles fallback with no
+                                // matching students row yet).
+                                handleUpdateStudentTeacher(
+                                    s.id,
+                                    e.target.value || null,
+                                    { email: s.email ?? null },
+                                );
                             }}
                             title="Atribuir professor"
                             aria-label="Professor responsável"
