@@ -88,10 +88,23 @@ export const apiAdmin = {
 
   // ─── Extended Students ────────────────────────────────────────────────────────
 
-  /** POST update student status (pago/pendente/atrasado/cancelar) */
-  updateStudentStatus: (id: string, status: string, authHeaders?: Record<string, string>) =>
-    apiPost<{ ok: boolean }>('/api/admin/students/status', { id, status },
-      { headers: { 'Content-Type': 'application/json', ...authHeaders } }),
+  /**
+   * POST update student status (pago/pendente/atrasado/cancelar).
+   * `id` is tried first as students.id, then as students.user_id (profile UUID).
+   * `email` is a last-resort fallback for rows that came from the profiles-only
+   * fallback path (AdminUser built before the real `students` row exists).
+   */
+  updateStudentStatus: (
+    id: string,
+    status: string,
+    authHeaders?: Record<string, string>,
+    email?: string | null,
+  ) =>
+    apiPost<{ ok: boolean }>(
+      '/api/admin/students/status',
+      { id, status, ...(email ? { email } : {}) },
+      { headers: { 'Content-Type': 'application/json', ...authHeaders } },
+    ),
 
   /** POST delete a student and all associated data */
   deleteStudent: (id: string, token: string, authHeaders?: Record<string, string>) =>
