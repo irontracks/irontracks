@@ -45,7 +45,7 @@ interface RestTimerOverlayProps {
     onToggleAutoStart?: () => void;
 }
 
-const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context, onFinish, onStart, onClose: _onClose, settings, autoStartEnabled: _autoStartEnabled, onToggleAutoStart: _onToggleAutoStart }) => {
+const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context, onFinish, onStart, onClose: _onClose, settings, autoStartEnabled, onToggleAutoStart: _onToggleAutoStart }) => {
     const isPlankMode = context?.kind === 'plank'
     const finishedLabel = isPlankMode ? 'Tempo concluído!' : 'Descanso finalizado'
 
@@ -337,22 +337,15 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
         };
     }, [targetTime]);
 
-    // Auto-start feature was fully removed. The entire "fire START automatically
-    // after 500ms" path is gone — user MUST tap START explicitly. This closes
-    // every possible route for the "START disparou sozinho" bug class, including
-    // the paths that couldn't be reached by mere state-reset fixes (stale cached
-    // JS bundles via the service worker, stale settings in the DB, race
-    // conditions on iOS WKWebView between touch events and the 500ms timeout,
-    // etc.). Restoring auto-start in the future should require an opt-in UI in
-    // Settings that can't be triggered by an accidental overlay tap.
-    //
-    // onCompleteRef is kept below because the timer tick callback still needs
-    // to call context?.onComplete when the rest finishes (external observers,
-    // e.g. analytics or Apple Watch sync).
+    // onCompleteRef is used by the timer tick callback to notify external
+    // observers (analytics, Apple Watch sync, etc.) when the rest finishes.
     const onCompleteRef = useRef(context?.onComplete);
     onCompleteRef.current = context?.onComplete;
 
-    // Guard against double-tap on START button (short window only)
+    // Guard against double-tap on START button AND against the auto-advance
+    // racing with a manual tap. Both the user's finger and the 500ms auto-fire
+    // path read/write this ref before calling onStart — whoever gets there
+    // first wins, the other short-circuits.
     const startBusyRef = useRef(false);
 
     // Reset local state when targetTime changes (new timer for a new set)
@@ -360,6 +353,60 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
         startBusyRef.current = false;
         setDismissed(false);
     }, [targetTime]);
+
+    // ── Auto-advance after rest completes ──────────────────────────────────
+    // Previously the app fired the START button 500ms after the overlay mounted
+    // ("START disparou sozinho" bug). Commit 1ce2ed48 ripped that out because
+    // the AUTO toggle was sitting next to START and users were tapping it by
+    // accident. The feature is back — but safer:
+    //
+    //   1. ONLY triggers when the countdown actually reaches 0 (isFinished).
+    //      No more "500ms after overlay mounts" — at that moment the countdown
+    //      is still running, so an auto-fire would be a skip-rest.
+    //   2. Gated by `autoStartEnabled` (the `restTimerAutoStart` user setting).
+    //      Default OFF — nobody gets it unless they opt-in via Settings.
+    //   3. Locked per-rest with `autoStartFiredRef`. Even if autoStartEnabled
+    //      flips true AFTER the countdown already finished (e.g. user opens
+    //      Settings during rest), nothing fires — the decision for this rest
+    //      was locked the moment isFinished went true.
+    //   4. `startBusyRef` already prevents racing with a manual tap.
+    const onStartRef = useRef(onStart);
+    onStartRef.current = onStart;
+    const onFinishRef = useRef(onFinish);
+    onFinishRef.current = onFinish;
+    const contextRef = useRef(context);
+    contextRef.current = context;
+    const autoStartFiredRef = useRef(false);
+
+    useEffect(() => {
+        if (!isFinished) {
+            autoStartFiredRef.current = false;
+            return;
+        }
+        if (autoStartFiredRef.current) return;
+        // Lock the decision for this rest at the moment it finishes. Any later
+        // toggle of the Settings switch is ignored — only the NEXT rest uses it.
+        autoStartFiredRef.current = true;
+        if (!autoStartEnabled) return;
+
+        const timeout = setTimeout(() => {
+            // Bail if the user already tapped START manually during the delay
+            if (startBusyRef.current) return;
+            startBusyRef.current = true;
+            setDismissed(true);
+            try {
+                if (notifyIdRef.current) endRestLiveActivity(notifyIdRef.current);
+                stopAlarm(true);
+                const fn = onStartRef.current ?? onFinishRef.current;
+                if (typeof fn === 'function') fn(contextRef.current);
+            } catch {
+                try {
+                    if (typeof onFinishRef.current === 'function') onFinishRef.current(contextRef.current);
+                } catch { /* swallow — nothing useful to do */ }
+            }
+        }, 500);
+        return () => clearTimeout(timeout);
+    }, [isFinished, autoStartEnabled]);
 
     // ── Early return: hide immediately on dismiss OR when no timer ──
     if (!targetTime || dismissed) return null;

@@ -3,6 +3,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { MessageCircle, Send, ChevronDown } from 'lucide-react'
 import Image from 'next/image'
 import { useTeamWorkout } from '@/contexts/TeamWorkoutContext'
+import { useWorkoutContext } from './workout/WorkoutContext'
 
 export interface ChatMessage {
     id: string
@@ -33,6 +34,22 @@ export function TeamChatDrawer({ myUserId, myPhotoURL, participants }: TeamChatD
         chatMessages: ChatMessage[]
         sendChatMessage: (text: string) => void
     }
+
+    // The rest-timer overlay bar (z-[2100]) sits at the bottom during recovery
+    // and is ~120px tall (68px ring + padding + pb-safe). The default floating
+    // chat button at bottom-[88px] z-[60] ended up BEHIND it — during rest the
+    // user lost access to team chat right when it's most useful. We read the
+    // workout session's timerTargetTime to detect rest, push the button up to
+    // 188px, and bump its z-index above the overlay so it always clears it.
+    //
+    // Using `> 0` (same check WorkoutFooter uses) instead of `> Date.now()` to
+    // keep this pure at render time — the orchestrator clears timerTargetTime
+    // back to 0/null when rest ends, so this stays in sync without needing a
+    // live clock read.
+    const workout = useWorkoutContext() as unknown as { session: Record<string, unknown> | null } | null
+    const timerTargetRaw = workout?.session ? (workout.session as Record<string, unknown>)?.timerTargetTime : null
+    const timerTargetNum = Number(timerTargetRaw ?? 0)
+    const hasRecovery = Number.isFinite(timerTargetNum) && timerTargetNum > 0
 
     const [open, setOpen] = useState(false)
     const [unread, setUnread] = useState(0)
@@ -90,11 +107,18 @@ export function TeamChatDrawer({ myUserId, myPhotoURL, participants }: TeamChatD
 
     return (
         <>
-            {/* Floating chat button */}
+            {/* Floating chat button — repositions above the rest-timer bar during
+                recovery so it's never buried by the z-[2100] overlay. Smooth
+                transition on bottom so the jump isn't jarring when rest starts. */}
             {!open && (
                 <button
                     onClick={handleOpen}
-                    className="fixed bottom-[88px] right-4 z-[60] w-12 h-12 rounded-full bg-yellow-500 text-black flex items-center justify-center shadow-xl shadow-yellow-900/30 hover:bg-yellow-400 transition-transform active:scale-95"
+                    style={{
+                        bottom: hasRecovery ? 188 : 88,
+                        zIndex: hasRecovery ? 2200 : 60,
+                        transition: 'bottom 220ms ease, z-index 0s',
+                    }}
+                    className="fixed right-4 w-12 h-12 rounded-full bg-yellow-500 text-black flex items-center justify-center shadow-xl shadow-yellow-900/30 hover:bg-yellow-400 transition-transform active:scale-95"
                     aria-label="Abrir chat da equipe"
                 >
                     <MessageCircle size={20} />

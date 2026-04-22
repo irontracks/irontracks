@@ -141,9 +141,14 @@ export function ModalsComplexMethods() {
                                     const safeRestSec = Number.isFinite(restSec) && restSec > 0 ? restSec : 0;
                                     return (
                                         <div key={`mini-${idx}`} className="rounded-xl border border-neutral-800 bg-neutral-950/30 p-3 relative">
-                                            <div className="flex items-center justify-between gap-2">
+                                            <div className="flex items-center gap-2">
+                                                {/* "Mini N" label. The rest-duration info that used to live on the
+                                                    right of this row was removed because the absolute-positioned
+                                                    {safeRestSec}s button (top-3 right-3, z-10) was covering it,
+                                                    leaving only a "D..." peek. The button IS the rest indicator
+                                                    now, and the "Descanso: Ns" caption below the inputs gives the
+                                                    full-text version. */}
                                                 <div className="text-[10px] uppercase tracking-widest font-bold text-neutral-400">Mini {idx + 1}</div>
-                                                {!isLast ? <div className="text-[10px] font-mono text-neutral-500">Descanso {safeRestSec}s</div> : <div />}
                                             </div>
                                             {!isLast && safeRestSec ? (() => {
                                                 const btnKey = `${String(modal.key || '')}-rp-${idx}`;
