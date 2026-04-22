@@ -180,8 +180,19 @@ export function useAdminActions({
         if (!(await confirm(`Mudar status de "${student.name || student.email}" para ${label}?`))) return;
         try {
             const authHeaders = await getAdminAuthHeaders();
-            const json = await apiAdmin.updateStudentStatus(student.id, newStatus, authHeaders)
-                .catch(() => ({ ok: false, error: 'Falha na requisição' })) as Record<string, unknown>;
+            // Same shape bug as handleUpdateStudentTeacher: the previous `.catch()`
+            // replaced the server's real error with "Falha na requisição" and the
+            // route only resolves by students.id. When `student.id` is actually a
+            // profile UUID (AdminUser built from the profiles fallback), the update
+            // matched 0 rows and the user had no idea why. Now we (a) let apiPost's
+            // real ApiError bubble up and (b) pass the email as a fallback identifier
+            // so the endpoint can find the row either way.
+            const json = (await apiAdmin.updateStudentStatus(
+                student.id,
+                newStatus,
+                authHeaders,
+                student.email ?? null,
+            )) as Record<string, unknown>;
             if (!json?.ok) throw new Error(String(json?.error || 'Falha ao atualizar status'));
             setUsersList((prev) =>
                 prev.map((u) => (u.id === student.id ? { ...u, status: newStatus } : u))
@@ -207,8 +218,11 @@ export function useAdminActions({
             const { data: sessionData } = await supabase.auth.getSession();
             const token = sessionData?.session?.access_token || '';
             const authHeaders = await getAdminAuthHeaders();
-            const json = await apiAdmin.deleteStudent(studentId, token, authHeaders)
-                .catch(() => ({ ok: false, error: 'Falha na requisição' })) as Record<string, unknown>;
+            // Let apiPost's ApiError bubble up with the real server message.
+            // Swallowing it into a generic "Falha na requisição" has burned us
+            // twice in a row (teacher assignment + status update) — same anti-
+            // pattern, same invisible root cause.
+            const json = (await apiAdmin.deleteStudent(studentId, token, authHeaders)) as Record<string, unknown>;
             if (!json?.ok) throw new Error(String(json?.error || 'Falha ao excluir aluno'));
             setUsersList((prev) => prev.filter((u) => u.id !== studentId && u.user_id !== studentId));
             await alert('Aluno excluído com sucesso!', 'Concluído');
