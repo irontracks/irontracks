@@ -81,6 +81,11 @@ const eslintConfig = defineConfig([
       // useIsIosNative intentionally sets state in useEffect — this is the
       // SSR-safe hydration pattern: false on server, real value after mount.
       "src/hooks/useIsIosNative.ts",
+      // useCardioTracking subscribes to an external GPS stream and must derive
+      // filtered track/metrics state from each new fix — this is exactly the
+      // "subscribe for updates" pattern the rule's own docs sanction. Keeping
+      // it silenced here mirrors useTeamBroadcast above.
+      "src/hooks/useCardioTracking.ts",
     ],
     rules: {
       "react-hooks/set-state-in-effect": "off",

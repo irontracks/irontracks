@@ -35,7 +35,11 @@ interface GymSuggestion {
 }
 
 export default function GymSettingsSection({ userId, supabase }: GymSettingsSectionProps) {
-  const { getCurrentPosition, position, loading: geoLoading, error: geoError } = useGeoLocation()
+  const { getCurrentPosition, position, status: geoStatus, error: geoError } = useGeoLocation()
+  // Preserve the legacy `loading` boolean semantics for the downstream UI —
+  // the hook now exposes a richer `status` state machine, but this section
+  // only cares about "is the GPS busy acquiring".
+  const geoLoading = geoStatus === 'requesting-permission' || geoStatus === 'acquiring'
   const [gyms, setGyms] = useState<Gym[]>([])
   const [qrGym, setQrGym] = useState<{ id: string; name: string } | null>(null)
   const [settings, setSettings] = useState<LocationSettings>({
