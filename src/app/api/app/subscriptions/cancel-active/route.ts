@@ -52,6 +52,20 @@ export async function POST(req: Request) {
     const providerSubId = String(sub?.provider_subscription_id || '').trim()
     const asaasSubId = String(sub?.asaas_subscription_id || '').trim()
 
+    // Apple IAP (via RevenueCat) CANNOT be cancelled server-side by design —
+    // Apple requires the user to cancel through iOS Settings → Apple ID →
+    // Subscriptions. If we only updated our DB, the user's card would keep
+    // being charged by Apple while the app tells them "assinatura cancelada".
+    // Bail out early and ask the client to direct the user to iOS Settings.
+    if (provider === 'apple' || provider === 'revenuecat' || provider === 'iap') {
+      return NextResponse.json({
+        ok: true,
+        cancelled: false,
+        apple_iap: true,
+        message: 'Para cancelar esta assinatura, vá em Ajustes do iPhone → seu nome no topo → Assinaturas → IronTracks → Cancelar. O cancelamento pelo app não encerra a cobrança da Apple.',
+      })
+    }
+
     if (provider === 'mercadopago' && providerSubId) {
       try {
         await mercadopagoRequest({

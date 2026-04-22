@@ -66,16 +66,25 @@ const INACTIVE_EVENTS = new Set([
 
 export async function POST(request: NextRequest) {
   try {
-    // Optional: Verify webhook auth header
-    if (WEBHOOK_AUTH_KEY) {
-      const authHeader = request.headers.get('authorization') || ''
-      const token = authHeader.replace(/^Bearer\s+/i, '').trim()
-      if (token !== WEBHOOK_AUTH_KEY) {
-        return NextResponse.json(
-          { ok: false, error: 'unauthorized' },
-          { status: 401 },
-        )
-      }
+    // The WEBHOOK_AUTH_KEY is the only thing standing between an anonymous POST
+    // and a user getting VIP granted. If the secret is unset in production,
+    // anyone who discovers the endpoint URL can forge an INITIAL_PURCHASE and
+    // grant themselves any plan. Refuse to process the webhook until the key
+    // is configured — better to drop legitimate events on the floor (RevenueCat
+    // auto-retries) than to silently open a free-VIP backdoor.
+    if (!WEBHOOK_AUTH_KEY) {
+      return NextResponse.json(
+        { ok: false, error: 'webhook_not_configured' },
+        { status: 500 },
+      )
+    }
+    const authHeader = request.headers.get('authorization') || ''
+    const token = authHeader.replace(/^Bearer\s+/i, '').trim()
+    if (token !== WEBHOOK_AUTH_KEY) {
+      return NextResponse.json(
+        { ok: false, error: 'unauthorized' },
+        { status: 401 },
+      )
     }
 
     const body = (await request.json()) as RevenueCatWebhookPayload
