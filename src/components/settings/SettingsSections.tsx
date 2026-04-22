@@ -427,18 +427,55 @@ export function SettingsNotificationsSection({ draft, setValue, iosNotifStatus, 
     const inAppToasts = Boolean(draft?.inAppToasts ?? true)
     const notificationPermissionPrompt = Boolean(draft?.notificationPermissionPrompt ?? true)
     const allowSocialFollows = Boolean(draft?.allowSocialFollows ?? true)
+    // Master switch: disables ALL push (lock-screen) notifications.
+    // In-app bell list still populates so the user can review events later.
+    const pushNotificationsEnabled = Boolean(draft?.pushNotificationsEnabled ?? true)
+    // Per-type toggles (in-app row + push)
     const notifyDirectMessages = Boolean(draft?.notifyDirectMessages ?? true)
     const notifyAppointments = Boolean(draft?.notifyAppointments ?? true)
+    const notifyBroadcasts = Boolean(draft?.notifyBroadcasts ?? true)
     const notifySocialFollows = Boolean(draft?.notifySocialFollows ?? true)
+    const notifyFollowAccepted = Boolean(draft?.notifyFollowAccepted ?? true)
     const notifyFriendOnline = Boolean(draft?.notifyFriendOnline ?? true)
     const notifyFriendWorkoutEvents = Boolean(draft?.notifyFriendWorkoutEvents ?? true)
+    const notifyFriendWorkoutStart = Boolean(draft?.notifyFriendWorkoutStart ?? true)
     const notifyFriendPRs = Boolean(draft?.notifyFriendPRs ?? true)
     const notifyFriendStreaks = Boolean(draft?.notifyFriendStreaks ?? true)
     const notifyFriendGoals = Boolean(draft?.notifyFriendGoals ?? true)
+    const notifyStoryPosted = Boolean(draft?.notifyStoryPosted ?? true)
+    const notifyStoryLikes = Boolean(draft?.notifyStoryLikes ?? true)
+    const notifyStoryReactions = Boolean(draft?.notifyStoryReactions ?? true)
+    const notifyChallenges = Boolean(draft?.notifyChallenges ?? true)
+    const notifyTeamInvites = Boolean(draft?.notifyTeamInvites ?? true)
+    const notifyMealReminders = Boolean(draft?.notifyMealReminders ?? true)
+    const notifyWorkoutReminders = Boolean(draft?.notifyWorkoutReminders ?? true)
+
     return (
         <SectionCard>
             <SectionHeader icon={Bell} label="Notificações" color="#f59e0b" />
             <div className="space-y-3">
+                {/* Master switch for lock-screen pushes */}
+                <div
+                    className="rounded-xl p-3 border"
+                    style={{
+                        background: pushNotificationsEnabled ? 'rgba(234,179,8,0.08)' : 'rgba(255,255,255,0.02)',
+                        borderColor: pushNotificationsEnabled ? 'rgba(234,179,8,0.25)' : 'rgba(255,255,255,0.06)',
+                    }}
+                >
+                    <div className="flex items-center justify-between gap-3">
+                        <div className="flex-1 min-w-0">
+                            <div className="text-sm font-black text-white">Notificações push</div>
+                            <div className="text-xs text-neutral-400">
+                                Controle geral. Se desligar, nada aparece na tela bloqueada — o sino do app continua listando tudo.
+                            </div>
+                        </div>
+                        <ToggleSwitch
+                            checked={pushNotificationsEnabled}
+                            onChange={() => setValue('pushNotificationsEnabled', !pushNotificationsEnabled)}
+                        />
+                    </div>
+                </div>
+
                 <div className="flex items-center justify-between gap-3">
                     <div><div className="text-sm font-bold text-white">Toasts no app</div><div className="text-xs text-neutral-400">Mensagens rápidas no topo da tela.</div></div>
                     <ToggleSwitch checked={inAppToasts} onChange={() => setValue('inAppToasts', !inAppToasts)} />
@@ -447,45 +484,162 @@ export function SettingsNotificationsSection({ draft, setValue, iosNotifStatus, 
                     <div><div className="text-sm font-bold text-white">Pedir permissão automaticamente</div><div className="text-xs text-neutral-400">Evita prompt do navegador ao iniciar treino.</div></div>
                     <ToggleSwitch checked={notificationPermissionPrompt} onChange={() => setValue('notificationPermissionPrompt', !notificationPermissionPrompt)} />
                 </div>
-                <div className="flex items-center justify-between gap-3">
-                    <div><div className="text-sm font-bold text-white">Notificação de mensagem direta</div><div className="text-xs text-neutral-400">Aparece no centro de notificações.</div></div>
-                    <ToggleSwitch checked={notifyDirectMessages} onChange={() => setValue('notifyDirectMessages', !notifyDirectMessages)} />
+
+                {/* ── Conversas e eventos diretos ──────────────────────────── */}
+                <div className="pt-3 border-t border-neutral-700/60 space-y-3">
+                    <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Mensagens e convites</div>
+                    <NotifRow
+                        title="Mensagem direta"
+                        description="DMs recebidas de outros usuários."
+                        checked={notifyDirectMessages}
+                        disabled={!pushNotificationsEnabled}
+                        onChange={() => setValue('notifyDirectMessages', !notifyDirectMessages)}
+                    />
+                    <NotifRow
+                        title="Convite de treino em grupo"
+                        description="Alguém te chamou para treinar junto."
+                        checked={notifyTeamInvites}
+                        disabled={!pushNotificationsEnabled}
+                        onChange={() => setValue('notifyTeamInvites', !notifyTeamInvites)}
+                    />
+                    <NotifRow
+                        title="Agenda / professor"
+                        description="Lembretes e eventos criados pelo coach."
+                        checked={notifyAppointments}
+                        disabled={!pushNotificationsEnabled}
+                        onChange={() => setValue('notifyAppointments', !notifyAppointments)}
+                    />
+                    <NotifRow
+                        title="Avisos do IronTracks"
+                        description="Comunicados oficiais enviados pelo time do app."
+                        checked={notifyBroadcasts}
+                        disabled={!pushNotificationsEnabled}
+                        onChange={() => setValue('notifyBroadcasts', !notifyBroadcasts)}
+                    />
                 </div>
-                <div className="flex items-center justify-between gap-3">
-                    <div><div className="text-sm font-bold text-white">Notificação de agenda</div><div className="text-xs text-neutral-400">Lembretes e eventos criados pelo coach.</div></div>
-                    <ToggleSwitch checked={notifyAppointments} onChange={() => setValue('notifyAppointments', !notifyAppointments)} />
-                </div>
+
+                {/* ── Redes sociais ─────────────────────────────────────────── */}
                 <div className="pt-3 border-t border-neutral-700/60 space-y-3">
                     <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Redes Sociais</div>
                     <div className="flex items-center justify-between gap-3">
                         <div><div className="text-sm font-bold text-white">Permitir seguidores</div><div className="text-xs text-neutral-400">Outros usuários podem te seguir no app.</div></div>
                         <ToggleSwitch checked={allowSocialFollows} onChange={() => setValue('allowSocialFollows', !allowSocialFollows)} />
                     </div>
-                    <div className="flex items-center justify-between gap-3">
-                        <div><div className="text-sm font-bold text-white">Novo seguidor</div><div className="text-xs text-neutral-400">Notifica quando alguém começa a te seguir.</div></div>
-                        <ToggleSwitch checked={notifySocialFollows} onChange={() => setValue('notifySocialFollows', !notifySocialFollows)} disabled={!allowSocialFollows} />
-                    </div>
-                    <div className="flex items-center justify-between gap-3">
-                        <div><div className="text-sm font-bold text-white">Amigo online</div><div className="text-xs text-neutral-400">Notifica quando um seguido inicia treino.</div></div>
-                        <ToggleSwitch checked={notifyFriendOnline} onChange={() => setValue('notifyFriendOnline', !notifyFriendOnline)} />
-                    </div>
-                    <div className="flex items-center justify-between gap-3">
-                        <div><div className="text-sm font-bold text-white">Treino do amigo</div><div className="text-xs text-neutral-400">Stories e relatórios publicados por seguidos.</div></div>
-                        <ToggleSwitch checked={notifyFriendWorkoutEvents} onChange={() => setValue('notifyFriendWorkoutEvents', !notifyFriendWorkoutEvents)} />
-                    </div>
-                    <div className="flex items-center justify-between gap-3">
-                        <div><div className="text-sm font-bold text-white">Novos recordes de amigos</div><div className="text-xs text-neutral-400">Quando um seguido bate um PR pessoal.</div></div>
-                        <ToggleSwitch checked={notifyFriendPRs} onChange={() => setValue('notifyFriendPRs', !notifyFriendPRs)} />
-                    </div>
-                    <div className="flex items-center justify-between gap-3">
-                        <div><div className="text-sm font-bold text-white">Streaks de amigos</div><div className="text-xs text-neutral-400">Quando um seguido mantém sequência de treinos.</div></div>
-                        <ToggleSwitch checked={notifyFriendStreaks} onChange={() => setValue('notifyFriendStreaks', !notifyFriendStreaks)} />
-                    </div>
-                    <div className="flex items-center justify-between gap-3">
-                        <div><div className="text-sm font-bold text-white">Metas de amigos</div><div className="text-xs text-neutral-400">Quando um seguido atinge uma meta.</div></div>
-                        <ToggleSwitch checked={notifyFriendGoals} onChange={() => setValue('notifyFriendGoals', !notifyFriendGoals)} />
-                    </div>
+                    <NotifRow
+                        title="Pedido para seguir"
+                        description="Alguém quer te seguir."
+                        checked={notifySocialFollows}
+                        disabled={!pushNotificationsEnabled || !allowSocialFollows}
+                        onChange={() => setValue('notifySocialFollows', !notifySocialFollows)}
+                    />
+                    <NotifRow
+                        title="Pedido aceito"
+                        description="Alguém aceitou seu pedido para seguir."
+                        checked={notifyFollowAccepted}
+                        disabled={!pushNotificationsEnabled}
+                        onChange={() => setValue('notifyFollowAccepted', !notifyFollowAccepted)}
+                    />
+                    <NotifRow
+                        title="Amigo online"
+                        description="Quando um seguido abre o app."
+                        checked={notifyFriendOnline}
+                        disabled={!pushNotificationsEnabled}
+                        onChange={() => setValue('notifyFriendOnline', !notifyFriendOnline)}
+                    />
+                    <NotifRow
+                        title="Amigo começou treino"
+                        description="Quando um seguido inicia um treino agora."
+                        checked={notifyFriendWorkoutStart}
+                        disabled={!pushNotificationsEnabled}
+                        onChange={() => setValue('notifyFriendWorkoutStart', !notifyFriendWorkoutStart)}
+                    />
+                    <NotifRow
+                        title="Amigo terminou treino"
+                        description="Quando um seguido finaliza um treino."
+                        checked={notifyFriendWorkoutEvents}
+                        disabled={!pushNotificationsEnabled}
+                        onChange={() => setValue('notifyFriendWorkoutEvents', !notifyFriendWorkoutEvents)}
+                    />
+                    <NotifRow
+                        title="Novos recordes (PR)"
+                        description="Quando um seguido bate um PR."
+                        checked={notifyFriendPRs}
+                        disabled={!pushNotificationsEnabled}
+                        onChange={() => setValue('notifyFriendPRs', !notifyFriendPRs)}
+                    />
+                    <NotifRow
+                        title="Streaks de amigos"
+                        description="Quando um seguido mantém sequência de treinos."
+                        checked={notifyFriendStreaks}
+                        disabled={!pushNotificationsEnabled}
+                        onChange={() => setValue('notifyFriendStreaks', !notifyFriendStreaks)}
+                    />
+                    <NotifRow
+                        title="Metas de amigos"
+                        description="Quando um seguido atinge uma meta."
+                        checked={notifyFriendGoals}
+                        disabled={!pushNotificationsEnabled}
+                        onChange={() => setValue('notifyFriendGoals', !notifyFriendGoals)}
+                    />
                 </div>
+
+                {/* ── Stories ───────────────────────────────────────────────── */}
+                <div className="pt-3 border-t border-neutral-700/60 space-y-3">
+                    <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Stories</div>
+                    <NotifRow
+                        title="Amigo postou story"
+                        description="Avisa quando seguidos publicam um story."
+                        checked={notifyStoryPosted}
+                        disabled={!pushNotificationsEnabled}
+                        onChange={() => setValue('notifyStoryPosted', !notifyStoryPosted)}
+                    />
+                    <NotifRow
+                        title="Curtidas no seu story"
+                        description="Avisa quando alguém curte seu story."
+                        checked={notifyStoryLikes}
+                        disabled={!pushNotificationsEnabled}
+                        onChange={() => setValue('notifyStoryLikes', !notifyStoryLikes)}
+                    />
+                    <NotifRow
+                        title="Reações no seu story"
+                        description="Avisa quando alguém reage ao seu story."
+                        checked={notifyStoryReactions}
+                        disabled={!pushNotificationsEnabled}
+                        onChange={() => setValue('notifyStoryReactions', !notifyStoryReactions)}
+                    />
+                </div>
+
+                {/* ── Desafios ──────────────────────────────────────────────── */}
+                <div className="pt-3 border-t border-neutral-700/60 space-y-3">
+                    <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Desafios</div>
+                    <NotifRow
+                        title="Desafios"
+                        description="Você foi desafiado, ou alguém aceitou / recusou seu desafio."
+                        checked={notifyChallenges}
+                        disabled={!pushNotificationsEnabled}
+                        onChange={() => setValue('notifyChallenges', !notifyChallenges)}
+                    />
+                </div>
+
+                {/* ── Lembretes ─────────────────────────────────────────────── */}
+                <div className="pt-3 border-t border-neutral-700/60 space-y-3">
+                    <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Lembretes</div>
+                    <NotifRow
+                        title="Refeições"
+                        description="Horários de refeição configurados na nutrição."
+                        checked={notifyMealReminders}
+                        disabled={!pushNotificationsEnabled}
+                        onChange={() => setValue('notifyMealReminders', !notifyMealReminders)}
+                    />
+                    <NotifRow
+                        title="Treino"
+                        description="Lembretes para não perder um dia de treino."
+                        checked={notifyWorkoutReminders}
+                        disabled={!pushNotificationsEnabled}
+                        onChange={() => setValue('notifyWorkoutReminders', !notifyWorkoutReminders)}
+                    />
+                </div>
+
                 {isIosNative && (
                     <div className="mt-2 rounded-xl bg-neutral-900 border border-neutral-700 p-3">
                         <div className="flex items-center justify-between gap-3">
@@ -502,6 +656,30 @@ export function SettingsNotificationsSection({ draft, setValue, iosNotifStatus, 
                 )}
             </div>
         </SectionCard>
+    )
+}
+
+function NotifRow({
+    title,
+    description,
+    checked,
+    disabled,
+    onChange,
+}: {
+    title: string
+    description: string
+    checked: boolean
+    disabled?: boolean
+    onChange: () => void
+}) {
+    return (
+        <div className={`flex items-center justify-between gap-3 ${disabled ? 'opacity-50' : ''}`}>
+            <div>
+                <div className="text-sm font-bold text-white">{title}</div>
+                <div className="text-xs text-neutral-400">{description}</div>
+            </div>
+            <ToggleSwitch checked={checked} onChange={onChange} disabled={disabled} />
+        </div>
     )
 }
 

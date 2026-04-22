@@ -36,14 +36,30 @@ export const UserSettingsSchema = z
     allowTeamInvites: z.boolean().default(true),
     allowSocialFollows: z.boolean().default(true),
     allowDirectMessages: z.boolean().default(true),
+    // ── Notificações (push + in-app) ──────────────────────────────────────
+    // Master switch: when false, NO push is delivered to the lock screen for
+    // any type. In-app notifications still appear (the user may want to see
+    // them on the bell menu without being interrupted on the lock screen).
+    pushNotificationsEnabled: z.boolean().default(true),
+    // Per-type toggles — apply to both in-app notifications and pushes
     notifyDirectMessages: z.boolean().default(true),
     notifyAppointments: z.boolean().default(true),
+    notifyBroadcasts: z.boolean().default(true),
     notifySocialFollows: z.boolean().default(true),
+    notifyFollowAccepted: z.boolean().default(true),
     notifyFriendOnline: z.boolean().default(true),
     notifyFriendWorkoutEvents: z.boolean().default(true),
+    notifyFriendWorkoutStart: z.boolean().default(true),
     notifyFriendPRs: z.boolean().default(true),
     notifyFriendStreaks: z.boolean().default(true),
     notifyFriendGoals: z.boolean().default(true),
+    notifyStoryPosted: z.boolean().default(true),
+    notifyStoryLikes: z.boolean().default(true),
+    notifyStoryReactions: z.boolean().default(true),
+    notifyChallenges: z.boolean().default(true),
+    notifyTeamInvites: z.boolean().default(true),
+    notifyMealReminders: z.boolean().default(true),
+    notifyWorkoutReminders: z.boolean().default(true),
     soundVolume: z.number().min(0).max(100).default(100),
     inAppToasts: z.boolean().default(true),
     notificationPermissionPrompt: z.boolean().default(true),

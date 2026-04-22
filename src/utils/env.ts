@@ -82,7 +82,11 @@ export const env = {
   // ── Apple Push Notification Service ──────────────────────
   apns: {
     get keyId() { return optionalEnv('APNS_KEY_ID') },
-    get keyP8() { return optionalEnv('APNS_KEY_P') },
+    // APNS_KEY_P8 is the documented var (contents of the .p8 file).
+    // APNS_KEY_P is accepted as a legacy fallback because earlier deploys
+    // used that name — silently losing the key was causing every iOS push
+    // to be skipped in production.
+    get keyP8() { return optionalEnv('APNS_KEY_P8') || optionalEnv('APNS_KEY_P') },
     get teamId() { return optionalEnv('APNS_TEAM_ID') },
     get bundleId() { return optionalEnv('APNS_BUNDLE_ID', 'com.irontracks.app') },
     get production() { return optionalEnv('APNS_PRODUCTION', 'false') === 'true' },

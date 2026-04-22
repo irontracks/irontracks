@@ -51,7 +51,7 @@ const VARS: VarSpec[] = [
   { key: 'FCM_PRIVATE_KEY', required: false, group: 'Firebase FCM', hint: 'PRIVADA' },
   // APNs
   { key: 'APNS_KEY_ID', required: false, group: 'Apple APNs' },
-  { key: 'APNS_KEY_P', required: false, group: 'Apple APNs', hint: 'PRIVADA' },
+  { key: 'APNS_KEY_P8', required: false, group: 'Apple APNs', hint: 'PRIVADA (contents of .p8 file)' },
   { key: 'APNS_TEAM_ID', required: false, group: 'Apple APNs' },
   { key: 'APNS_BUNDLE_ID', required: false, group: 'Apple APNs', hint: 'valor: com.irontracks.app' },
   { key: 'APNS_PRODUCTION', required: false, group: 'Apple APNs', hint: 'true/false' },

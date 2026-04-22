@@ -3,6 +3,48 @@ import { getErrorMessage } from '@/utils/errorMessage'
 import { sendPushToAllPlatforms as sendPushToUsers } from '@/lib/push/sender'
 import { logError } from '@/lib/logger'
 
+/**
+ * Canonical mapping of notification type → preference key in user_settings.
+ *
+ * When a notification row has a `type` matching one of these keys, the
+ * recipient's preference is respected for BOTH the in-app row insertion
+ * and the push delivery. Types NOT in this map fall through as "always
+ * deliver" — callers can still filter upstream if they want.
+ *
+ * Keep in sync with src/schemas/settings.ts and the UI toggles.
+ */
+export const NOTIFICATION_TYPE_TO_PREFERENCE: Record<string, string> = {
+  message: 'notifyDirectMessages',
+  direct_message: 'notifyDirectMessages',
+  appointment: 'notifyAppointments',
+  appointment_created: 'notifyAppointments',
+  broadcast: 'notifyBroadcasts',
+  follow_request: 'notifySocialFollows',
+  follow_accepted: 'notifyFollowAccepted',
+  friend_online: 'notifyFriendOnline',
+  friend_pr: 'notifyFriendPRs',
+  friend_streak: 'notifyFriendStreaks',
+  friend_goal: 'notifyFriendGoals',
+  workout_finish: 'notifyFriendWorkoutEvents',
+  workout_finished: 'notifyFriendWorkoutEvents',
+  workout_start: 'notifyFriendWorkoutStart',
+  story_posted: 'notifyStoryPosted',
+  story_like: 'notifyStoryLikes',
+  story_reaction: 'notifyStoryReactions',
+  challenge_created: 'notifyChallenges',
+  challenge_accepted: 'notifyChallenges',
+  challenge_declined: 'notifyChallenges',
+  team_invite: 'notifyTeamInvites',
+  meal_reminder: 'notifyMealReminders',
+  workout_reminder: 'notifyWorkoutReminders',
+}
+
+/** Given a notification type, return the preference key that gates it, or null. */
+export function preferenceKeyForType(type: unknown): string | null {
+  const t = String(type || '').trim().toLowerCase()
+  return t ? (NOTIFICATION_TYPE_TO_PREFERENCE[t] ?? null) : null
+}
+
 const chunk = (arr: unknown, size: unknown): unknown[][] => {
   const out: unknown[][] = []
   const safe = Array.isArray(arr) ? arr : []
@@ -62,9 +104,69 @@ export async function shouldThrottleBySenderType(senderId: unknown, type: unknow
 
 export async function insertNotifications(rows: unknown): Promise<{ ok: boolean; inserted: number; error?: string }> {
   const admin = createAdminClient()
-  const safeRows = (Array.isArray(rows) ? rows : [])
+  const rawRows = (Array.isArray(rows) ? rows : [])
     .filter((r) => r && typeof r === 'object')
     .map((r) => ({ ...(r as Record<string, unknown>), is_read: false, read: false }) as Record<string, unknown>)
+  if (!rawRows.length) return { ok: true, inserted: 0 }
+
+  // Auto-filter rows by the recipient's preference when the notification type
+  // maps to a known pref key. This way callers don't need to remember to
+  // filterRecipientsByPreference() upstream — every row that ends up here is
+  // either allowed or discarded.
+  const recipientsByPrefKey = new Map<string, Set<string>>()
+  for (const row of rawRows) {
+    const prefKey = preferenceKeyForType(row.type)
+    const recipientId = String(row.user_id || row.recipient_id || '').trim()
+    if (!prefKey || !recipientId) continue
+    if (!recipientsByPrefKey.has(prefKey)) recipientsByPrefKey.set(prefKey, new Set())
+    recipientsByPrefKey.get(prefKey)!.add(recipientId)
+  }
+
+  // Lookup each recipient's prefs exactly once and cache the allow-set by prefKey
+  const allowByPrefKey = new Map<string, Set<string>>()
+  if (recipientsByPrefKey.size > 0) {
+    try {
+      const allIds = new Set<string>()
+      recipientsByPrefKey.forEach((set) => set.forEach((id) => allIds.add(id)))
+      const { data } = await admin
+        .from('user_settings')
+        .select('user_id, preferences')
+        .in('user_id', Array.from(allIds))
+      const prefsByUser = new Map<string, Record<string, unknown>>()
+      for (const r of Array.isArray(data) ? data : []) {
+        const uid = String(r?.user_id || '')
+        const prefs =
+          r?.preferences && typeof r.preferences === 'object'
+            ? (r.preferences as Record<string, unknown>)
+            : {}
+        if (uid) prefsByUser.set(uid, prefs)
+      }
+      recipientsByPrefKey.forEach((recipients, prefKey) => {
+        const allowed = new Set<string>()
+        recipients.forEach((id) => {
+          const prefs = prefsByUser.get(id)
+          // Missing settings row → default is on. Explicit false → opt out.
+          if (!prefs || prefs[prefKey] !== false) allowed.add(id)
+        })
+        allowByPrefKey.set(prefKey, allowed)
+      })
+    } catch (e) {
+      // Fail open on pref lookup failure — we'd rather deliver than drop.
+      logError('insertNotifications.prefs', e)
+    }
+  }
+
+  const safeRows = rawRows.filter((row) => {
+    const prefKey = preferenceKeyForType(row.type)
+    if (!prefKey) return true // no mapping → always deliver
+    const allowed = allowByPrefKey.get(prefKey)
+    // If we never loaded (or lookup failed) the allow-set, fail open.
+    if (!allowed) return true
+    const recipientId = String(row.user_id || row.recipient_id || '').trim()
+    if (!recipientId) return false
+    return allowed.has(recipientId)
+  })
+
   if (!safeRows.length) return { ok: true, inserted: 0 }
 
   let inserted = 0
@@ -130,7 +232,17 @@ export async function insertNotifications(rows: unknown): Promise<{ ok: boolean;
       const extra: Record<string, string> = { type: group.type }
       if (group.link) extra.link = group.link
 
-      void sendPushToUsers(batch, group.title, group.message, extra).catch(() => { })
+      // Defense-in-depth: sender also enforces the master push switch and
+      // per-type pref. Rows are already pre-filtered but passing the key
+      // keeps the two layers consistent if someone changes this file later.
+      const prefKey = preferenceKeyForType(group.type)
+      void sendPushToUsers(
+        batch,
+        group.title,
+        group.message,
+        extra,
+        prefKey ? { preferenceKey: prefKey } : undefined,
+      ).catch(() => { })
     }
   } catch (e) { logError('insertNotifications.sendPush', e) }
 

@@ -48,9 +48,16 @@ export async function sendBroadcastMessage(title: string, message: string): Prom
         }
 
         // 4. Fire push notification to all users
+        // Respect the notifyBroadcasts per-user pref and the master switch.
         const allUserIds = safeProfiles.map(p => String(p.id)).filter(Boolean)
         if (allUserIds.length && title && message) {
-            void sendPushToUsers(allUserIds, title, message).catch(() => { })
+            void sendPushToUsers(
+                allUserIds,
+                title,
+                message,
+                { type: 'broadcast' },
+                { preferenceKey: 'notifyBroadcasts' },
+            ).catch(() => { })
         }
 
         return { success: true, count: notifications.length }
