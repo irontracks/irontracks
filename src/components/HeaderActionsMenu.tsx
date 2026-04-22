@@ -165,6 +165,15 @@ export default function HeaderActionsMenu({
         window.alert(String(json?.error || 'Falha ao cancelar assinatura.'))
         return
       }
+      // Apple IAP: server returns cancelled=false + apple_iap=true + a friendly
+      // message explaining that cancellation has to happen through iOS Settings.
+      // Without this branch the UI would say "Nenhuma assinatura ativa encontrada"
+      // which is both wrong (they DO have an active Apple sub) and harmful
+      // (Apple keeps charging).
+      if (json?.apple_iap) {
+        window.alert(String(json?.message || 'Para cancelar, vá em Ajustes do iPhone → Apple ID → Assinaturas → IronTracks.'))
+        return
+      }
       if (!json?.cancelled) {
         window.alert('Nenhuma assinatura ativa encontrada.')
         return
