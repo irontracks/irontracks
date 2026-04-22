@@ -103,8 +103,21 @@ export function DashboardHeader({
     return (
         <>
             <div className="bg-neutral-950 flex justify-between items-center fixed top-0 left-0 right-0 z-40 border-b border-zinc-800 px-6 shadow-lg pt-[env(safe-area-inset-top)] min-h-[calc(4rem+env(safe-area-inset-top))]">
-                <button type="button" className="flex items-center cursor-pointer group" onClick={onGoHome}>
-                    <div className="flex items-center gap-2">
+                {/*
+                  Logo + VIP badge container. Previously this whole block was a
+                  single <button> wrapping the logo AND the VIP <button>, which
+                  produced a hydration error in React 19 (button inside button
+                  is invalid HTML and triggers unpredictable hit-testing on iOS).
+                  Now the logo is its own <button> and the VIP badge is a
+                  sibling — clean semantics, no stopPropagation hacks needed.
+                */}
+                <div className="flex items-center">
+                    <button
+                        type="button"
+                        onClick={onGoHome}
+                        aria-label="Voltar ao dashboard"
+                        className="flex items-center gap-2 cursor-pointer group outline-none focus-visible:ring-2 focus-visible:ring-yellow-500 rounded-md"
+                    >
                         {/* Premium 3D dumbbell icon — plain img avoids next/image optimizer (Capacitor-safe) */}
                         {/* eslint-disable-next-line @next/next/no-img-element */}
                         <img
@@ -126,8 +139,8 @@ export function DashboardHeader({
                                 }}
                             >TRACKS</span>
                         </h1>
-                    </div>
-                    {/* VIP badge — shows on all platforms; non-interactive on iOS (no IAP nav) */}
+                    </button>
+                    {/* VIP badge — sibling of the logo button, not nested inside it. Shows on all platforms; non-interactive on iOS (no IAP nav) */}
                     {vipAccess?.hasVip && (
                         hideVipOnIos
                             ? (
@@ -137,13 +150,18 @@ export function DashboardHeader({
                                 </div>
                             )
                             : (
-                                <button type="button" onClick={(e) => { e.stopPropagation(); onOpenVip() }} className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-yellow-500/10 border border-yellow-500/20 shadow-[0_0_10px_-3px_rgba(234,179,8,0.3)] ml-3 hover:bg-yellow-500/15">
+                                <button
+                                    type="button"
+                                    onClick={onOpenVip}
+                                    aria-label="Abrir detalhes da assinatura VIP"
+                                    className="flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-yellow-500/10 border border-yellow-500/20 shadow-[0_0_10px_-3px_rgba(234,179,8,0.3)] ml-3 hover:bg-yellow-500/15"
+                                >
                                     <Crown size={11} className="text-yellow-500 fill-yellow-500" />
                                     <span className="text-[10px] font-black text-yellow-500 tracking-widest leading-none">VIP</span>
                                 </button>
                             )
                     )}
-                </button>
+                </div>
                 <div className="flex items-center gap-3">
                     {syncBadge}
                     {isCoach && <div className="hidden sm:block"><TeacherPlanSection /></div>}

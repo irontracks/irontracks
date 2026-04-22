@@ -341,7 +341,11 @@ export default function HeaderActionsMenu({
                   {!hideVipCtas && (
                     <MenuItem
                       icon={<CreditCard size={14} className="text-yellow-400" />}
-                      label="Carteira"
+                      // Matches the "COBRANÇAS" tab label inside the Admin
+                      // Panel. The previous "Carteira" label created a
+                      // same-destination-different-name inconsistency that
+                      // surfaced during the UI audit.
+                      label="Cobranças"
                       gold
                       onClick={() => { onOpenWallet?.(); close() }}
                     />

@@ -27,10 +27,26 @@ const nextConfig: NextConfig = {
   typescript: { ignoreBuildErrors: true },
 
   images: {
+    // localPatterns restricts which /public-served paths next/image can load.
+    // The previous list only whitelisted /api/social/stories/media and every
+    // other local asset (illustrations, badges, muscle-overlays, onboarding,
+    // body-types …) silently triggered an Error Boundary on any screen that
+    // rendered one of them (Comunidade crashed on /illustrations/empty-community.png).
     localPatterns: [
-      {
-        pathname: '/api/social/stories/media',
-      },
+      { pathname: '/api/social/stories/media/**' },
+      { pathname: '/illustrations/**' },
+      { pathname: '/badge-**' },
+      { pathname: '/muscle-overlays/**' },
+      { pathname: '/muscle-overlays-female/**' },
+      { pathname: '/body-types/**' },
+      { pathname: '/onboarding-**' },
+      { pathname: '/body-**' },
+      { pathname: '/default-avatar.png' },
+      { pathname: '/empty-**' },
+      { pathname: '/header-dumbbell.png' },
+      { pathname: '/login-hero.png' },
+      { pathname: '/icone.png' },
+      { pathname: '/logo-irontracks.png' },
     ],
     remotePatterns: [
       {
@@ -54,6 +70,15 @@ const nextConfig: NextConfig = {
       {
         protocol: 'https',
         hostname: 'www.gstatic.com',
+        port: '',
+        pathname: '/**',
+      },
+      // Cloudinary — user profile photos + uploaded media. Its absence here
+      // was causing Conversas (chat list) to crash when any DM partner had
+      // a Cloudinary-hosted avatar.
+      {
+        protocol: 'https',
+        hostname: 'res.cloudinary.com',
         port: '',
         pathname: '/**',
       },

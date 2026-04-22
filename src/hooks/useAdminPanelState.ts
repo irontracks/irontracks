@@ -14,7 +14,23 @@ import { useState, useCallback } from 'react'
 
 const ADMIN_PANEL_OPEN_KEY = 'irontracks_admin_panel_open'
 const ADMIN_PANEL_TAB_KEY = 'irontracks_admin_panel_tab'
-const VALID_TABS = new Set(['dashboard', 'students', 'teachers', 'templates', 'videos', 'broadcast', 'system'])
+// Keep in sync with AdminPanelHeader's `gestao` + `conteudo` + `suporte` keys.
+// Missing entries here silently fall back to 'dashboard' — which is why
+// "Carteira" in the side menu was opening the Admin Panel on Visão Geral
+// instead of the Cobranças tab: 'billing' wasn't in the set.
+const VALID_TABS = new Set([
+  'dashboard',
+  'students',
+  'requests',
+  'teachers',
+  'priorities',
+  'billing',
+  'guide',
+  'templates',
+  'videos',
+  'broadcast',
+  'system',
+])
 
 interface UseAdminPanelStateOptions {
   userRole?: string | null
