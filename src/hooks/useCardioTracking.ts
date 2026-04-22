@@ -1,48 +1,76 @@
 'use client'
 
 import { useState, useCallback, useRef, useEffect } from 'react'
-import { useGeoLocation } from './useGeoLocation'
-import { totalTrackDistance, avgPaceMinKm, speedKmh } from '@/utils/geoUtils'
+import { useGeoLocation, type GeoFix, type TrackingStatus } from './useGeoLocation'
+import { totalTrackDistance, avgPaceMinKm, speedKmh, haversineDistance } from '@/utils/geoUtils'
 import type { GeoTrackPoint } from '@/utils/geoUtils'
+import { decideCardioFilter, estimateCardioCalories } from '@/utils/cardioFilters'
 
 interface CardioMetrics {
-  /** Total distance in meters */
+  /** Total distance in meters. */
   distanceMeters: number
-  /** Elapsed time in seconds */
+  /** Elapsed time in seconds (excludes paused time). */
   durationSeconds: number
-  /** Average pace in min/km (null if no distance) */
+  /** Average pace in min/km, null if no distance yet. */
   paceMinKm: number | null
-  /** Current speed in km/h */
+  /** Instantaneous speed in km/h (smoothed over the last segment). */
   currentSpeedKmh: number
-  /** Max speed recorded in km/h */
+  /** Peak speed in km/h recorded during the session. */
   maxSpeedKmh: number
-  /** Estimated calories burned */
+  /** MET-based calorie estimate. */
   caloriesEstimated: number
+  /** Current GPS accuracy in meters (null if no fix yet). Lower is better. */
+  accuracyMeters: number | null
 }
 
 interface UseCardioTrackingOptions {
-  /** Body weight in kg — used for accurate MET-based calorie calculation. Defaults to 75 kg. */
+  /** Body weight in kg for accurate calorie calculation. Defaults to 75 kg. */
   bodyWeightKg?: number
+  /**
+   * Maximum GPS accuracy (in meters) for a point to be recorded.
+   * Points with accuracy > this are dropped as unreliable. Default 30 m.
+   */
+  maxAccuracyMeters?: number
+  /**
+   * Minimum movement (in meters) between consecutive recorded points.
+   * Sub-threshold moves are GPS drift while standing still. Default 5 m.
+   */
+  minMovementMeters?: number
+  /**
+   * Speed cap in km/h — segments faster than this are treated as GPS spikes
+   * and the offending point is dropped. 45 km/h is well above any human
+   * running or trail-biking pace but far below car speeds. Default 45.
+   */
+  maxRealisticSpeedKmh?: number
 }
 
 interface UseCardioTrackingResult {
-  /** Whether tracking is active */
+  /** True between start() and stop()/reset(), pause included. */
   isTracking: boolean
-  /** Whether tracking is paused */
+  /** True while paused (timer frozen, GPS stopped). */
   isPaused: boolean
-  /** Current real-time metrics */
+  /** Live metrics. */
   metrics: CardioMetrics
-  /** All recorded track points */
+  /** Recorded route points (post-filter). */
   trackPoints: GeoTrackPoint[]
-  /** Start GPS tracking */
-  start: () => void
-  /** Pause tracking (keeps timer but stops GPS) */
+  /** Geolocation status from the underlying hook (drives UI). */
+  gpsStatus: TrackingStatus
+  /** Last user-facing geolocation error, or null. */
+  gpsError: string | null
+  /**
+   * True when a GPS fix exists AND its accuracy is within
+   * maxAccuracyMeters — i.e., we're getting usable points.
+   */
+  hasReliableFix: boolean
+  start: () => Promise<void>
   pause: () => void
-  /** Resume from pause */
-  resume: () => void
-  /** Stop tracking and return final data */
-  stop: () => { metrics: CardioMetrics; points: GeoTrackPoint[]; startedAt: string; finishedAt: string } | null
-  /** Reset all state */
+  resume: () => Promise<void>
+  stop: () => {
+    metrics: CardioMetrics
+    points: GeoTrackPoint[]
+    startedAt: string
+    finishedAt: string
+  } | null
   reset: () => void
 }
 
@@ -53,37 +81,48 @@ const EMPTY_METRICS: CardioMetrics = {
   currentSpeedKmh: 0,
   maxSpeedKmh: 0,
   caloriesEstimated: 0,
+  accuracyMeters: null,
+}
+
+/** Convert a GeoFix into a GeoTrackPoint (trims fields we don't persist). */
+function toTrackPoint(fix: GeoFix): GeoTrackPoint {
+  return {
+    latitude:  fix.latitude,
+    longitude: fix.longitude,
+    altitude:  fix.altitudeMeters ?? undefined,
+    speed:     fix.speedMps ?? undefined,
+    timestamp: fix.timestamp,
+  }
 }
 
 /**
- * Estimate calories burned using MET × body weight × time.
- * MET tiers by speed:
- *   < 5 km/h  → walking slow  (MET 2.8)
- *   5–6 km/h  → walking brisk (MET 3.5)
- *   6–8 km/h  → fast walk     (MET 5.0)
- *   8–10 km/h → jogging       (MET 8.0)
- *  10–12 km/h → running       (MET 10.0)
- *  > 12 km/h  → fast running  (MET 11.5)
+ * Cardio GPS tracking hook.
+ *
+ * Wraps useGeoLocation with workout-specific logic:
+ *   - Accuracy gate (drop points with accuracy > maxAccuracyMeters).
+ *   - Movement threshold (skip GPS drift while standing still).
+ *   - Speed spike rejection (a bad fix that makes speed look like a car).
+ *   - Pause/resume (timer tracks only active time).
+ *   - MET-based calorie estimation.
+ *
+ * The hook surfaces the underlying GPS status/error so the UI can show
+ * "aguardando GPS", "permission denied", or an inline error — instead of
+ * the old behaviour where failures were silenced and the user saw nothing.
  */
-function estimateCalories(
-  distanceMeters: number,
-  durationSeconds: number,
+export function useCardioTracking({
   bodyWeightKg = 75,
-): number {
-  if (distanceMeters <= 0 || durationSeconds <= 0) return 0
-  const speed = speedKmh(distanceMeters, durationSeconds)
-  const met =
-    speed < 5  ? 2.8 :
-    speed < 6  ? 3.5 :
-    speed < 8  ? 5.0 :
-    speed < 10 ? 8.0 :
-    speed < 12 ? 10.0 : 11.5
-  const durationHours = durationSeconds / 3600
-  return Math.round(met * bodyWeightKg * durationHours)
-}
+  maxAccuracyMeters = 30,
+  minMovementMeters = 5,
+  maxRealisticSpeedKmh = 45,
+}: UseCardioTrackingOptions = {}): UseCardioTrackingResult {
+  const {
+    position,
+    status: gpsStatus,
+    error: gpsError,
+    startWatching,
+    stopWatching,
+  } = useGeoLocation()
 
-export function useCardioTracking({ bodyWeightKg = 75 }: UseCardioTrackingOptions = {}): UseCardioTrackingResult {
-  const { startWatching, stopWatching, position } = useGeoLocation()
   const [isTracking, setIsTracking] = useState(false)
   const [isPaused, setIsPaused] = useState(false)
   const [metrics, setMetrics] = useState<CardioMetrics>(EMPTY_METRICS)
@@ -95,104 +134,123 @@ export function useCardioTracking({ bodyWeightKg = 75 }: UseCardioTrackingOption
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const maxSpeedRef = useRef<number>(0)
   const startedAtRef = useRef<string>('')
+  // Hold the latest full GeoFix (including accuracy) for reading in effects
+  // that otherwise only see GeoTrackPoint shape.
+  const latestFixRef = useRef<GeoFix | null>(null)
 
-  // Update metrics every second
+  // ── Timer: advance elapsed + recompute pace/calories every second ────────
   useEffect(() => {
     if (!isTracking || isPaused) return
-
     timerRef.current = setInterval(() => {
-      const elapsed = Math.floor((Date.now() - startTimeRef.current - pausedDurationRef.current) / 1000)
-      setMetrics(prev => ({
+      const elapsed = Math.floor(
+        (Date.now() - startTimeRef.current - pausedDurationRef.current) / 1000,
+      )
+      setMetrics((prev) => ({
         ...prev,
         durationSeconds: elapsed,
         paceMinKm: avgPaceMinKm(prev.distanceMeters, elapsed),
-        caloriesEstimated: estimateCalories(prev.distanceMeters, elapsed, bodyWeightKg),
+        caloriesEstimated: estimateCardioCalories(prev.distanceMeters, elapsed, bodyWeightKg),
       }))
     }, 1000)
-
     return () => {
-      if (timerRef.current) clearInterval(timerRef.current)
+      if (timerRef.current) {
+        clearInterval(timerRef.current)
+        timerRef.current = null
+      }
     }
   }, [isTracking, isPaused, bodyWeightKg])
 
-  // Record new position when it changes
+  // ── Position pipeline: filter + append + recompute ──────────────────────
   useEffect(() => {
     if (!isTracking || isPaused || !position) return
+    latestFixRef.current = position
 
-    const newPoint: GeoTrackPoint = {
-      latitude: position.latitude,
-      longitude: position.longitude,
-      timestamp: Date.now(),
-    }
+    const newPoint = toTrackPoint(position)
+    const incoming = { ...newPoint, accuracyMeters: position.accuracyMeters }
 
-    setTrackPoints(prev => {
-      // Filter GPS drift: ignore points that moved less than 3 meters from last
-      if (prev.length > 0) {
-        const last = prev[prev.length - 1]
-        const drift = totalTrackDistance([last, newPoint])
-        if (drift < 3) return prev // skip — standing still or GPS noise
+    setTrackPoints((prev) => {
+      const last = prev.length > 0 ? prev[prev.length - 1] : null
+      const decision = decideCardioFilter(last, incoming, {
+        maxAccuracyMeters,
+        minMovementMeters,
+        maxRealisticSpeedKmh,
+      })
+
+      if (decision.type === 'reject') {
+        // Keep the accuracy visible so the UI can show signal quality and
+        // "searching for GPS" while we wait for a good fix.
+        setMetrics((p) => ({ ...p, accuracyMeters: position.accuracyMeters }))
+        return prev
       }
 
       const updated = [...prev, newPoint]
-      const dist = totalTrackDistance(updated)
-      const elapsed = Math.floor((Date.now() - startTimeRef.current - pausedDurationRef.current) / 1000)
+      const totalDist = totalTrackDistance(updated)
+      const elapsed = Math.floor(
+        (Date.now() - startTimeRef.current - pausedDurationRef.current) / 1000,
+      )
 
-      // Calculate current speed from last 2 points
+      // Current speed from the freshest segment
       let currentSpeed = 0
       if (updated.length >= 2) {
-        const last = updated[updated.length - 1]
-        const prev2 = updated[updated.length - 2]
-        const segDist = totalTrackDistance([prev2, last])
-        const segTime = (last.timestamp - prev2.timestamp) / 1000
-        currentSpeed = segTime > 0 ? speedKmh(segDist, segTime) : 0
+        const a = updated[updated.length - 1]
+        const b = updated[updated.length - 2]
+        const sd = haversineDistance(b, a)
+        const st = (a.timestamp - b.timestamp) / 1000
+        currentSpeed = st > 0 ? speedKmh(sd, st) : 0
       }
-
-      // Ignore GPS spikes — anything above 45 km/h is unrealistic for cardio
-      if (currentSpeed > 45) currentSpeed = 0
-
       if (currentSpeed > maxSpeedRef.current) maxSpeedRef.current = currentSpeed
 
       setMetrics({
-        distanceMeters: dist,
+        distanceMeters: totalDist,
         durationSeconds: elapsed,
-        paceMinKm: avgPaceMinKm(dist, elapsed),
+        paceMinKm: avgPaceMinKm(totalDist, elapsed),
         currentSpeedKmh: Math.round(currentSpeed * 10) / 10,
         maxSpeedKmh: Math.round(maxSpeedRef.current * 10) / 10,
-        caloriesEstimated: estimateCalories(dist, elapsed, bodyWeightKg),
+        caloriesEstimated: estimateCardioCalories(totalDist, elapsed, bodyWeightKg),
+        accuracyMeters: position.accuracyMeters,
       })
 
       return updated
     })
-  }, [position, isTracking, isPaused, bodyWeightKg])
+  }, [position, isTracking, isPaused, bodyWeightKg, maxAccuracyMeters, minMovementMeters, maxRealisticSpeedKmh])
 
-  const start = useCallback(() => {
+  // ── Public API ──────────────────────────────────────────────────────────
+
+  const start = useCallback(async () => {
     startTimeRef.current = Date.now()
     pausedDurationRef.current = 0
     maxSpeedRef.current = 0
     startedAtRef.current = new Date().toISOString()
+    latestFixRef.current = null
     setTrackPoints([])
     setMetrics(EMPTY_METRICS)
     setIsTracking(true)
     setIsPaused(false)
-    startWatching()
+    await startWatching()
   }, [startWatching])
 
   const pause = useCallback(() => {
     setIsPaused(true)
     pauseStartRef.current = Date.now()
     stopWatching()
-    if (timerRef.current) clearInterval(timerRef.current)
+    if (timerRef.current) {
+      clearInterval(timerRef.current)
+      timerRef.current = null
+    }
   }, [stopWatching])
 
-  const resume = useCallback(() => {
+  const resume = useCallback(async () => {
     pausedDurationRef.current += Date.now() - pauseStartRef.current
     setIsPaused(false)
-    startWatching()
+    await startWatching()
   }, [startWatching])
 
   const stop = useCallback(() => {
     stopWatching()
-    if (timerRef.current) clearInterval(timerRef.current)
+    if (timerRef.current) {
+      clearInterval(timerRef.current)
+      timerRef.current = null
+    }
     setIsTracking(false)
     setIsPaused(false)
 
@@ -209,14 +267,34 @@ export function useCardioTracking({ bodyWeightKg = 75 }: UseCardioTrackingOption
 
   const reset = useCallback(() => {
     stopWatching()
-    if (timerRef.current) clearInterval(timerRef.current)
+    if (timerRef.current) {
+      clearInterval(timerRef.current)
+      timerRef.current = null
+    }
     setIsTracking(false)
     setIsPaused(false)
     setTrackPoints([])
     setMetrics(EMPTY_METRICS)
     maxSpeedRef.current = 0
     pausedDurationRef.current = 0
+    latestFixRef.current = null
   }, [stopWatching])
 
-  return { isTracking, isPaused, metrics, trackPoints, start, pause, resume, stop, reset }
+  const hasReliableFix =
+    !!position && position.accuracyMeters <= maxAccuracyMeters
+
+  return {
+    isTracking,
+    isPaused,
+    metrics,
+    trackPoints,
+    gpsStatus,
+    gpsError,
+    hasReliableFix,
+    start,
+    pause,
+    resume,
+    stop,
+    reset,
+  }
 }

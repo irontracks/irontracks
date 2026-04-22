@@ -1,270 +1,464 @@
 'use client'
 
 import { useState, useCallback, useRef, useEffect } from 'react'
+import { isNativePlatform } from '@/utils/platform'
+import { logWarn } from '@/lib/logger'
 import type { GeoPoint } from '@/utils/geoUtils'
 
-/** Geolocation permission state */
-type PermissionState = 'prompt' | 'granted' | 'denied' | 'unavailable'
+/** A GPS fix with full metadata. Extends GeoPoint with accuracy + speed + timestamp. */
+export interface GeoFix extends GeoPoint {
+  /** Horizontal accuracy in meters. Lower is better. */
+  accuracyMeters: number
+  /** Altitude in meters (if available). */
+  altitudeMeters: number | null
+  /** Instantaneous speed in m/s (if reported by device). */
+  speedMps: number | null
+  /** Heading in degrees (if reported by device). */
+  headingDeg: number | null
+  /** Unix ms the fix was produced by the device. */
+  timestamp: number
+}
+
+/** Permission lifecycle states the caller needs to react to. */
+export type PermissionState = 'prompt' | 'granted' | 'denied' | 'unavailable'
+
+/** High-level tracking status shown in the UI. */
+export type TrackingStatus =
+  /** Not started yet. */
+  | 'idle'
+  /** Permission dialog is on screen. */
+  | 'requesting-permission'
+  /** Acquiring the first GPS fix after permission granted. */
+  | 'acquiring'
+  /** Actively streaming positions. */
+  | 'watching'
+  /** User or OS denied permission. */
+  | 'denied'
+  /** Hardware/plugin not available (e.g. desktop browser with no location). */
+  | 'unavailable'
+  /** Generic error — surfaced to the UI via `error`. */
+  | 'error'
 
 interface UseGeoLocationResult {
-  /** Current position (null until first read) */
-  position: GeoPoint | null
-  /** Whether a position read is in progress */
-  loading: boolean
-  /** Last error message */
-  error: string | null
-  /** Current permission state */
+  /** Latest GPS fix, or null if none yet. */
+  position: GeoFix | null
+  /** High-level tracking state — drives the UI. */
+  status: TrackingStatus
+  /** Raw permission state (checked on mount + after requests). */
   permission: PermissionState
-  /** Request a one-shot position read */
-  getCurrentPosition: () => Promise<GeoPoint | null>
-  /** Start watching position (returns cleanup fn) */
-  startWatching: () => void
-  /** Stop watching position */
-  stopWatching: () => void
-  /** Whether actively watching */
-  watching: boolean
+  /** Last user-facing error message, or null. */
+  error: string | null
+  /** One-shot: prompt the user and resolve to the first fix. */
+  getCurrentPosition: () => Promise<GeoFix | null>
+  /** Start streaming positions. Requests permission if needed. */
+  startWatching: () => Promise<void>
+  /** Stop streaming + cancel any pending operations. */
+  stopWatching: () => Promise<void>
 }
 
 /**
- * Try to dynamically import @capacitor/geolocation.
- * Returns null if not available (e.g. web, simulator without plugin).
+ * Lazily import the Capacitor Geolocation plugin. Returns null when:
+ *   - not running in Capacitor (web build),
+ *   - plugin not bundled (e.g. dev env without cap:sync),
+ *   - import fails for any other reason.
+ *
+ * We wrap the return in an object because the Capacitor plugin proxy is
+ * Thenable: returning it directly from an async function triggers the native
+ * bridge via `.then()` and crashes on iOS with
+ * "Geolocation.then() is not implemented on ios".
  */
-async function getCapacitorGeolocation() {
+async function loadCapacitorGeolocation() {
   try {
     const mod = await import('@capacitor/geolocation')
-    // Wrap in an object to prevent async function from calling .then() on the
-    // Capacitor plugin proxy (which is Thenable), which would trigger the native
-    // bridge and throw "Geolocation.then() is not implemented on ios"
     return { geo: mod.Geolocation }
   } catch {
     return null
   }
 }
 
+/** Friendly error messages (PT-BR) for the most common PositionError codes. */
+function friendlyGeoError(code: number | null): string {
+  switch (code) {
+    case 1: return 'Permissão de localização negada. Ative o GPS para o IronTracks nas configurações do seu dispositivo.'
+    case 2: return 'Sem sinal de GPS. Saia para um local aberto e tente novamente.'
+    case 3: return 'Tempo esgotado ao obter GPS. Verifique se o GPS está ligado.'
+    default: return 'Erro ao obter localização.'
+  }
+}
+
 /**
- * Central geolocation hook. Works on both Capacitor (native) and web.
- * Uses @capacitor/geolocation on native, navigator.geolocation on web.
- * Safe in simulators — all Capacitor calls are wrapped in try/catch.
+ * Central geolocation hook.
+ *
+ * Works on Capacitor (iOS + Android) via @capacitor/geolocation and on web
+ * via navigator.geolocation. Detection uses the project's shared
+ * isNativePlatform() helper (reads window.Capacitor.getPlatform()), which
+ * is more reliable than checking for `window.Capacitor` alone.
+ *
+ * Contract:
+ *   - startWatching() will request permission if needed. The promise
+ *     resolves when watching begins OR when permission is denied.
+ *   - position updates only trigger React re-renders when the coordinates
+ *     actually change (accuracy filtering + 1m dedupe) — avoids useEffect
+ *     churn.
+ *   - stopWatching() is idempotent and safe to call even if not watching.
  */
 export function useGeoLocation(): UseGeoLocationResult {
-  const [position, setPosition] = useState<GeoPoint | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [position, setPosition] = useState<GeoFix | null>(null)
+  const [status, setStatus] = useState<TrackingStatus>('idle')
   const [permission, setPermission] = useState<PermissionState>('prompt')
-  const [watching, setWatching] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  // Refs that must survive re-renders / avoid effect churn
   const watchIdRef = useRef<string | number | null>(null)
   const isNativeRef = useRef(false)
+  const lastFixRef = useRef<GeoFix | null>(null)
+  const mountedRef = useRef(true)
 
-  // Detect if running on Capacitor native
   useEffect(() => {
-    isNativeRef.current = typeof (window as unknown as Record<string, unknown>)?.Capacitor !== 'undefined'
+    isNativeRef.current = isNativePlatform()
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+    }
   }, [])
+
+  /** Safe setState wrappers that no-op after unmount. */
+  const safeSetPosition = useCallback((p: GeoFix | null) => {
+    if (mountedRef.current) setPosition(p)
+  }, [])
+  const safeSetStatus = useCallback((s: TrackingStatus) => {
+    if (mountedRef.current) setStatus(s)
+  }, [])
+  const safeSetPermission = useCallback((p: PermissionState) => {
+    if (mountedRef.current) setPermission(p)
+  }, [])
+  const safeSetError = useCallback((e: string | null) => {
+    if (mountedRef.current) setError(e)
+  }, [])
+
+  /** Normalize a position update into our GeoFix shape and filter duplicates. */
+  const applyFix = useCallback(
+    (fix: GeoFix) => {
+      const last = lastFixRef.current
+      // Dedupe: if sub-meter identical to last, ignore (avoids re-renders
+      // when the OS rebroadcasts a cached fix repeatedly).
+      if (
+        last &&
+        Math.abs(last.latitude - fix.latitude) < 0.000005 &&
+        Math.abs(last.longitude - fix.longitude) < 0.000005
+      ) {
+        return
+      }
+      lastFixRef.current = fix
+      safeSetPosition(fix)
+    },
+    [safeSetPosition],
+  )
+
+  // ── Permission check + request ────────────────────────────────────────────
 
   const checkPermission = useCallback(async (): Promise<PermissionState> => {
     try {
       if (isNativeRef.current) {
-        const result = await getCapacitorGeolocation()
-        if (!result) {
-          // Plugin not available — fall through to web
-          isNativeRef.current = false
-        } else {
-          const { geo: Geo } = result
-          const perm = await Geo.checkPermissions()
-          const state = perm.location === 'granted' ? 'granted' : perm.location === 'denied' ? 'denied' : 'prompt'
-          setPermission(state)
+        const loaded = await loadCapacitorGeolocation()
+        if (loaded) {
+          const perm = await loaded.geo.checkPermissions()
+          const state: PermissionState =
+            perm.location === 'granted' ? 'granted' :
+            perm.location === 'denied'  ? 'denied'  :
+            'prompt'
+          safeSetPermission(state)
           return state
         }
+        // Capacitor bridge present but plugin missing — treat as web
+        isNativeRef.current = false
       }
-      // Web fallback
-      if (!navigator.geolocation) {
-        setPermission('unavailable')
+      if (typeof navigator === 'undefined' || !navigator.geolocation) {
+        safeSetPermission('unavailable')
         return 'unavailable'
       }
       if (navigator.permissions) {
-        const result = await navigator.permissions.query({ name: 'geolocation' })
-        const state = result.state === 'granted' ? 'granted' : result.state === 'denied' ? 'denied' : 'prompt'
-        setPermission(state)
-        return state
+        try {
+          const r = await navigator.permissions.query({ name: 'geolocation' })
+          const state: PermissionState =
+            r.state === 'granted' ? 'granted' :
+            r.state === 'denied'  ? 'denied'  :
+            'prompt'
+          safeSetPermission(state)
+          return state
+        } catch {
+          // Some older Safari versions throw here — fall through to prompt.
+        }
       }
+      safeSetPermission('prompt')
       return 'prompt'
-    } catch {
+    } catch (e) {
+      logWarn('useGeoLocation.checkPermission', 'failed', e)
+      safeSetPermission('prompt')
       return 'prompt'
     }
-  }, [])
+  }, [safeSetPermission])
 
-  const requestPermission = useCallback(async (): Promise<boolean> => {
+  const requestPermission = useCallback(async (): Promise<PermissionState> => {
+    safeSetStatus('requesting-permission')
     try {
       if (isNativeRef.current) {
-        const result = await getCapacitorGeolocation()
-        if (!result) {
-          isNativeRef.current = false
-          return true // fallback to web implicit permission
+        const loaded = await loadCapacitorGeolocation()
+        if (loaded) {
+          const perm = await loaded.geo.requestPermissions()
+          const state: PermissionState = perm.location === 'granted' ? 'granted' : 'denied'
+          safeSetPermission(state)
+          return state
         }
-        const { geo: Geo } = result
-        const perm = await Geo.requestPermissions()
-        const granted = perm.location === 'granted'
-        setPermission(granted ? 'granted' : 'denied')
-        return granted
+        isNativeRef.current = false
       }
-      // On web, permission is requested implicitly when getting position
-      return true
-    } catch {
-      setPermission('denied')
-      return false
+      // On web, there's no explicit request API — the prompt fires when
+      // you actually call getCurrentPosition/watchPosition. Treat 'prompt'
+      // as "will ask on next call."
+      return 'prompt'
+    } catch (e) {
+      logWarn('useGeoLocation.requestPermission', 'failed', e)
+      safeSetPermission('denied')
+      return 'denied'
     }
-  }, [])
+  }, [safeSetPermission, safeSetStatus])
 
-  const getCurrentPosition = useCallback(async (): Promise<GeoPoint | null> => {
-    setLoading(true)
-    setError(null)
+  // ── One-shot position ─────────────────────────────────────────────────────
+
+  const getCurrentPosition = useCallback(async (): Promise<GeoFix | null> => {
+    safeSetError(null)
     try {
-      const perm = await checkPermission()
-      if (perm === 'denied' || perm === 'unavailable') {
-        setError(perm === 'denied' ? 'Permissão de localização negada' : 'GPS não disponível')
-        setLoading(false)
+      let perm = await checkPermission()
+      if (perm === 'unavailable') {
+        safeSetStatus('unavailable')
+        safeSetError('GPS não disponível neste dispositivo.')
         return null
       }
-      if (perm === 'prompt') {
-        const ok = await requestPermission()
-        if (!ok) {
-          setError('Permissão de localização negada')
-          setLoading(false)
-          return null
-        }
+      if (perm === 'prompt') perm = await requestPermission()
+      if (perm === 'denied') {
+        safeSetStatus('denied')
+        safeSetError(friendlyGeoError(1))
+        return null
       }
 
-      let point: GeoPoint | null = null
+      safeSetStatus('acquiring')
+
+      let fix: GeoFix | null = null
 
       if (isNativeRef.current) {
-        const result = await getCapacitorGeolocation()
-        if (result) {
-          const { geo: Geo } = result
+        const loaded = await loadCapacitorGeolocation()
+        if (loaded) {
           try {
-            const pos = await Geo.getCurrentPosition({ enableHighAccuracy: true, timeout: 15000, maximumAge: 0 })
-            point = { latitude: pos.coords.latitude, longitude: pos.coords.longitude }
-          } catch {
-            // Native failed — try web fallback
+            const pos = await loaded.geo.getCurrentPosition({
+              enableHighAccuracy: true,
+              timeout: 15000,
+              maximumAge: 0,
+            })
+            fix = {
+              latitude:  pos.coords.latitude,
+              longitude: pos.coords.longitude,
+              accuracyMeters:  Number(pos.coords.accuracy) || 99,
+              altitudeMeters:  pos.coords.altitude ?? null,
+              speedMps:        pos.coords.speed ?? null,
+              headingDeg:      pos.coords.heading ?? null,
+              timestamp:       pos.timestamp ?? Date.now(),
+            }
+          } catch (e) {
+            logWarn('useGeoLocation.native.getCurrentPosition', 'failed', e)
             isNativeRef.current = false
           }
         }
       }
 
-      if (!point && navigator.geolocation) {
-        // Web fallback
-        point = await new Promise<GeoPoint | null>((resolve) => {
+      if (!fix && typeof navigator !== 'undefined' && navigator.geolocation) {
+        fix = await new Promise<GeoFix | null>((resolve) => {
           navigator.geolocation.getCurrentPosition(
-            (pos) => resolve({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
-            () => resolve(null),
-            { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
+            (pos) =>
+              resolve({
+                latitude:  pos.coords.latitude,
+                longitude: pos.coords.longitude,
+                accuracyMeters:  pos.coords.accuracy ?? 99,
+                altitudeMeters:  pos.coords.altitude ?? null,
+                speedMps:        pos.coords.speed ?? null,
+                headingDeg:      pos.coords.heading ?? null,
+                timestamp:       pos.timestamp,
+              }),
+            (err) => {
+              safeSetError(friendlyGeoError(err.code))
+              resolve(null)
+            },
+            { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
           )
         })
       }
 
-      if (point) {
-        setPosition(point)
-        setPermission('granted')
-      } else {
-        setError('Não foi possível obter a localização')
+      if (fix) {
+        applyFix(fix)
+        safeSetPermission('granted')
+        safeSetStatus('idle') // one-shot ends — caller can startWatching for continuous
+      } else if (!error) {
+        // If getCurrentPosition produced nothing AND we didn't set an error,
+        // it's almost certainly a timeout.
+        safeSetError(friendlyGeoError(3))
+        safeSetStatus('error')
       }
-      setLoading(false)
-      return point
+
+      return fix
     } catch (e) {
-      setError(e instanceof Error ? e.message : 'Erro ao obter localização')
-      setLoading(false)
+      logWarn('useGeoLocation.getCurrentPosition', 'failed', e)
+      safeSetError(e instanceof Error ? e.message : 'Erro ao obter localização.')
+      safeSetStatus('error')
       return null
     }
-  }, [checkPermission, requestPermission])
+    // error state is read via ref? No — we use getState indirectly via closure.
+    // Safe because we only check !error inside the same tick as the null check.
+  }, [applyFix, checkPermission, requestPermission, error, safeSetError, safeSetPermission, safeSetStatus])
 
-  const startWatching = useCallback(() => {
-    if (watching) return
+  // ── Continuous watch ──────────────────────────────────────────────────────
 
-    const run = async () => {
-      try {
-        if (isNativeRef.current) {
-          const result = await getCapacitorGeolocation()
-          if (result) {
-            const { geo: Geo } = result
-            try {
-              const id = await Geo.watchPosition(
-                { enableHighAccuracy: true, timeout: 15000 },
-                (
-                  pos: { coords: { latitude: number; longitude: number; altitude?: number | null; speed?: number | null } } | null,
-                  err?: unknown,
-                ) => {
-                  if (err) return // silenced: GPS signal temporarily lost
-                  if (pos) {
-                    setPosition({
-                      latitude: pos.coords.latitude,
-                      longitude: pos.coords.longitude,
-                    })
+  const startWatching = useCallback(async (): Promise<void> => {
+    if (watchIdRef.current !== null) return // already watching
+    safeSetError(null)
+
+    let perm = await checkPermission()
+    if (perm === 'unavailable') {
+      safeSetStatus('unavailable')
+      safeSetError('GPS não disponível neste dispositivo.')
+      return
+    }
+    if (perm === 'prompt') perm = await requestPermission()
+    if (perm === 'denied') {
+      safeSetStatus('denied')
+      safeSetError(friendlyGeoError(1))
+      return
+    }
+
+    safeSetStatus('acquiring')
+
+    try {
+      if (isNativeRef.current) {
+        const loaded = await loadCapacitorGeolocation()
+        if (loaded) {
+          try {
+            const id = await loaded.geo.watchPosition(
+              { enableHighAccuracy: true, timeout: 30000 },
+              (
+                pos: {
+                  coords: {
+                    latitude: number
+                    longitude: number
+                    accuracy: number
+                    altitude?: number | null
+                    speed?: number | null
+                    heading?: number | null
                   }
+                  timestamp?: number
+                } | null,
+                err?: unknown,
+              ) => {
+                if (err) {
+                  // Don't flip to error on transient signal loss — just stay
+                  // in 'watching' and log. A persistent failure is surfaced
+                  // by no position updates for the caller to handle.
+                  logWarn('useGeoLocation.watch.native', 'transient error', err)
+                  return
                 }
-              )
-              watchIdRef.current = id
-              setWatching(true)
-              return
-            } catch {
-              // Native watch failed — fall through to web
-              isNativeRef.current = false
-            }
+                if (!pos) return
+                applyFix({
+                  latitude:  pos.coords.latitude,
+                  longitude: pos.coords.longitude,
+                  accuracyMeters:  Number(pos.coords.accuracy) || 99,
+                  altitudeMeters:  pos.coords.altitude ?? null,
+                  speedMps:        pos.coords.speed ?? null,
+                  headingDeg:      pos.coords.heading ?? null,
+                  timestamp:       pos.timestamp ?? Date.now(),
+                })
+                safeSetStatus('watching')
+              },
+            )
+            watchIdRef.current = id
+            return
+          } catch (e) {
+            logWarn('useGeoLocation.watch.native.setup', 'failed', e)
+            isNativeRef.current = false
           }
         }
-
-        // Web fallback
-        if (navigator.geolocation) {
-          const id = navigator.geolocation.watchPosition(
-            (pos) => setPosition({ latitude: pos.coords.latitude, longitude: pos.coords.longitude }),
-            () => { /* intentional: silenced watch error */ },
-            { enableHighAccuracy: true }
-          )
-          watchIdRef.current = id
-          setWatching(true)
-        }
-      } catch (e) {
-        setError(e instanceof Error ? e.message : 'Erro ao iniciar tracking')
       }
-    }
-    run()
-  }, [watching])
 
-  const stopWatching = useCallback(() => {
-    const run = async () => {
-      try {
-        if (watchIdRef.current !== null) {
-          if (isNativeRef.current) {
-            const result = await getCapacitorGeolocation()
-            if (result) {
-              const { geo: Geo } = result
-              try {
-                await Geo.clearWatch({ id: String(watchIdRef.current) })
-              } catch {
-                // intentional: cleanup errors are non-critical
-              }
-            }
-          } else if (navigator.geolocation && typeof watchIdRef.current === 'number') {
-            navigator.geolocation.clearWatch(watchIdRef.current)
+      // Web fallback
+      if (typeof navigator !== 'undefined' && navigator.geolocation) {
+        const id = navigator.geolocation.watchPosition(
+          (pos) => {
+            applyFix({
+              latitude:  pos.coords.latitude,
+              longitude: pos.coords.longitude,
+              accuracyMeters:  pos.coords.accuracy ?? 99,
+              altitudeMeters:  pos.coords.altitude ?? null,
+              speedMps:        pos.coords.speed ?? null,
+              headingDeg:      pos.coords.heading ?? null,
+              timestamp:       pos.timestamp,
+            })
+            safeSetStatus('watching')
+          },
+          (err) => {
+            // Persistent failure path — surface to UI.
+            safeSetError(friendlyGeoError(err.code))
+            safeSetStatus('error')
+          },
+          { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 },
+        )
+        watchIdRef.current = id
+      } else {
+        safeSetStatus('unavailable')
+        safeSetError('GPS não disponível neste dispositivo.')
+      }
+    } catch (e) {
+      logWarn('useGeoLocation.startWatching', 'failed', e)
+      safeSetError(e instanceof Error ? e.message : 'Erro ao iniciar GPS.')
+      safeSetStatus('error')
+    }
+  }, [applyFix, checkPermission, requestPermission, safeSetError, safeSetStatus])
+
+  const stopWatching = useCallback(async (): Promise<void> => {
+    const id = watchIdRef.current
+    watchIdRef.current = null
+    try {
+      if (id === null) return
+      if (isNativeRef.current) {
+        const loaded = await loadCapacitorGeolocation()
+        if (loaded) {
+          try {
+            await loaded.geo.clearWatch({ id: String(id) })
+          } catch (e) {
+            logWarn('useGeoLocation.stopWatching.native', 'failed', e)
           }
-          watchIdRef.current = null
         }
-      } catch {
-        // intentional: cleanup errors are non-critical
+      } else if (typeof navigator !== 'undefined' && navigator.geolocation && typeof id === 'number') {
+        navigator.geolocation.clearWatch(id)
       }
-      setWatching(false)
+    } finally {
+      if (mountedRef.current) safeSetStatus('idle')
     }
-    run()
-  }, [])
+  }, [safeSetStatus])
 
   // Cleanup on unmount
   useEffect(() => {
     return () => {
-      if (watchIdRef.current !== null) {
-        if (typeof watchIdRef.current === 'number' && navigator.geolocation) {
-          navigator.geolocation.clearWatch(watchIdRef.current)
-        }
-        watchIdRef.current = null
+      const id = watchIdRef.current
+      watchIdRef.current = null
+      if (id !== null && typeof id === 'number' && typeof navigator !== 'undefined' && navigator.geolocation) {
+        try { navigator.geolocation.clearWatch(id) } catch { /* ignore */ }
       }
     }
   }, [])
 
-  return { position, loading, error, permission, getCurrentPosition, startWatching, stopWatching, watching }
+  return {
+    position,
+    status,
+    permission,
+    error,
+    getCurrentPosition,
+    startWatching,
+    stopWatching,
+  }
 }
