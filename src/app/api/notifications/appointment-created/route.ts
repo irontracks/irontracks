@@ -82,8 +82,14 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: insertError.message }, { status: 400 })
     }
 
-    // Fire push notification
-    void sendPushToUsers([targetUserId], title, message).catch(() => { })
+    // Fire push notification (pref filter enforced by sender)
+    void sendPushToUsers(
+      [targetUserId],
+      title,
+      message,
+      { type: type || 'appointment' },
+      { preferenceKey: 'notifyAppointments' },
+    ).catch(() => { })
 
     return NextResponse.json({ ok: true, notified: true })
   } catch (e: unknown) {

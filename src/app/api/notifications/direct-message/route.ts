@@ -87,8 +87,16 @@ export async function POST(req: Request) {
 
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
 
-    // Fire push notification to the RECEIVER
-    void sendPushToUsers([receiverId], `💬 ${safeSenderName}`, safePreview).catch(() => { })
+    // Fire push notification to the RECEIVER.
+    // The sender enforces both the master switch AND the notifyDirectMessages
+    // per-type pref, so we pass the key for consistency.
+    void sendPushToUsers(
+      [receiverId],
+      `💬 ${safeSenderName}`,
+      safePreview,
+      { type: 'message' },
+      { preferenceKey: 'notifyDirectMessages' },
+    ).catch(() => { })
 
     return NextResponse.json({ ok: true })
   } catch (e: unknown) {

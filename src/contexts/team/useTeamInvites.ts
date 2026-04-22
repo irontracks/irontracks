@@ -478,6 +478,32 @@ export function useTeamInvites({
                 });
 
             if (inviteError) throw inviteError;
+
+            // Fire a lock-screen push to the recipient. The invite row itself
+            // is realtime-delivered by the 'invites' subscription, but realtime
+            // only fires if the recipient's app is running. Without this push
+            // the user sees nothing on the lock screen when their friend invites
+            // them to a workout.
+            try {
+                const workoutTitle =
+                    (typeof workout?.title === 'string' && workout.title) ||
+                    (typeof workout?.name === 'string' && workout.name) ||
+                    'Treino';
+                void fetch('/api/team/invite/notify', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    cache: 'no-store',
+                    body: JSON.stringify({
+                        targetUserId,
+                        workoutTitle: String(workoutTitle).slice(0, 120),
+                        sessionId: sessionId ?? undefined,
+                    }),
+                }).catch(() => { });
+            } catch (e) {
+                logError('useTeamInvites.notifyPush', e);
+            }
+
             return sessionId;
         } catch (e: unknown) {
             const msg = getErrorMessage(e) || String(e || 'Erro ao enviar convite');

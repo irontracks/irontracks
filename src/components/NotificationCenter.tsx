@@ -3,7 +3,9 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
     Bell, Check, X, Users, MessageSquare, Trophy, Dumbbell,
-    Zap, Trash2, Sparkles, Activity, Heart, Star
+    Trash2, Sparkles, Activity, Heart, Star,
+    UserPlus, Calendar, Utensils, Swords, Flame, Target,
+    Camera, Megaphone
 } from 'lucide-react';
 import { useTeamWorkout } from '@/contexts/TeamWorkoutContext';
 import { useDialog } from '@/contexts/DialogContext';
@@ -24,80 +26,129 @@ interface NotificationCenterProps {
 }
 
 // ─── Notification type config ─────────────────────────────────────────────────
-const TYPE_CONFIG: Record<string, {
+// Keys MUST match the `type` values emitted by the server. Aliases map legacy
+// names to the canonical entry so one server type rename doesn't break the UI.
+type TypeConfig = {
     icon: React.ReactNode;
     bg: string;
     border: string;
     dot: string;
     label: string;
-}> = {
+};
+
+const TYPE_CONFIG: Record<string, TypeConfig> = {
     invite: {
-        icon: <Users size={15} />,
-        bg: 'from-blue-500/20 to-blue-600/10',
-        border: 'border-blue-500/30',
-        dot: 'bg-blue-400',
-        label: 'Convite',
+        icon: <Users size={15} />, bg: 'from-blue-500/20 to-blue-600/10',
+        border: 'border-blue-500/30', dot: 'bg-blue-400', label: 'Convite',
     },
-    pr: {
-        icon: <Trophy size={15} />,
-        bg: 'from-yellow-500/20 to-amber-600/10',
-        border: 'border-yellow-500/30',
-        dot: 'bg-yellow-400',
-        label: 'PR',
+    team_invite: {
+        icon: <Users size={15} />, bg: 'from-blue-500/20 to-blue-600/10',
+        border: 'border-blue-500/30', dot: 'bg-blue-400', label: 'Convite',
     },
-    workout_finished: {
-        icon: <Dumbbell size={15} />,
-        bg: 'from-green-500/20 to-emerald-600/10',
-        border: 'border-green-500/30',
-        dot: 'bg-green-400',
-        label: 'Treino',
+    friend_pr: {
+        icon: <Trophy size={15} />, bg: 'from-yellow-500/20 to-amber-600/10',
+        border: 'border-yellow-500/30', dot: 'bg-yellow-400', label: 'PR',
     },
-    workout_started: {
-        icon: <Activity size={15} />,
-        bg: 'from-orange-500/20 to-orange-600/10',
-        border: 'border-orange-500/30',
-        dot: 'bg-orange-400',
-        label: 'Iniciado',
+    friend_streak: {
+        icon: <Flame size={15} />, bg: 'from-orange-500/20 to-red-500/10',
+        border: 'border-orange-500/30', dot: 'bg-orange-400', label: 'Streak',
+    },
+    friend_goal: {
+        icon: <Target size={15} />, bg: 'from-emerald-500/20 to-green-600/10',
+        border: 'border-emerald-500/30', dot: 'bg-emerald-400', label: 'Meta',
+    },
+    workout_finish: {
+        icon: <Dumbbell size={15} />, bg: 'from-green-500/20 to-emerald-600/10',
+        border: 'border-green-500/30', dot: 'bg-green-400', label: 'Treino',
+    },
+    workout_start: {
+        icon: <Activity size={15} />, bg: 'from-orange-500/20 to-orange-600/10',
+        border: 'border-orange-500/30', dot: 'bg-orange-400', label: 'Iniciou',
+    },
+    friend_online: {
+        icon: <Activity size={15} />, bg: 'from-cyan-500/20 to-sky-600/10',
+        border: 'border-cyan-500/30', dot: 'bg-cyan-400', label: 'Online',
+    },
+    follow_request: {
+        icon: <UserPlus size={15} />, bg: 'from-blue-500/20 to-indigo-600/10',
+        border: 'border-blue-500/30', dot: 'bg-blue-400', label: 'Seguir',
+    },
+    follow_accepted: {
+        icon: <UserPlus size={15} />, bg: 'from-green-500/20 to-emerald-600/10',
+        border: 'border-green-500/30', dot: 'bg-green-400', label: 'Aceito',
     },
     message: {
-        icon: <MessageSquare size={15} />,
-        bg: 'from-purple-500/20 to-purple-600/10',
-        border: 'border-purple-500/30',
-        dot: 'bg-purple-400',
-        label: 'Mensagem',
+        icon: <MessageSquare size={15} />, bg: 'from-purple-500/20 to-purple-600/10',
+        border: 'border-purple-500/30', dot: 'bg-purple-400', label: 'Mensagem',
     },
     broadcast: {
-        icon: <Zap size={15} />,
-        bg: 'from-red-500/20 to-red-600/10',
-        border: 'border-red-500/30',
-        dot: 'bg-red-400',
-        label: 'Aviso',
+        icon: <Megaphone size={15} />, bg: 'from-red-500/20 to-red-600/10',
+        border: 'border-red-500/30', dot: 'bg-red-400', label: 'Aviso',
+    },
+    appointment: {
+        icon: <Calendar size={15} />, bg: 'from-indigo-500/20 to-violet-600/10',
+        border: 'border-indigo-500/30', dot: 'bg-indigo-400', label: 'Agenda',
+    },
+    appointment_created: {
+        icon: <Calendar size={15} />, bg: 'from-indigo-500/20 to-violet-600/10',
+        border: 'border-indigo-500/30', dot: 'bg-indigo-400', label: 'Agenda',
     },
     milestone: {
-        icon: <Star size={15} />,
-        bg: 'from-pink-500/20 to-pink-600/10',
-        border: 'border-pink-500/30',
-        dot: 'bg-pink-400',
-        label: 'Marco',
+        icon: <Star size={15} />, bg: 'from-pink-500/20 to-pink-600/10',
+        border: 'border-pink-500/30', dot: 'bg-pink-400', label: 'Marco',
+    },
+    story_posted: {
+        icon: <Camera size={15} />, bg: 'from-fuchsia-500/20 to-pink-600/10',
+        border: 'border-fuchsia-500/30', dot: 'bg-fuchsia-400', label: 'Story',
+    },
+    story_like: {
+        icon: <Heart size={15} />, bg: 'from-rose-500/20 to-rose-600/10',
+        border: 'border-rose-500/30', dot: 'bg-rose-400', label: 'Curtiu',
     },
     like: {
-        icon: <Heart size={15} />,
-        bg: 'from-rose-500/20 to-rose-600/10',
-        border: 'border-rose-500/30',
-        dot: 'bg-rose-400',
-        label: 'Curtiu',
+        icon: <Heart size={15} />, bg: 'from-rose-500/20 to-rose-600/10',
+        border: 'border-rose-500/30', dot: 'bg-rose-400', label: 'Curtiu',
+    },
+    story_reaction: {
+        icon: <Heart size={15} />, bg: 'from-rose-500/20 to-rose-600/10',
+        border: 'border-rose-500/30', dot: 'bg-rose-400', label: 'Reação',
+    },
+    challenge_created: {
+        icon: <Swords size={15} />, bg: 'from-amber-500/20 to-orange-600/10',
+        border: 'border-amber-500/30', dot: 'bg-amber-400', label: 'Desafio',
+    },
+    challenge_accepted: {
+        icon: <Swords size={15} />, bg: 'from-green-500/20 to-emerald-600/10',
+        border: 'border-green-500/30', dot: 'bg-green-400', label: 'Aceito',
+    },
+    challenge_declined: {
+        icon: <Swords size={15} />, bg: 'from-neutral-500/20 to-neutral-600/10',
+        border: 'border-neutral-500/30', dot: 'bg-neutral-400', label: 'Recusado',
+    },
+    meal_reminder: {
+        icon: <Utensils size={15} />, bg: 'from-lime-500/20 to-green-600/10',
+        border: 'border-lime-500/30', dot: 'bg-lime-400', label: 'Refeição',
+    },
+    workout_reminder: {
+        icon: <Activity size={15} />, bg: 'from-teal-500/20 to-cyan-600/10',
+        border: 'border-teal-500/30', dot: 'bg-teal-400', label: 'Lembrete',
     },
     default: {
-        icon: <Bell size={15} />,
-        bg: 'from-neutral-700/40 to-neutral-800/20',
-        border: 'border-neutral-700/40',
-        dot: 'bg-neutral-500',
-        label: 'Info',
+        icon: <Bell size={15} />, bg: 'from-neutral-700/40 to-neutral-800/20',
+        border: 'border-neutral-700/40', dot: 'bg-neutral-500', label: 'Info',
     },
 };
 
+// Legacy aliases — map old server type names to the current config entry.
+const TYPE_ALIASES: Record<string, string> = {
+    workout_finished: 'workout_finish',
+    workout_started: 'workout_start',
+    pr: 'friend_pr',
+};
+
 function getTypeConfig(type: string) {
-    return TYPE_CONFIG[type] ?? TYPE_CONFIG.default;
+    const canonical = TYPE_ALIASES[type] ?? type;
+    return TYPE_CONFIG[canonical] ?? TYPE_CONFIG.default;
 }
 
 // ─── Micro components ─────────────────────────────────────────────────────────
@@ -247,8 +298,10 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded, open:
     };
 
     const safeIncomingInvites = Array.isArray(incomingInvites) ? incomingInvites.filter(Boolean) : [];
+    // Preserve server-emitted types verbatim — the TYPE_CONFIG map (plus
+    // TYPE_ALIASES for legacy renames) picks the right icon and color.
     const safeSystem = Array.isArray(systemNotifications) ? systemNotifications.map(n => ({
-        ...n, type: String(n?.type ?? '').toLowerCase() === 'invite' ? 'broadcast' : String(n?.type ?? 'default')
+        ...n, type: String(n?.type ?? 'default'),
     })) : [];
 
     const allNotifications = [

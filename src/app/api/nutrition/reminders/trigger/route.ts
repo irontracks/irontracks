@@ -60,7 +60,8 @@ export async function POST(req: Request) {
           [userId],
           `🍽️ ${label}`,
           'Hora de registrar sua refeição no IronTracks!',
-          { type: 'meal_reminder', path: '/dashboard/nutrition' }
+          { type: 'meal_reminder', link: '/dashboard/nutrition' },
+          { preferenceKey: 'notifyMealReminders' },
         )
         sent++
       } catch { /* continue to next user on individual failure */ }

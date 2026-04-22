@@ -76,7 +76,15 @@ export async function POST(req: Request) {
         .filter((uid) => uid && uid !== senderId)
 
       if (recipientIds.length) {
-        void sendPushToUsers(recipientIds, `💬 ${senderName.slice(0, 80)}`, text.slice(0, 100)).catch(() => { })
+        // Team chat uses the notifyTeamInvites pref as a proxy for "team
+        // interaction pushes" — no separate toggle for chat-only pushes.
+        void sendPushToUsers(
+          recipientIds,
+          `💬 ${senderName.slice(0, 80)}`,
+          text.slice(0, 100),
+          { type: 'team_chat' },
+          { preferenceKey: 'notifyTeamInvites' },
+        ).catch(() => { })
       }
     }
 
