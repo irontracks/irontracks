@@ -7,6 +7,7 @@ import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
 import { env } from '@/utils/env'
+import { safeGemini, handleGeminiError } from '@/utils/ai/handleGeminiError'
 
 export const dynamic = 'force-dynamic'
 
@@ -129,7 +130,11 @@ export async function POST(req: Request) {
 
     const genAI = new GoogleGenerativeAI(apiKey)
     const model = genAI.getGenerativeModel({ model: MODEL_ID })
-    const result = await model.generateContent(prompt)
+    const geminiResult = await safeGemini('weekly-report', () =>
+      model.generateContent(prompt),
+    )
+    if ('errorResponse' in geminiResult) return geminiResult.errorResponse
+    const result = geminiResult.value
     const text = (await result?.response?.text()) || ''
     const parsed = extractJson(text)
 
@@ -139,7 +144,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: true, report: parsed })
   } catch (e: unknown) {
-    const msg = (e as Record<string, unknown>)?.message
-    return NextResponse.json({ ok: false, error: typeof msg === 'string' ? msg : String(e) }, { status: 500 })
+    return handleGeminiError('weekly-report', e)
   }
 }

@@ -11,6 +11,7 @@ import { resolveCanonicalExerciseName } from '@/utils/exerciseCanonical'
 import { MUSCLE_GROUPS } from '@/utils/muscleMapConfig'
 import { buildHeuristicExerciseMap } from '@/utils/exerciseMuscleHeuristics'
 import { env } from '@/utils/env'
+import { safeGemini, handleGeminiError } from '@/utils/ai/handleGeminiError'
 
 export const dynamic = 'force-dynamic'
 
@@ -201,7 +202,11 @@ export async function POST(req: Request) {
 
     const genAI = new GoogleGenerativeAI(apiKey)
     const model = genAI.getGenerativeModel({ model: MODEL })
-    const result = await model.generateContent(prompt)
+    const geminiResult = await safeGemini('exercise-muscle-map', () =>
+      model.generateContent(prompt),
+    )
+    if ('errorResponse' in geminiResult) return geminiResult.errorResponse
+    const result = geminiResult.value
     const text = (await result?.response?.text()) || ''
     const parsed = extractJsonFromModelText(text)
     if (!parsed) return NextResponse.json({ ok: false, error: 'invalid_ai_response' }, { status: 400 })
@@ -226,7 +231,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: true, items: [...heuristicItems, ...upsertRows] })
   } catch (e: unknown) {
-    const msg = (e as Record<string, unknown>)?.message
-    return NextResponse.json({ ok: false, error: typeof msg === 'string' ? msg : String(e) }, { status: 500 })
+    return handleGeminiError('exercise-muscle-map', e)
   }
 }

@@ -5,8 +5,8 @@ import { requireUser } from '@/utils/auth/route'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { parseJsonBody, parseJsonWithSchema } from '@/utils/zod'
 import { sanitizeAiInput } from '@/lib/nutrition/security'
-import { getErrorMessage } from '@/utils/errorMessage'
 import { env } from '@/utils/env'
+import { safeGemini, handleGeminiError } from '@/utils/ai/handleGeminiError'
 
 export const dynamic = 'force-dynamic'
 
@@ -97,7 +97,11 @@ export async function POST(req: Request) {
 
     const genAI = new GoogleGenerativeAI(apiKey)
     const model = genAI.getGenerativeModel({ model: MODEL })
-    const result = await model.generateContent([{ text: prompt }])
+    const geminiResult = await safeGemini('parse-exercise-voice', () =>
+      model.generateContent([{ text: prompt }]),
+    )
+    if ('errorResponse' in geminiResult) return geminiResult.errorResponse
+    const result = geminiResult.value
     const rawText = result?.response?.text?.() || ''
     const extracted = extractJsonFromText(rawText)
     const parsed = OutputSchema.safeParse(extracted)
@@ -108,6 +112,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: true, exercises: parsed.data.exercises })
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: getErrorMessage(e) || 'unexpected_error' }, { status: 500 })
+    return handleGeminiError('parse-exercise-voice', e)
   }
 }

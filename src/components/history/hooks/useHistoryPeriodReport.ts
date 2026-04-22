@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { generatePeriodReportInsights } from '@/actions/workout-actions';
 import { buildPeriodReportHtml } from '@/utils/report/buildPeriodReportHtml';
+import { translateAiError } from '@/utils/ai/clientErrors';
 import { PeriodStats } from '@/types/workout';
 import { PeriodReport, PeriodAiState, PeriodPdfState, WorkoutSummary, isRecord, RawSessionObjectSchema } from '@/components/historyListTypes';
 import { toDateMs, calculateTotalVolumeFromLogs } from './useHistoryData';
@@ -122,11 +123,10 @@ export function useHistoryPeriodReport({ historyItems, user, alert }: UseHistory
             setPeriodAi({ status: 'loading', ai: null, error: '' });
             try {
                 const res = await generatePeriodReportInsights({ type, stats });
-                if (!res?.ok) { setPeriodAi({ status: 'error', ai: null, error: String(res?.error || 'Falha ao gerar insights') }); return; }
+                if (!res?.ok) { setPeriodAi({ status: 'error', ai: null, error: translateAiError(res?.error) }); return; }
                 setPeriodAi({ status: 'ready', ai: (res.ai as Record<string, unknown>) || null, error: '' });
             } catch (err) {
-                const msg = err instanceof Error ? err.message : String(err);
-                setPeriodAi({ status: 'error', ai: null, error: msg || 'Falha ao gerar insights' });
+                setPeriodAi({ status: 'error', ai: null, error: translateAiError(err) });
             }
         } catch (e) {
             const msg = e instanceof Error ? e.message : String(e);

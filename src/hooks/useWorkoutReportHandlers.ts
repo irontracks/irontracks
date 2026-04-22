@@ -8,6 +8,7 @@ import {
 import { buildReportHTML } from '@/utils/report/buildHtml'
 import { fetchLogoDataUrl } from '@/utils/report/fetchLogoDataUrl'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { translateAiError } from '@/utils/ai/clientErrors'
 import {
     remapPrevLogsByCanonical,
     remapPrevBaseMsByCanonical,
@@ -172,12 +173,12 @@ export function useWorkoutReportHandlers({
             const res = await generatePostWorkoutInsights({ workoutId: typeof session?.id === 'string' ? session.id : null, session: session! })
             if (!res?.ok) {
                 if (res.upgradeRequired) { if (onUpgrade) onUpgrade(); else alert('Upgrade necessário para usar esta função.') }
-                setAiState((prev: AiState) => ({ ...(prev || { loading: false, error: null, result: null, cached: false }), loading: false, error: String(res?.error || 'Falha ao gerar insights'), cached: false }))
+                setAiState((prev: AiState) => ({ ...(prev || { loading: false, error: null, result: null, cached: false }), loading: false, error: translateAiError(res?.error), cached: false }))
                 return
             }
             setAiState({ loading: false, error: null, result: res.ai && typeof res.ai === 'object' ? (res.ai as Record<string, unknown>) : null, cached: !!res.saved })
         } catch (e) {
-            setAiState((prev: AiState) => ({ ...(prev || { loading: false, error: null, result: null, cached: false }), loading: false, error: String((e as AnyObj | null)?.message || e || 'Falha ao gerar insights'), cached: false }))
+            setAiState((prev: AiState) => ({ ...(prev || { loading: false, error: null, result: null, cached: false }), loading: false, error: translateAiError((e as AnyObj | null)?.message || e), cached: false }))
         }
     }, [session, aiState, setAiState, onUpgrade])
 

@@ -12,8 +12,8 @@ import { requireUser } from '@/utils/auth/route'
 import { checkVipFeatureAccess, incrementVipUsage } from '@/utils/vip/limits'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { parseJsonBody } from '@/utils/zod'
-import { getErrorMessage } from '@/utils/errorMessage'
 import { env } from '@/utils/env'
+import { safeGemini, handleGeminiError } from '@/utils/ai/handleGeminiError'
 
 export const dynamic = 'force-dynamic'
 
@@ -86,7 +86,11 @@ Inclua no máximo 6 suplementos, ordenados por prioridade. Seja específico e ba
   try {
     const genai = new GoogleGenerativeAI(env.gemini.apiKey || '')
     const model = genai.getGenerativeModel({ model: env.gemini.modelId })
-    const result = await model.generateContent(prompt)
+    const geminiResult = await safeGemini('supplement-analysis', () =>
+      model.generateContent(prompt),
+    )
+    if ('errorResponse' in geminiResult) return geminiResult.errorResponse
+    const result = geminiResult.value
     const text = result.response.text()
 
     let data: Record<string, unknown> | null = null
@@ -110,6 +114,6 @@ Inclua no máximo 6 suplementos, ordenados por prioridade. Seja específico e ba
       summary: String(data.summary || ''),
     })
   } catch (e) {
-    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
+    return handleGeminiError('supplement-analysis', e)
   }
 }
