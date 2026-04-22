@@ -5,9 +5,9 @@ import { requireUser } from '@/utils/auth/route'
 import { checkVipFeatureAccess, incrementVipUsage } from '@/utils/vip/limits'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { parseJsonBody } from '@/utils/zod'
-import { getErrorMessage } from '@/utils/errorMessage'
 import { logInfo, logError } from '@/lib/logger'
 import { env } from '@/utils/env'
+import { safeGemini, handleGeminiError } from '@/utils/ai/handleGeminiError'
 
 export const dynamic = 'force-dynamic'
 
@@ -93,7 +93,11 @@ export async function POST(req: Request) {
 
     const genAI = new GoogleGenerativeAI(apiKey)
     const model = genAI.getGenerativeModel({ model: MODEL })
-    const result = await model.generateContent([{ text: prompt }] as Parameters<typeof model.generateContent>[0])
+    const geminiResult = await safeGemini('coach-chat', () =>
+      model.generateContent([{ text: prompt }] as Parameters<typeof model.generateContent>[0]),
+    )
+    if ('errorResponse' in geminiResult) return geminiResult.errorResponse
+    const result = geminiResult.value
     const text = String((await result?.response?.text()) || '').trim()
     if (!text) return NextResponse.json({ ok: false, error: 'Resposta inválida da IA' }, { status: 400 })
 
@@ -129,21 +133,30 @@ export async function POST(req: Request) {
           text,
         ].join('\n')
 
-        const extractResult = await model.generateContent([{ text: extractPrompt }] as Parameters<typeof model.generateContent>[0])
-        const jsonStr = String((await extractResult?.response?.text()) || '').trim()
+        const extractGemini = await safeGemini('coach-chat:extract', () =>
+          model.generateContent([{ text: extractPrompt }] as Parameters<typeof model.generateContent>[0]),
+        )
+        if ('errorResponse' in extractGemini) {
+          // Extraction is best-effort — if it fails, return the main answer
+          // without workout data rather than erroring the whole response.
+          logError('api:ai:coach-chat', 'extract step failed; skipping workout extraction')
+        } else {
+          const extractResult = extractGemini.value
+          const jsonStr = String((await extractResult?.response?.text()) || '').trim()
 
-        if (jsonStr && jsonStr !== 'null' && jsonStr !== '{}') {
-          // Clean markdown wrappers, whitespace, etc
-          const cleaned = jsonStr
-            .replace(/^```(?:json)?\s*/i, '')
-            .replace(/\s*```\s*$/i, '')
-            .replace(/^\s*json\s*/i, '')
-            .trim()
+          if (jsonStr && jsonStr !== 'null' && jsonStr !== '{}') {
+            // Clean markdown wrappers, whitespace, etc
+            const cleaned = jsonStr
+              .replace(/^```(?:json)?\s*/i, '')
+              .replace(/\s*```\s*$/i, '')
+              .replace(/^\s*json\s*/i, '')
+              .trim()
 
-          const parsed = JSON.parse(cleaned)
-          if (parsed?.title && Array.isArray(parsed?.exercises) && parsed.exercises.length > 0) {
-            workout = parsed
-            logInfo('api:ai:coach-chat', 'Workout extracted', { title: parsed.title, exercises: parsed.exercises.length })
+            const parsed = JSON.parse(cleaned)
+            if (parsed?.title && Array.isArray(parsed?.exercises) && parsed.exercises.length > 0) {
+              workout = parsed
+              logInfo('api:ai:coach-chat', 'Workout extracted', { title: parsed.title, exercises: parsed.exercises.length })
+            }
           }
         }
       } catch (extractErr) {
@@ -154,7 +167,7 @@ export async function POST(req: Request) {
     await incrementVipUsage(supabase, userId, 'chat')
     return NextResponse.json({ ok: true, content: text, workout })
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: getErrorMessage(e) ?? String(e) }, { status: 500 })
+    return handleGeminiError('coach-chat', e)
   }
 }
 

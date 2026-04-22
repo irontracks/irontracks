@@ -13,8 +13,8 @@ import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { parseJsonWithSchema } from '@/utils/zod'
-import { getErrorMessage } from '@/utils/errorMessage'
 import { env } from '@/utils/env'
+import { safeGemini, handleGeminiError } from '@/utils/ai/handleGeminiError'
 
 export const dynamic = 'force-dynamic'
 
@@ -125,10 +125,14 @@ export async function POST(req: Request) {
 
     const genAI = new GoogleGenerativeAI(apiKey)
     const model = genAI.getGenerativeModel({ model: MODEL })
-    const result = await model.generateContent([
-      { text: prompt },
-      { inlineData: { mimeType, data: base64Data } },
-    ])
+    const geminiResult = await safeGemini('scan-nutrition-label', () =>
+      model.generateContent([
+        { text: prompt },
+        { inlineData: { mimeType, data: base64Data } },
+      ]),
+    )
+    if ('errorResponse' in geminiResult) return geminiResult.errorResponse
+    const result = geminiResult.value
 
     const rawText = result?.response?.text?.() || ''
     const extracted = extractJson(rawText)
@@ -136,17 +140,21 @@ export async function POST(req: Request) {
 
     if (!parsed.success || !isUsable(parsed.data)) {
       // Try once more with a simpler extraction prompt
-      const retry = await model.generateContent([
-        {
-          text: [
-            'Olhe com cuidado para esta imagem de embalagem/rótulo alimentar.',
-            'Tente estimar as calorias e macronutrientes por 100g com base no que consegue ver.',
-            'Retorne JSON: { "productName": "...", "servingSizeG": 100, "kcalPer100g": X, "proteinPer100g": X, "carbsPer100g": X, "fatPer100g": X, "fiberPer100g": 0, "confidence": "low" }',
-            'Se absolutamente não conseguir, retorne: { "productName": "Produto", "servingSizeG": 100, "kcalPer100g": 0, "proteinPer100g": 0, "carbsPer100g": 0, "fatPer100g": 0, "fiberPer100g": 0, "confidence": "low" }',
-          ].join('\n'),
-        },
-        { inlineData: { mimeType, data: base64Data } },
-      ])
+      const retryGemini = await safeGemini('scan-nutrition-label:retry', () =>
+        model.generateContent([
+          {
+            text: [
+              'Olhe com cuidado para esta imagem de embalagem/rótulo alimentar.',
+              'Tente estimar as calorias e macronutrientes por 100g com base no que consegue ver.',
+              'Retorne JSON: { "productName": "...", "servingSizeG": 100, "kcalPer100g": X, "proteinPer100g": X, "carbsPer100g": X, "fatPer100g": X, "fiberPer100g": 0, "confidence": "low" }',
+              'Se absolutamente não conseguir, retorne: { "productName": "Produto", "servingSizeG": 100, "kcalPer100g": 0, "proteinPer100g": 0, "carbsPer100g": 0, "fatPer100g": 0, "fiberPer100g": 0, "confidence": "low" }',
+            ].join('\n'),
+          },
+          { inlineData: { mimeType, data: base64Data } },
+        ]),
+      )
+      if ('errorResponse' in retryGemini) return retryGemini.errorResponse
+      const retry = retryGemini.value
       const retryText = retry?.response?.text?.() || ''
       const retryExtracted = extractJson(retryText)
       const retryParsed = LabelSchema.safeParse(retryExtracted)
@@ -186,6 +194,6 @@ export async function POST(req: Request) {
       },
     })
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
+    return handleGeminiError('scan-nutrition-label', e)
   }
 }

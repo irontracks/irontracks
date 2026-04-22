@@ -13,6 +13,7 @@ import { MUSCLE_GROUPS } from '@/utils/muscleMapConfig'
 import { buildHeuristicExerciseMap } from '@/utils/exerciseMuscleHeuristics'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { env } from '@/utils/env'
+import { safeGemini, handleGeminiError } from '@/utils/ai/handleGeminiError'
 import {
   toStr,
   extractJsonFromModelText,
@@ -102,7 +103,13 @@ const classifyExercisesWithAi = async (apiKey: string, names: string[]) => {
 
   const genAI = new GoogleGenerativeAI(apiKey)
   const model = genAI.getGenerativeModel({ model: MODEL })
-  const result = await model.generateContent(prompt)
+  const geminiResult = await safeGemini('muscle-map-week:classify', () =>
+    model.generateContent(prompt),
+  )
+  if ('errorResponse' in geminiResult) {
+    throw new Error('ai_upstream_error')
+  }
+  const result = geminiResult.value
   const text = (await result?.response?.text()) || ''
   const rawParsed = extractJsonFromModelText(text)
   const validationResult = AiExerciseMuscleMapSchema.safeParse(rawParsed)
@@ -174,7 +181,13 @@ const generateWeeklyInsightsWithAi = async (apiKey: string, input: unknown) => {
 
   const genAI = new GoogleGenerativeAI(apiKey)
   const model = genAI.getGenerativeModel({ model: MODEL })
-  const result = await model.generateContent(prompt)
+  const geminiResult = await safeGemini('muscle-map-week:insights', () =>
+    model.generateContent(prompt),
+  )
+  if ('errorResponse' in geminiResult) {
+    throw new Error('ai_upstream_error')
+  }
+  const result = geminiResult.value
   const text = (await result?.response?.text()) || ''
   const parsed = extractJsonFromModelText(text)
   if (!parsed) return null
@@ -544,6 +557,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json(payload)
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
+    return handleGeminiError('muscle-map-week', e)
   }
 }

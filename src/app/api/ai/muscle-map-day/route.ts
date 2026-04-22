@@ -12,6 +12,7 @@ import { MUSCLE_GROUPS } from '@/utils/muscleMapConfig'
 import { buildHeuristicExerciseMap } from '@/utils/exerciseMuscleHeuristics'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { env } from '@/utils/env'
+import { safeGemini, handleGeminiError } from '@/utils/ai/handleGeminiError'
 
 export const dynamic = 'force-dynamic'
 
@@ -225,7 +226,14 @@ const classifyExercisesWithAi = async (apiKey: string, names: string[]) => {
 
   const genAI = new GoogleGenerativeAI(apiKey)
   const model = genAI.getGenerativeModel({ model: MODEL })
-  const result = await model.generateContent(prompt)
+  const geminiResult = await safeGemini('muscle-map-day:classify', () =>
+    model.generateContent(prompt),
+  )
+  if ('errorResponse' in geminiResult) {
+    // Bubble up so the existing aiError handling in POST continues to work.
+    throw new Error('ai_upstream_error')
+  }
+  const result = geminiResult.value
   const text = (await result?.response?.text()) || ''
   const rawParsed = extractJsonFromModelText(text)
   const validationResult = AiExerciseMuscleMapSchema.safeParse(rawParsed)
@@ -552,6 +560,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json(payload)
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
+    return handleGeminiError('muscle-map-day', e)
   }
 }

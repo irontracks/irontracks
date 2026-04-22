@@ -2,6 +2,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { Sparkles, Send, X, ChevronDown, Loader2, Zap } from 'lucide-react'
+import { translateAiError } from '@/utils/ai/clientErrors'
 
 export interface ExerciseChatContext {
   exerciseName: string
@@ -91,11 +92,14 @@ export function ExerciseAIChat({ context }: ExerciseAIChatProps) {
 
       const json = await res.json().catch(() => ({ ok: false, error: 'Erro de rede' }))
       if (!json.ok || !json.content) {
+        // Messaging-specific errors stay, but any Gemini-shaped error ('ai_*')
+        // or raw Google SDK leak is routed through translateAiError so we
+        // never show stack traces in the chat bubble.
         const errMsg = json.error === 'rate_limited'
           ? 'Muitas perguntas seguidas. Aguarde um momento.'
           : json.error === 'limit_reached'
             ? 'Limite de mensagens atingido. Faça upgrade para continuar.'
-            : (json.error ?? 'Erro ao processar resposta')
+            : translateAiError(json.error ?? 'Erro ao processar resposta')
         setError(errMsg)
         return
       }

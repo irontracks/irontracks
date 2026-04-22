@@ -5,6 +5,7 @@ import { requireUser } from '@/utils/auth/route'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { parseJsonBody } from '@/utils/zod'
 import { env } from '@/utils/env'
+import { safeGemini, handleGeminiError } from '@/utils/ai/handleGeminiError'
 
 export const dynamic = 'force-dynamic'
 
@@ -86,7 +87,11 @@ export async function POST(req: Request) {
 
         const genAI = new GoogleGenerativeAI(apiKey)
         const model = genAI.getGenerativeModel({ model: TEAM_AI_MODEL })
-        const result = await model.generateContent(prompt)
+        const geminiResult = await safeGemini('team-workout-insights', () =>
+            model.generateContent(prompt),
+        )
+        if ('errorResponse' in geminiResult) return geminiResult.errorResponse
+        const result = geminiResult.value
         const text = (await result?.response?.text()) || ''
         const raw = extractJson(text)
         if (!raw || typeof raw !== 'object') {
@@ -96,7 +101,6 @@ export async function POST(req: Request) {
         const insights = raw as Record<string, unknown>
         return NextResponse.json({ ok: true, insights })
     } catch (e: unknown) {
-        const msg = (e as Record<string, unknown>)?.message
-        return NextResponse.json({ ok: false, error: typeof msg === 'string' ? msg : String(e) }, { status: 500 })
+        return handleGeminiError('team-workout-insights', e)
     }
 }

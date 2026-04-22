@@ -5,10 +5,10 @@ import { requireUser } from '@/utils/auth/route'
 import { checkVipFeatureAccess, incrementVipUsage } from '@/utils/vip/limits'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { parseJsonBody, parseJsonWithSchema } from '@/utils/zod'
-import { getErrorMessage } from '@/utils/errorMessage'
 import { logError } from '@/lib/logger'
 import { applyWizardConsistency, buildProgressionTargets } from '@/utils/workoutWizardGenerator'
 import { env } from '@/utils/env'
+import { safeGemini, handleGeminiError } from '@/utils/ai/handleGeminiError'
 
 export const dynamic = 'force-dynamic'
 
@@ -347,7 +347,11 @@ export async function POST(req: Request) {
         responseMimeType: 'application/json',
       },
     })
-    const result = await model.generateContent([{ text: prompt }] as Parameters<typeof model.generateContent>[0])
+    const geminiResult = await safeGemini('workout-wizard', () =>
+      model.generateContent([{ text: prompt }] as Parameters<typeof model.generateContent>[0]),
+    )
+    if ('errorResponse' in geminiResult) return geminiResult.errorResponse
+    const result = geminiResult.value
     const text = String((await result?.response?.text()) || '')
     const parsed = extractJsonFromModelText(text)
     if (!parsed) return NextResponse.json({ ok: false, error: 'Resposta inválida da IA' }, { status: 400 })
@@ -391,6 +395,6 @@ export async function POST(req: Request) {
     await incrementVipUsage(supabase, userId, 'wizard')
     return NextResponse.json({ ok: true, draft: draftValidated.data })
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: getErrorMessage(e) ?? String(e) }, { status: 500 })
+    return handleGeminiError('workout-wizard', e)
   }
 }

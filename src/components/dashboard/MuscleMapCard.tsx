@@ -5,6 +5,7 @@ import { ChevronDown, Crown, Loader2, RefreshCcw, Sparkles, Wand2 } from 'lucide
 import BodyMapSvg from '@/components/muscle-map/BodyMapSvg'
 import { MUSCLE_BY_ID, MUSCLE_GROUPS, type MuscleId } from '@/utils/muscleMapConfig'
 import { backfillExerciseMuscleMaps, getMuscleMapDay, getMuscleMapWeek } from '@/actions/workout-actions'
+import { translateAiError } from '@/utils/ai/clientErrors'
 import { motion, AnimatePresence } from 'framer-motion'
 import { parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
@@ -178,7 +179,7 @@ const MuscleMapCard = memo(function MuscleMapCard(props: Props) {
             })
             : await getMuscleMapWeek({ refreshCache: !!opts?.refreshCache, refreshAi: !!opts?.refreshAi })
         if (!res?.ok) {
-          const msg = String(res?.error || 'Falha ao carregar mapa muscular')
+          const msg = translateAiError(res?.error)
           if (opts?.silent) {
             autoErrorCountRef.current += 1
             setAutoSync((p) => ({ ...p, status: 'error', error: 'Falha ao sincronizar mapa muscular. Tentando novamente em breve.' }))
@@ -320,7 +321,7 @@ const MuscleMapCard = memo(function MuscleMapCard(props: Props) {
     setBackfill({ status: 'loading', error: '' })
     const res = await backfillExerciseMuscleMaps({ days: 365, maxAi: 240 })
     if (!res?.ok) {
-      const msg = String(res?.error || 'Falha ao reprocessar histórico')
+      const msg = translateAiError(res?.error)
       setBackfill({ status: 'error', error: msg })
       try { window.alert(msg) } catch { }
       return

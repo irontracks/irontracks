@@ -12,6 +12,7 @@ import { FEATURE_KEYS, isFeatureEnabled } from '@/utils/featureFlags';
 import { logError } from '@/lib/logger'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { escapeHtml } from '@/utils/escapeHtml'
+import { translateAiError } from '@/utils/ai/clientErrors'
 import {
     formatDate as sharedFormatDate,
     formatDuration as _sharedFormatDuration,
@@ -300,12 +301,17 @@ const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose,
                     if (onUpgrade) onUpgrade();
                     else alert('Upgrade necessário para usar esta função.');
                 }
-                setAiState((prev: AiState) => ({ ...(prev || { loading: false, error: null, result: null, cached: false }), loading: false, error: String(res?.error || 'Falha ao gerar insights'), cached: false }));
+                // translateAiError turns canonical codes ('ai_upstream_error', etc.) AND
+                // any raw Google SDK string into a friendly pt-BR message before the UI
+                // ever sees it. Never let internals leak to the report screen again.
+                const friendly = translateAiError(res?.error)
+                setAiState((prev: AiState) => ({ ...(prev || { loading: false, error: null, result: null, cached: false }), loading: false, error: friendly, cached: false }));
                 return;
             }
             setAiState({ loading: false, error: null, result: (res.ai && typeof res.ai === 'object' ? (res.ai as Record<string, unknown>) : null), cached: !!res.saved });
         } catch (e) {
-            setAiState((prev: AiState) => ({ ...(prev || { loading: false, error: null, result: null, cached: false }), loading: false, error: String((e as AnyObj | null)?.message || e || 'Falha ao gerar insights'), cached: false }));
+            const friendly = translateAiError((e as AnyObj | null)?.message || e)
+            setAiState((prev: AiState) => ({ ...(prev || { loading: false, error: null, result: null, cached: false }), loading: false, error: friendly, cached: false }));
         }
     };
 

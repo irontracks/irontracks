@@ -11,6 +11,7 @@ import { normalizeExerciseName } from '@/utils/normalizeExerciseName'
 import { MUSCLE_GROUPS } from '@/utils/muscleMapConfig'
 import { buildHeuristicExerciseMap } from '@/utils/exerciseMuscleHeuristics'
 import { env } from '@/utils/env'
+import { safeGemini, handleGeminiError } from '@/utils/ai/handleGeminiError'
 
 export const dynamic = 'force-dynamic'
 
@@ -144,7 +145,13 @@ const classifyExercisesWithAi = async (apiKey: string, names: string[]) => {
 
   const genAI = new GoogleGenerativeAI(apiKey)
   const model = genAI.getGenerativeModel({ model: MODEL })
-  const result = await model.generateContent(prompt)
+  const geminiResult = await safeGemini('exercise-muscle-map-backfill:classify', () =>
+    model.generateContent(prompt),
+  )
+  if ('errorResponse' in geminiResult) {
+    throw new Error('ai_upstream_error')
+  }
+  const result = geminiResult.value
   const text = (await result?.response?.text()) || ''
   const parsed = extractJsonFromModelText(text)
   if (!parsed) return []
@@ -301,7 +308,6 @@ export async function POST(req: Request) {
       remainingUnmapped: remainingAfter.slice(0, 50),
     })
   } catch (e: unknown) {
-    const msg = (e as Record<string, unknown>)?.message
-    return NextResponse.json({ ok: false, error: typeof msg === 'string' ? msg : String(e) }, { status: 500 })
+    return handleGeminiError('exercise-muscle-map-backfill', e)
   }
 }

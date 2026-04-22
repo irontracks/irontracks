@@ -8,6 +8,7 @@ import { checkVipFeatureAccess, incrementVipUsage } from '@/utils/vip/limits'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { parseJsonBody, parseJsonWithSchema } from '@/utils/zod'
 import { env } from '@/utils/env'
+import { safeGemini, handleGeminiError } from '@/utils/ai/handleGeminiError'
 
 export const dynamic = 'force-dynamic'
 
@@ -335,10 +336,17 @@ export async function POST(req: Request) {
 
     const genAI = new GoogleGenerativeAI(apiKey)
     const model = genAI.getGenerativeModel({ model: POST_WORKOUT_MODEL })
-    const result = await model.generateContent(prompt)
-    const text = (await result?.response?.text()) || ''
+    // Retry transient 503/504/timeout with exponential backoff. Never leaks
+    // Google's raw error string — errors become canonical 'ai_*' codes that
+    // the client translates to pt-BR.
+    const geminiResult = await safeGemini(
+      'post-workout-insights',
+      () => model.generateContent(prompt),
+    )
+    if ('errorResponse' in geminiResult) return geminiResult.errorResponse
+    const text = (await geminiResult.value?.response?.text()) || ''
     const parsed = extractJsonFromModelText(text)
-    if (!parsed) return NextResponse.json({ ok: false, error: 'Resposta inválida da IA' }, { status: 400 })
+    if (!parsed) return NextResponse.json({ ok: false, error: 'ai_invalid_input' }, { status: 400 })
 
     const baseAi = normalizeAi(parsed)
     const metrics = computeMetrics(sessionObj)
@@ -359,7 +367,8 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: true, ai, saved: true })
   } catch (e: unknown) {
-    const msg = (e as Record<string, unknown>)?.message
-    return NextResponse.json({ ok: false, error: typeof msg === 'string' ? msg : String(e) }, { status: 500 })
+    // Any unexpected error (including late Gemini errors outside safeGemini)
+    // is normalized to a canonical 'ai_*' code by handleGeminiError.
+    return handleGeminiError('post-workout-insights', e)
   }
 }
