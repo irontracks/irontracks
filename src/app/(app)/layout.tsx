@@ -4,6 +4,7 @@ import { resolveRoleByUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { safePgLike } from '@/utils/safePgFilter'
 import OfflineBanner from '@/components/OfflineBanner'
+import { UpdateAvailableBanner } from '@/components/update/UpdateAvailableBanner'
 import React from 'react'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -85,6 +86,8 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <>
       <OfflineBanner />
+      {/* UpdateAvailableBanner self-gates to iOS native only via isIosNative() */}
+      <UpdateAvailableBanner />
       {children}
     </>
   )
