@@ -232,7 +232,7 @@ export default function NutritionMixer({
 
   // ── Hooks ────────────────────────────────────────────────────────────────
   const { favorites, loading: favoritesLoading, deleteFavorite, saveFavorite } = useFavoriteMeals(userId)
-  const { foods: customFoods, loading: customFoodsLoading, saving: scannerSaving, saveFood: scannerSaveFood, deleteFood: deleteCustomFood } = useCustomFoods(userId)
+  const { foods: customFoods, loading: customFoodsLoading, saving: scannerSaving, saveFood: scannerSaveFood, updateFood: updateCustomFood, deleteFood: deleteCustomFood } = useCustomFoods(userId)
 
   // ── Derived ──────────────────────────────────────────────────────────────
   const safeEntries = Array.isArray(entries) ? entries : []
@@ -560,6 +560,7 @@ export default function NutritionMixer({
             foods={customFoods}
             loading={customFoodsLoading}
             onUse={handleFavoriteSelect}
+            onEdit={updateCustomFood}
             onDelete={deleteCustomFood}
             onScan={() => setActivePanel('scanner')}
           />
