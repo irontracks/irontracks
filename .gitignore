@@ -116,3 +116,4 @@ ios-native/**/xcshareddata/swiftpm/
 ios-native/DerivedData/
 ios-native/build/
 ios-native/.build/
+.worktrees/
