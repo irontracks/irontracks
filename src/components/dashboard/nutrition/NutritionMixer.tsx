@@ -305,7 +305,10 @@ export default function NutritionMixer({
     startTransition(async () => {
       try {
         const res = await logMealAction(text, currentDateKey)
-        if (!res?.ok) { setError(String((res as Record<string, unknown>)?.error || 'Falha ao processar.')); return }
+        if (!res?.ok) {
+          if ((res as Record<string, unknown>)?.needsAi) { void estimateWithAi(); return }
+          setError(String((res as Record<string, unknown>)?.error || 'Falha ao processar.')); return
+        }
         const meal = (res as Record<string, unknown>).meal as MealLog | undefined
         const entry = (res as Record<string, unknown>).entry as unknown
         if (!meal) { setError('Falha ao processar.'); return }
