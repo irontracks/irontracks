@@ -35,6 +35,41 @@ function expandFoodKeys(foods: Record<string, FoodItem>): Record<string, FoodIte
   return expanded
 }
 
+/** Load the user's custom foods from nutrition_custom_foods as a FoodItem map. */
+async function loadCustomFoods(
+  supabase: SupabaseClient,
+  userId: string,
+): Promise<Record<string, FoodItem>> {
+  try {
+    const { data } = await supabase
+      .from('nutrition_custom_foods')
+      .select('name, aliases, kcal_per100g, protein_per100g, carbs_per100g, fat_per100g')
+      .eq('user_id', userId)
+      .limit(50)
+
+    const result: Record<string, FoodItem> = {}
+    const rows = Array.isArray(data) ? data : []
+    for (const row of rows) {
+      const item: FoodItem = {
+        kcal: Number(row.kcal_per100g) || 0,
+        p: Number(row.protein_per100g) || 0,
+        c: Number(row.carbs_per100g) || 0,
+        f: Number(row.fat_per100g) || 0,
+      }
+      const primaryKey = String(row.name ?? '').toLowerCase().trim()
+      if (primaryKey) result[primaryKey] = item
+      const aliases = Array.isArray(row.aliases) ? row.aliases : []
+      for (const alias of aliases) {
+        const k = String(alias ?? '').toLowerCase().trim()
+        if (k) result[k] = item
+      }
+    }
+    return result
+  } catch {
+    return {}
+  }
+}
+
 /**
  * Attempt to resolve a free-text meal description using:
  *   Phase 1: hardcoded base + TACO + learned foods (all in-process / Supabase)
@@ -56,12 +91,13 @@ export async function resolveFood(
     if (!msg.startsWith(UNKNOWN_PREFIX)) return null
   }
 
-  // ── Phase 1b: augment with TACO + learned foods (one Supabase round-trip) ───
-  const [tacoFoods, learned] = await Promise.all([
+  // ── Phase 1b: augment with TACO + learned + custom foods (parallel) ─────────
+  const [tacoFoods, learned, customFoods] = await Promise.all([
     loadTacoFoods(supabase),
     loadLearnedFoods(supabase, userId),
+    loadCustomFoods(supabase, userId),
   ])
-  const phase1ExtraFoods = expandFoodKeys({ ...tacoFoods, ...learned })
+  const phase1ExtraFoods = expandFoodKeys({ ...tacoFoods, ...learned, ...customFoods })
 
   try {
     const meal = parseInput(text, phase1ExtraFoods)
