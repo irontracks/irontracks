@@ -124,12 +124,26 @@ export async function POST(request: NextRequest) {
 
     const admin = createAdminClient()
 
-    // Find existing RevenueCat subscription for this user
+    // The app_subscriptions.provider CHECK constraint allows a fixed set of
+    // values: asaas / stripe / apple / google / manual / admin / mercadopago.
+    // RevenueCat is an intermediary over Apple IAP — the source of truth is
+    // Apple — so we persist the subscription row with provider='apple'. The
+    // fact that the event came through RevenueCat is preserved in metadata
+    // (`metadata.provider = 'revenuecat'` and `product_identifier`).
+    //
+    // Previously this code used provider='revenuecat' directly, which was
+    // rejected by the CHECK constraint at INSERT time and the handler
+    // returned 500 — meaning no real iOS purchase could ever create an
+    // app_subscriptions row in production. user_entitlements was fine
+    // because that block (further below) already used 'apple'.
+
+    // Find existing iOS/RC subscription for this user (new 'apple' rows
+    // plus any legacy rows still tagged 'revenuecat' before this fix)
     const { data: existing } = await admin
       .from('app_subscriptions')
       .select('id, status')
       .eq('user_id', userId)
-      .eq('provider', 'revenuecat')
+      .in('provider', ['apple', 'revenuecat'])
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()
@@ -168,7 +182,7 @@ export async function POST(request: NextRequest) {
           user_id: userId,
           plan_id: dbPlanId || productId,
           status: 'active',
-          provider: 'revenuecat',
+          provider: 'apple',
           current_period_start: new Date().toISOString(),
           current_period_end: expiresDate,
           cancel_at_period_end: false,
