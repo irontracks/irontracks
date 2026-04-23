@@ -2,9 +2,11 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/utils/supabase/server'
-import { parseInput } from '@/lib/nutrition/parser'
 import { trackMeal } from '@/lib/nutrition/engine'
+import { resolveFood } from '@/lib/nutrition/food-resolver'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { resolveBarcode } from '@/lib/nutrition/barcode-resolver'
+import { sanitizeFoodName } from '@/lib/nutrition/security'
 
 export async function logMealAction(mealText: string, dateKey?: string) {
   try {
@@ -29,25 +31,27 @@ export async function logMealAction(mealText: string, dateKey?: string) {
       }
     })()
 
-    const meal = parseInput(normalizedText)
-    const row = await trackMeal(userId, meal, resolvedDateKey)
+    // Try food-resolver first (local → TACO → learned → OFF)
+    const resolved = await resolveFood(supabase, userId, normalizedText)
 
-    revalidatePath('/dashboard/nutrition')
-    return { ok: true, meal, entry: row || null }
+    if (resolved) {
+      const row = await trackMeal(userId, resolved.meal, resolvedDateKey)
+      revalidatePath('/dashboard/nutrition')
+      return { ok: true, meal: resolved.meal, entry: row || null }
+    }
+
+    // Nothing resolved → signal client to call AI
+    return {
+      ok: false,
+      error: `nutrition_parser_unknown_food:${normalizedText}`,
+      needsAi: true,
+    }
   } catch (e: unknown) {
     const message = String(getErrorMessage(e) || '')
-    const unknownPrefix = 'nutrition_parser_unknown_food:'
-    if (message.startsWith(unknownPrefix)) {
-      const raw = message.slice(unknownPrefix.length).trim()
-      const parts = raw.split('|').map((s) => String(s || '').trim()).filter(Boolean)
-      const list = parts.slice(0, 6).join(', ')
-      return { ok: false, error: list ? `Não reconheci: ${list}.` : 'Não reconheci alguns itens.' }
-    }
     const looksLikeMissingTable =
       message.toLowerCase().includes('could not find the table') ||
       message.toLowerCase().includes('schema cache') ||
-      message.toLowerCase().includes('nutrition_meal_entries') ||
-      message.toLowerCase().includes('nutrition_add_meal_entry')
+      message.toLowerCase().includes('nutrition_meal_entries')
     if (looksLikeMissingTable) {
       return { ok: false, error: 'Banco de dados de nutrição não configurado.' }
     }
@@ -159,5 +163,54 @@ export async function editMealAction(
     return { ok: true, totals }
   } catch (e: unknown) {
     return { ok: false, error: String(getErrorMessage(e) || 'nutrition_edit_meal_failed') }
+  }
+}
+
+export async function logBarcodeAction(ean: string, grams: number, dateKey?: string) {
+  try {
+    const cleanEan = String(ean ?? '').trim()
+    if (!cleanEan) return { ok: false, error: 'Código de barras inválido.' }
+
+    const safeGrams = Number(grams)
+    if (!Number.isFinite(safeGrams) || safeGrams <= 0 || safeGrams > 5000) {
+      return { ok: false, error: 'Quantidade inválida.' }
+    }
+
+    const supabase = await createClient()
+    const { data, error } = await supabase.auth.getUser()
+    if (error) throw new Error(error.message || 'nutrition_auth_failed')
+    const userId = data?.user?.id
+    if (!userId) throw new Error('nutrition_unauthorized')
+
+    const resolvedDateKey = (() => {
+      const s = typeof dateKey === 'string' ? dateKey.trim() : ''
+      if (s && /^\d{4}-\d{2}-\d{2}$/.test(s)) return s
+      try {
+        const tz = 'America/Sao_Paulo'
+        return new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
+      } catch {
+        return new Date().toISOString().slice(0, 10)
+      }
+    })()
+
+    const resolved = await resolveBarcode(supabase, cleanEan)
+    if (!resolved) {
+      return { ok: false, error: 'Produto não encontrado. Tente digitar o nome manualmente.' }
+    }
+
+    const multiplier = safeGrams / 100
+    const meal = {
+      foodName: sanitizeFoodName(resolved.name).slice(0, 120) || 'Produto',
+      calories: Math.round(resolved.item.kcal * multiplier),
+      protein: Math.round(resolved.item.p * multiplier),
+      carbs: Math.round(resolved.item.c * multiplier),
+      fat: Math.round(resolved.item.f * multiplier),
+    }
+
+    const row = await trackMeal(userId, meal, resolvedDateKey)
+    revalidatePath('/dashboard/nutrition')
+    return { ok: true, meal, entry: row || null }
+  } catch (e: unknown) {
+    return { ok: false, error: String(getErrorMessage(e) || 'nutrition_log_barcode_failed') }
   }
 }
