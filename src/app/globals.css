@@ -415,8 +415,52 @@ body {
   overflow-x: hidden;
   background-color: #0a0a0a;
   color: white;
-  font-family: var(--font-inter), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  /* Emoji font fallback — ensures emoji glyphs render on Android WebView  */
+  /* without this, some emoji appear as raw Unicode escape sequences       */
+  font-family: var(--font-inter), ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Color Emoji", "Apple Color Emoji", "Segoe UI Emoji", sans-serif;
   -webkit-tap-highlight-color: transparent;
+}
+
+/* ── Android WebView compatibility fixes ───────────────────────────────
+ * Android WebView (Chromium) has a GPU compositing bug where
+ * backdrop-filter: blur() can fail silently and turn the entire
+ * rendering layer black/opaque, breaking all modal overlays.
+ * We disable it globally on Android; the rgba() background alone
+ * provides sufficient visual separation.
+ * PlatformBodyClass.tsx sets [data-platform="android"] at runtime.
+ * ─────────────────────────────────────────────────────────────────── */
+
+/* Disable backdrop-filter on all Tailwind backdrop-blur-* classes */
+[data-platform="android"] .backdrop-blur,
+[data-platform="android"] .backdrop-blur-none,
+[data-platform="android"] .backdrop-blur-sm,
+[data-platform="android"] .backdrop-blur-md,
+[data-platform="android"] .backdrop-blur-lg,
+[data-platform="android"] .backdrop-blur-xl,
+[data-platform="android"] .backdrop-blur-2xl,
+[data-platform="android"] .backdrop-blur-3xl {
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+/* Disable CSS filter: blur() on decorative glow/halo elements.
+ * These create stacking-context compositing layers that can cause
+ * sibling panels to render out of order on Android WebView.         */
+[data-platform="android"] .blur,
+[data-platform="android"] .blur-sm,
+[data-platform="android"] .blur-md,
+[data-platform="android"] .blur-lg,
+[data-platform="android"] .blur-xl,
+[data-platform="android"] .blur-2xl,
+[data-platform="android"] .blur-3xl {
+  filter: none !important;
+}
+
+/* Ensure modal backdrop overlays are never fully opaque on Android.
+ * Guards against any case where bg-opacity combines with a broken
+ * compositing layer to produce a solid black fill.                  */
+[data-platform="android"] .fixed.inset-0[class*="bg-black"] {
+  background-color: rgba(0, 0, 0, 0.82) !important;
 }
 
 /* ── Safe Area — Global modal/overlay protection (Android + iOS) ───── */

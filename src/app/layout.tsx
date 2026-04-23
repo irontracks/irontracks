@@ -1,4 +1,5 @@
 import "./globals.css";
+import PlatformBodyClass from "@/components/PlatformBodyClass"
 import ServiceWorkerRegister from "@/components/ServiceWorkerRegister";
 import PerformanceReporter from "@/components/PerformanceReporter";
 import SessionRecovery from "@/components/auth/SessionRecovery";
@@ -86,6 +87,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
         )}
       </head>
       <body suppressHydrationWarning className={`${inter.variable} font-sans antialiased bg-neutral-950 text-white`}>
+        <PlatformBodyClass />
         <AppLoadingOverlay />
         <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:top-4 focus:left-4 focus:z-[9999] focus:px-4 focus:py-2 focus:bg-yellow-500 focus:text-black focus:font-bold focus:rounded-xl focus:outline-none">
           Pular para conteúdo
