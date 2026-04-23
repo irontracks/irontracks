@@ -2,8 +2,8 @@
 
 import { revalidatePath } from 'next/cache'
 import { createClient } from '@/utils/supabase/server'
-import { parseInput } from '@/lib/nutrition/parser'
 import { trackMeal } from '@/lib/nutrition/engine'
+import { resolveFood } from '@/lib/nutrition/food-resolver'
 import { getErrorMessage } from '@/utils/errorMessage'
 
 export async function logMealAction(mealText: string, dateKey?: string) {
@@ -29,25 +29,27 @@ export async function logMealAction(mealText: string, dateKey?: string) {
       }
     })()
 
-    const meal = parseInput(normalizedText)
-    const row = await trackMeal(userId, meal, resolvedDateKey)
+    // Try food-resolver first (local → TACO → learned → OFF)
+    const resolved = await resolveFood(supabase, userId, normalizedText)
 
-    revalidatePath('/dashboard/nutrition')
-    return { ok: true, meal, entry: row || null }
+    if (resolved) {
+      const row = await trackMeal(userId, resolved.meal, resolvedDateKey)
+      revalidatePath('/dashboard/nutrition')
+      return { ok: true, meal: resolved.meal, entry: row || null }
+    }
+
+    // Nothing resolved → signal client to call AI
+    return {
+      ok: false,
+      error: `nutrition_parser_unknown_food:${normalizedText}`,
+      needsAi: true,
+    }
   } catch (e: unknown) {
     const message = String(getErrorMessage(e) || '')
-    const unknownPrefix = 'nutrition_parser_unknown_food:'
-    if (message.startsWith(unknownPrefix)) {
-      const raw = message.slice(unknownPrefix.length).trim()
-      const parts = raw.split('|').map((s) => String(s || '').trim()).filter(Boolean)
-      const list = parts.slice(0, 6).join(', ')
-      return { ok: false, error: list ? `Não reconheci: ${list}.` : 'Não reconheci alguns itens.' }
-    }
     const looksLikeMissingTable =
       message.toLowerCase().includes('could not find the table') ||
       message.toLowerCase().includes('schema cache') ||
-      message.toLowerCase().includes('nutrition_meal_entries') ||
-      message.toLowerCase().includes('nutrition_add_meal_entry')
+      message.toLowerCase().includes('nutrition_meal_entries')
     if (looksLikeMissingTable) {
       return { ok: false, error: 'Banco de dados de nutrição não configurado.' }
     }
