@@ -141,5 +141,35 @@ export function useCustomFoods(userId: string | null | undefined) {
     } catch { /* silent — UI already optimistic */ }
   }, [userId, supabase])
 
-  return { foods, loading, saving, error, saveFood, deleteFood, reload: load }
+  const updateFood = useCallback(async (id: string, draft: CustomFoodDraft): Promise<{ ok: boolean; error?: string }> => {
+    if (!userId) return { ok: false, error: 'not_authenticated' }
+    try {
+      const { data, error: err } = await supabase
+        .from('nutrition_custom_foods')
+        .update({
+          name: draft.name.trim(),
+          aliases: draft.aliases.map(a => a.trim()).filter(Boolean),
+          serving_size_g: draft.serving_size_g,
+          kcal_per100g: draft.kcal_per100g,
+          protein_per100g: draft.protein_per100g,
+          carbs_per100g: draft.carbs_per100g,
+          fat_per100g: draft.fat_per100g,
+          fiber_per100g: draft.fiber_per100g,
+          label_image_url: draft.label_image_url,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', id)
+        .eq('user_id', userId)
+        .select()
+        .single()
+      if (err) throw new Error(err.message)
+      setFoods(prev => prev.map(f => f.id === id ? (data as CustomFood) : f))
+      return { ok: true }
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'Erro ao atualizar'
+      return { ok: false, error: msg }
+    }
+  }, [userId, supabase])
+
+  return { foods, loading, saving, error, saveFood, updateFood, deleteFood, reload: load }
 }
