@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState, useTransition, useCallback } from 'react'
-import { logMealAction } from '@/app/(app)/dashboard/nutrition/actions'
+import { logMealAction, logBarcodeAction } from '@/app/(app)/dashboard/nutrition/actions'
 import type { MealLog } from '@/lib/nutrition/engine'
 import { useIsIosNative } from '@/hooks/useIsIosNative'
 import { createClient } from '@/utils/supabase/client'
@@ -20,6 +20,7 @@ const DateNavigator = dynamic(() => import('./DateNavigator'), { ssr: false })
 const CustomFoodScanner = dynamic(() => import('./CustomFoodScanner'), { ssr: false })
 const CustomFoodLibrary = dynamic(() => import('./CustomFoodLibrary'), { ssr: false })
 const NutritionWorkoutCorrelation = dynamic(() => import('./NutritionWorkoutCorrelation'), { ssr: false })
+const BarcodeScanner = dynamic(() => import('./BarcodeScanner'), { ssr: false })
 
 // ── Hooks ──────────────────────────────────────────────────────────────────────
 import { useFavoriteMeals } from './useFavoriteMeals'
@@ -152,7 +153,13 @@ export default function NutritionMixer({
   goalsSource?: 'saved' | 'profile' | 'default'
 }) {
   const supabase = useMemo(() => createClient(), [])
-  const hideVipCtas = useIsIosNative()
+  const isIosNative = useIsIosNative()
+  const hideVipCtas = isIosNative
+  const [isAndroidNative, setIsAndroidNative] = useState(false)
+  useEffect(() => {
+    import('@/utils/platform').then(({ isAndroidNative: check }) => setIsAndroidNative(check()))
+  }, [])
+  const isNative = isIosNative || isAndroidNative
 
   // ── Auth ──────────────────────────────────────────────────────────────────
   const [userId, setUserId] = useState<string | undefined>()
@@ -221,6 +228,7 @@ export default function NutritionMixer({
   // ── Panel toggles ────────────────────────────────────────────────────────
   const [activePanel, setActivePanel] = useState<'none' | 'scanner' | 'library' | 'favorites' | 'water'>('none')
   const togglePanel = useCallback((p: typeof activePanel) => setActivePanel(prev => prev === p ? 'none' : p), [])
+  const [showBarcodeScanner, setShowBarcodeScanner] = useState(false)
 
   // ── Hooks ────────────────────────────────────────────────────────────────
   const { favorites, loading: favoritesLoading, deleteFavorite, saveFavorite } = useFavoriteMeals(userId)
@@ -370,6 +378,35 @@ export default function NutritionMixer({
 
   const handleFavoriteSelect = useCallback((mealText: string) => { setInput(mealText); try { inputRef.current?.focus() } catch {} }, [])
   const handleDateChange = useCallback((d: string) => { setCurrentDateKey(d); setEntries([]); setTotals({ calories: 0, protein: 0, carbs: 0, fat: 0 }); setEntriesTick(v => v + 1) }, [])
+
+  const handleBarcodeResult = useCallback(async (ean: string) => {
+    setShowBarcodeScanner(false)
+    const gramsStr = window.prompt(`Produto escaneado (EAN: ${ean})\nQuantidade em gramas:`, '100')
+    const grams = Number(gramsStr)
+    if (!grams || grams <= 0) return
+
+    setError(null)
+    try {
+      const result = await logBarcodeAction(ean, grams, currentDateKey)
+      if (result.ok && result.meal) {
+        const meal = result.meal
+        const entry = result.entry
+        if (entry && typeof entry === 'object') {
+          const e = entry as Record<string, unknown>
+          const nt = { calories: safeNumber(e?.totals_calories), protein: safeNumber(e?.totals_protein), carbs: safeNumber(e?.totals_carbs), fat: safeNumber(e?.totals_fat) }
+          if (nt.calories || nt.protein || nt.carbs || nt.fat) setTotals(nt)
+          setEntries(prev => [{ id: String(e?.entry_id || e?.id || Date.now()), created_at: String(e?.created_at || new Date().toISOString()), food_name: String(e?.food_name || meal.foodName || 'Produto'), calories: safeNumber(e?.calories ?? meal.calories), protein: safeNumber(e?.protein ?? meal.protein), carbs: safeNumber(e?.carbs ?? meal.carbs), fat: safeNumber(e?.fat ?? meal.fat) }, ...(Array.isArray(prev) ? prev : [])].slice(0, 30))
+        } else {
+          setTotals(prev => ({ calories: safeNumber(prev?.calories) + safeNumber(meal.calories), protein: safeNumber(prev?.protein) + safeNumber(meal.protein), carbs: safeNumber(prev?.carbs) + safeNumber(meal.carbs), fat: safeNumber(prev?.fat) + safeNumber(meal.fat) }))
+          setEntriesTick(v => v + 1)
+        }
+      } else {
+        setError(result.error ?? 'Produto não encontrado.')
+      }
+    } catch (e: unknown) {
+      setError(getErrorMessage(e) || 'Erro ao adicionar produto.')
+    }
+  }, [currentDateKey])
 
   // ════════════════════════════════════════════════════════════════════════════
   // RENDER
@@ -578,6 +615,18 @@ export default function NutritionMixer({
             >
               {isPending ? 'Processando...' : '✚ Lançar'}
             </button>
+            {isNative && (
+              <button
+                type="button"
+                onClick={() => setShowBarcodeScanner(true)}
+                aria-label="Escanear código de barras"
+                className="flex size-9 items-center justify-center rounded-lg bg-white/10 text-white active:scale-95"
+              >
+                <svg className="size-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M3 4h2v16H3V4zm4 0h1v16H7V4zm3 0h2v16h-2V4zm4 0h1v16h-1V4zm3 0h4v16h-4V4z" />
+                </svg>
+              </button>
+            )}
           </div>
 
           {/* Schema missing */}
@@ -673,6 +722,14 @@ export default function NutritionMixer({
           )}
         </div>
       </Card>
+
+      {/* ── Barcode Scanner overlay ───────────────────────────────────── */}
+      {showBarcodeScanner && (
+        <BarcodeScanner
+          onResult={handleBarcodeResult}
+          onClose={() => setShowBarcodeScanner(false)}
+        />
+      )}
 
       {/* ══ FLOATING CTA ═════════════════════════════════════════════════ */}
       {isToday && (input.trim() || isPending) && (

@@ -117,3 +117,4 @@ ios-native/DerivedData/
 ios-native/build/
 ios-native/.build/
 .worktrees/
+scripts/taco-data.json
