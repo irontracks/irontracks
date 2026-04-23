@@ -93,3 +93,6 @@ android/capacitor-cordova-android-plugins/
 **/* 2.css
 **/* 2.json
 **/* 2.txt
+
+# Supabase CLI temp
+supabase/.temp/
