@@ -1,0 +1,106 @@
+{
+  "identifier" : "IronTracks",
+  "nonRenewingSubscriptions" : [],
+  "products" : [],
+  "settings" : {
+    "_applicationInternalID" : "6741234567",
+    "_developerTeamID" : "",
+    "_failTransactionsEnabled" : false,
+    "_locale" : "pt_BR",
+    "_storefront" : "BRA",
+    "_storeKitErrors" : [
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Load Products"
+      },
+      {
+        "current" : null,
+        "enabled" : false,
+        "name" : "Purchase"
+      }
+    ]
+  },
+  "subscriptionGroups" : [
+    {
+      "id" : "iron_tracks_vip",
+      "localizations" : [
+        {
+          "description" : "Assinatura VIP do IronTracks — desbloqueia IA, histórico e nutrição.",
+          "displayName" : "IronTracks VIP",
+          "locale" : "pt_BR"
+        }
+      ],
+      "name" : "IronTracks VIP",
+      "subscriptions" : [
+        {
+          "adHocOffers" : [],
+          "codeOffers" : [],
+          "displayPrice" : "29.90",
+          "familyShareable" : false,
+          "groupNumber" : 1,
+          "internalID" : "vip_start1_month_sk",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Para quem está começando no caminho.",
+              "displayName" : "VIP Start",
+              "locale" : "pt_BR"
+            }
+          ],
+          "productID" : "vip_start1_month",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "VIP Start (Monthly)",
+          "subscriptionGroupID" : "iron_tracks_vip",
+          "type" : "RecurringSubscription"
+        },
+        {
+          "adHocOffers" : [],
+          "codeOffers" : [],
+          "displayPrice" : "59.90",
+          "familyShareable" : false,
+          "groupNumber" : 2,
+          "internalID" : "vip_pro1_month_sk",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Evolução constante e consistente.",
+              "displayName" : "VIP Pro",
+              "locale" : "pt_BR"
+            }
+          ],
+          "productID" : "vip_pro1_month",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "VIP Pro (Monthly)",
+          "subscriptionGroupID" : "iron_tracks_vip",
+          "type" : "RecurringSubscription"
+        },
+        {
+          "adHocOffers" : [],
+          "codeOffers" : [],
+          "displayPrice" : "99.90",
+          "familyShareable" : false,
+          "groupNumber" : 3,
+          "internalID" : "vip_elite1_month_sk",
+          "introductoryOffer" : null,
+          "localizations" : [
+            {
+              "description" : "Alta performance sem limites.",
+              "displayName" : "VIP Elite",
+              "locale" : "pt_BR"
+            }
+          ],
+          "productID" : "vip_elite1_month",
+          "recurringSubscriptionPeriod" : "P1M",
+          "referenceName" : "VIP Elite (Monthly)",
+          "subscriptionGroupID" : "iron_tracks_vip",
+          "type" : "RecurringSubscription"
+        }
+      ]
+    }
+  ],
+  "version" : {
+    "major" : 3,
+    "minor" : 0
+  }
+}
