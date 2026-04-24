@@ -4,6 +4,7 @@ import { cookies } from 'next/headers'
 import { z } from 'zod'
 import { getSupabaseCookieOptions } from '@/utils/supabase/cookieOptions'
 import { warmupCacheForUser } from '@/utils/cacheWarmup'
+import { notifyAdminsNewSignup } from '@/lib/push/notifyAdmins'
 import { env } from '@/utils/env'
 
 export const dynamic = 'force-dynamic'
@@ -144,9 +145,20 @@ export async function GET(request: Request) {
     }
     try {
       const { data: { user } } = await supabase.auth.getUser()
-      // Pre-populate cache after successful login
       if (user?.id) {
+        // Pre-populate cache after successful login
         warmupCacheForUser(user.id).catch(() => { })
+
+        // Notify admins when a brand-new account is created (created_at within last 60s)
+        const createdAt = new Date(user.created_at || 0)
+        if (Date.now() - createdAt.getTime() < 60_000) {
+          const name = String(
+            user.user_metadata?.full_name ||
+            user.user_metadata?.name ||
+            user.email || ''
+          )
+          notifyAdminsNewSignup(name, user.email ?? '').catch(() => { })
+        }
       }
     } catch { }
   } catch {
