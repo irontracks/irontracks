@@ -1,9 +1,9 @@
 import Image from 'next/image'
 import Link from 'next/link'
 import {
-  Dumbbell, Zap, BarChart3, MapPin, ChefHat, Users,
+  Dumbbell, Zap, BarChart3, MapPin, Users,
   Crown, Star, Globe, Check, ArrowRight, Flame,
-  Trophy, Target, Smartphone, Activity, Camera,
+  Trophy, Target, Smartphone, Camera,
 } from 'lucide-react'
 import type { Metadata } from 'next'
 
@@ -302,6 +302,45 @@ export default function ComercialPage() {
         </div>
       </section>
 
+      {/* ── COMO FUNCIONA ───────────────────────────────────────────────── */}
+      <section className="px-6 py-20">
+        <div className="max-w-4xl mx-auto">
+          <div className="text-center mb-14">
+            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-black uppercase tracking-widest mb-4"
+              style={{ border: '1px solid rgba(245,158,11,0.25)', background: 'rgba(245,158,11,0.06)', color: '#f59e0b' }}>
+              <Zap size={11} />
+              Como funciona
+            </div>
+            <h2 className="font-black text-white" style={{ fontSize: 'clamp(1.8rem, 5vw, 2.8rem)', lineHeight: 1.1 }}>
+              Simples de começar.<br />
+              <span style={{ color: 'rgba(255,255,255,0.4)' }}>Impossível de parar.</span>
+            </h2>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-10 relative">
+            <div className="hidden md:block absolute top-8 left-[20%] right-[20%] h-px"
+              style={{ background: 'linear-gradient(90deg, transparent, rgba(245,158,11,0.3), rgba(245,158,11,0.3), transparent)' }} />
+            {([
+              { step: '01', title: 'Baixe e configure', desc: 'Crie seu perfil em 2 minutos. Defina objetivos e o app já estrutura um ponto de partida pra você.', icon: Smartphone },
+              { step: '02', title: 'Registre seus treinos', desc: 'Cada série, repetição e carga — o app acompanha tudo em tempo real, na academia ou em casa.', icon: Dumbbell },
+              { step: '03', title: 'Veja sua evolução', desc: 'Gráficos, recordes pessoais e IronRank. Progresso visual e claro, semana após semana.', icon: BarChart3 },
+            ] as const).map((s, i) => {
+              const Icon = s.icon
+              return (
+                <div key={i} className="flex flex-col items-center text-center">
+                  <div className="w-16 h-16 rounded-2xl flex items-center justify-center mb-5 relative z-10"
+                    style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.25)' }}>
+                    <Icon size={26} className="text-yellow-500" />
+                  </div>
+                  <div className="text-xs font-black uppercase tracking-widest mb-2" style={{ color: '#f59e0b' }}>{s.step}</div>
+                  <h3 className="font-black text-white text-lg mb-2">{s.title}</h3>
+                  <p className="text-sm text-neutral-500 leading-relaxed max-w-xs">{s.desc}</p>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      </section>
+
       {/* ── FEATURES ────────────────────────────────────────────────────── */}
       <section className="px-6 py-20">
         <div className="max-w-5xl mx-auto">
@@ -337,6 +376,39 @@ export default function ComercialPage() {
               )
             })}
           </div>
+        </div>
+      </section>
+
+      {/* ── SCREENSHOTS ─────────────────────────────────────────────────── */}
+      <section className="py-20 overflow-hidden" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+        <div className="max-w-5xl mx-auto px-6 mb-12 text-center">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full text-xs font-black uppercase tracking-widest mb-4"
+            style={{ border: '1px solid rgba(245,158,11,0.25)', background: 'rgba(245,158,11,0.06)', color: '#f59e0b' }}>
+            <Smartphone size={11} />
+            O app na prática
+          </div>
+          <h2 className="font-black text-white" style={{ fontSize: 'clamp(1.8rem, 5vw, 2.8rem)', lineHeight: 1.1 }}>
+            Feito para a academia.<br />
+            <span style={{ color: 'rgba(255,255,255,0.4)' }}>Refinado nos detalhes.</span>
+          </h2>
+        </div>
+        <div className="flex gap-5 overflow-x-auto pb-4 px-8 snap-x snap-mandatory" style={{ scrollbarWidth: 'none' }}>
+          {[
+            { src: '/onboarding-workout.png', label: 'Treinos' },
+            { src: '/onboarding-progress.png', label: 'Evolução' },
+            { src: '/onboarding-muscles.png', label: 'Grupos Musculares' },
+            { src: '/onboarding-ready.png', label: 'Pronto para treinar' },
+            { src: '/onboarding-welcome.png', label: 'Bem-vindo' },
+          ].map((screen, i) => (
+            <div key={i} className="flex-none snap-center flex flex-col items-center" style={{ width: 220 }}>
+              <div className="rounded-[32px] overflow-hidden mb-3 w-full"
+                style={{ border: '1.5px solid rgba(255,255,255,0.1)', boxShadow: '0 24px 64px rgba(0,0,0,0.6)', aspectRatio: '9/19.5' }}>
+                <Image src={screen.src} alt={screen.label} width={220} height={477}
+                  className="w-full h-full object-cover" unoptimized />
+              </div>
+              <p className="text-xs text-neutral-500 font-black uppercase tracking-widest">{screen.label}</p>
+            </div>
+          ))}
         </div>
       </section>
 
@@ -402,39 +474,63 @@ export default function ComercialPage() {
         </div>
       </section>
 
-      {/* ── SOCIAL PROOF ────────────────────────────────────────────────── */}
-      <section className="px-6 py-16" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
-        <div className="max-w-4xl mx-auto">
-          <div className="flex flex-col sm:flex-row items-center justify-between gap-8">
-            <div>
-              <div className="flex items-center gap-1 mb-2">
-                {[...Array(5)].map((_, i) => (
-                  <Star key={i} size={18} fill="#f59e0b" className="text-yellow-500" />
-                ))}
-                <span className="ml-2 text-yellow-500 font-black text-lg">5,0</span>
-              </div>
-              <div className="text-white font-black text-xl mb-1">Avaliado com 5 estrelas</div>
-              <div className="text-neutral-500 text-sm">na App Store Brasil</div>
+      {/* ── DEPOIMENTOS ─────────────────────────────────────────────────── */}
+      <section className="px-6 py-20" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
+        <div className="max-w-5xl mx-auto">
+          <div className="text-center mb-12">
+            <div className="flex items-center justify-center gap-1 mb-3">
+              {[...Array(5)].map((_, i) => (
+                <Star key={i} size={18} fill="#f59e0b" className="text-yellow-500" />
+              ))}
+              <span className="ml-2 text-yellow-500 font-black text-lg">5,0</span>
             </div>
-
-            <div className="flex flex-wrap gap-3 justify-center sm:justify-end">
-              {[
-                { icon: Activity, label: 'Treinos ilimitados', color: '#3b82f6' },
-                { icon: Zap, label: 'IA integrada', color: '#f59e0b' },
-                { icon: Globe, label: 'Funciona offline', color: '#22c55e' },
-                { icon: ChefHat, label: 'Nutrição com IA', color: '#ec4899' },
-              ].map(b => {
-                const Icon = b.icon
-                return (
-                  <div key={b.label}
-                    className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-black"
-                    style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                    <Icon size={13} style={{ color: b.color }} />
-                    <span className="text-neutral-300">{b.label}</span>
+            <h2 className="font-black text-white text-2xl mb-2">O que quem treina está dizendo</h2>
+            <p className="text-neutral-500 text-sm">Avaliado com 5 estrelas na App Store Brasil</p>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {[
+              {
+                name: 'Carlos M.',
+                role: 'Musculação há 4 anos',
+                text: 'Tentei vários apps, mas nenhum me deu a clareza de progressão que o IronTracks dá. Ver meu PR evoluir semana a semana é viciante.',
+                initials: 'CM',
+                color: '#f59e0b',
+              },
+              {
+                name: 'Ana R.',
+                role: 'Treino funcional + corrida',
+                text: 'O cardio GPS junto com o log de musculação em um único app é o que eu precisava. A IA de nutrição então... uso todo dia.',
+                initials: 'AR',
+                color: '#3b82f6',
+              },
+              {
+                name: 'Bruno S.',
+                role: 'Personal trainer, 12 anos',
+                text: 'Recomendo para todos os meus alunos. A organização de treinos e o histórico detalhado são exatamente o que um atleta sério precisa.',
+                initials: 'BS',
+                color: '#22c55e',
+              },
+            ].map((t, i) => (
+              <div key={i} className="rounded-2xl p-5 flex flex-col gap-4"
+                style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+                <div className="flex items-center gap-1">
+                  {[...Array(5)].map((_, j) => (
+                    <Star key={j} size={12} fill="#f59e0b" className="text-yellow-500" />
+                  ))}
+                </div>
+                <p className="text-sm text-neutral-300 leading-relaxed flex-1">&ldquo;{t.text}&rdquo;</p>
+                <div className="flex items-center gap-3">
+                  <div className="w-9 h-9 rounded-full flex items-center justify-center flex-shrink-0 text-xs font-black"
+                    style={{ background: `${t.color}20`, border: `1px solid ${t.color}40`, color: t.color }}>
+                    {t.initials}
                   </div>
-                )
-              })}
-            </div>
+                  <div>
+                    <div className="text-sm font-black text-white">{t.name}</div>
+                    <div className="text-xs text-neutral-600">{t.role}</div>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </section>
