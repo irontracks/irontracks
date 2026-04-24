@@ -2,7 +2,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import {
   Dumbbell, Zap, BarChart3, MapPin, Users,
-  Crown, Star, Globe, Check, ArrowRight, Flame,
+  Star, Globe, ArrowRight, Flame,
   Trophy, Target, Smartphone, Camera,
 } from 'lucide-react'
 import type { Metadata } from 'next'
@@ -65,16 +65,6 @@ const features = [
     title: 'IA no Treino',
     desc: 'Sugestão de carga com IA, troca de exercício inteligente e criação de treinos personalizados por IA em segundos.',
   },
-]
-
-const vipFeatures = [
-  'Coach IA com acesso ao seu histórico completo',
-  'Periodização automática de 4–6 semanas',
-  'Diagnóstico profundo de performance',
-  'Análise de suplementação personalizada',
-  'Resumo semanal com insights avançados',
-  'Mapa de calor de frequência de treinos',
-  'Créditos ilimitados de Chat com o Coach',
 ]
 
 const stats = [
@@ -334,67 +324,13 @@ export default function ComercialPage() {
         </div>
       </section>
 
-      {/* ── VIP SECTION ─────────────────────────────────────────────────── */}
-      <section className="px-6 py-20 relative overflow-hidden">
-        <div className="absolute inset-0 pointer-events-none"
-          style={{ background: 'radial-gradient(ellipse at 50% 100%, rgba(245,158,11,0.08) 0%, transparent 70%)' }} />
-
-        <div className="max-w-5xl mx-auto">
-          <div className="rounded-3xl overflow-hidden relative"
-            style={{ background: 'linear-gradient(135deg, rgba(245,158,11,0.08) 0%, rgba(15,15,14,0.99) 50%, rgba(217,119,6,0.06) 100%)', border: '1px solid rgba(245,158,11,0.2)', boxShadow: '0 0 80px rgba(245,158,11,0.06)' }}>
-
-            {/* Top gold line */}
-            <div className="absolute top-0 left-0 right-0 h-[1px]"
-              style={{ background: 'linear-gradient(90deg, transparent, rgba(245,158,11,0.8), transparent)' }} />
-
-            <div className="flex flex-col lg:flex-row items-center gap-10 p-8 md:p-12">
-              {/* Left — image + badge */}
-              <div className="flex-shrink-0 text-center">
-                <Image src="/vip-crown.png" alt="VIP" width={180} height={180}
-                  className="mx-auto object-contain"
-                  style={{ filter: 'drop-shadow(0 0 40px rgba(245,158,11,0.4))' }} />
-                <div className="mt-4 inline-flex items-center gap-1.5 px-4 py-1.5 rounded-full text-xs font-black"
-                  style={{ background: 'linear-gradient(135deg,rgba(245,158,11,0.2),rgba(217,119,6,0.1))', border: '1px solid rgba(245,158,11,0.4)', color: '#f59e0b' }}>
-                  <Crown size={12} />
-                  IronTracks VIP
-                </div>
-              </div>
-
-              {/* Right — content */}
-              <div className="flex-1">
-                <div className="text-xs font-black uppercase tracking-widest mb-3" style={{ color: '#f59e0b' }}>
-                  Premium · Desbloqueie tudo
-                </div>
-                <h2 className="font-black text-white mb-3 leading-tight" style={{ fontSize: 'clamp(1.5rem, 4vw, 2.2rem)' }}>
-                  Seu Coach IA pessoal.<br />Periodização no piloto automático.
-                </h2>
-                <p className="text-neutral-400 text-sm mb-6 leading-relaxed max-w-lg">
-                  O VIP transforma dados dos seus treinos em planos inteligentes, análise de performance e orientação nutricional personalizada — como ter um preparador físico no bolso.
-                </p>
-
-                <ul className="space-y-2.5 mb-8">
-                  {vipFeatures.map(item => (
-                    <li key={item} className="flex items-center gap-3">
-                      <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"
-                        style={{ background: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.3)' }}>
-                        <Check size={11} className="text-yellow-400" />
-                      </div>
-                      <span className="text-sm text-neutral-300">{item}</span>
-                    </li>
-                  ))}
-                </ul>
-
-                <Link href={WEB}
-                  className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl font-black text-sm text-black transition-all active:scale-95 hover:opacity-90"
-                  style={{ background: 'linear-gradient(135deg,#f59e0b,#d97706)', boxShadow: '0 8px 30px rgba(245,158,11,0.3)' }}>
-                  Experimentar VIP
-                  <ArrowRight size={16} />
-                </Link>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
+      {/* ── VIP hint ────────────────────────────────────────────────────── */}
+      <div className="px-6 py-6 text-center" style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+        <Link href={WEB} className="inline-flex items-center gap-2 text-xs text-neutral-600 hover:text-neutral-400 transition-colors">
+          Quer ir além? Conheça o IronTracks VIP
+          <ArrowRight size={12} />
+        </Link>
+      </div>
 
       {/* ── DEPOIMENTOS ─────────────────────────────────────────────────── */}
       <section className="px-6 py-20" style={{ borderTop: '1px solid rgba(255,255,255,0.05)' }}>
@@ -470,14 +406,15 @@ export default function ComercialPage() {
             style={{ boxShadow: '0 0 40px rgba(245,158,11,0.3)' }} />
 
           <h2 className="font-black text-white mb-4 leading-tight" style={{ fontSize: 'clamp(2rem, 6vw, 3.5rem)' }}>
-            Pronto para treinar<br />
+            Baixe grátis.<br />
             <span style={{ background: 'linear-gradient(135deg,#f59e0b,#fbbf24)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent', backgroundClip: 'text' }}>
-              de verdade?
+              Comece agora.
             </span>
           </h2>
-          <p className="text-neutral-400 mb-10 max-w-md mx-auto">
-            Grátis. Sem anúncios. Disponível em qualquer dispositivo. Comece agora.
+          <p className="text-neutral-400 mb-2 max-w-md mx-auto">
+            100% gratuito. Sem anúncios. Sem limitações absurdas.
           </p>
+          <p className="text-neutral-600 text-sm mb-10">Disponível para iOS, Android e navegador.</p>
 
           <div className="flex flex-wrap items-center justify-center gap-4">
             <Link href={APPLE}
