@@ -5,6 +5,15 @@
 	"server": {
 		"url": "https://irontracks.com.br"
 	},
+	"plugins": {
+		"PushNotifications": {
+			"presentationOptions": [
+				"badge",
+				"sound",
+				"alert"
+			]
+		}
+	},
 	"packageClassList": [
 		"SignInWithApple",
 		"BarcodeScannerPlugin",
