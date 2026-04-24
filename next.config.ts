@@ -47,6 +47,10 @@ const nextConfig: NextConfig = {
       { pathname: '/login-hero.png' },
       { pathname: '/icone.png' },
       { pathname: '/logo-irontracks.png' },
+      { pathname: '/vip-crown.png' },
+      { pathname: '/rank-**' },
+      { pathname: '/report-**' },
+      { pathname: '/sticker-**' },
     ],
     remotePatterns: [
       {
