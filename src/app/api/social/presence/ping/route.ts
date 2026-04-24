@@ -10,6 +10,7 @@ import {
 } from '@/lib/social/notifyFollowers'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { getUpstashConfig } from '@/utils/cache'
+import { sendPushToAllPlatforms } from '@/lib/push/sender'
 
 export const dynamic = 'force-dynamic'
 
@@ -65,6 +66,14 @@ export async function POST(req: Request) {
 
     const res = await insertNotifications(rows)
     if (!res.ok) return NextResponse.json({ ok: false, error: res.error || 'failed' }, { status: 400 })
+
+    sendPushToAllPlatforms(
+      recipients,
+      'Amigo online',
+      `${name} entrou no app.`,
+      { type: 'friend_online', link: '/social' },
+      { preferenceKey: 'notifyFriendOnline' },
+    ).catch(() => null)
 
     return NextResponse.json({ ok: true, sent: res.inserted })
   } catch (e: unknown) {
