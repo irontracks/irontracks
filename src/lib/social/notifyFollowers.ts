@@ -2,6 +2,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { sendPushToAllPlatforms as sendPushToUsers } from '@/lib/push/sender'
 import { logError } from '@/lib/logger'
+import { waitUntil } from '@vercel/functions'
 
 /**
  * Canonical mapping of notification type → preference key in user_settings.
@@ -236,13 +237,15 @@ export async function insertNotifications(rows: unknown): Promise<{ ok: boolean;
       // per-type pref. Rows are already pre-filtered but passing the key
       // keeps the two layers consistent if someone changes this file later.
       const prefKey = preferenceKeyForType(group.type)
-      void sendPushToUsers(
-        batch,
-        group.title,
-        group.message,
-        extra,
-        prefKey ? { preferenceKey: prefKey } : undefined,
-      ).catch(() => { })
+      waitUntil(
+        sendPushToUsers(
+          batch,
+          group.title,
+          group.message,
+          extra,
+          prefKey ? { preferenceKey: prefKey } : undefined,
+        ).catch(() => { })
+      )
     }
   } catch (e) { logError('insertNotifications.sendPush', e) }
 
