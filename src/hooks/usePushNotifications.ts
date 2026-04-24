@@ -1,16 +1,8 @@
-/**
- * @module usePushNotifications
- *
- * Registers the device for push notifications on iOS native.
- * Requests permission, obtains the FCM/APNs token, and POSTs it
- * to `/api/push/register`. Listens for incoming push events and
- * dispatches them as in-app notifications. No-ops on web.
- */
 'use client'
-import { logWarn } from '@/lib/logger'
 
 import { useEffect } from 'react'
 import { isNativePlatform } from '@/utils/platform'
+import { logWarn } from '@/lib/logger'
 
 type ListenerHandle = { remove: () => void }
 type PushPermission = { receive: string }
@@ -21,98 +13,113 @@ export function usePushNotifications(userId?: string | null) {
   useEffect(() => {
     if (!isNativePlatform()) return
     if (!userId) return
+
     let alive = true
     const handles: ListenerHandle[] = []
 
-      ; (async () => {
+    const run = async () => {
+      try {
+        // Dynamic imports — correct pattern for Next.js App Router + Capacitor
+        const [{ PushNotifications }, { Capacitor }, { Device }] = await Promise.all([
+          import('@capacitor/push-notifications'),
+          import('@capacitor/core'),
+          import('@capacitor/device'),
+        ])
+
+        if (!alive) return
+
+        // Clear delivered notifications
         try {
-          const capCore = require('@capacitor/core')
-          const pushMod = require('@capacitor/push-notifications')
-          const deviceMod = require('@capacitor/device')
-          const Capacitor = capCore?.Capacitor
-          const PushNotifications = pushMod?.PushNotifications
-          const Device = deviceMod?.Device
-          if (!Capacitor || !PushNotifications) return
+          await PushNotifications.removeAllDeliveredNotifications()
+        } catch (e) {
+          logWarn('usePushNotifications', 'removeAllDeliveredNotifications failed', e)
+        }
 
-          // Clear badge count and delivered notifications when app opens
-          try {
-            const badgeMod = require('@capawesome/capacitor-badge')
-            if (badgeMod?.Badge?.set) {
-              await badgeMod.Badge.set({ count: 0 }).catch(() => { })
-            }
-          } catch {
-            // Badge plugin not installed — skip
-          }
-          try {
-            await PushNotifications.removeAllDeliveredNotifications().catch(() => { })
-          } catch (e) { logWarn('usePushNotifications', 'silenced error', e) }
+        if (!alive) return
 
-          const platform = String(Capacitor.getPlatform?.() || 'ios').toLowerCase()
-          const deviceId =
-            (await Device?.getId?.()
-              .then((x: unknown) => String((x as DeviceId | null)?.identifier || '').trim())
-              .catch(() => '')) || ''
+        const platform = String(Capacitor.getPlatform?.() || 'ios').toLowerCase()
+        const deviceId = await Device.getId()
+          .then((x: DeviceId) => String(x?.identifier || '').trim())
+          .catch(() => '')
 
-          const perm = (await PushNotifications.checkPermissions().catch((): PushPermission => ({ receive: 'prompt' }))) as PushPermission
+        // Check / request permission
+        const perm = await PushNotifications.checkPermissions()
+          .catch((): PushPermission => ({ receive: 'prompt' }))
+
+        if (!alive) return
+
+        if (perm?.receive !== 'granted') {
+          const res = await PushNotifications.requestPermissions()
+            .catch((): PushPermission => ({ receive: 'denied' }))
           if (!alive) return
-          if (perm?.receive !== 'granted') {
-            const res = (await PushNotifications.requestPermissions().catch((): PushPermission => ({ receive: 'denied' }))) as PushPermission
-            if (!alive) return
-            if (res?.receive !== 'granted') return
+          if (res?.receive !== 'granted') {
+            logWarn('usePushNotifications', 'Push permission denied', { status: res?.receive })
+            return
           }
+        }
 
-          const registration = await PushNotifications.addListener('registration', async (token: unknown) => {
-            try {
-              if (!alive) return
-              const value = String((token as PushToken | null)?.value || '').trim()
-              if (!value) return
-              await fetch('/api/push/register', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ token: value, platform, deviceId }),
-                credentials: 'include',
-                cache: 'no-store',
-              }).catch(() => { })
-            } catch (e) { logWarn('usePushNotifications', 'silenced error', e) }
-          })
-          if (registration?.remove) handles.push(registration)
+        // Register listener BEFORE calling register()
+        const regHandle = await PushNotifications.addListener('registration', async (token: PushToken) => {
+          try {
+            if (!alive) return
+            const value = String(token?.value || '').trim()
+            if (!value) return
 
-          const regError = await PushNotifications.addListener('registrationError', (err: unknown) => {
-            logWarn('usePushNotifications', '[APNs] Token registration failed', err)
-          })
-          if (regError?.remove) handles.push(regError)
+            await fetch('/api/push/register', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ token: value, platform, deviceId }),
+              credentials: 'include',
+              cache: 'no-store',
+            }).catch((e) => logWarn('usePushNotifications', 'register fetch failed', e))
+          } catch (e) {
+            logWarn('usePushNotifications', 'registration handler error', e)
+          }
+        })
+        handles.push(regHandle)
 
-          // Deep link: navigate when user taps a push notification
-          const tapHandler = await PushNotifications.addListener('pushNotificationActionPerformed', (action: unknown) => {
-            try {
-              if (!alive) return
-              const act = action && typeof action === 'object' ? (action as Record<string, unknown>) : null
-              const notification = act?.notification && typeof act.notification === 'object'
-                ? (act.notification as Record<string, unknown>) : null
-              const data = notification?.data && typeof notification.data === 'object'
-                ? (notification.data as Record<string, unknown>) : null
-              const link = data ? String(data.link || '').trim() : ''
-              const type = data ? String(data.type || '').trim() : ''
-              if (link || type) {
-                // Dispatch event so the app shell can navigate without a direct router dependency here
-                try {
-                  window.dispatchEvent(new CustomEvent('irontracks:push:navigate', { detail: { link, type } }))
-                } catch { /* not in browser context */ }
-              }
-            } catch (e) { logWarn('usePushNotifications', 'pushNotificationActionPerformed error', e) }
-          }).catch(() => null)
-          if (tapHandler?.remove) handles.push(tapHandler)
+        const errHandle = await PushNotifications.addListener('registrationError', (err: unknown) => {
+          logWarn('usePushNotifications', 'APNs token registration failed', err)
+        })
+        handles.push(errHandle)
 
-          await PushNotifications.register().catch(() => { })
-        } catch (e) { logWarn('usePushNotifications', 'silenced error', e) }
-      })()
+        // Tap handler — navigate on push tap
+        const tapHandle = await PushNotifications.addListener('pushNotificationActionPerformed', (action: unknown) => {
+          try {
+            if (!alive) return
+            const act = action && typeof action === 'object' ? (action as Record<string, unknown>) : null
+            const notification = act?.notification && typeof act.notification === 'object'
+              ? (act.notification as Record<string, unknown>) : null
+            const data = notification?.data && typeof notification.data === 'object'
+              ? (notification.data as Record<string, unknown>) : null
+            const link = data ? String(data.link || '').trim() : ''
+            const type = data ? String(data.type || '').trim() : ''
+            if (link || type) {
+              window.dispatchEvent(new CustomEvent('irontracks:push:navigate', { detail: { link, type } }))
+            }
+          } catch (e) {
+            logWarn('usePushNotifications', 'pushNotificationActionPerformed error', e)
+          }
+        }).catch(() => null)
+        if (tapHandle?.remove) handles.push(tapHandle)
+
+        if (!alive) return
+
+        // Trigger APNs token request
+        await PushNotifications.register().catch((e: unknown) => {
+          logWarn('usePushNotifications', 'PushNotifications.register() failed', e)
+        })
+      } catch (e) {
+        logWarn('usePushNotifications', 'Unexpected error in push setup', e)
+      }
+    }
+
+    void run()
 
     return () => {
       alive = false
       handles.forEach((h) => {
-        try {
-          h.remove()
-        } catch (e) { logWarn('usePushNotifications', 'silenced error', e) }
+        try { h.remove() } catch { /* ignore */ }
       })
     }
   }, [userId])
