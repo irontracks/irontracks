@@ -86,7 +86,7 @@ const stats = [
 
 export default function ComercialPage() {
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-white overflow-x-hidden">
+    <div className="bg-[#0a0a0a] text-white">
 
       {/* ── NAV ─────────────────────────────────────────────────────────── */}
       <header className="fixed top-0 left-0 right-0 z-50 flex items-center justify-between px-6 py-4"
