@@ -7,6 +7,17 @@ export type WhatsNewEntry = {
 
 export const WHATS_NEW: WhatsNewEntry[] = [
   {
+    id: '2026-04-24-v1.6-push',
+    title: 'Notificações em Tempo Real',
+    dateIso: '2026-04-24',
+    items: [
+      '🔔 Notificações sociais: saiba quando um amigo entra no app ou inicia um treino.',
+      '📲 Banners aparecem mesmo com o app aberto, sem perder nenhum aviso.',
+      '⚡ Entregas mais rápidas e confiáveis — notificações chegam sem atraso.',
+      '🆕 Aviso dentro do app quando uma nova versão estiver disponível na App Store.',
+    ],
+  },
+  {
     id: '2026-02-03-coach-ia-2.0',
     title: 'Nova Era do Iron Coach IA',
     dateIso: '2026-02-03',
