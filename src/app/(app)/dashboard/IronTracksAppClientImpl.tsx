@@ -50,6 +50,7 @@ import { useProfileCompletion } from '@/hooks/useProfileCompletion'
 import { useWhatsNew } from '@/hooks/useWhatsNew'
 import { useUnreadBadges } from '@/hooks/useUnreadBadges'
 import { useNativeAppSetup } from '@/hooks/useNativeAppSetup'
+import { usePushNotifications } from '@/hooks/usePushNotifications'
 import { BiometricLock, useBiometricLock } from '@/components/BiometricLock'
 import { useLocalPersistence } from '@/hooks/useLocalPersistence'
 import { useAdminPanelState } from '@/hooks/useAdminPanelState'
@@ -119,6 +120,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
     const handleMyStoryStateChange = useCallback((active: boolean) => setHasActiveStory(active), [])
     // ── Native iOS setup (notifications + biometric lock) ─────────────────────
     useNativeAppSetup(user?.id)
+    usePushNotifications(user?.id)
     const userName = String(user?.displayName || user?.email || '')
 
     // workouts, stats, studentFolders, fetchWorkouts, isFetching — extraídos para useWorkoutFetch
