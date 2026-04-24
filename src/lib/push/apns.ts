@@ -81,18 +81,19 @@ async function sendOneApnsPush(
 
     return new Promise((resolve) => {
         try {
+            const interruptionLevel = (() => {
+                const type = String(extra?.type ?? '').toLowerCase()
+                const passive = ['story_like', 'workout_like', 'pr_achieved']
+                return passive.includes(type) ? 'active' : 'time-sensitive'
+            })()
+            console.error(`[APNs:DEBUG] type=${String(extra?.type ?? '')} interruption-level=${interruptionLevel} token=${token.slice(0, 8)}`)
+
             const apnsPayload = JSON.stringify({
                 aps: {
                     alert: { title, body },
                     sound: 'default',
                     badge: (extra?.__badge as number | undefined) ?? 1,
-                    // time-sensitive bypasses iOS Focus Mode and wakes the screen.
-                    // passive is for silent/low-priority. active for social events.
-                    'interruption-level': (() => {
-                        const type = String(extra?.type ?? '').toLowerCase()
-                        const passive = ['story_like', 'workout_like', 'pr_achieved']
-                        return passive.includes(type) ? 'active' : 'time-sensitive'
-                    })(),
+                    'interruption-level': interruptionLevel,
                 },
                 // Spread extra but omit the internal __badge key used only for the aps.badge field
                 ...Object.fromEntries(Object.entries(extra ?? {}).filter(([k]) => k !== '__badge')),
