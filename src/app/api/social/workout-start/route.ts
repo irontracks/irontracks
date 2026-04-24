@@ -11,6 +11,7 @@ import {
 import { parseJsonBody } from '@/utils/zod'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
+import { sendPushToAllPlatforms } from '@/lib/push/sender'
 
 export const dynamic = 'force-dynamic'
 
@@ -64,6 +65,15 @@ export async function POST(req: Request) {
 
     const res = await insertNotifications(rows)
     if (!res.ok) return NextResponse.json({ ok: false, error: res.error || 'failed' }, { status: 400 })
+
+    sendPushToAllPlatforms(
+      recipients,
+      'Treino iniciado',
+      `${name} começou um treino: ${workoutTitle}.`,
+      { type: 'workout_start', link: '/social' },
+      { preferenceKey: 'notifyFriendWorkoutEvents' },
+    ).catch(() => null)
+
     return NextResponse.json({ ok: true, sent: res.inserted })
   } catch (e: unknown) {
     return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
