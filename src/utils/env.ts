@@ -89,7 +89,7 @@ export const env = {
     get keyP8() { return optionalEnv('APNS_KEY_P8') || optionalEnv('APNS_KEY_P') },
     get teamId() { return optionalEnv('APNS_TEAM_ID') },
     get bundleId() { return optionalEnv('APNS_BUNDLE_ID', 'com.irontracks.app') },
-    get production() { return optionalEnv('APNS_PRODUCTION', 'false') === 'true' },
+    get production() { return optionalEnv('APNS_PRODUCTION', 'false').trim() === 'true' },
   },
 
   // ── Cloudinary ────────────────────────────────────────────
