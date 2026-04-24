@@ -174,104 +174,26 @@ export default function ComercialPage() {
           </Link>
         </div>
 
-        {/* Phone Mockup */}
+        {/* Phone Mockup — prints reais */}
         <div className="relative z-10 flex items-end justify-center gap-4">
           {/* Main phone */}
-          <div className="relative" style={{ filter: 'drop-shadow(0 40px 80px rgba(245,158,11,0.2))' }}>
-            <div className="relative w-[240px] h-[500px] rounded-[42px] overflow-hidden"
-              style={{ border: '2px solid rgba(255,255,255,0.12)', background: 'linear-gradient(180deg,#0f0f0f 0%, #0a0a0a 100%)', boxShadow: 'inset 0 0 40px rgba(0,0,0,0.8)' }}>
-
-              {/* Notch */}
-              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-20 h-6 rounded-b-2xl z-10"
-                style={{ background: '#0a0a0a' }} />
-
-              {/* App chrome — header */}
-              <div className="px-4 pt-8 pb-3"
-                style={{ background: 'linear-gradient(180deg, rgba(245,158,11,0.08) 0%, transparent 100%)' }}>
-                <div className="text-[10px] text-neutral-500 uppercase tracking-widest font-black">Quinta-feira</div>
-                <div className="text-white font-black text-lg leading-tight">Peito & Tríceps</div>
-                <div className="flex items-center gap-2 mt-1">
-                  <div className="h-1 rounded-full flex-1" style={{ background: 'rgba(255,255,255,0.08)' }}>
-                    <div className="h-1 rounded-full w-[68%]" style={{ background: 'linear-gradient(90deg,#f59e0b,#fbbf24)' }} />
-                  </div>
-                  <span className="text-[10px] text-yellow-500 font-black">68%</span>
-                </div>
-              </div>
-
-              {/* Exercise cards */}
-              <div className="px-3 space-y-2 mt-1">
-                {[
-                  { name: 'Supino Reto', sets: '4×8', kg: '80kg', done: true },
-                  { name: 'Crucifixo Incl.', sets: '3×12', kg: '20kg', done: true },
-                  { name: 'Tríceps Corda', sets: '4×15', kg: '35kg', done: false },
-                ].map((ex, i) => (
-                  <div key={i} className="rounded-xl px-3 py-2.5 flex items-center gap-2.5"
-                    style={{ background: ex.done ? 'rgba(245,158,11,0.08)' : 'rgba(255,255,255,0.04)', border: `1px solid ${ex.done ? 'rgba(245,158,11,0.2)' : 'rgba(255,255,255,0.07)'}` }}>
-                    <div className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0"
-                      style={{ background: ex.done ? 'rgba(245,158,11,0.2)' : 'rgba(255,255,255,0.06)' }}>
-                      {ex.done && <Check size={10} className="text-yellow-400" />}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="text-[11px] font-black text-white truncate">{ex.name}</div>
-                      <div className="text-[9px] text-neutral-500">{ex.sets} · {ex.kg}</div>
-                    </div>
-                    {!ex.done && (
-                      <div className="w-2 h-2 rounded-full animate-pulse" style={{ background: '#f59e0b' }} />
-                    )}
-                  </div>
-                ))}
-              </div>
-
-              {/* PR Badge */}
-              <div className="absolute bottom-20 right-3 flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl"
-                style={{ background: 'linear-gradient(135deg,rgba(245,158,11,0.9),rgba(217,119,6,0.9))', boxShadow: '0 4px 20px rgba(245,158,11,0.5)' }}>
-                <Trophy size={10} className="text-black" />
-                <span className="text-[10px] font-black text-black">Novo PR!</span>
-              </div>
-
-              {/* Bottom bar */}
-              <div className="absolute bottom-0 left-0 right-0 px-4 py-3 flex items-center justify-between"
-                style={{ background: 'rgba(10,10,10,0.95)', borderTop: '1px solid rgba(255,255,255,0.07)' }}>
-                <span className="text-[10px] text-neutral-500 font-black">3/5 exercícios</span>
-                <div className="px-3 py-1.5 rounded-lg text-[10px] font-black text-black"
-                  style={{ background: 'linear-gradient(135deg,#f59e0b,#d97706)' }}>
-                  Continuar
-                </div>
-              </div>
+          <div className="relative" style={{ filter: 'drop-shadow(0 40px 80px rgba(245,158,11,0.25))' }}>
+            <div className="relative w-[240px] rounded-[42px] overflow-hidden"
+              style={{ border: '2px solid rgba(255,255,255,0.12)' }}>
+              <Image src="/screenshot/IMG_7427.PNG" alt="IronTracks Dashboard" width={240} height={520}
+                className="w-full" unoptimized priority />
             </div>
-
-            {/* Reflection */}
-            <div className="absolute -bottom-8 left-1/2 -translate-x-1/2 w-[180px] h-[30px] rounded-full blur-xl"
-              style={{ background: 'rgba(245,158,11,0.15)' }} />
+            <div className="absolute -bottom-6 left-1/2 -translate-x-1/2 w-[180px] h-[30px] rounded-full blur-xl"
+              style={{ background: 'rgba(245,158,11,0.2)' }} />
           </div>
 
-          {/* Side phone (nutrition) — hidden on small screens */}
-          <div className="hidden md:block relative opacity-60 scale-90 origin-bottom"
+          {/* Side phone — hidden on small screens */}
+          <div className="hidden md:block relative opacity-70 scale-90 origin-bottom"
             style={{ filter: 'drop-shadow(0 20px 40px rgba(0,0,0,0.5))' }}>
-            <div className="relative w-[200px] h-[420px] rounded-[36px] overflow-hidden"
-              style={{ border: '2px solid rgba(255,255,255,0.08)', background: '#0a0a0a' }}>
-              <div className="absolute top-0 left-1/2 -translate-x-1/2 w-16 h-5 rounded-b-xl" style={{ background: '#0a0a0a' }} />
-              <div className="px-3 pt-7 pb-2" style={{ background: 'rgba(16,185,129,0.06)' }}>
-                <div className="text-[9px] text-neutral-500 uppercase tracking-widest font-black">Hoje</div>
-                <div className="text-white font-black text-base">Nutrição</div>
-              </div>
-              <div className="px-3 mt-2 space-y-2">
-                {[
-                  { label: 'Proteína', v: 142, max: 180, color: '#3b82f6' },
-                  { label: 'Carbs', v: 210, max: 300, color: '#f97316' },
-                  { label: 'Gordura', v: 55, max: 80, color: '#eab308' },
-                ].map(m => (
-                  <div key={m.label} className="rounded-xl p-2.5" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                    <div className="flex justify-between mb-1">
-                      <span className="text-[9px] text-neutral-400 font-black">{m.label}</span>
-                      <span className="text-[9px] font-black" style={{ color: m.color }}>{m.v}g</span>
-                    </div>
-                    <div className="h-1 rounded-full" style={{ background: 'rgba(255,255,255,0.06)' }}>
-                      <div className="h-1 rounded-full transition-all" style={{ width: `${(m.v/m.max)*100}%`, background: m.color }} />
-                    </div>
-                  </div>
-                ))}
-              </div>
+            <div className="relative w-[200px] rounded-[36px] overflow-hidden"
+              style={{ border: '1.5px solid rgba(255,255,255,0.08)' }}>
+              <Image src="/screenshot/IMG_7431.PNG" alt="IronTracks Treino Ativo" width={200} height={433}
+                className="w-full" unoptimized />
             </div>
           </div>
         </div>
