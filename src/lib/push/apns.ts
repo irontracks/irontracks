@@ -86,12 +86,12 @@ async function sendOneApnsPush(
                     alert: { title, body },
                     sound: 'default',
                     badge: (extra?.__badge as number | undefined) ?? 1,
-                    // time-sensitive bypasses iOS Focus Mode — reserve for urgent notifications only.
-                    // workout_reminder and message are time-critical; social events use 'active'.
+                    // time-sensitive bypasses iOS Focus Mode and wakes the screen.
+                    // passive is for silent/low-priority. active for social events.
                     'interruption-level': (() => {
                         const type = String(extra?.type ?? '').toLowerCase()
-                        const urgent = ['workout_reminder', 'rest_timer', 'message', 'direct_message']
-                        return urgent.includes(type) ? 'time-sensitive' : 'active'
+                        const passive = ['story_like', 'workout_like', 'pr_achieved']
+                        return passive.includes(type) ? 'active' : 'time-sensitive'
                     })(),
                 },
                 // Spread extra but omit the internal __badge key used only for the aps.badge field
