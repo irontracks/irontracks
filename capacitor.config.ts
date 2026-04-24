@@ -12,7 +12,13 @@ const config: CapacitorConfig = {
     // Override with CAPACITOR_SERVER_URL for local dev:
     // Example: CAPACITOR_SERVER_URL=http://192.168.1.10:3000 npx cap sync
     url: process.env.CAPACITOR_SERVER_URL || 'https://irontracks.com.br',
-  }
+  },
+  plugins: {
+    PushNotifications: {
+      // Show push banners even when the app is in the foreground (iOS default suppresses them).
+      presentationOptions: ['badge', 'sound', 'alert'],
+    },
+  },
 };
 
 export default config;
