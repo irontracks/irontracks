@@ -105,6 +105,7 @@ export const AssessmentHeader = ({
               multiple
               className="hidden"
               onChange={onScanFileChange}
+              aria-label="Escanear avaliação (foto ou PDF)"
             />
           ) : null}
         </div>

@@ -750,7 +750,7 @@ export default function Modals() {
                       }}
                       placeholder="Total reps (ex.: 12)"
                       className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
-                    />
+                     aria-label="Total reps (ex.: 12)"/>
                     <input
                       inputMode="decimal"
                       value={String((((clusterModal as UnknownRecord | null)?.planned as UnknownRecord | null)?.cluster_blocks_count ?? '') as unknown)}
@@ -764,7 +764,7 @@ export default function Modals() {
                       }}
                       placeholder="Blocos (ex.: 3)"
                       className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
-                    />
+                     aria-label="Blocos (ex.: 3)"/>
                     <input
                       inputMode="decimal"
                       value={String((((clusterModal as UnknownRecord | null)?.planned as UnknownRecord | null)?.intra_rest_sec ?? (clusterModal as UnknownRecord | null)?.intra ?? '') as unknown)}
@@ -778,7 +778,7 @@ export default function Modals() {
                       }}
                       placeholder="Descanso (s) (ex.: 15)"
                       className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
-                    />
+                     aria-label="Descanso (s) (ex.: 15)"/>
                   </div>
                   <div className="mt-2 flex items-center justify-end">
                     <button
@@ -868,7 +868,7 @@ export default function Modals() {
                           }}
                           placeholder="kg"
                           className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
-                        />
+                         aria-label="kg"/>
                         <input
                           inputMode="decimal"
                           value={repsValue}
@@ -891,7 +891,7 @@ export default function Modals() {
                           }}
                           placeholder="reps"
                           className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
-                        />
+                         aria-label="reps"/>
                       </div>
                       {!isLast ? <div className="mt-2 text-xs text-neutral-500">Descanso: {safeRestSec}s</div> : null}
                     </div>
@@ -909,7 +909,7 @@ export default function Modals() {
                   }}
                   placeholder="RPE (0-10)"
                   className="mt-2 w-full bg-black/30 border border-yellow-500/30 rounded-lg px-3 py-2 text-sm text-yellow-500 font-bold outline-none focus:ring-1 ring-yellow-500"
-                />
+                 aria-label="RPE (0-10)"/>
               </div>
             </div>
 

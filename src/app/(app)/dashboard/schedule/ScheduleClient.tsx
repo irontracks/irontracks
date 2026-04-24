@@ -388,6 +388,7 @@ export default function SchedulePage() {
                 value={selectedDate}
                 onChange={e => setSelectedDate(e.target.value)}
                 className="bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-3 text-sm text-white focus:outline-none focus:border-yellow-500 min-h-[48px] w-full"
+                aria-label="Data"
               />
             </div>
             <button
@@ -502,6 +503,7 @@ export default function SchedulePage() {
                       value={form.date}
                       onChange={e => setForm(prev => ({ ...prev, date: e.target.value }))}
                       className="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-yellow-500 min-h-[44px]"
+                      aria-label="Data do agendamento"
                     />
                   </div>
                   <div className="space-y-1">
@@ -511,6 +513,7 @@ export default function SchedulePage() {
                       value={form.startTime}
                       onChange={e => setForm(prev => ({ ...prev, startTime: e.target.value }))}
                       className="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-yellow-500 min-h-[44px]"
+                      aria-label="Hora de início"
                     />
                   </div>
                 </div>
@@ -521,6 +524,7 @@ export default function SchedulePage() {
                     value={form.endTime}
                     onChange={e => setForm(prev => ({ ...prev, endTime: e.target.value }))}
                     className="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-yellow-500 min-h-[44px]"
+                    aria-label="Hora de fim"
                   />
                 </div>
                 <div className="space-y-1">
