@@ -469,7 +469,7 @@ function FeatCard({
     >
       {textContent}
       {children && (
-        <div style={{ position: 'relative', flex: 1, minHeight: 120 }}>
+        <div style={{ position: 'relative', flex: 1, minHeight: 150, overflow: 'hidden' }}>
           {children}
         </div>
       )}
@@ -664,7 +664,7 @@ function Showcase() {
               <h3 style={{ fontFamily: '"Space Grotesk", sans-serif', fontWeight: 700, fontSize: 'clamp(22px, 2.5vw, 32px)', lineHeight: 1.1, margin: '0 0 12px', letterSpacing: '-0.02em' }}>
                 {cur.title}
               </h3>
-              <p style={{ color: 'rgba(245,245,245,0.6)', fontSize: 15, lineHeight: 1.65, maxWidth: 480 }}>
+              <p style={{ color: 'rgba(245,245,245,0.78)', fontSize: 15, lineHeight: 1.7, maxWidth: 480 }}>
                 {cur.desc}
               </p>
             </div>
@@ -715,20 +715,20 @@ function Wearables() {
               Seu punho sabe mais<br /><span style={{ color: '#F5B800' }}>que sua desculpa.</span>
             </h2>
             <p style={{ color: 'rgba(245,245,245,0.6)', fontSize: 16, lineHeight: 1.65, maxWidth: 520, marginBottom: 36 }}>
-              BPM, calorias, zona de esforço — em tempo real, do punho pro app. Integração nativa com os principais dispositivos do mercado.
+              BPM, FC de repouso, HRV, calorias e passos — do Apple Watch direto pro app, via Apple Health. Tudo sincronizado, sem precisar abrir o relógio.
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {[
-                { label: 'Apple Watch', sub: '— Series 4+ · WatchOS 9' },
-                { label: 'Garmin', sub: '— Forerunner · Fenix · Venu' },
-                { label: 'Whoop', sub: '— HRV & recuperação' },
-                { label: 'Wear OS', sub: '— Pixel Watch · Galaxy Watch' },
-                { label: 'Polar H10', sub: '— Cinta cardíaca BLE' },
+                { label: 'Apple Watch', sub: '— Series 4+ · WatchOS 9+', active: true },
+                { label: 'Apple Health', sub: '— HealthKit · iOS nativo', active: true },
+                { label: 'Frequência cardíaca', sub: '— BPM em tempo real', active: true },
+                { label: 'HRV & Recuperação', sub: '— SDNN · FC de repouso', active: true },
               ].map(chip => (
                 <div key={chip.label} style={{
                   display: 'inline-flex', alignItems: 'center', gap: 10,
                   padding: '10px 16px', borderRadius: 10,
-                  border: '1px solid rgba(255,255,255,0.1)', background: 'rgba(255,255,255,0.03)',
+                  border: chip.active ? '1px solid rgba(245,184,0,0.18)' : '1px solid rgba(255,255,255,0.1)',
+                  background: chip.active ? 'rgba(245,184,0,0.04)' : 'rgba(255,255,255,0.03)',
                   width: 'fit-content',
                 }}>
                   <span style={{ width: 7, height: 7, borderRadius: '50%', background: '#2AE870', flexShrink: 0 }} />
@@ -808,7 +808,7 @@ function Wearables() {
 // ── STATS ────────────────────────────────────────────────────────────────────
 function StatsBar() {
   const stats = [
-    { num: '18.970', suf: '', label: 'Dispositivos compatíveis' },
+    { num: '12', suf: '+', label: 'Métodos de treino avançados' },
     { num: '5,0', suf: '★', label: 'Rating na App Store' },
     { num: '100', suf: '%', label: 'Gratuito para baixar' },
     { num: '3', suf: '×', label: 'iOS · Android · Web' },
@@ -892,16 +892,29 @@ function Testimonials() {
 // ── VIP HINT ─────────────────────────────────────────────────────────────────
 function VipHint() {
   return (
-    <div style={{ textAlign: 'center', padding: '20px', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
+    <div style={{ textAlign: 'center', padding: '36px 20px', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
       <Link href={WEB} style={{
-        display: 'inline-flex', alignItems: 'center', gap: 6,
-        fontSize: 12, color: 'rgba(245,245,245,0.3)', textDecoration: 'none',
-        transition: 'color 0.2s',
+        display: 'inline-flex', alignItems: 'center', gap: 10,
+        padding: '12px 22px', borderRadius: 12,
+        border: '1px solid rgba(245,184,0,0.2)',
+        background: 'rgba(245,184,0,0.04)',
+        fontSize: 14, color: 'rgba(245,245,245,0.65)', textDecoration: 'none',
+        transition: 'all 0.2s',
       }}
-        onMouseEnter={e => { e.currentTarget.style.color = 'rgba(245,245,245,0.55)' }}
-        onMouseLeave={e => { e.currentTarget.style.color = 'rgba(245,245,245,0.3)' }}
+        onMouseEnter={e => {
+          e.currentTarget.style.borderColor = 'rgba(245,184,0,0.4)'
+          e.currentTarget.style.color = 'rgba(245,245,245,0.9)'
+          e.currentTarget.style.background = 'rgba(245,184,0,0.08)'
+        }}
+        onMouseLeave={e => {
+          e.currentTarget.style.borderColor = 'rgba(245,184,0,0.2)'
+          e.currentTarget.style.color = 'rgba(245,245,245,0.65)'
+          e.currentTarget.style.background = 'rgba(245,184,0,0.04)'
+        }}
       >
-        Quer ir além? Conheça o IronTracks VIP <ArrowRight size={11} />
+        <span style={{ fontSize: 13, color: '#F5B800' }}>♛</span>
+        Quer ir além? Conheça o IronTracks VIP
+        <ArrowRight size={13} style={{ color: '#F5B800' }} />
       </Link>
     </div>
   )
@@ -924,10 +937,10 @@ function FinalCta() {
             planejar.<br />
             <span style={{ color: '#F5B800' }}>Treina.</span>
           </h2>
-          <p style={{ color: 'rgba(245,245,245,0.6)', fontSize: 17, marginBottom: 8, maxWidth: 460, margin: '0 auto 8px' }}>
+          <p style={{ color: 'rgba(245,245,245,0.75)', fontSize: 17, maxWidth: 460, margin: '0 auto 10px' }}>
             Grátis. Funciona offline. Sem anúncios.
           </p>
-          <p style={{ color: 'rgba(245,245,245,0.3)', fontSize: 14, marginBottom: 44 }}>
+          <p style={{ color: 'rgba(245,245,245,0.45)', fontSize: 14, marginBottom: 44, letterSpacing: '0.05em' }}>
             iOS · Android · Navegador
           </p>
 
