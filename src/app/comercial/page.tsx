@@ -394,11 +394,11 @@ export default function ComercialPage() {
         </div>
         <div className="flex gap-5 overflow-x-auto pb-4 px-8 snap-x snap-mandatory" style={{ scrollbarWidth: 'none' }}>
           {[
-            { src: '/onboarding-workout.png', label: 'Treinos' },
-            { src: '/onboarding-progress.png', label: 'Evolução' },
-            { src: '/onboarding-muscles.png', label: 'Grupos Musculares' },
-            { src: '/onboarding-ready.png', label: 'Pronto para treinar' },
-            { src: '/onboarding-welcome.png', label: 'Bem-vindo' },
+            { src: '/screenshot/IMG_7427.PNG', label: 'Dashboard' },
+            { src: '/screenshot/IMG_7430.PNG', label: 'Meus Treinos' },
+            { src: '/screenshot/IMG_7431.PNG', label: 'Treino Ativo' },
+            { src: '/screenshot/IMG_7428.PNG', label: 'Mapa Muscular' },
+            { src: '/screenshot/IMG_7432.PNG', label: 'Cardio GPS' },
           ].map((screen, i) => (
             <div key={i} className="flex-none snap-center flex flex-col items-center" style={{ width: 220 }}>
               <div className="rounded-[32px] overflow-hidden mb-3 w-full"
