@@ -210,7 +210,7 @@ function HudCard({ label, badge, imgSrc, imgAlt, imgPosition }: {
   )
 }
 
-function Hero() {
+function Hero({ onAndroidClick }: { onAndroidClick: () => void }) {
   return (
     <section className="com-hero-grid">
       {/* Left column */}
@@ -260,18 +260,18 @@ function Hero() {
               <strong style={{ fontSize: 15 }}>App Store</strong>
             </span>
           </Link>
-          <Link href={PLAY} style={{
+          <button onClick={onAndroidClick} style={{
             display: 'inline-flex', alignItems: 'center', gap: 10,
-            padding: '14px 22px', borderRadius: 14,
+            padding: '14px 22px', borderRadius: 14, cursor: 'pointer',
             border: '1px solid rgba(255,255,255,0.14)', background: 'rgba(255,255,255,0.04)',
-            color: '#f5f5f5', textDecoration: 'none', fontWeight: 600,
+            color: '#f5f5f5', fontWeight: 600,
           }}>
             <PlaySvg />
             <span>
               <small style={{ display: 'block', fontSize: 10, opacity: 0.65 }}>Disponível no</small>
               <strong style={{ fontSize: 15 }}>Google Play</strong>
             </span>
-          </Link>
+          </button>
           <Link href={WEB} style={{
             display: 'inline-flex', alignItems: 'center', gap: 10,
             padding: '14px 22px', borderRadius: 14,
@@ -921,7 +921,7 @@ function VipHint() {
 }
 
 // ── FINAL CTA ────────────────────────────────────────────────────────────────
-function FinalCta() {
+function FinalCta({ onAndroidClick }: { onAndroidClick: () => void }) {
   return (
     <section id="download" style={{ padding: '120px 20px', position: 'relative', overflow: 'hidden' }}>
       <div style={{
@@ -956,17 +956,17 @@ function FinalCta() {
                 <strong style={{ fontSize: 16 }}>App Store</strong>
               </span>
             </Link>
-            <Link href={PLAY} style={{
+            <button onClick={onAndroidClick} style={{
               display: 'inline-flex', alignItems: 'center', gap: 12, padding: '16px 28px', borderRadius: 16,
               border: '1px solid rgba(255,255,255,0.14)', background: 'rgba(255,255,255,0.05)',
-              color: '#f5f5f5', textDecoration: 'none', fontWeight: 600,
+              color: '#f5f5f5', cursor: 'pointer', fontWeight: 600,
             }}>
               <PlaySvg />
               <span>
                 <small style={{ display: 'block', fontSize: 11, opacity: 0.6 }}>Disponível no</small>
                 <strong style={{ fontSize: 16 }}>Google Play</strong>
               </span>
-            </Link>
+            </button>
             <Link href={WEB} style={{
               display: 'inline-flex', alignItems: 'center', gap: 12, padding: '16px 28px', borderRadius: 16,
               border: '1px solid rgba(255,255,255,0.14)', background: 'rgba(255,255,255,0.05)',
@@ -1009,11 +1009,116 @@ function Footer() {
 }
 
 // ── PAGE ROOT ────────────────────────────────────────────────────────────────
+// ── ANDROID MODAL ────────────────────────────────────────────────────────────
+function AndroidModal({ onClose }: { onClose: () => void }) {
+  const steps = [
+    { n: '1', title: 'Acesse o link pelo seu Android', desc: 'Toque no botão abaixo para abrir a página do teste interno no Google Play.' },
+    { n: '2', title: 'Entre com sua conta Google', desc: 'Se não estiver logado, o Play Store vai pedir para você entrar.' },
+    { n: '3', title: 'Aceite o convite de testador', desc: 'Clique em "Aceitar convite" na página que abrir. Isso te adiciona ao programa de teste.' },
+    { n: '4', title: 'Aguarde 1 a 2 minutos', desc: 'O Google precisa processar a sua entrada. Não feche o Play Store.' },
+    { n: '5', title: 'Instale o IronTracks', desc: 'Após o processamento, o botão de instalar vai aparecer. Toque em "Instalar" e pronto!' },
+  ]
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: 'fixed', inset: 0, zIndex: 9999,
+        background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(8px)',
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        padding: '20px',
+      }}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          background: '#111', borderRadius: 24, padding: '36px 32px',
+          maxWidth: 480, width: '100%',
+          border: '1px solid rgba(245,184,0,0.2)',
+          boxShadow: '0 0 80px rgba(245,184,0,0.08)',
+        }}
+      >
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <PlaySvg />
+            <span style={{ fontFamily: '"Space Grotesk", sans-serif', fontWeight: 700, fontSize: 18 }}>
+              Baixar para Android
+            </span>
+          </div>
+          <button
+            onClick={onClose}
+            style={{ background: 'none', border: 'none', color: 'rgba(245,245,245,0.4)', cursor: 'pointer', fontSize: 22, lineHeight: 1, padding: 4 }}
+          >
+            ×
+          </button>
+        </div>
+
+        {/* Tag teste interno */}
+        <div style={{
+          display: 'inline-flex', alignItems: 'center', gap: 6,
+          padding: '5px 12px', borderRadius: 999, marginBottom: 24,
+          background: 'rgba(245,184,0,0.08)', border: '1px solid rgba(245,184,0,0.25)',
+          fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#F5B800',
+        }}>
+          ⚗ Versão de Teste Interno
+        </div>
+
+        <p style={{ color: 'rgba(245,245,245,0.55)', fontSize: 14, lineHeight: 1.6, marginBottom: 28 }}>
+          O IronTracks para Android está em teste. Siga os passos abaixo para instalar:
+        </p>
+
+        {/* Steps */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 16, marginBottom: 32 }}>
+          {steps.map(s => (
+            <div key={s.n} style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+              <div style={{
+                flexShrink: 0, width: 28, height: 28, borderRadius: '50%',
+                background: 'rgba(245,184,0,0.12)', border: '1px solid rgba(245,184,0,0.35)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+                fontFamily: '"Space Grotesk", sans-serif', fontWeight: 700, fontSize: 13, color: '#F5B800',
+              }}>
+                {s.n}
+              </div>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 14, marginBottom: 2 }}>{s.title}</div>
+                <div style={{ fontSize: 13, color: 'rgba(245,245,245,0.5)', lineHeight: 1.5 }}>{s.desc}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* CTA */}
+        <a
+          href={PLAY}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+            padding: '15px 24px', borderRadius: 14, textDecoration: 'none',
+            background: 'linear-gradient(135deg, #FFD34D 0%, #F5B800 40%, #FF7A1A 100%)',
+            color: '#000', fontWeight: 700, fontSize: 15, width: '100%',
+          }}
+        >
+          <PlaySvg />
+          Acessar o programa de teste
+        </a>
+
+        <p style={{ textAlign: 'center', fontSize: 12, color: 'rgba(245,245,245,0.25)', marginTop: 14 }}>
+          Toque fora para fechar
+        </p>
+      </div>
+    </div>
+  )
+}
+
 export default function ComercialContent() {
+  const [showAndroid, setShowAndroid] = useState(false)
   return (
     <div style={{ background: '#070707', color: '#f5f5f5', fontFamily: '"Inter", system-ui, -apple-system, sans-serif' }}>
+      {showAndroid && <AndroidModal onClose={() => setShowAndroid(false)} />}
       <Nav />
-      <Hero />
+      <Hero onAndroidClick={() => setShowAndroid(true)} />
       <Ticker />
       <Manifesto />
       <FeatureBento />
@@ -1022,7 +1127,7 @@ export default function ComercialContent() {
       <StatsBar />
       <Testimonials />
       <VipHint />
-      <FinalCta />
+      <FinalCta onAndroidClick={() => setShowAndroid(true)} />
       <Footer />
     </div>
   )
