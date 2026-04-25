@@ -442,6 +442,8 @@ export function SettingsNotificationsSection({ draft, setValue, iosNotifStatus, 
     const notifyFriendPRs = Boolean(draft?.notifyFriendPRs ?? true)
     const notifyFriendStreaks = Boolean(draft?.notifyFriendStreaks ?? true)
     const notifyFriendGoals = Boolean(draft?.notifyFriendGoals ?? true)
+    const notifyFriendComeback = Boolean(draft?.notifyFriendComeback ?? true)
+    const notifyAchievements = Boolean(draft?.notifyAchievements ?? true)
     const notifyStoryPosted = Boolean(draft?.notifyStoryPosted ?? true)
     const notifyStoryLikes = Boolean(draft?.notifyStoryLikes ?? true)
     const notifyStoryReactions = Boolean(draft?.notifyStoryReactions ?? true)
@@ -580,6 +582,20 @@ export function SettingsNotificationsSection({ draft, setValue, iosNotifStatus, 
                         checked={notifyFriendGoals}
                         disabled={!pushNotificationsEnabled}
                         onChange={() => setValue('notifyFriendGoals', !notifyFriendGoals)}
+                    />
+                    <NotifRow
+                        title="Amigo voltou a treinar"
+                        description="Quando um seguido volta após 3+ dias sem treinar."
+                        checked={notifyFriendComeback}
+                        disabled={!pushNotificationsEnabled}
+                        onChange={() => setValue('notifyFriendComeback', !notifyFriendComeback)}
+                    />
+                    <NotifRow
+                        title="Conquistas de amigos"
+                        description="Quando um seguido desbloqueia uma conquista (primeiro treino, marcos de volume)."
+                        checked={notifyAchievements}
+                        disabled={!pushNotificationsEnabled}
+                        onChange={() => setValue('notifyAchievements', !notifyAchievements)}
                     />
                 </div>
 

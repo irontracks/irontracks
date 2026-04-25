@@ -114,6 +114,27 @@ export const computeWorkoutStreak = (dateRows: unknown[]) => {
   return streak
 }
 
+// ─── Achievement badges ───────────────────────────────────────────────────────
+// Mirrors the public-facing badge list in workout-analytics-actions.ts, but
+// streak badges are intentionally omitted here — they're already covered by
+// the `friend_streak` notification with finer-grained milestones.
+type AchievementBadge = {
+  id: string
+  label: string
+  kind: string
+  unlocked: (s: { totalWorkouts: number; totalVolumeKg: number }) => boolean
+}
+
+const ACHIEVEMENT_BADGES: AchievementBadge[] = [
+  { id: 'first_workout', label: 'Primeiro treino', kind: 'milestone', unlocked: (s) => s.totalWorkouts > 0 },
+  { id: 'vol_5k', label: '5.000kg levantados', kind: 'volume', unlocked: (s) => s.totalVolumeKg >= 5_000 },
+  { id: 'vol_20k', label: '20.000kg levantados', kind: 'volume', unlocked: (s) => s.totalVolumeKg >= 20_000 },
+  { id: 'vol_50k', label: '50.000kg levantados', kind: 'volume', unlocked: (s) => s.totalVolumeKg >= 50_000 },
+  { id: 'vol_100k', label: '100.000kg levantados', kind: 'volume', unlocked: (s) => s.totalVolumeKg >= 100_000 },
+  { id: 'vol_500k', label: '500.000kg levantados', kind: 'volume', unlocked: (s) => s.totalVolumeKg >= 500_000 },
+  { id: 'vol_1m', label: '1.000.000kg levantados', kind: 'volume', unlocked: (s) => s.totalVolumeKg >= 1_000_000 },
+]
+
 // ─── Main export ──────────────────────────────────────────────────────────────
 
 const formatVolume = (kg: number) => {
@@ -190,10 +211,11 @@ export async function notifyWorkoutFinished(
     const streakMilestones = new Set([3, 7, 14, 30, 60, 100])
     const goalMilestones = new Set([10, 25, 50, 100, 200, 500])
 
-    const [throttleStreak, throttleGoals, throttlePr] = await Promise.all([
+    const [throttleStreak, throttleGoals, throttlePr, throttleComeback] = await Promise.all([
       shouldThrottleBySenderType(userId, 'friend_streak', 12 * 60).catch(() => true),
       shouldThrottleBySenderType(userId, 'friend_goal', 12 * 60).catch(() => true),
       shouldThrottleBySenderType(userId, 'friend_pr', 60).catch(() => true),
+      shouldThrottleBySenderType(userId, 'friend_comeback', 24 * 60).catch(() => true),
     ])
 
     // Streak milestone notification
@@ -339,6 +361,111 @@ export async function notifyWorkoutFinished(
       }
     } catch (e) {
       logError('workoutNotifications:pr', e)
+    }
+
+    // Achievement unlock notification — fires once per badge per user, gated
+    // by the user_achievements table. No throttle: the unique (user_id, badge_id)
+    // index in the table guarantees we only ever notify once per badge.
+    try {
+      const [workoutsCountRes, volumeRes] = await Promise.all([
+        admin
+          .from('workouts')
+          .select('id', { head: true, count: 'exact' })
+          .eq('user_id', userId)
+          .eq('is_template', false),
+        admin.rpc('iron_rank_total_volume_for_user', { p_user_id: userId }),
+      ])
+      const totalWorkouts = Number(workoutsCountRes?.count ?? 0)
+      const totalVolumeKg = Math.round(Number(volumeRes?.data ?? 0) || 0)
+
+      const eligible = ACHIEVEMENT_BADGES.filter((b) => b.unlocked({ totalWorkouts, totalVolumeKg }))
+      if (eligible.length) {
+        const { data: existing } = await admin
+          .from('user_achievements')
+          .select('badge_id')
+          .eq('user_id', userId)
+          .in('badge_id', eligible.map((b) => b.id))
+        const existingIds = new Set(
+          (Array.isArray(existing) ? existing : []).map((r) => String((r as { badge_id?: unknown })?.badge_id || '')),
+        )
+        const fresh = eligible.filter((b) => !existingIds.has(b.id))
+        if (fresh.length) {
+          // Persist first so a concurrent finish hits the unique constraint
+          // instead of double-notifying.
+          const { error: insertErr } = await admin.from('user_achievements').upsert(
+            fresh.map((b) => ({
+              user_id: userId,
+              badge_id: b.id,
+              badge_label: b.label,
+              badge_kind: b.kind,
+            })),
+            { onConflict: 'user_id,badge_id', ignoreDuplicates: true },
+          )
+          if (insertErr) {
+            logError('workoutNotifications:achievement.upsert', insertErr)
+          } else {
+            const recipients = await filterRecipientsByPreference(followerIds, 'notifyAchievements')
+            if (recipients.length) {
+              for (const badge of fresh) {
+                await insertNotifications(
+                  recipients.map((rid) => ({
+                    user_id: rid,
+                    recipient_id: rid,
+                    sender_id: userId,
+                    type: 'friend_achievement',
+                    title: 'Conquista desbloqueada',
+                    message: `${name} desbloqueou: ${badge.label}.`,
+                    is_read: false,
+                    metadata: { badge_id: badge.id, badge_kind: badge.kind, sender_id: userId },
+                  })),
+                )
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {
+      logError('workoutNotifications:achievement', e)
+    }
+
+    // Comeback notification (returning after 3+ days away)
+    try {
+      if (!throttleComeback) {
+        const { data: dates } = await admin
+          .from('workouts')
+          .select('date')
+          .eq('user_id', userId)
+          .eq('is_template', false)
+          .order('date', { ascending: false })
+          .limit(2)
+        const rows = Array.isArray(dates) ? dates : []
+        if (rows.length >= 2) {
+          const today = new Date(String(rows[0]?.date || ''))
+          const prev = new Date(String(rows[1]?.date || ''))
+          if (!Number.isNaN(today.getTime()) && !Number.isNaN(prev.getTime())) {
+            const days = Math.floor((today.getTime() - prev.getTime()) / (24 * 60 * 60 * 1000))
+            if (days >= 3) {
+              const recipients = await filterRecipientsByPreference(followerIds, 'notifyFriendComeback')
+              if (recipients.length) {
+                await insertNotifications(
+                  recipients.map((rid) => ({
+                    user_id: rid,
+                    recipient_id: rid,
+                    sender_id: userId,
+                    type: 'friend_comeback',
+                    title: 'Voltou aos treinos',
+                    message: `${name} voltou a treinar depois de ${days} dias.`,
+                    is_read: false,
+                    metadata: { days_away: days, sender_id: userId },
+                  })),
+                )
+              }
+            }
+          }
+        }
+      }
+    } catch (e) {
+      logError('workoutNotifications:comeback', e)
     }
   } catch (e) {
     logError('workoutNotifications', e)
