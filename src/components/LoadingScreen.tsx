@@ -72,7 +72,7 @@ const LoadingScreen = () => {
         >
             {/* IRONTRACKS wordmark — with shimmer sweep */}
             <div className="mb-3 relative overflow-hidden">
-                <h1 className="text-5xl font-black tracking-wide text-center leading-none">
+                <h1 className="text-4xl font-black tracking-tight text-center leading-none">
                     <span className="text-white">IRON</span>
                     <span className="text-transparent bg-clip-text bg-gradient-to-b from-yellow-300 to-amber-500">TRACKS</span>
                 </h1>
