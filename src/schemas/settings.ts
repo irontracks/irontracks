@@ -71,6 +71,8 @@ export const UserSettingsSchema = z
     notifyWaterReminder: z.boolean().default(false),
     notifyTrialEnding: z.boolean().default(true),
     notifyBillingIssue: z.boolean().default(true),
+    notifyDailyGoal: z.boolean().default(true),
+    notifyMissedMeal: z.boolean().default(false),
     notifyChallenges: z.boolean().default(true),
     notifyTeamInvites: z.boolean().default(true),
     notifyMealReminders: z.boolean().default(true),

@@ -49,6 +49,8 @@ export const NOTIFICATION_TYPE_TO_PREFERENCE: Record<string, string> = {
   water_reminder: 'notifyWaterReminder',
   trial_ending: 'notifyTrialEnding',
   billing_issue: 'notifyBillingIssue',
+  daily_goal_hit: 'notifyDailyGoal',
+  missed_meal: 'notifyMissedMeal',
   challenge_created: 'notifyChallenges',
   challenge_accepted: 'notifyChallenges',
   challenge_declined: 'notifyChallenges',

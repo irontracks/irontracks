@@ -556,6 +556,8 @@ export function SettingsNotificationsSection({ draft, setValue, iosNotifStatus, 
     const notifyWaterReminder = Boolean(draft?.notifyWaterReminder ?? false)
     const notifyTrialEnding = Boolean(draft?.notifyTrialEnding ?? true)
     const notifyBillingIssue = Boolean(draft?.notifyBillingIssue ?? true)
+    const notifyDailyGoal = Boolean(draft?.notifyDailyGoal ?? true)
+    const notifyMissedMeal = Boolean(draft?.notifyMissedMeal ?? false)
     const notifyChallenges = Boolean(draft?.notifyChallenges ?? true)
     const notifyTeamInvites = Boolean(draft?.notifyTeamInvites ?? true)
     const notifyMealReminders = Boolean(draft?.notifyMealReminders ?? true)
@@ -856,6 +858,20 @@ export function SettingsNotificationsSection({ draft, setValue, iosNotifStatus, 
                         checked={notifyMealReminders}
                         disabled={!pushNotificationsEnabled}
                         onChange={() => setValue('notifyMealReminders', !notifyMealReminders)}
+                    />
+                    <NotifRow
+                        title="Refeição esquecida"
+                        description="Avisa 30min depois se você não registrou. Desligado por padrão."
+                        checked={notifyMissedMeal}
+                        disabled={!pushNotificationsEnabled}
+                        onChange={() => setValue('notifyMissedMeal', !notifyMissedMeal)}
+                    />
+                    <NotifRow
+                        title="Meta diária atingida"
+                        description="Quando você bate a meta de calorias ou proteína do dia."
+                        checked={notifyDailyGoal}
+                        disabled={!pushNotificationsEnabled}
+                        onChange={() => setValue('notifyDailyGoal', !notifyDailyGoal)}
                     />
                     <NotifRow
                         title="Treino"

@@ -7,6 +7,58 @@ import { resolveFood } from '@/lib/nutrition/food-resolver'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { resolveBarcode } from '@/lib/nutrition/barcode-resolver'
 import { sanitizeFoodName } from '@/lib/nutrition/security'
+import { insertNotifications, shouldThrottleBySenderType } from '@/lib/social/notifyFollowers'
+import { logError } from '@/lib/logger'
+import { waitUntil } from '@vercel/functions'
+import type { SupabaseClient } from '@supabase/supabase-js'
+
+/**
+ * Fire-and-forget self push when the user crosses their daily calorie or
+ * protein goal for the first time today. Throttled 24h per type so even
+ * with multiple meals we only celebrate once.
+ */
+async function maybeNotifyDailyGoal(
+  supabase: SupabaseClient,
+  userId: string,
+  dateKey: string,
+): Promise<void> {
+  try {
+    const [{ data: goalRow }, { data: logRow }] = await Promise.all([
+      supabase.from('nutrition_goals').select('calories, protein').eq('user_id', userId).maybeSingle(),
+      supabase.from('daily_nutrition_logs').select('calories, protein').eq('user_id', userId).eq('date', dateKey).maybeSingle(),
+    ])
+    const calGoal = Number(goalRow?.calories) || 0
+    const protGoal = Number(goalRow?.protein) || 0
+    const calNow = Number(logRow?.calories) || 0
+    const protNow = Number(logRow?.protein) || 0
+
+    const calHit = calGoal > 0 && calNow >= calGoal
+    const protHit = protGoal > 0 && protNow >= protGoal
+    if (!calHit && !protHit) return
+
+    const throttled = await shouldThrottleBySenderType(userId, 'daily_goal_hit', 24 * 60).catch(() => true)
+    if (throttled) return
+
+    const message = calHit && protHit
+      ? `Meta diária batida: ${Math.round(calNow)} kcal e ${Math.round(protNow)}g de proteína. 🎯`
+      : calHit
+        ? `Meta de ${calGoal} kcal atingida hoje. 🎯`
+        : `Meta de ${protGoal}g de proteína atingida hoje. 💪`
+
+    await insertNotifications([{
+      user_id: userId,
+      recipient_id: userId,
+      sender_id: userId,
+      type: 'daily_goal_hit',
+      title: 'Meta diária atingida',
+      message,
+      is_read: false,
+      metadata: { calories: calNow, protein: protNow, calories_goal: calGoal, protein_goal: protGoal, date: dateKey },
+    }])
+  } catch (e) {
+    logError('nutrition.maybeNotifyDailyGoal', e)
+  }
+}
 
 export async function logMealAction(mealText: string, dateKey?: string) {
   try {
@@ -37,6 +89,7 @@ export async function logMealAction(mealText: string, dateKey?: string) {
     if (resolved) {
       const row = await trackMeal(userId, resolved.meal, resolvedDateKey)
       revalidatePath('/dashboard/nutrition')
+      waitUntil(maybeNotifyDailyGoal(supabase, userId, resolvedDateKey))
       return { ok: true, meal: resolved.meal, entry: row || null }
     }
 
@@ -209,6 +262,7 @@ export async function logBarcodeAction(ean: string, grams: number, dateKey?: str
 
     const row = await trackMeal(userId, meal, resolvedDateKey)
     revalidatePath('/dashboard/nutrition')
+    waitUntil(maybeNotifyDailyGoal(supabase, userId, resolvedDateKey))
     return { ok: true, meal, entry: row || null }
   } catch (e: unknown) {
     return { ok: false, error: String(getErrorMessage(e) || 'nutrition_log_barcode_failed') }
