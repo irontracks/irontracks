@@ -5,6 +5,7 @@ import { Save, X, Pause, Play, Zap } from 'lucide-react';
 import { useWorkoutContext } from './WorkoutContext';
 import { useWorkoutTimer } from './WorkoutTimerContext';
 import { useTeamWorkout } from '@/contexts/TeamWorkoutContext';
+import { logError, logWarn } from '@/lib/logger';
 
 export default function WorkoutFooter() {
   const {
@@ -89,10 +90,10 @@ export default function WorkoutFooter() {
               if (typeof cancelWorkout === 'function') {
                 cancelWorkout();
               } else {
-                console.error('[WorkoutFooter] cancelWorkout is not available');
+                logWarn('WorkoutFooter', 'cancelWorkout is not available');
               }
             } catch (e) {
-              console.error('[WorkoutFooter] cancel failed:', e);
+              logError('WorkoutFooter.cancel', e);
             } finally {
               // Always reset after a delay so the user can retry if navigation fails
               setTimeout(() => { cancelBusyRef.current = false; }, 1500);

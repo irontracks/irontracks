@@ -3,6 +3,7 @@
 import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { ArrowLeft, RotateCcw } from 'lucide-react'
+import { logError } from '@/lib/logger'
 
 export default function NutritionError({
   error,
@@ -14,7 +15,7 @@ export default function NutritionError({
   const router = useRouter()
 
   useEffect(() => {
-    console.error('[NutritionError]', error)
+    logError('NutritionError', error)
   }, [error])
 
   return (
