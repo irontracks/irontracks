@@ -53,8 +53,10 @@ const LoadingScreen = () => {
                 ? { animation: 'splash-in 0.9s cubic-bezier(0.16, 1, 0.3, 1) forwards', opacity: 0 }
                 : { opacity: 1 }}
         >
+            {/* The cropped variant trims the dark padding present in the
+                original PNG so the image edges blend into the splash bg. */}
             <Image
-                src="/logo-irontracks.png"
+                src="/logo-irontracks-splash.png"
                 alt="IronTracks"
                 width={320}
                 height={320}
@@ -62,6 +64,10 @@ const LoadingScreen = () => {
                 unoptimized
                 sizes="320px"
                 className="w-[60vmin] h-[60vmin] max-w-[320px] max-h-[320px] object-contain"
+                style={{
+                  WebkitMaskImage: 'radial-gradient(ellipse at center, black 70%, transparent 100%)',
+                  maskImage: 'radial-gradient(ellipse at center, black 70%, transparent 100%)',
+                }}
             />
 
             {/* Progress bar — directly under the logo */}
