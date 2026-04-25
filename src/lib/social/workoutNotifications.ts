@@ -116,6 +116,32 @@ export const computeWorkoutStreak = (dateRows: unknown[]) => {
 
 // ─── Main export ──────────────────────────────────────────────────────────────
 
+const formatVolume = (kg: number) => {
+  if (!Number.isFinite(kg) || kg <= 0) return null
+  if (kg >= 1000) return `${(kg / 1000).toFixed(1).replace('.', ',')}t`
+  return `${Math.round(kg)}kg`
+}
+
+const buildWorkoutSummary = (sessionObj: Record<string, unknown>): string | null => {
+  const reportMeta = sessionObj?.reportMeta
+  const totals = reportMeta && typeof reportMeta === 'object'
+    ? (reportMeta as Record<string, unknown>).totals
+    : null
+  if (!totals || typeof totals !== 'object') return null
+  const t = totals as Record<string, unknown>
+  const parts: string[] = []
+  const exercisesCount = Number(t.exercisesCount) || 0
+  const setsDone = Number(t.setsDone) || 0
+  const volumeKg = Number(t.volumeKg) || 0
+  const durationMinutes = Number(t.durationMinutes) || 0
+  if (exercisesCount > 0) parts.push(`${exercisesCount} ex`)
+  if (setsDone > 0) parts.push(`${setsDone} séries`)
+  const vol = formatVolume(volumeKg)
+  if (vol) parts.push(vol)
+  if (durationMinutes > 0) parts.push(`${Math.round(durationMinutes)}min`)
+  return parts.length ? `🏋️ ${parts.join(' • ')}` : null
+}
+
 export async function notifyWorkoutFinished(
   userId: string,
   workoutId: string | null,
@@ -139,6 +165,9 @@ export async function notifyWorkoutFinished(
       'notifyFriendWorkoutEvents',
     )
     if (workoutRecipients.length) {
+      const summary = buildWorkoutSummary(sessionObj)
+      const baseLine = `${name} terminou: ${workoutTitle}`
+      const message = summary ? `${baseLine}\n${summary}` : `${baseLine}.`
       await insertNotifications(
         workoutRecipients.map((rid) => ({
           user_id: rid,
@@ -146,9 +175,14 @@ export async function notifyWorkoutFinished(
           sender_id: userId,
           type: 'workout_finish',
           title: 'Treino finalizado',
-          message: `${name} terminou um treino: ${workoutTitle}.`,
+          message,
           is_read: false,
-          metadata: { workout_id: workoutId, workout_title: workoutTitle, sender_id: userId },
+          metadata: {
+            workout_id: workoutId,
+            workout_title: workoutTitle,
+            sender_id: userId,
+            summary: summary ?? null,
+          },
         })),
       )
     }
