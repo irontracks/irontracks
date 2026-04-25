@@ -1,5 +1,4 @@
 'use client'
-import Image from 'next/image'
 import { useEffect, useState } from 'react'
 
 // Module-level flag: true after the first LoadingScreen has been shown in this
@@ -46,59 +45,19 @@ const LoadingScreen = () => {
 
     return (
     <div className="fixed inset-0 z-50 bg-neutral-950 flex flex-col items-center justify-center pt-safe pb-safe overflow-hidden">
-
-        {/* Full-screen hero background */}
-        <div className="absolute inset-0">
-            <Image
-                src="/login-hero.png"
-                alt=""
-                fill
-                priority
-                unoptimized
-                style={{ opacity: 0.18, objectFit: 'contain', objectPosition: 'center center' }}
-            />
-            {/* Bottom fade to black */}
-            <div className="absolute inset-0 bg-gradient-to-t from-neutral-950 via-neutral-950/60 to-neutral-950/30" />
-            {/* Top fade */}
-            <div className="absolute inset-0 bg-gradient-to-b from-neutral-950/70 via-transparent to-transparent" />
-        </div>
-
-        {/* Center content */}
+        {/* IRONTRACKS wordmark */}
         <div
-            className="relative z-10 flex flex-col items-center"
             style={shouldAnimate
                 ? { animation: 'splash-in 0.9s cubic-bezier(0.16, 1, 0.3, 1) forwards', opacity: 0 }
                 : { opacity: 1 }}
         >
-            {/* IRONTRACKS wordmark — with shimmer sweep */}
-            <div className="mb-3 relative overflow-hidden">
-                <h1 className="text-4xl font-black tracking-tight text-center leading-none">
-                    <span className="text-white">IRON</span>
-                    <span className="text-transparent bg-clip-text bg-gradient-to-b from-yellow-300 to-amber-500">TRACKS</span>
-                </h1>
-                {/* Gold shimmer sweep across the logo */}
-                <div
-                    className="absolute inset-0 pointer-events-none"
-                    style={{
-                        background: 'linear-gradient(90deg, transparent 0%, rgba(251,191,36,0.15) 45%, rgba(251,191,36,0.3) 50%, rgba(251,191,36,0.15) 55%, transparent 100%)',
-                        animation: 'logo-shimmer 2.5s ease-in-out 0.5s infinite',
-                    }}
-                />
-            </div>
-
-            {/* Amber divider line — breathing glow */}
-            <div
-                className="w-12 h-[2px] bg-gradient-to-r from-transparent via-amber-400 to-transparent mb-3 rounded-full"
-                style={{ animation: 'divider-breathe 2s ease-in-out infinite' }}
-            />
-
-            {/* Tagline */}
-            <p className="text-[10px] font-bold text-neutral-500 uppercase tracking-[0.35em]">
-                Sistema de Alta Performance
-            </p>
+            <h1 className="text-4xl font-black tracking-tight text-center leading-none">
+                <span className="text-white">IRON</span>
+                <span className="text-transparent bg-clip-text bg-gradient-to-b from-yellow-300 to-amber-500">TRACKS</span>
+            </h1>
         </div>
 
-        {/* Progress bar — bottom of screen, premium gold animated */}
+        {/* Progress bar — bottom of screen */}
         <div
             className="absolute bottom-12 left-1/2 -translate-x-1/2 w-20 h-[2px] bg-neutral-800 rounded-full overflow-hidden"
             style={shouldAnimate
@@ -136,17 +95,9 @@ const LoadingScreen = () => {
                 85%  { width: 88%; }
                 100% { width: 100%; }
             }
-            @keyframes logo-shimmer {
-                0%   { transform: translateX(-100%); }
-                100% { transform: translateX(200%); }
-            }
             @keyframes shimmer {
                 0%   { transform: translateX(-100%); }
                 100% { transform: translateX(100%); }
-            }
-            @keyframes divider-breathe {
-                0%, 100% { opacity: 0.6; width: 48px; }
-                50%      { opacity: 1; width: 56px; }
             }
         `}</style>
     </div>
