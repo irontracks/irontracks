@@ -45,11 +45,10 @@ const LoadingScreen = () => {
     }
 
     return (
-    <div className="fixed inset-0 z-50 bg-neutral-950 overflow-hidden">
-        {/* Full-bleed logo — object-cover + scale crops the PNG borders so the
-            splash looks edge-to-edge, not like a stamped card. */}
+    <div className="fixed inset-0 z-50 bg-neutral-950 flex flex-col items-center justify-center pt-safe pb-safe overflow-hidden">
+        {/* Logo + progress bar grouped, vertically centered */}
         <div
-            className="absolute inset-0"
+            className="flex flex-col items-center"
             style={shouldAnimate
                 ? { animation: 'splash-in 0.9s cubic-bezier(0.16, 1, 0.3, 1) forwards', opacity: 0 }
                 : { opacity: 1 }}
@@ -57,30 +56,31 @@ const LoadingScreen = () => {
             <Image
                 src="/logo-irontracks.png"
                 alt="IronTracks"
-                fill
+                width={320}
+                height={320}
                 priority
                 unoptimized
-                sizes="100vw"
-                className="object-cover scale-[1.3]"
+                sizes="320px"
+                className="w-[60vmin] h-[60vmin] max-w-[320px] max-h-[320px] object-contain"
             />
-        </div>
 
-        {/* Progress bar — bottom centered, overlaid on the logo */}
-        <div className="absolute bottom-[18%] left-1/2 -translate-x-1/2 w-28 h-[3px] bg-black/40 backdrop-blur-sm rounded-full overflow-hidden">
-            <div
-                className="h-full rounded-full relative overflow-hidden"
-                style={shouldAnimate ? {
-                    background: 'linear-gradient(90deg, #92400e, #d97706, #fbbf24, #fde68a)',
-                    animation: 'progress 1.8s cubic-bezier(0.4, 0, 0.2, 1) 0.4s forwards',
-                    width: '0%',
-                    boxShadow: '0 0 12px rgba(251,191,36,0.6)',
-                } : {
-                    background: 'linear-gradient(90deg, #92400e, #d97706, #fbbf24, #fde68a)',
-                    width: '100%',
-                    boxShadow: '0 0 12px rgba(251,191,36,0.6)',
-                }}
-            >
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent" style={{ animation: 'shimmer 1.5s ease-in-out infinite' }} />
+            {/* Progress bar — directly under the logo */}
+            <div className="mt-2 w-24 h-[3px] bg-neutral-800 rounded-full overflow-hidden">
+                <div
+                    className="h-full rounded-full relative overflow-hidden"
+                    style={shouldAnimate ? {
+                        background: 'linear-gradient(90deg, #92400e, #d97706, #fbbf24, #fde68a)',
+                        animation: 'progress 1.8s cubic-bezier(0.4, 0, 0.2, 1) 0.4s forwards',
+                        width: '0%',
+                        boxShadow: '0 0 8px rgba(251,191,36,0.5)',
+                    } : {
+                        background: 'linear-gradient(90deg, #92400e, #d97706, #fbbf24, #fde68a)',
+                        width: '100%',
+                        boxShadow: '0 0 8px rgba(251,191,36,0.5)',
+                    }}
+                >
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent" style={{ animation: 'shimmer 1.5s ease-in-out infinite' }} />
+                </div>
             </div>
         </div>
 
