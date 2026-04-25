@@ -55,7 +55,7 @@ const LoadingScreen = () => {
                 fill
                 priority
                 unoptimized
-                style={{ opacity: 0.18, objectFit: 'cover', objectPosition: 'center top' }}
+                style={{ opacity: 0.18, objectFit: 'contain', objectPosition: 'center center' }}
             />
             {/* Bottom fade to black */}
             <div className="absolute inset-0 bg-gradient-to-t from-neutral-950 via-neutral-950/60 to-neutral-950/30" />
