@@ -321,11 +321,24 @@ export async function notifyWorkoutFinished(
           }
 
           const prs: { exercise: string; label: string; value: string; score: number }[] = []
+          const nearPrs: { exercise: string; gap_kg: number; current: number; pr: number }[] = []
           currentBest.forEach((cur, exName) => {
             const hist = historyBest.get(exName) || { weight: 0, reps: 0, volume: 0 }
             const volumePr = cur.volume > 0 && cur.volume > hist.volume
             const weightPr = cur.weight > 0 && cur.weight > hist.weight
             const repsPr = cur.reps > 0 && cur.reps > hist.reps
+
+            // Near-PR detection: came within 95% of historical PR weight but
+            // did not beat it. Self-motivational push, distinct from friend_pr.
+            if (!weightPr && hist.weight > 0 && cur.weight > 0 && cur.weight >= hist.weight * 0.95 && cur.weight < hist.weight) {
+              nearPrs.push({
+                exercise: exName,
+                gap_kg: Math.round((hist.weight - cur.weight) * 10) / 10,
+                current: cur.weight,
+                pr: hist.weight,
+              })
+            }
+
             if (!volumePr && !weightPr && !repsPr) return
             if (volumePr) {
               prs.push({ exercise: exName, label: 'Volume', value: `${cur.volume.toLocaleString('pt-BR')}kg`, score: cur.volume })
@@ -337,6 +350,22 @@ export async function notifyWorkoutFinished(
             }
             prs.push({ exercise: exName, label: 'Reps', value: `${Math.round(cur.reps)} reps`, score: cur.reps })
           })
+
+          // Self-notification: closest exercise that wasn't beat
+          if (nearPrs.length) {
+            nearPrs.sort((a, b) => a.gap_kg - b.gap_kg)
+            const closest = nearPrs[0]
+            await insertNotifications([{
+              user_id: userId,
+              recipient_id: userId,
+              sender_id: userId,
+              type: 'pr_close',
+              title: 'Quase bateu o PR 🔥',
+              message: `Faltou ${closest.gap_kg}kg pro seu PR de ${closest.exercise}. Da próxima vez é seu!`,
+              is_read: false,
+              metadata: closest,
+            }])
+          }
 
           prs.sort((a, b) => b.score - a.score)
           const top = prs.slice(0, 3)
