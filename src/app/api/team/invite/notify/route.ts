@@ -20,6 +20,7 @@ import { requireUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { sendPushToAllPlatforms } from '@/lib/push/sender'
 import { checkRateLimitAsync } from '@/utils/rateLimit'
+import { waitUntil } from '@vercel/functions'
 
 export const dynamic = 'force-dynamic'
 
@@ -73,9 +74,11 @@ export async function POST(req: Request) {
     // master; pushTeamInvites is the "do I want the push" specific pref.
     // sendPushToAllPlatforms enforces the master switch; we pass the per-type
     // key so the caller only needs one call.
-    void sendPushToAllPlatforms([targetUserId], title, body, extra, {
-      preferenceKey: 'notifyTeamInvites',
-    }).catch(() => { })
+    waitUntil(
+      sendPushToAllPlatforms([targetUserId], title, body, extra, {
+        preferenceKey: 'notifyTeamInvites',
+      }).catch(() => { })
+    )
 
     return NextResponse.json({ ok: true })
   } catch (e: unknown) {

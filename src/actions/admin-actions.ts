@@ -4,6 +4,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { requireRole } from '@/utils/auth/route'
 import { logError } from '@/lib/logger'
 import { sendPushToAllPlatforms as sendPushToUsers } from '@/lib/push/sender'
+import { waitUntil } from '@vercel/functions'
 
 type AdminResult = { success: true;[key: string]: unknown } | { success?: never; error: string;[key: string]: unknown }
 
@@ -51,13 +52,15 @@ export async function sendBroadcastMessage(title: string, message: string): Prom
         // Respect the notifyBroadcasts per-user pref and the master switch.
         const allUserIds = safeProfiles.map(p => String(p.id)).filter(Boolean)
         if (allUserIds.length && title && message) {
-            void sendPushToUsers(
-                allUserIds,
-                title,
-                message,
-                { type: 'broadcast' },
-                { preferenceKey: 'notifyBroadcasts' },
-            ).catch(() => { })
+            waitUntil(
+                sendPushToUsers(
+                    allUserIds,
+                    title,
+                    message,
+                    { type: 'broadcast' },
+                    { preferenceKey: 'notifyBroadcasts' },
+                ).catch(() => { })
+            )
         }
 
         return { success: true, count: notifications.length }
