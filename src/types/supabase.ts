@@ -1970,6 +1970,7 @@ export type Database = {
       }
       profiles: {
         Row: {
+          acquisition_source: Json | null
           approval_status: string | null
           approved_at: string | null
           approved_by: string | null
@@ -1984,6 +1985,7 @@ export type Database = {
           role: string | null
         }
         Insert: {
+          acquisition_source?: Json | null
           approval_status?: string | null
           approved_at?: string | null
           approved_by?: string | null
@@ -1998,6 +2000,7 @@ export type Database = {
           role?: string | null
         }
         Update: {
+          acquisition_source?: Json | null
           approval_status?: string | null
           approved_at?: string | null
           approved_by?: string | null

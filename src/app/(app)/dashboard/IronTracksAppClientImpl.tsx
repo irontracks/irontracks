@@ -46,6 +46,7 @@ import { useVipAccess } from '@/hooks/useVipAccess'
 import { useWorkoutStreak } from '@/hooks/useWorkoutStreak'
 import { useGuidedTour } from '@/hooks/useGuidedTour'
 import { usePresencePing } from '@/hooks/usePresencePing'
+import { useUtmAcquisition } from '@/hooks/useUtmAcquisition'
 import { useProfileCompletion } from '@/hooks/useProfileCompletion'
 import { useWhatsNew } from '@/hooks/useWhatsNew'
 import { useUnreadBadges } from '@/hooks/useUnreadBadges'
@@ -253,6 +254,10 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
 
     // Presence ping — extracted to usePresencePing hook
     usePresencePing(user?.id);
+
+    // First-touch UTM attribution — captures utm_* on first visit
+    // and POSTs them once the user is authenticated.
+    useUtmAcquisition(user?.id);
 
     // What's New modal — extracted to useWhatsNew hook
     const { whatsNewOpen, setWhatsNewOpen, pendingUpdate, setPendingUpdate, closeWhatsNew } = useWhatsNew({
