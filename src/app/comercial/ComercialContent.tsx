@@ -6,7 +6,7 @@ import Link from 'next/link'
 import { ArrowRight, Globe, Star } from 'lucide-react'
 
 const APPLE = 'https://apps.apple.com/br/app/irontracks/id6758735356'
-const PLAY  = 'https://play.google.com/store/apps/details?id=com.irontracks.app'
+const PLAY  = 'https://play.google.com/apps/internaltest/4701049092773956563'
 const WEB   = 'https://irontracks.com.br'
 
 // ── Reveal wrapper ──────────────────────────────────────────────────────────
