@@ -31,6 +31,7 @@ export const NOTIFICATION_TYPE_TO_PREFERENCE: Record<string, string> = {
   workout_start: 'notifyFriendWorkoutStart',
   friend_comeback: 'notifyFriendComeback',
   friend_achievement: 'notifyAchievements',
+  friend_weekly_goal: 'notifyFriendWeeklyGoal',
   story_posted: 'notifyStoryPosted',
   story_like: 'notifyStoryLikes',
   story_reaction: 'notifyStoryReactions',

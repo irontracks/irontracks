@@ -55,6 +55,7 @@ export const UserSettingsSchema = z
     notifyFriendGoals: z.boolean().default(true),
     notifyFriendComeback: z.boolean().default(true),
     notifyAchievements: z.boolean().default(true),
+    notifyFriendWeeklyGoal: z.boolean().default(true),
     notifyStoryPosted: z.boolean().default(true),
     notifyStoryLikes: z.boolean().default(true),
     notifyStoryReactions: z.boolean().default(true),

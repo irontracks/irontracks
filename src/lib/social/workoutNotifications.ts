@@ -211,11 +211,12 @@ export async function notifyWorkoutFinished(
     const streakMilestones = new Set([3, 7, 14, 30, 60, 100])
     const goalMilestones = new Set([10, 25, 50, 100, 200, 500])
 
-    const [throttleStreak, throttleGoals, throttlePr, throttleComeback] = await Promise.all([
+    const [throttleStreak, throttleGoals, throttlePr, throttleComeback, throttleWeeklyGoal] = await Promise.all([
       shouldThrottleBySenderType(userId, 'friend_streak', 12 * 60).catch(() => true),
       shouldThrottleBySenderType(userId, 'friend_goal', 12 * 60).catch(() => true),
       shouldThrottleBySenderType(userId, 'friend_pr', 60).catch(() => true),
       shouldThrottleBySenderType(userId, 'friend_comeback', 24 * 60).catch(() => true),
+      shouldThrottleBySenderType(userId, 'friend_weekly_goal', 7 * 24 * 60).catch(() => true),
     ])
 
     // Streak milestone notification
@@ -426,6 +427,60 @@ export async function notifyWorkoutFinished(
       }
     } catch (e) {
       logError('workoutNotifications:achievement', e)
+    }
+
+    // Weekly goal notification — fires once per ISO week per user (Mon-Sun).
+    // Target = user_settings.preferences.trainingFrequencyPerWeek. Counts
+    // workouts since the start of the current UTC week.
+    try {
+      if (!throttleWeeklyGoal) {
+        const { data: settings } = await admin
+          .from('user_settings')
+          .select('preferences')
+          .eq('user_id', userId)
+          .maybeSingle()
+        const prefs =
+          settings?.preferences && typeof settings.preferences === 'object'
+            ? (settings.preferences as Record<string, unknown>)
+            : null
+        const target = Math.max(0, Number(prefs?.trainingFrequencyPerWeek) || 0)
+        if (target > 0) {
+          const now = new Date()
+          const dow = now.getUTCDay() // 0=Sun, 1=Mon, ..., 6=Sat
+          const daysSinceMonday = (dow + 6) % 7
+          const startOfWeek = new Date(now)
+          startOfWeek.setUTCDate(now.getUTCDate() - daysSinceMonday)
+          startOfWeek.setUTCHours(0, 0, 0, 0)
+          const startISO = startOfWeek.toISOString().slice(0, 10)
+
+          const { count } = await admin
+            .from('workouts')
+            .select('id', { count: 'exact', head: true })
+            .eq('user_id', userId)
+            .eq('is_template', false)
+            .gte('date', startISO)
+          const total = Number(count || 0)
+          if (total >= target) {
+            const recipients = await filterRecipientsByPreference(followerIds, 'notifyFriendWeeklyGoal')
+            if (recipients.length) {
+              await insertNotifications(
+                recipients.map((rid) => ({
+                  user_id: rid,
+                  recipient_id: rid,
+                  sender_id: userId,
+                  type: 'friend_weekly_goal',
+                  title: 'Meta semanal atingida',
+                  message: `${name} bateu a meta de ${target} treinos nesta semana.`,
+                  is_read: false,
+                  metadata: { target, total_this_week: total, sender_id: userId },
+                })),
+              )
+            }
+          }
+        }
+      }
+    } catch (e) {
+      logError('workoutNotifications:weekly_goal', e)
     }
 
     // Comeback notification (returning after 3+ days away)

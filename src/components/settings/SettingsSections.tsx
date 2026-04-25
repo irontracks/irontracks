@@ -444,6 +444,7 @@ export function SettingsNotificationsSection({ draft, setValue, iosNotifStatus, 
     const notifyFriendGoals = Boolean(draft?.notifyFriendGoals ?? true)
     const notifyFriendComeback = Boolean(draft?.notifyFriendComeback ?? true)
     const notifyAchievements = Boolean(draft?.notifyAchievements ?? true)
+    const notifyFriendWeeklyGoal = Boolean(draft?.notifyFriendWeeklyGoal ?? true)
     const notifyStoryPosted = Boolean(draft?.notifyStoryPosted ?? true)
     const notifyStoryLikes = Boolean(draft?.notifyStoryLikes ?? true)
     const notifyStoryReactions = Boolean(draft?.notifyStoryReactions ?? true)
@@ -596,6 +597,13 @@ export function SettingsNotificationsSection({ draft, setValue, iosNotifStatus, 
                         checked={notifyAchievements}
                         disabled={!pushNotificationsEnabled}
                         onChange={() => setValue('notifyAchievements', !notifyAchievements)}
+                    />
+                    <NotifRow
+                        title="Meta semanal de amigos"
+                        description="Quando um seguido bate a meta de treinos da semana."
+                        checked={notifyFriendWeeklyGoal}
+                        disabled={!pushNotificationsEnabled}
+                        onChange={() => setValue('notifyFriendWeeklyGoal', !notifyFriendWeeklyGoal)}
                     />
                 </div>
 
