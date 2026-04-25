@@ -90,6 +90,12 @@ export default function ProfilePage({ settings, displayName, onSave, onBack }: P
   const [userId, setUserId] = useState('')
   const [userPhotoURL, setUserPhotoURL] = useState<string | null>(null)
 
+  // Display name editor state
+  const [nameDraft, setNameDraft] = useState(displayName || '')
+  const [currentName, setCurrentName] = useState(displayName || '')
+  const [nameStatus, setNameStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const [nameErr, setNameErr] = useState('')
+
   // Handle (@) state
   const [currentHandle, setCurrentHandle] = useState<string | null>(null)
   const [handleDraft, setHandleDraft] = useState('')
@@ -145,6 +151,36 @@ export default function ProfilePage({ settings, displayName, onSave, onBack }: P
 
   const handleValid = /^[a-z][a-z0-9_]{2,19}$/.test(handleDraft.trim().toLowerCase())
   const handleDirty = handleDraft.trim().toLowerCase() !== (currentHandle || '')
+
+  const saveName = useCallback(async () => {
+    const next = nameDraft.trim()
+    if (!next || !userId) return
+    if (next.length < 2 || next.length > 60) {
+      setNameStatus('error')
+      setNameErr('Use entre 2 e 60 caracteres.')
+      return
+    }
+    setNameStatus('saving')
+    setNameErr('')
+    try {
+      const supabase = createClient()
+      const { error } = await supabase.from('profiles').update({ display_name: next }).eq('id', userId)
+      if (error) {
+        setNameStatus('error')
+        setNameErr(error.message)
+        return
+      }
+      setCurrentName(next)
+      setNameStatus('saved')
+      window.setTimeout(() => setNameStatus('idle'), 1500)
+    } catch (e) {
+      setNameStatus('error')
+      setNameErr(e instanceof Error ? e.message : String(e))
+    }
+  }, [nameDraft, userId])
+
+  const nameDirty = nameDraft.trim() !== (currentName || '').trim()
+  const nameValid = nameDraft.trim().length >= 2 && nameDraft.trim().length <= 60
 
   // Local draft state mirroring settings
   const [draft, setDraft] = useState<Partial<UserSettings>>({
@@ -286,6 +322,39 @@ export default function ProfilePage({ settings, displayName, onSave, onBack }: P
                 <Camera size={12} />
                 Trocar
               </button>
+            </div>
+
+            {/* Display name editor */}
+            <div className="pt-3 border-t border-neutral-700/40">
+              <div className="flex items-center gap-2 mb-1.5">
+                <User size={14} className="text-neutral-400" />
+                <p className="text-sm font-bold text-white">Nome de exibição</p>
+              </div>
+              <p className="text-[11px] text-neutral-500 mb-2">
+                Como você aparece pra outros usuários. Pode ter espaços e acentos.
+              </p>
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  aria-label="Nome de exibição"
+                  value={nameDraft}
+                  onChange={(e) => setNameDraft(e.target.value.slice(0, 60))}
+                  placeholder="Seu nome"
+                  autoComplete="name"
+                  className="flex-1 bg-neutral-800/80 border border-neutral-700/60 rounded-xl px-3 py-2 text-sm text-white placeholder:text-neutral-600 focus:outline-none focus:border-yellow-500/60 transition-colors"
+                />
+                <button
+                  type="button"
+                  disabled={!nameDirty || !nameValid || nameStatus === 'saving'}
+                  onClick={saveName}
+                  className="px-3 py-2 rounded-xl bg-yellow-500 text-black text-xs font-black disabled:opacity-40 disabled:cursor-not-allowed hover:bg-yellow-400 transition-colors"
+                >
+                  {nameStatus === 'saving' ? 'Salvando…' : nameStatus === 'saved' ? 'Salvo' : 'Salvar'}
+                </button>
+              </div>
+              {nameStatus === 'error' && nameErr && (
+                <p className="text-[11px] text-red-400 mt-1.5">{nameErr}</p>
+              )}
             </div>
 
             {/* Handle (@) */}
