@@ -63,7 +63,7 @@ const LoadingScreen = () => {
                 priority
                 unoptimized
                 sizes="460px"
-                className="w-[95vmin] h-[95vmin] max-w-[560px] max-h-[560px] object-contain"
+                className="w-[100vmin] h-[100vmin] max-w-[680px] max-h-[680px] object-contain"
             />
 
             {/* Progress bar — directly under the logo */}
