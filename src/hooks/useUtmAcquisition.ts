@@ -26,6 +26,8 @@ type CapturedUtm = {
   campaign?: string
   content?: string
   term?: string
+  gclid?: string
+  fbclid?: string
   referrer?: string
   landing_path?: string
 }
@@ -40,6 +42,12 @@ function readFromUrl(): CapturedUtm | null {
       const v = params.get(`utm_${f}`)?.trim()
       if (v) { out[f] = v.slice(0, 120); any = true }
     }
+    // Google Ads click ID + Facebook/Instagram click ID — these come without
+    // utm_* prefixes and are valuable for matching back to ad platforms.
+    const gclid = params.get('gclid')?.trim()
+    if (gclid) { out.gclid = gclid.slice(0, 120); any = true }
+    const fbclid = params.get('fbclid')?.trim()
+    if (fbclid) { out.fbclid = fbclid.slice(0, 120); any = true }
     if (!any) return null
     const ref = String(document.referrer || '').trim()
     if (ref) out.referrer = ref.slice(0, 255)
