@@ -5,7 +5,7 @@ import Image from 'next/image'
 import {
   User, Scale, Ruler, Calendar, Phone, MapPin, Building2, Dumbbell,
   Activity, BarChart3, ChevronLeft, Save, Check, Flame, Zap, Heart, Trophy,
-  Camera, Lock,
+  Camera, Lock, AtSign,
 } from 'lucide-react'
 import { getProfileCompletenessScore } from '@/schemas/settings'
 import type { UserSettings } from '@/schemas/settings'
@@ -90,6 +90,12 @@ export default function ProfilePage({ settings, displayName, onSave, onBack }: P
   const [userId, setUserId] = useState('')
   const [userPhotoURL, setUserPhotoURL] = useState<string | null>(null)
 
+  // Handle (@) state
+  const [currentHandle, setCurrentHandle] = useState<string | null>(null)
+  const [handleDraft, setHandleDraft] = useState('')
+  const [handleStatus, setHandleStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+  const [handleErr, setHandleErr] = useState('')
+
   useEffect(() => {
     const supabase = createClient()
     supabase.auth.getUser().then(({ data }) => {
@@ -97,13 +103,48 @@ export default function ProfilePage({ settings, displayName, onSave, onBack }: P
       setUserEmail(String(data?.user?.email || ''))
       setUserId(uid)
       if (uid) {
-        supabase.from('profiles').select('photo_url').eq('id', uid).maybeSingle()
+        supabase.from('profiles').select('photo_url, handle').eq('id', uid).maybeSingle()
           .then(({ data: profile }) => {
-            setUserPhotoURL(String(profile?.photo_url || data?.user?.user_metadata?.avatar_url || '') || null)
+            const p = profile as { photo_url?: string | null; handle?: string | null } | null
+            setUserPhotoURL(String(p?.photo_url || data?.user?.user_metadata?.avatar_url || '') || null)
+            const h = String(p?.handle || '').trim()
+            setCurrentHandle(h || null)
+            setHandleDraft(h || '')
           })
       }
     })
   }, [])
+
+  const handleSaveHandle = useCallback(async () => {
+    const next = handleDraft.trim().toLowerCase()
+    if (!next) return
+    setHandleStatus('saving')
+    setHandleErr('')
+    try {
+      const res = await fetch('/api/profiles/handle', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ handle: next }),
+      })
+      const json = (await res.json()) as { ok?: boolean; error?: string; handle?: string; message?: string }
+      if (!res.ok || !json.ok) {
+        setHandleStatus('error')
+        if (json.error === 'handle_taken') setHandleErr('Esse @ já está em uso.')
+        else if (json.error === 'invalid_format') setHandleErr(json.message || 'Formato inválido. Use 3-20 caracteres, comece com letra, [a-z0-9_].')
+        else setHandleErr(json.error || 'Falha ao salvar.')
+        return
+      }
+      setCurrentHandle(json.handle || next)
+      setHandleStatus('saved')
+      window.setTimeout(() => setHandleStatus('idle'), 1500)
+    } catch (e) {
+      setHandleStatus('error')
+      setHandleErr(e instanceof Error ? e.message : String(e))
+    }
+  }, [handleDraft])
+
+  const handleValid = /^[a-z][a-z0-9_]{2,19}$/.test(handleDraft.trim().toLowerCase())
+  const handleDirty = handleDraft.trim().toLowerCase() !== (currentHandle || '')
 
   // Local draft state mirroring settings
   const [draft, setDraft] = useState<Partial<UserSettings>>({
@@ -245,6 +286,41 @@ export default function ProfilePage({ settings, displayName, onSave, onBack }: P
                 <Camera size={12} />
                 Trocar
               </button>
+            </div>
+
+            {/* Handle (@) */}
+            <div className="pt-3 border-t border-neutral-700/40">
+              <div className="flex items-center gap-2 mb-1.5">
+                <AtSign size={14} className="text-neutral-400" />
+                <p className="text-sm font-bold text-white">Nome de usuário (@)</p>
+              </div>
+              <p className="text-[11px] text-neutral-500 mb-2">
+                Permite que outros te mencionem (@). 3-20 caracteres, letras minúsculas, números e underscore.
+              </p>
+              <div className="flex items-center gap-2">
+                <span className="text-neutral-500 text-sm">@</span>
+                <input
+                  type="text"
+                  aria-label="Nome de usuário (handle)"
+                  value={handleDraft}
+                  onChange={(e) => setHandleDraft(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 20))}
+                  placeholder="seu_handle"
+                  autoComplete="off"
+                  spellCheck={false}
+                  className="flex-1 bg-neutral-800/80 border border-neutral-700/60 rounded-xl px-3 py-2 text-sm text-white placeholder:text-neutral-600 focus:outline-none focus:border-yellow-500/60 transition-colors"
+                />
+                <button
+                  type="button"
+                  disabled={!handleDirty || !handleValid || handleStatus === 'saving'}
+                  onClick={handleSaveHandle}
+                  className="px-3 py-2 rounded-xl bg-yellow-500 text-black text-xs font-black disabled:opacity-40 disabled:cursor-not-allowed hover:bg-yellow-400 transition-colors"
+                >
+                  {handleStatus === 'saving' ? 'Salvando…' : handleStatus === 'saved' ? 'Salvo' : 'Salvar'}
+                </button>
+              </div>
+              {handleStatus === 'error' && handleErr && (
+                <p className="text-[11px] text-red-400 mt-1.5">{handleErr}</p>
+              )}
             </div>
 
             {/* Change Password */}
