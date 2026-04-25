@@ -3039,6 +3039,33 @@ export type Database = {
         }
         Relationships: []
       }
+      user_achievements: {
+        Row: {
+          badge_id: string
+          badge_kind: string
+          badge_label: string
+          id: string
+          unlocked_at: string
+          user_id: string
+        }
+        Insert: {
+          badge_id: string
+          badge_kind: string
+          badge_label: string
+          id?: string
+          unlocked_at?: string
+          user_id: string
+        }
+        Update: {
+          badge_id?: string
+          badge_kind?: string
+          badge_label?: string
+          id?: string
+          unlocked_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_settings: {
         Row: {
           created_at: string
@@ -3926,6 +3953,7 @@ export type Database = {
         }[]
       }
       iron_rank_my_total_volume: { Args: never; Returns: number }
+      iron_rank_total_volume_for_user: { Args: { p_user_id: string }; Returns: number }
       is_admin: { Args: never; Returns: boolean }
       is_teacher_of: { Args: { target_user_id: string }; Returns: boolean }
       join_team_session_by_code: { Args: { code: string }; Returns: Json }
