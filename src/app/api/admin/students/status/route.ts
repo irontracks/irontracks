@@ -6,6 +6,7 @@ import { requireRoleOrBearer } from '@/utils/auth/route'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { safePgLike } from '@/utils/safePgFilter'
 import { sendPushToAllPlatforms as sendPushToUsers } from '@/lib/push/sender'
+import { waitUntil } from '@vercel/functions'
 
 const ZodBodySchema = z
   .object({
@@ -99,11 +100,13 @@ export async function POST(req: Request) {
     // Fire push notification if status changed and student has a linked account
     const pushMsg = STATUS_PUSH[status] ?? null
     if (pushMsg && resolvedUserId && status !== prevStatus) {
-      // Fire-and-forget — don't block the response
-      sendPushToUsers([resolvedUserId], pushMsg.title, pushMsg.body, {
-        type: 'student_status_change',
-        newStatus: status,
-      }).catch(() => { /* silent */ })
+      // Keep the Lambda alive until the push HTTP/2 round-trip completes.
+      waitUntil(
+        sendPushToUsers([resolvedUserId], pushMsg.title, pushMsg.body, {
+          type: 'student_status_change',
+          newStatus: status,
+        }).catch(() => { /* silent */ })
+      )
     }
 
     return NextResponse.json({ ok: true })

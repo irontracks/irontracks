@@ -5,6 +5,7 @@ import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { sendPushToAllPlatforms as sendPushToUsers } from '@/lib/push/sender'
 import { logError } from '@/lib/logger'
+import { waitUntil } from '@vercel/functions'
 
 export const dynamic = 'force-dynamic'
 
@@ -90,13 +91,15 @@ export async function POST(req: Request) {
     // Fire push notification to the RECEIVER.
     // The sender enforces both the master switch AND the notifyDirectMessages
     // per-type pref, so we pass the key for consistency.
-    void sendPushToUsers(
-      [receiverId],
-      `💬 ${safeSenderName}`,
-      safePreview,
-      { type: 'message' },
-      { preferenceKey: 'notifyDirectMessages' },
-    ).catch(() => { })
+    waitUntil(
+      sendPushToUsers(
+        [receiverId],
+        `💬 ${safeSenderName}`,
+        safePreview,
+        { type: 'message' },
+        { preferenceKey: 'notifyDirectMessages' },
+      ).catch(() => { })
+    )
 
     return NextResponse.json({ ok: true })
   } catch (e: unknown) {

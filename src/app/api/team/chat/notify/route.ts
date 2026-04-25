@@ -6,6 +6,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { sendPushToAllPlatforms as sendPushToUsers } from '@/lib/push/sender'
 import { logInfo, logError } from '@/lib/logger'
 import { requireUser } from '@/utils/auth/route'
+import { waitUntil } from '@vercel/functions'
 
 export const dynamic = 'force-dynamic'
 
@@ -78,13 +79,15 @@ export async function POST(req: Request) {
       if (recipientIds.length) {
         // Team chat uses the notifyTeamInvites pref as a proxy for "team
         // interaction pushes" — no separate toggle for chat-only pushes.
-        void sendPushToUsers(
-          recipientIds,
-          `💬 ${senderName.slice(0, 80)}`,
-          text.slice(0, 100),
-          { type: 'team_chat' },
-          { preferenceKey: 'notifyTeamInvites' },
-        ).catch(() => { })
+        waitUntil(
+          sendPushToUsers(
+            recipientIds,
+            `💬 ${senderName.slice(0, 80)}`,
+            text.slice(0, 100),
+            { type: 'team_chat' },
+            { preferenceKey: 'notifyTeamInvites' },
+          ).catch(() => { })
+        )
       }
     }
 

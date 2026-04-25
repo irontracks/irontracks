@@ -4,6 +4,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { requireRole } from '@/utils/auth/route'
 import { parseJsonBody } from '@/utils/zod'
 import { sendPushToAllPlatforms as sendPushToUsers } from '@/lib/push/sender'
+import { waitUntil } from '@vercel/functions'
 
 export const dynamic = 'force-dynamic'
 
@@ -83,13 +84,15 @@ export async function POST(req: Request) {
     }
 
     // Fire push notification (pref filter enforced by sender)
-    void sendPushToUsers(
-      [targetUserId],
-      title,
-      message,
-      { type: type || 'appointment' },
-      { preferenceKey: 'notifyAppointments' },
-    ).catch(() => { })
+    waitUntil(
+      sendPushToUsers(
+        [targetUserId],
+        title,
+        message,
+        { type: type || 'appointment' },
+        { preferenceKey: 'notifyAppointments' },
+      ).catch(() => { })
+    )
 
     return NextResponse.json({ ok: true, notified: true })
   } catch (e: unknown) {
