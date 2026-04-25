@@ -23,6 +23,8 @@ const BodySchema = z
     campaign: z.string().trim().max(120).optional(),
     content: z.string().trim().max(120).optional(),
     term: z.string().trim().max(120).optional(),
+    gclid: z.string().trim().max(120).optional(),
+    fbclid: z.string().trim().max(120).optional(),
     referrer: z.string().trim().max(255).optional(),
     landing_path: z.string().trim().max(255).optional(),
   })
