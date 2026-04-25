@@ -7,6 +7,8 @@ import { sendPushToAllPlatforms as sendPushToUsers } from '@/lib/push/sender'
 import { logInfo, logError } from '@/lib/logger'
 import { requireUser } from '@/utils/auth/route'
 import { waitUntil } from '@vercel/functions'
+import { extractMentions } from '@/lib/social/extractMentions'
+import { insertNotifications } from '@/lib/social/notifyFollowers'
 
 export const dynamic = 'force-dynamic'
 
@@ -90,6 +92,35 @@ export async function POST(req: Request) {
         )
       }
     }
+
+    // ─── 3. @mention notifications (separate from chat broadcast) ──────
+    waitUntil(
+      (async () => {
+        try {
+          const mentions = await extractMentions(text)
+          const mentionedIds = Object.values(mentions.userIdsByHandle).filter(
+            (id) => id && id !== senderId,
+          )
+          if (!mentionedIds.length) return
+
+          const preview = text.length > 80 ? `${text.slice(0, 77)}…` : text
+          await insertNotifications(
+            mentionedIds.map((mid) => ({
+              user_id: mid,
+              recipient_id: mid,
+              sender_id: senderId,
+              type: 'mentioned_in_chat',
+              title: 'Você foi mencionado',
+              message: `${senderName} te mencionou: ${preview}`,
+              is_read: false,
+              metadata: { session_id: sessionId, message_id: inserted.id, sender_id: senderId },
+            })),
+          )
+        } catch (e) {
+          logError('team-chat.mention', e)
+        }
+      })(),
+    )
 
     return NextResponse.json({ ok: true, id: inserted.id })
   } catch (e: unknown) {
