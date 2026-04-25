@@ -1,8 +1,9 @@
 'use client'
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 import Image from 'next/image'
-import { Camera, Palette, CalendarDays, Layers, Wrench, Dumbbell, Volume2, Bell, Timer, Lock, RotateCcw, User } from 'lucide-react'
+import { Camera, Palette, CalendarDays, Layers, Wrench, Dumbbell, Volume2, Bell, Timer, Lock, RotateCcw, User, AtSign } from 'lucide-react'
 import { SectionCard, SectionHeader, ToggleSwitch, type SettingsSectionProps } from './settingsShared'
+import { createClient } from '@/utils/supabase/client'
 
 // ── Perfil ───────────────────────────────────────────────────────────────────
 interface SettingsProfileSectionProps extends SettingsSectionProps {
@@ -13,7 +14,99 @@ interface SettingsProfileSectionProps extends SettingsSectionProps {
     onOpenAvatarUpload?: () => void
 }
 
-export function SettingsProfileSection({ draft, setValue, userPhotoURL, onOpenAvatarUpload, onOpenChangePassword }: SettingsProfileSectionProps) {
+function HandleEditor({ userId }: { userId?: string }) {
+    const [current, setCurrent] = useState<string | null>(null)
+    const [draft, setDraft] = useState('')
+    const [status, setStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
+    const [errorMsg, setErrorMsg] = useState<string>('')
+
+    useEffect(() => {
+        if (!userId) return
+        let cancelled = false
+        ;(async () => {
+            try {
+                const supabase = createClient()
+                const { data } = await supabase.from('profiles').select('handle').eq('id', userId).maybeSingle()
+                if (cancelled) return
+                const h = String((data as { handle?: string | null } | null)?.handle ?? '').trim()
+                setCurrent(h || null)
+                setDraft(h || '')
+            } catch {
+                /* ignore — user can still type */
+            }
+        })()
+        return () => { cancelled = true }
+    }, [userId])
+
+    const handleSave = async () => {
+        const next = draft.trim().toLowerCase()
+        if (!next) return
+        setStatus('saving')
+        setErrorMsg('')
+        try {
+            const res = await fetch('/api/profiles/handle', {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({ handle: next }),
+            })
+            const json = (await res.json()) as { ok?: boolean; error?: string; handle?: string; message?: string }
+            if (!res.ok || !json.ok) {
+                setStatus('error')
+                if (json.error === 'handle_taken') setErrorMsg('Esse @ já está em uso.')
+                else if (json.error === 'invalid_format') setErrorMsg(json.message || 'Formato inválido. Use 3-20 caracteres, letra inicial, [a-z0-9_].')
+                else setErrorMsg(json.error || 'Falha ao salvar.')
+                return
+            }
+            setCurrent(json.handle || next)
+            setStatus('saved')
+            window.setTimeout(() => setStatus('idle'), 1500)
+        } catch (e) {
+            setStatus('error')
+            setErrorMsg(e instanceof Error ? e.message : String(e))
+        }
+    }
+
+    const dirty = draft.trim().toLowerCase() !== (current || '')
+    const valid = /^[a-z][a-z0-9_]{2,19}$/.test(draft.trim().toLowerCase())
+
+    return (
+        <div className="pt-3 border-t border-neutral-700/60">
+            <div className="flex items-center gap-2 mb-1">
+                <AtSign size={14} className="text-neutral-400" />
+                <div className="text-sm font-bold text-white">@ Nome de usuário</div>
+            </div>
+            <div className="text-[11px] text-neutral-500 mb-2">
+                Permite que outros te mencionem (@). 3-20 caracteres, letras minúsculas, números e underscore.
+            </div>
+            <div className="flex items-center gap-2">
+                <span className="text-neutral-500 text-sm">@</span>
+                <input
+                    type="text"
+                    aria-label="Nome de usuário (handle)"
+                    value={draft}
+                    onChange={(e) => setDraft(e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 20))}
+                    placeholder="seu_handle"
+                    autoComplete="off"
+                    spellCheck={false}
+                    className="flex-1 bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white placeholder:text-neutral-600 focus:outline-none focus:border-yellow-500/60"
+                />
+                <button
+                    type="button"
+                    disabled={!dirty || !valid || status === 'saving'}
+                    onClick={handleSave}
+                    className="px-3 py-2 rounded-xl bg-yellow-500 text-black text-xs font-black disabled:opacity-40 disabled:cursor-not-allowed hover:bg-yellow-400 transition-colors"
+                >
+                    {status === 'saving' ? 'Salvando…' : status === 'saved' ? 'Salvo' : 'Salvar'}
+                </button>
+            </div>
+            {status === 'error' && errorMsg && (
+                <div className="text-[11px] text-red-400 mt-1.5">{errorMsg}</div>
+            )}
+        </div>
+    )
+}
+
+export function SettingsProfileSection({ draft, setValue, userId, userPhotoURL, onOpenAvatarUpload, onOpenChangePassword }: SettingsProfileSectionProps) {
     const biologicalSex = String(draft?.biologicalSex ?? 'not_informed')
     const options = [
         { value: 'male', label: '♂ Masculino' },
@@ -66,6 +159,9 @@ export function SettingsProfileSection({ draft, setValue, userPhotoURL, onOpenAv
                         ))}
                     </div>
                 </div>
+
+                {/* Handle (@) */}
+                <HandleEditor userId={userId} />
 
                 {/* Change password */}
                 <div className="pt-3 border-t border-neutral-700/60">
@@ -448,6 +544,8 @@ export function SettingsNotificationsSection({ draft, setValue, iosNotifStatus, 
     const notifyStoryPosted = Boolean(draft?.notifyStoryPosted ?? true)
     const notifyStoryLikes = Boolean(draft?.notifyStoryLikes ?? true)
     const notifyStoryReactions = Boolean(draft?.notifyStoryReactions ?? true)
+    const notifyStoryComments = Boolean(draft?.notifyStoryComments ?? true)
+    const notifyMentions = Boolean(draft?.notifyMentions ?? true)
     const notifyChallenges = Boolean(draft?.notifyChallenges ?? true)
     const notifyTeamInvites = Boolean(draft?.notifyTeamInvites ?? true)
     const notifyMealReminders = Boolean(draft?.notifyMealReminders ?? true)
@@ -630,6 +728,20 @@ export function SettingsNotificationsSection({ draft, setValue, iosNotifStatus, 
                         checked={notifyStoryReactions}
                         disabled={!pushNotificationsEnabled}
                         onChange={() => setValue('notifyStoryReactions', !notifyStoryReactions)}
+                    />
+                    <NotifRow
+                        title="Comentários no seu story"
+                        description="Avisa quando alguém comenta no seu story."
+                        checked={notifyStoryComments}
+                        disabled={!pushNotificationsEnabled}
+                        onChange={() => setValue('notifyStoryComments', !notifyStoryComments)}
+                    />
+                    <NotifRow
+                        title="Menções (@)"
+                        description="Avisa quando alguém te menciona em comentários ou no chat de team."
+                        checked={notifyMentions}
+                        disabled={!pushNotificationsEnabled}
+                        onChange={() => setValue('notifyMentions', !notifyMentions)}
                     />
                 </div>
 

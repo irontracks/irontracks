@@ -59,6 +59,8 @@ export const UserSettingsSchema = z
     notifyStoryPosted: z.boolean().default(true),
     notifyStoryLikes: z.boolean().default(true),
     notifyStoryReactions: z.boolean().default(true),
+    notifyStoryComments: z.boolean().default(true),
+    notifyMentions: z.boolean().default(true),
     notifyChallenges: z.boolean().default(true),
     notifyTeamInvites: z.boolean().default(true),
     notifyMealReminders: z.boolean().default(true),

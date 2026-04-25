@@ -1975,6 +1975,7 @@ export type Database = {
           approved_by: string | null
           display_name: string | null
           email: string | null
+          handle: string | null
           id: string
           is_approved: boolean | null
           last_seen: string | null
@@ -1988,6 +1989,7 @@ export type Database = {
           approved_by?: string | null
           display_name?: string | null
           email?: string | null
+          handle?: string | null
           id: string
           is_approved?: boolean | null
           last_seen?: string | null
@@ -2001,6 +2003,7 @@ export type Database = {
           approved_by?: string | null
           display_name?: string | null
           email?: string | null
+          handle?: string | null
           id?: string
           is_approved?: boolean | null
           last_seen?: string | null

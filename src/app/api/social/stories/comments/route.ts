@@ -6,6 +6,10 @@ import { parseJsonBody } from '@/utils/zod'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { cacheGet, cacheSet } from '@/utils/cache'
+import { insertNotifications } from '@/lib/social/notifyFollowers'
+import { extractMentions } from '@/lib/social/extractMentions'
+import { logError } from '@/lib/logger'
+import { waitUntil } from '@vercel/functions'
 
 export const dynamic = 'force-dynamic'
 
@@ -125,6 +129,62 @@ export async function POST(req: Request) {
       .maybeSingle()
 
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+
+    // Fire-and-forget: notify the story author (1→1) and any @mentioned users.
+    waitUntil(
+      (async () => {
+        try {
+          const admin = createAdminClient()
+          const [{ data: story }, { data: me }, mentions] = await Promise.all([
+            admin.from('social_stories').select('author_id').eq('id', storyId).maybeSingle(),
+            admin.from('profiles').select('display_name').eq('id', auth.user.id).maybeSingle(),
+            extractMentions(text),
+          ])
+          const authorId = String(story?.author_id || '').trim()
+          const senderName = String(me?.display_name || '').trim() || 'Alguém'
+          const preview = text.length > 80 ? `${text.slice(0, 77)}…` : text
+
+          // Mentioned users — exclude the commenter themselves and the story
+          // author (the author already gets the story_comment notification).
+          const mentionedIds = Object.values(mentions.userIdsByHandle).filter(
+            (id) => id && id !== auth.user.id && id !== authorId,
+          )
+
+          const rows: Array<Record<string, unknown>> = []
+
+          if (authorId && authorId !== auth.user.id) {
+            rows.push({
+              user_id: authorId,
+              recipient_id: authorId,
+              sender_id: auth.user.id,
+              type: 'story_comment',
+              title: 'Novo comentário no seu story',
+              message: `${senderName}: ${preview}`,
+              is_read: false,
+              metadata: { story_id: storyId, comment_id: data?.id ?? null, sender_id: auth.user.id },
+            })
+          }
+
+          for (const mid of mentionedIds) {
+            rows.push({
+              user_id: mid,
+              recipient_id: mid,
+              sender_id: auth.user.id,
+              type: 'mentioned_in_comment',
+              title: 'Você foi mencionado',
+              message: `${senderName} te mencionou: ${preview}`,
+              is_read: false,
+              metadata: { story_id: storyId, comment_id: data?.id ?? null, sender_id: auth.user.id },
+            })
+          }
+
+          if (rows.length) await insertNotifications(rows)
+        } catch (e) {
+          logError('story-comment.notify', e)
+        }
+      })(),
+    )
+
     return NextResponse.json({ ok: true, data })
   } catch (e: unknown) {
     return NextResponse.json({ ok: false, error: getErrorMessage(e) ?? String(e) }, { status: 500 })
