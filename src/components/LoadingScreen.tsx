@@ -58,12 +58,12 @@ const LoadingScreen = () => {
             <Image
                 src="/logo-irontracks-transparent.png"
                 alt="IronTracks"
-                width={320}
-                height={320}
+                width={500}
+                height={242}
                 priority
                 unoptimized
-                sizes="320px"
-                className="w-[85vmin] h-[85vmin] max-w-[460px] max-h-[460px] object-contain"
+                sizes="500px"
+                className="w-[88vw] max-w-[500px] h-auto"
             />
 
             {/* Progress bar — directly under the logo */}
