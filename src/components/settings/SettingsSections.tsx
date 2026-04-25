@@ -546,6 +546,16 @@ export function SettingsNotificationsSection({ draft, setValue, iosNotifStatus, 
     const notifyStoryReactions = Boolean(draft?.notifyStoryReactions ?? true)
     const notifyStoryComments = Boolean(draft?.notifyStoryComments ?? true)
     const notifyMentions = Boolean(draft?.notifyMentions ?? true)
+    const notifyNearPR = Boolean(draft?.notifyNearPR ?? true)
+    const notifyBirthday = Boolean(draft?.notifyBirthday ?? true)
+    const notifyStreakAtRisk = Boolean(draft?.notifyStreakAtRisk ?? true)
+    const notifyInactivity = Boolean(draft?.notifyInactivity ?? true)
+    const notifyMorningBriefing = Boolean(draft?.notifyMorningBriefing ?? false)
+    const notifyWeeklyRecap = Boolean(draft?.notifyWeeklyRecap ?? true)
+    const notifyFriendsTrainedToday = Boolean(draft?.notifyFriendsTrainedToday ?? true)
+    const notifyWaterReminder = Boolean(draft?.notifyWaterReminder ?? false)
+    const notifyTrialEnding = Boolean(draft?.notifyTrialEnding ?? true)
+    const notifyBillingIssue = Boolean(draft?.notifyBillingIssue ?? true)
     const notifyChallenges = Boolean(draft?.notifyChallenges ?? true)
     const notifyTeamInvites = Boolean(draft?.notifyTeamInvites ?? true)
     const notifyMealReminders = Boolean(draft?.notifyMealReminders ?? true)
@@ -702,6 +712,86 @@ export function SettingsNotificationsSection({ draft, setValue, iosNotifStatus, 
                         checked={notifyFriendWeeklyGoal}
                         disabled={!pushNotificationsEnabled}
                         onChange={() => setValue('notifyFriendWeeklyGoal', !notifyFriendWeeklyGoal)}
+                    />
+                </div>
+
+                {/* ── Pessoais ──────────────────────────────────────────────── */}
+                <div className="pt-3 border-t border-neutral-700/60 space-y-3">
+                    <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Pessoais</div>
+                    <NotifRow
+                        title="Quase bateu PR"
+                        description="Quando você fica perto de um recorde pessoal sem bater."
+                        checked={notifyNearPR}
+                        disabled={!pushNotificationsEnabled}
+                        onChange={() => setValue('notifyNearPR', !notifyNearPR)}
+                    />
+                    <NotifRow
+                        title="Streak em risco"
+                        description="À noite, se você ainda não treinou e tem sequência ativa."
+                        checked={notifyStreakAtRisk}
+                        disabled={!pushNotificationsEnabled}
+                        onChange={() => setValue('notifyStreakAtRisk', !notifyStreakAtRisk)}
+                    />
+                    <NotifRow
+                        title="Saudade do treino"
+                        description="Avisa após 3+ dias sem treinar."
+                        checked={notifyInactivity}
+                        disabled={!pushNotificationsEnabled}
+                        onChange={() => setValue('notifyInactivity', !notifyInactivity)}
+                    />
+                    <NotifRow
+                        title="Bom dia (briefing)"
+                        description="Lembrete de motivação pela manhã. Desligado por padrão."
+                        checked={notifyMorningBriefing}
+                        disabled={!pushNotificationsEnabled}
+                        onChange={() => setValue('notifyMorningBriefing', !notifyMorningBriefing)}
+                    />
+                    <NotifRow
+                        title="Resumo semanal"
+                        description="Toda segunda, resumo da semana anterior."
+                        checked={notifyWeeklyRecap}
+                        disabled={!pushNotificationsEnabled}
+                        onChange={() => setValue('notifyWeeklyRecap', !notifyWeeklyRecap)}
+                    />
+                    <NotifRow
+                        title="Aniversário no app"
+                        description="Avisa no aniversário do seu cadastro."
+                        checked={notifyBirthday}
+                        disabled={!pushNotificationsEnabled}
+                        onChange={() => setValue('notifyBirthday', !notifyBirthday)}
+                    />
+                    <NotifRow
+                        title="Hidratação"
+                        description="Lembrete diário pra beber água. Desligado por padrão."
+                        checked={notifyWaterReminder}
+                        disabled={!pushNotificationsEnabled}
+                        onChange={() => setValue('notifyWaterReminder', !notifyWaterReminder)}
+                    />
+                    <NotifRow
+                        title="Amigos treinaram hoje"
+                        description="No fim do dia, se algum seguido treinou hoje."
+                        checked={notifyFriendsTrainedToday}
+                        disabled={!pushNotificationsEnabled}
+                        onChange={() => setValue('notifyFriendsTrainedToday', !notifyFriendsTrainedToday)}
+                    />
+                </div>
+
+                {/* ── Conta / VIP ────────────────────────────────────────────── */}
+                <div className="pt-3 border-t border-neutral-700/60 space-y-3">
+                    <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Conta / VIP</div>
+                    <NotifRow
+                        title="Assinatura expirando"
+                        description="Quando seu VIP está pra expirar nas próximas 24h."
+                        checked={notifyTrialEnding}
+                        disabled={!pushNotificationsEnabled}
+                        onChange={() => setValue('notifyTrialEnding', !notifyTrialEnding)}
+                    />
+                    <NotifRow
+                        title="Falha no pagamento"
+                        description="Quando uma cobrança da assinatura falha."
+                        checked={notifyBillingIssue}
+                        disabled={!pushNotificationsEnabled}
+                        onChange={() => setValue('notifyBillingIssue', !notifyBillingIssue)}
                     />
                 </div>
 

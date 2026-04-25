@@ -10,6 +10,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { cacheDelete } from '@/utils/cache'
 import { env } from '@/utils/env'
+import { insertNotifications } from '@/lib/social/notifyFollowers'
+import { waitUntil } from '@vercel/functions'
 
 /**
  * Maps Apple/RevenueCat product identifiers to app_plans.id values.
@@ -245,6 +247,24 @@ export async function POST(request: NextRequest) {
       cacheDelete(`vip:access:${userId}`).catch(() => {}),
       cacheDelete(`dashboard:bootstrap:${userId}`).catch(() => {}),
     ])
+
+    // Read-only addition: notify the user when RevenueCat reports a billing
+    // failure. Does not modify the billing flow — only piggybacks on the
+    // existing webhook to surface a self push.
+    if (eventType === 'BILLING_ISSUE') {
+      waitUntil(
+        insertNotifications([{
+          user_id: userId,
+          recipient_id: userId,
+          sender_id: userId,
+          type: 'billing_issue',
+          title: 'Falha no pagamento',
+          message: 'Não conseguimos cobrar sua assinatura. Atualize seus dados pra manter o VIP.',
+          is_read: false,
+          metadata: { event_type: eventType, product_id: productId },
+        }]).catch(() => { }),
+      )
+    }
 
     return NextResponse.json({ ok: true, event: eventType, status: targetStatus })
   } catch (e: unknown) {
