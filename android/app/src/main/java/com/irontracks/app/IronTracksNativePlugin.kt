@@ -2,6 +2,7 @@ package com.irontracks.app
 
 import android.Manifest
 import android.app.AlarmManager
+import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
@@ -51,6 +52,11 @@ class IronTracksNativePlugin : Plugin(), SensorEventListener {
     companion object {
         const val CHANNEL_REST = "rest_timer"
         const val CHANNEL_APP = "app_notifications"
+        // Channel id matched by the FCM payload (src/lib/push/fcm.ts).
+        // IMPORTANCE_HIGH so push notifications produce a heads-up banner
+        // and wake the screen on lock screen — required for time-sensitive
+        // social pushes (achievements, comeback, weekly goal, etc.).
+        const val CHANNEL_DEFAULT = "irontracks_default"
         const val NOTIF_ID_BASE = 9000
     }
 
@@ -469,6 +475,17 @@ class IronTracksNativePlugin : Plugin(), SensorEventListener {
                 description = "Notificações gerais do IronTracks"
             }
             nm.createNotificationChannel(appChannel)
+
+            val defaultChannel = NotificationChannel(
+                CHANNEL_DEFAULT, "Notificações IronTracks",
+                NotificationManager.IMPORTANCE_HIGH
+            ).apply {
+                description = "Conquistas, treinos, eventos sociais e lembretes"
+                enableVibration(true)
+                enableLights(true)
+                lockscreenVisibility = Notification.VISIBILITY_PUBLIC
+            }
+            nm.createNotificationChannel(defaultChannel)
         }
     }
 
