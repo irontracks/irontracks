@@ -13,6 +13,7 @@ import ExerciseList from './workout/ExerciseList';
 import WorkoutFooter from './workout/WorkoutFooter';
 import Modals from './workout/Modals';
 import { ActiveWorkoutProps } from './workout/types';
+import { logError } from '@/lib/logger';
 import dynamic from 'next/dynamic';
 const CardioGPSPanel = dynamic(() => import('@/components/workout/CardioGPSPanel'), { ssr: false });
 import { useTeamWorkout } from '@/contexts/TeamWorkoutContext';
@@ -39,7 +40,7 @@ export default function ActiveWorkout(props: ActiveWorkoutProps) {
       // `if (exitTimerRef.current) return` to block ALL subsequent calls —
       // including cancel retries after a failed Finalizar.
       exitTimerRef.current = null;
-      try { cb(); } catch (e) { console.error('[ActiveWorkout] triggerExit callback failed:', e); }
+      try { cb(); } catch (e) { logError('ActiveWorkout.triggerExit', e); }
     }, 280);
   }, []);
 
@@ -69,7 +70,7 @@ export default function ActiveWorkout(props: ActiveWorkoutProps) {
             if (exitTimerRef.current) { clearTimeout(exitTimerRef.current); exitTimerRef.current = null; }
             setIsExiting(true);
             setTimeout(() => {
-              try { originalOnFinish(null, false); } catch (e) { console.error('[ActiveWorkout] cancelWorkout failed:', e); }
+              try { originalOnFinish(null, false); } catch (e) { logError('ActiveWorkout.cancelWorkout', e); }
             }, 100);
           }
         : undefined,
