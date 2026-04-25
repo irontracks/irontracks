@@ -1,4 +1,5 @@
 'use client'
+import Image from 'next/image'
 import { useEffect, useState } from 'react'
 
 // Module-level flag: true after the first LoadingScreen has been shown in this
@@ -52,10 +53,15 @@ const LoadingScreen = () => {
                 ? { animation: 'splash-in 0.9s cubic-bezier(0.16, 1, 0.3, 1) forwards', opacity: 0 }
                 : { opacity: 1 }}
         >
-            <h1 className="text-4xl font-black tracking-tight text-center leading-none">
-                <span className="text-white">IRON</span>
-                <span className="text-transparent bg-clip-text bg-gradient-to-b from-yellow-300 to-amber-500">TRACKS</span>
-            </h1>
+            <Image
+                src="/logo-irontracks.png"
+                alt="IronTracks"
+                width={240}
+                height={64}
+                priority
+                unoptimized
+                className="h-auto w-[240px]"
+            />
 
             {/* Progress bar — directly under the logo */}
             <div className="mt-4 w-20 h-[2px] bg-neutral-800 rounded-full overflow-hidden">
