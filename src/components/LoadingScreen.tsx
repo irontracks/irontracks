@@ -45,8 +45,9 @@ const LoadingScreen = () => {
 
     return (
     <div className="fixed inset-0 z-50 bg-neutral-950 flex flex-col items-center justify-center pt-safe pb-safe overflow-hidden">
-        {/* IRONTRACKS wordmark */}
+        {/* IRONTRACKS wordmark + progress bar grouped together */}
         <div
+            className="flex flex-col items-center"
             style={shouldAnimate
                 ? { animation: 'splash-in 0.9s cubic-bezier(0.16, 1, 0.3, 1) forwards', opacity: 0 }
                 : { opacity: 1 }}
@@ -55,29 +56,24 @@ const LoadingScreen = () => {
                 <span className="text-white">IRON</span>
                 <span className="text-transparent bg-clip-text bg-gradient-to-b from-yellow-300 to-amber-500">TRACKS</span>
             </h1>
-        </div>
 
-        {/* Progress bar — bottom of screen */}
-        <div
-            className="absolute bottom-12 left-1/2 -translate-x-1/2 w-20 h-[2px] bg-neutral-800 rounded-full overflow-hidden"
-            style={shouldAnimate
-                ? { animation: 'fade-in 0.4s ease-out 0.5s forwards', opacity: 0 }
-                : { opacity: 1 }}
-        >
-            <div
-                className="h-full rounded-full relative overflow-hidden"
-                style={shouldAnimate ? {
-                    background: 'linear-gradient(90deg, #92400e, #d97706, #fbbf24, #fde68a)',
-                    animation: 'progress 1.8s cubic-bezier(0.4, 0, 0.2, 1) 0.4s forwards',
-                    width: '0%',
-                    boxShadow: '0 0 8px rgba(251,191,36,0.4)',
-                } : {
-                    background: 'linear-gradient(90deg, #92400e, #d97706, #fbbf24, #fde68a)',
-                    width: '100%',
-                    boxShadow: '0 0 8px rgba(251,191,36,0.4)',
-                }}
-            >
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent" style={{ animation: 'shimmer 1.5s ease-in-out infinite' }} />
+            {/* Progress bar — directly under the logo */}
+            <div className="mt-4 w-20 h-[2px] bg-neutral-800 rounded-full overflow-hidden">
+                <div
+                    className="h-full rounded-full relative overflow-hidden"
+                    style={shouldAnimate ? {
+                        background: 'linear-gradient(90deg, #92400e, #d97706, #fbbf24, #fde68a)',
+                        animation: 'progress 1.8s cubic-bezier(0.4, 0, 0.2, 1) 0.4s forwards',
+                        width: '0%',
+                        boxShadow: '0 0 8px rgba(251,191,36,0.4)',
+                    } : {
+                        background: 'linear-gradient(90deg, #92400e, #d97706, #fbbf24, #fde68a)',
+                        width: '100%',
+                        boxShadow: '0 0 8px rgba(251,191,36,0.4)',
+                    }}
+                >
+                    <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/30 to-transparent" style={{ animation: 'shimmer 1.5s ease-in-out infinite' }} />
+                </div>
             </div>
         </div>
 
@@ -85,9 +81,6 @@ const LoadingScreen = () => {
             @keyframes splash-in {
                 0%   { opacity: 0; transform: translateY(12px) scale(0.97); }
                 100% { opacity: 1; transform: translateY(0) scale(1); }
-            }
-            @keyframes fade-in {
-                to { opacity: 1; }
             }
             @keyframes progress {
                 0%   { width: 0%; }
