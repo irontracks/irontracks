@@ -109,37 +109,80 @@ struct LockScreenBannerView: View {
     let context: ActivityViewContext<RestTimerAttributes>
 
     var body: some View {
-        HStack(spacing: 14) {
-            // Icon
-            ZStack {
-                Circle()
-                    .fill(Color.green.opacity(0.15))
-                    .frame(width: 44, height: 44)
-                Image(systemName: context.state.isFinished ? "checkmark.circle.fill" : "timer")
-                    .font(.title3.bold())
-                    .foregroundColor(.green)
+        VStack(spacing: 10) {
+            // ── Top row: icon + labels + timer ──────────────────────────────
+            HStack(spacing: 14) {
+                // Circular icon
+                ZStack {
+                    Circle()
+                        .fill(context.state.isFinished
+                              ? Color.green.opacity(0.25)
+                              : Color.yellow.opacity(0.15))
+                        .frame(width: 44, height: 44)
+                    Image(systemName: context.state.isFinished
+                          ? "checkmark.circle.fill"
+                          : "timer")
+                        .font(.title3.bold())
+                        .foregroundColor(context.state.isFinished ? .green : .yellow)
+                }
+
+                // Labels
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(context.state.isFinished ? "Hora de Treinar!" : "Descansando")
+                        .font(.caption.bold())
+                        .foregroundColor(.secondary)
+                    Text(context.attributes.exerciseName)
+                        .font(.subheadline.bold())
+                        .foregroundColor(.primary)
+                        .lineLimit(1)
+                }
+
+                Spacer()
+
+                // Timer countdown / count-up
+                TimerCountdownText(
+                    endDate: context.state.endDate,
+                    isFinished: context.state.isFinished,
+                    font: .system(.title2, design: .rounded).bold(),
+                    color: context.state.isFinished ? .green : .primary
+                )
             }
 
-            // Labels
-            VStack(alignment: .leading, spacing: 2) {
-                Text(context.state.isFinished ? "Hora de Treinar!" : "Descanso")
-                    .font(.caption.bold())
-                    .foregroundColor(.secondary)
-                Text(context.attributes.exerciseName)
-                    .font(.subheadline.bold())
-                    .foregroundColor(.primary)
-                    .lineLimit(1)
+            // ── Bottom row: interactive buttons (iOS 17+) ────────────────────
+            // Shown only when the countdown has finished so the user can act
+            // without opening the app.
+            if context.state.isFinished {
+                if #available(iOS 17.0, *) {
+                    HStack(spacing: 10) {
+                        // OK — dismisses the Live Activity banner, stays on lock screen
+                        Button(intent: DismissTimerIntent()) {
+                            Text("OK")
+                                .font(.subheadline.bold())
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 9)
+                                .background(Color.white.opacity(0.12))
+                                .foregroundColor(.white)
+                                .clipShape(RoundedRectangle(cornerRadius: 10))
+                        }
+                        .buttonStyle(.plain)
+
+                        // START — opens the app so user can begin the next set
+                        Button(intent: StartSetIntent()) {
+                            HStack(spacing: 5) {
+                                Image(systemName: "play.fill")
+                                Text("INICIAR SÉRIE")
+                            }
+                            .font(.subheadline.bold())
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 9)
+                            .background(Color.green)
+                            .foregroundColor(.black)
+                            .clipShape(RoundedRectangle(cornerRadius: 10))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
             }
-
-            Spacer()
-
-            // Timer: native countdown / count-up driven by endDate
-            TimerCountdownText(
-                endDate: context.state.endDate,
-                isFinished: context.state.isFinished,
-                font: .system(.title, design: .rounded).bold(),
-                color: .primary
-            )
         }
         .padding(16)
         .activityBackgroundTint(Color(red: 0.05, green: 0.05, blue: 0.05))

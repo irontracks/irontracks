@@ -45,7 +45,7 @@ interface RestTimerOverlayProps {
     onToggleAutoStart?: () => void;
 }
 
-const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context, onFinish, onStart, onClose: _onClose, settings, autoStartEnabled, onToggleAutoStart: _onToggleAutoStart }) => {
+const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context, onFinish, onStart, onClose: _onClose, settings, autoStartEnabled: _autoStartEnabled, onToggleAutoStart: _onToggleAutoStart }) => {
     const isPlankMode = context?.kind === 'plank'
     const finishedLabel = isPlankMode ? 'Tempo concluído!' : 'Descanso finalizado'
 
@@ -56,6 +56,9 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
     // Without this, the overlay stays visible for 1-2 frames after tap, during which
     // re-renders can interfere with the button's click handling on iOS WKWebView.
     const [dismissed, setDismissed] = useState(false);
+    // AUTO: local-only toggle (never persisted). Defaults OFF every session.
+    // When ON, the overlay auto-advances 500 ms after the countdown reaches zero.
+    const [autoLocal, setAutoLocal] = useState(false);
     const warnedRef = useRef(false);
     const notifyIdRef = useRef('');
     const soundIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -387,7 +390,7 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
         // Lock the decision for this rest at the moment it finishes. Any later
         // toggle of the Settings switch is ignored — only the NEXT rest uses it.
         autoStartFiredRef.current = true;
-        if (!autoStartEnabled) return;
+        if (!autoLocal) return;
 
         const timeout = setTimeout(() => {
             // Bail if the user already tapped START manually during the delay
@@ -406,7 +409,7 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
             }
         }, 500);
         return () => clearTimeout(timeout);
-    }, [isFinished, autoStartEnabled]);
+    }, [isFinished, autoLocal]);
 
     // ── Early return: hide immediately on dismiss OR when no timer ──
     if (!targetTime || dismissed) return null;
@@ -563,8 +566,18 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
                             >
                                 {isSideRest ? 'TROCAR LADO ▶' : isTransition ? 'CHEGUEI ✓' : 'START ▶'}
                             </button>
-                            {/* AUTO button was removed — auto-start feature no longer exists
-                                in the overlay. User must tap START explicitly. */}
+                            {!isSideRest && !isTransition && (
+                                <button
+                                    onClick={() => setAutoLocal(v => !v)}
+                                    className={`px-3 py-2 rounded-xl text-xs font-black transition-all active:scale-95 border ${
+                                        autoLocal
+                                            ? 'bg-amber-500 text-black border-amber-400 shadow-lg shadow-amber-900/40'
+                                            : 'bg-neutral-800/80 text-neutral-400 border-neutral-700'
+                                    }`}
+                                >
+                                    AUTO
+                                </button>
+                            )}
                         </div>
                     </div>
                 </div>
