@@ -14,7 +14,7 @@ type IronTracksNativePlugin = {
   scheduleRestTimer: (opts: { id: string; seconds: number; title?: string; body?: string; repeatCount?: number; repeatEverySeconds?: number }) => Promise<void>
   cancelRestTimer: (opts: { id: string }) => Promise<void>
   // Live Activity
-  startRestLiveActivity: (opts: { id: string; seconds: number; title?: string }) => Promise<void>
+  startRestLiveActivity: (opts: { id: string; seconds: number; title?: string; workoutStartMs?: number }) => Promise<void>
   updateRestLiveActivity: (opts: { id: string; isFinished: boolean; secondsRemaining?: number; targetSeconds?: number; endDateMs?: number }) => Promise<void>
   endRestLiveActivity: (opts: { id: string }) => Promise<void>
   endAllRestLiveActivities: () => Promise<void>
@@ -221,13 +221,13 @@ export const cancelRestNotification = async (id: string) => {
 
 // ─── Live Activity ────────────────────────────────────────────────────────────
 
-export const startRestLiveActivity = async (id: string, seconds: number, title?: string) => {
+export const startRestLiveActivity = async (id: string, seconds: number, title?: string, workoutStartMs?: number) => {
   try {
     if (!isIosNative()) return
     const safeId = String(id || 'rest_timer').trim() || 'rest_timer'
     const safeSeconds = Math.max(1, Math.round(Number(seconds) || 0))
     if (!safeSeconds) return
-    await Native.startRestLiveActivity({ id: safeId, seconds: safeSeconds, title })
+    await Native.startRestLiveActivity({ id: safeId, seconds: safeSeconds, title, workoutStartMs: workoutStartMs ?? 0 })
   } catch { }
 }
 

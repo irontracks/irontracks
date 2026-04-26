@@ -18,4 +18,6 @@ struct RestTimerAttributes: ActivityAttributes {
     var timerID: String
     /// Exercise name shown in the Live Activity (e.g. "Supino Reto")
     var exerciseName: String
+    /// When the overall workout session started — drives the count-up "Treino" timer
+    var workoutStartDate: Date
 }

@@ -43,9 +43,12 @@ interface RestTimerOverlayProps {
     settings: RestTimerSettings | null;
     autoStartEnabled?: boolean;
     onToggleAutoStart?: () => void;
+    /** Unix epoch ms when the workout session started — forwarded to the
+     *  Live Activity so the lock screen can show total workout elapsed time. */
+    workoutStartMs?: number;
 }
 
-const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context, onFinish, onStart, onClose: _onClose, settings, autoStartEnabled: _autoStartEnabled, onToggleAutoStart: _onToggleAutoStart }) => {
+const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context, onFinish, onStart, onClose: _onClose, settings, autoStartEnabled: _autoStartEnabled, onToggleAutoStart: _onToggleAutoStart, workoutStartMs }) => {
     const isPlankMode = context?.kind === 'plank'
     const finishedLabel = isPlankMode ? 'Tempo concluído!' : 'Descanso finalizado'
 
@@ -252,7 +255,7 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
                     }).catch(() => { });
                 }).catch(() => { });
             }
-            startRestLiveActivity(id, seconds, liveTitle);
+            startRestLiveActivity(id, seconds, liveTitle, workoutStartMs);
         } catch { }
 
         // Capture total duration on first tick

@@ -509,6 +509,11 @@ export default function DashboardModals(props: DashboardModalsProps) {
                             saveFn?.(next)
                         } catch { }
                     }}
+                    workoutStartMs={(() => {
+                        const raw = (activeSession as Record<string, unknown>).startedAt
+                        const ms = typeof raw === 'number' ? raw : typeof raw === 'string' ? Number(raw) : 0
+                        return ms > 0 ? ms : 0
+                    })()}
                 />
             )}
 

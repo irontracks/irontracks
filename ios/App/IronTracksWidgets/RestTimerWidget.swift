@@ -110,7 +110,7 @@ struct LockScreenBannerView: View {
 
     var body: some View {
         VStack(spacing: 10) {
-            // ── Top row: icon + labels + timer ──────────────────────────────
+            // ── Top row: icon + labels + rest countdown ──────────────────
             HStack(spacing: 14) {
                 // Circular icon
                 ZStack {
@@ -139,7 +139,7 @@ struct LockScreenBannerView: View {
 
                 Spacer()
 
-                // Timer countdown / count-up
+                // Rest countdown / count-up
                 TimerCountdownText(
                     endDate: context.state.endDate,
                     isFinished: context.state.isFinished,
@@ -148,13 +148,31 @@ struct LockScreenBannerView: View {
                 )
             }
 
-            // ── Bottom row: interactive buttons (iOS 17+) ────────────────────
-            // Shown only when the countdown has finished so the user can act
-            // without opening the app.
-            if context.state.isFinished {
-                if #available(iOS 17.0, *) {
-                    HStack(spacing: 10) {
-                        // OK — dismisses the Live Activity banner, stays on lock screen
+            // ── Workout elapsed row ──────────────────────────────────────
+            HStack(spacing: 4) {
+                Image(systemName: "stopwatch")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                Text("Treino:")
+                    .font(.caption2)
+                    .foregroundColor(.secondary)
+                // Count UP from workout start — system-driven, no JS updates needed
+                Text(timerInterval: context.attributes.workoutStartDate...Date.distantFuture,
+                     countsDown: false)
+                    .font(.caption2.monospacedDigit())
+                    .foregroundColor(.secondary)
+                Spacer()
+            }
+            .padding(.top, -4)
+
+            // ── Interactive buttons (iOS 17+) ────────────────────────────
+            // INICIAR SÉRIE is always visible so users can start early from
+            // the lock screen without opening the app first.
+            // OK appears only when the rest is done (to dismiss the banner).
+            if #available(iOS 17.0, *) {
+                HStack(spacing: 10) {
+                    if context.state.isFinished {
+                        // OK — dismisses the Live Activity banner
                         Button(intent: DismissTimerIntent()) {
                             Text("OK")
                                 .font(.subheadline.bold())
@@ -165,22 +183,22 @@ struct LockScreenBannerView: View {
                                 .clipShape(RoundedRectangle(cornerRadius: 10))
                         }
                         .buttonStyle(.plain)
-
-                        // START — opens the app so user can begin the next set
-                        Button(intent: StartSetIntent()) {
-                            HStack(spacing: 5) {
-                                Image(systemName: "play.fill")
-                                Text("INICIAR SÉRIE")
-                            }
-                            .font(.subheadline.bold())
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 9)
-                            .background(Color.green)
-                            .foregroundColor(.black)
-                            .clipShape(RoundedRectangle(cornerRadius: 10))
-                        }
-                        .buttonStyle(.plain)
                     }
+
+                    // INICIAR SÉRIE — always visible, opens app to start next set
+                    Button(intent: StartSetIntent()) {
+                        HStack(spacing: 5) {
+                            Image(systemName: "play.fill")
+                            Text(context.state.isFinished ? "INICIAR SÉRIE" : "PULAR DESCANSO")
+                        }
+                        .font(.subheadline.bold())
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 9)
+                        .background(context.state.isFinished ? Color.green : Color.white.opacity(0.15))
+                        .foregroundColor(context.state.isFinished ? .black : .white)
+                        .clipShape(RoundedRectangle(cornerRadius: 10))
+                    }
+                    .buttonStyle(.plain)
                 }
             }
         }
