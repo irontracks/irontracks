@@ -197,7 +197,7 @@ export function useLoginScreen() {
     }, [])
 
     const handleAppleLogin = useCallback(async () => {
-        setIsLoading(true); setErrorMsg('')
+        setErrorMsg('')
         try {
             const isIOSNative = isIosNative()
             if (isIOSNative) {
@@ -209,7 +209,13 @@ export function useLoginScreen() {
                 // delivers the token directly via the OS — no web redirect replay risk.
                 // Passing a nonce causes a persistent "Nonces mismatch" because the Apple JWT
                 // nonce claim verification depends on exact matching between client sessions.
+                //
+                // NOTE: setIsLoading is called AFTER authorize() returns, NOT before.
+                // The native Apple dialog can take >8s (user reads, uses Face ID, etc.)
+                // and starting the LoadingScreen before it would trigger the 8s safety
+                // valve showing "Não foi possível carregar o app" mid-auth.
                 const result = await SignInWithApple.authorize({ clientId, scopes: 'name email', state })
+                setIsLoading(true)
                 const token = result?.response?.identityToken
                 if (!token) throw new Error('Falha ao obter token da Apple.')
                 const email = String(result?.response?.email || '').trim()
@@ -247,6 +253,7 @@ export function useLoginScreen() {
                 window.location.replace('/dashboard')
                 return
             }
+            setIsLoading(true)
             window.location.assign(getOAuthHref('apple'))
         } catch (error: unknown) {
             logError('error', 'Login Error:', error)
