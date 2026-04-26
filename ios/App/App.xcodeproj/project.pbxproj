@@ -23,6 +23,7 @@
 		W011W011W011W011 /* RestTimerWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = W00BW00BW00BW00B /* RestTimerWidget.swift */; };
 		W012W012W012W012 /* IronTracksWidgets.swift in Sources */ = {isa = PBXBuildFile; fileRef = W00CW00CW00CW00C /* IronTracksWidgets.swift */; };
 		W013W013W013W013 /* IronTracksWidgets appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = W002W002W002W002 /* IronTracksWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		W020W020W020W020 /* RestTimerIntents.swift in Sources (Widget) */ = {isa = PBXBuildFile; fileRef = W021W021W021W021 /* RestTimerIntents.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -46,6 +47,7 @@
 		W00CW00CW00CW00C /* IronTracksWidgets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IronTracksWidgets.swift; sourceTree = "<group>"; };
 		W00DW00DW00DW00D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		W00EW00EW00EW00E /* IronTracksWidgets.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = IronTracksWidgets.entitlements; sourceTree = "<group>"; };
+		W021W021W021W021 /* RestTimerIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestTimerIntents.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -125,6 +127,7 @@
 			children = (
 				W00BW00BW00BW00B /* RestTimerWidget.swift */,
 				W00CW00CW00CW00C /* IronTracksWidgets.swift */,
+				W021W021W021W021 /* RestTimerIntents.swift */,
 				W00DW00DW00DW00D /* Info.plist */,
 				W00EW00EW00EW00E /* IronTracksWidgets.entitlements */,
 			);
@@ -258,6 +261,7 @@
 				W010W010W010W010 /* RestTimerAttributes.swift in Sources (Widget) */,
 				W011W011W011W011 /* RestTimerWidget.swift in Sources */,
 				W012W012W012W012 /* IronTracksWidgets.swift in Sources */,
+				W020W020W020W020 /* RestTimerIntents.swift in Sources (Widget) */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -416,7 +420,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 12;
+				CURRENT_PROJECT_VERSION = 13;
 				DEVELOPMENT_TEAM = 5XLC55D3YR;
 				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				INFOPLIST_FILE = App/Info.plist;
@@ -440,7 +444,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 12;
+				CURRENT_PROJECT_VERSION = 13;
 				DEVELOPMENT_TEAM = 5XLC55D3YR;
 				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				INFOPLIST_FILE = App/Info.plist;
@@ -462,7 +466,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 12;
+				CURRENT_PROJECT_VERSION = 13;
 				DEVELOPMENT_TEAM = 5XLC55D3YR;
 				CODE_SIGN_ENTITLEMENTS = IronTracksWidgets/IronTracksWidgets.entitlements;
 				GENERATE_INFOPLIST_FILE = YES;
@@ -490,7 +494,7 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 12;
+				CURRENT_PROJECT_VERSION = 13;
 				DEVELOPMENT_TEAM = 5XLC55D3YR;
 				CODE_SIGN_ENTITLEMENTS = IronTracksWidgets/IronTracksWidgets.entitlements;
 				GENERATE_INFOPLIST_FILE = YES;
