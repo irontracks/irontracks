@@ -247,6 +247,12 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin {
             let id       = call.getString("id")      ?? "rest"
             let seconds  = call.getInt("seconds")    ?? 60
             let title    = call.getString("title")   ?? ""
+            // workoutStartMs: Unix epoch ms of when the workout session began.
+            // If absent or zero, fall back to now (workout just started).
+            let workoutStartMs = call.getDouble("workoutStartMs") ?? 0.0
+            let workoutStartDate = workoutStartMs > 0
+                ? Date(timeIntervalSince1970: workoutStartMs / 1000.0)
+                : Date()
 
             // Cancel any pending auto-finish from a previous timer
             autoFinishTask?.cancel()
@@ -260,7 +266,7 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin {
                 }
 
                 let endDate = Date().addingTimeInterval(Double(seconds))
-                let attrs = RestTimerAttributes(timerID: id, exerciseName: title)
+                let attrs = RestTimerAttributes(timerID: id, exerciseName: title, workoutStartDate: workoutStartDate)
                 let state = RestTimerAttributes.ContentState(
                     endDate: endDate,
                     targetSeconds: seconds,
