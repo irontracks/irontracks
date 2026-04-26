@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/utils/supabase/client'
-import NutritionConsoleShell from './NutritionConsoleShell'
 import NutritionMixer from './NutritionMixer'
 import { SkeletonList } from '@/components/ui/Skeleton'
 
@@ -70,7 +69,7 @@ interface NutritionOverlayProps {
   canViewMacros?: boolean
 }
 
-export default function NutritionOverlay({ onClose, canViewMacros }: NutritionOverlayProps) {
+export default function NutritionOverlay({ onClose: _onClose, canViewMacros }: NutritionOverlayProps) {
   const supabase = useMemo(() => createClient(), [])
   const [data, setData] = useState<{
     dateKey: string
@@ -160,8 +159,11 @@ export default function NutritionOverlay({ onClose, canViewMacros }: NutritionOv
   }, [supabase, dateKey])
 
   return (
-    <div className="fixed inset-0 z-[200] bg-neutral-950 overflow-y-auto overscroll-none">
-      <NutritionConsoleShell title="Nutrition Console" subtitle={`Hoje \u00b7 ${dateKey}`} onBack={onClose}>
+    <div
+      className="fixed inset-x-0 bottom-0 z-[25] bg-neutral-950 overflow-y-auto overscroll-none"
+      style={{ top: 'calc(4rem + env(safe-area-inset-top) + 64px)' }}
+    >
+      <div className="mx-auto w-full max-w-md px-4 pb-28 pt-4">
         {data ? (
           <NutritionMixer
             dateKey={data.dateKey}
@@ -183,7 +185,7 @@ export default function NutritionOverlay({ onClose, canViewMacros }: NutritionOv
             <SkeletonList count={4} />
           </div>
         )}
-      </NutritionConsoleShell>
+      </div>
     </div>
   )
 }
