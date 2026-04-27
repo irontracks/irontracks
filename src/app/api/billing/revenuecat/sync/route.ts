@@ -83,12 +83,16 @@ export async function POST() {
     }
     if (!resolvedPlanId) return NextResponse.json({ ok: false, error: 'plan_not_found' }, { status: 400 })
 
-    // R2#6: Filter by provider to avoid overwriting subscriptions from other providers (Asaas, MercadoPago)
+    // Find any active Apple/RevenueCat subscription for this user.
+    // The partial unique index enforces one active row per user, so we must
+    // query all Apple-IAP providers together — 'apple' (written by the webhook)
+    // and 'revenuecat' (legacy rows).  Filtering only 'revenuecat' misses rows
+    // tagged 'apple', causing a duplicate-key error on the INSERT below.
     const { data: existing } = await admin
       .from('app_subscriptions')
       .select('id, status')
       .eq('user_id', user.id)
-      .eq('provider', 'revenuecat')
+      .in('provider', ['apple', 'revenuecat'])
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()
@@ -122,6 +126,7 @@ export async function POST() {
           user_id: user.id,
           plan_id: resolvedPlanId,
           status: 'active',
+          provider: 'revenuecat',
           current_period_start: new Date().toISOString(),
           current_period_end: expiresDate,
           cancel_at_period_end: false,
