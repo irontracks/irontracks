@@ -24,6 +24,7 @@
 		W012W012W012W012 /* IronTracksWidgets.swift in Sources */ = {isa = PBXBuildFile; fileRef = W00CW00CW00CW00C /* IronTracksWidgets.swift */; };
 		W013W013W013W013 /* IronTracksWidgets appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = W002W002W002W002 /* IronTracksWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		W020W020W020W020 /* RestTimerIntents.swift in Sources (Widget) */ = {isa = PBXBuildFile; fileRef = W021W021W021W021 /* RestTimerIntents.swift */; };
+		W022W022W022W022 /* RestTimerIntents.swift in Sources (App) */ = {isa = PBXBuildFile; fileRef = W021W021W021W021 /* RestTimerIntents.swift */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -251,6 +252,7 @@
 				BBBB0001BBBB0001BBBB0001 /* SceneDelegate.swift in Sources */,
 				AAAA0002AAAA0002AAAA0002 /* IronTracksNativePlugin.swift in Sources */,
 				W00FW00FW00FW00F /* RestTimerAttributes.swift in Sources (App) */,
+				W022W022W022W022 /* RestTimerIntents.swift in Sources (App) */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
