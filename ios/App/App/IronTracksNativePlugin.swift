@@ -65,6 +65,8 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "requestVoicePermissions", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "startSpeechRecognition", returnType: CAPPluginReturnCallback),
         CAPPluginMethod(name: "stopSpeechRecognition", returnType: CAPPluginReturnPromise),
+        // Widget intents
+        CAPPluginMethod(name: "checkPendingWidgetAction", returnType: CAPPluginReturnPromise),
     ]
 
     private let motionManager = CMMotionManager()
@@ -84,6 +86,7 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin {
 
     /// On plugin load, end any stale Live Activities left from a previous session
     /// (e.g. app was killed while a rest timer was running).
+    /// Also register observer so StartSetIntent can relay the "start set" action to JS.
     public override func load() {
         autoFinishTask?.cancel()
         autoFinishTask = nil
@@ -94,6 +97,29 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin {
                 }
             }
         }
+        // Observe the notification posted by StartSetIntent.perform() (App process only).
+        // When received, relay the action to JS via Capacitor event and clear UserDefaults.
+        NotificationCenter.default.addObserver(
+            forName: IronTracksStartSetNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            UserDefaults.standard.removeObject(forKey: IronTracksWidgetPendingActionKey)
+            self?.notifyListeners("widgetStartSet", data: [:])
+        }
+    }
+
+    // ── Widget intent bridge ─────────────────────────────────────────────────
+
+    /// Called by JS on mount as a cold-start fallback: reads and clears the
+    /// UserDefaults flag written by StartSetIntent.perform() before the
+    /// NotificationCenter observer could relay it (e.g. app was just launched).
+    @objc func checkPendingWidgetAction(_ call: CAPPluginCall) {
+        let action = UserDefaults.standard.string(forKey: IronTracksWidgetPendingActionKey) ?? ""
+        if !action.isEmpty {
+            UserDefaults.standard.removeObject(forKey: IronTracksWidgetPendingActionKey)
+        }
+        call.resolve(["action": action])
     }
 
     // ─── Screen ────────────────────────────────────────────────────────────────
