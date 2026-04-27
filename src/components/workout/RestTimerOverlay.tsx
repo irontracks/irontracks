@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { playTimerFinishSound, playTick } from '@/lib/sounds';
 import { isNativePlatform } from '@/utils/platform';
-import { cancelRestNotification, endRestLiveActivity, requestNativeNotifications, scheduleRestNotification, startRestLiveActivity, stopAlarmSound, triggerHaptic, updateRestLiveActivity } from '@/utils/native/irontracksNative';
+import { addWidgetStartSetListener, cancelRestNotification, checkPendingWidgetAction, endRestLiveActivity, requestNativeNotifications, scheduleRestNotification, startRestLiveActivity, stopAlarmSound, triggerHaptic, updateRestLiveActivity } from '@/utils/native/irontracksNative';
 
 interface RestTimerContext {
     kind?: string;
@@ -383,6 +383,9 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
     const contextRef = useRef(context);
     contextRef.current = context;
     const autoStartFiredRef = useRef(false);
+    // Ref so the widget-intent effect can call handleStart() even though the
+    // function is defined below the early-return guard.
+    const handleStartRef = useRef<(() => void) | null>(null);
 
     useEffect(() => {
         if (!isFinished) {
@@ -414,6 +417,25 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
         return () => clearTimeout(timeout);
     }, [isFinished, autoLocal]);
 
+    // ── Widget lock-screen button bridge ───────────────────────────────────
+    // When the user taps "PULAR DESCANSO" or "INICIAR SÉRIE" on the iOS lock
+    // screen, StartSetIntent.perform() fires inside the App process:
+    //   1. Writes "startSet" to UserDefaults (cold-start fallback).
+    //   2. Posts IronTracksStartSetFromWidget via NotificationCenter.
+    // IronTracksNativePlugin relays the notification as a Capacitor event
+    // ("widgetStartSet"). This effect handles both cases.
+    useEffect(() => {
+        // Cold-start path: read UserDefaults flag written before JS was ready
+        checkPendingWidgetAction().then((action) => {
+            if (action === 'startSet') handleStartRef.current?.()
+        }).catch(() => {})
+        // Live path: Capacitor event relayed from NotificationCenter
+        const unsub = addWidgetStartSetListener(() => {
+            handleStartRef.current?.()
+        })
+        return unsub
+    }, [])
+
     // ── Early return: hide immediately on dismiss OR when no timer ──
     if (!targetTime || dismissed) return null;
 
@@ -435,6 +457,9 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
             } catch { }
         }
     };
+    // Keep ref in sync so the widget-intent effect (above the early-return
+    // guard) can call handleStart even though it was created before this point.
+    handleStartRef.current = handleStart;
 
     const baseSeconds = Math.max(0, timeLeft);
     const extraSeconds = Math.max(0, -timeLeft);

@@ -1,4 +1,5 @@
 import { registerPlugin } from '@capacitor/core'
+import type { PluginListenerHandle } from '@capacitor/core'
 import { isIosNative, isNativePlatform } from '@/utils/platform'
 
 // ─── Plugin type ────────────────────────────────────────────────────────────
@@ -50,6 +51,9 @@ type IronTracksNativePlugin = {
   requestVoicePermissions: () => Promise<{ microphone: string; speechRecognition: string }>
   startSpeechRecognition: (opts: { lang?: string }, callback: (result: { transcript?: string; isFinal?: boolean; error?: string; message?: string; code?: number }) => void) => Promise<string>
   stopSpeechRecognition: () => Promise<{ ok: boolean }>
+  // Widget intent bridge
+  checkPendingWidgetAction: () => Promise<{ action: string }>
+  addListener(eventName: 'widgetStartSet', listenerFunc: () => void): Promise<PluginListenerHandle>
 }
 
 export type HapticStyle =
@@ -93,6 +97,8 @@ const webFallback: IronTracksNativePlugin = {
   requestVoicePermissions: async () => ({ microphone: 'granted', speechRecognition: 'granted' }),
   startSpeechRecognition: async () => '',
   stopSpeechRecognition: async () => ({ ok: false }),
+  checkPendingWidgetAction: async () => ({ action: '' }),
+  addListener: async () => ({ remove: async () => {} }),
 }
 
 // ─── Register plugin ─────────────────────────────────────────────────────────
@@ -544,4 +550,34 @@ export const saveBlobToPhotos = async (blob: Blob, filename: string, isVideo: bo
   } catch {
     return { saved: false, error: 'Save via file failed' }
   }
+}
+
+// ─── Widget intent bridge ─────────────────────────────────────────────────────
+
+/**
+ * Reads and clears the UserDefaults flag written by StartSetIntent.perform().
+ * Returns "startSet" if the user tapped "PULAR DESCANSO" / "INICIAR SÉRIE"
+ * on the lock screen and the event hasn't been consumed yet.
+ * Call this on RestTimerOverlay mount as a cold-start fallback.
+ */
+export const checkPendingWidgetAction = async (): Promise<string> => {
+  try {
+    if (!isIosNative()) return ''
+    const result = await Native.checkPendingWidgetAction()
+    return String(result?.action || '')
+  } catch { return '' }
+}
+
+/**
+ * Subscribes to the "widgetStartSet" Capacitor event emitted when
+ * IronTracksNativePlugin receives the NotificationCenter notification from
+ * StartSetIntent.perform() (background→foreground path).
+ * Returns an unsubscribe function.
+ */
+export const addWidgetStartSetListener = (callback: () => void): (() => void) => {
+  if (!isIosNative()) return () => {}
+  try {
+    const listenerPromise = Native.addListener('widgetStartSet', callback)
+    return () => { listenerPromise.then((l: PluginListenerHandle) => l.remove()).catch(() => {}) }
+  } catch { return () => {} }
 }
