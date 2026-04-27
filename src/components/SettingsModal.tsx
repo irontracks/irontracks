@@ -4,7 +4,7 @@ import React, { useEffect, useMemo, useState } from 'react'
 import {
   X, Save, Download, Trash2, RotateCcw, LogOut, ShieldAlert,
   Layers, Mail, MessageCircle, ChevronRight, ExternalLink,
-  HelpCircle, Database, Smartphone,
+  HelpCircle, Database, Smartphone, Crown,
 } from 'lucide-react'
 import { logError } from '@/lib/logger'
 import { useDialog } from '@/contexts/DialogContext'
@@ -80,6 +80,7 @@ export default function SettingsModal(props: SettingsModalProps) {
   const [healthKitBusy, setHealthKitBusy] = useState(false)
   const [exportingData, setExportingData] = useState(false)
   const [deletingAccount, setDeletingAccount] = useState(false)
+  const iapEnabled = useMemo(() => String(process.env.NEXT_PUBLIC_ENABLE_IAP || '').trim().toLowerCase() === 'true', [])
 
   const setValue = (key: string, value: unknown) => {
     if (!key) return
@@ -285,6 +286,37 @@ export default function SettingsModal(props: SettingsModalProps) {
 
           <SettingsPrivacySection draft={draft} setValue={setValue} />
           <SettingsTimerSection draft={draft} setValue={setValue} />
+
+          {/* Gerenciar Assinatura — iOS only, IAP enabled */}
+          {iosNative && iapEnabled && (
+            <div className="rounded-xl p-4" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
+              <div className="flex items-center gap-2 mb-3">
+                <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: 'rgba(234,179,8,0.12)', border: '1px solid rgba(234,179,8,0.2)' }}><Crown size={13} className="text-yellow-500" /></div>
+                <div className="text-xs font-black uppercase tracking-[0.16em]" style={{ color: '#f59e0b' }}>Assinatura</div>
+              </div>
+              <button
+                type="button"
+                onClick={() => {
+                  try {
+                    // itms-apps:// is intercepted by Capacitor on iOS and opens the App Store app
+                    // directly on the subscription management screen — no extra SDK call needed.
+                    window.open('itms-apps://apps.apple.com/account/subscriptions', '_system')
+                  } catch { }
+                }}
+                className="w-full flex items-center gap-3 p-3 rounded-xl border hover:border-yellow-500/20 transition-all group disabled:opacity-60"
+                style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'rgba(255,255,255,0.06)' }}
+              >
+                <div className="w-10 h-10 rounded-xl bg-yellow-500/10 border border-yellow-500/20 inline-flex items-center justify-center shrink-0">
+                  <Crown size={18} className="text-yellow-500" />
+                </div>
+                <div className="flex-1 text-left min-w-0">
+                  <div className="text-sm font-bold text-white">Gerenciar Assinatura</div>
+                  <div className="text-xs text-neutral-400">Cancelar ou alterar plano via App Store</div>
+                </div>
+                <ChevronRight size={14} className="text-neutral-500 group-hover:text-yellow-500 transition-colors shrink-0" />
+              </button>
+            </div>
+          )}
 
           {/* Ajuda e Suporte */}
           <div className="rounded-xl p-4" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
