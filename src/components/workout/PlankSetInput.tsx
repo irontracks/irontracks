@@ -3,6 +3,7 @@ import { flushSync } from 'react-dom'
 import { Check, Play, Square } from 'lucide-react'
 import { useWorkoutContext } from './WorkoutContext'
 import { UnknownRecord } from './types'
+import { parseTrainingNumber } from '@/utils/trainingNumber'
 
 type Props = {
   ex: UnknownRecord
@@ -13,6 +14,9 @@ type Props = {
 
 export const PlankSetInput: React.FC<Props> = ({ ex, exIdx, setIdx, setsCount }) => {
   const { getLog, updateLog, startTimer, getPlannedSet, settings, setCollapsed } = useWorkoutContext()
+
+  // Rest time between plank sets (same field as regular exercises)
+  const restTime = parseTrainingNumber(ex?.restTime ?? (ex as Record<string, unknown>)?.rest_time) ?? 0
 
   const key = `${exIdx}-${setIdx}`
   const weightInputId = `plank-weight-${key}`
@@ -83,30 +87,45 @@ export const PlankSetInput: React.FC<Props> = ({ ex, exIdx, setIdx, setsCount })
       key,
       exerciseName: String(ex?.name ?? '').trim(),
       onComplete: () => {
+        const nowMs = Date.now()
         updateLog(key, {
           weight: weight === '' ? null : Number(weight),
           reps: null,
           durationSeconds: sec,
           done: true,
+          restStartMs: restTime > 0 ? nowMs : null,
         })
         setIsRunning(false)
+        // Switch from plank exercise timer → rest timer, exactly like normal sets do.
+        // This replaces the plank overlay so the user sees the rest countdown
+        // instead of the plank timer lingering through the recovery period.
+        if (restTime > 0) {
+          startTimer(restTime, { kind: 'rest', key, restStartedAtMs: nowMs })
+        }
         maybeCollapseIfLastSet()
       },
     })
-  }, [targetSeconds, startTimer, key, ex, updateLog, weight, maybeCollapseIfLastSet])
+  }, [targetSeconds, startTimer, key, ex, updateLog, weight, restTime, maybeCollapseIfLastSet])
 
   const handleStop = useCallback(() => {
     const elapsedMs = Date.now() - startedAtRef.current
     const aguentou = Math.max(1, Math.round(elapsedMs / 1000))
+    const nowMs = Date.now()
     updateLog(key, {
       weight: weight === '' ? null : Number(weight),
       reps: null,
       durationSeconds: aguentou,
       done: true,
+      restStartMs: restTime > 0 ? nowMs : null,
     })
     setIsRunning(false)
+    // Replace the still-running plank timer with the rest timer so the overlay
+    // immediately switches to rest mode instead of lingering on the plank countdown.
+    if (restTime > 0) {
+      startTimer(restTime, { kind: 'rest', key, restStartedAtMs: nowMs })
+    }
     maybeCollapseIfLastSet()
-  }, [key, updateLog, weight, maybeCollapseIfLastSet])
+  }, [key, updateLog, weight, restTime, startTimer, maybeCollapseIfLastSet])
 
   const secondsNum = Number(targetSeconds)
   const canStart = Number.isFinite(secondsNum) && secondsNum > 0

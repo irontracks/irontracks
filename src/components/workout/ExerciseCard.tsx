@@ -71,6 +71,13 @@ function ExerciseCardInner({ ex, exIdx }: { ex: WorkoutExercise; exIdx: number }
   const setsCount = Math.max(setsHeader, Array.isArray(sdArr) ? sdArr.length : 0);
   const collapsedNow = collapsed.has(exIdx);
   const restTime = parseTrainingNumber(ex?.restTime ?? ex?.rest_time);
+  const isExPlank = isPlank(name);
+  // For plank exercises, show planned exercise duration (from first setDetail) instead of rest time.
+  // The "Xs" in the header is restTime for normal exercises, which users correctly read as "rest".
+  // For planks, users assume "Xs" is how long to hold — so we show durationSeconds here.
+  const plankPlannedSec: number | null = isExPlank && sdArr.length > 0 && isObject(sdArr[0])
+    ? (parseTrainingNumber((sdArr[0] as Record<string, unknown>).durationSeconds) ?? null)
+    : null;
   const videoUrl = String(ex?.videoUrl ?? ex?.video_url ?? '').trim();
   const isReportLoading = reportHistoryStatus?.status === 'loading' && reportHistoryLoadingRef.current;
 
@@ -345,7 +352,15 @@ function ExerciseCardInner({ ex, exIdx }: { ex: WorkoutExercise; exIdx: number }
           <div className="mt-1 flex items-center gap-2 text-xs text-neutral-400">
             <span className="font-mono">{setsCount} sets</span>
             <span className="opacity-30">•</span>
-            <span className="font-mono">{restTime ? `${restTime}s` : '-'}</span>
+            {isExPlank ? (
+              // Plank: show exercise hold time (durationSeconds) with "⏱" prefix so users
+              // don't confuse it with rest time. Falls back to restTime if not configured.
+              <span className="font-mono">
+                {plankPlannedSec ? `⏱${plankPlannedSec}s` : restTime ? `${restTime}s desc` : '-'}
+              </span>
+            ) : (
+              <span className="font-mono">{restTime ? `${restTime}s` : '-'}</span>
+            )}
             <span className="opacity-30">•</span>
             {(() => {
               const methodLabel = String(ex?.method || 'Normal');
