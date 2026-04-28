@@ -144,7 +144,15 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin {
     // ─── Notifications ─────────────────────────────────────────────────────────
 
     @objc func requestNotificationPermission(_ call: CAPPluginCall) {
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, _ in
+        // .timeSensitive is required so iOS actually grants time-sensitive delivery
+        // (the entitlement alone is not enough). Without it the system silently
+        // downgrades interruptionLevel = .timeSensitive to .active, which means
+        // notifications won't bypass Focus Mode and may not wake the screen.
+        var options: UNAuthorizationOptions = [.alert, .sound, .badge]
+        if #available(iOS 15.0, *) {
+            options.insert(.timeSensitive)
+        }
+        UNUserNotificationCenter.current().requestAuthorization(options: options) { granted, _ in
             call.resolve(["granted": granted])
         }
     }
