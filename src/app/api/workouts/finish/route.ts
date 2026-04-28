@@ -16,8 +16,9 @@ import { env } from '@/utils/env'
 const LogEntrySchema = z
   .object({
     done: z.boolean().optional(),
-    weight: z.union([z.string(), z.number()]).optional(),
-    reps: z.union([z.string(), z.number()]).optional(),
+    // null is a valid value when the user left the field blank (e.g. cardio sets)
+    weight: z.union([z.string(), z.number(), z.null()]).optional(),
+    reps: z.union([z.string(), z.number(), z.null()]).optional(),
   })
   .passthrough()
 
