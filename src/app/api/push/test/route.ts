@@ -65,14 +65,21 @@ export async function GET(req: Request) {
 
         // ── Admin-only guard ───────────────────────────────────────────────────
         // This endpoint sends real push notifications and exposes device tokens.
-        // Only admins are allowed to call it.
-        const { data: profile } = await supabase
-            .from('profiles')
-            .select('role')
-            .eq('id', user.id)
-            .single()
-        if (profile?.role !== 'admin') {
-            return NextResponse.json({ ok: false, error: 'Forbidden — admin only' }, { status: 403 })
+        // Accepts: (a) profile.role === 'admin' in the DB, OR
+        //          (b) ?secret=<PUSH_TEST_SECRET> query param (for owner access
+        //              when the DB role isn't set yet).
+        const secretParam = url.searchParams.get('secret') ?? ''
+        const secretEnv = process.env.PUSH_TEST_SECRET ?? ''
+        const secretOk = secretEnv.length > 0 && secretParam === secretEnv
+        if (!secretOk) {
+            const { data: profile } = await supabase
+                .from('profiles')
+                .select('role')
+                .eq('id', user.id)
+                .single()
+            if (profile?.role !== 'admin') {
+                return NextResponse.json({ ok: false, error: 'Forbidden — admin only' }, { status: 403 })
+            }
         }
 
         // ── 1. Check env vars ──────────────────────────────────────────────────
