@@ -22,11 +22,29 @@ class NotificationService: UNNotificationServiceExtension {
         }
         bestAttemptContent = mutableContent
 
-        let type = mutableContent.userInfo["type"] as? String ?? ""
-        let isMessageType = ["message", "direct_message", "mentioned_in_chat"].contains(type)
+        // Whitelist of types that get upgraded to Communication Notification.
+        // KEEP IN SYNC with WAKE_SCREEN_TYPES in src/lib/push/apns.ts.
+        let wakeScreenTypes: Set<String> = [
+            "access_request", "admin_new_signup",
+            "billing_issue",
+            "direct_message", "message",
+            "follow_request",
+            "friend_comeback", "friend_online", "friends_trained_today",
+            "inactivity",
+            "meal_reminder", "missed_meal",
+            "mentioned_in_chat", "mentioned_in_comment",
+            "morning_briefing",
+            "story_comment", "story_like", "story_posted",
+            "team_chat", "team_invite",
+            "trial_ending", "vip_welcome",
+            "water_reminder",
+            "workout_finish", "workout_start",
+        ]
 
-        guard isMessageType else {
-            // Not a message — deliver as-is (still benefits from mutable-content if needed later)
+        let type = mutableContent.userInfo["type"] as? String ?? ""
+
+        guard wakeScreenTypes.contains(type) else {
+            // Not in whitelist — deliver as-is (still benefits from mutable-content if needed later)
             contentHandler(mutableContent)
             return
         }

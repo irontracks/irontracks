@@ -81,11 +81,28 @@ async function sendOneApnsPush(
 
     return new Promise((resolve) => {
         try {
-            // Message types get mutable-content so the Notification Service Extension
-            // can upgrade them to Communication Notifications (INSendMessageIntent),
-            // which guarantees screen wake + sound on locked devices — like WhatsApp.
+            // Types that get mutable-content:1 → Notification Service Extension upgrades
+            // them to Communication Notifications (INSendMessageIntent), which guarantees
+            // screen wake + sound on locked devices — like WhatsApp. Whitelist chosen
+            // by the product owner. KEEP IN SYNC with NotificationService.swift.
+            const WAKE_SCREEN_TYPES = new Set([
+                'access_request', 'admin_new_signup',
+                'billing_issue',
+                'direct_message', 'message',
+                'follow_request',
+                'friend_comeback', 'friend_online', 'friends_trained_today',
+                'inactivity',
+                'meal_reminder', 'missed_meal',
+                'mentioned_in_chat', 'mentioned_in_comment',
+                'morning_briefing',
+                'story_comment', 'story_like', 'story_posted',
+                'team_chat', 'team_invite',
+                'trial_ending', 'vip_welcome',
+                'water_reminder',
+                'workout_finish', 'workout_start',
+            ])
             const notifType = String(extra?.type ?? '').toLowerCase()
-            const isMessageType = ['message', 'direct_message', 'mentioned_in_chat'].includes(notifType)
+            const wakesScreen = WAKE_SCREEN_TYPES.has(notifType)
 
             const apnsPayload = JSON.stringify({
                 aps: {
@@ -100,7 +117,7 @@ async function sendOneApnsPush(
                     })(),
                     // Tells iOS to wake the Notification Service Extension before displaying.
                     // Required for INSendMessageIntent upgrade (Communication Notification).
-                    ...(isMessageType ? { 'mutable-content': 1 } : {}),
+                    ...(wakesScreen ? { 'mutable-content': 1 } : {}),
                 },
                 // Spread extra but omit the internal __badge key used only for the aps.badge field
                 ...Object.fromEntries(Object.entries(extra ?? {}).filter(([k]) => k !== '__badge')),
