@@ -58,20 +58,34 @@ export async function GET(req: Request) {
   const url = new URL(req.url)
   const type = String(url.searchParams.get('type') || '').trim()
   const platform = String(url.searchParams.get('platform') || 'ios').trim()
-    try {
-        const supabase = await createClient()
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+  const secretParam = url.searchParams.get('secret') ?? ''
+  const secretEnv = process.env.PUSH_TEST_SECRET ?? ''
+  const secretOk = secretEnv.length > 0 && secretParam === secretEnv
 
-        // ── Admin-only guard ───────────────────────────────────────────────────
-        // This endpoint sends real push notifications and exposes device tokens.
-        // Accepts: (a) profile.role === 'admin' in the DB, OR
-        //          (b) ?secret=<PUSH_TEST_SECRET> query param (for owner access
-        //              when the DB role isn't set yet).
-        const secretParam = url.searchParams.get('secret') ?? ''
-        const secretEnv = process.env.PUSH_TEST_SECRET ?? ''
-        const secretOk = secretEnv.length > 0 && secretParam === secretEnv
-        if (!secretOk) {
+    try {
+        const admin = createAdminClient()
+
+        // ── Auth + admin guard ─────────────────────────────────────────────────
+        // ?secret=<PUSH_TEST_SECRET> bypasses both session auth and role check —
+        // useful when the native-app session cookie isn't present in the browser.
+        // Without the secret, requires a Supabase session + profile.role = 'admin'.
+        let userId: string
+        if (secretOk) {
+            // Secret mode: accept optional ?uid=<uuid>, otherwise look up by owner email
+            const uidParam = url.searchParams.get('uid') ?? ''
+            if (uidParam) {
+                userId = uidParam
+            } else {
+                // Fall back to finding the account by known owner email
+                const { data: found } = await admin.auth.admin.listUsers()
+                const owner = found?.users?.find((u) => u.email === 'djmkbrasil@gmail.com')
+                if (!owner) return NextResponse.json({ ok: false, error: 'Owner user not found — pass ?uid=<uuid>' }, { status: 404 })
+                userId = owner.id
+            }
+        } else {
+            const supabase = await createClient()
+            const { data: { user } } = await supabase.auth.getUser()
+            if (!user) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
             const { data: profile } = await supabase
                 .from('profiles')
                 .select('role')
@@ -80,6 +94,7 @@ export async function GET(req: Request) {
             if (profile?.role !== 'admin') {
                 return NextResponse.json({ ok: false, error: 'Forbidden — admin only' }, { status: 403 })
             }
+            userId = user.id
         }
 
         // ── 1. Check env vars ──────────────────────────────────────────────────
@@ -88,15 +103,15 @@ export async function GET(req: Request) {
             APNS_TEAM_ID: Boolean(env.apns.teamId.trim()),
             APNS_KEY_P8: Boolean(env.apns.keyP8.trim()),
             APNS_BUNDLE_ID: env.apns.bundleId || '(not set — using com.irontracks.app)',
+            APNS_PRODUCTION: env.apns.production,
         }
         const cfgOk = cfg.APNS_KEY_ID && cfg.APNS_TEAM_ID && cfg.APNS_KEY_P8
 
         // ── 2. Check if this user has registered device tokens ─────────────────
-        const admin = createAdminClient()
         const { data: tokens, error: tokenErr } = await admin
             .from('device_push_tokens')
             .select('token, platform, device_id, last_seen_at, updated_at')
-            .eq('user_id', user.id)
+            .eq('user_id', userId)
 
         const tokenCount = Array.isArray(tokens) ? tokens.length : 0
         const iosTokenCount = Array.isArray(tokens) ? tokens.filter((t) => String(t.platform || '') === 'ios').length : 0
@@ -110,8 +125,8 @@ export async function GET(req: Request) {
         let pushResult: unknown = 'skipped — APNs config missing or no iOS tokens'
         if (cfgOk && iosTokenCount > 0) {
             const delivery = platform === 'all'
-                ? await sendPushToAllPlatforms([user.id], title, body, extra, { bypassMasterSwitch: true })
-                : await sendPushToUsers([user.id], title, body, extra)
+                ? await sendPushToAllPlatforms([userId], title, body, extra, { bypassMasterSwitch: true })
+                : await sendPushToUsers([userId], title, body, extra)
             pushResult = {
                 sent: true,
                 type: type || '(generic)',
@@ -126,7 +141,7 @@ export async function GET(req: Request) {
 
         return NextResponse.json({
             ok: true,
-            userId: user.id,
+            userId,
             envVars: cfg,
             envConfigOk: cfgOk,
             deviceTokens: {
