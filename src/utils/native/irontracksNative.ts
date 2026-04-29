@@ -10,7 +10,7 @@ type IronTracksNativePlugin = {
   openAppSettings: () => Promise<{ ok: boolean }>
   // Notifications
   requestNotificationPermission: () => Promise<{ granted: boolean }>
-  checkNotificationPermission: () => Promise<{ status: string }>
+  checkNotificationPermission: () => Promise<{ status: string; timeSensitiveStatus?: string }>
   setupNotificationActions: () => Promise<void>
   scheduleRestTimer: (opts: { id: string; seconds: number; title?: string; body?: string; repeatCount?: number; repeatEverySeconds?: number }) => Promise<void>
   cancelRestTimer: (opts: { id: string }) => Promise<void>
@@ -66,7 +66,7 @@ const webFallback: IronTracksNativePlugin = {
   setIdleTimerDisabled: async () => { },
   openAppSettings: async () => ({ ok: false }),
   requestNotificationPermission: async () => ({ granted: false }),
-  checkNotificationPermission: async () => ({ status: 'notDetermined' }),
+  checkNotificationPermission: async () => ({ status: 'notDetermined', timeSensitiveStatus: undefined }),
   setupNotificationActions: async () => { },
   scheduleRestTimer: async () => { },
   cancelRestTimer: async () => { },
@@ -144,7 +144,7 @@ export const requestNativeNotifications = async () => {
   }
 }
 
-export const checkNativeNotificationPermission = async () => {
+export const checkNativeNotificationPermission = async (): Promise<{ status: string; timeSensitiveStatus?: string }> => {
   try {
     if (!isNativePlatform()) return { status: 'notDetermined' }
     return await Native.checkNotificationPermission()

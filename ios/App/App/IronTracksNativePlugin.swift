@@ -160,7 +160,22 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin {
             case .ephemeral: status = "ephemeral"
             @unknown default: status = "unknown"
             }
-            call.resolve(["status": status])
+            var result: [String: Any] = ["status": status]
+            // timeSensitiveStatus: tells JS whether the user has disabled
+            // Time Sensitive Notifications for this app in Settings.
+            // "disabled" means iOS downgrades .timeSensitive → .active, which
+            // breaks the screen-wake guarantee when Focus Mode is active.
+            if #available(iOS 15.0, *) {
+                let tsStatus: String
+                switch settings.timeSensitiveSetting {
+                case .enabled: tsStatus = "enabled"
+                case .disabled: tsStatus = "disabled"
+                case .notSupported: tsStatus = "notSupported"
+                @unknown default: tsStatus = "unknown"
+                }
+                result["timeSensitiveStatus"] = tsStatus
+            }
+            call.resolve(result)
         }
     }
 
@@ -258,6 +273,10 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin {
         content.title = title
         content.body = body
         content.sound = UNNotificationSound.default
+        // Match scheduleRestTimer: time-sensitive wakes the screen and bypasses Focus Mode.
+        if #available(iOS 15.0, *) {
+            content.interruptionLevel = .timeSensitive
+        }
 
         let trigger = UNTimeIntervalNotificationTrigger(timeInterval: TimeInterval(max(1, delay)), repeats: false)
         let request = UNNotificationRequest(identifier: id, content: content, trigger: trigger)

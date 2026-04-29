@@ -515,11 +515,12 @@ export function SettingsPrivacySection({ draft, setValue }: SettingsSectionProps
 interface SettingsNotificationsSectionProps extends SettingsSectionProps {
     iosNotifStatus: string
     iosNotifBusy: boolean
+    iosTimeSensitiveStatus?: string
     onRequestIosNotifPermission: () => Promise<void>
     onOpenAppSettings: () => Promise<void>
     isIosNative: boolean
 }
-export function SettingsNotificationsSection({ draft, setValue, iosNotifStatus, iosNotifBusy, onRequestIosNotifPermission, onOpenAppSettings, isIosNative }: SettingsNotificationsSectionProps) {
+export function SettingsNotificationsSection({ draft, setValue, iosNotifStatus, iosNotifBusy, iosTimeSensitiveStatus, onRequestIosNotifPermission, onOpenAppSettings, isIosNative }: SettingsNotificationsSectionProps) {
     const inAppToasts = Boolean(draft?.inAppToasts ?? true)
     const notificationPermissionPrompt = Boolean(draft?.notificationPermissionPrompt ?? true)
     const allowSocialFollows = Boolean(draft?.allowSocialFollows ?? true)
@@ -881,6 +882,28 @@ export function SettingsNotificationsSection({ draft, setValue, iosNotifStatus, 
                         onChange={() => setValue('notifyWorkoutReminders', !notifyWorkoutReminders)}
                     />
                 </div>
+
+                {isIosNative && iosTimeSensitiveStatus === 'disabled' && (
+                    <div className="mt-2 rounded-xl border border-orange-500/40 bg-orange-500/10 p-3">
+                        <div className="flex items-start gap-2">
+                            <span className="text-orange-400 text-base leading-none mt-0.5">⚠️</span>
+                            <div className="flex-1 min-w-0">
+                                <div className="text-sm font-black text-orange-300">Notificações urgentes desativadas</div>
+                                <div className="text-xs text-orange-200/80 mt-1">
+                                    As notificações do IronTracks que deveriam acordar a tela (timer de descanso, mensagens) foram desativadas nas configurações do iOS. Ative &quot;Notificações Importantes&quot; em <span className="font-bold">Ajustes → IronTracks → Notificações</span> para que a tela acorde corretamente.
+                                </div>
+                                <button
+                                    type="button"
+                                    disabled={iosNotifBusy}
+                                    onClick={onOpenAppSettings}
+                                    className="mt-2 px-3 py-1.5 rounded-lg bg-orange-500 text-black font-black text-xs disabled:opacity-60"
+                                >
+                                    Abrir Ajustes
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
 
                 {isIosNative && (
                     <div className="mt-2 rounded-xl bg-neutral-900 border border-neutral-700 p-3">

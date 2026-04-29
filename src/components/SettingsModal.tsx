@@ -72,6 +72,7 @@ export default function SettingsModal(props: SettingsModalProps) {
   const [userId, setUserId] = useState('')
   const [userPhotoURL, setUserPhotoURL] = useState<string | null>(null)
   const [iosNotifStatus, setIosNotifStatus] = useState<string>('unknown')
+  const [iosTimeSensitiveStatus, setIosTimeSensitiveStatus] = useState<string | undefined>(undefined)
   const [iosNotifBusy, setIosNotifBusy] = useState(false)
   const [iosDiag, setIosDiag] = useState<Record<string, unknown> | null>(null)
   const [iosDiagBusy, setIosDiagBusy] = useState(false)
@@ -108,7 +109,8 @@ export default function SettingsModal(props: SettingsModalProps) {
         try {
           const res = await checkNativeNotificationPermission()
           if (!alive) return
-          setIosNotifStatus(String((res as Record<string, unknown>)?.status ?? 'unknown'))
+          setIosNotifStatus(String(res?.status ?? 'unknown'))
+          setIosTimeSensitiveStatus(res?.timeSensitiveStatus)
         } catch (e) { logError('component:SettingsModal.checkNotifPermission', e); if (!alive) return; setIosNotifStatus('unknown') }
       })()
     return () => { alive = false }
@@ -132,6 +134,7 @@ export default function SettingsModal(props: SettingsModalProps) {
       const biom = await checkBiometricsAvailable()
       const healthAvailable = await isHealthKitAvailable()
       const notif = await checkNativeNotificationPermission()
+      if (notif?.timeSensitiveStatus) setIosTimeSensitiveStatus(notif.timeSensitiveStatus)
       setIosDiag({ capacitorPresent, platform, pluginNames, app: appInfo || null, device: deviceInfo || null, push: pushPerm || null, biometrics: biom || null, notifications: notif || null, healthKitAvailable: healthAvailable })
     } catch (e) { logError('component:SettingsModal.loadIosDiag', e); setIosDiag(null) } finally { setIosDiagBusy(false) }
   }
@@ -167,7 +170,8 @@ export default function SettingsModal(props: SettingsModalProps) {
       setIosNotifBusy(true)
       await requestNativeNotifications()
       const res = await checkNativeNotificationPermission()
-      setIosNotifStatus(String((res as Record<string, unknown>)?.status ?? 'unknown'))
+      setIosNotifStatus(String(res?.status ?? 'unknown'))
+      setIosTimeSensitiveStatus(res?.timeSensitiveStatus)
     } catch (e) { logError('component:SettingsModal.requestNotifPermission', e); setIosNotifStatus('unknown') } finally { setIosNotifBusy(false) }
   }
 
@@ -230,6 +234,7 @@ export default function SettingsModal(props: SettingsModalProps) {
           <SettingsNotificationsSection
             draft={draft} setValue={setValue}
             iosNotifStatus={iosNotifStatus} iosNotifBusy={iosNotifBusy}
+            iosTimeSensitiveStatus={iosTimeSensitiveStatus}
             isIosNative={iosNative}
             onRequestIosNotifPermission={handleRequestIosNotifPermission}
             onOpenAppSettings={handleOpenAppSettings}
@@ -265,6 +270,7 @@ export default function SettingsModal(props: SettingsModalProps) {
                 <div className="rounded-xl bg-neutral-900 border border-neutral-700 p-3">
                   <div className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">Permissões</div>
                   <div className="text-[11px] text-neutral-300 mt-1">Notificações: {String(iosDiagNotif?.status ?? '') || 'unknown'}</div>
+                  <div className={`text-[11px] mt-1 ${iosDiagNotif?.timeSensitiveStatus === 'disabled' ? 'text-red-400 font-bold' : 'text-neutral-300'}`}>Time Sensitive: {String(iosDiagNotif?.timeSensitiveStatus ?? '—')}</div>
                   <div className="text-[11px] text-neutral-300 mt-1">Push: {String(iosDiagPush?.receive ?? '') || 'unknown'}</div>
                   <div className="text-[11px] text-neutral-300 mt-1">Biometria: {Boolean(iosDiagBiom?.available) ? String(iosDiagBiom?.biometryType || 'ok') : 'não'}</div>
                   <div className="text-[11px] text-neutral-300 mt-1">HealthKit: {Boolean(iosDiagObj?.healthKitAvailable) ? 'disponível' : 'não'}</div>
