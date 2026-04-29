@@ -95,6 +95,21 @@ npm run cap:open:android # Abrir Android Studio
 - **App ID**: `com.irontracks.app`
 - **Web dir para Capacitor**: `out/` (build estático — `next build` gera este diretório)
 
+## iOS — release pra App Store / TestFlight
+**REGRA FIXA do usuário: SEMPRE subir build pro App Store Connect via terminal, NUNCA abrir Xcode UI pra Archive/Distribute. Faz o claude perder tempão.**
+
+```bash
+npm run ios:release           # bump build atual+1, archive, upload pra TestFlight
+npm run ios:release 25        # força build = 25
+```
+
+O script `scripts/ios-release.sh`:
+1. Bumpa `CURRENT_PROJECT_VERSION` no `project.pbxproj` (todos os 6 build configs)
+2. Roda `xcodebuild archive` (signing automático com cert "Apple Development: Maicon Benitz", team `5XLC55D3YR`)
+3. Roda `xcodebuild -exportArchive` com `method=app-store-connect` + `destination=upload` — envia direto pra Apple
+
+Em ~10 min depois aparece no TestFlight do iPhone do usuário. Auth reusa a session do Xcode em `Xcode → Settings → Accounts` (uma vez configurado, não pede de novo).
+
 ## Supabase — padrões obrigatórios
 ```bash
 # Novas migrations via MCP quando disponível:
