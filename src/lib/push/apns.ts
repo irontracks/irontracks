@@ -119,7 +119,14 @@ async function sendOneApnsPush(
                 'apns-topic': cfg.bundleId,
                 'apns-push-type': 'alert',
                 'apns-priority': '10',
-                'apns-expiration': '0',
+                // 0 = discard immediately if device offline (breaks delivery in gyms).
+                // Time-critical types: 10 min TTL. Social/informational: 1 hour.
+                'apns-expiration': (() => {
+                    const type = String(extra?.type ?? '').toLowerCase()
+                    const timeCritical = ['message', 'direct_message', 'workout_reminder', 'rest_timer', 'challenge', 'new_follower']
+                    const ttlSeconds = timeCritical.includes(type) ? 600 : 3600
+                    return String(Math.floor(Date.now() / 1000) + ttlSeconds)
+                })(),
                 'content-type': 'application/json',
             })
 
