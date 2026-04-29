@@ -25,6 +25,8 @@
 		W013W013W013W013 /* IronTracksWidgets appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = W002W002W002W002 /* IronTracksWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		W020W020W020W020 /* RestTimerIntents.swift in Sources (Widget) */ = {isa = PBXBuildFile; fileRef = W021W021W021W021 /* RestTimerIntents.swift */; };
 		W022W022W022W022 /* RestTimerIntents.swift in Sources (App) */ = {isa = PBXBuildFile; fileRef = W021W021W021W021 /* RestTimerIntents.swift */; };
+		NS005NS005NS005NS005 /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = NS001NS001NS001NS001 /* NotificationService.swift */; };
+		NS006NS006NS006NS006 /* NotificationService appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = NS002NS002NS002NS002 /* NotificationService.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
@@ -49,6 +51,9 @@
 		W00DW00DW00DW00D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		W00EW00EW00EW00E /* IronTracksWidgets.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = IronTracksWidgets.entitlements; sourceTree = "<group>"; };
 		W021W021W021W021 /* RestTimerIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestTimerIntents.swift; sourceTree = "<group>"; };
+		NS001NS001NS001NS001 /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
+		NS002NS002NS002NS002 /* NotificationService.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = NotificationService.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		NS003NS003NS003NS003 /* Info.plist (NotificationService) */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXCopyFilesBuildPhase section */
@@ -59,6 +64,7 @@
 			dstSubfolderSpec = 13;
 			files = (
 				W013W013W013W013 /* IronTracksWidgets appex in Embed App Extensions */,
+				NS006NS006NS006NS006 /* NotificationService appex in Embed App Extensions */,
 			);
 			name = "Embed App Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
@@ -81,6 +87,13 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		NS008NS008NS008NS008 /* Frameworks (NotificationService) */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
@@ -90,6 +103,7 @@
 				958DCC722DB07C7200EA8C5F /* debug.xcconfig */,
 				504EC3061FED79650016851F /* App */,
 				W009W009W009W009 /* IronTracksWidgets */,
+				NS004NS004NS004NS004 /* NotificationService */,
 				504EC3051FED79650016851F /* Products */,
 			);
 			sourceTree = "<group>";
@@ -99,6 +113,7 @@
 			children = (
 				504EC3041FED79650016851F /* App.app */,
 				W002W002W002W002 /* IronTracksWidgets.appex */,
+				NS002NS002NS002NS002 /* NotificationService.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -135,6 +150,15 @@
 			path = IronTracksWidgets;
 			sourceTree = "<group>";
 		};
+		NS004NS004NS004NS004 /* NotificationService */ = {
+			isa = PBXGroup;
+			children = (
+				NS001NS001NS001NS001 /* NotificationService.swift */,
+				NS003NS003NS003NS003 /* Info.plist (NotificationService) */,
+			);
+			path = NotificationService;
+			sourceTree = "<group>";
+		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -151,6 +175,7 @@
 			);
 			dependencies = (
 				W015W015W015W015 /* PBXTargetDependency */,
+				NS011NS011NS011NS011 /* PBXTargetDependency (NotificationService) */,
 			);
 			name = App;
 			packageProductDependencies = (
@@ -177,6 +202,23 @@
 			productReference = W002W002W002W002 /* IronTracksWidgets.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
+		NS010NS010NS010NS010 /* NotificationService */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = NS015NS015NS015NS015 /* Build configuration list for PBXNativeTarget "NotificationService" */;
+			buildPhases = (
+				NS007NS007NS007NS007 /* Sources (NotificationService) */,
+				NS008NS008NS008NS008 /* Frameworks (NotificationService) */,
+				NS009NS009NS009NS009 /* Resources (NotificationService) */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = NotificationService;
+			productName = NotificationService;
+			productReference = NS002NS002NS002NS002 /* NotificationService.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 /* End PBXNativeTarget section */
 
 /* Begin PBXProject section */
@@ -193,6 +235,10 @@
 					};
 					W001W001W001W001 = {
 						CreatedOnToolsVersion = 14.0;
+						ProvisioningStyle = Automatic;
+					};
+					NS010NS010NS010NS010 = {
+						CreatedOnToolsVersion = 15.0;
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -215,6 +261,7 @@
 			targets = (
 				504EC3031FED79650016851F /* App */,
 				W001W001W001W001 /* IronTracksWidgets */,
+				NS010NS010NS010NS010 /* NotificationService */,
 			);
 		};
 /* End PBXProject section */
@@ -235,6 +282,13 @@
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 		W005W005W005W005 /* Resources (Widget) */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		NS009NS009NS009NS009 /* Resources (NotificationService) */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -267,6 +321,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		NS007NS007NS007NS007 /* Sources (NotificationService) */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				NS005NS005NS005NS005 /* NotificationService.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
@@ -274,6 +336,11 @@
 			isa = PBXTargetDependency;
 			target = W001W001W001W001 /* IronTracksWidgets */;
 			targetProxy = W016W016W016W016 /* PBXContainerItemProxy */;
+		};
+		NS011NS011NS011NS011 /* PBXTargetDependency (NotificationService) */ = {
+			isa = PBXTargetDependency;
+			target = NS010NS010NS010NS010 /* NotificationService */;
+			targetProxy = NS012NS012NS012NS012 /* PBXContainerItemProxy (NotificationService) */;
 		};
 /* End PBXTargetDependency section */
 
@@ -284,6 +351,13 @@
 			proxyType = 1;
 			remoteGlobalIDString = W001W001W001W001;
 			remoteInfo = IronTracksWidgets;
+		};
+		NS012NS012NS012NS012 /* PBXContainerItemProxy (NotificationService) */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 504EC2FC1FED79650016851F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = NS010NS010NS010NS010;
+			remoteInfo = NotificationService;
 		};
 /* End PBXContainerItemProxy section */
 
@@ -519,6 +593,51 @@
 			};
 			name = Release;
 		};
+		NS013NS013NS013NS013 /* Debug (NotificationService) */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 14;
+				DEVELOPMENT_TEAM = 5XLC55D3YR;
+				INFOPLIST_FILE = NotificationService/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.7;
+				PRODUCT_BUNDLE_IDENTIFIER = com.irontracks.app.NotificationService;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		NS014NS014NS014NS014 /* Release (NotificationService) */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 14;
+				DEVELOPMENT_TEAM = 5XLC55D3YR;
+				INFOPLIST_FILE = NotificationService/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.7;
+				PRODUCT_BUNDLE_IDENTIFIER = com.irontracks.app.NotificationService;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
 /* End XCBuildConfiguration section */
 
 /* Begin XCConfigurationList section */
@@ -545,6 +664,15 @@
 			buildConfigurations = (
 				W007W007W007W007 /* Debug */,
 				W008W008W008W008 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		NS015NS015NS015NS015 /* Build configuration list for PBXNativeTarget "NotificationService" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				NS013NS013NS013NS013 /* Debug (NotificationService) */,
+				NS014NS014NS014NS014 /* Release (NotificationService) */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
