@@ -81,6 +81,12 @@ async function sendOneApnsPush(
 
     return new Promise((resolve) => {
         try {
+            // Message types get mutable-content so the Notification Service Extension
+            // can upgrade them to Communication Notifications (INSendMessageIntent),
+            // which guarantees screen wake + sound on locked devices — like WhatsApp.
+            const notifType = String(extra?.type ?? '').toLowerCase()
+            const isMessageType = ['message', 'direct_message', 'mentioned_in_chat'].includes(notifType)
+
             const apnsPayload = JSON.stringify({
                 aps: {
                     alert: { title, body },
@@ -89,10 +95,12 @@ async function sendOneApnsPush(
                     // time-sensitive bypasses iOS Focus Mode and wakes the screen.
                     // passive is for silent/low-priority. active for social events.
                     'interruption-level': (() => {
-                        const type = String(extra?.type ?? '').toLowerCase()
                         const passive = ['story_like', 'workout_like', 'pr_achieved']
-                        return passive.includes(type) ? 'active' : 'time-sensitive'
+                        return passive.includes(notifType) ? 'active' : 'time-sensitive'
                     })(),
+                    // Tells iOS to wake the Notification Service Extension before displaying.
+                    // Required for INSendMessageIntent upgrade (Communication Notification).
+                    ...(isMessageType ? { 'mutable-content': 1 } : {}),
                 },
                 // Spread extra but omit the internal __badge key used only for the aps.badge field
                 ...Object.fromEntries(Object.entries(extra ?? {}).filter(([k]) => k !== '__badge')),
