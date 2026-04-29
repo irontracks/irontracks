@@ -96,7 +96,14 @@ export async function POST(req: Request) {
         [receiverId],
         `💬 ${safeSenderName}`,
         safePreview,
-        { type: 'message' },
+        {
+          type: 'message',
+          // Passed to the Notification Service Extension so it can build an
+          // INSendMessageIntent → Communication Notification (guaranteed screen wake).
+          sender_name: safeSenderName,
+          sender_id: user.id,
+          conversation_id: `dm-${[user.id, receiverId].sort().join('-')}`,
+        },
         { preferenceKey: 'notifyDirectMessages' },
       ).catch(() => { })
     )
