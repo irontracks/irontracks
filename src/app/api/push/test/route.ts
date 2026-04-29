@@ -113,6 +113,24 @@ export async function GET(req: Request) {
             .select('token, platform, device_id, last_seen_at, updated_at')
             .eq('user_id', userId)
 
+        // ── 2b. When using secret: also show all recent tokens across ALL users ─
+        // Helps diagnose whether ANY device has registered (e.g. logged in with a
+        // different account than the admin account).
+        let allRecentTokens: Array<{ userId: string; platform: string; tokenPrefix: string; lastSeen: string | null }> = []
+        if (secretOk) {
+            const { data: recent } = await admin
+                .from('device_push_tokens')
+                .select('user_id, token, platform, last_seen_at')
+                .order('last_seen_at', { ascending: false })
+                .limit(20)
+            allRecentTokens = (Array.isArray(recent) ? recent : []).map((t) => ({
+                userId: String(t.user_id || ''),
+                platform: String(t.platform || ''),
+                tokenPrefix: String(t.token || '').slice(0, 12) + '...',
+                lastSeen: t.last_seen_at ?? null,
+            }))
+        }
+
         const tokenCount = Array.isArray(tokens) ? tokens.length : 0
         const iosTokenCount = Array.isArray(tokens) ? tokens.filter((t) => String(t.platform || '') === 'ios').length : 0
 
@@ -143,6 +161,7 @@ export async function GET(req: Request) {
             ok: true,
             userId,
             envVars: cfg,
+            allRecentTokens,
             envConfigOk: cfgOk,
             deviceTokens: {
                 total: tokenCount,
