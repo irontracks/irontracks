@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { requireRoleOrBearer } from '@/utils/auth/route'
 import { getErrorMessage } from '@/utils/errorMessage'
-import { safePgLike } from '@/utils/safePgFilter'
+import { resolveStudentRow } from '@/utils/admin/resolveStudent'
 import { sendPushToAllPlatforms as sendPushToUsers } from '@/lib/push/sender'
 import { waitUntil } from '@vercel/functions'
 
@@ -56,34 +56,18 @@ export async function POST(req: Request) {
 
     const admin = createAdminClient()
 
-    // Resolve the real students row. The caller may send `id` as either:
-    //   - students.id (the row PK) — happens when AdminUser came from the
-    //     /api/admin/students/list endpoint.
-    //   - profiles.id / auth uid  — happens when AdminUser was built from
-    //     the profiles fallback before a real `students` row existed.
-    // `email` is an optional last-resort identifier for the second case.
-    const SELECT_COLS = 'id, user_id, teacher_id, email, name, status'
-
-    const tryFind = async (column: 'id' | 'user_id', value: string) => {
-      const { data } = await admin.from('students').select(SELECT_COLS).eq(column, value).maybeSingle()
-      return data as Record<string, unknown> | null
-    }
-    const tryFindByEmail = async (value: string) => {
-      const { data } = await admin.from('students').select(SELECT_COLS).ilike('email', safePgLike(value)).maybeSingle()
-      return data as Record<string, unknown> | null
-    }
-
-    const studentRow: Record<string, unknown> | null =
-      (await tryFind('id', id))
-      ?? (await tryFind('user_id', id))
-      ?? (email ? await tryFindByEmail(email) : null)
-
+    // Resolve the real students row. Supports both real students (AdminUser.id =
+    // students.id) and "pending" profiles (AdminUser.id = "pending_<profile.id>"):
+    // resolveStudentRow strips the prefix, tries id/user_id/email lookups, and
+    // auto-creates the row from profile data when needed (with a guaranteed
+    // non-null `name`, fixing the recurring NOT NULL violation).
+    const studentRow = await resolveStudentRow(admin, { id, email })
     if (!studentRow) return NextResponse.json({ ok: false, error: 'student_not_found' }, { status: 404 })
 
-    const resolvedId = String(studentRow.id || '')
-    const resolvedTeacher = String(studentRow.teacher_id || '')
-    const resolvedUserId = String(studentRow.user_id || '').trim()
-    const prevStatus = String(studentRow.status || '')
+    const resolvedId = studentRow.id
+    const resolvedTeacher = studentRow.teacher_id ?? ''
+    const resolvedUserId = studentRow.user_id ?? ''
+    const prevStatus = studentRow.status ?? ''
 
     // Only admin or the student's responsible teacher
     if (auth.role !== 'admin') {

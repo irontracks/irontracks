@@ -5,6 +5,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { requireRoleOrBearer } from '@/utils/auth/route'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { safePgLike } from '@/utils/safePgFilter'
+import { resolveStudentRow } from '@/utils/admin/resolveStudent'
 
 export const dynamic = 'force-dynamic'
 
@@ -57,42 +58,20 @@ export async function POST(req: Request) {
       }
     }
 
-    // Resolve student row by id, user_id or email
-    let targetId = student_id || ''
-    let srow: Record<string, unknown> | null = null
-    if (targetId) {
-      const { data } = await admin.from('students').select('id, email').eq('id', targetId).maybeSingle()
-      srow = data || null
-    }
-    // Resolve by student_user_id (auth uid) — this is what the admin panel sends
-    if (!srow && student_user_id) {
-      const { data } = await admin.from('students').select('id, email').eq('user_id', student_user_id).maybeSingle()
-      srow = data || null
-    }
-    if (!srow && email) {
-      const { data } = await admin.from('students').select('id, email').ilike('email', safePgLike(email)).maybeSingle()
-      srow = data || null
-    }
-    if (!srow && student_id) {
-      const { data } = await admin.from('students').select('id').eq('user_id', student_id).maybeSingle()
-      srow = data || null
-    }
-    // Upsert by email if not exists
-    if (!srow && email) {
-      const { data: profile } = await admin.from('profiles').select('id, display_name').ilike('email', safePgLike(email)).maybeSingle()
-      const payload: Record<string, unknown> = { email, teacher_id: teacher_user_id || null }
-      if (profile?.display_name) payload.name = profile.display_name
-      if (profile?.id) payload.user_id = profile.id
-      const { data: ins, error: iErr } = await admin.from('students').insert(payload).select().single()
-      if (iErr) return NextResponse.json({ ok: false, error: iErr.message }, { status: 400 })
-      srow = ins
-    }
+    // Resolve student row via the shared helper. Handles all caller shapes:
+    //   - student_id = students.id (PK)
+    //   - student_id = "pending_<profile.id>" (auto-creates the row)
+    //   - student_user_id = profiles.id / auth uid
+    //   - email-only (auto-creates with profile lookup)
+    // The helper guarantees `name` is never null, fixing the recurring
+    // NOT NULL violation that previously slipped through this INSERT path.
+    const lookupId = student_id || student_user_id || ''
+    const srow = await resolveStudentRow(admin, { id: lookupId, email })
     if (!srow) return NextResponse.json({ ok: false, error: 'student not found' }, { status: 404 })
 
     // R3#5: Teachers can only reassign students they own (or unassigned students)
     if (auth.role === 'teacher') {
-      const { data: currentStudent } = await admin.from('students').select('teacher_id').eq('id', srow.id).maybeSingle()
-      const currentTeacher = currentStudent?.teacher_id ? String(currentStudent.teacher_id) : ''
+      const currentTeacher = srow.teacher_id || ''
       if (currentTeacher && currentTeacher !== auth.user.id) {
         return NextResponse.json({ ok: false, error: 'Aluno já pertence a outro professor.' }, { status: 403 })
       }
