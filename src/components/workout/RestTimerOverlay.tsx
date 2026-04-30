@@ -59,9 +59,25 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
     // Without this, the overlay stays visible for 1-2 frames after tap, during which
     // re-renders can interfere with the button's click handling on iOS WKWebView.
     const [dismissed, setDismissed] = useState(false);
-    // AUTO: local-only toggle (never persisted). Defaults OFF every session.
-    // When ON, the overlay auto-advances 500 ms after the countdown reaches zero.
-    const [autoLocal, setAutoLocal] = useState(false);
+    // AUTO: persisted in localStorage so the user's preference survives across
+    // sets, sessions and app restarts. When ON, the overlay auto-advances 500 ms
+    // after the countdown reaches zero.
+    const [autoLocal, setAutoLocal] = useState<boolean>(() => {
+        if (typeof window === 'undefined') return false;
+        try {
+            return window.localStorage.getItem('irontracks.restTimerAuto.v1') === '1';
+        } catch {
+            return false;
+        }
+    });
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        try {
+            window.localStorage.setItem('irontracks.restTimerAuto.v1', autoLocal ? '1' : '0');
+        } catch {
+            /* storage unavailable — preference simply won't persist */
+        }
+    }, [autoLocal]);
     const warnedRef = useRef(false);
     const notifyIdRef = useRef('');
     const soundIntervalRef = useRef<NodeJS.Timeout | null>(null);
