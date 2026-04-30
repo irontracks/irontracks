@@ -28,7 +28,10 @@ export interface ApiResponse<T = unknown> {
   error?: string
 }
 
-const RETRYABLE_STATUSES = new Set([408, 429, 502, 503, 504])
+// 429 is intentionally excluded — rate-limit responses should fail fast so the
+// UI can show the message immediately. Retrying just amplifies one user click
+// into 3 server hits and delays the error feedback by ~1.6s.
+const RETRYABLE_STATUSES = new Set([408, 502, 503, 504])
 
 /**
  * Core fetch wrapper — throws ApiError on non-ok responses.
