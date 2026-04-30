@@ -13,6 +13,48 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { logInfo, logError, logWarn } from '@/lib/logger'
 import { env } from '@/utils/env'
 
+// ─── Conversation/Sender stable defaults ────────────────────────────────────
+// iOS Communication Notifications use a heuristic to decide whether to grant
+// the full screen-wake + sound treatment: it watches for stable sender_id and
+// conversation_id values that suggest a real, recurring conversation. Random
+// or per-notification ids look like spam and the system silently downgrades
+// them to plain time-sensitive (no screen wake).
+//
+// This helper fills sensible defaults when the route handler didn't provide
+// explicit values, so iOS sees consistent identifiers across notifications of
+// the same type/source. Routes that DO pass sender_id/conversation_id (e.g.
+// direct-message) keep their explicit values — `??=` only fills holes.
+
+function withConversationDefaults(
+    extra: Record<string, unknown> | undefined,
+    recipientUserId: string,
+    badge: number,
+): Record<string, unknown> {
+    const e: Record<string, unknown> = { ...(extra ?? {}) }
+    const type = String(e.type ?? '').toLowerCase()
+
+    // Stable sender_id: derive from type + recipient when not provided.
+    // For person-to-person types (message, mentioned_in_*), the route should
+    // always pass an explicit sender_id and this branch is skipped. For
+    // system-driven types (water_reminder, billing_issue, morning_briefing),
+    // the synthesized id is stable per (recipient, type) so the iOS sees
+    // every reminder of that kind as the "same source".
+    if (!e.sender_id) {
+        e.sender_id = `irontracks-${type || 'app'}-${recipientUserId}`
+    }
+
+    // Stable conversation_id: derive from sender_id when not provided.
+    // iOS groups notifications with the same conversationIdentifier as a
+    // single thread — stable ids signal "recurring real conversation",
+    // which is what trains the system to keep granting Communication tier.
+    if (!e.conversation_id) {
+        e.conversation_id = `feed-${e.sender_id}`
+    }
+
+    e.__badge = badge
+    return e
+}
+
 // ─── Configuration ──────────────────────────────────────────────────────────
 
 function getApnsConfig() {
@@ -279,7 +321,7 @@ export async function sendPushToUsers(
             const batchResults = await Promise.allSettled(
                 batch.map(({ token, userId }) => {
                     const badge = badgeByUserId.get(userId) ?? 1
-                    return sendOneApnsPush(token, title, body, cfg, { ...extra, __badge: badge })
+                    return sendOneApnsPush(token, title, body, cfg, withConversationDefaults(extra, userId, badge))
                 })
             )
             batchResults.forEach((res, idx) => {
