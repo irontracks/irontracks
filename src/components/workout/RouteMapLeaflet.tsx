@@ -16,7 +16,7 @@ interface RouteMapProps {
 }
 
 /**
- * Route map \u2014 Leaflet with OpenStreetMap tiles proxied through same-origin.
+ * Route map — Leaflet with OpenStreetMap tiles proxied through same-origin.
  *
  * Why imperative Leaflet (not react-leaflet):
  *   - Past react-leaflet attempts failed on iOS WKWebView with blank maps.
@@ -30,7 +30,7 @@ interface RouteMapProps {
  *
  * Resilience:
  *   - If Leaflet fails to initialize for any reason we fall back to the old
- *     pure-SVG polyline \u2014 the user still sees their route.
+ *     pure-SVG polyline — the user still sees their route.
  */
 export default function RouteMapLeaflet({ points, height = 200, live, acquiring }: RouteMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -95,7 +95,7 @@ export default function RouteMapLeaflet({ points, height = 200, live, acquiring 
           }
         }, 120)
 
-        // Detect user interaction \u2014 stop auto-panning to the latest fix so
+        // Detect user interaction — stop auto-panning to the latest fix so
         // they can explore the route.
         map.on('dragstart zoomstart', () => {
           autoFollowRef.current = false
