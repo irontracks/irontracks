@@ -29,7 +29,7 @@ function gpsSignalLabel(accuracy: number | null): { label: string; color: string
   if (accuracy === null) return { label: 'Sem sinal', color: '#6b7280' }
   if (accuracy <= 10) return { label: 'Excelente', color: '#22c55e' }
   if (accuracy <= 20) return { label: 'Bom', color: '#84cc16' }
-  if (accuracy <= 30) return { label: 'Aceit\u00e1vel', color: '#eab308' }
+  if (accuracy <= 30) return { label: 'Aceitável', color: '#eab308' }
   return { label: 'Fraco', color: '#ef4444' }
 }
 
@@ -51,7 +51,7 @@ export default function CardioGPSPanel({ workoutId, onSaved, bodyWeightKg }: Car
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [saveError, setSaveError] = useState<string | null>(null)
-  // Collapsed by default \u2014 auto-expands when tracking starts
+  // Collapsed by default — auto-expands when tracking starts
   const [isOpen, setIsOpen] = useState(false)
 
   useEffect(() => {
@@ -99,10 +99,10 @@ export default function CardioGPSPanel({ workoutId, onSaved, bodyWeightKg }: Car
         setSaved(true)
         onSaved?.(data.track.id)
       } else {
-        setSaveError('N\u00e3o foi poss\u00edvel salvar a rota. Tente novamente.')
+        setSaveError('Não foi possível salvar a rota. Tente novamente.')
       }
     } catch {
-      setSaveError('N\u00e3o foi poss\u00edvel salvar a rota. Tente novamente.')
+      setSaveError('Não foi possível salvar a rota. Tente novamente.')
     } finally {
       setSaving(false)
     }
@@ -130,14 +130,14 @@ export default function CardioGPSPanel({ workoutId, onSaved, bodyWeightKg }: Car
         borderColor: isTracking ? 'rgba(34,197,94,0.3)' : 'rgba(255,255,255,0.08)',
       }}
     >
-      {/* Accordion header \u2014 always visible */}
+      {/* Accordion header — always visible */}
       <button
         type="button"
         onClick={() => setIsOpen((v) => !v)}
         className="w-full flex items-center justify-between px-4 py-3 text-left"
       >
         <div className="flex items-center gap-2">
-          <span className="text-base">\ud83c\udfc3</span>
+          <span className="text-base">🏃</span>
           <span className="text-sm font-bold text-white">Cardio GPS</span>
           {isTracking && (
             <div className="flex items-center gap-1.5">
@@ -164,7 +164,7 @@ export default function CardioGPSPanel({ workoutId, onSaved, bodyWeightKg }: Car
       {/* Collapsible content */}
       {isOpen && (
         <div className="px-4 pb-4">
-          {/* GPS state banners \u2014 shown before the map so user understands why */}
+          {/* GPS state banners — shown before the map so user understands why */}
           {gpsIsDenied && (
             <div
               className="mb-3 flex items-start gap-2 rounded-xl p-3"
@@ -178,7 +178,7 @@ export default function CardioGPSPanel({ workoutId, onSaved, bodyWeightKg }: Car
                 <p className="font-bold text-red-400">GPS bloqueado</p>
                 <p className="mt-0.5 text-white/60">
                   {gpsError ??
-                    'Permiss\u00e3o de localiza\u00e7\u00e3o negada. Ative o GPS para o IronTracks nas configura\u00e7\u00f5es do seu dispositivo.'}
+                    'Permissão de localização negada. Ative o GPS para o IronTracks nas configurações do seu dispositivo.'}
                 </p>
               </div>
             </div>
@@ -193,9 +193,9 @@ export default function CardioGPSPanel({ workoutId, onSaved, bodyWeightKg }: Car
             >
               <AlertTriangle size={16} className="mt-0.5 flex-shrink-0 text-neutral-400" />
               <div className="text-xs text-white/80">
-                <p className="font-bold text-neutral-300">GPS indispon\u00edvel</p>
+                <p className="font-bold text-neutral-300">GPS indisponível</p>
                 <p className="mt-0.5 text-white/60">
-                  Este dispositivo n\u00e3o possui GPS ou a API de localiza\u00e7\u00e3o n\u00e3o est\u00e1 dispon\u00edvel.
+                  Este dispositivo não possui GPS ou a API de localização não está disponível.
                 </p>
               </div>
             </div>
@@ -210,13 +210,13 @@ export default function CardioGPSPanel({ workoutId, onSaved, bodyWeightKg }: Car
             >
               <AlertTriangle size={16} className="mt-0.5 flex-shrink-0 text-yellow-400" />
               <div className="text-xs text-white/80">
-                <p className="font-bold text-yellow-400">Aten\u00e7\u00e3o</p>
+                <p className="font-bold text-yellow-400">Atenção</p>
                 <p className="mt-0.5 text-white/60">{gpsError}</p>
               </div>
             </div>
           )}
 
-          {/* GPS signal indicator \u2014 live during tracking */}
+          {/* GPS signal indicator — live during tracking */}
           {isTracking && !gpsIsDenied && !gpsIsUnavailable && (
             <div className="mb-3 flex items-center justify-between rounded-xl px-3 py-2"
               style={{
@@ -234,7 +234,7 @@ export default function CardioGPSPanel({ workoutId, onSaved, bodyWeightKg }: Car
                 </span>
                 {metrics.accuracyMeters !== null && (
                   <span className="text-xs text-white/40">
-                    \u00b1{Math.round(metrics.accuracyMeters)}m
+                    ±{Math.round(metrics.accuracyMeters)}m
                   </span>
                 )}
               </div>
@@ -255,12 +255,12 @@ export default function CardioGPSPanel({ workoutId, onSaved, bodyWeightKg }: Car
             </div>
           )}
 
-          {/* Route Map \u2014 Leaflet with dark tiles (Strava-style) */}
+          {/* Route Map — Leaflet with dark tiles (Strava-style) */}
           <RouteMapLeaflet points={trackPoints} height={200} live={isTracking} acquiring={gpsIsAcquiring} />
 
           {/* Metrics Grid */}
           <div className="grid grid-cols-3 gap-2 mb-3">
-            <MetricCard label="Dist\u00e2ncia" value={formatDistance(metrics.distanceMeters)} accent />
+            <MetricCard label="Distância" value={formatDistance(metrics.distanceMeters)} accent />
             <MetricCard label="Tempo" value={formatDuration(metrics.durationSeconds)} />
             <MetricCard label="Pace" value={formatPace(metrics.paceMinKm)} unit="/km" />
             <MetricCard label="Velocidade" value={`${metrics.currentSpeedKmh}`} unit="km/h" />
@@ -283,10 +283,10 @@ export default function CardioGPSPanel({ workoutId, onSaved, bodyWeightKg }: Car
               >
                 {startDisabled ? (
                   <span className="inline-flex items-center gap-2">
-                    <MapPin size={14} /> GPS indispon\u00edvel
+                    <MapPin size={14} /> GPS indisponível
                   </span>
                 ) : (
-                  '\u25b6 Iniciar Cardio'
+                  '▶ Iniciar Cardio'
                 )}
               </button>
             ) : isTracking ? (
@@ -300,7 +300,7 @@ export default function CardioGPSPanel({ workoutId, onSaved, bodyWeightKg }: Car
                       : 'linear-gradient(135deg, #eab308, #ca8a04)',
                   }}
                 >
-                  {isPaused ? '\u25b6 Retomar' : '\u23f8 Pausar'}
+                  {isPaused ? '▶ Retomar' : '⏸ Pausar'}
                 </button>
                 <button
                   onClick={handleStop}
@@ -308,13 +308,13 @@ export default function CardioGPSPanel({ workoutId, onSaved, bodyWeightKg }: Car
                   className="rounded-xl border px-5 py-3 text-sm font-bold text-red-400 transition-all active:scale-95 disabled:opacity-50"
                   style={{ borderColor: 'rgba(239,68,68,0.3)' }}
                 >
-                  {saving ? '...' : '\u23f9 Parar'}
+                  {saving ? '...' : '⏹ Parar'}
                 </button>
               </>
             ) : saved ? (
               <div className="flex-1 flex items-center justify-between">
                 <div className="flex items-center gap-2">
-                  <span className="text-green-400">\u2713</span>
+                  <span className="text-green-400">✓</span>
                   <span className="text-sm text-white/60">Cardio salvo!</span>
                 </div>
                 <button

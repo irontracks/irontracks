@@ -39,7 +39,8 @@
     "scan:async": "node scripts/scan-async-loading.mjs",
     "scan:async:critical": "node scripts/scan-async-loading.mjs --only-critical",
     "scan:console": "node scripts/scan-console.mjs",
-    "scan:all": "node scripts/scan-secrets.mjs && node scripts/scan-a11y.mjs && node scripts/scan-async-loading.mjs --only-critical && node scripts/scan-buttons-static.mjs --only-critical",
+    "scan:unicode": "node scripts/scan-unicode-escapes.mjs",
+    "scan:all": "node scripts/scan-secrets.mjs && node scripts/scan-a11y.mjs && node scripts/scan-async-loading.mjs --only-critical && node scripts/scan-buttons-static.mjs --only-critical && node scripts/scan-unicode-escapes.mjs",
     "check:env": "npx tsx scripts/check-env.ts",
     "prepare": "husky"
   },
