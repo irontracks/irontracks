@@ -18,6 +18,7 @@ import {
     CANVAS_W,
     CANVAS_H,
     DEFAULT_LIVE_POSITIONS,
+    DEFAULT_GROUP_POSITIONS,
     isIOSUserAgent,
     parseExt,
     extFromMime,
@@ -388,10 +389,17 @@ export function useStoryComposer({ open, session, onClose, caloriesOverride }: U
 
     const onSelectLayout = useCallback((nextLayout: string) => {
         try {
-            setLayout(safeString(nextLayout) || 'bottom-row')
+            const safeNext = safeString(nextLayout) || 'bottom-row'
+            setLayout(safeNext)
             setDraggingKey(null)
             dragRef.current = { key: null, pointerId: null, startX: 0, startY: 0, startPos: { x: 0, y: 0 } }
-            groupDragRef.current = { active: false, pointerId: null, startX: 0, startY: 0, startPositions: livePositions ?? DEFAULT_LIVE_POSITIONS }
+            // Entering Grupo always resets positions to its Normal-like default —
+            // the whole point of Grupo is "drag the bottom-row arrangement around
+            // as a unit", so starting from the user's leftover LIVE positions
+            // would defeat the purpose.
+            const nextPositions = safeNext === 'group' ? DEFAULT_GROUP_POSITIONS : livePositions
+            if (safeNext === 'group') setLivePositions(DEFAULT_GROUP_POSITIONS)
+            groupDragRef.current = { active: false, pointerId: null, startX: 0, startY: 0, startPositions: nextPositions ?? DEFAULT_LIVE_POSITIONS }
         } catch { setLayout('bottom-row') }
     }, [livePositions])
 
