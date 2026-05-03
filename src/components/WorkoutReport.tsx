@@ -41,6 +41,7 @@ const ExerciseTrendPanel = dynamic(() => import('@/components/workout-report/Exe
 const ReportCheckinPanel = dynamic(() => import('@/components/workout-report/ReportCheckinPanel').then(m => ({ default: m.ReportCheckinPanel })), { ssr: false, loading: () => <SectionSkeleton /> })
 const ReportAiSection = dynamic(() => import('@/components/workout-report/ReportAiSection').then(m => ({ default: m.ReportAiSection })), { ssr: false, loading: () => <SectionSkeleton /> })
 const ReportMusclePieChart = dynamic(() => import('@/components/workout-report/ReportMusclePieChart').then(m => ({ default: m.ReportMusclePieChart })), { ssr: false, loading: () => <SectionSkeleton /> })
+const MuscleMapSection = dynamic(() => import('@/components/workout-report/MuscleMapSection').then(m => ({ default: m.MuscleMapSection })), { ssr: false, loading: () => <SectionSkeleton /> })
 
 // Modals — loaded only when user opens them
 const StoryComposer = dynamic(() => import('@/components/StoryComposer'), { ssr: false, loading: () => null })
@@ -54,6 +55,7 @@ import {
     type AiState,
 } from '@/hooks/useReportData'
 import { MUSCLE_BY_ID } from '@/utils/muscleMapConfig'
+import { useMuscleMapWeek } from '@/hooks/useMuscleMapWeek'
 
 type AnyObj = Record<string, unknown>
 
@@ -119,6 +121,16 @@ const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose,
         isGenerating, setIsGenerating,
         pdfUrl, setPdfUrl, pdfBlob, setPdfBlob, pdfFrameRef,
     } = useReportData({ session, previousSession, user, settings });
+
+    // Weekly muscle map for the in-report visualization + PDF export.
+    // Fetches once when the report opens; re-export wraps cached server data.
+    const muscleMapWeek = useMuscleMapWeek(!!session);
+    const muscleGender: 'male' | 'female' | 'not_informed' = (() => {
+        const raw = String(settings?.biologicalSex || '').toLowerCase().trim();
+        if (raw === 'female' || raw === 'feminino') return 'female';
+        if (raw === 'male' || raw === 'masculino') return 'male';
+        return 'not_informed';
+    })();
 
     useEffect(() => {
         if (!storiesV2Enabled) { setShowStoryPrompt(false); return; }
@@ -223,6 +235,8 @@ const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose,
                 bodyWeightKg: Number(settings?.bodyWeightKg) || undefined,
                 biologicalSex: String(settings?.biologicalSex || '').toLowerCase() || undefined,
                 rpe: Number(postCheckin?.rpe) || undefined,
+                // Weekly muscle map snapshot — same data the in-page section uses
+                muscleMapWeek: muscleMapWeek.status === 'ready' ? muscleMapWeek.data : null,
             });
 
             const title = String(session?.workoutTitle || 'Treino').trim() || 'Treino'
@@ -772,6 +786,12 @@ const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose,
                 />
 
                 <Suspense fallback={<SectionSkeleton />}>
+                    <MuscleMapSection
+                        data={muscleMapWeek.data}
+                        status={muscleMapWeek.status}
+                        gender={muscleGender}
+                    />
+
                     {muscleTrend.status === 'ready' && muscleTrend.data && (
                         <MuscleTrendPanel
                             data={muscleTrend.data}
