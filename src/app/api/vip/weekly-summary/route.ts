@@ -107,7 +107,11 @@ export async function GET() {
     return NextResponse.json({ ok: false, error: 'vip_required', upgradeRequired: true }, { status: 403 })
   }
 
-  const rl_key = `vip-weekly-summary:${user.id}`
+  // Admin / VIP Elite are exempt from the per-user rate limit. They're either
+  // staff or top-tier paying users — the limiter is meant to protect Gemini
+  // budget from accidental loops, not gate normal usage.
+  const tier = String(plan?.tier || '').toLowerCase()
+  const skipRateLimit = tier === 'vip_elite' || tier === 'admin'
 
   try {
     const cacheKey = `vip:weekly-summary:${user.id}`
@@ -116,15 +120,20 @@ export async function GET() {
 
     // Cache miss: this request will actually call the AI. Now is the time to
     // gate it on the rate limiter — checking BEFORE the cache lookup made
-    // every refresh (even cached ones) tick the 5/hour budget down, so users
-    // were getting 429s after a handful of clicks even when nothing reached
-    // Gemini.
-    const rl = await checkRateLimitAsync(rl_key, 5, 3_600_000)
-    if (!rl.allowed) {
-      return NextResponse.json(
-        { ok: false, error: 'ai_rate_limited' },
-        { status: 429, headers: { 'Retry-After': String(rl.retryAfterSeconds) } },
-      )
+    // every refresh (even cached ones) tick the budget down, so users were
+    // getting 429s after a handful of clicks even when nothing reached Gemini.
+    //
+    // Limit raised from 5/hour to 60/hour: the cache TTL is 2 min, so a user
+    // hammering Refresh would still hit cache 99% of the time. The previous
+    // 5/h was too tight for a button users tap repeatedly.
+    if (!skipRateLimit) {
+      const rl = await checkRateLimitAsync(`vip-weekly-summary:${user.id}`, 60, 3_600_000)
+      if (!rl.allowed) {
+        return NextResponse.json(
+          { ok: false, error: 'ai_rate_limited' },
+          { status: 429, headers: { 'Retry-After': String(rl.retryAfterSeconds) } },
+        )
+      }
     }
 
     const now = Date.now()
