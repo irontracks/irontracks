@@ -49,6 +49,7 @@ import { usePresencePing } from '@/hooks/usePresencePing'
 import { useUtmAcquisition } from '@/hooks/useUtmAcquisition'
 import { useProfileCompletion } from '@/hooks/useProfileCompletion'
 import { useWhatsNew } from '@/hooks/useWhatsNew'
+import { useSeasonalCampaign } from '@/hooks/useSeasonalCampaign'
 import { useUnreadBadges } from '@/hooks/useUnreadBadges'
 import { useNativeAppSetup } from '@/hooks/useNativeAppSetup'
 import { usePushNotifications } from '@/hooks/usePushNotifications'
@@ -261,6 +262,15 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
 
     // What's New modal — extracted to useWhatsNew hook
     const { whatsNewOpen, setWhatsNewOpen, pendingUpdate, setPendingUpdate, closeWhatsNew } = useWhatsNew({
+        userId: user?.id,
+        userSettingsApi,
+    })
+
+    // Seasonal campaigns (Mother's Day, Black Friday, Christmas, …)
+    const mothersDay = useSeasonalCampaign({
+        id: 'mothersDay2026',
+        activeFrom: '2026-05-07',
+        activeUntil: '2026-05-12',
         userId: user?.id,
         userSettingsApi,
     })
@@ -1022,6 +1032,8 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                             pendingUpdate={pendingUpdate as Record<string, unknown> | null}
                             setPendingUpdate={setPendingUpdate as (v: Record<string, unknown> | null) => void}
                             closeWhatsNew={closeWhatsNew}
+                            mothersDayOpen={mothersDay.isOpen}
+                            closeMothersDay={mothersDay.close}
                             preCheckinOpen={preCheckinOpen}
                             setPreCheckinOpen={setPreCheckinOpen}
                             preCheckinWorkout={preCheckinWorkout as Record<string, unknown> | null}

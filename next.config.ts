@@ -52,6 +52,7 @@ const nextConfig: NextConfig = {
       { pathname: '/rank-**' },
       { pathname: '/report-**' },
       { pathname: '/sticker-**' },
+      { pathname: '/seasonal/**' },
     ],
     remotePatterns: [
       {
@@ -164,7 +165,11 @@ const nextConfig: NextConfig = {
       },
       {
         source: '/((?!_next/static|_next/image|favicon.ico|manifest.json|icone.png|robots.txt|sitemap.xml).*)',
-        headers: [{ key: 'cache-control', value: 'no-store, max-age=0' }],
+        headers: [
+          { key: 'cache-control', value: 'no-store, max-age=0' },
+          { key: 'x-frame-options', value: 'DENY' },
+          { key: 'x-content-type-options', value: 'nosniff' },
+        ],
       },
     ]
   },

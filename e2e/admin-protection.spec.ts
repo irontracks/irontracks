@@ -7,11 +7,11 @@ import { test, expect } from '@playwright/test'
 
 test.describe('Admin Routes Require Auth', () => {
     const adminRoutes = [
-        { method: 'GET', path: '/api/admin/students' },
-        { method: 'GET', path: '/api/admin/teachers' },
+        { method: 'GET', path: '/api/admin/students/list' },
+        { method: 'GET', path: '/api/admin/teachers/list' },
         { method: 'GET', path: '/api/admin/workouts/templates-list' },
-        { method: 'GET', path: '/api/admin/error-reports' },
-        { method: 'GET', path: '/api/admin/execution-videos' },
+        { method: 'GET', path: '/api/admin/user-activity/events' },
+        { method: 'POST', path: '/api/admin/exercise-videos/suggest' },
         { method: 'POST', path: '/api/admin/students/delete' },
         { method: 'POST', path: '/api/admin/delete-auth-user' },
     ]
