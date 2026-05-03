@@ -730,7 +730,13 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                     profileIncomplete={Boolean(profileIncomplete)}
                                     onOpenCompleteProfile={() => setView('profile')}
                                     view={view === 'assessments' ? 'assessments' : view === 'community' ? 'community' : view === 'vip' ? 'vip' : 'dashboard'}
-                                    onChangeView={(next: string) => setView(next)}
+                                    onChangeView={(next: string) => {
+                                        // Close the nutrition overlay before switching views — it's a
+                                        // full-screen overlay, so leaving it open would hide the tab the
+                                        // user just clicked AND keep the Nutrição indicator stuck on.
+                                        setNutritionOpen(false)
+                                        setView(next)
+                                    }}
                                     assessmentsContent={
                                         (user?.id || initialUserObj?.id) ? (
                                             <ErrorBoundary>
