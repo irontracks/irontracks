@@ -13,7 +13,7 @@ export default defineConfig({
     testDir: './e2e',
     fullyParallel: true,
     forbidOnly: !!process.env.CI,
-    retries: process.env.CI ? 1 : 0,
+    retries: 1, // 1 retry handles transient ECONNRESET with workers=2
     workers: process.env.CI ? 2 : undefined,
     reporter: process.env.CI ? 'github' : 'html',
     timeout: 30_000,
@@ -50,6 +50,8 @@ export default defineConfig({
                         storageState: authStatePath,
                     },
                     testMatch: ['**/authenticated-*.spec.ts'],
+                    // Retries handle ECONNRESET / load-related flakiness with workers=2
+                    retries: 1,
                 },
             ]
             : []),

@@ -15,6 +15,7 @@ const SettingsModal = dynamic(() => import('@/components/SettingsModal'), { ssr:
 const ProgressPhotos = dynamic(() => import('@/components/ProgressPhotos'), { ssr: false })
 const RestTimerOverlay = dynamic(() => import('@/components/workout/RestTimerOverlay'), { ssr: false })
 const WhatsNewModal = dynamic(() => import('@/components/WhatsNewModal'), { ssr: false })
+const MothersDayModal = dynamic(() => import('@/components/MothersDayModal'), { ssr: false })
 const OfflineSyncModal = dynamic(() => import('@/components/OfflineSyncModal'), { ssr: false })
 const WelcomeFloatingWindow = dynamic(() => import('@/components/WelcomeFloatingWindow'), { ssr: false })
 const PartnerExerciseOverlay = dynamic(() => import('@/components/workout/PartnerExerciseOverlay'), { ssr: false })
@@ -87,6 +88,10 @@ export interface DashboardModalsProps {
     setPendingUpdate: (v: Record<string, unknown> | null) => void
     closeWhatsNew: () => void
 
+    // Seasonal — Mother's Day
+    mothersDayOpen: boolean
+    closeMothersDay: () => Promise<void> | void
+
     // PreCheckin
     preCheckinOpen: boolean
     setPreCheckinOpen: (v: boolean) => void
@@ -136,7 +141,8 @@ export default function DashboardModals(props: DashboardModalsProps) {
         showNotifCenter, setShowNotifCenter, activeSession, handleCloseTimer, handleTimerFinish, handleStartFromRestTimer,
         view, setView, sessionTicker, parseStartedAtMs, calculateExerciseDuration, toMinutesRounded,
         showAdminPanel, closeAdminPanel, whatsNewOpen, setWhatsNewOpen, pendingUpdate,
-        setPendingUpdate, closeWhatsNew, preCheckinOpen, setPreCheckinOpen, preCheckinWorkout,
+        setPendingUpdate, closeWhatsNew, mothersDayOpen, closeMothersDay,
+        preCheckinOpen, setPreCheckinOpen, preCheckinWorkout,
         preCheckinDraft, setPreCheckinDraft, preCheckinResolveRef, settingsOpen, setSettingsOpen,
         userSettingsApi, offlineSyncOpen, setOfflineSyncOpen,
         openStudent, setOpenStudent, showExportModal, setShowExportModal, exportWorkout,
@@ -583,6 +589,11 @@ export default function DashboardModals(props: DashboardModalsProps) {
                     } : null}
                     onClose={closeWhatsNew}
                 />
+            )}
+
+            {/* Seasonal — Mother's Day 2026 */}
+            {mothersDayOpen && (
+                <MothersDayModal onClose={() => { void closeMothersDay() }} />
             )}
 
             {/* PreCheckin */}

@@ -28,8 +28,8 @@ export default async function globalSetup(_config: FullConfig) {
     const page = await context.newPage()
 
     try {
-        // Navigate to login page
-        await page.goto(`${baseURL}/login`, { waitUntil: 'networkidle', timeout: 15_000 })
+        // Navigate to login page (app login is at root /)
+        await page.goto(`${baseURL}/`, { waitUntil: 'networkidle', timeout: 15_000 })
 
         // Wait for login form to appear
         await page.waitForSelector('input[type="email"]', { timeout: 10_000 })
