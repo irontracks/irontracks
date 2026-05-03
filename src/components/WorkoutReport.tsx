@@ -5,6 +5,7 @@ import NextImage from 'next/image';
 import { Download, ArrowLeft, FileText, Code, Share2, Save } from 'lucide-react';
 import { buildReportHTML } from '@/utils/report/buildHtml';
 import { fetchLogoDataUrl } from '@/utils/report/fetchLogoDataUrl';
+import { fetchMuscleMapAssets } from '@/utils/report/fetchMuscleMapAssets';
 import { workoutPlanHtml } from '@/utils/report/templates';
 import { generatePostWorkoutInsights, applyProgressionToNextTemplate } from '@/actions/workout-actions';
 import { useVipCredits } from '@/hooks/useVipCredits';
@@ -226,6 +227,12 @@ const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose,
                 } catch (e) { logError('component:WorkoutReport.generateAiForPdf', e) }
             }
             const logoDataUrl = await fetchLogoDataUrl().catch(() => null)
+            // Pre-fetch the muscle-map PNGs as base64. The exported HTML is
+            // opened in iOS share / file:// blob contexts that can't reach the
+            // origin for external images.
+            const muscleMapAssets = muscleMapWeek.status === 'ready'
+                ? await fetchMuscleMapAssets(muscleGender, muscleMapWeek.data).catch(() => null)
+                : null
             const html = buildReportHTML(sessionForReport, prevForReport, String(user?.displayName || user?.email || ''), calories, {
                 prevLogsByExercise: prevLogsForReport,
                 prevBaseMsByExercise: prevBaseForReport,
@@ -237,6 +244,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose,
                 rpe: Number(postCheckin?.rpe) || undefined,
                 // Weekly muscle map snapshot — same data the in-page section uses
                 muscleMapWeek: muscleMapWeek.status === 'ready' ? muscleMapWeek.data : null,
+                muscleMapAssets,
             });
 
             const title = String(session?.workoutTitle || 'Treino').trim() || 'Treino'
