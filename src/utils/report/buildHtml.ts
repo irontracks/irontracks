@@ -382,7 +382,14 @@ export function buildReportHTML(
     } catch { /* SSR */ }
     return 'https://irontracks.com.br'
   })()
-  const muscleMapHtml = buildMuscleMapHtml(muscleMapWeek, { origin: reportOrigin, gender: muscleGender })
+  const muscleMapAssets = isRecord(opts?.muscleMapAssets) ? (opts.muscleMapAssets as {
+    baseFront: string | null
+    baseBack: string | null
+    maskFront: string | null
+    maskBack: string | null
+    overlays: Record<string, string>
+  }) : null
+  const muscleMapHtml = buildMuscleMapHtml(muscleMapWeek, { origin: reportOrigin, gender: muscleGender, assets: muscleMapAssets })
 
   const volumeDeltaStr = reportData?.summaryMetrics?.volumeDeltaPctVsPrev != null
     ? Number(reportData.summaryMetrics.volumeDeltaPctVsPrev).toFixed(1)

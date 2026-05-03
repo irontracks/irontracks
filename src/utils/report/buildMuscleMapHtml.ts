@@ -63,11 +63,22 @@ const dedupForView = (
 }
 
 interface BuildOptions {
-    /** Origin URL for the asset paths (e.g. https://irontracks.com.br). When
-     *  the HTML is opened locally as a file, absolute URLs let the browser
-     *  reach back to production for the PNGs. */
+    /** Origin URL for the asset paths (e.g. https://irontracks.com.br). Used
+     *  only as a fallback when `assets` is not provided. */
     origin?: string
     gender?: 'male' | 'female' | 'not_informed'
+    /** Pre-fetched base64 data URLs for every PNG the silhouette needs.
+     *  Required for the export to render correctly in iOS share sheets /
+     *  file:// blobs / print previews — those contexts can't fetch external
+     *  resources. When null/undefined, falls back to `origin` URLs (only
+     *  works in normal browser tabs with network to the origin). */
+    assets?: {
+        baseFront: string | null
+        baseBack: string | null
+        maskFront: string | null
+        maskBack: string | null
+        overlays: Record<string, string>
+    } | null
 }
 
 const buildOneSilhouette = (
@@ -76,13 +87,15 @@ const buildOneSilhouette = (
     opts: BuildOptions,
 ) => {
     const isFemale = opts.gender === 'female'
-    const overlayFolder = `${opts.origin || ''}/muscle-overlays`
-    const baseSrc = view === 'front'
+    const assets = opts.assets ?? null
+    const baseFallback = view === 'front'
         ? `${opts.origin || ''}/${isFemale ? 'body-front-female.png' : 'body-front.png'}`
         : `${opts.origin || ''}/${isFemale ? 'body-back-female.png' : 'body-back.png'}`
-    const maskSrc = view === 'front'
+    const maskFallback = view === 'front'
         ? `${opts.origin || ''}/${isFemale ? 'body-front-female-mask.png' : 'body-front-mask.png'}`
         : `${opts.origin || ''}/${isFemale ? 'body-back-female-mask.png' : 'body-back-mask.png'}`
+    const baseSrc = (view === 'front' ? assets?.baseFront : assets?.baseBack) || baseFallback
+    const maskSrc = (view === 'front' ? assets?.maskFront : assets?.maskBack) || maskFallback
 
     const overlays = view === 'front' ? FRONT_OVERLAYS : BACK_OVERLAYS
     const layers = dedupForView(overlays, muscles)
@@ -91,9 +104,10 @@ const buildOneSilhouette = (
         .map(({ file, maxRatio }) => {
             const opacity = ratioToOpacity(maxRatio)
             if (opacity <= 0) return ''
+            const overlaySrc = assets?.overlays?.[file] || `${opts.origin || ''}/muscle-overlays/${file}`
             return `<div style="
                 position:absolute; inset:0;
-                background-image:url('${overlayFolder}/${file}');
+                background-image:url('${overlaySrc}');
                 background-size:contain; background-position:center; background-repeat:no-repeat;
                 opacity:${opacity.toFixed(3)};
             "></div>`
