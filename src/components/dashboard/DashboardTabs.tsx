@@ -99,8 +99,14 @@ export const DashboardTabs = memo(({
               backdropFilter: 'blur(20px)',
             }}
           >
+            {/*
+              When the Nutrição overlay is open it sits on top of every view —
+              so visually the user is "in" Nutrição regardless of `view`.
+              Other tabs must dim out, otherwise the previously-selected tab
+              stays lit alongside Nutrição (the bug from PR #88's follow-up).
+            */}
             {tabs.map(({ key, label, icon }) => {
-              const active = view === key
+              const active = view === key && !nutritionActive
               return (
                 <button
                   key={key}
@@ -116,18 +122,21 @@ export const DashboardTabs = memo(({
               )
             })}
 
-            {showCommunityTab && (
-              <button
-                type="button"
-                onClick={() => changeTab('community')}
-                data-tour="tab-community"
-                className={tabCls(view === 'community')}
-              >
-                {renderIndicator(view === 'community')}
-                {renderIcon('/icons/tab-comunidade.png', view === 'community', 'Comunidade')}
-                <span>Comunidade</span>
-              </button>
-            )}
+            {showCommunityTab && (() => {
+              const active = view === 'community' && !nutritionActive
+              return (
+                <button
+                  type="button"
+                  onClick={() => changeTab('community')}
+                  data-tour="tab-community"
+                  className={tabCls(active)}
+                >
+                  {renderIndicator(active)}
+                  {renderIcon('/icons/tab-comunidade.png', active, 'Comunidade')}
+                  <span>Comunidade</span>
+                </button>
+              )
+            })()}
 
             {showNutritionTab && (
               <button
@@ -143,18 +152,21 @@ export const DashboardTabs = memo(({
               </button>
             )}
 
-            {showVipTab && (
-              <button
-                type="button"
-                onClick={() => changeTab('vip')}
-                data-tour="tab-vip"
-                className={tabCls(view === 'vip')}
-              >
-                {renderIndicator(view === 'vip')}
-                {renderIcon('/icons/tab-vip.png', view === 'vip', 'VIP')}
-                <span>{vipLabel}{vipLocked ? ' 🔒' : ''}</span>
-              </button>
-            )}
+            {showVipTab && (() => {
+              const active = view === 'vip' && !nutritionActive
+              return (
+                <button
+                  type="button"
+                  onClick={() => changeTab('vip')}
+                  data-tour="tab-vip"
+                  className={tabCls(active)}
+                >
+                  {renderIndicator(active)}
+                  {renderIcon('/icons/tab-vip.png', active, 'VIP')}
+                  <span>{vipLabel}{vipLocked ? ' 🔒' : ''}</span>
+                </button>
+              )
+            })()}
           </div>
         </div>
       </div>
