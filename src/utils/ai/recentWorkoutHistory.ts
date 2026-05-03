@@ -17,6 +17,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 interface CompactExercise {
     name: string
+    setsPlanned: number
     setsDone: number
     topSet: { weight: number; reps: number } | null
     volumeKg: number
@@ -54,8 +55,13 @@ const compactFromSession = (session: Record<string, unknown>, workoutName: strin
     const compactExercises: CompactExercise[] = exercises.map((ex, exIdx) => {
         const exObj = isObj(ex) ? ex : {}
         const name = String(exObj.name || `Exercício ${exIdx + 1}`).trim()
+        const setsPlanned = parseInt(String(exObj.sets || 0), 10) || 0
 
-        // Walk all logs that belong to this exercise (key prefix `${exIdx}-`).
+        // Walk all logs that belong to this exercise. Preferred key format is
+        // `${exIdx}-${setIdx}` (matches active-workout writes + report reads),
+        // but if a future schema change uses a different prefix the loop just
+        // returns 0 logged — caller still emits the exercise with setsPlanned
+        // so the AI knows what was scheduled.
         let setsDone = 0
         let volumeKg = 0
         let topSet: { weight: number; reps: number } | null = null
@@ -78,11 +84,16 @@ const compactFromSession = (session: Record<string, unknown>, workoutName: strin
 
         return {
             name,
+            setsPlanned,
             setsDone,
             topSet,
             volumeKg: Math.round(volumeKg),
         }
-    }).filter((e) => e.setsDone > 0)
+    })
+    // Don't filter exercises by `setsDone > 0` — keeping them lets the AI
+    // distinguish "user planned bench but skipped it" from "user didn't have
+    // bench in the workout at all". Same reasoning for keeping workouts with
+    // 0 total logs below.
 
     return {
         date: workoutDate,
@@ -128,7 +139,10 @@ export async function fetchRecentWorkoutHistory(
             const name = String(r.name || session.workoutTitle || 'Treino').trim() || 'Treino'
             const date = String(r.date || '').trim()
             const c = compactFromSession(session, name, date)
-            if (c.exercises.length > 0) compact.push(c)
+            // Push every workout, even when no logs were recorded — the AI can
+            // still summarise scheduled volume and call out missing logs
+            // explicitly instead of pretending it has no idea.
+            compact.push(c)
         }
 
         return compact.length > 0 ? compact : null
