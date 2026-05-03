@@ -8,6 +8,7 @@ import { parseJsonBody } from '@/utils/zod'
 import { logInfo, logError } from '@/lib/logger'
 import { env } from '@/utils/env'
 import { safeGemini, handleGeminiError } from '@/utils/ai/handleGeminiError'
+import { fetchRecentWorkoutHistory } from '@/utils/ai/recentWorkoutHistory'
 
 export const dynamic = 'force-dynamic'
 
@@ -64,6 +65,13 @@ export async function POST(req: Request) {
     const messages = normalizeMessages(body.messages)
     const context = body.context ?? null
 
+    // Pull a compact summary of the user's last 5 workouts so the coach can
+    // answer questions about progression, weights, recent volume, etc.
+    // Without this, the chat had no access to the user's history and would
+    // tell them "I don't have your performance data" — even when the report
+    // shows everything. (Reported by user testing 2026-05-03.)
+    const recentHistory = await fetchRecentWorkoutHistory(supabase, userId, 5)
+
     const apiKey = env.gemini.apiKey
     if (!apiKey) {
       return NextResponse.json(
@@ -82,13 +90,16 @@ export async function POST(req: Request) {
       'Não invente números; use apenas o que o usuário forneceu.',
       'Quando o usuário pedir um treino, monte um treino completo com nome, exercícios, séries, repetições, descanso e método de cada exercício.',
       '',
-      'Contexto (pode ser null):',
+      'Histórico recente do usuário (últimos treinos com pesos/reps/volume — pode ser vazio):',
+      recentHistory ? JSON.stringify(recentHistory) : '[]',
+      '',
+      'Contexto adicional fornecido pelo cliente (pode ser null — geralmente o treino atual ou comparação):',
       JSON.stringify(context),
       '',
       'Conversa:',
       JSON.stringify(messages),
       '',
-      'Responda com o texto final do coach (sem markdown).',
+      'Responda com o texto final do coach (sem markdown). Se o usuário perguntar sobre desempenho/progressão, USE o histórico acima — não diga "não tenho dados" se o histórico estiver populado.',
     ].join('\n')
 
     const genAI = new GoogleGenerativeAI(apiKey)
