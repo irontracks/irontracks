@@ -43,6 +43,15 @@ export function useStoryComposer({ open, session, onClose, caloriesOverride }: U
     const videoRef = useRef<HTMLVideoElement>(null)
     const compositorRef = useRef<VideoCompositor | null>(null)
     const dragRef = useRef({ key: null as string | null, pointerId: null as number | null, startX: 0, startY: 0, startPos: { x: 0, y: 0 } })
+    // Group-drag mirrors the LIVE per-piece drag, but tracks the start positions
+    // of all 6 pieces so a single pointer move can apply the same delta to each.
+    const groupDragRef = useRef<{
+        active: boolean
+        pointerId: number | null
+        startX: number
+        startY: number
+        startPositions: LivePositions
+    }>({ active: false, pointerId: null, startX: 0, startY: 0, startPositions: DEFAULT_LIVE_POSITIONS })
     const [mediaLoadIdRef] = useState({ current: 0 })
     const backgroundUrlRef = useRef('')
 
@@ -323,13 +332,68 @@ export function useStoryComposer({ open, session, onClose, caloriesOverride }: U
         } catch { }
     }, [])
 
+    const onGroupPointerDown = useCallback((e: React.PointerEvent<HTMLElement>) => {
+        try {
+            if (layout !== 'group' || !e?.currentTarget || typeof e?.pointerId !== 'number') return
+            e.preventDefault?.(); e.stopPropagation?.()
+            const startPositions = livePositions ?? DEFAULT_LIVE_POSITIONS
+            groupDragRef.current = { active: true, pointerId: e.pointerId, startX: e.clientX, startY: e.clientY, startPositions }
+            setDraggingKey('__group__')
+            e.currentTarget?.setPointerCapture?.(e.pointerId)
+        } catch { }
+    }, [layout, livePositions])
+
+    const onGroupPointerMove = useCallback((e: React.PointerEvent<HTMLElement>, previewRect: DOMRect | null) => {
+        try {
+            if (layout !== 'group') return
+            const { active, pointerId, startX, startY, startPositions } = groupDragRef.current
+            if (!active || typeof pointerId !== 'number' || e?.pointerId !== pointerId) return
+            if (!previewRect?.width || !previewRect?.height) return
+            e.preventDefault?.(); e.stopPropagation?.()
+            const dxPct = (Number(e.clientX) - Number(startX)) / previewRect.width
+            const dyPct = (Number(e.clientY) - Number(startY)) / previewRect.height
+            // Apply the proposed delta to every piece, clamp each, then take the
+            // most-constrained delta back so the whole group moves as one unit.
+            const keys = Object.keys(startPositions) as (keyof LivePositions)[]
+            let actualDx = dxPct
+            let actualDy = dyPct
+            for (const k of keys) {
+                const start = startPositions[k] ?? { x: 0, y: 0 }
+                const proposed = { x: start.x + dxPct, y: start.y + dyPct }
+                const clamped = clampPctWithSize({ pos: proposed, size: getSizeForKey(String(k)) })
+                const realDx = clamped.x - start.x
+                const realDy = clamped.y - start.y
+                if (Math.abs(realDx) < Math.abs(actualDx)) actualDx = realDx
+                if (Math.abs(realDy) < Math.abs(actualDy)) actualDy = realDy
+            }
+            const next: LivePositions = { ...startPositions }
+            for (const k of keys) {
+                const start = startPositions[k] ?? { x: 0, y: 0 }
+                next[k] = { x: start.x + actualDx, y: start.y + actualDy }
+            }
+            setLivePositions(next)
+        } catch { }
+    }, [layout, getSizeForKey])
+
+    const onGroupPointerUp = useCallback((e: React.PointerEvent<HTMLElement>) => {
+        try {
+            const { active, pointerId } = groupDragRef.current
+            if (!active || typeof pointerId !== 'number' || e?.pointerId !== pointerId) return
+            e.preventDefault?.(); e.stopPropagation?.()
+            e.currentTarget?.releasePointerCapture?.(pointerId)
+            groupDragRef.current = { active: false, pointerId: null, startX: 0, startY: 0, startPositions: livePositions ?? DEFAULT_LIVE_POSITIONS }
+            setDraggingKey(null)
+        } catch { }
+    }, [livePositions])
+
     const onSelectLayout = useCallback((nextLayout: string) => {
         try {
             setLayout(safeString(nextLayout) || 'bottom-row')
             setDraggingKey(null)
             dragRef.current = { key: null, pointerId: null, startX: 0, startY: 0, startPos: { x: 0, y: 0 } }
+            groupDragRef.current = { active: false, pointerId: null, startX: 0, startY: 0, startPositions: livePositions ?? DEFAULT_LIVE_POSITIONS }
         } catch { setLayout('bottom-row') }
-    }, [])
+    }, [livePositions])
 
     // Canvas helpers
     const renderVideoFrameAsJpeg = async (vid: HTMLVideoElement): Promise<{ blob: Blob; filename: string; mime: string }> => {
@@ -513,6 +577,7 @@ export function useStoryComposer({ open, session, onClose, caloriesOverride }: U
         // handlers
         loadMedia, onSelectLayout,
         onPiecePointerDown, onPiecePointerMove, onPiecePointerUp,
+        onGroupPointerDown, onGroupPointerMove, onGroupPointerUp,
         shareImage, postToIronTracks,
     }
 }
