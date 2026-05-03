@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { RefreshCw, Flame, Trophy, Activity, Moon } from 'lucide-react'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { translateAiError } from '@/utils/ai/clientErrors'
 
 type WeeklySummary = {
   ok: boolean
@@ -32,7 +33,11 @@ export default function VipWeeklySummaryCard() {
       const json = (await res.json().catch((): null => null)) as WeeklySummary | null
       if (!json?.ok) {
         setData(null)
-        setError(String(json?.error || 'Falha ao carregar resumo semanal.'))
+        const raw = String(json?.error || '')
+        // Keep 'vip_required' raw so the upgrade-CTA branch in the JSX
+        // can detect it. Everything else goes through translateAiError to
+        // hide canonical codes like 'ai_rate_limited' / 'rate_limit_exceeded'.
+        setError(raw === 'vip_required' ? 'vip_required' : translateAiError(raw))
         return
       }
       setData(json)

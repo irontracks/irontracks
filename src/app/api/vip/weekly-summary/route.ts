@@ -107,18 +107,25 @@ export async function GET() {
     return NextResponse.json({ ok: false, error: 'vip_required', upgradeRequired: true }, { status: 403 })
   }
 
-  const rl = await checkRateLimitAsync(`vip-weekly-summary:${user.id}`, 5, 3_600_000)
-  if (!rl.allowed) {
-    return NextResponse.json(
-      { ok: false, error: 'rate_limit_exceeded' },
-      { status: 429, headers: { 'Retry-After': String(rl.retryAfterSeconds) } },
-    )
-  }
+  const rl_key = `vip-weekly-summary:${user.id}`
 
   try {
     const cacheKey = `vip:weekly-summary:${user.id}`
     const cached = await cacheGet<Record<string, unknown>>(cacheKey, (v) => (v && typeof v === 'object' ? (v as Record<string, unknown>) : null))
     if (cached) return NextResponse.json(cached)
+
+    // Cache miss: this request will actually call the AI. Now is the time to
+    // gate it on the rate limiter — checking BEFORE the cache lookup made
+    // every refresh (even cached ones) tick the 5/hour budget down, so users
+    // were getting 429s after a handful of clicks even when nothing reached
+    // Gemini.
+    const rl = await checkRateLimitAsync(rl_key, 5, 3_600_000)
+    if (!rl.allowed) {
+      return NextResponse.json(
+        { ok: false, error: 'ai_rate_limited' },
+        { status: 429, headers: { 'Retry-After': String(rl.retryAfterSeconds) } },
+      )
+    }
 
     const now = Date.now()
     const startIso = new Date(now - 7 * 24 * 60 * 60 * 1000).toISOString()
