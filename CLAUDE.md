@@ -178,3 +178,16 @@ editar código
   → npm run scan:secrets        (se tocou configs)
   → npm run deploy              (commit + push + Vercel CI/CD)
 ```
+
+## Auto-merge ao terminar tarefa (quando trabalhando via PR)
+Quando o agente está desenvolvendo numa branch e abriu PR, o fluxo padrão ao terminar a tarefa é:
+
+1. Aguardar o `quality-check` do GitHub Actions ficar verde
+2. Marcar o PR como ready (sair de draft)
+3. Mergear com **squash** (mantém main com 1 commit por feature, casa com o histórico atual)
+4. Vercel deploya prod automático no push pra main
+
+Não é preciso pedir confirmação a cada PR — esta regra é a confirmação durável. Exceções em que o agente DEVE pedir antes de mergear:
+- Mudança em `middleware.ts`, fluxos de auth, schemas do banco com migration, ou pagamentos (RevenueCat/IAP)
+- CI vermelho ou flaky — investigar primeiro, não tentar contornar com `--no-verify` ou retry cego
+- PR com revisões humanas pendentes não resolvidas
