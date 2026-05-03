@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useMemo, useState } from 'react'
+import { useMemo, useState } from 'react'
 import dynamic from 'next/dynamic'
 import { MUSCLE_GROUPS } from '@/utils/muscleMapConfig'
 
