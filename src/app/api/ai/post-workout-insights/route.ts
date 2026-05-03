@@ -163,24 +163,29 @@ export async function POST(req: Request) {
     const supabase = auth.supabase
     const userId = String(auth.user.id || '').trim()
 
-    const ip = getRequestIp(req)
-    const rl = await checkRateLimitAsync(`ai:post-workout-insights:${userId}:${ip}`, 15, 60_000)
-    if (!rl.allowed) {
-      return NextResponse.json(
-        { ok: false, error: 'rate_limited' },
-        { status: 429, headers: { 'Retry-After': String(rl.retryAfterSeconds) } },
-      )
-    }
-
-    // Check VIP Limits (Counts as Insights Weekly)
+    // Check VIP weekly quota first — paying tiers are already bounded by their
+    // weekly limit, so they bypass the abuse rate limiter below. Free tier
+    // still goes through rate limiting to protect the endpoint.
     const { allowed, limit, tier } = await checkVipFeatureAccess(supabase, userId, 'insights_weekly');
     if (!allowed) {
-        return NextResponse.json({ 
+        return NextResponse.json({
             ok: false,
-            error: 'Limit Reached', 
+            error: 'Limit Reached',
             message: `Você atingiu o limite semanal de ${limit} insights do seu plano ${tier}. Faça upgrade para continuar.`,
             upgradeRequired: true
         }, { status: 403 });
+    }
+
+    const isFreeTier = !tier || tier === 'free'
+    if (isFreeTier) {
+      const ip = getRequestIp(req)
+      const rl = await checkRateLimitAsync(`ai:post-workout-insights:${userId}:${ip}`, 15, 60_000)
+      if (!rl.allowed) {
+        return NextResponse.json(
+          { ok: false, error: 'rate_limited' },
+          { status: 429, headers: { 'Retry-After': String(rl.retryAfterSeconds) } },
+        )
+      }
     }
 
     const apiKey = env.gemini.apiKey

@@ -59,6 +59,7 @@ export const STORY_LAYOUTS: LayoutOption[] = [
     { id: 'left-stack', label: 'Esquerda' },
     { id: 'top-row', label: 'Topo' },
     { id: 'live', label: 'LIVE' },
+    { id: 'group', label: 'Grupo' },
 ];
 
 // Safe-area-aware defaults for LIVE layout
@@ -524,7 +525,7 @@ export const drawStory = ({
 
     const layoutId = STORY_LAYOUTS.some((l) => l.id === layout) ? layout : 'bottom-row';
 
-    if (layoutId === 'live') {
+    if (layoutId === 'live' || layoutId === 'group') {
         const safe =
             livePositions && typeof livePositions === 'object' ? livePositions : DEFAULT_LIVE_POSITIONS;
         const sizes = computeLiveSizes({ ctx, metrics });

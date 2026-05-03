@@ -47,6 +47,7 @@ export default function StoryComposer({ open, session, onClose, calories }: Stor
     metrics: rawMetrics,
     loadMedia, onSelectLayout,
     onPiecePointerDown, onPiecePointerMove, onPiecePointerUp,
+    onGroupPointerDown, onGroupPointerMove, onGroupPointerUp,
     shareImage, postToIronTracks,
   } = useStoryComposer({ open, session, onClose, caloriesOverride: calories })
 
@@ -275,6 +276,31 @@ export default function StoryComposer({ open, session, onClose, calories }: Stor
                         })}
                       </div>
                     )}
+
+                    {layout === 'group' && (
+                      <div
+                        className={[
+                          'absolute inset-0 z-20 touch-none select-none cursor-grab active:cursor-grabbing',
+                          'flex items-center justify-center',
+                        ].join(' ')}
+                        onPointerDown={onGroupPointerDown}
+                        onPointerMove={(e) => onGroupPointerMove(e, previewRef.current?.getBoundingClientRect() ?? null)}
+                        onPointerUp={onGroupPointerUp}
+                        onPointerCancel={onGroupPointerUp}
+                      >
+                        <span
+                          className={[
+                            'pointer-events-none px-3 py-1.5 rounded-full border text-[10px] font-black uppercase tracking-widest shadow-lg transition-all',
+                            draggingKey === '__group__'
+                              ? 'bg-yellow-500 text-black border-yellow-500 scale-110'
+                              : 'bg-black/60 backdrop-blur text-white border-white/30',
+                          ].join(' ')}
+                        >
+                          ARRASTAR GRUPO
+                        </span>
+                      </div>
+                    )}
+
                             {selectedSticker && (() => {
                           const stk = STICKERS.find(s => s.id === selectedSticker)
                           if (!stk) return null
