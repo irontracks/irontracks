@@ -21,12 +21,20 @@ export interface MuscleMapWeekState {
  * when `enabled` becomes true.
  */
 export function useMuscleMapWeek(enabled: boolean): MuscleMapWeekState {
-    const [state, setState] = useState<MuscleMapWeekState>({ status: 'idle', data: null, error: null })
+    // Initialize directly to 'loading' when enabled — avoids the
+    // react-hooks/set-state-in-effect violation that would come from a
+    // synchronous setState({ status: 'loading' }) inside the fetch effect.
+    // The effect only setStates to a terminal status ('ready' / 'error') after
+    // the await, which the rule allows.
+    const [state, setState] = useState<MuscleMapWeekState>(() => ({
+        status: enabled ? 'loading' : 'idle',
+        data: null,
+        error: null,
+    }))
 
     useEffect(() => {
         if (!enabled) return
         let cancelled = false
-        setState({ status: 'loading', data: null, error: null })
         ;(async () => {
             try {
                 const res = await getMuscleMapWeek({}) as { ok?: boolean; muscles?: unknown; error?: string } & Record<string, unknown>
