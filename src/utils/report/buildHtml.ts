@@ -1,4 +1,5 @@
 import { escapeHtml } from '@/utils/escapeHtml'
+import { buildMuscleMapHtml } from '@/utils/report/buildMuscleMapHtml'
 import {
   isRecord,
   formatDate,
@@ -367,6 +368,21 @@ export function buildReportHTML(
 ) {
   const reportData = buildReportData(session, previousSession, studentName, kcalOverride, options)
   const aiRaw = isRecord((reportData as Record<string, unknown>)?.ai) ? ((reportData as Record<string, unknown>).ai as Record<string, unknown>) : null
+  const opts = isRecord(options) ? (options as Record<string, unknown>) : {}
+  const muscleMapWeek = isRecord(opts?.muscleMapWeek) ? (opts.muscleMapWeek as Record<string, unknown>) : null
+  const biologicalSexRaw = String((opts?.biologicalSex as string) || '').toLowerCase().trim()
+  const muscleGender: 'male' | 'female' | 'not_informed' = biologicalSexRaw === 'female' || biologicalSexRaw === 'feminino'
+    ? 'female'
+    : biologicalSexRaw === 'male' || biologicalSexRaw === 'masculino'
+      ? 'male'
+      : 'not_informed'
+  const reportOrigin = (() => {
+    try {
+      if (typeof window !== 'undefined' && window.location?.origin) return window.location.origin
+    } catch { /* SSR */ }
+    return 'https://irontracks.com.br'
+  })()
+  const muscleMapHtml = buildMuscleMapHtml(muscleMapWeek, { origin: reportOrigin, gender: muscleGender })
 
   const volumeDeltaStr = reportData?.summaryMetrics?.volumeDeltaPctVsPrev != null
     ? Number(reportData.summaryMetrics.volumeDeltaPctVsPrev).toFixed(1)
@@ -916,6 +932,7 @@ export function buildReportHTML(
 
     ${buildBikeCards()}
     ${buildAiSection()}
+    ${muscleMapHtml}
     ${detailByExerciseHtml}
 
     <!-- ── Exercises ──────────────────────────────── -->
