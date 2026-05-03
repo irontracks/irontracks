@@ -74,6 +74,23 @@ export const DEFAULT_LIVE_POSITIONS: LivePositions = {
     cardKcal: { x: 0.654, y: 0.720 },
 };
 
+// Group layout starts with the same arrangement as the Normal (bottom-row)
+// layout: brand at top, title and subtitle clustered just above the cards at
+// the bottom. Numbers derive from bottom-row's drawStory math:
+//   cardTopY  = safeBottomY - 16 - cardH           = 934 → 934/1280 ≈ 0.730
+//   subtitleY = cardTopY - 52                       = 882 → 882/1280 ≈ 0.689
+//   titleY    = subtitleY - 16 - 2*titleLineH       = 778 → 778/1280 ≈ 0.608
+// (titleY uses the 2-line worst case so longer titles don't collide with the
+// subtitle pill.)
+export const DEFAULT_GROUP_POSITIONS: LivePositions = {
+    brand: { x: 0.078, y: 0.135 },
+    title: { x: 0.078, y: 0.608 },
+    subtitle: { x: 0.078, y: 0.689 },
+    cardVolume: { x: 0.078, y: 0.730 },
+    cardTempo: { x: 0.366, y: 0.730 },
+    cardKcal: { x: 0.654, y: 0.730 },
+};
+
 // ─── Helper Utilities ─────────────────────────────────────────────────────────
 
 
