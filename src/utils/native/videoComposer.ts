@@ -17,7 +17,6 @@
  * over without UX disruption.
  */
 
-import { Capacitor } from '@capacitor/core'
 import { isIosNative } from '@/utils/platform'
 import {
   composeStoryVideoNative,
@@ -216,18 +215,30 @@ export const composeStoryVideoOnIos = async (
     }
     outputNativePath = result.outputPath
 
-    // ── 4. Read result back via WKWebView-accessible URL (no base64) ───────
-    const webPath = Capacitor.convertFileSrc(outputNativePath)
+    // ── 4. Read result back via Filesystem.readFile ────────────────────────
+    // Capacitor.convertFileSrc returns capacitor://localhost/... which fails
+    // when server.url is set to a real domain (the WebView's https origin
+    // can't fetch from a custom scheme). Going through the plugin call instead
+    // avoids the cross-origin issue entirely. The base64 → Blob decode uses
+    // a data: URL so WebKit handles the decoding in native code.
     let blob: Blob
     try {
-      const fetchResponse = await fetch(webPath)
-      if (!fetchResponse.ok) {
-        emitDiag({ path: 'fallback', stage: 'read_output', error: `http_${fetchResponse.status}` })
-        return null
-      }
-      blob = await fetchResponse.blob()
+      const { Filesystem, Directory } = await import('@capacitor/filesystem')
+      const outputFilename = outputNativePath.split('/').pop() || ''
+      if (!outputFilename) throw new Error('empty_output_filename')
+      const readResult = await Filesystem.readFile({
+        path: outputFilename,
+        directory: Directory.Cache,
+      })
+      const base64 = typeof readResult.data === 'string'
+        ? readResult.data
+        : ''
+      if (!base64) throw new Error('empty_read_data')
+      const dataUrl = `data:video/mp4;base64,${base64}`
+      const dataResp = await fetch(dataUrl)
+      blob = await dataResp.blob()
     } catch (e) {
-      const msg = e instanceof Error ? e.message : 'fetch_failed'
+      const msg = e instanceof Error ? e.message : 'read_failed'
       emitDiag({ path: 'fallback', stage: 'read_output', error: msg })
       return null
     }
