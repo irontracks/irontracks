@@ -425,6 +425,26 @@ export function useStoryComposer({ open, session, onClose, caloriesOverride }: U
         compositorRef.current = new VideoCompositor()
         setIsExporting(true)
         try {
+            // ── Pre-render static overlay once (metrics/cards/brand never change during export) ──
+            // Each video frame then does only 2 drawImage calls instead of ~50 canvas ops.
+            const overlayCanvas = document.createElement('canvas')
+            overlayCanvas.width = CANVAS_W
+            overlayCanvas.height = CANVAS_H
+            const overlayCtx = overlayCanvas.getContext('2d') // alpha: true (default) — transparent bg
+            if (overlayCtx) {
+                drawStory({
+                    ctx: overlayCtx,
+                    canvasW: CANVAS_W,
+                    canvasH: CANVAS_H,
+                    backgroundImage: null,
+                    metrics,
+                    layout,
+                    livePositions,
+                    transparentBg: true,
+                    skipClear: false,
+                })
+            }
+
             const renderPromise = compositorRef.current.render({
                 videoElement: vid, trimRange, outputWidth: CANVAS_W, outputHeight: CANVAS_H, fps: 30,
                 onDrawFrame: (ctx, video) => {
@@ -432,8 +452,10 @@ export function useStoryComposer({ open, session, onClose, caloriesOverride }: U
                     if (!vw || !vh) return
                     const { scale } = fitCover({ canvasW: CANVAS_W, canvasH: CANVAS_H, imageW: vw, imageH: vh })
                     const dw = vw * scale; const dh = vh * scale
+                    // 1. Draw current video frame (fills canvas)
                     ctx.drawImage(video, (CANVAS_W - dw) / 2, (CANVAS_H - dh) / 2, dw, dh)
-                    drawStory({ ctx, canvasW: CANVAS_W, canvasH: CANVAS_H, backgroundImage: null, metrics, layout, livePositions, transparentBg: true, skipClear: true })
+                    // 2. Composite pre-baked overlay bitmap in a single draw call
+                    if (overlayCtx) ctx.drawImage(overlayCanvas, 0, 0)
                 }
             })
             const result = await Promise.race([renderPromise, new Promise<never>((_, reject) => setTimeout(() => reject(new Error('render_timeout_60s')), 60_000))])
