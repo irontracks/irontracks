@@ -40,11 +40,39 @@ const buildLogVolume = (logs: UnknownRecord, exerciseIndex: number) => {
     const eIdx = Number(parts[0])
     if (!Number.isFinite(eIdx) || eIdx !== exerciseIndex) return
     if (!isObject(value)) return
-    const weight = toNumber(value.weight ?? value.kg ?? value.load)
-    const repsVal = toNumber(value.reps)
     const doneRaw = value.done ?? value.isDone ?? value.completed ?? null
     const done = doneRaw == null ? true : doneRaw === true || String(doneRaw || '').toLowerCase() === 'true'
     if (!done) return
+
+    // ── Drop-set: sum each stage's volume; use first-stage (main) weight as avg ──
+    const dropSet = isObject(value.drop_set) ? (value.drop_set as UnknownRecord) : null
+    const dropStages = dropSet && Array.isArray(dropSet.stages) ? (dropSet.stages as unknown[]) : []
+    if (dropStages.length > 0) {
+      let dropVol = 0
+      let totalReps = 0
+      let firstWeight: number | null = null
+      for (const stage of dropStages) {
+        if (!isObject(stage)) continue
+        const sw = toNumber((stage as UnknownRecord).weight)
+        const sr = toNumber((stage as UnknownRecord).reps)
+        if (sw > 0 && sr > 0) {
+          dropVol += sw * sr
+          totalReps += sr
+          if (firstWeight === null) firstWeight = sw
+        }
+      }
+      if (totalReps > 0) reps += totalReps
+      if (dropVol > 0) volume += dropVol
+      if (firstWeight !== null) { weightSum += firstWeight; weightCount += 1 }
+      sets += 1
+      return
+    }
+
+    // ── Plank / isometric: durationSeconds carries the actual hold time ──
+    const durationSec = toNumber(value.durationSeconds ?? value.duration_seconds ?? 0)
+    const weight = toNumber(value.weight ?? value.kg ?? value.load)
+    const repsVal = durationSec > 0 ? durationSec : toNumber(value.reps)
+
     if (weight > 0 && repsVal > 0) {
       volume += weight * repsVal
       reps += repsVal
