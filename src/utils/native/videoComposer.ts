@@ -57,6 +57,83 @@ export type NativeComposeDiagnostic = {
 }
 
 /**
+ * Read a Blob slice as base64 using the native WebKit FileReader.
+ * Far faster than a JS String.fromCharCode + btoa loop because the conversion
+ * runs in WebKit's C code (single call for the whole slice).
+ */
+const readBlobSliceAsBase64 = (slice: Blob): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    try {
+      const reader = new FileReader()
+      reader.onloadend = () => {
+        try {
+          const dataUrl = String(reader.result ?? '')
+          const commaIdx = dataUrl.indexOf(',')
+          resolve(commaIdx >= 0 ? dataUrl.slice(commaIdx + 1) : dataUrl)
+        } catch (e) {
+          reject(e)
+        }
+      }
+      reader.onerror = () => reject(new Error('reader_failed'))
+      reader.readAsDataURL(slice)
+    } catch (e) {
+      reject(e)
+    }
+  })
+}
+
+/**
+ * Stream a Blob to a Cache file via Filesystem.writeFile + appendFile.
+ *
+ * The Capacitor bridge serializes plugin calls as JSON, which is slow + memory-
+ * heavy for a single 70 MB base64 string. By splitting the blob into 2 MB
+ * binary chunks (~2.7 MB base64 each), every cross-bridge call stays small and
+ * fast. FileReader.readAsDataURL handles the binary→base64 conversion natively
+ * inside WebKit, so the per-chunk overhead is dominated by the disk write
+ * (which is also fast on internal flash).
+ *
+ * Net result for a 100 MB video: ~1-2s vs 15-30s for a single base64 round-trip.
+ */
+const writeBlobToCacheChunked = async (
+  blob: Blob,
+  filename: string,
+): Promise<string> => {
+  const { Filesystem, Directory } = await import('@capacitor/filesystem')
+
+  const CHUNK_SIZE = 2 * 1024 * 1024 // 2 MB binary → ~2.7 MB base64
+  const total = blob.size
+  let resultUri = ''
+
+  if (total === 0) {
+    const r = await Filesystem.writeFile({ path: filename, data: '', directory: Directory.Cache })
+    return String(r.uri || '')
+  }
+
+  for (let offset = 0, idx = 0; offset < total; offset += CHUNK_SIZE, idx++) {
+    const end = Math.min(offset + CHUNK_SIZE, total)
+    const slice = blob.slice(offset, end)
+    const base64 = await readBlobSliceAsBase64(slice)
+
+    if (idx === 0) {
+      const r = await Filesystem.writeFile({
+        path: filename,
+        data: base64,
+        directory: Directory.Cache,
+      })
+      resultUri = String(r.uri || '')
+    } else {
+      await Filesystem.appendFile({
+        path: filename,
+        data: base64,
+        directory: Directory.Cache,
+      })
+    }
+  }
+
+  return resultUri
+}
+
+/**
  * Try to compose the story video natively on iOS. Returns null on any failure
  * (caller should fall back to the JS pipeline). When `onDiagnostic` is provided,
  * emits where the pipeline stopped + total wall time — useful for diagnosing
@@ -81,50 +158,39 @@ export const composeStoryVideoOnIos = async (
   let progressUnsubscribe: (() => void) | null = null
 
   try {
-    // Lazy-import to avoid bundling Filesystem on web builds where it's unused.
-    const { Filesystem, Directory } = await import('@capacitor/filesystem')
-
     const timestamp = Date.now()
     const safeExt = (input.videoExt || 'mp4').replace(/^\.+/, '').toLowerCase()
     const videoFilename = `irontracks-source-${timestamp}.${safeExt}`
     const overlayFilename = `irontracks-overlay-${timestamp}.png`
 
-    // ── 1. Write source video to Cache ──────────────────────────────────────
-    // Filesystem 8+ accepts Blob directly: no base64 conversion, no JSON-encoded
-    // bridge round-trip. The plugin streams binary data natively, which on iOS
-    // is dramatically faster (1-2s for 100 MB vs 15-30s via base64).
-    let videoWrite: { uri: string }
+    // ── 1. Stream source video to Cache (chunked base64) ───────────────────
+    // The Capacitor iOS Filesystem only accepts string data despite the TS
+    // types claiming Blob support. Chunked writes via FileReader keep each
+    // bridge call small and fast.
+    let videoUri = ''
     try {
-      videoWrite = await Filesystem.writeFile({
-        path: videoFilename,
-        data: input.videoBlob,
-        directory: Directory.Cache,
-      })
+      videoUri = await writeBlobToCacheChunked(input.videoBlob, videoFilename)
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'write_failed'
       emitDiag({ path: 'fallback', stage: 'write_video', error: msg })
       return null
     }
-    videoTempPath = String(videoWrite.uri || '').replace(/^file:\/\//, '')
+    videoTempPath = String(videoUri || '').replace(/^file:\/\//, '')
     if (!videoTempPath) {
       emitDiag({ path: 'fallback', stage: 'write_video', error: 'empty_uri' })
       return null
     }
 
-    // ── 2. Write overlay PNG to Cache (same Blob shortcut) ─────────────────
-    let overlayWrite: { uri: string }
+    // ── 2. Stream overlay PNG to Cache (same chunked path; tiny file = 1 chunk) ──
+    let overlayUri = ''
     try {
-      overlayWrite = await Filesystem.writeFile({
-        path: overlayFilename,
-        data: input.overlayBlob,
-        directory: Directory.Cache,
-      })
+      overlayUri = await writeBlobToCacheChunked(input.overlayBlob, overlayFilename)
     } catch (e) {
       const msg = e instanceof Error ? e.message : 'write_failed'
       emitDiag({ path: 'fallback', stage: 'write_overlay', error: msg })
       return null
     }
-    overlayTempPath = String(overlayWrite.uri || '').replace(/^file:\/\//, '')
+    overlayTempPath = String(overlayUri || '').replace(/^file:\/\//, '')
     if (!overlayTempPath) {
       emitDiag({ path: 'fallback', stage: 'write_overlay', error: 'empty_uri' })
       return null
