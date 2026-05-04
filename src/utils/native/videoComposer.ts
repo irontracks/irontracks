@@ -45,28 +45,35 @@ interface ComposeStoryNativeResult {
 }
 
 /**
- * Convert Blob → base64 string in chunks (avoids stack overflow on big buffers).
- * Same pattern as saveBlobToPhotos in irontracksNative.ts.
+ * Diagnostic outcome for the caller. `path` is "native" when AVFoundation ran
+ * end-to-end, "fallback" when we returned null and the JS pipeline takes over.
+ * `stage` indicates where the native pipeline stopped (for debugging).
  */
-const blobToBase64 = async (blob: Blob): Promise<string> => {
-  const buffer = await blob.arrayBuffer()
-  const bytes = new Uint8Array(buffer)
-  let binary = ''
-  const chunkSize = 8192
-  for (let i = 0; i < bytes.length; i += chunkSize) {
-    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize))
-  }
-  return btoa(binary)
+export type NativeComposeDiagnostic = {
+  path: 'native' | 'fallback'
+  durationMs: number
+  stage?: 'write_video' | 'write_overlay' | 'native_export' | 'read_output' | 'precondition'
+  error?: string
 }
 
 /**
  * Try to compose the story video natively on iOS. Returns null on any failure
- * (caller should fall back to the JS pipeline).
+ * (caller should fall back to the JS pipeline). When `onDiagnostic` is provided,
+ * emits where the pipeline stopped + total wall time — useful for diagnosing
+ * why the fast path didn't take.
  */
 export const composeStoryVideoOnIos = async (
-  input: ComposeStoryNativeInput,
+  input: ComposeStoryNativeInput & { onDiagnostic?: (d: NativeComposeDiagnostic) => void },
 ): Promise<ComposeStoryNativeResult | null> => {
-  if (!isIosNative()) return null
+  const t0 = Date.now()
+  const emitDiag = (d: Omit<NativeComposeDiagnostic, 'durationMs'>) => {
+    try { input.onDiagnostic?.({ ...d, durationMs: Date.now() - t0 }) } catch { /* swallow */ }
+  }
+
+  if (!isIosNative()) {
+    emitDiag({ path: 'fallback', stage: 'precondition', error: 'not_ios_native' })
+    return null
+  }
 
   let videoTempPath: string | null = null
   let overlayTempPath: string | null = null
@@ -78,31 +85,52 @@ export const composeStoryVideoOnIos = async (
     const { Filesystem, Directory } = await import('@capacitor/filesystem')
 
     const timestamp = Date.now()
-    const safeExt = (input.videoExt || '.mp4').replace(/^\.+/, '').toLowerCase()
+    const safeExt = (input.videoExt || 'mp4').replace(/^\.+/, '').toLowerCase()
     const videoFilename = `irontracks-source-${timestamp}.${safeExt}`
     const overlayFilename = `irontracks-overlay-${timestamp}.png`
 
-    // 1. Write source video to Cache
-    const videoB64 = await blobToBase64(input.videoBlob)
-    const videoWrite = await Filesystem.writeFile({
-      path: videoFilename,
-      data: videoB64,
-      directory: Directory.Cache,
-    })
+    // ── 1. Write source video to Cache ──────────────────────────────────────
+    // Filesystem 8+ accepts Blob directly: no base64 conversion, no JSON-encoded
+    // bridge round-trip. The plugin streams binary data natively, which on iOS
+    // is dramatically faster (1-2s for 100 MB vs 15-30s via base64).
+    let videoWrite: { uri: string }
+    try {
+      videoWrite = await Filesystem.writeFile({
+        path: videoFilename,
+        data: input.videoBlob,
+        directory: Directory.Cache,
+      })
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'write_failed'
+      emitDiag({ path: 'fallback', stage: 'write_video', error: msg })
+      return null
+    }
     videoTempPath = String(videoWrite.uri || '').replace(/^file:\/\//, '')
-    if (!videoTempPath) throw new Error('write_video_failed')
+    if (!videoTempPath) {
+      emitDiag({ path: 'fallback', stage: 'write_video', error: 'empty_uri' })
+      return null
+    }
 
-    // 2. Write overlay PNG to Cache
-    const overlayB64 = await blobToBase64(input.overlayBlob)
-    const overlayWrite = await Filesystem.writeFile({
-      path: overlayFilename,
-      data: overlayB64,
-      directory: Directory.Cache,
-    })
+    // ── 2. Write overlay PNG to Cache (same Blob shortcut) ─────────────────
+    let overlayWrite: { uri: string }
+    try {
+      overlayWrite = await Filesystem.writeFile({
+        path: overlayFilename,
+        data: input.overlayBlob,
+        directory: Directory.Cache,
+      })
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'write_failed'
+      emitDiag({ path: 'fallback', stage: 'write_overlay', error: msg })
+      return null
+    }
     overlayTempPath = String(overlayWrite.uri || '').replace(/^file:\/\//, '')
-    if (!overlayTempPath) throw new Error('write_overlay_failed')
+    if (!overlayTempPath) {
+      emitDiag({ path: 'fallback', stage: 'write_overlay', error: 'empty_uri' })
+      return null
+    }
 
-    // 3. Subscribe to progress + invoke native composer
+    // ── 3. Subscribe to progress + invoke native composer ──────────────────
     if (input.onProgress) {
       progressUnsubscribe = addStoryComposeProgressListener(input.onProgress)
     }
@@ -117,20 +145,32 @@ export const composeStoryVideoOnIos = async (
     })
 
     if (result.error || !result.outputPath) {
-      throw new Error(`native_compose_failed: ${result.error || 'no_output_path'}`)
+      emitDiag({ path: 'fallback', stage: 'native_export', error: result.error || 'no_output_path' })
+      return null
     }
     outputNativePath = result.outputPath
 
-    // 4. Read result back via WKWebView-accessible URL (no base64 round-trip)
+    // ── 4. Read result back via WKWebView-accessible URL (no base64) ───────
     const webPath = Capacitor.convertFileSrc(outputNativePath)
-    const fetchResponse = await fetch(webPath)
-    if (!fetchResponse.ok) {
-      throw new Error(`fetch_output_failed: ${fetchResponse.status}`)
+    let blob: Blob
+    try {
+      const fetchResponse = await fetch(webPath)
+      if (!fetchResponse.ok) {
+        emitDiag({ path: 'fallback', stage: 'read_output', error: `http_${fetchResponse.status}` })
+        return null
+      }
+      blob = await fetchResponse.blob()
+    } catch (e) {
+      const msg = e instanceof Error ? e.message : 'fetch_failed'
+      emitDiag({ path: 'fallback', stage: 'read_output', error: msg })
+      return null
     }
-    const blob = await fetchResponse.blob()
     if (!blob || blob.size === 0) {
-      throw new Error('output_blob_empty')
+      emitDiag({ path: 'fallback', stage: 'read_output', error: 'empty_blob' })
+      return null
     }
+
+    emitDiag({ path: 'native' })
 
     return {
       blob,
@@ -139,7 +179,9 @@ export const composeStoryVideoOnIos = async (
       durationSec: Number(result.durationSec) || 0,
     }
   } catch (e) {
+    const msg = e instanceof Error ? e.message : 'unknown'
     logWarn('warn', 'Native story compose failed, will fall back to JS pipeline', e)
+    emitDiag({ path: 'fallback', stage: 'native_export', error: msg })
     return null
   } finally {
     try { progressUnsubscribe?.() } catch { /* swallow */ }

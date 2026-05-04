@@ -470,6 +470,16 @@ export function useStoryComposer({ open, session, onClose, caloriesOverride }: U
                             outputHeight: CANVAS_H,
                             trimStartSec: trimRange[0],
                             trimEndSec: trimRange[1],
+                            onDiagnostic: (d) => {
+                                // Surface which path actually ran + how long it took. Helps
+                                // diagnose silent native failures in production builds.
+                                const secs = (d.durationMs / 1000).toFixed(1)
+                                if (d.path === 'native') {
+                                    setInfo(`Render nativo: ${secs}s`)
+                                } else {
+                                    setInfo(`Native indisponível (${d.stage || 'erro'}: ${d.error || '—'}), usando JS…`)
+                                }
+                            },
                         })
                         if (nativeResult) {
                             return {
