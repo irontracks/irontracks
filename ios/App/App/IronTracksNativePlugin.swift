@@ -67,6 +67,9 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin {
         CAPPluginMethod(name: "stopSpeechRecognition", returnType: CAPPluginReturnPromise),
         // Widget intents
         CAPPluginMethod(name: "checkPendingWidgetAction", returnType: CAPPluginReturnPromise),
+        // Story video composition (AVFoundation hardware-accelerated overlay)
+        CAPPluginMethod(name: "composeStoryVideo", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "cancelStoryCompose", returnType: CAPPluginReturnPromise),
     ]
 
     private let motionManager = CMMotionManager()
@@ -901,5 +904,258 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin {
         recognitionRequest = nil
         recognitionTask = nil
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+    }
+
+    // ─── Story Video Composition (AVFoundation, hardware-accelerated) ─────────
+    //
+    // Composites a transparent overlay PNG (rendered by JS canvas — same
+    // drawStory() as the preview) onto a source video using AVMutableComposition
+    // + AVVideoCompositionCoreAnimationTool, then exports via AVAssetExportSession
+    // with HighestQuality preset. The export uses VideoToolbox (Apple's hardware
+    // H.264 encoder), running entirely outside the WKWebView. Typical 30s clip
+    // exports in 3-8s on modern iPhones vs 30-60s for the JS Canvas+MediaRecorder
+    // pipeline.
+    //
+    // The overlay is sized exactly outputWidth x outputHeight (720x1280 in
+    // practice). The source video is cover-fit scaled into the same canvas using
+    // a CGAffineTransform that respects the source's preferredTransform (so
+    // portrait videos shot on iPhone stay upright).
+
+    private var activeExportSession: AVAssetExportSession?
+    private var activeProgressTimer: DispatchSourceTimer?
+
+    @objc func composeStoryVideo(_ call: CAPPluginCall) {
+        guard let videoPath = call.getString("videoPath"), !videoPath.isEmpty else {
+            call.reject("videoPath is required"); return
+        }
+        guard let overlayPath = call.getString("overlayPath"), !overlayPath.isEmpty else {
+            call.reject("overlayPath is required"); return
+        }
+        let outputW = CGFloat(call.getDouble("outputWidth") ?? 720)
+        let outputH = CGFloat(call.getDouble("outputHeight") ?? 1280)
+        let trimStart = call.getDouble("trimStartSec") ?? 0
+        let trimEnd = call.getDouble("trimEndSec") ?? 0
+        let outputSize = CGSize(width: outputW, height: outputH)
+
+        DispatchQueue.global(qos: .userInitiated).async { [weak self] in
+            guard let self = self else { return }
+            do {
+                let (path, duration) = try self.runStoryComposition(
+                    videoPath: videoPath,
+                    overlayPath: overlayPath,
+                    outputSize: outputSize,
+                    trimStart: trimStart,
+                    trimEnd: trimEnd
+                )
+                DispatchQueue.main.async {
+                    call.resolve([
+                        "outputPath": path,
+                        "durationSec": duration,
+                        "mime": "video/mp4",
+                        "error": "",
+                    ])
+                }
+            } catch let error {
+                DispatchQueue.main.async {
+                    call.resolve([
+                        "outputPath": "",
+                        "durationSec": 0,
+                        "mime": "",
+                        "error": error.localizedDescription,
+                    ])
+                }
+            }
+        }
+    }
+
+    @objc func cancelStoryCompose(_ call: CAPPluginCall) {
+        activeExportSession?.cancelExport()
+        activeProgressTimer?.cancel()
+        activeProgressTimer = nil
+        activeExportSession = nil
+        call.resolve(["ok": true])
+    }
+
+    private func runStoryComposition(
+        videoPath: String,
+        overlayPath: String,
+        outputSize: CGSize,
+        trimStart: Double,
+        trimEnd: Double
+    ) throws -> (path: String, duration: Double) {
+        let videoURL = URL(fileURLWithPath: videoPath)
+        let overlayURL = URL(fileURLWithPath: overlayPath)
+
+        guard FileManager.default.fileExists(atPath: videoURL.path) else {
+            throw NSError(domain: "VideoComposer", code: 100, userInfo: [NSLocalizedDescriptionKey: "Source video not found at path"])
+        }
+        guard FileManager.default.fileExists(atPath: overlayURL.path) else {
+            throw NSError(domain: "VideoComposer", code: 101, userInfo: [NSLocalizedDescriptionKey: "Overlay PNG not found at path"])
+        }
+
+        let asset = AVURLAsset(url: videoURL)
+        guard let sourceVideoTrack = asset.tracks(withMediaType: .video).first else {
+            throw NSError(domain: "VideoComposer", code: 102, userInfo: [NSLocalizedDescriptionKey: "No video track in source asset"])
+        }
+
+        let assetDuration = CMTimeGetSeconds(asset.duration)
+        let safeStart = max(0, trimStart)
+        let safeEnd = (trimEnd > 0 && trimEnd <= assetDuration) ? trimEnd : assetDuration
+        let duration = max(0.1, safeEnd - safeStart)
+
+        let timeRange = CMTimeRange(
+            start: CMTime(seconds: safeStart, preferredTimescale: 600),
+            duration: CMTime(seconds: duration, preferredTimescale: 600)
+        )
+
+        let composition = AVMutableComposition()
+        guard let compositionVideoTrack = composition.addMutableTrack(
+            withMediaType: .video,
+            preferredTrackID: kCMPersistentTrackID_Invalid
+        ) else {
+            throw NSError(domain: "VideoComposer", code: 103, userInfo: [NSLocalizedDescriptionKey: "Failed to add video track to composition"])
+        }
+        try compositionVideoTrack.insertTimeRange(timeRange, of: sourceVideoTrack, at: .zero)
+
+        // Audio is optional — some videos have none, and missing audio shouldn't
+        // fail the whole pipeline.
+        if let sourceAudioTrack = asset.tracks(withMediaType: .audio).first,
+           let compositionAudioTrack = composition.addMutableTrack(
+                withMediaType: .audio,
+                preferredTrackID: kCMPersistentTrackID_Invalid
+           ) {
+            try? compositionAudioTrack.insertTimeRange(timeRange, of: sourceAudioTrack, at: .zero)
+        }
+
+        // ── Cover-fit transform ───────────────────────────────────────────────
+        // Mirrors the JS fitCover() logic: scale the source so it fully covers
+        // the output canvas, then center it. Respects preferredTransform so
+        // portrait iPhone footage stays upright.
+        let naturalSize = sourceVideoTrack.naturalSize
+        let preferredTransform = sourceVideoTrack.preferredTransform
+        let transformedRect = CGRect(origin: .zero, size: naturalSize).applying(preferredTransform)
+        let renderedW = abs(transformedRect.width)
+        let renderedH = abs(transformedRect.height)
+        let coverScale = max(outputSize.width / renderedW, outputSize.height / renderedH)
+        let scaledW = renderedW * coverScale
+        let scaledH = renderedH * coverScale
+        let centerX = (outputSize.width - scaledW) / 2
+        let centerY = (outputSize.height - scaledH) / 2
+
+        var finalTransform = preferredTransform
+        // After preferredTransform the rect may have negative origin (rotated
+        // around 0,0). Translate so it sits at origin, then scale, then center.
+        finalTransform = finalTransform.concatenating(
+            CGAffineTransform(translationX: -transformedRect.origin.x, y: -transformedRect.origin.y)
+        )
+        finalTransform = finalTransform.concatenating(
+            CGAffineTransform(scaleX: coverScale, y: coverScale)
+        )
+        finalTransform = finalTransform.concatenating(
+            CGAffineTransform(translationX: centerX, y: centerY)
+        )
+
+        let layerInstruction = AVMutableVideoCompositionLayerInstruction(assetTrack: compositionVideoTrack)
+        layerInstruction.setTransform(finalTransform, at: .zero)
+
+        let mainInstruction = AVMutableVideoCompositionInstruction()
+        mainInstruction.timeRange = CMTimeRange(start: .zero, duration: composition.duration)
+        mainInstruction.layerInstructions = [layerInstruction]
+
+        let videoComposition = AVMutableVideoComposition()
+        videoComposition.renderSize = outputSize
+        videoComposition.frameDuration = CMTime(value: 1, timescale: 30)
+        videoComposition.instructions = [mainInstruction]
+
+        // ── Overlay layer hierarchy ───────────────────────────────────────────
+        // The overlay PNG was rendered by JS canvas (top-left origin). With
+        // isGeometryFlipped=true on the parent layer, CoreAnimation interprets
+        // sublayer positions and content rendering using top-left origin too,
+        // so the overlay maps 1:1 to what the user saw in the preview.
+        guard let overlayUIImage = UIImage(contentsOfFile: overlayURL.path),
+              let overlayCGImage = overlayUIImage.cgImage else {
+            throw NSError(domain: "VideoComposer", code: 104, userInfo: [NSLocalizedDescriptionKey: "Failed to load overlay PNG"])
+        }
+
+        let parentLayer = CALayer()
+        parentLayer.frame = CGRect(origin: .zero, size: outputSize)
+        parentLayer.isGeometryFlipped = true
+
+        let videoLayer = CALayer()
+        videoLayer.frame = CGRect(origin: .zero, size: outputSize)
+        parentLayer.addSublayer(videoLayer)
+
+        let overlayLayer = CALayer()
+        overlayLayer.frame = CGRect(origin: .zero, size: outputSize)
+        overlayLayer.contents = overlayCGImage
+        overlayLayer.contentsGravity = .resize
+        parentLayer.addSublayer(overlayLayer)
+
+        videoComposition.animationTool = AVVideoCompositionCoreAnimationTool(
+            postProcessingAsVideoLayer: videoLayer,
+            in: parentLayer
+        )
+
+        // ── Export ────────────────────────────────────────────────────────────
+        // Output in Caches so JS can read it back via Capacitor.convertFileSrc().
+        let cachesDir = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first
+            ?? URL(fileURLWithPath: NSTemporaryDirectory())
+        let timestamp = Int(Date().timeIntervalSince1970 * 1000)
+        let outputURL = cachesDir.appendingPathComponent("irontracks-story-\(timestamp).mp4")
+        try? FileManager.default.removeItem(at: outputURL)
+
+        guard let exportSession = AVAssetExportSession(
+            asset: composition,
+            presetName: AVAssetExportPresetHighestQuality
+        ) else {
+            throw NSError(domain: "VideoComposer", code: 105, userInfo: [NSLocalizedDescriptionKey: "Failed to create export session"])
+        }
+        exportSession.videoComposition = videoComposition
+        exportSession.outputURL = outputURL
+        exportSession.outputFileType = .mp4
+        exportSession.shouldOptimizeForNetworkUse = true
+
+        self.activeExportSession = exportSession
+
+        // Progress polling — emit to JS via Capacitor event listener.
+        let progressTimer = DispatchSource.makeTimerSource(queue: .main)
+        progressTimer.schedule(deadline: .now() + .milliseconds(150), repeating: .milliseconds(150))
+        progressTimer.setEventHandler { [weak self] in
+            guard let self = self, let session = self.activeExportSession else { return }
+            self.notifyListeners("storyComposeProgress", data: ["progress": Double(session.progress)])
+        }
+        progressTimer.resume()
+        self.activeProgressTimer = progressTimer
+
+        let semaphore = DispatchSemaphore(value: 0)
+        var exportError: Error?
+
+        exportSession.exportAsynchronously {
+            switch exportSession.status {
+            case .failed:
+                exportError = exportSession.error
+                    ?? NSError(domain: "VideoComposer", code: 106, userInfo: [NSLocalizedDescriptionKey: "Export failed (unknown reason)"])
+            case .cancelled:
+                exportError = NSError(domain: "VideoComposer", code: 107, userInfo: [NSLocalizedDescriptionKey: "Export cancelled"])
+            default:
+                break
+            }
+            semaphore.signal()
+        }
+        semaphore.wait()
+
+        progressTimer.cancel()
+        self.activeProgressTimer = nil
+        self.activeExportSession = nil
+
+        if let err = exportError {
+            try? FileManager.default.removeItem(at: outputURL)
+            throw err
+        }
+
+        // Final 100% progress tick
+        self.notifyListeners("storyComposeProgress", data: ["progress": Double(1.0)])
+
+        return (path: outputURL.path, duration: duration)
     }
 }
