@@ -1,6 +1,7 @@
 'use client'
 
 import React from 'react'
+import { isPlank } from '@/utils/exerciseTracking'
 
 type AnyObj = Record<string, unknown>
 
@@ -48,6 +49,7 @@ export function ReportExerciseTable({ exercises, historicalBestE1rm }: ReportExe
               const order = Number(ex.order || idx + 1)
               const setsDone = Number(ex.setsDone || 0)
               const repsDone = Number(ex.repsDone || 0)
+              const isPlankEx = isPlank(name)
               const executionMinutes = Number(ex.executionMinutes || 0)
               const restMinutes = Number(ex.restMinutes || 0)
               const rest = Number(ex.restTimePlannedSec || 0)
@@ -67,7 +69,7 @@ export function ReportExerciseTable({ exercises, historicalBestE1rm }: ReportExe
                   <td className="px-3 py-2 font-mono text-neutral-300">{Number.isFinite(order) ? order : idx + 1}</td>
                   <td className="px-3 py-2 font-semibold text-white">{name}</td>
                   <td className="px-3 py-2 text-center font-mono text-neutral-300">{Number.isFinite(setsDone) && setsDone > 0 ? setsDone : '—'}</td>
-                  <td className="px-3 py-2 text-center font-mono text-neutral-300">{Number.isFinite(repsDone) && repsDone > 0 ? repsDone : '—'}</td>
+                  <td className="px-3 py-2 text-center font-mono text-neutral-300">{Number.isFinite(repsDone) && repsDone > 0 ? (isPlankEx ? `${repsDone}s` : repsDone) : '—'}</td>
                   <td className="px-3 py-2 text-center font-mono text-neutral-300">{Number.isFinite(executionMinutes) && executionMinutes > 0 ? `${executionMinutes.toFixed(1)} min` : '—'}</td>
                   <td className="px-3 py-2 text-center font-mono text-neutral-300">{Number.isFinite(restMinutes) && restMinutes > 0 ? `${restMinutes.toFixed(1)} min` : '—'}</td>
                   <td className="px-3 py-2 text-center font-mono text-neutral-300">{Number.isFinite(rest) && rest > 0 ? `${Math.round(rest)}s` : '—'}</td>
