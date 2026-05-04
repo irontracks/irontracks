@@ -5,6 +5,7 @@ import { createClient } from '@/utils/supabase/client'
 import { getKcalEstimate } from '@/utils/calories/kcalClient'
 import { estimateCaloriesMet } from '@/utils/calories/metEstimate'
 import { VideoCompositor } from '@/lib/video/VideoCompositor'
+import { composeStoryVideoOnIos, cancelNativeStoryCompose } from '@/utils/native/videoComposer'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { isIosNative } from '@/utils/platform'
 import { safeString } from '@/utils/guards'
@@ -189,6 +190,10 @@ export function useStoryComposer({ open, session, onClose, caloriesOverride }: U
         if (isClose && compositorRef.current) {
             compositorRef.current.cancel()
             compositorRef.current = null
+        }
+        if (isClose) {
+            // Best-effort: cancel any in-flight native AVAssetExportSession.
+            cancelNativeStoryCompose().catch(() => { /* swallow */ })
         }
         if (isClose) {
             try { const url = String(backgroundUrlRef.current || ''); if (url) URL.revokeObjectURL(url) } catch { }
@@ -421,12 +426,12 @@ export function useStoryComposer({ open, session, onClose, caloriesOverride }: U
     const renderVideo = async (): Promise<{ blob: Blob; filename: string; mime: string }> => {
         const vid = videoRef.current
         if (!vid) throw new Error('Vídeo não disponível')
-        if (!VideoCompositor.isSupported()) return renderVideoFrameAsJpeg(vid)
-        compositorRef.current = new VideoCompositor()
         setIsExporting(true)
         try {
             // ── Pre-render static overlay once (metrics/cards/brand never change during export) ──
-            // Each video frame then does only 2 drawImage calls instead of ~50 canvas ops.
+            // Shared by both the iOS native path (saved as PNG to Cache for AVFoundation)
+            // and the JS fallback (composited per-frame as a bitmap, ~50× cheaper than
+            // recomputing drawStory() on every frame).
             const overlayCanvas = document.createElement('canvas')
             overlayCanvas.width = CANVAS_W
             overlayCanvas.height = CANVAS_H
@@ -445,28 +450,67 @@ export function useStoryComposer({ open, session, onClose, caloriesOverride }: U
                 })
             }
 
-            const renderPromise = compositorRef.current.render({
-                videoElement: vid, trimRange, outputWidth: CANVAS_W, outputHeight: CANVAS_H, fps: 30,
-                onDrawFrame: (ctx, video) => {
-                    const vw = video.videoWidth; const vh = video.videoHeight
-                    if (!vw || !vh) return
-                    const { scale } = fitCover({ canvasW: CANVAS_W, canvasH: CANVAS_H, imageW: vw, imageH: vh })
-                    const dw = vw * scale; const dh = vh * scale
-                    // 1. Draw current video frame (fills canvas)
-                    ctx.drawImage(video, (CANVAS_W - dw) / 2, (CANVAS_H - dh) / 2, dw, dh)
-                    // 2. Composite pre-baked overlay bitmap in a single draw call
-                    if (overlayCtx) ctx.drawImage(overlayCanvas, 0, 0)
+            // ── iOS native fast path (AVFoundation + VideoToolbox hardware H.264) ──
+            // Composites entirely outside WKWebView. Typical 30s clip: 3-8s vs 30-60s
+            // for the JS fallback. Returns null on any failure → falls through to JS.
+            if (isIosNative() && selectedFile && overlayCtx) {
+                try {
+                    const overlayBlob = await new Promise<Blob | null>((resolve) => {
+                        try { overlayCanvas.toBlob(b => resolve(b), 'image/png') }
+                        catch { resolve(null) }
+                    })
+                    if (overlayBlob) {
+                        const rawExt = String(selectedFile.name || '').split('.').pop() || 'mp4'
+                        const ext = rawExt.toLowerCase().replace(/[^a-z0-9]/g, '') || 'mp4'
+                        const nativeResult = await composeStoryVideoOnIos({
+                            videoBlob: selectedFile,
+                            videoExt: ext,
+                            overlayBlob,
+                            outputWidth: CANVAS_W,
+                            outputHeight: CANVAS_H,
+                            trimStartSec: trimRange[0],
+                            trimEndSec: trimRange[1],
+                        })
+                        if (nativeResult) {
+                            return {
+                                blob: nativeResult.blob,
+                                filename: nativeResult.filename,
+                                mime: nativeResult.mime,
+                            }
+                        }
+                    }
+                } catch (e) {
+                    logWarn('StoryComposer', 'Native compose threw, falling back to JS pipeline', e)
                 }
-            })
-            const result = await Promise.race([renderPromise, new Promise<never>((_, reject) => setTimeout(() => reject(new Error('render_timeout_60s')), 60_000))])
-            if (!result.blob || result.blob.size === 0) { logWarn('StoryComposer', 'Empty blob, falling back to JPEG'); throw new Error('empty_blob') }
-            return result
-        } catch (e) {
-            try { compositorRef.current?.cancel() } catch { }
-            logWarn('StoryComposer', 'Video render failed, falling back to JPEG', e)
-            try { const fallback = await renderVideoFrameAsJpeg(vid); setInfo('Exportação de vídeo não disponível. Imagem salva com o relatório.'); return fallback }
-            catch (fallbackErr) { logError('error', 'JPEG fallback also failed', fallbackErr); throw e }
-        } finally { compositorRef.current = null; setIsExporting(false) }
+            }
+
+            // ── JS fallback (Canvas + MediaRecorder) ─────────────────────────
+            if (!VideoCompositor.isSupported()) return renderVideoFrameAsJpeg(vid)
+            compositorRef.current = new VideoCompositor()
+            try {
+                const renderPromise = compositorRef.current.render({
+                    videoElement: vid, trimRange, outputWidth: CANVAS_W, outputHeight: CANVAS_H, fps: 30,
+                    onDrawFrame: (ctx, video) => {
+                        const vw = video.videoWidth; const vh = video.videoHeight
+                        if (!vw || !vh) return
+                        const { scale } = fitCover({ canvasW: CANVAS_W, canvasH: CANVAS_H, imageW: vw, imageH: vh })
+                        const dw = vw * scale; const dh = vh * scale
+                        // 1. Draw current video frame (fills canvas)
+                        ctx.drawImage(video, (CANVAS_W - dw) / 2, (CANVAS_H - dh) / 2, dw, dh)
+                        // 2. Composite pre-baked overlay bitmap in a single draw call
+                        if (overlayCtx) ctx.drawImage(overlayCanvas, 0, 0)
+                    }
+                })
+                const result = await Promise.race([renderPromise, new Promise<never>((_, reject) => setTimeout(() => reject(new Error('render_timeout_60s')), 60_000))])
+                if (!result.blob || result.blob.size === 0) { logWarn('StoryComposer', 'Empty blob, falling back to JPEG'); throw new Error('empty_blob') }
+                return result
+            } catch (e) {
+                try { compositorRef.current?.cancel() } catch { }
+                logWarn('StoryComposer', 'Video render failed, falling back to JPEG', e)
+                try { const fallback = await renderVideoFrameAsJpeg(vid); setInfo('Exportação de vídeo não disponível. Imagem salva com o relatório.'); return fallback }
+                catch (fallbackErr) { logError('error', 'JPEG fallback also failed', fallbackErr); throw e }
+            } finally { compositorRef.current = null }
+        } finally { setIsExporting(false) }
     }
 
     const createImageBlob = async ({ type = 'jpg', quality = 0.95 } = {}): Promise<{ blob: Blob; filename: string; mime: string }> => {

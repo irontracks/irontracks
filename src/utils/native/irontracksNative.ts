@@ -54,6 +54,17 @@ type IronTracksNativePlugin = {
   // Widget intent bridge
   checkPendingWidgetAction: () => Promise<{ action: string }>
   addListener(eventName: 'widgetStartSet', listenerFunc: () => void): Promise<PluginListenerHandle>
+  // Story video composition (AVFoundation, iOS only — hardware H.264 via VideoToolbox)
+  composeStoryVideo: (opts: {
+    videoPath: string
+    overlayPath: string
+    outputWidth: number
+    outputHeight: number
+    trimStartSec: number
+    trimEndSec: number
+  }) => Promise<{ outputPath: string; durationSec: number; mime: string; error: string }>
+  cancelStoryCompose: () => Promise<{ ok: boolean }>
+  addListener(eventName: 'storyComposeProgress', listenerFunc: (data: { progress: number }) => void): Promise<PluginListenerHandle>
 }
 
 export type HapticStyle =
@@ -99,6 +110,8 @@ const webFallback: IronTracksNativePlugin = {
   stopSpeechRecognition: async () => ({ ok: false }),
   checkPendingWidgetAction: async () => ({ action: '' }),
   addListener: async () => ({ remove: async () => {} }),
+  composeStoryVideo: async () => ({ outputPath: '', durationSec: 0, mime: '', error: 'Not available on web' }),
+  cancelStoryCompose: async () => ({ ok: false }),
 }
 
 // ─── Register plugin ─────────────────────────────────────────────────────────
@@ -580,4 +593,58 @@ export const addWidgetStartSetListener = (callback: () => void): (() => void) =>
     const listenerPromise = Native.addListener('widgetStartSet', callback)
     return () => { listenerPromise.then((l: PluginListenerHandle) => l.remove()).catch(() => {}) }
   } catch { return () => {} }
+}
+
+// ─── Story Video Composition (iOS native, AVFoundation) ───────────────────────
+
+/**
+ * Composites a transparent overlay PNG onto a source video using AVFoundation.
+ * Runs entirely outside WKWebView via VideoToolbox (hardware H.264).
+ * iOS native only — caller must check `isIosNative()` and provide a fallback.
+ */
+export const composeStoryVideoNative = async (opts: {
+  videoPath: string
+  overlayPath: string
+  outputWidth: number
+  outputHeight: number
+  trimStartSec: number
+  trimEndSec: number
+}): Promise<{ outputPath: string; durationSec: number; mime: string; error: string }> => {
+  if (!isIosNative()) {
+    return { outputPath: '', durationSec: 0, mime: '', error: 'Not iOS native' }
+  }
+  try {
+    return await Native.composeStoryVideo(opts)
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : 'compose_failed'
+    return { outputPath: '', durationSec: 0, mime: '', error: msg }
+  }
+}
+
+export const cancelStoryComposeNative = async () => {
+  try {
+    if (!isIosNative()) return { ok: false }
+    return await Native.cancelStoryCompose()
+  } catch {
+    return { ok: false }
+  }
+}
+
+/**
+ * Subscribes to story-compose progress events (0–1 float).
+ * Returns an unsubscribe function. No-op on non-iOS.
+ */
+export const addStoryComposeProgressListener = (callback: (progress: number) => void): (() => void) => {
+  if (!isIosNative()) return () => {}
+  try {
+    const listenerPromise = Native.addListener('storyComposeProgress', (data: { progress: number }) => {
+      try {
+        const n = Number(data?.progress)
+        if (Number.isFinite(n)) callback(Math.max(0, Math.min(1, n)))
+      } catch { /* swallow */ }
+    })
+    return () => { listenerPromise.then((l: PluginListenerHandle) => l.remove()).catch(() => {}) }
+  } catch {
+    return () => {}
+  }
 }
