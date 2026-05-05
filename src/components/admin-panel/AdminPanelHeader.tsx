@@ -1,6 +1,6 @@
 'use client'
 
-import { AlertCircle, BarChart3, BookOpen, ChevronDown, ChevronRight, Crown, CreditCard, Dumbbell, MessageSquare, Play, Settings, UserCog, UserPlus, Users, X } from 'lucide-react'
+import { AlertCircle, BarChart3, BookOpen, Building2, ChevronDown, ChevronRight, Crown, CreditCard, Dumbbell, MessageSquare, Play, Settings, UserCog, UserPlus, Users, X } from 'lucide-react'
 
 type AdminPanelHeaderProps = {
   debugError: string | null
@@ -42,6 +42,7 @@ const buildMenuGroups = (tabKeys: string[]): MenuGroup[] => {
     vip: { key: 'vip', icon: <Crown size={ICON_SIZE} />, subtitle: 'Gestão de assinantes VIP' },
     errors: { key: 'errors', icon: <MessageSquare size={ICON_SIZE} />, subtitle: 'Feedbacks reportados' },
     system: { key: 'system', icon: <Settings size={ICON_SIZE} />, subtitle: 'Mensagens em massa e manutenção' },
+    platform_billing: { key: 'platform_billing', icon: <Building2 size={ICON_SIZE} />, subtitle: 'Cobrança da plataforma + diagnóstico' },
     billing: { key: 'billing', icon: <CreditCard size={ICON_SIZE} />, subtitle: 'Planos de serviço e cobranças dos alunos' },
     guide:   { key: 'guide',   icon: <BookOpen size={ICON_SIZE} />,  subtitle: 'Manual completo para professores' },
   }
@@ -58,7 +59,7 @@ const buildMenuGroups = (tabKeys: string[]): MenuGroup[] => {
   if (conteudo.length > 0) groups.push({ label: 'Conteúdo', items: conteudo.map(k => allItems[k]) })
 
   // Group 3: Ferramentas
-  const ferramentas = ['errors', 'system'].filter(k => available.has(k))
+  const ferramentas = ['platform_billing', 'errors', 'system'].filter(k => available.has(k))
   if (ferramentas.length > 0) groups.push({ label: 'Ferramentas', items: ferramentas.map(k => allItems[k]) })
 
   return groups
