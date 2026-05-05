@@ -7,6 +7,7 @@ import InviteManager from '@/components/InviteManager';
 import { useWorkoutContext } from './WorkoutContext';
 import { useWorkoutTimer } from './WorkoutTimerContext';
 import HeartRateMonitor from './HeartRateMonitor';
+import { SharePlayBadge } from './SharePlayBadge';
 
 export default function WorkoutHeader() {
   const {
@@ -115,6 +116,9 @@ export default function WorkoutHeader() {
 
           <div className="min-w-0 flex-1">
             <div className="flex items-center justify-end gap-2">
+              <SharePlayBadge
+                workout={workout?.id ? { id: String(workout.id), name: String(workout?.title || 'Treino') } : null}
+              />
               <div className="font-black text-white truncate">{String(workout?.title || 'Treino')}</div>
               <HeartRateMonitor />
             </div>

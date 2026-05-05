@@ -137,39 +137,90 @@ export async function POST(req: Request) {
       if (status === 'active') {
         const { data: sub } = await admin
           .from('app_subscriptions')
-          .select('id, user_id, plan_id')
+          .select('id, user_id, plan_id, metadata')
           .eq('provider', 'mercadopago')
           .eq('provider_subscription_id', providerSubscriptionId)
           .maybeSingle()
         if (sub?.user_id) {
-          const { data: plan } = await admin.from('app_plans').select('id, interval').eq('id', sub.plan_id).maybeSingle()
-          const now = new Date()
-          const end = plan?.interval ? addInterval(now, String(plan.interval)) : null
-          await admin
-            .from('user_entitlements')
-            .upsert(
-              {
-                user_id: sub.user_id,
-                plan_id: sub.plan_id,
-                status: 'active',
-                provider: 'mercadopago',
-                provider_subscription_id: providerSubscriptionId,
+          // Detect recurring teacher plan via metadata.scope — different
+          // table to update than the VIP entitlement flow.
+          const subMeta = (sub.metadata ?? {}) as Record<string, unknown>
+          const subScope = String(subMeta?.scope || '').trim()
+
+          if (subScope === 'teacher_plan_recurring') {
+            const tierKey = String(subMeta?.tier_key || sub.plan_id || 'free').trim()
+            const now = new Date()
+            const end = new Date(now); end.setMonth(end.getMonth() + 1)
+
+            await admin
+              .from('teachers')
+              .update({
+                plan_tier_key:        tierKey,
+                plan_status:          'active',
+                plan_valid_until:     end.toISOString(),
+                plan_subscription_id: providerSubscriptionId,
+              })
+              .eq('user_id', sub.user_id)
+
+            await admin
+              .from('app_subscriptions')
+              .update({
+                current_period_start: now.toISOString(),
+                current_period_end: end.toISOString(),
+                updated_at: now.toISOString(),
+              })
+              .eq('id', sub.id)
+          } else {
+            // VIP / app-plans flow (unchanged)
+            const { data: plan } = await admin.from('app_plans').select('id, interval').eq('id', sub.plan_id).maybeSingle()
+            const now = new Date()
+            const end = plan?.interval ? addInterval(now, String(plan.interval)) : null
+            await admin
+              .from('user_entitlements')
+              .upsert(
+                {
+                  user_id: sub.user_id,
+                  plan_id: sub.plan_id,
+                  status: 'active',
+                  provider: 'mercadopago',
+                  provider_subscription_id: providerSubscriptionId,
+                  current_period_start: now.toISOString(),
+                  current_period_end: end ? end.toISOString() : null,
+                  valid_from: now.toISOString(),
+                  valid_until: end ? end.toISOString() : null,
+                  metadata: { mercadopago: { kind: 'preapproval', subscription_id: providerSubscriptionId, raw: preapproval } },
+                },
+                { onConflict: 'provider,provider_subscription_id' },
+              )
+            await admin
+              .from('app_subscriptions')
+              .update({
                 current_period_start: now.toISOString(),
                 current_period_end: end ? end.toISOString() : null,
-                valid_from: now.toISOString(),
-                valid_until: end ? end.toISOString() : null,
-                metadata: { mercadopago: { kind: 'preapproval', subscription_id: providerSubscriptionId, raw: preapproval } },
-              },
-              { onConflict: 'provider,provider_subscription_id' },
-            )
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', sub.id)
+          }
+        }
+      }
+
+      // Cancellation reflected on teachers row when scope=teacher_plan_recurring
+      if (status === 'cancelled') {
+        const { data: sub } = await admin
+          .from('app_subscriptions')
+          .select('user_id, metadata')
+          .eq('provider', 'mercadopago')
+          .eq('provider_subscription_id', providerSubscriptionId)
+          .maybeSingle()
+        const subMeta = (sub?.metadata ?? {}) as Record<string, unknown>
+        if (sub?.user_id && String(subMeta?.scope || '') === 'teacher_plan_recurring') {
           await admin
             .from('app_subscriptions')
-            .update({
-              current_period_start: now.toISOString(),
-              current_period_end: end ? end.toISOString() : null,
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', sub.id)
+            .update({ cancel_at_period_end: true, updated_at: new Date().toISOString() })
+            .eq('provider', 'mercadopago')
+            .eq('provider_subscription_id', providerSubscriptionId)
+          // teachers.plan_status flip happens at expiry time via the suspend
+          // cron — until plan_valid_until passes, the teacher keeps access.
         }
       }
 
@@ -247,10 +298,10 @@ export async function POST(req: Request) {
         return NextResponse.json({ ok: true })
       }
 
-      // ── teacher_plan: activate/renew plan on teacher row ─────────────────────
+      // ── teacher_plan: activate/renew plan on teacher row + invoice ──────────
       if (scope === 'teacher_plan' && userId) {
+        const now = new Date()
         if (status.toLowerCase() === 'approved') {
-          const now = new Date()
           const end = new Date(now)
           end.setMonth(end.getMonth() + 1) // monthly billing
 
@@ -272,6 +323,30 @@ export async function POST(req: Request) {
             .update({ plan_tier_key: 'free', plan_status: 'cancelled', plan_valid_until: null })
             .eq('user_id', userId)
         }
+
+        // Mirror the payment status into app_payments so "Minhas Faturas"
+        // reflects approved / refunded / cancelled within seconds of the
+        // webhook firing. Upsert keyed on (provider, provider_payment_id) —
+        // matches the row inserted at checkout time.
+        try {
+          await admin
+            .from('app_payments')
+            .upsert(
+              {
+                user_id: userId,
+                plan_id: null,
+                subscription_id: null,
+                amount_cents: amountCents,
+                currency,
+                status: status.toLowerCase(),
+                provider: 'mercadopago',
+                provider_payment_id: dataId,
+                paid_at: status.toLowerCase() === 'approved' ? now.toISOString() : null,
+                raw: { ...meta, scope: 'teacher_plan', tier_key: planId },
+              },
+              { onConflict: 'provider,provider_payment_id' },
+            )
+        } catch (e) { logWarn('billing:webhooks:mp', 'Could not mirror teacher_plan invoice', e) }
 
         return NextResponse.json({ ok: true })
       }

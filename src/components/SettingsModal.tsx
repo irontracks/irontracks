@@ -25,6 +25,7 @@ import {
   startRestLiveActivity,
   triggerHaptic,
   authenticateWithBiometrics,
+  requestAlwaysLocationPermission,
 } from '@/utils/native/irontracksNative'
 import { isObject } from '@/components/settings/settingsShared'
 import {
@@ -40,6 +41,7 @@ import {
   SettingsPrivacySection,
   SettingsSecuritySection,
   SettingsHealthKitSection,
+  SettingsGymGeofenceSection,
   SettingsModulesModal,
 } from '@/components/settings/SettingsSections'
 import ChangePasswordModal from '@/components/settings/ChangePasswordModal'
@@ -192,6 +194,28 @@ export default function SettingsModal(props: SettingsModalProps) {
     try { setIosNotifBusy(true); await openAppSettings() } catch { } finally { setIosNotifBusy(false) }
   }
 
+  /** Captures the device's current GPS location for the gym geofence. Uses the
+   *  browser Geolocation API which Capacitor maps to Core Location on iOS. */
+  const handleCaptureCurrentLocation = async (): Promise<{ lat: number; lng: number } | null> => {
+    return new Promise((resolve) => {
+      try {
+        if (typeof navigator === 'undefined' || !navigator.geolocation) {
+          resolve(null); return
+        }
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            const lat = Number(pos.coords?.latitude)
+            const lng = Number(pos.coords?.longitude)
+            if (!Number.isFinite(lat) || !Number.isFinite(lng)) { resolve(null); return }
+            resolve({ lat, lng })
+          },
+          () => resolve(null),
+          { enableHighAccuracy: true, timeout: 12_000, maximumAge: 0 },
+        )
+      } catch { resolve(null) }
+    })
+  }
+
   if (!isOpen) return null
 
   return (
@@ -245,6 +269,15 @@ export default function SettingsModal(props: SettingsModalProps) {
               healthKitGranted={healthKitGranted}
               healthKitBusy={healthKitBusy}
               onRequestPermission={handleRequestHealthKitPermission}
+              onOpenAppSettings={handleOpenAppSettings}
+            />
+          )}
+          {iosNative && (
+            <SettingsGymGeofenceSection
+              draft={draft}
+              setValue={setValue}
+              onCaptureCurrentLocation={handleCaptureCurrentLocation}
+              onRequestAlwaysPermission={requestAlwaysLocationPermission}
               onOpenAppSettings={handleOpenAppSettings}
             />
           )}

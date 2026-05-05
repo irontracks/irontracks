@@ -65,6 +65,81 @@ type IronTracksNativePlugin = {
   }) => Promise<{ outputPath: string; durationSec: number; mime: string; error: string }>
   cancelStoryCompose: () => Promise<{ ok: boolean }>
   addListener(eventName: 'storyComposeProgress', listenerFunc: (data: { progress: number }) => void): Promise<PluginListenerHandle>
+  // App Store review prompt (SKStoreReviewController — iOS enforces 3/year limit)
+  requestStoreReview: () => Promise<void>
+  // HealthKit sleep data (last 24 h window)
+  getSleepData: () => Promise<{
+    totalMinutes: number
+    asleepMinutes: number
+    inBedMinutes: number
+    startMs: number
+    endMs: number
+  }>
+  // Workout-session Live Activity (Dynamic Island + Lock Screen)
+  startWorkoutLiveActivity: (opts: {
+    workoutName: string
+    workoutStartMs: number
+    currentExerciseName?: string
+    currentSetIndex?: number
+    totalSetsForExercise?: number
+    totalSetsCompleted?: number
+    totalVolumeKg?: number
+  }) => Promise<{ activityId: string }>
+  updateWorkoutLiveActivity: (opts: {
+    currentExerciseName?: string
+    currentSetIndex?: number
+    totalSetsForExercise?: number
+    totalSetsCompleted?: number
+    totalVolumeKg?: number
+  }) => Promise<void>
+  endWorkoutLiveActivity: () => Promise<void>
+  // App Intents (Siri shortcuts) — pending action triggered by Siri/Shortcuts
+  checkPendingIntentAction: () => Promise<{ action: string }>
+  addListener(eventName: 'intentAction', listenerFunc: (data: { action: string }) => void): Promise<PluginListenerHandle>
+  // Geofencing — gym auto check-in
+  startGymGeofence: (opts: { lat: number; lng: number; radius?: number; name: string }) => Promise<{ ok: boolean; error?: string }>
+  stopGymGeofence: () => Promise<{ ok: boolean }>
+  checkGeofenceStatus: () => Promise<{ active: boolean; authorization: string; gymName: string }>
+  requestAlwaysLocationPermission: () => Promise<{ status: string }>
+  addListener(eventName: 'gymGeofenceEntered', listenerFunc: (data: { gymName: string }) => void): Promise<PluginListenerHandle>
+  // BGTaskScheduler — schedule next refresh / sync windows
+  scheduleBackgroundTasks: () => Promise<{ ok: boolean }>
+  addListener(eventName: 'backgroundRefresh', listenerFunc: (data: { kind: 'refresh' | 'sync' }) => void): Promise<PluginListenerHandle>
+  // App Shortcuts dynamic suggestions (Siri)
+  updateSiriWorkoutSuggestions: (opts: { workouts: Array<{ id: string; name: string }> }) => Promise<{ ok: boolean; count: number }>
+  // Live Activity push tokens (Feature 11)
+  getLiveActivityPushTokens: () => Promise<{ tokens: Array<{ kind: string; token: string }> }>
+  addListener(eventName: 'liveActivityPushToken', listenerFunc: (data: { kind: string; activityId: string; token: string }) => void): Promise<PluginListenerHandle>
+  // SQLite3 native cache (Feature 16)
+  kvGet: (opts: { key: string }) => Promise<{ value: string | null; exists: boolean }>
+  kvSet: (opts: { key: string; value: string }) => Promise<{ ok: boolean }>
+  kvDelete: (opts: { key: string }) => Promise<{ ok: boolean }>
+  kvKeys: (opts?: { prefix?: string; limit?: number }) => Promise<{ keys: string[] }>
+  queuePut: (opts: {
+    id: string
+    payload: string
+    status?: string
+    attempts?: number
+    nextAttemptAt?: number
+  }) => Promise<{ ok: boolean }>
+  queueGetAll: (opts?: { limit?: number }) => Promise<{ payloads: string[] }>
+  queueDelete: (opts: { id: string }) => Promise<{ ok: boolean }>
+  queueClear: () => Promise<{ ok: boolean }>
+  kvStoreStats: () => Promise<{ available: boolean; kvCount?: number; queueCount?: number; sizeBytes?: number }>
+  // SharePlay (Feature 18) — train together via FaceTime
+  startSharePlayWorkout: (opts: { workoutId: string; workoutName: string; hostName?: string }) => Promise<{ ok: boolean; error?: string }>
+  endSharePlayWorkout: () => Promise<{ ok: boolean }>
+  sendSharePlayMessage: (opts: { type: string; payload: Record<string, unknown> }) => Promise<{ ok: boolean; error?: string }>
+  getSharePlayState: () => Promise<{
+    active: boolean
+    participantCount: number
+    workoutId?: string
+    workoutName?: string
+    hostName?: string
+  }>
+  addListener(eventName: 'sharePlayState', listenerFunc: (data: { state: 'waiting' | 'joined' | 'invalidated' | 'unknown'; workoutId: string }) => void): Promise<PluginListenerHandle>
+  addListener(eventName: 'sharePlayParticipants', listenerFunc: (data: { count: number }) => void): Promise<PluginListenerHandle>
+  addListener(eventName: 'sharePlayMessage', listenerFunc: (data: { type: string; payloadJSON: string; sentAtMs: number; fromParticipantId: string }) => void): Promise<PluginListenerHandle>
 }
 
 export type HapticStyle =
@@ -112,6 +187,32 @@ const webFallback: IronTracksNativePlugin = {
   addListener: async () => ({ remove: async () => {} }),
   composeStoryVideo: async () => ({ outputPath: '', durationSec: 0, mime: '', error: 'Not available on web' }),
   cancelStoryCompose: async () => ({ ok: false }),
+  requestStoreReview: async () => { },
+  getSleepData: async () => ({ totalMinutes: 0, asleepMinutes: 0, inBedMinutes: 0, startMs: 0, endMs: 0 }),
+  startWorkoutLiveActivity: async () => ({ activityId: '' }),
+  updateWorkoutLiveActivity: async () => { },
+  endWorkoutLiveActivity: async () => { },
+  checkPendingIntentAction: async () => ({ action: '' }),
+  startGymGeofence: async () => ({ ok: false }),
+  stopGymGeofence: async () => ({ ok: false }),
+  checkGeofenceStatus: async () => ({ active: false, authorization: 'denied', gymName: '' }),
+  requestAlwaysLocationPermission: async () => ({ status: 'denied' }),
+  scheduleBackgroundTasks: async () => ({ ok: false }),
+  updateSiriWorkoutSuggestions: async () => ({ ok: false, count: 0 }),
+  getLiveActivityPushTokens: async () => ({ tokens: [] }),
+  kvGet: async () => ({ value: null, exists: false }),
+  kvSet: async () => ({ ok: false }),
+  kvDelete: async () => ({ ok: false }),
+  kvKeys: async () => ({ keys: [] }),
+  queuePut: async () => ({ ok: false }),
+  queueGetAll: async () => ({ payloads: [] }),
+  queueDelete: async () => ({ ok: false }),
+  queueClear: async () => ({ ok: false }),
+  kvStoreStats: async () => ({ available: false }),
+  startSharePlayWorkout: async () => ({ ok: false, error: 'not_ios' }),
+  endSharePlayWorkout: async () => ({ ok: false }),
+  sendSharePlayMessage: async () => ({ ok: false, error: 'not_ios' }),
+  getSharePlayState: async () => ({ active: false, participantCount: 0 }),
 }
 
 // ─── Register plugin ─────────────────────────────────────────────────────────
@@ -277,6 +378,104 @@ export const endAllRestLiveActivities = async () => {
     if (!isIosNative()) return
     await Native.endAllRestLiveActivities()
   } catch { }
+}
+
+// ─── Workout Live Activity (session-level) ────────────────────────────────────
+
+export interface WorkoutLiveActivityState {
+  workoutName: string
+  workoutStartMs: number
+  currentExerciseName?: string
+  currentSetIndex?: number
+  totalSetsForExercise?: number
+  totalSetsCompleted?: number
+  totalVolumeKg?: number
+}
+
+/** Start the workout Live Activity. Returns the activityId or empty string on failure. */
+export const startWorkoutLiveActivity = async (state: WorkoutLiveActivityState): Promise<string> => {
+  try {
+    if (!isIosNative()) return ''
+    const safeName = String(state.workoutName || 'Treino').slice(0, 60)
+    const startMs = Math.max(0, Math.round(Number(state.workoutStartMs) || Date.now()))
+    const result = await Native.startWorkoutLiveActivity({
+      workoutName: safeName,
+      workoutStartMs: startMs,
+      currentExerciseName: String(state.currentExerciseName ?? '').slice(0, 50),
+      currentSetIndex: Math.max(1, Math.round(Number(state.currentSetIndex) || 1)),
+      totalSetsForExercise: Math.max(0, Math.round(Number(state.totalSetsForExercise) || 0)),
+      totalSetsCompleted: Math.max(0, Math.round(Number(state.totalSetsCompleted) || 0)),
+      totalVolumeKg: Math.max(0, Number(state.totalVolumeKg) || 0),
+    })
+    return String(result?.activityId || '')
+  } catch {
+    return ''
+  }
+}
+
+/** Update the workout Live Activity. No-op when there isn't one running. */
+export const updateWorkoutLiveActivity = async (
+  patch: Omit<WorkoutLiveActivityState, 'workoutName' | 'workoutStartMs'>,
+): Promise<void> => {
+  try {
+    if (!isIosNative()) return
+    await Native.updateWorkoutLiveActivity({
+      currentExerciseName: String(patch.currentExerciseName ?? '').slice(0, 50),
+      currentSetIndex: Math.max(1, Math.round(Number(patch.currentSetIndex) || 1)),
+      totalSetsForExercise: Math.max(0, Math.round(Number(patch.totalSetsForExercise) || 0)),
+      totalSetsCompleted: Math.max(0, Math.round(Number(patch.totalSetsCompleted) || 0)),
+      totalVolumeKg: Math.max(0, Number(patch.totalVolumeKg) || 0),
+    })
+  } catch { /* swallow */ }
+}
+
+export const endWorkoutLiveActivity = async (): Promise<void> => {
+  try {
+    if (!isIosNative()) return
+    await Native.endWorkoutLiveActivity()
+  } catch { /* swallow */ }
+}
+
+// ─── App Intents (Siri Shortcuts) ─────────────────────────────────────────────
+
+export type IntentAction = 'startWorkout' | 'openLastWorkout' | 'checkStreak' | 'openHistory' | ''
+
+/**
+ * Reads and clears the pending App Intent action set by Siri / Shortcuts.
+ * Call on app bootstrap as a cold-start fallback (the listener below catches
+ * warm-start cases automatically).
+ */
+export const checkPendingIntentAction = async (): Promise<IntentAction> => {
+  try {
+    if (!isIosNative()) return ''
+    const r = await Native.checkPendingIntentAction()
+    const a = String(r?.action || '')
+    if (a === 'startWorkout' || a === 'openLastWorkout' || a === 'checkStreak' || a === 'openHistory') {
+      return a
+    }
+    return ''
+  } catch {
+    return ''
+  }
+}
+
+/** Subscribes to "intentAction" events fired when an App Intent runs while the
+ * app is already in memory. Returns an unsubscribe function. */
+export const addIntentActionListener = (handler: (action: IntentAction) => void): (() => void) => {
+  if (!isIosNative()) return () => { }
+  try {
+    const listenerPromise = Native.addListener('intentAction', (data: { action: string }) => {
+      try {
+        const a = String(data?.action ?? '')
+        if (a === 'startWorkout' || a === 'openLastWorkout' || a === 'checkStreak' || a === 'openHistory') {
+          handler(a)
+        }
+      } catch { /* swallow */ }
+    })
+    return () => { listenerPromise.then((l: PluginListenerHandle) => l.remove()).catch(() => { }) }
+  } catch {
+    return () => { }
+  }
 }
 
 // ─── Generic App Notification ────────────────────────────────────────────────
@@ -628,6 +827,433 @@ export const cancelStoryComposeNative = async () => {
   } catch {
     return { ok: false }
   }
+}
+
+// ─── App Store Review ─────────────────────────────────────────────────────────
+
+/**
+ * Requests an in-app App Store review via SKStoreReviewController.
+ * Apple limits this to 3 prompts per 365 days — safe to call at key milestones.
+ * No-op on web / Android / sandbox builds (Apple silently suppresses there too).
+ */
+export const requestNativeReview = async (): Promise<void> => {
+  try {
+    if (!isIosNative()) return
+    await Native.requestStoreReview()
+  } catch { /* swallow — non-critical */ }
+}
+
+// ─── HealthKit Sleep ──────────────────────────────────────────────────────────
+
+export interface SleepData {
+  /** Total minutes actually asleep (sum of Core/Deep/REM/Unspecified stages). */
+  totalMinutes: number
+  /** Same as totalMinutes for watchOS 9+ multi-stage breakdown. */
+  asleepMinutes: number
+  /** Total minutes recorded as "in bed" (older watch firmware). */
+  inBedMinutes: number
+  /** Unix-ms of first sleep sample start. */
+  startMs: number
+  /** Unix-ms of last sleep sample end. */
+  endMs: number
+}
+
+const EMPTY_SLEEP: SleepData = { totalMinutes: 0, asleepMinutes: 0, inBedMinutes: 0, startMs: 0, endMs: 0 }
+
+export const getSleepData = async (): Promise<SleepData> => {
+  try {
+    if (!isIosNative()) return EMPTY_SLEEP
+    return await Native.getSleepData()
+  } catch {
+    return EMPTY_SLEEP
+  }
+}
+
+// ─── Geofencing — gym auto check-in (Feature 6) ───────────────────────────────
+
+export interface GeofenceStatus {
+  active: boolean
+  authorization: 'authorizedAlways' | 'authorizedWhenInUse' | 'denied' | 'restricted' | 'notDetermined' | 'unknown'
+  gymName: string
+}
+
+/** Requests CLAuthorizationStatus.authorizedAlways. Two-prompt flow on iOS. */
+export const requestAlwaysLocationPermission = async (): Promise<string> => {
+  try {
+    if (!isIosNative()) return 'denied'
+    const r = await Native.requestAlwaysLocationPermission()
+    return String(r?.status || 'denied')
+  } catch { return 'denied' }
+}
+
+export const startGymGeofence = async (opts: {
+  lat: number
+  lng: number
+  radius?: number
+  name: string
+}): Promise<{ ok: boolean; error?: string }> => {
+  try {
+    if (!isIosNative()) return { ok: false, error: 'not_ios' }
+    if (!Number.isFinite(opts.lat) || !Number.isFinite(opts.lng) || !opts.lat || !opts.lng) {
+      return { ok: false, error: 'invalid_coords' }
+    }
+    return await Native.startGymGeofence({
+      lat: Number(opts.lat),
+      lng: Number(opts.lng),
+      radius: Math.max(50, Math.min(500, Number(opts.radius) || 120)),
+      name: String(opts.name || 'Academia').slice(0, 60),
+    })
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'unknown' }
+  }
+}
+
+export const stopGymGeofence = async (): Promise<boolean> => {
+  try {
+    if (!isIosNative()) return false
+    const r = await Native.stopGymGeofence()
+    return !!r?.ok
+  } catch { return false }
+}
+
+export const checkGeofenceStatus = async (): Promise<GeofenceStatus> => {
+  try {
+    if (!isIosNative()) return { active: false, authorization: 'denied', gymName: '' }
+    const r = await Native.checkGeofenceStatus()
+    return {
+      active: !!r?.active,
+      authorization: (r?.authorization as GeofenceStatus['authorization']) || 'unknown',
+      gymName: String(r?.gymName || ''),
+    }
+  } catch { return { active: false, authorization: 'denied', gymName: '' } }
+}
+
+/** Subscribes to didEnterRegion firings. Fires only when app is in memory — when
+ * the app is killed iOS shows the local notification scheduled by the plugin. */
+export const addGymGeofenceListener = (callback: (gymName: string) => void): (() => void) => {
+  if (!isIosNative()) return () => { }
+  try {
+    const listenerPromise = Native.addListener('gymGeofenceEntered', (data: { gymName: string }) => {
+      try { callback(String(data?.gymName || '')) } catch { /* swallow */ }
+    })
+    return () => { listenerPromise.then((l: PluginListenerHandle) => l.remove()).catch(() => { }) }
+  } catch { return () => { } }
+}
+
+// ─── BGTaskScheduler (Feature 15) ─────────────────────────────────────────────
+
+/** Schedules the next opportunistic background refresh + sync. Call when the
+ *  app goes to background (visibilitychange) so iOS knows when we want a slot. */
+export const scheduleBackgroundTasks = async (): Promise<boolean> => {
+  try {
+    if (!isIosNative()) return false
+    const r = await Native.scheduleBackgroundTasks()
+    return !!r?.ok
+  } catch { return false }
+}
+
+/** Fires when iOS gives us a BGAppRefresh / BGProcessing slot. Use to flush the
+ *  offline queue, refetch streak data, etc. Returns unsubscribe function. */
+export const addBackgroundRefreshListener = (
+  callback: (kind: 'refresh' | 'sync') => void,
+): (() => void) => {
+  if (!isIosNative()) return () => { }
+  try {
+    const listenerPromise = Native.addListener('backgroundRefresh', (data: { kind: 'refresh' | 'sync' }) => {
+      try { callback(data?.kind === 'sync' ? 'sync' : 'refresh') } catch { /* swallow */ }
+    })
+    return () => { listenerPromise.then((l: PluginListenerHandle) => l.remove()).catch(() => { }) }
+  } catch { return () => { } }
+}
+
+// ─── App Shortcuts dynamic suggestions (Feature 19) ───────────────────────────
+
+/** Pushes the user's recent / favourite workouts into the AppEntity cache so
+ *  Siri can suggest them. Pass an empty array to clear. iOS dedupes & limits. */
+export const updateSiriWorkoutSuggestions = async (
+  workouts: Array<{ id: string; name: string }>,
+): Promise<number> => {
+  try {
+    if (!isIosNative()) return 0
+    const safe = (workouts || [])
+      .filter((w) => w && typeof w.id === 'string' && typeof w.name === 'string' && w.id.trim() && w.name.trim())
+      .slice(0, 10) // Cap at 10 — Siri ignores larger lists anyway
+      .map((w) => ({ id: String(w.id).slice(0, 64), name: String(w.name).slice(0, 60) }))
+    const r = await Native.updateSiriWorkoutSuggestions({ workouts: safe })
+    return Number(r?.count) || 0
+  } catch { return 0 }
+}
+
+// ─── Live Activity push tokens (Feature 11) ───────────────────────────────────
+
+export interface LiveActivityPushToken {
+  kind: string         // 'rest' | 'workout' | …
+  activityId?: string
+  token: string        // hex string ready for APNs apns-topic header
+}
+
+/** Snapshot of all currently active LA push tokens. Useful on resume. */
+export const getLiveActivityPushTokens = async (): Promise<LiveActivityPushToken[]> => {
+  try {
+    if (!isIosNative()) return []
+    const r = await Native.getLiveActivityPushTokens()
+    return Array.isArray(r?.tokens) ? r.tokens : []
+  } catch { return [] }
+}
+
+/** Subscribe to push-token rotation events (Apple rotates these periodically). */
+export const addLiveActivityPushTokenListener = (
+  callback: (token: LiveActivityPushToken) => void,
+): (() => void) => {
+  if (!isIosNative()) return () => { }
+  try {
+    const listenerPromise = Native.addListener(
+      'liveActivityPushToken',
+      (data: { kind: string; activityId: string; token: string }) => {
+        try {
+          if (data?.token) {
+            callback({
+              kind: String(data.kind || ''),
+              activityId: String(data.activityId || ''),
+              token: String(data.token),
+            })
+          }
+        } catch { /* swallow */ }
+      },
+    )
+    return () => { listenerPromise.then((l: PluginListenerHandle) => l.remove()).catch(() => { }) }
+  } catch { return () => { } }
+}
+
+// ─── Native SQLite3 cache (Feature 16) ────────────────────────────────────────
+//
+// Thin promise-returning wrappers around the IronTracksNative plugin's KV +
+// queue methods. These are LOW-LEVEL — most callers go through the higher-level
+// `nativeKVStore.ts` / `nativeQueue.ts` modules which handle JSON encoding,
+// fallbacks and write-through to the existing IDB / Filesystem paths.
+
+export interface NativeKVStoreStats {
+  available: boolean
+  kvCount: number
+  queueCount: number
+  sizeBytes: number
+}
+
+export const nativeKvGet = async (key: string): Promise<string | null> => {
+  try {
+    if (!isIosNative()) return null
+    const r = await Native.kvGet({ key })
+    return r?.exists ? (r.value ?? null) : null
+  } catch { return null }
+}
+
+export const nativeKvSet = async (key: string, value: string): Promise<boolean> => {
+  try {
+    if (!isIosNative()) return false
+    const r = await Native.kvSet({ key, value })
+    return !!r?.ok
+  } catch { return false }
+}
+
+export const nativeKvDelete = async (key: string): Promise<boolean> => {
+  try {
+    if (!isIosNative()) return false
+    const r = await Native.kvDelete({ key })
+    return !!r?.ok
+  } catch { return false }
+}
+
+export const nativeKvKeys = async (opts?: { prefix?: string; limit?: number }): Promise<string[]> => {
+  try {
+    if (!isIosNative()) return []
+    const r = await Native.kvKeys(opts)
+    return Array.isArray(r?.keys) ? r.keys : []
+  } catch { return [] }
+}
+
+export const nativeQueuePut = async (job: {
+  id: string
+  payload: string
+  status?: string
+  attempts?: number
+  nextAttemptAt?: number
+}): Promise<boolean> => {
+  try {
+    if (!isIosNative()) return false
+    if (!job?.id || !job?.payload) return false
+    const r = await Native.queuePut(job)
+    return !!r?.ok
+  } catch { return false }
+}
+
+export const nativeQueueGetAll = async (limit = 1000): Promise<string[]> => {
+  try {
+    if (!isIosNative()) return []
+    const r = await Native.queueGetAll({ limit })
+    return Array.isArray(r?.payloads) ? r.payloads : []
+  } catch { return [] }
+}
+
+export const nativeQueueDelete = async (id: string): Promise<boolean> => {
+  try {
+    if (!isIosNative()) return false
+    const r = await Native.queueDelete({ id })
+    return !!r?.ok
+  } catch { return false }
+}
+
+export const nativeQueueClear = async (): Promise<boolean> => {
+  try {
+    if (!isIosNative()) return false
+    const r = await Native.queueClear()
+    return !!r?.ok
+  } catch { return false }
+}
+
+export const nativeKvStoreStats = async (): Promise<NativeKVStoreStats> => {
+  const empty: NativeKVStoreStats = { available: false, kvCount: 0, queueCount: 0, sizeBytes: 0 }
+  try {
+    if (!isIosNative()) return empty
+    const r = await Native.kvStoreStats()
+    return {
+      available: !!r?.available,
+      kvCount: Number(r?.kvCount) || 0,
+      queueCount: Number(r?.queueCount) || 0,
+      sizeBytes: Number(r?.sizeBytes) || 0,
+    }
+  } catch { return empty }
+}
+
+// ─── SharePlay (Feature 18) ───────────────────────────────────────────────────
+//
+// FaceTime-driven workout co-presence. Two paths to start:
+//   A) User is already in a FaceTime call → tap "Treinar Junto" button →
+//      SharePlay tray appears → user (and peers) tap "Open" → activate succeeds.
+//   B) User taps "Treinar Junto" without a FaceTime active → activate returns
+//      not_activated; UI prompts the user to start a FaceTime first.
+//
+// Once active, every set-completion / exercise-change is mirrored across all
+// participants by serialising the JS state diff into a SharePlay message.
+
+export type SharePlayState = 'inactive' | 'waiting' | 'joined' | 'invalidated' | 'unknown'
+
+export interface SharePlayInfo {
+  active: boolean
+  participantCount: number
+  workoutId?: string
+  workoutName?: string
+  hostName?: string
+}
+
+export const startSharePlayWorkout = async (opts: {
+  workoutId: string
+  workoutName: string
+  hostName?: string
+}): Promise<{ ok: boolean; error?: string }> => {
+  try {
+    if (!isIosNative()) return { ok: false, error: 'not_ios' }
+    if (!opts?.workoutId) return { ok: false, error: 'missing_workoutId' }
+    return await Native.startSharePlayWorkout({
+      workoutId: String(opts.workoutId).slice(0, 64),
+      workoutName: String(opts.workoutName ?? 'Treino').slice(0, 60),
+      hostName: String(opts.hostName ?? '').slice(0, 60),
+    })
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : 'unknown' }
+  }
+}
+
+export const endSharePlayWorkout = async (): Promise<boolean> => {
+  try {
+    if (!isIosNative()) return false
+    const r = await Native.endSharePlayWorkout()
+    return !!r?.ok
+  } catch { return false }
+}
+
+/** Send a typed message to every other participant. The payload is JSON-encoded
+ *  on the Swift side so it can hold arbitrary nested objects. */
+export const sendSharePlayMessage = async <T extends Record<string, unknown>>(
+  type: string,
+  payload: T,
+): Promise<boolean> => {
+  try {
+    if (!isIosNative()) return false
+    if (!type) return false
+    const r = await Native.sendSharePlayMessage({ type, payload })
+    return !!r?.ok
+  } catch { return false }
+}
+
+export const getSharePlayState = async (): Promise<SharePlayInfo> => {
+  try {
+    if (!isIosNative()) return { active: false, participantCount: 0 }
+    const r = await Native.getSharePlayState()
+    return {
+      active: !!r?.active,
+      participantCount: Number(r?.participantCount) || 0,
+      workoutId: r?.workoutId ? String(r.workoutId) : undefined,
+      workoutName: r?.workoutName ? String(r.workoutName) : undefined,
+      hostName: r?.hostName ? String(r.hostName) : undefined,
+    }
+  } catch { return { active: false, participantCount: 0 } }
+}
+
+export const addSharePlayStateListener = (callback: (state: SharePlayState) => void): (() => void) => {
+  if (!isIosNative()) return () => { }
+  try {
+    const listenerPromise = Native.addListener('sharePlayState', (data) => {
+      const s = String(data?.state ?? '')
+      const safe: SharePlayState = (s === 'waiting' || s === 'joined' || s === 'invalidated' || s === 'unknown') ? s : 'unknown'
+      try { callback(safe) } catch { /* swallow */ }
+    })
+    return () => { listenerPromise.then((l: PluginListenerHandle) => l.remove()).catch(() => { }) }
+  } catch { return () => { } }
+}
+
+export const addSharePlayParticipantsListener = (callback: (count: number) => void): (() => void) => {
+  if (!isIosNative()) return () => { }
+  try {
+    const listenerPromise = Native.addListener('sharePlayParticipants', (data) => {
+      const n = Number(data?.count)
+      if (Number.isFinite(n)) try { callback(Math.max(0, n)) } catch { /* swallow */ }
+    })
+    return () => { listenerPromise.then((l: PluginListenerHandle) => l.remove()).catch(() => { }) }
+  } catch { return () => { } }
+}
+
+export interface SharePlayIncomingMessage {
+  type: string
+  payload: Record<string, unknown>
+  sentAtMs: number
+  fromParticipantId: string
+}
+
+export const addSharePlayMessageListener = (
+  callback: (msg: SharePlayIncomingMessage) => void,
+): (() => void) => {
+  if (!isIosNative()) return () => { }
+  try {
+    const listenerPromise = Native.addListener('sharePlayMessage', (data) => {
+      try {
+        let payload: Record<string, unknown> = {}
+        try {
+          const raw = String(data?.payloadJSON ?? '{}')
+          const parsed = JSON.parse(raw)
+          if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+            payload = parsed as Record<string, unknown>
+          }
+        } catch { /* invalid JSON — keep empty */ }
+        callback({
+          type: String(data?.type ?? ''),
+          payload,
+          sentAtMs: Number(data?.sentAtMs) || 0,
+          fromParticipantId: String(data?.fromParticipantId ?? ''),
+        })
+      } catch { /* swallow */ }
+    })
+    return () => { listenerPromise.then((l: PluginListenerHandle) => l.remove()).catch(() => { }) }
+  } catch { return () => { } }
 }
 
 /**

@@ -20,7 +20,7 @@ import { queueFinishWorkout, isOnline } from '@/lib/offline/offlineSync'
 import { buildFinishWorkoutPayload } from '@/lib/finishWorkoutPayload'
 import { saveFinishBackup, clearFinishBackup } from '@/lib/workoutSafetyNet'
 import { logWarn } from '@/lib/logger'
-import { endAllRestLiveActivities, triggerHaptic } from '@/utils/native/irontracksNative'
+import { endAllRestLiveActivities, triggerHaptic, requestNativeReview } from '@/utils/native/irontracksNative'
 
 interface UseWorkoutFinishProps {
   session: WorkoutSession | null
@@ -209,6 +209,17 @@ export function useWorkoutFinish(props: UseWorkoutFinishProps) {
       // Ensure any active rest timer Live Activity is cleared when workout ends
       endAllRestLiveActivities().catch(() => { })
       triggerHaptic('heavy').catch(() => { })
+
+      // In-app review at milestone workouts (3rd, 10th, 30th).
+      // SKStoreReviewController enforces a hard cap of 3 times/year — safe to call here.
+      try {
+        const reviewKey = 'irontracks.review.count.v1'
+        const n = (parseInt(localStorage.getItem(reviewKey) ?? '0', 10) || 0) + 1
+        localStorage.setItem(reviewKey, String(n))
+        if (n === 3 || n === 10 || n === 30) {
+          void requestNativeReview()
+        }
+      } catch { /* swallow — never block workout completion */ }
 
       try {
         if (typeof props?.onFinish === 'function') {

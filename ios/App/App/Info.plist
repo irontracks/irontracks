@@ -45,6 +45,14 @@
 		<string>location</string>
 		<string>remote-notification</string>
 		<string>fetch</string>
+		<string>processing</string>
+	</array>
+	<!-- BGTaskSchedulerPermittedIdentifiers — must include every task ID we register.
+	     Without this entry iOS rejects the BGTaskScheduler.register() call at launch. -->
+	<key>BGTaskSchedulerPermittedIdentifiers</key>
+	<array>
+		<string>com.irontracks.app.refresh</string>
+		<string>com.irontracks.app.sync</string>
 	</array>
 	<key>UILaunchStoryboardName</key>
 	<string>LaunchScreen</string>

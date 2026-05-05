@@ -99,6 +99,13 @@ export const UserSettingsSchema = z
     requireBiometricsOnStartup: z.boolean().default(false),
     // ── Integrations ──────────────────────────────────────────────────────────
     appleHealthSync: z.boolean().default(false),
+    // ── Geofencing — auto check-in (iOS only, opt-in) ─────────────────────────
+    gymGeofenceEnabled: z.boolean().default(false),
+    /** Coordinates of the favourite gym + display name. iOS uses these to
+     *  monitor a CLCircularRegion (~120 m) and prompt the user upon entry. */
+    favoriteGymName: z.string().default(''),
+    favoriteGymLat: z.number().nullable().default(null),
+    favoriteGymLng: z.number().nullable().default(null),
   })
   .passthrough()
 

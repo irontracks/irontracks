@@ -1,6 +1,14 @@
 import { parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
 import { nfsPutJob, nfsDeleteJob, nfsGetAllJobs } from './nativeFs'
+import {
+  nativeKvGet,
+  nativeKvSet,
+  nativeQueuePut,
+  nativeQueueGetAll,
+  nativeQueueDelete,
+} from '@/utils/native/irontracksNative'
+import { isIosNative } from '@/utils/platform'
 
 const DB_NAME = 'irontracks'
 const DB_VERSION = 1
@@ -68,6 +76,18 @@ const txDone = (tx: IDBTransaction): Promise<null> =>
 export const kvGet = async (key: unknown): Promise<unknown | null> => {
   const k = String(key || '')
   if (!k) return null
+
+  // Fast path on iOS native: SQLite3 (Feature 16). Fall through to IDB on
+  // miss so the migration window doesn't lose data already written elsewhere.
+  if (isIosNative()) {
+    try {
+      const raw = await nativeKvGet(k)
+      if (raw !== null && raw !== undefined && raw !== '') {
+        return parseJsonWithSchema(raw, z.unknown())
+      }
+    } catch { /* fall through to IDB */ }
+  }
+
   if (!hasIndexedDb()) {
     try {
       const raw = window.localStorage.getItem(`it.kv.${k}`) || ''
@@ -91,6 +111,14 @@ export const kvGet = async (key: unknown): Promise<unknown | null> => {
 export const kvSet = async (key: unknown, value: unknown): Promise<boolean> => {
   const k = String(key || '')
   if (!k) return false
+
+  // Dual-write: native SQLite3 fast path + IDB legacy path. We don't await the
+  // native write — IDB remains source of truth for now so failures here don't
+  // block the call. A future cleanup pass can flip the priority.
+  if (isIosNative()) {
+    void nativeKvSet(k, JSON.stringify(value ?? null)).catch(() => { /* best effort */ })
+  }
+
   if (!hasIndexedDb()) {
     try {
       window.localStorage.setItem(`it.kv.${k}`, JSON.stringify(value ?? null))
@@ -114,6 +142,18 @@ export const queuePut = async (job: unknown): Promise<boolean> => {
 
   // Write-through to native filesystem (survives iOS force-close)
   nfsPutJob(jobObj).catch(() => { /* best effort */ })
+
+  // Native SQLite3 fast path on iOS — survives iOS app suspension better than
+  // IDB and gives indexed status / next_attempt_at scans for the flush loop.
+  if (isIosNative()) {
+    void nativeQueuePut({
+      id,
+      payload: JSON.stringify(jobObj),
+      status: typeof jobObj?.status === 'string' ? (jobObj.status as string) : 'pending',
+      attempts: typeof jobObj?.attempts === 'number' ? (jobObj.attempts as number) : 0,
+      nextAttemptAt: typeof jobObj?.nextAttemptAt === 'number' ? (jobObj.nextAttemptAt as number) : 0,
+    }).catch(() => { /* best effort */ })
+  }
 
   if (!hasIndexedDb()) {
     try {
@@ -141,6 +181,11 @@ export const queueDelete = async (id: unknown): Promise<boolean> => {
   // Remove from native filesystem too
   nfsDeleteJob(key).catch(() => { /* best effort */ })
 
+  // Remove from native SQLite3 cache (Feature 16)
+  if (isIosNative()) {
+    void nativeQueueDelete(key).catch(() => { /* best effort */ })
+  }
+
   if (!hasIndexedDb()) {
     try {
       const raw = window.localStorage.getItem('it.queue.v1') || '[]'
@@ -160,6 +205,25 @@ export const queueDelete = async (id: unknown): Promise<boolean> => {
 }
 
 export const queueGetAll = async (): Promise<unknown[]> => {
+  // Native SQLite3 first on iOS — fastest path, indexed by next_attempt_at.
+  // If empty, fall through to IDB / FS / localStorage so we recover any
+  // jobs queued before the SQLite store existed.
+  if (isIosNative()) {
+    try {
+      const payloads = await nativeQueueGetAll(1000)
+      if (payloads.length > 0) {
+        const jobs: Record<string, unknown>[] = []
+        for (const p of payloads) {
+          try {
+            const parsed = parseJsonWithSchema(p, z.record(z.unknown()))
+            if (parsed && typeof parsed === 'object') jobs.push(parsed as Record<string, unknown>)
+          } catch { /* skip corrupted */ }
+        }
+        if (jobs.length > 0) return jobs
+      }
+    } catch { /* fall through */ }
+  }
+
   if (!hasIndexedDb()) {
     // Try native filesystem first (iOS), fall back to localStorage
     try {

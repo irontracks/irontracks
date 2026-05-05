@@ -250,4 +250,39 @@ export const apiAdmin = {
   syncWorkoutTemplates: (payload: Record<string, unknown>, authHeaders?: Record<string, string>) =>
     apiPost<{ ok: boolean }>('/api/admin/workouts/sync-templates', payload,
       { headers: { 'Content-Type': 'application/json', ...authHeaders } }),
+
+  // ─── Billing diagnostic & simulation ──────────────────────────────────────────
+
+  /**
+   * GET billing health checks (teacher_tiers consistency, MP token, env vars,
+   * data counts). Used by SystemTab to show "system ready to charge?" status.
+   */
+  getBillingDiagnostic: (authHeaders?: Record<string, string>) =>
+    apiGet<{
+      ok: boolean
+      ready_to_charge: boolean
+      checks: Record<string, { ok: boolean; message: string; data?: Record<string, unknown> }>
+      timestamp: string
+    }>('/api/admin/billing-diagnostic', {
+      headers: { 'Content-Type': 'application/json', ...authHeaders },
+    }),
+
+  /**
+   * POST simulate a teacher plan activation WITHOUT touching MercadoPago.
+   * Mirrors the real webhook handler but inserts raw.simulated=true on the
+   * resulting invoice so it doesn't pollute revenue analytics.
+   */
+  simulateTeacherPayment: (
+    payload: { teacherUserId: string; planId: 'starter' | 'pro' | 'elite' | 'unlimited' },
+    authHeaders?: Record<string, string>,
+  ) =>
+    apiPost<{
+      ok: boolean
+      error?: string
+      simulated_payment_id?: string
+      teacher?: { id: string; name: string; email: string }
+      plan?: { tier_key: string; name: string; price_cents: number }
+      plan_valid_until?: string
+    }>('/api/admin/simulate-teacher-payment', payload as unknown as Record<string, unknown>,
+      { headers: { 'Content-Type': 'application/json', ...authHeaders } }),
 }

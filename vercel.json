@@ -87,6 +87,8 @@
         { "path": "/api/cron/weekly-recap", "schedule": "0 11 * * 1" },
         { "path": "/api/cron/friends-trained-today", "schedule": "0 23 * * *" },
         { "path": "/api/cron/water-reminder", "schedule": "0 17 * * *" },
-        { "path": "/api/cron/trial-ending", "schedule": "0 13 * * *" }
+        { "path": "/api/cron/trial-ending", "schedule": "0 13 * * *" },
+        { "path": "/api/cron/teacher-plan-expiring", "schedule": "0 13 * * *" },
+        { "path": "/api/cron/teacher-plan-suspend", "schedule": "0 6 * * *" }
     ]
 }

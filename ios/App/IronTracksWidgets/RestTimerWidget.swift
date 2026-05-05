@@ -102,6 +102,150 @@ struct RestTimerLiveActivity: Widget {
     }
 }
 
+// ── Workout Live Activity (session-level — exercise progress, volume, elapsed) ──
+//
+// Coexists with RestTimerLiveActivity. The workout LA stays visible during the
+// entire session; the rest timer LA appears briefly on top of it during rests.
+// iOS automatically handles displaying multiple activities simultaneously.
+
+@available(iOS 16.1, *)
+struct WorkoutLiveActivity: Widget {
+    var body: some WidgetConfiguration {
+        ActivityConfiguration(for: WorkoutLiveActivityAttributes.self) { context in
+            WorkoutLockScreenView(context: context)
+        } dynamicIsland: { context in
+            DynamicIsland {
+                DynamicIslandExpandedRegion(.leading) {
+                    Label("Treino", systemImage: "figure.strengthtraining.traditional")
+                        .font(.caption2.bold())
+                        .foregroundColor(.orange)
+                }
+                DynamicIslandExpandedRegion(.trailing) {
+                    Text(timerInterval: context.attributes.workoutStartDate...Date.distantFuture, countsDown: false)
+                        .font(.title3.bold())
+                        .monospacedDigit()
+                        .foregroundColor(.white)
+                        .frame(minWidth: 64, alignment: .trailing)
+                }
+                DynamicIslandExpandedRegion(.center) {
+                    Text(context.state.currentExerciseName.isEmpty ? context.attributes.workoutName : context.state.currentExerciseName)
+                        .font(.caption.bold())
+                        .foregroundColor(.white.opacity(0.85))
+                        .lineLimit(1)
+                }
+                DynamicIslandExpandedRegion(.bottom) {
+                    HStack(spacing: 12) {
+                        Label {
+                            Text("Série \(context.state.currentSetIndex)/\(max(context.state.totalSetsForExercise, context.state.currentSetIndex))")
+                                .font(.caption2.bold())
+                                .foregroundColor(.white)
+                        } icon: {
+                            Image(systemName: "list.number")
+                                .font(.caption2)
+                                .foregroundColor(.orange)
+                        }
+                        Spacer()
+                        Label {
+                            Text("\(Int(context.state.totalVolumeKg)) kg")
+                                .font(.caption2.bold())
+                                .foregroundColor(.white)
+                        } icon: {
+                            Image(systemName: "scalemass.fill")
+                                .font(.caption2)
+                                .foregroundColor(.orange)
+                        }
+                    }
+                    .padding(.horizontal, 8)
+                    .padding(.bottom, 4)
+                }
+            } compactLeading: {
+                Image(systemName: "figure.strengthtraining.traditional")
+                    .foregroundColor(.orange)
+                    .font(.caption.bold())
+            } compactTrailing: {
+                Text(timerInterval: context.attributes.workoutStartDate...Date.distantFuture, countsDown: false)
+                    .font(.caption.bold())
+                    .monospacedDigit()
+                    .foregroundColor(.white)
+                    .frame(minWidth: 44)
+            } minimal: {
+                Image(systemName: "figure.strengthtraining.traditional")
+                    .foregroundColor(.orange)
+            }
+            .keylineTint(.orange)
+        }
+    }
+}
+
+@available(iOS 16.1, *)
+struct WorkoutLockScreenView: View {
+    let context: ActivityViewContext<WorkoutLiveActivityAttributes>
+
+    var body: some View {
+        VStack(spacing: 10) {
+            HStack(spacing: 14) {
+                ZStack {
+                    Circle()
+                        .fill(Color.orange.opacity(0.18))
+                        .frame(width: 44, height: 44)
+                    Image(systemName: "figure.strengthtraining.traditional")
+                        .font(.title3.bold())
+                        .foregroundColor(.orange)
+                }
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(context.attributes.workoutName)
+                        .font(.caption.bold())
+                        .foregroundColor(.secondary)
+                        .lineLimit(1)
+                    Text(context.state.currentExerciseName.isEmpty
+                         ? "Treinando…"
+                         : context.state.currentExerciseName)
+                        .font(.subheadline.bold())
+                        .foregroundColor(.primary)
+                        .lineLimit(1)
+                }
+                Spacer()
+                Text(timerInterval: context.attributes.workoutStartDate...Date.distantFuture,
+                     countsDown: false)
+                    .font(.system(.title2, design: .rounded).bold())
+                    .monospacedDigit()
+                    .foregroundColor(.primary)
+            }
+
+            HStack(spacing: 14) {
+                HStack(spacing: 4) {
+                    Image(systemName: "list.number")
+                        .font(.caption2)
+                        .foregroundColor(.orange)
+                    Text("Série \(context.state.currentSetIndex)/\(max(context.state.totalSetsForExercise, context.state.currentSetIndex))")
+                        .font(.caption2.bold())
+                        .foregroundColor(.secondary)
+                }
+                HStack(spacing: 4) {
+                    Image(systemName: "checkmark.circle.fill")
+                        .font(.caption2)
+                        .foregroundColor(.green)
+                    Text("\(context.state.totalSetsCompleted) séries")
+                        .font(.caption2.bold())
+                        .foregroundColor(.secondary)
+                }
+                HStack(spacing: 4) {
+                    Image(systemName: "scalemass.fill")
+                        .font(.caption2)
+                        .foregroundColor(.orange)
+                    Text("\(Int(context.state.totalVolumeKg)) kg")
+                        .font(.caption2.bold())
+                        .foregroundColor(.secondary)
+                }
+                Spacer()
+            }
+        }
+        .padding(16)
+        .activityBackgroundTint(Color(red: 0.05, green: 0.05, blue: 0.05))
+        .activitySystemActionForegroundColor(.white)
+    }
+}
+
 // ── Lock screen banner view ───────────────────────────────────────────────────
 
 @available(iOS 16.1, *)
