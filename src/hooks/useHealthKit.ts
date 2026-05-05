@@ -18,7 +18,9 @@ import {
   getRestingHeartRate,
   getHRV,
   getActiveCalories,
+  getSleepData,
 } from '@/utils/native/irontracksNative'
+import type { SleepData } from '@/utils/native/irontracksNative'
 
 export interface HealthKitData {
   steps: number
@@ -27,7 +29,10 @@ export interface HealthKitData {
   restingHeartRateBpm: number
   activeCalories: number
   sdnn: number           // HRV (ms)
+  sleep: SleepData
 }
+
+const EMPTY_SLEEP: SleepData = { totalMinutes: 0, asleepMinutes: 0, inBedMinutes: 0, startMs: 0, endMs: 0 }
 
 const EMPTY: HealthKitData = {
   steps: 0,
@@ -36,6 +41,7 @@ const EMPTY: HealthKitData = {
   restingHeartRateBpm: 0,
   activeCalories: 0,
   sdnn: 0,
+  sleep: EMPTY_SLEEP,
 }
 
 interface UseHealthKitOptions {
@@ -80,12 +86,13 @@ export function useHealthKit({ enabled, userId }: UseHealthKitOptions) {
   const fetchData = useCallback(async () => {
     if (!available || !enabled || !permissionGranted) return
     try {
-      const [steps, hr, rhr, hrv, cals] = await Promise.all([
+      const [steps, hr, rhr, hrv, cals, sleep] = await Promise.all([
         getHealthSteps(),
         getHeartRate(),
         getRestingHeartRate(),
         getHRV(),
         getActiveCalories(),
+        getSleepData(),
       ])
       setData({
         steps,
@@ -94,6 +101,7 @@ export function useHealthKit({ enabled, userId }: UseHealthKitOptions) {
         restingHeartRateBpm: rhr.bpm,
         activeCalories: cals,
         sdnn: hrv.sdnn,
+        sleep,
       })
     } catch { /* silently fail — health data is supplemental */ }
   }, [available, enabled, permissionGranted])

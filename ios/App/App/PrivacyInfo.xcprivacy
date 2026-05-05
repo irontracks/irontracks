@@ -69,7 +69,9 @@
 			</array>
 		</dict>
 
-		<!-- Precise Location: gym auto-checkin + cardio GPS tracking -->
+		<!-- Precise Location: gym geofencing auto-checkin (CLCircularRegion monitored
+		     in background, ~100m radius) + cardio GPS tracking. Lat/lng never leaves
+		     the device for the geofencing flow — only the gym name is stored remotely. -->
 		<dict>
 			<key>NSPrivacyCollectedDataType</key>
 			<string>NSPrivacyCollectedDataTypePreciseLocation</string>

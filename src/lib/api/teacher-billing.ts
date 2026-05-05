@@ -53,6 +53,76 @@ export interface TeacherCheckoutResult {
   [key: string]: unknown
 }
 
+// ─── Invoice (charge) row returned by /api/teachers/my-invoices ──────────────
+
+export interface TeacherInvoiceRow {
+  id: string
+  amount_cents: number
+  currency: string
+  status: string                 // 'pending' | 'approved' | 'refunded' | 'cancelled' | …
+  provider: string               // 'mercadopago' for now
+  provider_payment_id: string | null
+  pix_qr_code: string | null     // base64 PNG, only set while status=pending
+  pix_payload: string | null     // copy-paste PIX code, idem
+  invoice_url: string | null
+  due_date: string | null
+  paid_at: string | null
+  created_at: string | null
+  tier_key: string | null        // 'free' | 'starter' | 'pro' | 'elite' | 'unlimited'
+  plan_name: string | null
+}
+
+export interface TeacherInvoicesResult {
+  ok: boolean
+  invoices?: TeacherInvoiceRow[]
+  error?: string
+  [key: string]: unknown
+}
+
+// ─── Recurring subscription (MercadoPago Preapproval) ─────────────────────────
+
+export interface TeacherRecurringCheckoutPayload {
+  planId: string
+}
+
+export interface TeacherRecurringCheckoutResult {
+  ok: boolean
+  subscription_id?: string
+  init_point?: string             // URL the client opens to finish auth
+  plan?: { id: string; name: string }
+  amount?: number
+  error?: string
+  [key: string]: unknown
+}
+
+export interface TeacherActiveSubscription {
+  id: string
+  status: string                  // 'pending' | 'active' | 'cancelled' | 'past_due'
+  provider: string
+  provider_subscription_id: string | null
+  current_period_start: string | null
+  current_period_end: string | null
+  cancel_at_period_end: boolean
+  tier_key: string | null
+  plan_name: string | null
+  init_point: string | null       // resume MP checkout if status='pending'
+  created_at: string | null
+}
+
+export interface TeacherActiveSubscriptionResult {
+  ok: boolean
+  subscription?: TeacherActiveSubscription | null
+  error?: string
+  [key: string]: unknown
+}
+
+export interface TeacherCancelRecurringResult {
+  ok: boolean
+  cancelled?: number
+  error?: string
+  [key: string]: unknown
+}
+
 // ─── Client ───────────────────────────────────────────────────────────────────
 
 export const apiTeacherBilling = {
@@ -64,7 +134,23 @@ export const apiTeacherBilling = {
   getMyPlan: () =>
     apiGet<TeacherMyPlanResult>('/api/teachers/my-plan'),
 
-  /** POST initiate PIX checkout for a teacher plan upgrade */
+  /** POST initiate PIX checkout for a teacher plan upgrade (one-shot, monthly manual) */
   checkout: (payload: TeacherCheckoutPayload) =>
     apiPost<TeacherCheckoutResult>('/api/teachers/checkout', payload as unknown as Record<string, unknown>),
+
+  /** GET historical invoices (pending + paid + cancelled) for the teacher */
+  getInvoices: () =>
+    apiGet<TeacherInvoicesResult>('/api/teachers/my-invoices'),
+
+  /** POST start a recurring monthly subscription (MercadoPago Preapproval) */
+  checkoutRecurring: (payload: TeacherRecurringCheckoutPayload) =>
+    apiPost<TeacherRecurringCheckoutResult>('/api/teachers/checkout-recurring', payload as unknown as Record<string, unknown>),
+
+  /** POST cancel the active recurring subscription (effective at period end) */
+  cancelRecurring: () =>
+    apiPost<TeacherCancelRecurringResult>('/api/teachers/cancel-recurring', {}),
+
+  /** GET the most recent recurring subscription (or null) */
+  getActiveSubscription: () =>
+    apiGet<TeacherActiveSubscriptionResult>('/api/teachers/active-subscription'),
 }

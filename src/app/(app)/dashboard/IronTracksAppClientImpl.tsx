@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect, useCallback, Suspense, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, Suspense, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 
@@ -52,6 +52,11 @@ import { useWhatsNew } from '@/hooks/useWhatsNew'
 import { useSeasonalCampaign } from '@/hooks/useSeasonalCampaign'
 import { useUnreadBadges } from '@/hooks/useUnreadBadges'
 import { useNativeAppSetup } from '@/hooks/useNativeAppSetup'
+import { useNativeIntentRouter } from '@/hooks/useNativeIntentRouter'
+import { useBackgroundRefresh } from '@/hooks/useBackgroundRefresh'
+import { useSiriWorkoutSuggestions } from '@/hooks/useSiriWorkoutSuggestions'
+import { useLiveActivityPushSync } from '@/hooks/useLiveActivityPushSync'
+import { useGymGeofence } from '@/hooks/useGymGeofence'
 import { usePushNotifications } from '@/hooks/usePushNotifications'
 import { BiometricLock, useBiometricLock } from '@/components/BiometricLock'
 import { useLocalPersistence } from '@/hooks/useLocalPersistence'
@@ -123,6 +128,22 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
     // ── Native iOS setup (notifications + biometric lock) ─────────────────────
     useNativeAppSetup(user?.id)
     usePushNotifications(user?.id)
+
+    // ── Siri / Shortcuts intents (App Intents) ────────────────────────────────
+    // Voice triggers like "Iniciar treino no IronTracks" route here. Every
+    // intent currently brings the user back to the dashboard — that's where
+    // workouts, streak and history live. Future deep links can branch here.
+    useNativeIntentRouter({
+        onAction: useCallback((_action) => {
+            setView('dashboard')
+        }, []),
+    })
+
+    // ── BGTaskScheduler — opportunistic offline-queue flush + widget refresh ──
+    useBackgroundRefresh()
+
+    // ── Live Activity push tokens — forwarded to backend for APNs updates ─────
+    useLiveActivityPushSync()
     const userName = String(user?.displayName || user?.email || '')
 
     // workouts, stats, studentFolders, fetchWorkouts, isFetching — extraídos para useWorkoutFetch
@@ -188,6 +209,30 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         enabled: appleHealthEnabled,
         userId: user?.id,
     })
+
+    // ── Gym geofence (Feature 6) ──
+    // Reads favourite gym from user_settings.preferences and (re)registers
+    // the iOS CLCircularRegion when settings change. Local notification handles
+    // entry events when the app is killed.
+    const favoriteGym = useMemo(() => {
+        const s = userSettingsApi?.settings as Record<string, unknown> | undefined
+        if (!s) return null
+        const enabled = Boolean(s.gymGeofenceEnabled)
+        const lat = typeof s.favoriteGymLat === 'number' ? s.favoriteGymLat : null
+        const lng = typeof s.favoriteGymLng === 'number' ? s.favoriteGymLng : null
+        const name = typeof s.favoriteGymName === 'string' ? s.favoriteGymName : ''
+        if (!enabled || lat == null || lng == null || !name) return null
+        return { name, lat, lng }
+    }, [userSettingsApi?.settings])
+    useGymGeofence({
+        favoriteGym,
+        enabled: favoriteGym !== null,
+        onEntered: useCallback((_gymName: string) => {
+            // App is in foreground — bring user to dashboard so the start CTA
+            // is one tap away. (Local notif handles the killed-app case.)
+            setView('dashboard')
+        }, []),
+    })
     const {
         profileIncomplete,
         setProfileIncomplete,
@@ -233,6 +278,21 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         supabase,
         initialWorkouts: Array.isArray(initialWorkouts) ? (initialWorkouts as Array<Record<string, unknown>>) : undefined,
     })
+
+    // ── Siri Shortcuts suggestions (Feature 19) ──
+    // Pushes the 10 most relevant workouts into the iOS AppEntity cache so
+    // "Hey Siri, iniciar Treino A no IronTracks" works with their actual names.
+    const siriWorkouts = useMemo(() => {
+        const list = Array.isArray(workouts) ? (workouts as Array<Record<string, unknown>>) : []
+        return list
+            .slice(0, 10)
+            .map((w) => ({
+                id: String(w?.id ?? ''),
+                name: String(w?.title ?? w?.name ?? '').trim(),
+            }))
+            .filter((w) => w.id && w.name)
+    }, [workouts])
+    useSiriWorkoutSuggestions(siriWorkouts)
 
     // refreshSyncState, runFlushQueue, syncState effects — handled by useOfflineSync hook above
 

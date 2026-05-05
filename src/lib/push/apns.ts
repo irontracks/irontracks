@@ -6,12 +6,16 @@
  *   APNS_KEY_ID, APNS_TEAM_ID, APNS_KEY_P8, APNS_BUNDLE_ID
  *
  * Tokens are read from the `device_push_tokens` table (already populated by usePushNotifications.ts).
+ *
+ * Rich notifications (Feature 9): pass `extra.image_url` (HTTPS) and the iOS
+ * NotificationService extension will download + attach it as a thumbnail.
+ * Requires the type to be in WAKE_SCREEN_TYPES so `mutable-content: 1` is set.
  */
-import * as crypto from 'crypto'
 import * as http2 from 'http2'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { logInfo, logError, logWarn } from '@/lib/logger'
 import { env } from '@/utils/env'
+import { getApnsConfig, getJwt } from '@/lib/push/apnsJwt'
 
 // ─── Conversation/Sender stable defaults ────────────────────────────────────
 // iOS Communication Notifications use a heuristic to decide whether to grant
@@ -55,52 +59,7 @@ function withConversationDefaults(
     return e
 }
 
-// ─── Configuration ──────────────────────────────────────────────────────────
-
-function getApnsConfig() {
-    const keyId = env.apns.keyId.trim()
-    const teamId = env.apns.teamId.trim()
-    const keyP8 = env.apns.keyP8.trim()
-    const bundleId = env.apns.bundleId.trim()
-    if (!keyId || !teamId || !keyP8) return null
-    return { keyId, teamId, keyP8, bundleId }
-}
-
-// ─── JWT Token (ES256, mutex-cached for 50 min) ─────────────────────────────
-// Mutex pattern prevents double-token generation under concurrent serverless invocations.
-// Apple rejects a second JWT with the same `iss` issued within 60 min.
-
-let cachedJwt: { token: string; expiresAt: number } | null = null
-let jwtRefreshInFlight: Promise<string> | null = null
-
-async function getJwt(cfg: { keyId: string; teamId: string; keyP8: string }): Promise<string> {
-    const now = Math.floor(Date.now() / 1000)
-    if (cachedJwt && cachedJwt.expiresAt > now + 60) return cachedJwt.token
-
-    // If a refresh is already in flight, await it instead of generating a second token
-    if (jwtRefreshInFlight) return jwtRefreshInFlight
-
-    const doRefresh = async (): Promise<string> => {
-        const issuedAt = Math.floor(Date.now() / 1000)
-        const header = Buffer.from(JSON.stringify({ alg: 'ES256', kid: cfg.keyId })).toString('base64url')
-        const payload = Buffer.from(JSON.stringify({ iss: cfg.teamId, iat: issuedAt })).toString('base64url')
-        const unsigned = `${header}.${payload}`
-
-        // The .p8 key may come with literal \n in env vars — normalize
-        const pem = cfg.keyP8.replace(/\\n/g, '\n')
-        const signature = crypto.sign('sha256', Buffer.from(unsigned), {
-            key: pem,
-            dsaEncoding: 'ieee-p1363',
-        })
-
-        const token = `${unsigned}.${signature.toString('base64url')}`
-        cachedJwt = { token, expiresAt: issuedAt + 50 * 60 } // cache 50 min (Apple max is 60)
-        return token
-    }
-
-    jwtRefreshInFlight = doRefresh().finally(() => { jwtRefreshInFlight = null })
-    return jwtRefreshInFlight
-}
+// ─── JWT + config moved to ./apnsJwt.ts (shared with Live Activity sender) ──
 
 // ─── Send single push via HTTP/2 ────────────────────────────────────────────
 
@@ -145,6 +104,12 @@ async function sendOneApnsPush(
             ])
             const notifType = String(extra?.type ?? '').toLowerCase()
             const wakesScreen = WAKE_SCREEN_TYPES.has(notifType)
+            // Rich notifications (Feature 9): if the route passed an image_url,
+            // we MUST set mutable-content:1 so the NotificationServiceExtension
+            // wakes up and can download + attach the image. HTTPS-only enforced
+            // on the iOS side as well — non-https URLs are silently ignored.
+            const rawImageUrl = String(extra?.image_url ?? extra?.attachment_url ?? '').trim()
+            const hasRichImage = rawImageUrl.length > 0 && /^https:\/\//i.test(rawImageUrl)
 
             const apnsPayload = JSON.stringify({
                 aps: {
@@ -157,9 +122,8 @@ async function sendOneApnsPush(
                         const passive = ['story_like', 'workout_like', 'pr_achieved']
                         return passive.includes(notifType) ? 'active' : 'time-sensitive'
                     })(),
-                    // Tells iOS to wake the Notification Service Extension before displaying.
-                    // Required for INSendMessageIntent upgrade (Communication Notification).
-                    ...(wakesScreen ? { 'mutable-content': 1 } : {}),
+                    // Wake the NSE for either Communication upgrade or rich-image attachment.
+                    ...(wakesScreen || hasRichImage ? { 'mutable-content': 1 } : {}),
                 },
                 // Spread extra but omit the internal __badge key used only for the aps.badge field
                 ...Object.fromEntries(Object.entries(extra ?? {}).filter(([k]) => k !== '__badge')),

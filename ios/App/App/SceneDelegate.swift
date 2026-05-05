@@ -23,6 +23,10 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
             pluginRegistered = true
             print("⚡ [IronTracks] IronTracksNativePlugin registered via SceneDelegate")
         }
+        // ProMotion (120 Hz) note: WKWebView on iOS 16+ already uses adaptive frame
+        // rates for scrolling and CSS animations automatically — no explicit API is
+        // required. CALayer.preferredFrameRateRange is not exposed in the Xcode 26 SDK
+        // for WKWebView's layer, so the OS-driven adaptive rate is the correct path.
     }
 
     func sceneDidDisconnect(_ scene: UIScene) {}

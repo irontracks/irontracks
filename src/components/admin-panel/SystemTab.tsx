@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ShieldAlert, Download, Upload, Trash2, MessageSquare, Database, ChevronDown, FileText } from 'lucide-react';
 import { useAdminPanel } from './AdminPanelContext';
 import { apiAdmin } from '@/lib/api';
+import { BillingDiagnosticPanel } from './BillingDiagnosticPanel';
 
 export const SystemTab: React.FC = () => {
     const {
@@ -198,6 +199,9 @@ export const SystemTab: React.FC = () => {
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
+            {/* Billing diagnostic & simulator (admin-only utility) */}
+            <BillingDiagnosticPanel />
+
             {/* Backup & Restore */}
             <div className="p-6 rounded-2xl shadow-sm" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.07)' }}>
                 <h3 className="font-black text-white text-lg mb-4 flex items-center gap-2">

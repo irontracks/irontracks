@@ -137,6 +137,38 @@ export async function POST(req: Request) {
         .eq('user_id', user.id)
     } catch (e) { logWarn('teacher_checkout', 'Could not update plan_subscription_id', e) }
 
+    // ── Record the pending invoice in app_payments ────────────────────────
+    // Lets the "Minhas Faturas" screen show this charge before it's paid,
+    // and lets the webhook update it to 'approved' when MP confirms.
+    // Stored under raw.scope='teacher_plan' so we can filter by teacher.
+    try {
+      await admin
+        .from('app_payments')
+        .upsert(
+          {
+            user_id: user.id,
+            plan_id: null,
+            subscription_id: null,
+            amount_cents: plan.price_cents,
+            currency: String(plan.currency ?? 'BRL'),
+            status: 'pending',
+            provider: 'mercadopago',
+            provider_payment_id: providerPaymentId,
+            pix_qr_code: pixQrCode,
+            pix_payload: pixPayload,
+            invoice_url: invoiceUrl,
+            due_date: dueDate,
+            raw: {
+              scope: 'teacher_plan',
+              tier_key: planId,
+              plan_name: plan.name,
+              mercadopago: { raw: payment },
+            },
+          },
+          { onConflict: 'provider,provider_payment_id' },
+        )
+    } catch (e) { logWarn('teacher_checkout', 'Could not record pending invoice', e) }
+
     return NextResponse.json({
       ok: true,
       payment_id: providerPaymentId,

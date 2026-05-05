@@ -1044,6 +1044,170 @@ export function SettingsHealthKitSection({
     )
 }
 
+// ── Geofencing (iOS only) — auto check-in na academia ────────────────────────
+interface SettingsGymGeofenceSectionProps {
+    draft: Record<string, unknown>
+    setValue: (key: string, value: unknown) => void
+    /** Resolves to the user's CURRENT lat/lng (Geolocation API). */
+    onCaptureCurrentLocation: () => Promise<{ lat: number; lng: number } | null>
+    /** Requests CLAuthorizationStatus.authorizedAlways. */
+    onRequestAlwaysPermission: () => Promise<string>
+    onOpenAppSettings: () => Promise<void>
+}
+export function SettingsGymGeofenceSection({
+    draft,
+    setValue,
+    onCaptureCurrentLocation,
+    onRequestAlwaysPermission,
+    onOpenAppSettings,
+}: SettingsGymGeofenceSectionProps) {
+    const enabled = Boolean(draft?.gymGeofenceEnabled ?? false)
+    const gymName = String(draft?.favoriteGymName ?? '')
+    const lat = typeof draft?.favoriteGymLat === 'number' ? (draft.favoriteGymLat as number) : null
+    const lng = typeof draft?.favoriteGymLng === 'number' ? (draft.favoriteGymLng as number) : null
+    const hasGym = !!gymName && lat != null && lng != null
+    const [busy, setBusy] = React.useState(false)
+    const [error, setError] = React.useState<string>('')
+    const [nameDraft, setNameDraft] = React.useState(gymName)
+
+    React.useEffect(() => { setNameDraft(gymName) }, [gymName])
+
+    const handleSetCurrent = async () => {
+        setError('')
+        setBusy(true)
+        try {
+            const status = await onRequestAlwaysPermission()
+            if (status === 'denied' || status === 'restricted') {
+                setError('Permissão de localização negada. Habilite "Sempre" em Ajustes.')
+                return
+            }
+            const coords = await onCaptureCurrentLocation()
+            if (!coords) {
+                setError('Não foi possível obter sua localização atual.')
+                return
+            }
+            setValue('favoriteGymLat', coords.lat)
+            setValue('favoriteGymLng', coords.lng)
+            const safeName = (nameDraft || 'Minha academia').trim().slice(0, 60)
+            setValue('favoriteGymName', safeName)
+            setValue('gymGeofenceEnabled', true)
+        } catch (e) {
+            setError(e instanceof Error ? e.message : 'Erro inesperado.')
+        } finally {
+            setBusy(false)
+        }
+    }
+
+    const handleClear = () => {
+        setValue('favoriteGymLat', null)
+        setValue('favoriteGymLng', null)
+        setValue('favoriteGymName', '')
+        setValue('gymGeofenceEnabled', false)
+        setNameDraft('')
+    }
+
+    const handleToggleEnabled = () => {
+        if (!hasGym) return
+        setValue('gymGeofenceEnabled', !enabled)
+    }
+
+    return (
+        <SectionCard>
+            <div className="flex items-center gap-3 mb-4">
+                <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)' }}>
+                    <svg width="22" height="22" viewBox="0 0 24 24" fill="white" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                        <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5a2.5 2.5 0 010-5 2.5 2.5 0 010 5z" />
+                    </svg>
+                </div>
+                <div className="flex-1 min-w-0">
+                    <div className="text-xs font-black uppercase tracking-[0.16em] text-amber-400">Auto Check-in</div>
+                    <div className="text-white font-black text-sm truncate">Geolocalização da Academia</div>
+                </div>
+                <div className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wide shrink-0 ${enabled && hasGym ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30' : 'bg-neutral-800 text-neutral-400 border border-neutral-700'}`}>
+                    {enabled && hasGym ? '✓ Ativo' : 'Desativado'}
+                </div>
+            </div>
+
+            <div className="rounded-xl bg-neutral-900/60 border border-neutral-800 p-3 mb-4 space-y-2.5">
+                <div className="text-[10px] font-black uppercase tracking-widest text-neutral-500 mb-1">Como funciona</div>
+                <div className="text-[11px] text-neutral-400 leading-relaxed">
+                    Salve sua academia favorita e o IronTracks te avisa automaticamente assim que você chega lá — mesmo com o app fechado. Detecção sem GPS contínuo (zero impacto na bateria).
+                </div>
+                <div className="pt-1 text-[10px] text-neutral-500 leading-relaxed border-t border-neutral-800/60">
+                    Sua localização nunca sai do dispositivo para esse uso. Só o nome da academia é salvo na sua conta.
+                </div>
+            </div>
+
+            {hasGym ? (
+                <div className="rounded-xl bg-neutral-900 border border-neutral-700 p-3 mb-3">
+                    <div className="text-[10px] font-black uppercase tracking-widest text-neutral-500 mb-1">Academia favorita</div>
+                    <div className="text-sm font-bold text-white truncate">{gymName}</div>
+                    <div className="text-[10px] text-neutral-500 mt-0.5">
+                        {lat?.toFixed(5)}, {lng?.toFixed(5)}
+                    </div>
+                </div>
+            ) : null}
+
+            {/* Nome (editável antes de capturar) */}
+            <div className="mb-3">
+                <label htmlFor="favorite-gym-name" className="text-[10px] font-black uppercase tracking-widest text-neutral-500 mb-1 block">Nome da academia</label>
+                <input
+                    id="favorite-gym-name"
+                    type="text"
+                    value={nameDraft}
+                    onChange={(e) => setNameDraft(e.target.value)}
+                    placeholder="Smart Fit Centro"
+                    maxLength={60}
+                    aria-label="Nome da academia favorita"
+                    className="w-full min-h-[44px] px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 placeholder:text-neutral-600 text-sm"
+                />
+            </div>
+
+            {error ? (
+                <div className="rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 text-xs px-3 py-2 mb-3">{error}</div>
+            ) : null}
+
+            <div className="flex flex-col sm:flex-row gap-2">
+                <button
+                    type="button"
+                    disabled={busy}
+                    onClick={handleSetCurrent}
+                    className="flex-1 min-h-[44px] px-4 py-3 rounded-xl font-black text-sm text-white inline-flex items-center justify-center gap-2 transition-all active:scale-95 disabled:opacity-60"
+                    style={{ background: 'linear-gradient(135deg, #f59e0b 0%, #fbbf24 100%)' }}
+                >
+                    {busy ? 'Capturando...' : (hasGym ? 'Atualizar para localização atual' : 'Usar localização atual')}
+                </button>
+                {hasGym ? (
+                    <>
+                        <button
+                            type="button"
+                            onClick={handleToggleEnabled}
+                            className="min-h-[44px] px-4 py-3 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black text-sm hover:bg-neutral-800 transition-colors"
+                        >
+                            {enabled ? 'Pausar' : 'Reativar'}
+                        </button>
+                        <button
+                            type="button"
+                            onClick={handleClear}
+                            className="min-h-[44px] px-4 py-3 rounded-xl bg-red-900/30 border border-red-700/40 text-red-300 font-black text-sm hover:bg-red-900/40 transition-colors"
+                        >
+                            Remover
+                        </button>
+                    </>
+                ) : null}
+            </div>
+
+            <button
+                type="button"
+                onClick={onOpenAppSettings}
+                className="mt-2 min-h-[36px] w-full px-3 py-2 rounded-lg text-[11px] text-neutral-400 hover:text-neutral-200"
+            >
+                Gerenciar permissão de localização em Ajustes do iOS
+            </button>
+        </SectionCard>
+    )
+}
+
 // ── Segurança (iOS only) ─────────────────────────────────────────────────────
 export function SettingsSecuritySection({ draft, setValue }: SettingsSectionProps) {
     const requireBiometricsOnStartup = Boolean(draft?.requireBiometricsOnStartup ?? false)
