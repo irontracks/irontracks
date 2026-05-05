@@ -34,6 +34,7 @@ const RequestsTab = dynamic(() => import('@/components/admin/RequestsTab'), { ss
 const VipTab = dynamic(() => import('@/components/admin-panel/VipTab').then(m => ({ default: m.VipTab })), { ssr: false });
 const TeacherBillingTab = dynamic(() => import('@/components/admin-panel/TeacherBillingTab'), { ssr: false });
 const TeacherManualTab = dynamic(() => import('@/components/admin-panel/TeacherManualTab'), { ssr: false });
+const PlatformBillingTab = dynamic(() => import('@/components/admin-panel/PlatformBillingTab').then(m => ({ default: m.PlatformBillingTab })), { ssr: false });
 import { Modals } from '@/components/admin-panel/Modals';
 import { logError } from '@/lib/logger';
 import type { AdminUser } from '@/types/admin';
@@ -125,7 +126,7 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
 
     let TAB_LABELS: Record<string, string> = { dashboard: 'VISÃO GERAL', students: 'ALUNOS', templates: 'TREINOS' };
     if (isAdmin) {
-        TAB_LABELS = { ...TAB_LABELS, requests: 'SOLICITAÇÕES', teachers: 'PROFESSORES', videos: 'VÍDEOS', errors: 'FEEDBACK', vip: 'VIP GESTÃO', vip_reports: 'VIP REPORTS', system: 'FERRAMENTAS' };
+        TAB_LABELS = { ...TAB_LABELS, requests: 'SOLICITAÇÕES', teachers: 'PROFESSORES', videos: 'VÍDEOS', errors: 'FEEDBACK', vip: 'VIP GESTÃO', vip_reports: 'VIP REPORTS', platform_billing: 'PLATAFORMA', system: 'FERRAMENTAS' };
     }
     if (isTeacher && !isAdmin) {
         TAB_LABELS = { ...TAB_LABELS, priorities: 'PRIORIDADES', billing: 'COBRANÇAS', guide: 'GUIA' };
@@ -162,6 +163,7 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
                     {tab === 'errors' && !selectedStudent && isAdmin && <TabErrorBoundary name="Feedback"><ErrorsTab /></TabErrorBoundary>}
                     {tab === 'vip' && !selectedStudent && isAdmin && <TabErrorBoundary name="VIP"><VipTab /></TabErrorBoundary>}
                     {tab === 'vip_reports' && !selectedStudent && <TabErrorBoundary name="VIP Reports"><AdminVipReports supabase={supabase} /></TabErrorBoundary>}
+                    {tab === 'platform_billing' && !selectedStudent && isAdmin && <TabErrorBoundary name="Plataforma"><PlatformBillingTab /></TabErrorBoundary>}
                     {tab === 'system' && !selectedStudent && <TabErrorBoundary name="Ferramentas"><SystemTab /></TabErrorBoundary>}
                     {tab === 'teachers' && isAdmin && !selectedStudent && <TabErrorBoundary name="Professores"><TeachersTab /></TabErrorBoundary>}
                     {tab === 'billing' && !selectedStudent && <TabErrorBoundary name="Cobranças"><TeacherBillingTab /></TabErrorBoundary>}
