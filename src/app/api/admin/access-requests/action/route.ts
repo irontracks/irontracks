@@ -10,6 +10,35 @@ import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { cacheDeletePattern } from '@/utils/cache'
 import { env } from '@/utils/env'
 
+// Normaliza número BR para E.164 sem o "+": 5511999999999
+function normalizeBrPhone(raw: string): string | null {
+  const digits = raw.replace(/\D/g, '')
+  if (digits.length === 11) return `55${digits}`  // (11) 9xxxx-xxxx
+  if (digits.length === 13 && digits.startsWith('55')) return digits
+  if (digits.length === 12 && digits.startsWith('55')) return digits
+  return null
+}
+
+const sendWhatsAppMessage = async (rawPhone: string, fullName: string, accountExisted: boolean) => {
+  const instanceId = env.zapi.instanceId
+  const token = env.zapi.token
+  if (!instanceId || !token) return
+
+  const phone = normalizeBrPhone(rawPhone)
+  if (!phone) return
+
+  const name = (fullName || 'Atleta').split(' ')[0]
+  const message = accountExisted
+    ? `Olá ${name}! Seu acesso ao *IronTracks* foi aprovado. Você já pode entrar com seu e-mail e senha. Bons treinos! 💪`
+    : `Olá ${name}! Seu acesso ao *IronTracks* foi aprovado. Acesse https://irontracks.com.br para criar sua senha e começar a treinar!`
+
+  await fetch(`https://api.z-api.io/instances/${instanceId}/token/${token}/send-text`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ phone, message }),
+  }).catch((): null => null)
+}
+
 export const dynamic = 'force-dynamic'
 
 const ZodBodySchema = z
@@ -82,7 +111,7 @@ export async function POST(req: Request) {
     // to fail with a 500 before even reaching the RPC.
     const { data: request, error: fetchError } = await admin
       .from('access_requests')
-      .select('id, status, created_at, email, full_name')
+      .select('id, status, created_at, email, full_name, phone')
       .eq('id', requestId)
       .maybeSingle()
 
@@ -189,17 +218,21 @@ export async function POST(req: Request) {
         account_existed: boolean
       }
 
-      // Send approval email (external API — outside the DB transaction, best-effort)
+      // Send approval email + WhatsApp (external APIs — outside the DB transaction, best-effort)
       let emailWarning = false
+      const resolvedName = result.full_name || String(request.full_name || '')
+      const resolvedEmail = result.email || String(request.email || '')
       try {
-        await sendApprovalEmail(
-          result.email || String(request.email || ''),
-          result.full_name || String(request.full_name || ''),
-          result.account_existed,
-        )
+        await sendApprovalEmail(resolvedEmail, resolvedName, result.account_existed)
       } catch (e) {
         logWarn('admin:access-requests:action', 'Email send failed (non-fatal):', e)
         emailWarning = true
+      }
+      const phone = String(request.phone || '').trim()
+      if (phone) {
+        sendWhatsAppMessage(phone, resolvedName, result.account_existed).catch(
+          (e) => logWarn('admin:access-requests:action', 'WhatsApp send failed (non-fatal):', e),
+        )
       }
 
       // Bust students list cache so admin panel reflects the change immediately
