@@ -89,9 +89,10 @@ export function useWorkoutLiveActivity({
 
       // Track the highest done set index inside the focused exercise so we can
       // surface "Série N/total" where N = next un-done set (or last+1 if all done).
-      const parts = key.split('_')
-      const exI = Number(parts[0])
-      const setI = Number(parts[1])
+      // Log keys use the format "${exIdx}-${setIdx}" (dash separator, not underscore).
+      const dashIdx = key.lastIndexOf('-')
+      const exI = dashIdx > 0 ? Number(key.slice(0, dashIdx)) : NaN
+      const setI = dashIdx > 0 ? Number(key.slice(dashIdx + 1)) : NaN
       if (Number.isFinite(exI) && Number.isFinite(setI) && exI === safeIdx && setI > lastDoneSetIdxInCurrent) {
         lastDoneSetIdxInCurrent = setI
       }

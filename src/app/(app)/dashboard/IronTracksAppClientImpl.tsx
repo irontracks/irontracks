@@ -72,7 +72,8 @@ import { useSessionSync } from '@/hooks/useSessionSync'
 import { useWorkoutEditor } from '@/hooks/useWorkoutEditor'
 import { useBootstrap } from '@/hooks/useBootstrap'
 import { useHealthKit } from '@/hooks/useHealthKit'
-import { saveWorkoutToHealth } from '@/utils/native/irontracksNative'
+import { saveWorkoutToHealth, endWorkoutLiveActivity } from '@/utils/native/irontracksNative'
+import { isIosNative } from '@/utils/platform'
 import { useNativeTimerActions } from '@/hooks/useNativeTimerActions'
 import { useAppEffects, isRecord, parseStartedAtMs } from '@/hooks/useAppEffects'
 import { useAppHandlers } from '@/hooks/useAppHandlers'
@@ -271,6 +272,23 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
     const { isLocked, unlock } = useBiometricLock(
         !!user?.id && Boolean(userSettingsApi?.settings?.requireBiometricsOnStartup)
     )
+
+    // ── Stale Live Activity cleanup ───────────────────────────────────────────
+    // When the app loads without an active workout (e.g. after a dev build was
+    // force-killed without calling endWorkoutLiveActivity), any orphaned Live
+    // Activity is still visible on the lock screen. End it as soon as we know
+    // the app is ready and there is no ongoing session.
+    const staleActivityCleanedRef = useRef(false)
+    useEffect(() => {
+        if (!isIosNative()) return
+        if (!userSettingsApi.loaded) return
+        if (staleActivityCleanedRef.current) return
+        staleActivityCleanedRef.current = true
+        if (!activeSession) {
+            endWorkoutLiveActivity().catch(() => {})
+        }
+    }, [userSettingsApi.loaded, activeSession])
+
     // Offline sync state — extracted to useOfflineSync hook
     const { syncState, setSyncState, refreshSyncState, runFlushQueue } = useOfflineSync({
         userId: user?.id,
