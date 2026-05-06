@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { motion } from 'framer-motion'
 import { ChevronLeft, Loader2, Gamepad2, Save, Plus, Minus } from 'lucide-react'
 import { useTeacherControl } from '@/hooks/useTeacherControl'
@@ -251,13 +251,18 @@ export function TeacherControlModal({
   getAuthHeaders,
   onClose,
 }: TeacherControlModalProps) {
-  const { session, isLoading, isSaving, patchState } = useTeacherControl(
+  const { session, isLoading, isSaving, sessionEnded, patchState } = useTeacherControl(
     supabase,
     studentUserId,
     getAuthHeaders,
   )
 
   const [releasing, setReleasing] = useState(false)
+
+  // Auto-close when the student finishes / cancels the workout
+  useEffect(() => {
+    if (sessionEnded) onClose()
+  }, [sessionEnded, onClose])
 
   const handleRelease = useCallback(async () => {
     setReleasing(true)

@@ -427,6 +427,16 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         },
     })
 
+    // ── Teacher control notice (student side) ─────────────────────────────────
+    // Watches for teacher control requests on the student's own session row.
+    // Shows a consent banner when a teacher requests control, and a badge when active.
+    // Declared BEFORE useSessionSync so we can pass the suppression flag.
+    const controlNotice = useStudentControlNotice(
+        supabase,
+        user?.id,
+        Boolean(activeSession),
+    )
+
     // Session sync (localStorage, server, realtime, ticker) — extracted to useSessionSync
     useSessionSync({
         userId: user?.id,
@@ -438,16 +448,9 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         activeSession,
         setSessionTicker,
         view,
+        // Teacher has priority: while controlling, suppress student's local writes.
+        suppressLocalWrites: controlNotice.controlStatus === 'active',
     })
-
-    // ── Teacher control notice (student side) ─────────────────────────────────
-    // Watches for teacher control requests on the student's own session row.
-    // Shows a consent banner when a teacher requests control, and a badge when active.
-    const controlNotice = useStudentControlNotice(
-        supabase,
-        user?.id,
-        Boolean(activeSession),
-    )
 
 
     // ── User init from server data ───────────────────────────────

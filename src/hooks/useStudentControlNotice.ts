@@ -150,26 +150,39 @@ export function useStudentControlNotice(
   const accept = useCallback(async () => {
     if (!userId || !rawControlledById) return
     try {
-      await fetch(`/api/teacher/control/${userId}`, {
+      const res = await fetch(`/api/teacher/control/${userId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'accept' }),
       })
-      setRawStatus('active')
+      const json = await res.json() as { ok: boolean; error?: string }
+      if (json.ok) {
+        // Optimistic — Realtime will confirm shortly. If the backend rejected
+        // (e.g. controlled_by was cleared meanwhile) the next Realtime UPDATE
+        // will reset us to the correct state.
+        setRawStatus('active')
+      } else {
+        logError('useStudentControlNotice.accept', new Error(json.error || 'accept failed'))
+      }
     } catch (e) { logError('useStudentControlNotice.accept', e) }
   }, [userId, rawControlledById])
 
   const reject = useCallback(async () => {
     if (!userId) return
     try {
-      await fetch(`/api/teacher/control/${userId}`, {
+      const res = await fetch(`/api/teacher/control/${userId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'reject' }),
       })
-      setRawStatus('none')
-      setRawControlledById(null)
-      setRawControlledByName(null)
+      const json = await res.json() as { ok: boolean; error?: string }
+      if (json.ok) {
+        setRawStatus('none')
+        setRawControlledById(null)
+        setRawControlledByName(null)
+      } else {
+        logError('useStudentControlNotice.reject', new Error(json.error || 'reject failed'))
+      }
     } catch (e) { logError('useStudentControlNotice.reject', e) }
   }, [userId])
 

@@ -43,6 +43,8 @@ export interface UseTeacherControlResult {
   session: ActiveWorkoutSession | null
   isLoading: boolean
   isSaving: boolean
+  /** True when the student's session ended on the server (row was deleted) */
+  sessionEnded: boolean
   patchState: (updater: (prev: ActiveWorkoutSession) => ActiveWorkoutSession) => void
 }
 
@@ -54,6 +56,7 @@ export function useTeacherControl(
   const [session, setSession] = useState<ActiveWorkoutSession | null>(null)
   const [isLoading, setIsLoading] = useState(false)
   const [isSaving, setIsSaving] = useState(false)
+  const [sessionEnded, setSessionEnded] = useState(false)
 
   const sessionRef = useRef<ActiveWorkoutSession | null>(null)
   sessionRef.current = session
@@ -98,7 +101,7 @@ export function useTeacherControl(
         .on(
           'postgres_changes',
           {
-            event: 'UPDATE',
+            event: '*',
             schema: 'public',
             table: 'active_workout_sessions',
             filter: `user_id=eq.${studentUserId}`,
@@ -106,6 +109,12 @@ export function useTeacherControl(
           (payload: Record<string, unknown>) => {
             if (!mounted) return
             try {
+              const ev = String(payload?.eventType ?? '').toUpperCase()
+              if (ev === 'DELETE') {
+                // Student finished or canceled the workout — signal modal to close
+                setSessionEnded(true)
+                return
+              }
               const rowNew = isRecord(payload?.new) ? payload.new : null
               const stateRaw = rowNew?.state
               const state = isRecord(stateRaw) ? stateRaw : null
@@ -154,26 +163,26 @@ export function useTeacherControl(
       })
       if (res.ok) {
         lastTeacherSaveAtRef.current = savedAt
+      } else if (res.status === 404) {
+        // Student finished the workout — signal modal to close
+        setSessionEnded(true)
       }
     } catch (e) { logError('useTeacherControl.flushSave', e) }
     finally { setIsSaving(false) }
   }, [studentUserId, getAuthHeaders])
 
   const patchState = useCallback((updater: (prev: ActiveWorkoutSession) => ActiveWorkoutSession) => {
-    setSession(prev => {
-      if (!prev) return prev
-      const next = updater(prev)
-      sessionRef.current = next
+    // Compute the next state via setSession's pure updater (no side effects inside).
+    // The useEffect above keeps sessionRef.current in sync with the rendered state,
+    // so the setTimeout below reads the latest value reliably.
+    setSession(prev => (prev ? updater(prev) : prev))
 
-      // Debounce: cancel pending save and schedule new one
-      if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
-      saveTimerRef.current = setTimeout(() => {
-        const current = sessionRef.current
-        if (current) flushSave(current)
-      }, 800)
-
-      return next
-    })
+    // Debounce: cancel pending save and schedule new one
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+    saveTimerRef.current = setTimeout(() => {
+      const current = sessionRef.current
+      if (current) flushSave(current)
+    }, 800)
   }, [flushSave])
 
   // Cleanup pending save on unmount
@@ -181,5 +190,5 @@ export function useTeacherControl(
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
   }, [])
 
-  return { session, isLoading, isSaving, patchState }
+  return { session, isLoading, isSaving, sessionEnded, patchState }
 }

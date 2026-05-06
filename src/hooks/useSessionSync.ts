@@ -96,6 +96,13 @@ interface UseSessionSyncParams {
     activeSession: ActiveWorkoutSession | null
     setSessionTicker: (v: number) => void
     view: string
+    /**
+     * When true, the student is being actively controlled by a teacher.
+     * Local writes (debounced upsert + heartbeat) are suppressed so the
+     * teacher's edits are not overwritten by the student's stale state.
+     * The student still RECEIVES Realtime updates from the teacher.
+     */
+    suppressLocalWrites?: boolean
 }
 
 /**
@@ -115,9 +122,14 @@ export function useSessionSync({
     suppressForeignFinishToastUntilRef,
     activeSession,
     setSessionTicker,
+    suppressLocalWrites = false,
 }: UseSessionSyncParams) {
     const serverSessionSyncRef = useRef<{ timer: ReturnType<typeof setTimeout> | null; lastKey: string }>({ timer: null, lastKey: '' })
     const serverSessionSyncWarnedRef = useRef(false)
+    // Tracks whether local writes should be suppressed (when teacher is in control).
+    // Used as a ref so changing this flag doesn't restart the effects.
+    const suppressLocalWritesRef = useRef(suppressLocalWrites)
+    suppressLocalWritesRef.current = suppressLocalWrites
     // Tracks the _savedAt timestamp of the last upsert we wrote to the server.
     // Used by the Realtime handler as a secondary guard (primary = DEVICE_ID).
     const lastLocalUpsertAtRef = useRef<number>(0)
@@ -366,10 +378,17 @@ export function useSessionSync({
                 if (serverSessionSyncRef.current.lastKey !== key) return
 
                 if (!activeSession) {
+                    // DELETE is allowed even under teacher control — finishing/canceling
+                    // the workout naturally ends the control session too.
                     const { error } = await supabase.from('active_workout_sessions').delete().eq('user_id', uid)
                     if (error && isMissingTable(error)) notifyMigrationWarning()
                     return
                 }
+
+                // Teacher in control — suppress local writes so the teacher's edits
+                // aren't overwritten by stale student state. The student still receives
+                // Realtime updates and sees the teacher's changes live.
+                if (suppressLocalWritesRef.current) return
 
                 const startedAtRaw = activeSession?.startedAt
                 const startedAtMs = typeof startedAtRaw === 'number' ? startedAtRaw : new Date(startedAtRaw || 0).getTime()
@@ -433,6 +452,8 @@ export function useSessionSync({
 
         const heartbeat = async () => {
             try {
+                // Skip heartbeat while teacher is in control (same reason as the debounced save)
+                if (suppressLocalWritesRef.current) return
                 const session = activeSessionRef.current
                 if (!session) return
                 if (!session.startedAt || !session.workout) return

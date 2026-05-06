@@ -5,6 +5,7 @@ import { useAdminPanel } from './AdminPanelContext';
 import { AdminUser } from '@/types/admin';
 import { useAdminVipMap, getVipLabel, getVipColors } from '@/hooks/useAdminVipMap';
 import { useTeacherStudentSessions } from '@/hooks/useTeacherStudentSessions';
+import { logError } from '@/lib/logger';
 
 const TeacherControlModal = dynamic(
     () => import('@/components/teacher/TeacherControlModal').then(m => ({ default: m.TeacherControlModal })),
@@ -137,7 +138,7 @@ export const StudentsTab: React.FC = () => {
             });
             const json = await res.json() as { ok: boolean; error?: string };
             if (!json.ok) {
-                console.error('Control request failed:', json.error);
+                logError('StudentsTab.requestControl', new Error(json.error || 'request failed'));
             }
             // Modal opens when student accepts (Realtime update triggers controlStatus = 'active')
             // Meanwhile show a "aguardando" state

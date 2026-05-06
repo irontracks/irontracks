@@ -113,7 +113,7 @@ export async function POST(
     if (action === 'request') {
       const { data: session, error: selErr } = await admin
         .from('active_workout_sessions')
-        .select('user_id, control_status')
+        .select('user_id, controlled_by, control_status')
         .eq('user_id', studentId)
         .maybeSingle()
 
@@ -121,6 +121,19 @@ export async function POST(
       if (!session) return NextResponse.json({ ok: false, error: 'student has no active session' }, { status: 404 })
       if (session.control_status === 'active') {
         return NextResponse.json({ ok: false, error: 'session already controlled' }, { status: 409 })
+      }
+      // If another teacher (not this one and not admin override) already has a pending request,
+      // block silently overwriting it.
+      if (
+        session.control_status === 'requested' &&
+        session.controlled_by &&
+        session.controlled_by !== teacherId &&
+        teacherAuth.role !== 'admin'
+      ) {
+        return NextResponse.json(
+          { ok: false, error: 'another teacher has a pending control request' },
+          { status: 409 },
+        )
       }
 
       const { error } = await admin
