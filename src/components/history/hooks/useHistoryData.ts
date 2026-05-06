@@ -126,6 +126,29 @@ export function useHistoryData({
                 }
 
                 const formatted = (data || []).map(w => {
+                    // ── Cardio session ─────────────────────────────────────
+                    if (w.kind === 'cardio') {
+                        const dateMs = toDateMs(w?.date) ?? toDateMs(w?.completed_at) ?? toDateMs(w?.created_at) ?? null;
+                        const dateIso = dateMs ? new Date(dateMs).toISOString() : null;
+                        const distM = Number(w.distance_meters) || 0;
+                        const distText = distM >= 1000
+                            ? `${(distM / 1000).toFixed(1)} km`
+                            : distM > 0 ? `${Math.round(distM)} m` : null;
+                        return {
+                            id: String(w.id),
+                            kind: 'cardio' as const,
+                            workoutTitle: distText ?? 'Cardio',
+                            date: dateIso,
+                            dateMs,
+                            totalTime: Number(w.duration_seconds) || 0,
+                            rawSession: null,
+                            raw: w,
+                            isTemplate: false,
+                            distanceMeters: distM,
+                            avgPaceMinKm: w.avg_pace_min_km != null ? Number(w.avg_pace_min_km) : null,
+                        };
+                    }
+                    // ── Regular workout ────────────────────────────────────
                     const raw = parseRawSession(w.notes);
                     const dateMs = toDateMs(raw?.date) ?? toDateMs(w?.date) ?? toDateMs(w?.completed_at) ?? toDateMs(w?.created_at) ?? null;
                     const dateIso = dateMs ? new Date(dateMs).toISOString() : null;

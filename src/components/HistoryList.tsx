@@ -5,8 +5,8 @@ import { HistorySummaryCard } from '@/components/history/HistorySummaryCard';
 import { HistoryEmptyState, HistoryEmptyPeriod } from '@/components/history/HistoryEmptyStates';
 import {
     CalendarDays, ChevronLeft, ChevronRight, Clock,
-    Dumbbell, Edit3, History, Plus, Trash2, TrendingUp,
-    CheckCircle2, Circle, Lock,
+    Dumbbell, Edit3, History, MapPin, Plus, Trash2, TrendingUp,
+    CheckCircle2, Circle, Lock, Activity,
 } from 'lucide-react';
 import { useWindowVirtualizer } from '@tanstack/react-virtual';
 import WorkoutReport from '@/components/WorkoutReport';
@@ -180,6 +180,9 @@ const HistoryList: React.FC<HistoryListProps> = ({
                                     ? `Semana de ${new Date(currentWeek + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}`
                                     : '';
 
+                                const isCardio = session.kind === 'cardio';
+                                const accentColor = isCardio ? 'green' : 'yellow';
+
                                 return (
                                     <div
                                         key={row.key} data-index={row.index} ref={rowVirtualizer.measureElement}
@@ -187,39 +190,76 @@ const HistoryList: React.FC<HistoryListProps> = ({
                                     >
                                         {showWeekHeader && (
                                             <div className="flex items-center gap-2 mb-3 pt-1">
-                                                <div className="h-px flex-1 bg-gradient-to-r from-transparent via-yellow-500/20 to-transparent" />
-                                                <span className="inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.15em] text-yellow-500/70 bg-yellow-500/5 border border-yellow-500/15 px-3 py-1 rounded-full">
+                                                <div className={`h-px flex-1 bg-gradient-to-r from-transparent via-${accentColor}-500/20 to-transparent`} />
+                                                <span className={`inline-flex items-center gap-1.5 text-[10px] font-black uppercase tracking-[0.15em] text-${accentColor}-500/70 bg-${accentColor}-500/5 border border-${accentColor}-500/15 px-3 py-1 rounded-full`}>
                                                     <CalendarDays size={10} /> {weekHeaderLabel}
                                                 </span>
-                                                <div className="h-px flex-1 bg-gradient-to-r from-transparent via-yellow-500/20 to-transparent" />
+                                                <div className={`h-px flex-1 bg-gradient-to-r from-transparent via-${accentColor}-500/20 to-transparent`} />
                                             </div>
                                         )}
 
                                         <div
                                             role="button"
                                             tabIndex={0}
-                                            aria-label="Ver detalhes do treino"
-                                            onClick={() => isSelectionMode ? toggleItemSelection(session.id) : openSession(session, onViewReport)}
-                                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { isSelectionMode ? toggleItemSelection(session.id) : openSession(session, onViewReport) } }}
-                                            className={`relative rounded-2xl cursor-pointer transition-all duration-300 overflow-hidden ${isSelectionMode ? (isSelected ? 'shadow-lg shadow-yellow-500/10' : '') : 'hover:shadow-lg hover:shadow-black/30 group'}`}
+                                            aria-label={isCardio ? 'Ver detalhes do cardio' : 'Ver detalhes do treino'}
+                                            onClick={() => isSelectionMode ? toggleItemSelection(session.id) : (!isCardio ? openSession(session, onViewReport) : undefined)}
+                                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { isSelectionMode ? toggleItemSelection(session.id) : (!isCardio ? openSession(session, onViewReport) : undefined) } }}
+                                            className={`relative rounded-2xl transition-all duration-300 overflow-hidden ${isCardio ? '' : 'cursor-pointer'} ${isSelectionMode ? (isSelected ? `shadow-lg shadow-${accentColor}-500/10` : '') : (!isCardio ? 'hover:shadow-lg hover:shadow-black/30 group' : '')}`}
                                         >
-                                            <div className={`absolute left-0 top-0 bottom-0 w-[3px] rounded-l-2xl transition-colors duration-300 ${isSelected ? 'bg-yellow-500' : 'bg-yellow-500/30 group-hover:bg-yellow-500/60'}`} />
-                                            <div className={`rounded-2xl p-4 pl-5 ${isSelectionMode ? (isSelected ? 'border-yellow-500/50' : '') : 'group-hover:border-yellow-500/25'}`} style={{ background: 'rgba(255,255,255,0.02)', border: isSelectionMode ? (isSelected ? '1px solid rgba(234,179,8,0.5)' : '1px solid rgba(255,255,255,0.05)') : '1px solid rgba(255,255,255,0.05)' }}>
+                                            <div className={`absolute left-0 top-0 bottom-0 w-[3px] rounded-l-2xl transition-colors duration-300 ${
+                                                isCardio
+                                                    ? (isSelected ? 'bg-green-500' : 'bg-green-500/50')
+                                                    : (isSelected ? 'bg-yellow-500' : 'bg-yellow-500/30 group-hover:bg-yellow-500/60')
+                                            }`} />
+                                            <div
+                                                className={`rounded-2xl p-4 pl-5 ${isSelectionMode ? (isSelected ? (isCardio ? 'border-green-500/50' : 'border-yellow-500/50') : '') : (!isCardio ? 'group-hover:border-yellow-500/25' : '')}`}
+                                                style={{ background: isCardio ? 'rgba(34,197,94,0.03)' : 'rgba(255,255,255,0.02)', border: isSelectionMode ? (isSelected ? `1px solid rgba(${isCardio ? '34,197,94' : '234,179,8'},0.5)` : '1px solid rgba(255,255,255,0.05)') : '1px solid rgba(255,255,255,0.05)' }}
+                                            >
                                                 <div className="flex items-start gap-3">
                                                     {isSelectionMode && (
                                                         <div className="mt-0.5">
-                                                            {isSelected ? <CheckCircle2 className="text-yellow-500 fill-yellow-500/20" /> : <Circle className="text-neutral-600" />}
+                                                            {isSelected
+                                                                ? <CheckCircle2 className={isCardio ? 'text-green-500 fill-green-500/20' : 'text-yellow-500 fill-yellow-500/20'} />
+                                                                : <Circle className="text-neutral-600" />}
                                                         </div>
                                                     )}
                                                     <div className="flex-1 min-w-0">
                                                         <div className="flex items-start justify-between gap-3">
                                                             <div className="min-w-0">
-                                                                <h3 className="font-black tracking-tight text-white truncate">{formatHistoryTitle(session?.workoutTitle)}</h3>
-                                                                <div className="mt-1.5 flex items-center gap-2.5 text-xs text-neutral-400 flex-wrap">
-                                                                    <span className="inline-flex items-center gap-1"><CalendarDays size={12} className="text-yellow-500/60" />{formatCompletedAt(session?.date)}</span>
-                                                                    <span className="inline-flex items-center gap-1"><Clock size={12} className="text-yellow-500/60" />{minutes} min</span>
+                                                                <div className="flex items-center gap-1.5">
+                                                                    {isCardio && <Activity size={13} className="text-green-400 flex-shrink-0" />}
+                                                                    <h3 className="font-black tracking-tight text-white truncate">{isCardio ? 'Cardio' : formatHistoryTitle(session?.workoutTitle)}</h3>
                                                                 </div>
-                                                                {(meta.exCount > 0 || meta.vol > 0) && (
+                                                                <div className="mt-1.5 flex items-center gap-2.5 text-xs text-neutral-400 flex-wrap">
+                                                                    <span className={`inline-flex items-center gap-1`}><CalendarDays size={12} className={`${isCardio ? 'text-green-500/60' : 'text-yellow-500/60'}`} />{formatCompletedAt(session?.date)}</span>
+                                                                    <span className="inline-flex items-center gap-1"><Clock size={12} className={`${isCardio ? 'text-green-500/60' : 'text-yellow-500/60'}`} />{minutes} min</span>
+                                                                </div>
+                                                                {/* Cardio badges */}
+                                                                {isCardio && (session.distanceMeters != null || session.avgPaceMinKm != null) && (
+                                                                    <div className="mt-2 flex items-center gap-2 flex-wrap">
+                                                                        {session.distanceMeters != null && session.distanceMeters > 0 && (
+                                                                            <span className="inline-flex items-center gap-1 text-[10px] font-bold text-green-400 bg-green-500/5 border border-green-500/20 px-2 py-0.5 rounded-full">
+                                                                                <MapPin size={10} />
+                                                                                {session.distanceMeters >= 1000
+                                                                                    ? `${(session.distanceMeters / 1000).toFixed(2)} km`
+                                                                                    : `${Math.round(session.distanceMeters)} m`}
+                                                                            </span>
+                                                                        )}
+                                                                        {session.avgPaceMinKm != null && session.avgPaceMinKm > 0 && (() => {
+                                                                            const totalSec = Math.round(session.avgPaceMinKm * 60);
+                                                                            const pm = Math.floor(totalSec / 60);
+                                                                            const ps = totalSec % 60;
+                                                                            return (
+                                                                                <span className="inline-flex items-center gap-1 text-[10px] font-bold text-green-400/70 bg-green-500/5 border border-green-500/15 px-2 py-0.5 rounded-full">
+                                                                                    <TrendingUp size={10} />
+                                                                                    {pm}:{String(ps).padStart(2, '0')}/km
+                                                                                </span>
+                                                                            );
+                                                                        })()}
+                                                                    </div>
+                                                                )}
+                                                                {/* Workout badges */}
+                                                                {!isCardio && (meta.exCount > 0 || meta.vol > 0) && (
                                                                     <div className="mt-2 flex items-center gap-2 flex-wrap">
                                                                         {meta.exCount > 0 && (
                                                                             <span className="inline-flex items-center gap-1 text-[10px] font-bold text-neutral-400 bg-neutral-800/80 border border-neutral-700/50 px-2 py-0.5 rounded-full">
@@ -237,7 +277,7 @@ const HistoryList: React.FC<HistoryListProps> = ({
                                                                 )}
                                                             </div>
                                                             <div className="flex items-center gap-1.5 shrink-0">
-                                                                {!isReadOnly && !isSelectionMode && (
+                                                                {!isReadOnly && !isSelectionMode && !isCardio && (
                                                                     <>
                                                                         <button type="button" onClick={(e) => handleDeleteClick(e, session)} className="cursor-pointer relative z-20 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-xl transition-colors bg-neutral-950 text-neutral-500 border border-neutral-800 hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/20 active:scale-95" aria-label="Excluir">
                                                                             <Trash2 size={16} className="pointer-events-none" />
@@ -247,7 +287,7 @@ const HistoryList: React.FC<HistoryListProps> = ({
                                                                         </button>
                                                                     </>
                                                                 )}
-                                                                {!isSelectionMode && <ChevronRight size={16} className="text-neutral-600 group-hover:text-yellow-500/60 transition-colors ml-0.5" />}
+                                                                {!isSelectionMode && !isCardio && <ChevronRight size={16} className="text-neutral-600 group-hover:text-yellow-500/60 transition-colors ml-0.5" />}
                                                             </div>
                                                         </div>
                                                     </div>

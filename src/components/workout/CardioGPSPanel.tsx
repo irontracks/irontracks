@@ -363,176 +363,150 @@ export default function CardioGPSPanel({
     isTracking && (gpsStatus === 'requesting-permission' || gpsStatus === 'acquiring' || !hasReliableFix)
   const startDisabled = gpsIsDenied || gpsIsUnavailable
   const signal = gpsSignalLabel(metrics.accuracyMeters)
-  const mapHeight = standalone ? 240 : 200
 
-  // ── Content (shared between accordion and standalone) ──────────────────────
-  const content = (
-    <div className={standalone ? 'flex flex-col flex-1 min-h-0 overflow-y-auto' : 'px-4 pb-4'}>
-      {/* Post-cardio completion screen (standalone only) */}
-      {standalone && savedTrackId && savedMetrics ? (
-        <CompletionScreen
-          trackId={savedTrackId}
-          distanceMeters={savedMetrics.distanceMeters}
-          durationSeconds={savedMetrics.durationSeconds}
-          paceMinKm={savedMetrics.paceMinKm}
-          caloriesEstimated={savedMetrics.caloriesEstimated}
-          onReset={handleReset}
-          onClose={onRequestClose}
-        />
-      ) : (
-        <div className={standalone ? 'px-4 pb-6' : ''}>
-          {/* GPS state banners */}
-          {gpsIsDenied && (
-            <div
-              className="mb-3 flex items-start gap-2 rounded-xl p-3"
-              style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)' }}
-            >
-              <AlertTriangle size={16} className="mt-0.5 flex-shrink-0 text-red-400" />
-              <div className="text-xs text-white/80">
-                <p className="font-bold text-red-400">GPS bloqueado</p>
-                <p className="mt-0.5 text-white/60">
-                  {gpsError ?? 'Permissão de localização negada. Ative o GPS nas configurações.'}
-                </p>
-              </div>
-            </div>
-          )}
-          {gpsIsUnavailable && (
-            <div
-              className="mb-3 flex items-start gap-2 rounded-xl p-3"
-              style={{ background: 'rgba(107,114,128,0.1)', border: '1px solid rgba(107,114,128,0.3)' }}
-            >
-              <AlertTriangle size={16} className="mt-0.5 flex-shrink-0 text-neutral-400" />
-              <div className="text-xs text-white/80">
-                <p className="font-bold text-neutral-300">GPS indisponível</p>
-                <p className="mt-0.5 text-white/60">Este dispositivo não possui GPS.</p>
-              </div>
-            </div>
-          )}
-          {gpsError && !gpsIsDenied && !gpsIsUnavailable && (
-            <div
-              className="mb-3 flex items-start gap-2 rounded-xl p-3"
-              style={{ background: 'rgba(234,179,8,0.08)', border: '1px solid rgba(234,179,8,0.3)' }}
-            >
-              <AlertTriangle size={16} className="mt-0.5 flex-shrink-0 text-yellow-400" />
-              <div className="text-xs text-white/80">
-                <p className="font-bold text-yellow-400">Atenção</p>
-                <p className="mt-0.5 text-white/60">{gpsError}</p>
-              </div>
-            </div>
-          )}
+  // ── Shared pieces ──────────────────────────────────────────────────────────
 
-          {/* GPS signal indicator */}
-          {isTracking && !gpsIsDenied && !gpsIsUnavailable && (
-            <div
-              className="mb-3 flex items-center justify-between rounded-xl px-3 py-2"
-              style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}
-            >
-              <div className="flex items-center gap-2">
-                <Satellite size={14} style={{ color: signal.color }} />
-                <span className="text-xs text-white/60">Sinal GPS</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs font-bold" style={{ color: signal.color }}>{signal.label}</span>
-                {metrics.accuracyMeters !== null && (
-                  <span className="text-xs text-white/40">±{Math.round(metrics.accuracyMeters)}m</span>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* Save error */}
-          {saveError && (
-            <div
-              className="mb-3 flex items-start gap-2 rounded-xl p-3"
-              style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)' }}
-            >
-              <AlertTriangle size={16} className="mt-0.5 flex-shrink-0 text-red-400" />
-              <span className="text-xs text-white/80">{saveError}</span>
-            </div>
-          )}
-
-          {/* Route Map */}
-          <RouteMapLeaflet
-            points={trackPoints}
-            height={mapHeight}
-            live={isTracking}
-            acquiring={gpsIsAcquiring}
-          />
-
-          {/* Metrics Grid */}
-          <div className="grid grid-cols-3 gap-2 mb-3">
-            <MetricCard label="Distância" value={formatDistance(metrics.distanceMeters)} accent />
-            <MetricCard label="Tempo" value={formatDuration(metrics.durationSeconds)} />
-            <MetricCard label="Pace" value={formatPace(metrics.paceMinKm)} unit="/km" />
-            <MetricCard label="Velocidade" value={`${metrics.currentSpeedKmh}`} unit="km/h" />
-            <MetricCard label="Max" value={`${metrics.maxSpeedKmh}`} unit="km/h" />
-            <MetricCard label="Calorias" value={`${metrics.caloriesEstimated}`} unit="kcal" />
-          </div>
-
-          {/* Controls */}
-          <div className="flex gap-2">
-            {!isTracking && !savedTrackId ? (
-              <button
-                onClick={handleStart}
-                disabled={startDisabled}
-                className="flex-1 rounded-xl py-3 text-sm font-bold text-black transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
-                style={{
-                  background: startDisabled
-                    ? 'rgba(107,114,128,0.5)'
-                    : 'linear-gradient(135deg, #22c55e, #16a34a)',
-                }}
-              >
-                {startDisabled ? (
-                  <span className="inline-flex items-center gap-2">
-                    <MapPin size={14} /> GPS indisponível
-                  </span>
-                ) : '▶ Iniciar Cardio'}
-              </button>
-            ) : isTracking ? (
-              <>
-                <button
-                  onClick={isPaused ? handleResume : pause}
-                  className="flex-1 rounded-xl py-3 text-sm font-bold text-black transition-all active:scale-95"
-                  style={{
-                    background: isPaused
-                      ? 'linear-gradient(135deg, #22c55e, #16a34a)'
-                      : 'linear-gradient(135deg, #eab308, #ca8a04)',
-                  }}
-                >
-                  {isPaused ? '▶ Retomar' : '⏸ Pausar'}
-                </button>
-                <button
-                  onClick={handleStop}
-                  disabled={saving}
-                  className="rounded-xl border px-5 py-3 text-sm font-bold text-red-400 transition-all active:scale-95 disabled:opacity-50"
-                  style={{ borderColor: 'rgba(239,68,68,0.3)' }}
-                >
-                  {saving ? '...' : '⏹ Parar'}
-                </button>
-              </>
-            ) : savedTrackId && !standalone ? (
-              // Compact saved state for in-workout mode
-              <div className="flex-1 flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="text-green-400">✓</span>
-                  <span className="text-sm text-white/60">Cardio salvo!</span>
-                </div>
-                <button
-                  onClick={handleReset}
-                  className="rounded-lg px-3 py-1.5 text-xs text-white/40 hover:text-white transition-colors"
-                  style={{ background: 'rgba(255,255,255,0.05)' }}
-                >
-                  Novo
-                </button>
-              </div>
-            ) : null}
+  const gpsBanners = (
+    <>
+      {gpsIsDenied && (
+        <div
+          className="mb-3 flex items-start gap-2 rounded-xl p-3 flex-shrink-0"
+          style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)' }}
+        >
+          <AlertTriangle size={16} className="mt-0.5 flex-shrink-0 text-red-400" />
+          <div className="text-xs text-white/80">
+            <p className="font-bold text-red-400">GPS bloqueado</p>
+            <p className="mt-0.5 text-white/60">
+              {gpsError ?? 'Permissão de localização negada. Ative o GPS nas configurações.'}
+            </p>
           </div>
         </div>
       )}
+      {gpsIsUnavailable && (
+        <div
+          className="mb-3 flex items-start gap-2 rounded-xl p-3 flex-shrink-0"
+          style={{ background: 'rgba(107,114,128,0.1)', border: '1px solid rgba(107,114,128,0.3)' }}
+        >
+          <AlertTriangle size={16} className="mt-0.5 flex-shrink-0 text-neutral-400" />
+          <div className="text-xs text-white/80">
+            <p className="font-bold text-neutral-300">GPS indisponível</p>
+            <p className="mt-0.5 text-white/60">Este dispositivo não possui GPS.</p>
+          </div>
+        </div>
+      )}
+      {gpsError && !gpsIsDenied && !gpsIsUnavailable && (
+        <div
+          className="mb-3 flex items-start gap-2 rounded-xl p-3 flex-shrink-0"
+          style={{ background: 'rgba(234,179,8,0.08)', border: '1px solid rgba(234,179,8,0.3)' }}
+        >
+          <AlertTriangle size={16} className="mt-0.5 flex-shrink-0 text-yellow-400" />
+          <div className="text-xs text-white/80">
+            <p className="font-bold text-yellow-400">Atenção</p>
+            <p className="mt-0.5 text-white/60">{gpsError}</p>
+          </div>
+        </div>
+      )}
+      {saveError && (
+        <div
+          className="mb-3 flex items-start gap-2 rounded-xl p-3 flex-shrink-0"
+          style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)' }}
+        >
+          <AlertTriangle size={16} className="mt-0.5 flex-shrink-0 text-red-400" />
+          <span className="text-xs text-white/80">{saveError}</span>
+        </div>
+      )}
+    </>
+  )
+
+  const gpsSignalBar = isTracking && !gpsIsDenied && !gpsIsUnavailable ? (
+    <div
+      className="mb-3 flex items-center justify-between rounded-xl px-3 py-2 flex-shrink-0"
+      style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}
+    >
+      <div className="flex items-center gap-2">
+        <Satellite size={14} style={{ color: signal.color }} />
+        <span className="text-xs text-white/60">Sinal GPS</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <span className="text-xs font-bold" style={{ color: signal.color }}>{signal.label}</span>
+        {metrics.accuracyMeters !== null && (
+          <span className="text-xs text-white/40">±{Math.round(metrics.accuracyMeters)}m</span>
+        )}
+      </div>
+    </div>
+  ) : null
+
+  const metricsGrid = (
+    <div className="grid grid-cols-3 gap-2 mb-3 flex-shrink-0">
+      <MetricCard label="Distância" value={formatDistance(metrics.distanceMeters)} accent />
+      <MetricCard label="Tempo" value={formatDuration(metrics.durationSeconds)} />
+      <MetricCard label="Pace" value={formatPace(metrics.paceMinKm)} unit="/km" />
+      <MetricCard label="Velocidade" value={`${metrics.currentSpeedKmh}`} unit="km/h" />
+      <MetricCard label="Max" value={`${metrics.maxSpeedKmh}`} unit="km/h" />
+      <MetricCard label="Calorias" value={`${metrics.caloriesEstimated}`} unit="kcal" />
     </div>
   )
 
-  // ── Standalone mode: no accordion ─────────────────────────────────────────
+  const controls = (
+    <div className="flex gap-2 flex-shrink-0">
+      {!isTracking && !savedTrackId ? (
+        <button
+          onClick={handleStart}
+          disabled={startDisabled}
+          className="flex-1 rounded-xl py-3 text-sm font-bold text-black transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+          style={{
+            background: startDisabled
+              ? 'rgba(107,114,128,0.5)'
+              : 'linear-gradient(135deg, #22c55e, #16a34a)',
+          }}
+        >
+          {startDisabled ? (
+            <span className="inline-flex items-center gap-2">
+              <MapPin size={14} /> GPS indisponível
+            </span>
+          ) : '▶ Iniciar Cardio'}
+        </button>
+      ) : isTracking ? (
+        <>
+          <button
+            onClick={isPaused ? handleResume : pause}
+            className="flex-1 rounded-xl py-3 text-sm font-bold text-black transition-all active:scale-95"
+            style={{
+              background: isPaused
+                ? 'linear-gradient(135deg, #22c55e, #16a34a)'
+                : 'linear-gradient(135deg, #eab308, #ca8a04)',
+            }}
+          >
+            {isPaused ? '▶ Retomar' : '⏸ Pausar'}
+          </button>
+          <button
+            onClick={handleStop}
+            disabled={saving}
+            className="rounded-xl border px-5 py-3 text-sm font-bold text-red-400 transition-all active:scale-95 disabled:opacity-50"
+            style={{ borderColor: 'rgba(239,68,68,0.3)' }}
+          >
+            {saving ? '...' : '⏹ Parar'}
+          </button>
+        </>
+      ) : savedTrackId && !standalone ? (
+        <div className="flex-1 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <span className="text-green-400">✓</span>
+            <span className="text-sm text-white/60">Cardio salvo!</span>
+          </div>
+          <button
+            onClick={handleReset}
+            className="rounded-lg px-3 py-1.5 text-xs text-white/40 hover:text-white transition-colors"
+            style={{ background: 'rgba(255,255,255,0.05)' }}
+          >
+            Novo
+          </button>
+        </div>
+      ) : null}
+    </div>
+  )
+
+  // ── Standalone mode: no accordion, flex layout so map fills screen ─────────
   if (standalone) {
     return (
       <div className="flex flex-col flex-1 min-h-0" style={{ background: 'transparent' }}>
@@ -542,25 +516,70 @@ export default function CardioGPSPanel({
             50% { opacity: 0.4; }
           }
         `}</style>
-        {/* Live tracking badge at top */}
-        {isTracking && (
-          <div className="flex items-center justify-center gap-1.5 py-2 flex-shrink-0">
-            <span
-              className="h-2 w-2 rounded-full"
-              style={{
-                background: isPaused ? '#eab308' : hasReliableFix ? '#22c55e' : '#6b7280',
-                animation: isPaused || !hasReliableFix ? 'none' : 'gps-pulse 1.5s ease-in-out infinite',
-              }}
+
+        {/* Completion screen — scrollable */}
+        {savedTrackId && savedMetrics ? (
+          <div className="flex-1 overflow-y-auto">
+            <CompletionScreen
+              trackId={savedTrackId}
+              distanceMeters={savedMetrics.distanceMeters}
+              durationSeconds={savedMetrics.durationSeconds}
+              paceMinKm={savedMetrics.paceMinKm}
+              caloriesEstimated={savedMetrics.caloriesEstimated}
+              onReset={handleReset}
+              onClose={onRequestClose}
             />
-            <span className="text-xs text-white/50 font-semibold">
-              {isPaused ? 'Pausado' : hasReliableFix ? 'Gravando' : 'Buscando GPS...'}
-            </span>
+          </div>
+        ) : (
+          /* Tracking / idle view — flex column so map grows */
+          <div className="flex flex-col flex-1 min-h-0 px-4 pb-4">
+            {/* Live tracking badge */}
+            {isTracking && (
+              <div className="flex items-center justify-center gap-1.5 py-2 flex-shrink-0">
+                <span
+                  className="h-2 w-2 rounded-full"
+                  style={{
+                    background: isPaused ? '#eab308' : hasReliableFix ? '#22c55e' : '#6b7280',
+                    animation: isPaused || !hasReliableFix ? 'none' : 'gps-pulse 1.5s ease-in-out infinite',
+                  }}
+                />
+                <span className="text-xs text-white/50 font-semibold">
+                  {isPaused ? 'Pausado' : hasReliableFix ? 'Gravando' : 'Buscando GPS...'}
+                </span>
+              </div>
+            )}
+            {gpsBanners}
+            {gpsSignalBar}
+            {/* Map grows to fill all available vertical space */}
+            <RouteMapLeaflet
+              points={trackPoints}
+              grow
+              live={isTracking}
+              acquiring={gpsIsAcquiring}
+            />
+            {metricsGrid}
+            {controls}
           </div>
         )}
-        {content}
       </div>
     )
   }
+
+  // ── Accordion content (inside a workout) — keep the old flat layout ────────
+  const content = (
+    <div className="px-4 pb-4">
+      {gpsBanners}
+      {gpsSignalBar}
+      <RouteMapLeaflet
+        points={trackPoints}
+        height={200}
+        live={isTracking}
+        acquiring={gpsIsAcquiring}
+      />
+      {metricsGrid}
+      {controls}
+    </div>
+  )
 
   // ── Accordion mode (inside a workout) ─────────────────────────────────────
   return (

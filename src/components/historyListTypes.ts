@@ -47,6 +47,12 @@ export interface WorkoutSummary {
     notes?: string | Record<string, unknown>;
     is_template?: boolean;
     completed_at?: string;
+    /** Distinguishes cardio-only sessions from regular workouts */
+    kind?: 'workout' | 'cardio';
+    /** GPS distance in meters (cardio sessions) */
+    distanceMeters?: number;
+    /** Average pace in min/km (cardio sessions) */
+    avgPaceMinKm?: number | null;
     [key: string]: unknown;
 }
 
