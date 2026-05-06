@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Pause, Pencil } from 'lucide-react';
+import { Pause, Pencil, Gamepad2 } from 'lucide-react';
 import { BackButton } from '@/components/ui/BackButton';
 import { useActiveWorkoutController } from './workout/useActiveWorkoutController';
 import { WorkoutProvider } from './workout/WorkoutContext';
@@ -25,7 +25,7 @@ const TeamChatDrawer = dynamic(
   { ssr: false }
 );
 
-export default function ActiveWorkout(props: ActiveWorkoutProps) {
+export default function ActiveWorkout(props: ActiveWorkoutProps & { controlledByName?: string | null }) {
   const controller = useActiveWorkoutController(props);
   const { session, workout, exercises } = controller;
 
@@ -193,6 +193,16 @@ export default function ActiveWorkout(props: ActiveWorkoutProps) {
 
         {/* Scrollable content — sits below the fixed header */}
         <div className="flex-1 overflow-y-auto">
+          {/* Teacher control badge — subtle indicator when a teacher is controlling */}
+          {props.controlledByName && (
+            <div className="bg-indigo-500/10 border-b border-indigo-500/20 px-4 py-2 flex items-center gap-2 text-sm">
+              <Gamepad2 size={13} className="text-indigo-400 shrink-0" />
+              <span className="text-indigo-300 font-bold text-xs">
+                Prof. <strong className="text-indigo-200">{props.controlledByName}</strong> no controle
+              </span>
+            </div>
+          )}
+
           {/* Pause banner — shown when a partner paused the session */}
           {inTeamSession && teamCtx.sessionPaused && (
             <div className="bg-yellow-500/15 border-b border-yellow-500/30 px-4 py-2 flex items-center justify-between text-sm">

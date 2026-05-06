@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
+import { parseJsonBody } from '@/utils/zod'
 
 export const dynamic = 'force-dynamic'
 
@@ -23,14 +24,13 @@ export async function PATCH(
   const { id } = await params
   if (!id) return NextResponse.json({ ok: false, error: 'Missing id' }, { status: 400 })
 
-  const body = await req.json().catch(() => null)
-  const parsed = patchSchema.safeParse(body)
-  if (!parsed.success)
-    return NextResponse.json({ ok: false, error: 'Invalid input' }, { status: 400 })
+  const parsedBody = await parseJsonBody(req, patchSchema)
+  if (parsedBody.response) return parsedBody.response
+  const parsed = parsedBody.data!
 
   const { data, error } = await auth.supabase
     .from('cardio_tracks')
-    .update(parsed.data)
+    .update(parsed)
     .eq('id', id)
     .eq('user_id', auth.user.id) // RLS guard — user can only update their own
     .select('id')

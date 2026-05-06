@@ -59,6 +59,8 @@ export type ActiveWorkoutProps = {
   nextWorkout?: UnknownRecord | null;
   onEditWorkout?: () => void;
   onAddExercise?: () => void;
+  /** Name of the teacher controlling this session (null = not controlled) */
+  controlledByName?: string | null;
 };
 
 export type ReportHistoryItem = {
