@@ -10,6 +10,8 @@ import 'leaflet/dist/leaflet.css'
 interface RouteMapProps {
   points: GeoTrackPoint[]
   height?: number
+  /** If true, the container uses flex-1 min-h-0 to fill available vertical space. */
+  grow?: boolean
   /** True while a tracking session is active (shows live dot + pulse). */
   live?: boolean
   /** True while we're still waiting for a usable GPS fix. */
@@ -33,7 +35,7 @@ interface RouteMapProps {
  *   - If Leaflet fails to initialize for any reason we fall back to the old
  *     pure-SVG polyline — the user still sees their route.
  */
-export default function RouteMapLeaflet({ points, height = 200, live, acquiring }: RouteMapProps) {
+export default function RouteMapLeaflet({ points, height = 200, grow, live, acquiring }: RouteMapProps) {
   const containerRef = useRef<HTMLDivElement | null>(null)
   const mapRef = useRef<LeafletMap | null>(null)
   const polylineRef = useRef<LeafletPolyline | null>(null)
@@ -249,14 +251,14 @@ export default function RouteMapLeaflet({ points, height = 200, live, acquiring 
 
   // SVG fallback when Leaflet init fails (extremely rare, but defensive).
   if (initError) {
-    return <RouteMapSVG points={points} height={height} live={live} />
+    return <RouteMapSVG points={points} height={height} grow={grow} live={live} />
   }
 
   return (
     <div
-      className="mb-3 rounded-xl overflow-hidden relative"
+      className={`mb-3 rounded-xl overflow-hidden relative${grow ? ' flex-1 min-h-[180px]' : ''}`}
       style={{
-        height,
+        ...(grow ? {} : { height }),
         background: '#0d1117',
         border: '1px solid rgba(34,197,94,0.15)',
       }}
@@ -338,7 +340,7 @@ const W = 400
 const GRID_V = 7
 const GRID_H = 4
 
-function RouteMapSVG({ points, height = 200, live }: RouteMapProps) {
+function RouteMapSVG({ points, height = 200, grow, live }: RouteMapProps) {
   const data = useMemo(() => {
     if (points.length < 2) return null
     const lats = points.map((p) => p.latitude)
@@ -365,8 +367,8 @@ function RouteMapSVG({ points, height = 200, live }: RouteMapProps) {
 
   return (
     <div
-      className="mb-3 rounded-xl overflow-hidden"
-      style={{ height, background: '#0d1117', border: '1px solid rgba(34,197,94,0.15)' }}
+      className={`mb-3 rounded-xl overflow-hidden${grow ? ' flex-1 min-h-[180px]' : ''}`}
+      style={{ ...(grow ? {} : { height }), background: '#0d1117', border: '1px solid rgba(34,197,94,0.15)' }}
     >
       <svg
         viewBox={`0 0 ${W} ${height}`}
