@@ -49,6 +49,8 @@ export async function GET(req: Request) {
 
     const notifs: Array<Record<string, unknown>> = []
     followingByFollower.forEach((following, follower) => {
+      // Skip users who already trained today — "Bora você também?" would be wrong
+      if (trainedToday.has(follower)) return
       let count = 0
       following.forEach((id) => { if (trainedToday.has(id)) count += 1 })
       if (count <= 0) return
