@@ -1,6 +1,6 @@
 'use client'
 import React, { memo, useEffect, useRef, useState } from 'react'
-import { TrendingUp, TrendingDown, Flame, Clock, Dumbbell, Trophy } from 'lucide-react'
+import { TrendingUp, TrendingDown, Flame, Clock, Dumbbell, Trophy, MapPin } from 'lucide-react'
 import { formatDuration, formatKm, formatKmh } from '@/utils/report/formatters'
 
 type AnyObj = Record<string, unknown>
@@ -11,6 +11,7 @@ interface ReportSummaryCardsProps {
     volumeDelta: number
     calories: number
     outdoorBike: AnyObj | null
+    cardioGps?: AnyObj | null
     hasPreviousSession: boolean
 }
 
@@ -38,6 +39,7 @@ export const ReportSummaryCards = memo(({
     volumeDelta,
     calories,
     outdoorBike,
+    cardioGps,
     hasPreviousSession,
 }: ReportSummaryCardsProps) => {
     const animVol = useCountUp(Math.round(currentVolume))
@@ -122,6 +124,51 @@ export const ReportSummaryCards = memo(({
                         <div className="bg-neutral-900/60 p-4 rounded-xl border border-neutral-800">
                             <p className="text-xs font-bold uppercase text-neutral-400 mb-1">Tempo Bike</p>
                             <p className="text-2xl font-mono font-bold">{formatDuration(Number(outdoorBike.durationSeconds) || 0)}</p>
+                        </div>
+                    </div>
+                </div>
+            )}
+
+            {cardioGps && (Number(cardioGps?.distanceMeters) > 0 || Number(cardioGps?.durationSeconds) > 0) && (
+                <div className="mb-8">
+                    <div className="flex items-center gap-2 mb-3">
+                        <div className="w-6 h-6 rounded-lg bg-green-500/15 border border-green-500/25 flex items-center justify-center">
+                            <MapPin size={12} className="text-green-400" />
+                        </div>
+                        <div className="text-xs font-black uppercase tracking-widest text-green-400/80">Cardio GPS</div>
+                    </div>
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div className="bg-green-950/20 p-4 rounded-xl border border-green-500/15">
+                            <p className="text-xs font-bold uppercase text-neutral-400 mb-1">Distância</p>
+                            <p className="text-2xl font-mono font-bold text-green-300">{formatKm(cardioGps.distanceMeters)}</p>
+                        </div>
+                        <div className="bg-neutral-900/60 p-4 rounded-xl border border-neutral-800">
+                            <p className="text-xs font-bold uppercase text-neutral-400 mb-1">Tempo</p>
+                            <p className="text-2xl font-mono font-bold">{formatDuration(Number(cardioGps.durationSeconds) || 0)}</p>
+                        </div>
+                        <div className="bg-neutral-900/60 p-4 rounded-xl border border-neutral-800">
+                            <p className="text-xs font-bold uppercase text-neutral-400 mb-1">Pace Médio</p>
+                            <p className="text-2xl font-mono font-bold">
+                                {cardioGps.avgPaceMinKm != null && Number(cardioGps.avgPaceMinKm) > 0
+                                    ? (() => {
+                                        const totalSec = Math.round(Number(cardioGps.avgPaceMinKm) * 60)
+                                        const m = Math.floor(totalSec / 60)
+                                        const s = totalSec % 60
+                                        return `${m}:${String(s).padStart(2, '0')}`
+                                    })()
+                                    : '—'}
+                                {cardioGps.avgPaceMinKm != null && Number(cardioGps.avgPaceMinKm) > 0 && (
+                                    <span className="text-xs font-normal text-neutral-400 ml-1">/km</span>
+                                )}
+                            </p>
+                        </div>
+                        <div className="bg-orange-950/20 p-4 rounded-xl border border-orange-500/15">
+                            <p className="text-xs font-bold uppercase text-neutral-400 mb-1">Calorias</p>
+                            <p className="text-2xl font-mono font-bold text-orange-300">
+                                {Number(cardioGps.caloriesEstimated) > 0
+                                    ? `~${Math.round(Number(cardioGps.caloriesEstimated))}`
+                                    : '—'}
+                            </p>
                         </div>
                     </div>
                 </div>

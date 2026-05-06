@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { Map as LeafletMap, Polyline as LeafletPolyline, CircleMarker as LeafletCircleMarker } from 'leaflet'
+import { Locate } from 'lucide-react'
 import { logWarn } from '@/lib/logger'
 import type { GeoTrackPoint } from '@/utils/geoUtils'
 import 'leaflet/dist/leaflet.css'
@@ -39,8 +40,21 @@ export default function RouteMapLeaflet({ points, height = 200, live, acquiring 
   const startMarkerRef = useRef<LeafletCircleMarker | null>(null)
   const endMarkerRef = useRef<LeafletCircleMarker | null>(null)
   const autoFollowRef = useRef<boolean>(true)
+  // liveRef lets the dragstart closure (set up once) always read the current live value
+  const liveRef = useRef<boolean>(!!live)
+  const [showRecenter, setShowRecenter] = useState(false)
   const [initError, setInitError] = useState<string | null>(null)
   const [ready, setReady] = useState(false)
+
+  // ─── Sync live → liveRef + reset auto-follow on session state change ─────
+  useEffect(() => {
+    liveRef.current = !!live
+    // Re-enable auto-follow whenever live changes:
+    // • true → new session started → start following immediately
+    // • false → session ended → fitBounds the completed route
+    autoFollowRef.current = true
+    setShowRecenter(false)
+  }, [live])
 
   // ─── Mount / unmount Leaflet map ──────────────────────────────────────────
   useEffect(() => {
@@ -96,9 +110,10 @@ export default function RouteMapLeaflet({ points, height = 200, live, acquiring 
         }, 120)
 
         // Detect user interaction — stop auto-panning to the latest fix so
-        // they can explore the route.
+        // they can explore the route. Show re-center button only during live.
         map.on('dragstart zoomstart', () => {
           autoFollowRef.current = false
+          if (liveRef.current) setShowRecenter(true)
         })
 
         setReady(true)
@@ -132,6 +147,9 @@ export default function RouteMapLeaflet({ points, height = 200, live, acquiring 
     if (!ready) return
     const map = mapRef.current
     if (!map) return
+
+    // Capture live value at the time this effect fires (avoids stale closure)
+    const isLive = !!live
 
     let cancelled = false
     const run = async () => {
@@ -197,12 +215,24 @@ export default function RouteMapLeaflet({ points, height = 200, live, acquiring 
         endMarkerRef.current.setLatLng(last)
       }
 
-      // Framing
+      // ── Framing ────────────────────────────────────────────────────────────
       if (latlngs.length === 1) {
         if (autoFollowRef.current) map.setView(first, 16)
       } else if (latlngs.length >= 2) {
         if (autoFollowRef.current) {
-          map.fitBounds(L.latLngBounds(latlngs), { padding: [20, 20], maxZoom: 17 })
+          if (isLive) {
+            // Waze-style: keep current position centred while tracking.
+            // Preserve the user's current zoom level (once set ≥ 14) so they
+            // don't get zoomed out every GPS update.
+            const currentZoom = map.getZoom()
+            map.setView(last, currentZoom >= 14 ? currentZoom : 16, {
+              animate: true,
+              duration: 0.4,
+            })
+          } else {
+            // Completed/static route: show the whole path at once.
+            map.fitBounds(L.latLngBounds(latlngs), { padding: [20, 20], maxZoom: 17 })
+          }
         }
       }
     }
@@ -211,7 +241,9 @@ export default function RouteMapLeaflet({ points, height = 200, live, acquiring 
     return () => {
       cancelled = true
     }
-  }, [points, ready])
+  // live must be a dep: when the session ends (live → false) we want to
+  // re-run so fitBounds fires and shows the full completed route.
+  }, [points, ready, live])
 
   // ─── Render ───────────────────────────────────────────────────────────────
 
@@ -254,6 +286,38 @@ export default function RouteMapLeaflet({ points, height = 200, live, acquiring 
             Buscando sinal GPS...
           </div>
         </div>
+      )}
+
+      {/* Re-center button — appears when user manually pans during live tracking */}
+      {live && showRecenter && (
+        <button
+          type="button"
+          aria-label="Centralizar na posição atual"
+          onClick={() => {
+            autoFollowRef.current = true
+            setShowRecenter(false)
+            const map = mapRef.current
+            if (map && points.length > 0) {
+              const pt = points[points.length - 1]
+              const currentZoom = map.getZoom()
+              map.setView(
+                [pt.latitude, pt.longitude],
+                currentZoom >= 14 ? currentZoom : 16,
+                { animate: true, duration: 0.4 },
+              )
+            }
+          }}
+          className="absolute bottom-3 right-3 w-10 h-10 rounded-full flex items-center justify-center active:scale-95 transition-transform"
+          style={{
+            zIndex: 1000,
+            background: 'rgba(15,15,15,0.92)',
+            border: '1px solid rgba(34,197,94,0.45)',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.5)',
+            backdropFilter: 'blur(6px)',
+          }}
+        >
+          <Locate size={17} className="text-green-400" />
+        </button>
       )}
 
       <style jsx>{`

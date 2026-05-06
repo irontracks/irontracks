@@ -113,7 +113,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose,
         postCheckin: rawPostCheckin,
         aiState, setAiState,
         applyState, setApplyState,
-        sessionLogs, currentVolume, volumeDelta, volumeDeltaAbs, calories, outdoorBike,
+        sessionLogs, currentVolume, volumeDelta, volumeDeltaAbs, calories, outdoorBike, cardioGps,
         setsCompleted, setsPlanned, setCompletionPct,
         reportMeta, reportTotals, reportRest, reportCadence, reportWeekly, reportLoadFlags,
         prevLogsMap, prevBaseMsMap,
@@ -864,6 +864,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose,
                     volumeDelta={volumeDelta}
                     calories={calories}
                     outdoorBike={outdoorBike}
+                    cardioGps={cardioGps}
                     hasPreviousSession={!!effectivePreviousSession}
                 />
 

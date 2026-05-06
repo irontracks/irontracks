@@ -14,6 +14,7 @@ const InviteAcceptedModal = dynamic(() => import('@/components/InviteAcceptedMod
 import { DashboardHeader } from './DashboardHeader';
 
 // Heavy components — loaded only when needed
+const CardioGPSPanel = dynamic(() => import('@/components/workout/CardioGPSPanel'), { ssr: false })
 const AdminPanelV2 = dynamic(() => import('@/components/AdminPanelV2'), { ssr: false });
 const ChatListScreen = dynamic(() => import('@/components/ChatListScreen'), { ssr: false });
 const ChatDirectScreen = dynamic(() => import('@/components/ChatDirectScreen'), { ssr: false });
@@ -174,6 +175,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
     const [currentWorkout, setCurrentWorkout] = useState<ActiveSession | null>(null);
     const [createWizardOpen, setCreateWizardOpen] = useState(false)
     const [expressWorkoutOpen, setExpressWorkoutOpen] = useState(false)
+    const [standaloneCardioOpen, setStandaloneCardioOpen] = useState(false)
     const [nutritionOpen, setNutritionOpen] = useState(false)
     const [quickViewWorkout, setQuickViewWorkout] = useState<ActiveSession | null>(null);
     const [reportData, setReportData] = useState({ current: null, previous: null });
@@ -922,6 +924,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                     settings={userSettingsApi?.settings ?? null}
                                     onCreateWorkout={handleCreateWorkout}
                                     onExpressWorkout={() => setExpressWorkoutOpen(true)}
+                                    onStartCardio={() => setStandaloneCardioOpen(true)}
                                     onQuickView={(w) => setQuickViewWorkout(w)}
                                     onStartSession={(w) => handleStartSession(w)}
                                     onRestoreWorkout={(w: unknown) => handleRestoreWorkout(w)}
@@ -953,6 +956,39 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                 onClose={() => setExpressWorkoutOpen(false)}
                                 onUseDraft={handleExpressUseDraft}
                             />
+
+                            {/* Standalone GPS cardio — no workout needed */}
+                            {standaloneCardioOpen && (
+                                <div
+                                    className="fixed inset-0 z-50 flex flex-col"
+                                    style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)' }}
+                                >
+                                    <div className="flex items-center justify-between px-4 pt-safe pb-2 pt-4">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-lg">🏃</span>
+                                            <span className="text-base font-black text-white">Cardio GPS</span>
+                                        </div>
+                                        <button
+                                            type="button"
+                                            onClick={() => setStandaloneCardioOpen(false)}
+                                            className="w-9 h-9 rounded-full bg-neutral-800 border border-neutral-700 flex items-center justify-center text-neutral-300 active:scale-95 transition-transform"
+                                        >
+                                            <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
+                                                <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                                            </svg>
+                                        </button>
+                                    </div>
+                                    <div className="flex-1 overflow-y-auto py-2">
+                                        <CardioGPSPanel
+                                            bodyWeightKg={
+                                                typeof (userSettingsApi?.settings as Record<string, unknown> | null | undefined)?.bodyWeightKg === 'number'
+                                                    ? (userSettingsApi?.settings as Record<string, unknown>).bodyWeightKg as number
+                                                    : undefined
+                                            }
+                                        />
+                                    </div>
+                                </div>
+                            )}
 
                             {nutritionOpen ? (
                                 <NutritionOverlay
