@@ -115,6 +115,7 @@ export interface WorkoutStreak {
   badges: Array<{ id: string; label: string; kind: string }>;
   longestStreak?: number;
   lastWorkoutDate?: string | null;
+  weekWorkouts?: number;
 }
 
 export interface ActiveSession {
