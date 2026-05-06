@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import Image from 'next/image'
 
-import { Plus, Loader2, Sparkles, Crown, Zap } from 'lucide-react'
+import { Plus, Loader2, Sparkles, Crown, Zap, Activity } from 'lucide-react'
 const MuscleBalanceCard = dynamic(() => import('@/components/MuscleBalanceCard'), { ssr: false })
 import { EmptyState } from '@/components/ui/EmptyState'
 
@@ -92,6 +92,7 @@ type Props = {
   } | null
   onCreateWorkout: () => MaybePromise<void>
   onExpressWorkout?: () => void
+  onStartCardio?: () => void
   onQuickView: (w: DashboardWorkout) => void
   onStartSession: (w: DashboardWorkout) => MaybePromise<void | boolean>
   onRestoreWorkout?: (w: DashboardWorkout) => MaybePromise<void>
@@ -435,6 +436,27 @@ export default function StudentDashboard(props: Props) {
                   <div className="text-left flex-1">
                     <p className="text-sm font-black text-white">Treino Express</p>
                     <p className="text-xs text-white/30">IA gera em segundos · 15–45 min</p>
+                  </div>
+                  <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className="text-white/20">
+                    <path d="M6 3L11 8L6 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                </button>
+              )}
+
+              {/* Standalone GPS cardio */}
+              {props.onStartCardio && (
+                <button
+                  type="button"
+                  onClick={props.onStartCardio}
+                  className="w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all active:scale-[0.98]"
+                  style={{ background: 'rgba(34,197,94,0.05)', border: '1px solid rgba(34,197,94,0.12)' }}
+                >
+                  <div className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(34,197,94,0.12)' }}>
+                    <Activity size={15} className="text-green-400" />
+                  </div>
+                  <div className="text-left flex-1">
+                    <p className="text-sm font-black text-white">Cardio GPS</p>
+                    <p className="text-xs text-white/30">Corrida, caminhada ou ciclismo</p>
                   </div>
                   <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className="text-white/20">
                     <path d="M6 3L11 8L6 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />

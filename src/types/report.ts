@@ -23,6 +23,7 @@ export interface SessionData {
     ai?: AiInsights | null
     reportMeta?: ReportMeta | null
     outdoorBike?: OutdoorBikeData | null
+    cardioGps?: CardioGpsData | null
     preCheckin?: CheckinData | null
     postCheckin?: CheckinData | null
     teamMeta?: TeamMeta | null
@@ -128,6 +129,20 @@ export interface OutdoorBikeData {
     avgSpeedKmh?: number
     maxSpeedKmh?: number
     caloriesKcal?: number
+    [key: string]: unknown
+}
+
+// ─── Cardio GPS (from cardio_tracks table) ───────────────────────────────────
+
+export interface CardioGpsData {
+    id?: string
+    distanceMeters?: number
+    durationSeconds?: number
+    avgPaceMinKm?: number | null
+    maxSpeedKmh?: number | null
+    caloriesEstimated?: number
+    startedAt?: string
+    finishedAt?: string
     [key: string]: unknown
 }
 

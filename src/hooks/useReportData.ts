@@ -88,6 +88,7 @@ export interface UseReportDataReturn {
   volumeDeltaAbs: number
   calories: number
   outdoorBike: AnyObj | null
+  cardioGps: AnyObj | null
   // Set completion
   setsCompleted: number
   setsPlanned: number
@@ -263,6 +264,40 @@ export const useReportData = ({ session, previousSession, user, settings }: UseR
   const volumeDelta = prevVolume > 0 ? ((currentVolume - prevVolume) / prevVolume) * 100 : 0
   const durationInMinutes = (Number(safeSession?.totalTime) || 0) / 60
   const outdoorBike = safeSession?.outdoorBike && typeof safeSession.outdoorBike === 'object' ? (safeSession.outdoorBike as AnyObj) : null
+
+  // ── GPS cardio track (from cardio_tracks table, linked by workout_id) ─────
+  const [cardioGps, setCardioGps] = useState<AnyObj | null>(null)
+  const cardioWorkoutIdRef = useRef<string | null>(null)
+  useEffect(() => {
+    const workoutId = typeof session?.id === 'string' ? session.id : null
+    if (!workoutId || !supabase) return
+    // Avoid re-fetching if already loaded for this workout
+    if (cardioWorkoutIdRef.current === workoutId) return
+    cardioWorkoutIdRef.current = workoutId
+
+    void (async () => {
+      try {
+        const { data } = await supabase
+          .from('cardio_tracks')
+          .select('id, distance_meters, duration_seconds, avg_pace_min_km, max_speed_kmh, calories_estimated, started_at, finished_at')
+          .eq('workout_id', workoutId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+        if (!data) return
+        setCardioGps({
+          id: data.id,
+          distanceMeters: data.distance_meters ?? undefined,
+          durationSeconds: data.duration_seconds ?? undefined,
+          avgPaceMinKm: data.avg_pace_min_km ?? null,
+          maxSpeedKmh: data.max_speed_kmh ?? null,
+          caloriesEstimated: data.calories_estimated ?? undefined,
+          startedAt: data.started_at ?? undefined,
+          finishedAt: data.finished_at ?? undefined,
+        })
+      } catch { /* non-critical, silently ignore */ }
+    })()
+  }, [session?.id, supabase])
 
   // Body weight from pre-workout check-in (answers.body_weight_kg), falls back to 75 kg default
   const preCheckinAnswers = (() => {
@@ -546,7 +581,7 @@ export const useReportData = ({ session, previousSession, user, settings }: UseR
     postCheckin,
     aiState, setAiState,
     applyState, setApplyState,
-    sessionLogs, currentVolume, volumeDelta, volumeDeltaAbs, calories, outdoorBike,
+    sessionLogs, currentVolume, volumeDelta, volumeDeltaAbs, calories, outdoorBike, cardioGps,
     setsCompleted, setsPlanned, setCompletionPct,
     reportMeta, reportTotals, reportRest, reportCadence, reportWeekly, reportLoadFlags,
     prevLogsMap, prevBaseMsMap,
