@@ -77,6 +77,8 @@ import { useNativeTimerActions } from '@/hooks/useNativeTimerActions'
 import { useAppEffects, isRecord, parseStartedAtMs } from '@/hooks/useAppEffects'
 import { useAppHandlers } from '@/hooks/useAppHandlers'
 import { useWorkoutWizard } from '@/hooks/useWorkoutWizard'
+import WatchSyncProvider from '@/components/WatchSyncProvider'
+import type { WatchDashboard, WatchGym, WatchWorkout } from '@/hooks/useWatchBridge'
 
 
 import {
@@ -149,6 +151,25 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
     // workouts, stats, studentFolders, fetchWorkouts, isFetching — extraídos para useWorkoutFetch
     // Streak stats — extracted to useWorkoutStreak hook (userId resolved after auth)
     const { streakStats, setStreakStats, streakLoading } = useWorkoutStreak(user?.id);
+
+    // ── Apple Watch: user gyms for CheckinView ────────────────────────────────
+    const [watchGyms, setWatchGyms] = useState<WatchGym[]>([])
+    useEffect(() => {
+        if (!user?.id) return
+        fetch('/api/gps/gyms')
+            .then((r) => r.json() as Promise<{ ok: boolean; gyms?: Array<{ id: string; name: string; latitude: number; longitude: number; radius_meters: number }> }>)
+            .then((data) => {
+                if (!data.ok || !Array.isArray(data.gyms)) return
+                setWatchGyms(data.gyms.map((g) => ({
+                    id: g.id,
+                    name: g.name,
+                    latitude: g.latitude,
+                    longitude: g.longitude,
+                    radiusMeters: g.radius_meters,
+                })))
+            })
+            .catch(() => {})
+    }, [user?.id])
     const [currentWorkout, setCurrentWorkout] = useState<ActiveSession | null>(null);
     const [createWizardOpen, setCreateWizardOpen] = useState(false)
     const [expressWorkoutOpen, setExpressWorkoutOpen] = useState(false)
@@ -683,6 +704,39 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
 
     const isHeaderVisible = view !== 'active' && view !== 'report';
 
+    // ── Apple Watch: dashboard payload ────────────────────────────────────────
+    const watchNextWorkout = useMemo((): WatchWorkout | null => {
+        const list = Array.isArray(workouts) ? (workouts as Array<Record<string, unknown>>) : []
+        if (!list.length) return null
+        const w = list[0]
+        const exercises = Array.isArray(w?.exercises) ? (w.exercises as Array<Record<string, unknown>>) : []
+        return {
+            id: String(w?.id ?? ''),
+            name: String(w?.title ?? w?.name ?? 'Treino'),
+            dayLabel: '',
+            estimatedMinutes: Math.round(exercises.length * 4),
+            scheduledAt: null,
+            exercises: exercises.slice(0, 12).map((ex, i) => ({
+                id: String(ex?.id ?? ex?._itx_exKey ?? `ex-${i}`),
+                name: String(ex?.name ?? ''),
+                sets: Number(ex?.sets ?? 3) || 3,
+                reps: String(ex?.reps ?? '10'),
+                restSeconds: Number(ex?.restTime ?? ex?.rest_time ?? 60) || 60,
+                weightSuggestion: ex?.weightSuggestion ? String(ex.weightSuggestion) : null,
+                muscleGroup: ex?.muscleGroup ? String(ex.muscleGroup) : null,
+                notes: ex?.notes ? String(ex.notes) : null,
+            })),
+        }
+    }, [workouts])
+
+    const watchDashboard = useMemo((): WatchDashboard => ({
+        streakDays: streakStats?.currentStreak ?? 0,
+        weekWorkouts: streakStats?.weekWorkouts ?? 0,
+        weekGoal: 5,
+        nextWorkout: watchNextWorkout,
+        userName: String(user?.displayName ?? user?.email ?? ''),
+    }), [streakStats, watchNextWorkout, user?.displayName, user?.email])
+
     // Loading overlay starts visible (opacity 1) on both SSR and client.
     // Once isAppLoading becomes false on the client, it fades out.
     // No `mounted` gate needed — SSR always shows loading, client fades it away.
@@ -723,6 +777,12 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                 onOpenNotifications={handleOpenNotifications}
             >
                 <InAppNotifyBinder bind={bindInAppNotify} />
+                {/* Apple Watch sync — headless, no visual output */}
+                <WatchSyncProvider
+                    dashboard={watchDashboard}
+                    nearestGyms={watchGyms}
+                    onRefresh={() => { fetchWorkouts().catch(() => {}) }}
+                />
                 <TeamWorkoutProvider user={user?.id ? { id: String(user.id), email: user?.email ? String(user.email) : null } : null} settings={userSettingsApi?.settings ?? null} onStartSession={handleStartSession}>
                     <div className="w-full bg-neutral-900 min-h-screen relative flex flex-col overflow-hidden" suppressHydrationWarning>
                         <IncomingInviteModal onStartSession={handleStartSession} />

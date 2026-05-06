@@ -60,6 +60,8 @@ export function useWorkoutStreak(userId?: string | null) {
             d.lastWorkoutDate != null ? String(d.lastWorkoutDate) : null,
           longestStreak:
             d.longestStreak != null ? Number(d.longestStreak) : undefined,
+          weekWorkouts:
+            d.weekWorkouts != null ? Number(d.weekWorkouts) : undefined,
         };
 
         setStreakStats(streak);

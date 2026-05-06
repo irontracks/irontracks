@@ -248,7 +248,17 @@ export async function computeWorkoutStreakAndStats(): Promise<ActionResult<Recor
         if (totalVolumeKg >= 500000) badges.push({ id: 'vol_500k', label: '500.000kg levantados', kind: 'volume' })
         if (totalVolumeKg >= 1000000) badges.push({ id: 'vol_1m', label: '1.000.000kg levantados', kind: 'volume' })
 
-        return { ok: true, data: { currentStreak, bestStreak, totalWorkouts, totalVolumeKg, badges } }
+        // Count unique session days in the current week (Mon–Sun)
+        const todayMs = Date.now()
+        const dayOfWeek = new Date().getUTCDay() // 0=Sun, 1=Mon…
+        const mondayMs = todayMs - ((dayOfWeek === 0 ? 6 : dayOfWeek - 1) * 86_400_000)
+        const mondayKey = new Date(mondayMs).toISOString().slice(0, 10)
+        let weekWorkouts = 0
+        for (const dayKey of daySet) {
+            if (dayKey >= mondayKey) weekWorkouts += 1
+        }
+
+        return { ok: true, data: { currentStreak, bestStreak, totalWorkouts, totalVolumeKg, badges, weekWorkouts } }
     } catch (e) {
         const message = e instanceof Error ? e.message : String(e)
         return { ok: false, error: message }
