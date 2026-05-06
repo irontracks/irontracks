@@ -1,8 +1,15 @@
-import React, { useMemo } from 'react';
-import { Search, UserPlus, Trash2, Activity, User, UserCheck, ClipboardList, Crown } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import { Search, UserPlus, Trash2, Activity, User, UserCheck, ClipboardList, Crown, Gamepad2, Loader2 } from 'lucide-react';
+import dynamic from 'next/dynamic';
 import { useAdminPanel } from './AdminPanelContext';
 import { AdminUser } from '@/types/admin';
 import { useAdminVipMap, getVipLabel, getVipColors } from '@/hooks/useAdminVipMap';
+import { useTeacherStudentSessions } from '@/hooks/useTeacherStudentSessions';
+
+const TeacherControlModal = dynamic(
+    () => import('@/components/teacher/TeacherControlModal').then(m => ({ default: m.TeacherControlModal })),
+    { ssr: false, loading: () => null },
+);
 
 const STATUS_OPTIONS = [
     { value: 'pago', label: 'Pago', color: 'text-green-400' },
@@ -41,10 +48,51 @@ export const StudentsTab: React.FC = () => {
         setSelectedStudent,
         setHistoryOpen,
         user,
+        supabase,
+        getAdminAuthHeaders,
         // Bug 1 fix: pending self-registered users
         pendingProfiles,
         approvePendingProfile,
     } = useAdminPanel();
+
+    // Active sessions for teacher's students
+    const activeSessionsMap = useTeacherStudentSessions(
+        isTeacher || isAdmin ? supabase : null,
+        user?.id ? String(user.id) : undefined,
+    );
+
+    // Teacher control modal state
+    const [controlTarget, setControlTarget] = useState<{ userId: string; name: string } | null>(null);
+    const [requestingControl, setRequestingControl] = useState<string | null>(null); // studentUserId being requested
+
+    // Auto-open / auto-close the control modal in response to Realtime changes
+    const myUserId = user?.id ? String(user.id) : '';
+    const studentsRef = React.useRef(studentsWithTeacherFiltered);
+    studentsRef.current = studentsWithTeacherFiltered;
+    React.useEffect(() => {
+        if (!myUserId) return;
+        // Auto-open: student just accepted the request
+        Object.entries(activeSessionsMap).forEach(([uid, session]) => {
+            if (
+                session.controlStatus === 'active' &&
+                session.controlledBy === myUserId &&
+                !controlTarget
+            ) {
+                const all = studentsRef.current ?? [];
+                const student = all.find(s => String(s.user_id || s.id || '') === uid);
+                const name = String(student?.name || student?.email || 'Aluno');
+                setControlTarget({ userId: uid, name });
+            }
+        });
+        // Auto-close: student rejected, finished workout, or teacher was released
+        if (controlTarget) {
+            const session = activeSessionsMap[controlTarget.userId];
+            if (!session || !session.controlStatus) {
+                setControlTarget(null);
+            }
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [activeSessionsMap, myUserId]);
 
     // Live counts for filter pills
     const statusCounts = React.useMemo(() => {
@@ -66,18 +114,60 @@ export const StudentsTab: React.FC = () => {
     }, [studentsWithTeacherFiltered, studentsWithoutTeacherFiltered]);
     const { vipMap } = useAdminVipMap(allStudentIds);
 
+    const handleRequestControl = async (e: React.MouseEvent, s: AdminUser) => {
+        e.stopPropagation();
+        const studentUid = String(s.user_id || s.id || '');
+        if (!studentUid) return;
+        const activeSession = activeSessionsMap[studentUid];
+        if (!activeSession) return;
+
+        // If already active, open the modal directly
+        if (activeSession.controlStatus === 'active' && activeSession.controlledBy === String(user?.id || '')) {
+            setControlTarget({ userId: studentUid, name: String(s.name || s.email || 'Aluno') });
+            return;
+        }
+
+        setRequestingControl(studentUid);
+        try {
+            const headers = await getAdminAuthHeaders();
+            const res = await fetch(`/api/teacher/control/${studentUid}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', ...headers },
+                body: JSON.stringify({ action: 'request' }),
+            });
+            const json = await res.json() as { ok: boolean; error?: string };
+            if (!json.ok) {
+                console.error('Control request failed:', json.error);
+            }
+            // Modal opens when student accepts (Realtime update triggers controlStatus = 'active')
+            // Meanwhile show a "aguardando" state
+        } finally {
+            setRequestingControl(null);
+        }
+    };
+
     const renderStudentRow = (s: AdminUser) => {
         const uid = String(s.user_id || s.id || '');
         const vip = vipMap[uid];
         const vipLabel = vip ? getVipLabel(vip.tier) : null;
         const vipColor = vip ? getVipColors(vip.tier) : null;
+        const activeSession = activeSessionsMap[uid];
+        const isTraining = Boolean(activeSession);
+        const isRequestingThis = requestingControl === uid;
+        const myUserId = String(user?.id || '');
+        const alreadyControlling = activeSession?.controlStatus === 'active' && activeSession?.controlledBy === myUserId;
+        const requestedByMe = activeSession?.controlStatus === 'requested' && activeSession?.controlledBy === myUserId;
+
         return (
             <div
                 key={s.id}
                 className="group flex flex-col gap-3 p-4 rounded-xl hover:bg-white/[0.03] transition-all cursor-pointer"
-                style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}
-                onMouseEnter={(e) => (e.currentTarget.style.borderColor = 'rgba(234,179,8,0.3)')}
-                onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)')}
+                style={{
+                    background: isTraining ? 'rgba(34,197,94,0.03)' : 'rgba(255,255,255,0.02)',
+                    border: `1px solid ${isTraining ? 'rgba(34,197,94,0.15)' : 'rgba(255,255,255,0.06)'}`,
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.borderColor = isTraining ? 'rgba(34,197,94,0.35)' : 'rgba(234,179,8,0.3)')}
+                onMouseLeave={(e) => (e.currentTarget.style.borderColor = isTraining ? 'rgba(34,197,94,0.15)' : 'rgba(255,255,255,0.06)')}
                 onClick={() => setSelectedStudent(s)}
                 role="button"
                 tabIndex={0}
@@ -90,8 +180,17 @@ export const StudentsTab: React.FC = () => {
                         {(s.name || s.email || '?').charAt(0).toUpperCase()}
                     </div>
                     <div className="min-w-0">
-                        <div className="font-bold text-white group-hover:text-yellow-500 transition-colors truncate">
-                            {s.name || s.email || 'Sem Nome'}
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                            <span className="font-bold text-white group-hover:text-yellow-500 transition-colors truncate">
+                                {s.name || s.email || 'Sem Nome'}
+                            </span>
+                            {/* "Treinando agora" badge */}
+                            {isTraining && (
+                                <span className="flex-shrink-0 inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[9px] font-black uppercase tracking-wider bg-green-500/15 text-green-400 border border-green-500/25">
+                                    <span className="w-1.5 h-1.5 rounded-full bg-green-400 animate-pulse" />
+                                    Treinando
+                                </span>
+                            )}
                         </div>
                         <div className="text-xs text-neutral-500 truncate">{s.email}</div>
                     </div>
@@ -173,6 +272,43 @@ export const StudentsTab: React.FC = () => {
 
                     {/* Icon actions */}
                     <div className="flex items-center gap-1 ml-auto">
+                        {/* "Assumir Controle" — only when student is training */}
+                        {isTraining && (isTeacher || isAdmin) && (
+                            <button
+                                onClick={(e) => {
+                                    if (alreadyControlling) {
+                                        e.stopPropagation();
+                                        setControlTarget({ userId: uid, name: String(s.name || s.email || 'Aluno') });
+                                    } else {
+                                        handleRequestControl(e, s);
+                                    }
+                                }}
+                                disabled={isRequestingThis}
+                                className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[11px] font-black transition-all active:scale-95 disabled:opacity-60"
+                                style={{
+                                    background: alreadyControlling
+                                        ? 'rgba(34,197,94,0.2)'
+                                        : requestedByMe
+                                            ? 'rgba(251,191,36,0.15)'
+                                            : 'rgba(99,102,241,0.15)',
+                                    border: alreadyControlling
+                                        ? '1px solid rgba(34,197,94,0.4)'
+                                        : requestedByMe
+                                            ? '1px solid rgba(251,191,36,0.3)'
+                                            : '1px solid rgba(99,102,241,0.3)',
+                                    color: alreadyControlling ? '#4ade80' : requestedByMe ? '#fbbf24' : '#a5b4fc',
+                                }}
+                                title={alreadyControlling ? 'Abrir controle' : requestedByMe ? 'Aguardando aluno...' : 'Assumir controle'}
+                                aria-label={alreadyControlling ? 'Abrir controle do treino' : 'Assumir controle do treino'}
+                            >
+                                {isRequestingThis
+                                    ? <Loader2 size={11} className="animate-spin" />
+                                    : <Gamepad2 size={11} />
+                                }
+                                {alreadyControlling ? 'No controle' : requestedByMe ? 'Aguardando...' : 'Assumir'}
+                            </button>
+                        )}
+
                         <button
                             onClick={(e) => { e.stopPropagation(); setSelectedStudent(s); setHistoryOpen(true); }}
                             className="p-2 text-neutral-400 hover:text-yellow-500 hover:bg-yellow-500/10 rounded-lg transition-colors"
@@ -341,6 +477,17 @@ export const StudentsTab: React.FC = () => {
                     </div>
                 )}
             </div>
+
+            {/* Teacher Control Modal */}
+            {controlTarget && (
+                <TeacherControlModal
+                    supabase={supabase}
+                    studentUserId={controlTarget.userId}
+                    studentName={controlTarget.name}
+                    getAuthHeaders={getAdminAuthHeaders}
+                    onClose={() => setControlTarget(null)}
+                />
+            )}
         </div>
     );
 };

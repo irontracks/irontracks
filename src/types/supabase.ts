@@ -55,18 +55,24 @@ export type Database = {
       }
       active_workout_sessions: {
         Row: {
+          controlled_by: string | null
+          control_status: string | null
           started_at: string
           state: Json
           updated_at: string
           user_id: string
         }
         Insert: {
+          controlled_by?: string | null
+          control_status?: string | null
           started_at?: string
           state?: Json
           updated_at?: string
           user_id: string
         }
         Update: {
+          controlled_by?: string | null
+          control_status?: string | null
           started_at?: string
           state?: Json
           updated_at?: string

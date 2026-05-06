@@ -42,6 +42,10 @@ const NutritionOverlay = dynamic(() => import('@/components/dashboard/nutrition/
 import { getTourSteps } from '@/utils/tourSteps'
 const OfflineSyncModal = dynamic(() => import('@/components/OfflineSyncModal'), { ssr: false })
 const WorkoutRecoveryBanner = dynamic(() => import('@/components/WorkoutRecoveryBanner'), { ssr: false, loading: () => null })
+const StudentControlConsent = dynamic(
+    () => import('@/components/teacher/StudentControlConsent').then(m => ({ default: m.StudentControlConsent })),
+    { ssr: false, loading: () => null },
+)
 import { useOfflineSync } from '@/hooks/useOfflineSync'
 import { useVipAccess } from '@/hooks/useVipAccess'
 import { useWorkoutStreak } from '@/hooks/useWorkoutStreak'
@@ -70,6 +74,7 @@ import { useWorkoutCrud } from '@/hooks/useWorkoutCrud'
 import { useWorkoutNormalize } from '@/hooks/useWorkoutNormalize'
 import { useWorkoutFetch } from '@/hooks/useWorkoutFetch'
 import { useSessionSync } from '@/hooks/useSessionSync'
+import { useStudentControlNotice } from '@/hooks/useStudentControlNotice'
 import { useWorkoutEditor } from '@/hooks/useWorkoutEditor'
 import { useBootstrap } from '@/hooks/useBootstrap'
 import { useHealthKit } from '@/hooks/useHealthKit'
@@ -434,6 +439,15 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         setSessionTicker,
         view,
     })
+
+    // ── Teacher control notice (student side) ─────────────────────────────────
+    // Watches for teacher control requests on the student's own session row.
+    // Shows a consent banner when a teacher requests control, and a badge when active.
+    const controlNotice = useStudentControlNotice(
+        supabase,
+        user?.id,
+        Boolean(activeSession),
+    )
 
 
     // ── User init from server data ───────────────────────────────
@@ -1041,6 +1055,16 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
 
                             {view === 'active' && activeSession && (
                                 <SectionErrorBoundary section="Treino Ativo" fullScreen onReset={() => setView('dashboard')}>
+                                    {/* Teacher control consent banner — shown above the workout when a teacher requests control */}
+                                    {controlNotice.controlStatus === 'requested' && controlNotice.controlledByName && (
+                                        <div className="fixed inset-x-0 z-[60]" style={{ top: 'max(env(safe-area-inset-top, 0px), 56px)' }}>
+                                            <StudentControlConsent
+                                                teacherName={controlNotice.controlledByName}
+                                                onAccept={controlNotice.accept}
+                                                onReject={controlNotice.reject}
+                                            />
+                                        </div>
+                                    )}
                                     <ActiveWorkout
                                         session={activeSession as Record<string, unknown>}
                                         user={user as AdminUser}
@@ -1061,6 +1085,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                         nextWorkout={nextWorkout}
                                         onEditWorkout={() => handleOpenActiveWorkoutEditor()}
                                         onAddExercise={() => handleOpenActiveWorkoutEditor({ addExercise: true })}
+                                        controlledByName={controlNotice.controlStatus === 'active' ? controlNotice.controlledByName : null}
                                     />
                                 </SectionErrorBoundary>
                             )}
