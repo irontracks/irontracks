@@ -135,8 +135,10 @@ export const ReportExerciseCard = ({ exercise, exIdx, sessionLogs, prevLogs, bas
     const exName = String(obj?.name || '').trim()
     const baseText = (() => {
         try {
-            if (!Number.isFinite(Number(baseMs))) return ''
-            const d = new Date(Number(baseMs))
+            const bms = Number(baseMs)
+            // Guard against null (Number(null)=0) and epoch 0 (1970-01-01)
+            if (!bms || bms <= 0 || !Number.isFinite(bms)) return ''
+            const d = new Date(bms)
             if (Number.isNaN(d.getTime())) return ''
             return d.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' })
         } catch {

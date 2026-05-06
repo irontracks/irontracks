@@ -62,7 +62,15 @@ export const formatKmh = (kmh: unknown): string => {
 
 export const normalizeExerciseKey = (v: unknown): string => {
     try {
-        return String(v || '').trim().toLowerCase().replace(/\s+/g, ' ')
+        // Must match the server-side normalization in workout-report-actions.ts:
+        // NFD decomposition + diacritic removal so accented chars match
+        // (e.g. "MÁQUINA" → "maquina", "TRÍCEPS" → "triceps").
+        return String(v || '')
+            .trim()
+            .toLowerCase()
+            .normalize('NFD')
+            .replace(/[̀-ͯ]/g, '')
+            .replace(/\s+/g, ' ')
     } catch {
         return ''
     }
