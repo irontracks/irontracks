@@ -53,6 +53,14 @@ export interface WorkoutSummary {
     distanceMeters?: number;
     /** Average pace in min/km (cardio sessions) */
     avgPaceMinKm?: number | null;
+    /** Activity type: running, walking, cycling, swimming, other */
+    activityType?: string;
+    /** Calories burned (cardio sessions) */
+    caloriesEstimated?: number;
+    /** Perceived effort 1–5 (cardio sessions) */
+    perceivedEffort?: number | null;
+    /** User notes (cardio sessions) */
+    cardioNotes?: string | null;
     [key: string]: unknown;
 }
 
