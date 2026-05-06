@@ -594,6 +594,8 @@ export type Database = {
           finished_at: string | null
           id: string
           max_speed_kmh: number | null
+          notes: string | null
+          perceived_effort: number | null
           route: Json | null
           started_at: string | null
           user_id: string
@@ -608,6 +610,8 @@ export type Database = {
           finished_at?: string | null
           id?: string
           max_speed_kmh?: number | null
+          notes?: string | null
+          perceived_effort?: number | null
           route?: Json | null
           started_at?: string | null
           user_id: string
@@ -622,6 +626,8 @@ export type Database = {
           finished_at?: string | null
           id?: string
           max_speed_kmh?: number | null
+          notes?: string | null
+          perceived_effort?: number | null
           route?: Json | null
           started_at?: string | null
           user_id?: string

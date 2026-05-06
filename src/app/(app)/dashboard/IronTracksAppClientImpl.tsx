@@ -957,29 +957,47 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                 onUseDraft={handleExpressUseDraft}
                             />
 
-                            {/* Standalone GPS cardio — no workout needed */}
+                            {/* Standalone cardio — full-screen, no workout needed */}
                             {standaloneCardioOpen && (
                                 <div
                                     className="fixed inset-0 z-50 flex flex-col"
-                                    style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(8px)' }}
+                                    style={{
+                                        background: 'linear-gradient(180deg, rgba(10,20,15,0.99) 0%, rgba(5,5,5,0.99) 100%)',
+                                        backdropFilter: 'blur(12px)',
+                                    }}
                                 >
-                                    <div className="flex items-center justify-between px-4 pt-safe pb-2 pt-4">
-                                        <div className="flex items-center gap-2">
-                                            <span className="text-lg">🏃</span>
-                                            <span className="text-base font-black text-white">Cardio GPS</span>
+                                    {/* Header */}
+                                    <div
+                                        className="flex items-center justify-between px-4 pb-3 flex-shrink-0"
+                                        style={{ paddingTop: 'max(env(safe-area-inset-top, 0px), 16px)' }}
+                                    >
+                                        <div className="flex items-center gap-2.5">
+                                            <div
+                                                className="w-9 h-9 rounded-2xl flex items-center justify-center"
+                                                style={{ background: 'rgba(34,197,94,0.15)', border: '1px solid rgba(34,197,94,0.3)' }}
+                                            >
+                                                <span className="text-lg leading-none">🏃</span>
+                                            </div>
+                                            <span className="text-base font-black text-white">Cardio</span>
                                         </div>
                                         <button
                                             type="button"
                                             onClick={() => setStandaloneCardioOpen(false)}
-                                            className="w-9 h-9 rounded-full bg-neutral-800 border border-neutral-700 flex items-center justify-center text-neutral-300 active:scale-95 transition-transform"
+                                            className="w-9 h-9 rounded-full flex items-center justify-center text-neutral-400 active:scale-95 transition-all"
+                                            style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.1)' }}
                                         >
                                             <svg width="14" height="14" viewBox="0 0 14 14" fill="none">
-                                                <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                                                <path d="M1 1l12 12M13 1L1 13" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" />
                                             </svg>
                                         </button>
                                     </div>
-                                    <div className="flex-1 overflow-y-auto py-2">
+                                    {/* Divider */}
+                                    <div className="h-px flex-shrink-0" style={{ background: 'rgba(34,197,94,0.1)' }} />
+                                    {/* Content */}
+                                    <div className="flex flex-col flex-1 min-h-0">
                                         <CardioGPSPanel
+                                            standalone
+                                            onRequestClose={() => setStandaloneCardioOpen(false)}
                                             bodyWeightKg={
                                                 typeof (userSettingsApi?.settings as Record<string, unknown> | null | undefined)?.bodyWeightKg === 'number'
                                                     ? (userSettingsApi?.settings as Record<string, unknown>).bodyWeightKg as number
