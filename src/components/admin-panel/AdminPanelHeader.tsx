@@ -163,7 +163,7 @@ export const AdminPanelHeader = ({
 
       {moreTabsOpen && (
         <div
-          className="md:hidden fixed inset-0 z-[60] flex items-start justify-center px-4 pt-[12vh]"
+          className="md:hidden fixed inset-0 z-[60] flex flex-col items-center px-4 pt-[12vh] pb-[env(safe-area-inset-bottom,16px)]"
           role="presentation"
         >
           {/* Premium blurred backdrop — closes modal on click */}
@@ -175,13 +175,13 @@ export const AdminPanelHeader = ({
             aria-label="Fechar menu"
           />
 
-          {/* Modal card */}
+          {/* Modal card — fills all remaining height so no black gap shows below */}
           <div
             role="dialog"
             aria-modal="true"
             aria-label="Menu de navegação"
             tabIndex={-1}
-            className="relative w-full max-w-md rounded-3xl overflow-hidden shadow-[0_32px_80px_rgba(0,0,0,0.8)] border border-white/[0.06] animate-in fade-in slide-in-from-top-4 duration-300"
+            className="relative w-full max-w-md flex flex-col flex-1 min-h-0 rounded-3xl overflow-hidden shadow-[0_32px_80px_rgba(0,0,0,0.8)] border border-white/[0.06] animate-in fade-in slide-in-from-top-4 duration-300"
           >
             {/* Glassmorphism background layers */}
             <div className="absolute inset-0 bg-neutral-950/95 backdrop-blur-2xl" />
@@ -189,9 +189,9 @@ export const AdminPanelHeader = ({
             <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-yellow-500/30 to-transparent" />
 
             {/* Content */}
-            <div className="relative">
+            <div className="relative flex flex-col flex-1 min-h-0">
               {/* Header */}
-              <div className="px-5 pt-5 pb-4 flex items-center justify-between">
+              <div className="px-5 pt-5 pb-4 flex items-center justify-between flex-shrink-0">
                 <div className="flex items-center gap-3">
                   <div className="w-9 h-9 rounded-2xl bg-gradient-to-br from-yellow-400 to-amber-600 flex items-center justify-center shadow-lg shadow-yellow-500/25">
                     <Crown size={16} className="text-black" />
@@ -212,10 +212,10 @@ export const AdminPanelHeader = ({
               </div>
 
               {/* Divider */}
-              <div className="mx-5 h-px bg-gradient-to-r from-transparent via-neutral-700/60 to-transparent mb-1" />
+              <div className="mx-5 h-px bg-gradient-to-r from-transparent via-neutral-700/60 to-transparent mb-1 flex-shrink-0" />
 
-              {/* Grouped menu items */}
-              <div className="p-3 max-h-[60vh] overflow-y-auto space-y-4">
+              {/* Grouped menu items — scrollable, fills remaining space */}
+              <div className="p-3 flex-1 overflow-y-auto space-y-4">
                 {buildMenuGroups(tabKeys).map((group, groupIdx) => {
                   const groupAccents: Record<string, { text: string; dot: string }> = {
                     'Gestão': { text: 'text-yellow-400/70', dot: 'bg-yellow-500' },
@@ -286,8 +286,8 @@ export const AdminPanelHeader = ({
                 })}
               </div>
 
-              {/* Bottom padding */}
-              <div className="h-3" />
+              {/* Bottom safe-area spacer */}
+              <div className="h-4 flex-shrink-0" />
             </div>
           </div>
         </div>
