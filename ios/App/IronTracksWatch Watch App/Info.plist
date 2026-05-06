@@ -17,9 +17,9 @@
 	<key>CFBundlePackageType</key>
 	<string>$(PRODUCT_BUNDLE_PACKAGE_TYPE)</string>
 	<key>CFBundleShortVersionString</key>
-	<string>1.8</string>
+	<string>1.9</string>
 	<key>CFBundleVersion</key>
-	<string>35</string>
+	<string>36</string>
 	<key>LSRequiresIPhoneOS</key>
 	<false/>
 	<key>UIApplicationSceneManifest</key>
@@ -36,7 +36,6 @@
 	<key>WKBackgroundModes</key>
 	<array>
 		<string>workout-processing</string>
-		<string>location</string>
 	</array>
 	<key>NSHealthShareUsageDescription</key>
 	<string>O IronTracks usa sua frequência cardíaca e dados de treino para acompanhar sua intensidade durante exercícios e cardio.</string>
