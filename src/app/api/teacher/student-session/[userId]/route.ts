@@ -87,19 +87,24 @@ export async function PATCH(
       return NextResponse.json({ ok: false, error: 'invalid startedAt in state' }, { status: 400 })
     }
 
-    const { error } = await access.admin
+    // UPDATE-only (not upsert): if the student finished the workout (row deleted)
+    // between this teacher's read and write, we must NOT recreate a zombie session.
+    // The `.select()` returns the matched rows; an empty result means the session
+    // ended and the teacher should be told to release.
+    const { data: updated, error } = await access.admin
       .from('active_workout_sessions')
-      .upsert(
-        {
-          user_id: userId,
-          started_at: new Date(startedAtMs).toISOString(),
-          state,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: 'user_id' }
-      )
+      .update({
+        started_at: new Date(startedAtMs).toISOString(),
+        state,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('user_id', userId)
+      .select('user_id')
 
     if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+    if (!updated || updated.length === 0) {
+      return NextResponse.json({ ok: false, error: 'session ended' }, { status: 404 })
+    }
 
     return NextResponse.json({ ok: true })
   } catch (e: unknown) {
