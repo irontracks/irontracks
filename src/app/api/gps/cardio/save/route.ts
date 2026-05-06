@@ -11,8 +11,11 @@ const routePointSchema = z.object({
   alt: z.number().nullable().optional(),
 })
 
+const VALID_ACTIVITY_TYPES = ['running', 'walking', 'cycling', 'swimming', 'other'] as const
+
 const saveTrackSchema = z.object({
   workout_id: z.string().uuid().nullable().optional(),
+  activity_type: z.enum(VALID_ACTIVITY_TYPES).default('running'),
   distance_meters: z.number().min(0).max(500_000), // max 500km
   duration_seconds: z.number().int().min(0).max(86_400), // max 24h
   avg_pace_min_km: z.number().nullable().optional(),
@@ -38,6 +41,7 @@ export async function POST(req: Request) {
     .insert({
       user_id: auth.user.id,
       workout_id: d.workout_id || null,
+      activity_type: d.activity_type,
       distance_meters: d.distance_meters,
       duration_seconds: d.duration_seconds,
       avg_pace_min_km: d.avg_pace_min_km ?? null,

@@ -10,11 +10,12 @@ import {
 } from 'lucide-react';
 import { useWindowVirtualizer } from '@tanstack/react-virtual';
 import WorkoutReport from '@/components/WorkoutReport';
+import CardioSessionModal from '@/components/CardioSessionModal';
 import { useDialog } from '@/contexts/DialogContext';
 import { HistoryListManualModal } from '@/components/HistoryListManualModal';
 import { HistoryListPeriodReportModal } from '@/components/HistoryListPeriodReportModal';
 import { HistoryListEditModal } from '@/components/HistoryListEditModal';
-import { HistoryListProps } from '@/components/historyListTypes';
+import { HistoryListProps, WorkoutSummary } from '@/components/historyListTypes';
 
 import { useHistoryData, toDateMs } from '@/components/history/hooks/useHistoryData';
 import { useHistoryActions } from '@/components/history/hooks/useHistoryActions';
@@ -49,8 +50,10 @@ const HistoryList: React.FC<HistoryListProps> = ({
         editDuration, setEditDuration, editNotes, setEditNotes, editExercises,
         openEdit, updateEditExercise, saveEdit,
         selectedSession, setSelectedSession, openSession,
-        getSessionMeta,
+        getSessionMeta, updateCardioSession,
     } = actions;
+
+    const [selectedCardioSession, setSelectedCardioSession] = useState<WorkoutSummary | null>(null);
 
     // ── Period report hook ───────────────────────────────────────────────────
     const report = useHistoryPeriodReport({ historyItems, user, alert });
@@ -202,9 +205,9 @@ const HistoryList: React.FC<HistoryListProps> = ({
                                             role="button"
                                             tabIndex={0}
                                             aria-label={isCardio ? 'Ver detalhes do cardio' : 'Ver detalhes do treino'}
-                                            onClick={() => isSelectionMode ? toggleItemSelection(session.id) : (!isCardio ? openSession(session, onViewReport) : undefined)}
-                                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { isSelectionMode ? toggleItemSelection(session.id) : (!isCardio ? openSession(session, onViewReport) : undefined) } }}
-                                            className={`relative rounded-2xl transition-all duration-300 overflow-hidden ${isCardio ? '' : 'cursor-pointer'} ${isSelectionMode ? (isSelected ? `shadow-lg shadow-${accentColor}-500/10` : '') : (!isCardio ? 'hover:shadow-lg hover:shadow-black/30 group' : '')}`}
+                                            onClick={() => isSelectionMode ? toggleItemSelection(session.id) : (isCardio ? setSelectedCardioSession(session) : openSession(session, onViewReport))}
+                                            onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { isSelectionMode ? toggleItemSelection(session.id) : (isCardio ? setSelectedCardioSession(session) : openSession(session, onViewReport)) } }}
+                                            className={`relative rounded-2xl cursor-pointer transition-all duration-300 overflow-hidden ${isSelectionMode ? (isSelected ? `shadow-lg shadow-${accentColor}-500/10` : '') : (isCardio ? 'hover:shadow-lg hover:shadow-black/20 group' : 'hover:shadow-lg hover:shadow-black/30 group')}`}
                                         >
                                             <div className={`absolute left-0 top-0 bottom-0 w-[3px] rounded-l-2xl transition-colors duration-300 ${
                                                 isCardio
@@ -277,17 +280,34 @@ const HistoryList: React.FC<HistoryListProps> = ({
                                                                 )}
                                                             </div>
                                                             <div className="flex items-center gap-1.5 shrink-0">
-                                                                {!isReadOnly && !isSelectionMode && !isCardio && (
+                                                                {!isReadOnly && !isSelectionMode && (
                                                                     <>
-                                                                        <button type="button" onClick={(e) => handleDeleteClick(e, session)} className="cursor-pointer relative z-20 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-xl transition-colors bg-neutral-950 text-neutral-500 border border-neutral-800 hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/20 active:scale-95" aria-label="Excluir">
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={(e) => handleDeleteClick(e, session)}
+                                                                            className="cursor-pointer relative z-20 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-xl transition-colors bg-neutral-950 text-neutral-500 border border-neutral-800 hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/20 active:scale-95"
+                                                                            aria-label="Excluir"
+                                                                        >
                                                                             <Trash2 size={16} className="pointer-events-none" />
                                                                         </button>
-                                                                        <button type="button" onClick={(e) => { e.stopPropagation(); openEdit(session); }} className="cursor-pointer relative z-20 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-xl transition-colors bg-neutral-950 text-neutral-500 border border-neutral-800 hover:bg-yellow-500/10 hover:text-yellow-400 hover:border-yellow-500/20 active:scale-95" aria-label="Editar">
-                                                                            <Edit3 size={16} className="pointer-events-none" />
-                                                                        </button>
+                                                                        {!isCardio && (
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={(e) => { e.stopPropagation(); openEdit(session); }}
+                                                                                className="cursor-pointer relative z-20 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-xl transition-colors bg-neutral-950 text-neutral-500 border border-neutral-800 hover:bg-yellow-500/10 hover:text-yellow-400 hover:border-yellow-500/20 active:scale-95"
+                                                                                aria-label="Editar"
+                                                                            >
+                                                                                <Edit3 size={16} className="pointer-events-none" />
+                                                                            </button>
+                                                                        )}
                                                                     </>
                                                                 )}
-                                                                {!isSelectionMode && !isCardio && <ChevronRight size={16} className="text-neutral-600 group-hover:text-yellow-500/60 transition-colors ml-0.5" />}
+                                                                {!isSelectionMode && (
+                                                                    <ChevronRight
+                                                                        size={16}
+                                                                        className={`${isCardio ? 'text-green-600/50 group-hover:text-green-500/60' : 'text-neutral-600 group-hover:text-yellow-500/60'} transition-colors ml-0.5`}
+                                                                    />
+                                                                )}
                                                             </div>
                                                         </div>
                                                     </div>
@@ -368,7 +388,7 @@ const HistoryList: React.FC<HistoryListProps> = ({
                 />
             )}
 
-            {/* Report overlay */}
+            {/* Workout report overlay */}
             {selectedSession && (
                 <div role="presentation" className="fixed inset-0 z-[1200] bg-neutral-900 overflow-y-auto pt-safe" onClick={() => setSelectedSession(null)}>
                     <div role="presentation" onClick={(e) => e.stopPropagation()}>
@@ -379,6 +399,22 @@ const HistoryList: React.FC<HistoryListProps> = ({
                         />
                     </div>
                 </div>
+            )}
+
+            {/* Cardio session modal */}
+            {selectedCardioSession && (
+                <CardioSessionModal
+                    session={selectedCardioSession}
+                    onClose={() => setSelectedCardioSession(null)}
+                    onDeleted={() => {
+                        data.setHistory(prev => prev.filter(h => h.id !== selectedCardioSession.id));
+                        setSelectedCardioSession(null);
+                    }}
+                    onUpdated={(changes) => {
+                        updateCardioSession(selectedCardioSession.id, changes);
+                        setSelectedCardioSession(prev => prev ? { ...prev, ...changes } : prev);
+                    }}
+                />
             )}
         </>
     );

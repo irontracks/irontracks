@@ -146,6 +146,10 @@ export function useHistoryData({
                             isTemplate: false,
                             distanceMeters: distM,
                             avgPaceMinKm: w.avg_pace_min_km != null ? Number(w.avg_pace_min_km) : null,
+                            activityType: String(w.activity_type || 'running'),
+                            caloriesEstimated: Number(w.calories_estimated) || 0,
+                            perceivedEffort: w.perceived_effort != null ? Number(w.perceived_effort) : null,
+                            cardioNotes: w.cardio_notes != null ? String(w.cardio_notes) : null,
                         };
                     }
                     // ── Regular workout ────────────────────────────────────

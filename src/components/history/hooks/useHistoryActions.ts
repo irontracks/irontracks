@@ -56,14 +56,25 @@ export function useHistoryActions({ user, supabase, setHistory, alert, confirm }
         e.preventDefault();
         if (!window.confirm('Tem certeza que deseja excluir este histórico permanentemente?')) return;
         try {
-            // R4#1: Add user_id filter to prevent IDOR
-            const { error } = await supabase.from('workouts').delete().eq('id', session.id).eq('is_template', false).eq('user_id', user?.id ?? '');
-            if (error) throw error;
+            if (session.kind === 'cardio') {
+                const resp = await fetch(`/api/gps/cardio/${session.id}`, { method: 'DELETE' });
+                const json = await resp.json();
+                if (!json.ok) throw new Error(json.error || 'Falha ao excluir');
+            } else {
+                // R4#1: Add user_id filter to prevent IDOR
+                const { error } = await supabase.from('workouts').delete().eq('id', session.id).eq('is_template', false).eq('user_id', user?.id ?? '');
+                if (error) throw error;
+            }
             setHistory(prev => prev.filter(h => h.id !== session.id));
         } catch (error) {
             const msg = error instanceof Error ? error.message : String(error);
             await alert('Erro ao excluir: ' + msg);
         }
+    };
+
+    // ── Update cardio session in local state ─────────────────────────────────
+    const updateCardioSession = (id: string, changes: Partial<WorkoutSummary>) => {
+        setHistory(prev => prev.map(h => h.id === id ? { ...h, ...changes } : h));
     };
 
     // ── Edit session state ───────────────────────────────────────────────────
@@ -203,6 +214,6 @@ export function useHistoryActions({ user, supabase, setHistory, alert, confirm }
         editDuration, setEditDuration, editNotes, setEditNotes, editExercises,
         openEdit, updateEditExercise, saveEdit,
         selectedSession, setSelectedSession, openSession,
-        getSessionMeta,
+        getSessionMeta, updateCardioSession,
     };
 }

@@ -50,6 +50,14 @@ const EFFORT_OPTIONS: { value: number; emoji: string; label: string; color: stri
   { value: 5, emoji: '🔥', label: 'Máximo', color: '#ef4444' },
 ]
 
+export const ACTIVITY_TYPES: { value: string; emoji: string; label: string }[] = [
+  { value: 'running', emoji: '🏃', label: 'Corrida' },
+  { value: 'walking', emoji: '🚶', label: 'Caminhada' },
+  { value: 'cycling', emoji: '🚴', label: 'Bike' },
+  { value: 'swimming', emoji: '🏊', label: 'Natação' },
+  { value: 'other', emoji: '⚡', label: 'Outro' },
+]
+
 // ─── Post-cardio completion screen ───────────────────────────────────────────
 
 interface CompletionScreenProps {
@@ -288,6 +296,7 @@ export default function CardioGPSPanel({
     paceMinKm: number | null
     caloriesEstimated: number
   } | null>(null)
+  const [activityType, setActivityType] = useState('running')
 
   // Accordion state — only used when NOT in standalone mode
   const [isOpen, setIsOpen] = useState(false)
@@ -314,6 +323,7 @@ export default function CardioGPSPanel({
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           workout_id: workoutId || null,
+          activity_type: activityType,
           distance_meters: result.metrics.distanceMeters,
           duration_seconds: result.metrics.durationSeconds,
           avg_pace_min_km: result.metrics.paceMinKm,
@@ -347,13 +357,14 @@ export default function CardioGPSPanel({
     } finally {
       setSaving(false)
     }
-  }, [stop, workoutId, onSaved])
+  }, [stop, workoutId, onSaved, activityType])
 
   const handleReset = useCallback(() => {
     reset()
     setSavedTrackId(null)
     setSavedMetrics(null)
     setSaveError(null)
+    setActivityType('running')
   }, [reset])
 
   // Derived UI state
@@ -447,6 +458,34 @@ export default function CardioGPSPanel({
     </div>
   )
 
+  const activityTypeSelector = !isTracking && !savedTrackId ? (
+    <div className="mb-3 flex-shrink-0">
+      <p className="text-[10px] font-black uppercase tracking-widest text-white/30 mb-2">Tipo de atividade</p>
+      <div className="flex gap-2">
+        {ACTIVITY_TYPES.map((t) => (
+          <button
+            key={t.value}
+            type="button"
+            onClick={() => setActivityType(t.value)}
+            className="flex-1 flex flex-col items-center gap-1 py-2.5 rounded-xl border transition-all active:scale-95"
+            style={{
+              background: activityType === t.value ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.03)',
+              borderColor: activityType === t.value ? 'rgba(34,197,94,0.45)' : 'rgba(255,255,255,0.07)',
+            }}
+          >
+            <span className="text-lg leading-none">{t.emoji}</span>
+            <span
+              className="text-[9px] font-black uppercase tracking-wide"
+              style={{ color: activityType === t.value ? '#22c55e' : 'rgba(255,255,255,0.35)' }}
+            >
+              {t.label}
+            </span>
+          </button>
+        ))}
+      </div>
+    </div>
+  ) : null
+
   const controls = (
     <div className="flex gap-2 flex-shrink-0">
       {!isTracking && !savedTrackId ? (
@@ -464,7 +503,7 @@ export default function CardioGPSPanel({
             <span className="inline-flex items-center gap-2">
               <MapPin size={14} /> GPS indisponível
             </span>
-          ) : '▶ Iniciar Cardio'}
+          ) : `▶ Iniciar ${ACTIVITY_TYPES.find(t => t.value === activityType)?.label ?? 'Cardio'}`}
         </button>
       ) : isTracking ? (
         <>
@@ -550,6 +589,7 @@ export default function CardioGPSPanel({
             )}
             {gpsBanners}
             {gpsSignalBar}
+            {activityTypeSelector}
             {/* Map grows to fill all available vertical space */}
             <RouteMapLeaflet
               points={trackPoints}
@@ -570,6 +610,7 @@ export default function CardioGPSPanel({
     <div className="px-4 pb-4">
       {gpsBanners}
       {gpsSignalBar}
+      {activityTypeSelector}
       <RouteMapLeaflet
         points={trackPoints}
         height={200}

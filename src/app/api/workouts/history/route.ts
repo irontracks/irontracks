@@ -47,7 +47,7 @@ export async function GET(req: Request) {
     // Also fetch standalone cardio sessions (no workout_id) in parallel
     let cardioQuery = supabase
       .from('cardio_tracks')
-      .select('id, distance_meters, duration_seconds, avg_pace_min_km, calories_estimated, started_at, finished_at, created_at')
+      .select('id, activity_type, distance_meters, duration_seconds, avg_pace_min_km, calories_estimated, notes, perceived_effort, started_at, finished_at, created_at')
       .eq('user_id', user.id)
       .is('workout_id', null)
       .order('created_at', { ascending: false })
@@ -68,10 +68,13 @@ export async function GET(req: Request) {
     // Shape cardio rows to match the WorkoutSummary expected by the client
     type CardioRow = {
       id: string
+      activity_type: string
       distance_meters: number | null
       duration_seconds: number | null
       avg_pace_min_km: number | null
       calories_estimated: number | null
+      notes: string | null
+      perceived_effort: number | null
       started_at: string | null
       finished_at: string | null
       created_at: string
@@ -83,12 +86,14 @@ export async function GET(req: Request) {
       date: c.started_at ?? c.created_at,
       completed_at: c.finished_at,
       created_at: c.created_at,
-      notes: null,
       is_template: false,
+      activity_type: c.activity_type ?? 'running',
       distance_meters: c.distance_meters,
       duration_seconds: c.duration_seconds,
       avg_pace_min_km: c.avg_pace_min_km,
       calories_estimated: c.calories_estimated,
+      cardio_notes: c.notes,
+      perceived_effort: c.perceived_effort,
     }))
 
     // Merge and sort by date descending

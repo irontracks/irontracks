@@ -586,6 +586,7 @@ export type Database = {
       }
       cardio_tracks: {
         Row: {
+          activity_type: string
           avg_pace_min_km: number | null
           calories_estimated: number | null
           created_at: string | null
@@ -602,6 +603,7 @@ export type Database = {
           workout_id: string | null
         }
         Insert: {
+          activity_type?: string
           avg_pace_min_km?: number | null
           calories_estimated?: number | null
           created_at?: string | null
@@ -618,6 +620,7 @@ export type Database = {
           workout_id?: string | null
         }
         Update: {
+          activity_type?: string
           avg_pace_min_km?: number | null
           calories_estimated?: number | null
           created_at?: string | null
