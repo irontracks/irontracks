@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { AlertTriangle, ChevronDown, ChevronUp, MapPin, Satellite } from 'lucide-react'
 import { useCardioTracking } from '@/hooks/useCardioTracking'
 import { formatDistance, formatPace } from '@/utils/geoUtils'
@@ -13,7 +13,16 @@ interface CardioGPSPanelProps {
   onSaved?: (trackId: string) => void
   /** Body weight in kg for accurate calorie calculation */
   bodyWeightKg?: number
+  /**
+   * Standalone mode: no accordion wrapper, full-height layout, post-cardio
+   * completion screen with perceived_effort + notes.
+   */
+  standalone?: boolean
+  /** Called when user finishes the post-cardio flow in standalone mode */
+  onRequestClose?: () => void
 }
+
+// ─── Utils ────────────────────────────────────────────────────────────────────
 
 /** Format seconds as "HH:MM:SS" or "MM:SS" */
 function formatDuration(seconds: number): string {
@@ -33,7 +42,229 @@ function gpsSignalLabel(accuracy: number | null): { label: string; color: string
   return { label: 'Fraco', color: '#ef4444' }
 }
 
-export default function CardioGPSPanel({ workoutId, onSaved, bodyWeightKg }: CardioGPSPanelProps) {
+const EFFORT_OPTIONS: { value: number; emoji: string; label: string; color: string }[] = [
+  { value: 1, emoji: '😴', label: 'Leve', color: '#6b7280' },
+  { value: 2, emoji: '😐', label: 'Moderado', color: '#84cc16' },
+  { value: 3, emoji: '🙂', label: 'Bom', color: '#22c55e' },
+  { value: 4, emoji: '😊', label: 'Intenso', color: '#f97316' },
+  { value: 5, emoji: '🔥', label: 'Máximo', color: '#ef4444' },
+]
+
+// ─── Post-cardio completion screen ───────────────────────────────────────────
+
+interface CompletionScreenProps {
+  trackId: string
+  distanceMeters: number
+  durationSeconds: number
+  paceMinKm: number | null
+  caloriesEstimated: number
+  onReset: () => void
+  onClose?: () => void
+}
+
+function CompletionScreen({
+  trackId,
+  distanceMeters,
+  durationSeconds,
+  paceMinKm,
+  caloriesEstimated,
+  onReset,
+  onClose,
+}: CompletionScreenProps) {
+  const [effort, setEffort] = useState<number | null>(null)
+  const [notes, setNotes] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null)
+
+  const handleSave = useCallback(async () => {
+    setSaving(true)
+    try {
+      await fetch(`/api/gps/cardio/${trackId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          notes: notes.trim() || null,
+          perceived_effort: effort,
+        }),
+      })
+      setSaved(true)
+    } catch {
+      // non-critical
+      setSaved(true)
+    } finally {
+      setSaving(false)
+    }
+  }, [trackId, effort, notes])
+
+  const handleClose = useCallback(async () => {
+    if (!saved) await handleSave()
+    onClose?.()
+  }, [saved, handleSave, onClose])
+
+  // Format pace
+  const paceText = (() => {
+    if (paceMinKm == null || paceMinKm <= 0) return null
+    const totalSec = Math.round(paceMinKm * 60)
+    const m = Math.floor(totalSec / 60)
+    const s = totalSec % 60
+    return `${m}:${String(s).padStart(2, '0')}/km`
+  })()
+
+  return (
+    <div className="flex flex-col gap-5 px-4 py-5">
+      {/* Header */}
+      <div className="flex flex-col items-center gap-2 pt-2">
+        <div
+          className="w-16 h-16 rounded-full flex items-center justify-center shadow-lg"
+          style={{ background: 'rgba(34,197,94,0.15)', border: '2px solid rgba(34,197,94,0.4)' }}
+        >
+          <span className="text-3xl">✅</span>
+        </div>
+        <div className="text-center">
+          <p className="text-lg font-black text-white">Cardio Concluído!</p>
+          <p className="text-xs text-white/40">{new Date().toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}</p>
+        </div>
+      </div>
+
+      {/* Metrics */}
+      <div className="grid grid-cols-2 gap-3">
+        <MetricBig
+          label="Distância"
+          value={formatDistance(distanceMeters)}
+          accent
+        />
+        <MetricBig
+          label="Tempo"
+          value={formatDuration(durationSeconds)}
+        />
+        <MetricBig
+          label="Pace Médio"
+          value={paceText ?? '—'}
+        />
+        <MetricBig
+          label="Calorias"
+          value={caloriesEstimated > 0 ? `~${Math.round(caloriesEstimated)} kcal` : '—'}
+          orange
+        />
+      </div>
+
+      {/* Divider */}
+      <div className="h-px bg-white/[0.06]" />
+
+      {/* Como foi? */}
+      <div>
+        <p className="text-sm font-black text-white mb-3">Como foi?</p>
+        <div className="flex gap-2 justify-between">
+          {EFFORT_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              type="button"
+              onClick={() => setEffort(effort === opt.value ? null : opt.value)}
+              className="flex-1 flex flex-col items-center gap-1.5 py-3 rounded-2xl border transition-all active:scale-95"
+              style={{
+                background: effort === opt.value ? `${opt.color}20` : 'rgba(255,255,255,0.03)',
+                borderColor: effort === opt.value ? `${opt.color}60` : 'rgba(255,255,255,0.07)',
+                boxShadow: effort === opt.value ? `0 0 14px ${opt.color}30` : 'none',
+              }}
+            >
+              <span className="text-2xl">{opt.emoji}</span>
+              <span
+                className="text-[9px] font-black uppercase tracking-wider"
+                style={{ color: effort === opt.value ? opt.color : 'rgba(255,255,255,0.3)' }}
+              >
+                {opt.label}
+              </span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Notes */}
+      <div>
+        <p className="text-sm font-black text-white mb-2">Observações <span className="text-white/30 font-normal">(opcional)</span></p>
+        <textarea
+          ref={textareaRef}
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          placeholder="Como foi a corrida? Algum detalhe que queira lembrar..."
+          rows={3}
+          aria-label="Observações do cardio"
+          className="w-full rounded-xl px-3 py-2.5 text-sm text-white placeholder-white/20 resize-none focus:outline-none"
+          style={{
+            background: 'rgba(255,255,255,0.04)',
+            border: '1px solid rgba(255,255,255,0.08)',
+          }}
+        />
+      </div>
+
+      {/* Actions */}
+      <div className="flex flex-col gap-2 pb-2">
+        <button
+          type="button"
+          onClick={handleClose}
+          disabled={saving}
+          className="w-full rounded-2xl py-3.5 text-sm font-black text-black transition-all active:scale-95 disabled:opacity-60"
+          style={{
+            background: saved
+              ? 'linear-gradient(135deg, #22c55e, #16a34a)'
+              : 'linear-gradient(135deg, #22c55e, #16a34a)',
+          }}
+        >
+          {saving ? 'Salvando...' : saved ? '✓ Fechar' : 'Salvar e Fechar'}
+        </button>
+        <button
+          type="button"
+          onClick={onReset}
+          className="w-full rounded-2xl py-3 text-sm font-bold text-white/50 transition-all active:scale-95"
+          style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}
+        >
+          Novo Cardio
+        </button>
+      </div>
+    </div>
+  )
+}
+
+function MetricBig({
+  label,
+  value,
+  accent,
+  orange,
+}: {
+  label: string
+  value: string
+  accent?: boolean
+  orange?: boolean
+}) {
+  const color = accent ? '#22c55e' : orange ? '#f97316' : 'white'
+  return (
+    <div
+      className="rounded-2xl p-4 flex flex-col gap-1"
+      style={{
+        background: accent
+          ? 'rgba(34,197,94,0.08)'
+          : orange
+            ? 'rgba(249,115,22,0.08)'
+            : 'rgba(255,255,255,0.04)',
+        border: `1px solid ${accent ? 'rgba(34,197,94,0.2)' : orange ? 'rgba(249,115,22,0.2)' : 'rgba(255,255,255,0.06)'}`,
+      }}
+    >
+      <p className="text-[10px] font-black uppercase tracking-widest text-white/40">{label}</p>
+      <p className="text-2xl font-black font-mono" style={{ color }}>{value}</p>
+    </div>
+  )
+}
+
+// ─── Main component ───────────────────────────────────────────────────────────
+
+export default function CardioGPSPanel({
+  workoutId,
+  onSaved,
+  bodyWeightKg,
+  standalone,
+  onRequestClose,
+}: CardioGPSPanelProps) {
   const {
     isTracking,
     isPaused,
@@ -49,23 +280,27 @@ export default function CardioGPSPanel({ workoutId, onSaved, bodyWeightKg }: Car
     reset,
   } = useCardioTracking({ bodyWeightKg })
   const [saving, setSaving] = useState(false)
-  const [saved, setSaved] = useState(false)
+  const [savedTrackId, setSavedTrackId] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
-  // Collapsed by default — auto-expands when tracking starts
-  const [isOpen, setIsOpen] = useState(false)
+  const [savedMetrics, setSavedMetrics] = useState<{
+    distanceMeters: number
+    durationSeconds: number
+    paceMinKm: number | null
+    caloriesEstimated: number
+  } | null>(null)
 
+  // Accordion state — only used when NOT in standalone mode
+  const [isOpen, setIsOpen] = useState(false)
   useEffect(() => {
-    if (isTracking) setIsOpen(true)
-  }, [isTracking])
+    if (isTracking && !standalone) setIsOpen(true)
+  }, [isTracking, standalone])
 
   const handleStart = useCallback(() => {
     setSaveError(null)
     void start()
   }, [start])
 
-  const handleResume = useCallback(() => {
-    void resume()
-  }, [resume])
+  const handleResume = useCallback(() => { void resume() }, [resume])
 
   const handleStop = useCallback(async () => {
     const result = stop()
@@ -96,7 +331,13 @@ export default function CardioGPSPanel({ workoutId, onSaved, bodyWeightKg }: Car
       })
       const data = await resp.json()
       if (data.ok && data.track?.id) {
-        setSaved(true)
+        setSavedTrackId(data.track.id)
+        setSavedMetrics({
+          distanceMeters: result.metrics.distanceMeters,
+          durationSeconds: result.metrics.durationSeconds,
+          paceMinKm: result.metrics.paceMinKm,
+          caloriesEstimated: result.metrics.caloriesEstimated,
+        })
         onSaved?.(data.track.id)
       } else {
         setSaveError('Não foi possível salvar a rota. Tente novamente.')
@@ -110,7 +351,8 @@ export default function CardioGPSPanel({ workoutId, onSaved, bodyWeightKg }: Car
 
   const handleReset = useCallback(() => {
     reset()
-    setSaved(false)
+    setSavedTrackId(null)
+    setSavedMetrics(null)
     setSaveError(null)
   }, [reset])
 
@@ -121,64 +363,35 @@ export default function CardioGPSPanel({ workoutId, onSaved, bodyWeightKg }: Car
     isTracking && (gpsStatus === 'requesting-permission' || gpsStatus === 'acquiring' || !hasReliableFix)
   const startDisabled = gpsIsDenied || gpsIsUnavailable
   const signal = gpsSignalLabel(metrics.accuracyMeters)
+  const mapHeight = standalone ? 240 : 200
 
-  return (
-    <div
-      className="mx-4 rounded-2xl border overflow-hidden"
-      style={{
-        background: 'linear-gradient(135deg, rgba(15,15,15,0.98) 0%, rgba(10,20,15,0.98) 100%)',
-        borderColor: isTracking ? 'rgba(34,197,94,0.3)' : 'rgba(255,255,255,0.08)',
-      }}
-    >
-      {/* Accordion header — always visible */}
-      <button
-        type="button"
-        onClick={() => setIsOpen((v) => !v)}
-        className="w-full flex items-center justify-between px-4 py-3 text-left"
-      >
-        <div className="flex items-center gap-2">
-          <span className="text-base">🏃</span>
-          <span className="text-sm font-bold text-white">Cardio GPS</span>
-          {isTracking && (
-            <div className="flex items-center gap-1.5">
-              <span
-                className="h-1.5 w-1.5 rounded-full"
-                style={{
-                  background: isPaused ? '#eab308' : hasReliableFix ? '#22c55e' : '#6b7280',
-                  animation: isPaused || !hasReliableFix ? 'none' : 'gps-pulse 1.5s ease-in-out infinite',
-                }}
-              />
-              <span className="text-xs text-white/50">
-                {isPaused ? 'Pausado' : hasReliableFix ? 'Gravando' : 'Buscando GPS'}
-              </span>
-            </div>
-          )}
-        </div>
-        {isOpen ? (
-          <ChevronUp size={15} className="text-neutral-500" />
-        ) : (
-          <ChevronDown size={15} className="text-neutral-500" />
-        )}
-      </button>
-
-      {/* Collapsible content */}
-      {isOpen && (
-        <div className="px-4 pb-4">
-          {/* GPS state banners — shown before the map so user understands why */}
+  // ── Content (shared between accordion and standalone) ──────────────────────
+  const content = (
+    <div className={standalone ? 'flex flex-col flex-1 min-h-0 overflow-y-auto' : 'px-4 pb-4'}>
+      {/* Post-cardio completion screen (standalone only) */}
+      {standalone && savedTrackId && savedMetrics ? (
+        <CompletionScreen
+          trackId={savedTrackId}
+          distanceMeters={savedMetrics.distanceMeters}
+          durationSeconds={savedMetrics.durationSeconds}
+          paceMinKm={savedMetrics.paceMinKm}
+          caloriesEstimated={savedMetrics.caloriesEstimated}
+          onReset={handleReset}
+          onClose={onRequestClose}
+        />
+      ) : (
+        <div className={standalone ? 'px-4 pb-6' : ''}>
+          {/* GPS state banners */}
           {gpsIsDenied && (
             <div
               className="mb-3 flex items-start gap-2 rounded-xl p-3"
-              style={{
-                background: 'rgba(239,68,68,0.1)',
-                border: '1px solid rgba(239,68,68,0.3)',
-              }}
+              style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)' }}
             >
               <AlertTriangle size={16} className="mt-0.5 flex-shrink-0 text-red-400" />
               <div className="text-xs text-white/80">
                 <p className="font-bold text-red-400">GPS bloqueado</p>
                 <p className="mt-0.5 text-white/60">
-                  {gpsError ??
-                    'Permissão de localização negada. Ative o GPS para o IronTracks nas configurações do seu dispositivo.'}
+                  {gpsError ?? 'Permissão de localização negada. Ative o GPS nas configurações.'}
                 </p>
               </div>
             </div>
@@ -186,27 +399,19 @@ export default function CardioGPSPanel({ workoutId, onSaved, bodyWeightKg }: Car
           {gpsIsUnavailable && (
             <div
               className="mb-3 flex items-start gap-2 rounded-xl p-3"
-              style={{
-                background: 'rgba(107,114,128,0.1)',
-                border: '1px solid rgba(107,114,128,0.3)',
-              }}
+              style={{ background: 'rgba(107,114,128,0.1)', border: '1px solid rgba(107,114,128,0.3)' }}
             >
               <AlertTriangle size={16} className="mt-0.5 flex-shrink-0 text-neutral-400" />
               <div className="text-xs text-white/80">
                 <p className="font-bold text-neutral-300">GPS indisponível</p>
-                <p className="mt-0.5 text-white/60">
-                  Este dispositivo não possui GPS ou a API de localização não está disponível.
-                </p>
+                <p className="mt-0.5 text-white/60">Este dispositivo não possui GPS.</p>
               </div>
             </div>
           )}
           {gpsError && !gpsIsDenied && !gpsIsUnavailable && (
             <div
               className="mb-3 flex items-start gap-2 rounded-xl p-3"
-              style={{
-                background: 'rgba(234,179,8,0.08)',
-                border: '1px solid rgba(234,179,8,0.3)',
-              }}
+              style={{ background: 'rgba(234,179,8,0.08)', border: '1px solid rgba(234,179,8,0.3)' }}
             >
               <AlertTriangle size={16} className="mt-0.5 flex-shrink-0 text-yellow-400" />
               <div className="text-xs text-white/80">
@@ -216,47 +421,43 @@ export default function CardioGPSPanel({ workoutId, onSaved, bodyWeightKg }: Car
             </div>
           )}
 
-          {/* GPS signal indicator — live during tracking */}
+          {/* GPS signal indicator */}
           {isTracking && !gpsIsDenied && !gpsIsUnavailable && (
-            <div className="mb-3 flex items-center justify-between rounded-xl px-3 py-2"
-              style={{
-                background: 'rgba(255,255,255,0.03)',
-                border: '1px solid rgba(255,255,255,0.05)',
-              }}
+            <div
+              className="mb-3 flex items-center justify-between rounded-xl px-3 py-2"
+              style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}
             >
               <div className="flex items-center gap-2">
                 <Satellite size={14} style={{ color: signal.color }} />
                 <span className="text-xs text-white/60">Sinal GPS</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="text-xs font-bold" style={{ color: signal.color }}>
-                  {signal.label}
-                </span>
+                <span className="text-xs font-bold" style={{ color: signal.color }}>{signal.label}</span>
                 {metrics.accuracyMeters !== null && (
-                  <span className="text-xs text-white/40">
-                    ±{Math.round(metrics.accuracyMeters)}m
-                  </span>
+                  <span className="text-xs text-white/40">±{Math.round(metrics.accuracyMeters)}m</span>
                 )}
               </div>
             </div>
           )}
 
-          {/* Save error banner */}
+          {/* Save error */}
           {saveError && (
             <div
               className="mb-3 flex items-start gap-2 rounded-xl p-3"
-              style={{
-                background: 'rgba(239,68,68,0.1)',
-                border: '1px solid rgba(239,68,68,0.3)',
-              }}
+              style={{ background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.3)' }}
             >
               <AlertTriangle size={16} className="mt-0.5 flex-shrink-0 text-red-400" />
               <span className="text-xs text-white/80">{saveError}</span>
             </div>
           )}
 
-          {/* Route Map — Leaflet with dark tiles (Strava-style) */}
-          <RouteMapLeaflet points={trackPoints} height={200} live={isTracking} acquiring={gpsIsAcquiring} />
+          {/* Route Map */}
+          <RouteMapLeaflet
+            points={trackPoints}
+            height={mapHeight}
+            live={isTracking}
+            acquiring={gpsIsAcquiring}
+          />
 
           {/* Metrics Grid */}
           <div className="grid grid-cols-3 gap-2 mb-3">
@@ -270,7 +471,7 @@ export default function CardioGPSPanel({ workoutId, onSaved, bodyWeightKg }: Car
 
           {/* Controls */}
           <div className="flex gap-2">
-            {!isTracking && !saved ? (
+            {!isTracking && !savedTrackId ? (
               <button
                 onClick={handleStart}
                 disabled={startDisabled}
@@ -285,9 +486,7 @@ export default function CardioGPSPanel({ workoutId, onSaved, bodyWeightKg }: Car
                   <span className="inline-flex items-center gap-2">
                     <MapPin size={14} /> GPS indisponível
                   </span>
-                ) : (
-                  '▶ Iniciar Cardio'
-                )}
+                ) : '▶ Iniciar Cardio'}
               </button>
             ) : isTracking ? (
               <>
@@ -311,7 +510,8 @@ export default function CardioGPSPanel({ workoutId, onSaved, bodyWeightKg }: Car
                   {saving ? '...' : '⏹ Parar'}
                 </button>
               </>
-            ) : saved ? (
+            ) : savedTrackId && !standalone ? (
+              // Compact saved state for in-workout mode
               <div className="flex-1 flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <span className="text-green-400">✓</span>
@@ -329,6 +529,77 @@ export default function CardioGPSPanel({ workoutId, onSaved, bodyWeightKg }: Car
           </div>
         </div>
       )}
+    </div>
+  )
+
+  // ── Standalone mode: no accordion ─────────────────────────────────────────
+  if (standalone) {
+    return (
+      <div className="flex flex-col flex-1 min-h-0" style={{ background: 'transparent' }}>
+        <style jsx>{`
+          @keyframes gps-pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.4; }
+          }
+        `}</style>
+        {/* Live tracking badge at top */}
+        {isTracking && (
+          <div className="flex items-center justify-center gap-1.5 py-2 flex-shrink-0">
+            <span
+              className="h-2 w-2 rounded-full"
+              style={{
+                background: isPaused ? '#eab308' : hasReliableFix ? '#22c55e' : '#6b7280',
+                animation: isPaused || !hasReliableFix ? 'none' : 'gps-pulse 1.5s ease-in-out infinite',
+              }}
+            />
+            <span className="text-xs text-white/50 font-semibold">
+              {isPaused ? 'Pausado' : hasReliableFix ? 'Gravando' : 'Buscando GPS...'}
+            </span>
+          </div>
+        )}
+        {content}
+      </div>
+    )
+  }
+
+  // ── Accordion mode (inside a workout) ─────────────────────────────────────
+  return (
+    <div
+      className="mx-4 rounded-2xl border overflow-hidden"
+      style={{
+        background: 'linear-gradient(135deg, rgba(15,15,15,0.98) 0%, rgba(10,20,15,0.98) 100%)',
+        borderColor: isTracking ? 'rgba(34,197,94,0.3)' : 'rgba(255,255,255,0.08)',
+      }}
+    >
+      <button
+        type="button"
+        onClick={() => setIsOpen((v) => !v)}
+        className="w-full flex items-center justify-between px-4 py-3 text-left"
+      >
+        <div className="flex items-center gap-2">
+          <span className="text-base">🏃</span>
+          <span className="text-sm font-bold text-white">Cardio</span>
+          {isTracking && (
+            <div className="flex items-center gap-1.5">
+              <span
+                className="h-1.5 w-1.5 rounded-full"
+                style={{
+                  background: isPaused ? '#eab308' : hasReliableFix ? '#22c55e' : '#6b7280',
+                  animation: isPaused || !hasReliableFix ? 'none' : 'gps-pulse 1.5s ease-in-out infinite',
+                }}
+              />
+              <span className="text-xs text-white/50">
+                {isPaused ? 'Pausado' : hasReliableFix ? 'Gravando' : 'Buscando GPS'}
+              </span>
+            </div>
+          )}
+        </div>
+        {isOpen
+          ? <ChevronUp size={15} className="text-neutral-500" />
+          : <ChevronDown size={15} className="text-neutral-500" />}
+      </button>
+
+      {isOpen && content}
 
       <style jsx>{`
         @keyframes gps-pulse {

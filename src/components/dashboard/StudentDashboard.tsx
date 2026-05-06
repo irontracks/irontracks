@@ -455,8 +455,8 @@ export default function StudentDashboard(props: Props) {
                     <Activity size={15} className="text-green-400" />
                   </div>
                   <div className="text-left flex-1">
-                    <p className="text-sm font-black text-white">Cardio GPS</p>
-                    <p className="text-xs text-white/30">Corrida, caminhada ou ciclismo</p>
+                    <p className="text-sm font-black text-white">Cardio</p>
+                    <p className="text-xs text-white/30">Corrida, caminhada, bike</p>
                   </div>
                   <svg width="14" height="14" viewBox="0 0 16 16" fill="none" className="text-white/20">
                     <path d="M6 3L11 8L6 13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
