@@ -114,6 +114,11 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin, CLLocationMana
         CAPPluginMethod(name: "endSharePlayWorkout", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "sendSharePlayMessage", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "getSharePlayState", returnType: CAPPluginReturnPromise),
+        // Watch (WatchConnectivity)
+        CAPPluginMethod(name: "watchGetState", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "watchSendDashboard", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "watchSendWorkout", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "watchSendNearestGyms", returnType: CAPPluginReturnPromise),
     ]
 
     private let motionManager = CMMotionManager()
@@ -213,6 +218,50 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin, CLLocationMana
             queue: .main
         ) { [weak self] _ in
             self?.notifyListeners("backgroundRefresh", data: ["kind": "sync"])
+        }
+
+        // ── Watch (WatchConnectivity) — instancia o bridge e observa eventos ──
+        // O singleton ativa a WCSession no init.
+        _ = WatchBridge.shared
+
+        NotificationCenter.default.addObserver(
+            forName: .watchSetLogged,
+            object: nil,
+            queue: .main
+        ) { [weak self] note in
+            let payload = (note.userInfo?["payload"] as? String) ?? ""
+            self?.notifyListeners("watchSetLogged", data: ["payload": payload])
+        }
+        NotificationCenter.default.addObserver(
+            forName: .watchCardioFinished,
+            object: nil,
+            queue: .main
+        ) { [weak self] note in
+            let payload = (note.userInfo?["payload"] as? String) ?? ""
+            self?.notifyListeners("watchCardioFinished", data: ["payload": payload])
+        }
+        NotificationCenter.default.addObserver(
+            forName: .watchRefreshRequested,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.notifyListeners("watchRefreshRequested", data: [:])
+        }
+        NotificationCenter.default.addObserver(
+            forName: .watchCheckinRequested,
+            object: nil,
+            queue: .main
+        ) { [weak self] note in
+            let payload = (note.userInfo?["payload"] as? String) ?? ""
+            self?.notifyListeners("watchCheckinRequested", data: ["payload": payload])
+        }
+        NotificationCenter.default.addObserver(
+            forName: .watchReachabilityChanged,
+            object: nil,
+            queue: .main
+        ) { [weak self] note in
+            let info = note.userInfo as? [String: Any] ?? [:]
+            self?.notifyListeners("watchReachabilityChanged", data: info.mapValues { "\($0)" })
         }
     }
 
@@ -1989,6 +2038,62 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin, CLLocationMana
         self.notifyListeners("storyComposeProgress", data: ["progress": Double(1.0)])
 
         return (path: outputURL.path, duration: duration)
+    }
+
+    // ══════════════════════════════════════════════════════════════════════════
+    // MARK: - Watch (WatchConnectivity bridge)
+    // ══════════════════════════════════════════════════════════════════════════
+    //
+    // Os métodos abaixo expõem o WatchBridge à camada JS. JS:
+    //   - lê o estado de pareamento + alcance (watchGetState)
+    //   - empurra o dashboard, treino do dia e academias próximas pro Watch
+    //
+    // O Watch envia eventos de volta (watchSetLogged, watchCardioFinished,
+    // watchRefreshRequested, watchCheckinRequested, watchReachabilityChanged)
+    // que o JS pode escutar via Capacitor.addListener.
+
+    @objc func watchGetState(_ call: CAPPluginCall) {
+        Task { @MainActor in
+            let state = WatchBridge.shared.currentState()
+            call.resolve(state.mapValues { v -> Any in
+                if let b = v as? Bool { return b }
+                if let s = v as? String { return s }
+                return String(describing: v)
+            })
+        }
+    }
+
+    @objc func watchSendDashboard(_ call: CAPPluginCall) {
+        guard let json = call.getString("json"), !json.isEmpty else {
+            call.reject("Missing 'json' string parameter")
+            return
+        }
+        Task { @MainActor in
+            WatchBridge.shared.sendDashboard(json)
+            call.resolve(["ok": true])
+        }
+    }
+
+    @objc func watchSendWorkout(_ call: CAPPluginCall) {
+        guard let json = call.getString("json"), !json.isEmpty else {
+            call.reject("Missing 'json' string parameter")
+            return
+        }
+        Task { @MainActor in
+            WatchBridge.shared.sendWorkout(json)
+            call.resolve(["ok": true])
+        }
+    }
+
+    @objc func watchSendNearestGyms(_ call: CAPPluginCall) {
+        guard let json = call.getString("json"), !json.isEmpty else {
+            call.reject("Missing 'json' string parameter")
+            return
+        }
+        Task { @MainActor in
+            WatchBridge.shared.sendNearestGyms(json)
+            call.resolve(["ok": true])
+        }
     }
 }
 

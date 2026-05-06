@@ -7,69 +7,132 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		0E3A2E8BFA31635F597666E4 /* WatchSessionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C803BD5DF1345C17D4FDE6B /* WatchSessionManager.swift */; };
+		17D0776378C2E91F24C7CE68 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = E1BBCDEF1E0C97D84674225C /* PrivacyInfo.xcprivacy */; };
 		2FAD9763203C412B000D30F8 /* config.xml in Resources */ = {isa = PBXBuildFile; fileRef = 2FAD9762203C412B000D30F8 /* config.xml */; };
+		4611E554830F2929AAD10280 /* WorkoutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D63264B20D182409F2E8EB56 /* WorkoutView.swift */; };
 		4D22ABE92AF431CB00220026 /* CapApp-SPM in Frameworks */ = {isa = PBXBuildFile; productRef = 4D22ABE82AF431CB00220026 /* CapApp-SPM */; };
 		50379B232058CBB4000EE86E /* capacitor.config.json in Resources */ = {isa = PBXBuildFile; fileRef = 50379B222058CBB4000EE86E /* capacitor.config.json */; };
-		17D0776378C2E91F24C7CE68 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = E1BBCDEF1E0C97D84674225C /* PrivacyInfo.xcprivacy */; };
 		504EC3081FED79650016851F /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 504EC3071FED79650016851F /* AppDelegate.swift */; };
-		BBBB0001BBBB0001BBBB0001 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBBB0002BBBB0002BBBB0002 /* SceneDelegate.swift */; };
-		AAAA0002AAAA0002AAAA0002 /* IronTracksNativePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAAA0001AAAA0001AAAA0001 /* IronTracksNativePlugin.swift */; };
-		W00FW00FW00FW00F /* RestTimerAttributes.swift in Sources (App) */ = {isa = PBXBuildFile; fileRef = W00AW00AW00AW00A /* RestTimerAttributes.swift */; };
 		504EC30D1FED79650016851F /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30B1FED79650016851F /* Main.storyboard */; };
 		504EC30F1FED79650016851F /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30E1FED79650016851F /* Assets.xcassets */; };
 		504EC3121FED79650016851F /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC3101FED79650016851F /* LaunchScreen.storyboard */; };
 		50B271D11FEDC1A000F3C39B /* public in Resources */ = {isa = PBXBuildFile; fileRef = 50B271D01FEDC1A000F3C39B /* public */; };
-		W010W010W010W010 /* RestTimerAttributes.swift in Sources (Widget) */ = {isa = PBXBuildFile; fileRef = W00AW00AW00AW00A /* RestTimerAttributes.swift */; };
+		5B63F25EF52AEA122973D9A7 /* IronTracksWatchApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01C8FC5B5A5672EB03203531 /* IronTracksWatchApp.swift */; };
+		64F5E12B0FBE761409E7EC1F /* CardioView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F288244F20E4B78628ECA5D /* CardioView.swift */; };
+		6B3C2121D43C56CA1ABE69E0 /* LocationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 264F376959AF0EBA63259D0B /* LocationManager.swift */; };
+		753309CCBBFBBC9322856D0C /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3B78FD61B78C679FF19A936 /* DashboardView.swift */; };
+		79EB81F8ECC1D945D3D265C9 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1A1FFB92F9B0F2046BD57710 /* Assets.xcassets */; };
+		93D071EABBCB7F8D6387AC40 /* SharedModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4F5306B577DAB4CF49320B7 /* SharedModels.swift */; };
+		A7545205D811F9E6EB5A4752 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 408E411FFC584A108ABE64E6 /* ContentView.swift */; };
+		AAAA0002AAAA0002AAAA0002 /* IronTracksNativePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAAA0001AAAA0001AAAA0001 /* IronTracksNativePlugin.swift */; };
+		B588F44A4347B5C1BEB44831 /* IronTracksWatch Watch App.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = ED8BD25E5B0958E7A3CD3698 /* IronTracksWatch Watch App.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		BB1C08C7B06F81EC6C61A1EB /* CheckinView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1774FDD63F12185176BB635F /* CheckinView.swift */; };
+		BBBB0001BBBB0001BBBB0001 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBBB0002BBBB0002BBBB0002 /* SceneDelegate.swift */; };
+		E335CEEE42B6C9C7223A91E6 /* WatchBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B30C6B0FBC688E04227E7D4 /* WatchBridge.swift */; };
+		E445517AABE3AE7D00E1F373 /* HealthKitManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDBD28EEA1B02677FB2632AB /* HealthKitManager.swift */; };
+		NS005NS005NS005NS005 /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = NS001NS001NS001NS001 /* NotificationService.swift */; };
+		NS006NS006NS006NS006 /* NotificationService.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = NS002NS002NS002NS002 /* NotificationService.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		W00FW00FW00FW00F /* RestTimerAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = W00AW00AW00AW00A /* RestTimerAttributes.swift */; };
+		W010W010W010W010 /* RestTimerAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = W00AW00AW00AW00A /* RestTimerAttributes.swift */; };
 		W011W011W011W011 /* RestTimerWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = W00BW00BW00BW00B /* RestTimerWidget.swift */; };
 		W012W012W012W012 /* IronTracksWidgets.swift in Sources */ = {isa = PBXBuildFile; fileRef = W00CW00CW00CW00C /* IronTracksWidgets.swift */; };
-		W013W013W013W013 /* IronTracksWidgets appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = W002W002W002W002 /* IronTracksWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
-		W020W020W020W020 /* RestTimerIntents.swift in Sources (Widget) */ = {isa = PBXBuildFile; fileRef = W021W021W021W021 /* RestTimerIntents.swift */; };
-		W022W022W022W022 /* RestTimerIntents.swift in Sources (App) */ = {isa = PBXBuildFile; fileRef = W021W021W021W021 /* RestTimerIntents.swift */; };
-		NS005NS005NS005NS005 /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = NS001NS001NS001NS001 /* NotificationService.swift */; };
-		NS006NS006NS006NS006 /* NotificationService appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = NS002NS002NS002NS002 /* NotificationService.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		W013W013W013W013 /* IronTracksWidgets.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = W002W002W002W002 /* IronTracksWidgets.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		W020W020W020W020 /* RestTimerIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = W021W021W021W021 /* RestTimerIntents.swift */; };
+		W022W022W022W022 /* RestTimerIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = W021W021W021W021 /* RestTimerIntents.swift */; };
 /* End PBXBuildFile section */
 
-/* Begin PBXFileReference section */
-		2FAD9762203C412B000D30F8 /* config.xml */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = config.xml; sourceTree = "<group>"; };
-		50379B222058CBB4000EE86E /* capacitor.config.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = capacitor.config.json; sourceTree = "<group>"; };
-		E1BBCDEF1E0C97D84674225C /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
-		504EC3041FED79650016851F /* App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = App.app; sourceTree = BUILT_PRODUCTS_DIR; };
-				AAAA0007AAAA0007AAAA0007 /* App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
-		504EC3071FED79650016851F /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
-		BBBB0002BBBB0002BBBB0002 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
-		AAAA0001AAAA0001AAAA0001 /* IronTracksNativePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IronTracksNativePlugin.swift; sourceTree = "<group>"; };
-		W00AW00AW00AW00A /* RestTimerAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestTimerAttributes.swift; sourceTree = "<group>"; };
-		504EC30C1FED79650016851F /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
-		504EC30E1FED79650016851F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
-		504EC3111FED79650016851F /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
-		504EC3131FED79650016851F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		50B271D01FEDC1A000F3C39B /* public */ = {isa = PBXFileReference; lastKnownFileType = folder; path = public; sourceTree = "<group>"; };
-		958DCC722DB07C7200EA8C5F /* debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = debug.xcconfig; path = ../debug.xcconfig; sourceTree = SOURCE_ROOT; };
-		W002W002W002W002 /* IronTracksWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = IronTracksWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
-		W00BW00BW00BW00B /* RestTimerWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestTimerWidget.swift; sourceTree = "<group>"; };
-		W00CW00CW00CW00C /* IronTracksWidgets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IronTracksWidgets.swift; sourceTree = "<group>"; };
-		W00DW00DW00DW00D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-		W00EW00EW00EW00E /* IronTracksWidgets.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = IronTracksWidgets.entitlements; sourceTree = "<group>"; };
-		W021W021W021W021 /* RestTimerIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestTimerIntents.swift; sourceTree = "<group>"; };
-		NS001NS001NS001NS001 /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
-		NS002NS002NS002NS002 /* NotificationService.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = NotificationService.appex; sourceTree = BUILT_PRODUCTS_DIR; };
-		NS003NS003NS003NS003 /* Info.plist (NotificationService) */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
-/* End PBXFileReference section */
+/* Begin PBXContainerItemProxy section */
+		FEFE8544253E9EF20011E319 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 504EC2FC1FED79650016851F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 8440180D3C2189B976C0FFF0;
+			remoteInfo = "IronTracksWatch Watch App";
+		};
+		NS012NS012NS012NS012 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 504EC2FC1FED79650016851F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = NS010NS010NS010NS010;
+			remoteInfo = NotificationService;
+		};
+		W016W016W016W016 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 504EC2FC1FED79650016851F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = W001W001W001W001;
+			remoteInfo = IronTracksWidgets;
+		};
+/* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
+		E403C7AFEBEC2B37171079AC /* Embed Watch Content */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "$(CONTENTS_FOLDER_PATH)/Watch";
+			dstSubfolderSpec = 16;
+			files = (
+				B588F44A4347B5C1BEB44831 /* IronTracksWatch Watch App.app in Embed Watch Content */,
+			);
+			name = "Embed Watch Content";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		W014W014W014W014 /* Embed App Extensions */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
 			dstPath = "";
 			dstSubfolderSpec = 13;
 			files = (
-				W013W013W013W013 /* IronTracksWidgets appex in Embed App Extensions */,
-				NS006NS006NS006NS006 /* NotificationService appex in Embed App Extensions */,
+				W013W013W013W013 /* IronTracksWidgets.appex in Embed App Extensions */,
+				NS006NS006NS006NS006 /* NotificationService.appex in Embed App Extensions */,
 			);
 			name = "Embed App Extensions";
 			runOnlyForDeploymentPostprocessing = 0;
 		};
 /* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		01C8FC5B5A5672EB03203531 /* IronTracksWatchApp.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = IronTracksWatchApp.swift; sourceTree = "<group>"; };
+		1774FDD63F12185176BB635F /* CheckinView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CheckinView.swift; sourceTree = "<group>"; };
+		1A1FFB92F9B0F2046BD57710 /* Assets.xcassets */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		1F288244F20E4B78628ECA5D /* CardioView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CardioView.swift; sourceTree = "<group>"; };
+		264F376959AF0EBA63259D0B /* LocationManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LocationManager.swift; sourceTree = "<group>"; };
+		2FAD9762203C412B000D30F8 /* config.xml */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = config.xml; sourceTree = "<group>"; };
+		3B30C6B0FBC688E04227E7D4 /* WatchBridge.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WatchBridge.swift; sourceTree = "<group>"; };
+		408E411FFC584A108ABE64E6 /* ContentView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
+		45C7B568677AE56DA12C6742 /* IronTracksWatch.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = IronTracksWatch.entitlements; sourceTree = "<group>"; };
+		50379B222058CBB4000EE86E /* capacitor.config.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = capacitor.config.json; sourceTree = "<group>"; };
+		504EC3041FED79650016851F /* App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = App.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		504EC3071FED79650016851F /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AppDelegate.swift; sourceTree = "<group>"; };
+		504EC30C1FED79650016851F /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/Main.storyboard; sourceTree = "<group>"; };
+		504EC30E1FED79650016851F /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
+		504EC3111FED79650016851F /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
+		504EC3131FED79650016851F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		50B271D01FEDC1A000F3C39B /* public */ = {isa = PBXFileReference; lastKnownFileType = folder; path = public; sourceTree = "<group>"; };
+		7C803BD5DF1345C17D4FDE6B /* WatchSessionManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WatchSessionManager.swift; sourceTree = "<group>"; };
+		958DCC722DB07C7200EA8C5F /* debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = debug.xcconfig; path = ../debug.xcconfig; sourceTree = SOURCE_ROOT; };
+		AAAA0001AAAA0001AAAA0001 /* IronTracksNativePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IronTracksNativePlugin.swift; sourceTree = "<group>"; };
+		AAAA0007AAAA0007AAAA0007 /* App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
+		BBBB0002BBBB0002BBBB0002 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
+		D4F5306B577DAB4CF49320B7 /* SharedModels.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SharedModels.swift; sourceTree = "<group>"; };
+		D63264B20D182409F2E8EB56 /* WorkoutView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WorkoutView.swift; sourceTree = "<group>"; };
+		DDBD28EEA1B02677FB2632AB /* HealthKitManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HealthKitManager.swift; sourceTree = "<group>"; };
+		E1BBCDEF1E0C97D84674225C /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
+		E3B78FD61B78C679FF19A936 /* DashboardView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
+		ED8BD25E5B0958E7A3CD3698 /* IronTracksWatch Watch App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; lastKnownFileType = wrapper.application; path = "IronTracksWatch Watch App.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		F4A8B59B29604065B36C6721 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		NS001NS001NS001NS001 /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
+		NS002NS002NS002NS002 /* NotificationService.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = NotificationService.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		NS003NS003NS003NS003 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		W002W002W002W002 /* IronTracksWidgets.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = IronTracksWidgets.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		W00AW00AW00AW00A /* RestTimerAttributes.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestTimerAttributes.swift; sourceTree = "<group>"; };
+		W00BW00BW00BW00B /* RestTimerWidget.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestTimerWidget.swift; sourceTree = "<group>"; };
+		W00CW00CW00CW00C /* IronTracksWidgets.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IronTracksWidgets.swift; sourceTree = "<group>"; };
+		W00DW00DW00DW00D /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		W00EW00EW00EW00E /* IronTracksWidgets.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = IronTracksWidgets.entitlements; sourceTree = "<group>"; };
+		W021W021W021W021 /* RestTimerIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RestTimerIntents.swift; sourceTree = "<group>"; };
+/* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
 		504EC3011FED79650016851F /* Frameworks */ = {
@@ -80,14 +143,21 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		W004W004W004W004 /* Frameworks (Widget) */ = {
+		E91DF4E1CD1CA06C92031CF1 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		NS008NS008NS008NS008 /* Frameworks (NotificationService) */ = {
+		NS008NS008NS008NS008 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		W004W004W004W004 /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -97,6 +167,22 @@
 /* End PBXFrameworksBuildPhase section */
 
 /* Begin PBXGroup section */
+		3480BFA2699EC43B86592820 /* IronTracksWatch Watch App */ = {
+			isa = PBXGroup;
+			children = (
+				1A1FFB92F9B0F2046BD57710 /* Assets.xcassets */,
+				408E411FFC584A108ABE64E6 /* ContentView.swift */,
+				F4A8B59B29604065B36C6721 /* Info.plist */,
+				45C7B568677AE56DA12C6742 /* IronTracksWatch.entitlements */,
+				01C8FC5B5A5672EB03203531 /* IronTracksWatchApp.swift */,
+				9CD5C45CA4628CB33965C540 /* Models */,
+				A89561B7B7FA12233D2648FF /* Services */,
+				6B82CCCF3E8AC464DF711F60 /* Views */,
+			);
+			name = "IronTracksWatch Watch App";
+			path = "IronTracksWatch Watch App";
+			sourceTree = "<group>";
+		};
 		504EC2FB1FED79650016851F = {
 			isa = PBXGroup;
 			children = (
@@ -105,6 +191,7 @@
 				W009W009W009W009 /* IronTracksWidgets */,
 				NS004NS004NS004NS004 /* NotificationService */,
 				504EC3051FED79650016851F /* Products */,
+				3480BFA2699EC43B86592820 /* IronTracksWatch Watch App */,
 			);
 			sourceTree = "<group>";
 		};
@@ -114,6 +201,7 @@
 				504EC3041FED79650016851F /* App.app */,
 				W002W002W002W002 /* IronTracksWidgets.appex */,
 				NS002NS002NS002NS002 /* NotificationService.appex */,
+				ED8BD25E5B0958E7A3CD3698 /* IronTracksWatch Watch App.app */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -134,8 +222,50 @@
 				504EC3131FED79650016851F /* Info.plist */,
 				2FAD9762203C412B000D30F8 /* config.xml */,
 				50B271D01FEDC1A000F3C39B /* public */,
+				3B30C6B0FBC688E04227E7D4 /* WatchBridge.swift */,
 			);
 			path = App;
+			sourceTree = "<group>";
+		};
+		6B82CCCF3E8AC464DF711F60 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				1F288244F20E4B78628ECA5D /* CardioView.swift */,
+				1774FDD63F12185176BB635F /* CheckinView.swift */,
+				E3B78FD61B78C679FF19A936 /* DashboardView.swift */,
+				D63264B20D182409F2E8EB56 /* WorkoutView.swift */,
+			);
+			name = Views;
+			path = Views;
+			sourceTree = "<group>";
+		};
+		9CD5C45CA4628CB33965C540 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				D4F5306B577DAB4CF49320B7 /* SharedModels.swift */,
+				7C803BD5DF1345C17D4FDE6B /* WatchSessionManager.swift */,
+			);
+			name = Models;
+			path = Models;
+			sourceTree = "<group>";
+		};
+		A89561B7B7FA12233D2648FF /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				DDBD28EEA1B02677FB2632AB /* HealthKitManager.swift */,
+				264F376959AF0EBA63259D0B /* LocationManager.swift */,
+			);
+			name = Services;
+			path = Services;
+			sourceTree = "<group>";
+		};
+		NS004NS004NS004NS004 /* NotificationService */ = {
+			isa = PBXGroup;
+			children = (
+				NS001NS001NS001NS001 /* NotificationService.swift */,
+				NS003NS003NS003NS003 /* Info.plist */,
+			);
+			path = NotificationService;
 			sourceTree = "<group>";
 		};
 		W009W009W009W009 /* IronTracksWidgets */ = {
@@ -150,15 +280,6 @@
 			path = IronTracksWidgets;
 			sourceTree = "<group>";
 		};
-		NS004NS004NS004NS004 /* NotificationService */ = {
-			isa = PBXGroup;
-			children = (
-				NS001NS001NS001NS001 /* NotificationService.swift */,
-				NS003NS003NS003NS003 /* Info.plist (NotificationService) */,
-			);
-			path = NotificationService;
-			sourceTree = "<group>";
-		};
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
@@ -170,12 +291,14 @@
 				504EC3011FED79650016851F /* Frameworks */,
 				504EC3021FED79650016851F /* Resources */,
 				W014W014W014W014 /* Embed App Extensions */,
+				E403C7AFEBEC2B37171079AC /* Embed Watch Content */,
 			);
 			buildRules = (
 			);
 			dependencies = (
 				W015W015W015W015 /* PBXTargetDependency */,
-				NS011NS011NS011NS011 /* PBXTargetDependency (NotificationService) */,
+				NS011NS011NS011NS011 /* PBXTargetDependency */,
+				3A1EE81A3C43251B5CAD2F0C /* PBXTargetDependency */,
 			);
 			name = App;
 			packageProductDependencies = (
@@ -185,12 +308,46 @@
 			productReference = 504EC3041FED79650016851F /* App.app */;
 			productType = "com.apple.product-type.application";
 		};
+		8440180D3C2189B976C0FFF0 /* IronTracksWatch Watch App */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 54C7208C5C7B4CF637A41451 /* Build configuration list for PBXNativeTarget "IronTracksWatch Watch App" */;
+			buildPhases = (
+				F6AACF84CD1F9736D2D526CD /* Sources */,
+				E91DF4E1CD1CA06C92031CF1 /* Frameworks */,
+				003515FB7014763DA424745A /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = "IronTracksWatch Watch App";
+			productName = "IronTracksWatch Watch App";
+			productReference = ED8BD25E5B0958E7A3CD3698 /* IronTracksWatch Watch App.app */;
+			productType = "com.apple.product-type.application";
+		};
+		NS010NS010NS010NS010 /* NotificationService */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = NS015NS015NS015NS015 /* Build configuration list for PBXNativeTarget "NotificationService" */;
+			buildPhases = (
+				NS007NS007NS007NS007 /* Sources */,
+				NS008NS008NS008NS008 /* Frameworks */,
+				NS009NS009NS009NS009 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = NotificationService;
+			productName = NotificationService;
+			productReference = NS002NS002NS002NS002 /* NotificationService.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		W001W001W001W001 /* IronTracksWidgets */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = W006W006W006W006 /* Build configuration list for PBXNativeTarget "IronTracksWidgets" */;
 			buildPhases = (
 				W003W003W003W003 /* Sources */,
-				W004W004W004W004 /* Frameworks (Widget) */,
+				W004W004W004W004 /* Frameworks */,
 				W005W005W005W005 /* Resources */,
 			);
 			buildRules = (
@@ -200,23 +357,6 @@
 			name = IronTracksWidgets;
 			productName = IronTracksWidgets;
 			productReference = W002W002W002W002 /* IronTracksWidgets.appex */;
-			productType = "com.apple.product-type.app-extension";
-		};
-		NS010NS010NS010NS010 /* NotificationService */ = {
-			isa = PBXNativeTarget;
-			buildConfigurationList = NS015NS015NS015NS015 /* Build configuration list for PBXNativeTarget "NotificationService" */;
-			buildPhases = (
-				NS007NS007NS007NS007 /* Sources (NotificationService) */,
-				NS008NS008NS008NS008 /* Frameworks (NotificationService) */,
-				NS009NS009NS009NS009 /* Resources (NotificationService) */,
-			);
-			buildRules = (
-			);
-			dependencies = (
-			);
-			name = NotificationService;
-			productName = NotificationService;
-			productReference = NS002NS002NS002NS002 /* NotificationService.appex */;
 			productType = "com.apple.product-type.app-extension";
 		};
 /* End PBXNativeTarget section */
@@ -233,12 +373,12 @@
 						LastSwiftMigration = 1100;
 						ProvisioningStyle = Automatic;
 					};
-					W001W001W001W001 = {
-						CreatedOnToolsVersion = 14.0;
-						ProvisioningStyle = Automatic;
-					};
 					NS010NS010NS010NS010 = {
 						CreatedOnToolsVersion = 15.0;
+						ProvisioningStyle = Automatic;
+					};
+					W001W001W001W001 = {
+						CreatedOnToolsVersion = 14.0;
 						ProvisioningStyle = Automatic;
 					};
 				};
@@ -262,11 +402,20 @@
 				504EC3031FED79650016851F /* App */,
 				W001W001W001W001 /* IronTracksWidgets */,
 				NS010NS010NS010NS010 /* NotificationService */,
+				8440180D3C2189B976C0FFF0 /* IronTracksWatch Watch App */,
 			);
 		};
 /* End PBXProject section */
 
 /* Begin PBXResourcesBuildPhase section */
+		003515FB7014763DA424745A /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				79EB81F8ECC1D945D3D265C9 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		504EC3021FED79650016851F /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -281,14 +430,14 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		W005W005W005W005 /* Resources (Widget) */ = {
+		NS009NS009NS009NS009 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		NS009NS009NS009NS009 /* Resources (NotificationService) */ = {
+		W005W005W005W005 /* Resources */ = {
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -305,23 +454,30 @@
 				504EC3081FED79650016851F /* AppDelegate.swift in Sources */,
 				BBBB0001BBBB0001BBBB0001 /* SceneDelegate.swift in Sources */,
 				AAAA0002AAAA0002AAAA0002 /* IronTracksNativePlugin.swift in Sources */,
-				W00FW00FW00FW00F /* RestTimerAttributes.swift in Sources (App) */,
-				W022W022W022W022 /* RestTimerIntents.swift in Sources (App) */,
+				W00FW00FW00FW00F /* RestTimerAttributes.swift in Sources */,
+				W022W022W022W022 /* RestTimerIntents.swift in Sources */,
+				E335CEEE42B6C9C7223A91E6 /* WatchBridge.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		W003W003W003W003 /* Sources (Widget) */ = {
+		F6AACF84CD1F9736D2D526CD /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				W010W010W010W010 /* RestTimerAttributes.swift in Sources (Widget) */,
-				W011W011W011W011 /* RestTimerWidget.swift in Sources */,
-				W012W012W012W012 /* IronTracksWidgets.swift in Sources */,
-				W020W020W020W020 /* RestTimerIntents.swift in Sources (Widget) */,
+				A7545205D811F9E6EB5A4752 /* ContentView.swift in Sources */,
+				5B63F25EF52AEA122973D9A7 /* IronTracksWatchApp.swift in Sources */,
+				93D071EABBCB7F8D6387AC40 /* SharedModels.swift in Sources */,
+				0E3A2E8BFA31635F597666E4 /* WatchSessionManager.swift in Sources */,
+				E445517AABE3AE7D00E1F373 /* HealthKitManager.swift in Sources */,
+				6B3C2121D43C56CA1ABE69E0 /* LocationManager.swift in Sources */,
+				64F5E12B0FBE761409E7EC1F /* CardioView.swift in Sources */,
+				BB1C08C7B06F81EC6C61A1EB /* CheckinView.swift in Sources */,
+				753309CCBBFBBC9322856D0C /* DashboardView.swift in Sources */,
+				4611E554830F2929AAD10280 /* WorkoutView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
-		NS007NS007NS007NS007 /* Sources (NotificationService) */ = {
+		NS007NS007NS007NS007 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
@@ -329,37 +485,37 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		W003W003W003W003 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				W010W010W010W010 /* RestTimerAttributes.swift in Sources */,
+				W011W011W011W011 /* RestTimerWidget.swift in Sources */,
+				W012W012W012W012 /* IronTracksWidgets.swift in Sources */,
+				W020W020W020W020 /* RestTimerIntents.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		3A1EE81A3C43251B5CAD2F0C /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = "IronTracksWatch Watch App";
+			target = 8440180D3C2189B976C0FFF0 /* IronTracksWatch Watch App */;
+			targetProxy = FEFE8544253E9EF20011E319 /* PBXContainerItemProxy */;
+		};
+		NS011NS011NS011NS011 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = NS010NS010NS010NS010 /* NotificationService */;
+			targetProxy = NS012NS012NS012NS012 /* PBXContainerItemProxy */;
+		};
 		W015W015W015W015 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = W001W001W001W001 /* IronTracksWidgets */;
 			targetProxy = W016W016W016W016 /* PBXContainerItemProxy */;
 		};
-		NS011NS011NS011NS011 /* PBXTargetDependency (NotificationService) */ = {
-			isa = PBXTargetDependency;
-			target = NS010NS010NS010NS010 /* NotificationService */;
-			targetProxy = NS012NS012NS012NS012 /* PBXContainerItemProxy (NotificationService) */;
-		};
 /* End PBXTargetDependency section */
-
-/* Begin PBXContainerItemProxy section */
-		W016W016W016W016 /* PBXContainerItemProxy */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 504EC2FC1FED79650016851F /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = W001W001W001W001;
-			remoteInfo = IronTracksWidgets;
-		};
-		NS012NS012NS012NS012 /* PBXContainerItemProxy (NotificationService) */ = {
-			isa = PBXContainerItemProxy;
-			containerPortal = 504EC2FC1FED79650016851F /* Project object */;
-			proxyType = 1;
-			remoteGlobalIDString = NS010NS010NS010NS010;
-			remoteInfo = NotificationService;
-		};
-/* End PBXContainerItemProxy section */
 
 /* Begin PBXVariantGroup section */
 		504EC30B1FED79650016851F /* Main.storyboard */ = {
@@ -381,6 +537,60 @@
 /* End PBXVariantGroup section */
 
 /* Begin XCBuildConfiguration section */
+		4716C7DCDA51B2A3EF6B6B78 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				APPLICATION_EXTENSION_API_ONLY = NO;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CODE_SIGN_ENTITLEMENTS = "IronTracksWatch Watch App/IronTracksWatch.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 35;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = 5XLC55D3YR;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_TESTABILITY = YES;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "IronTracksWatch Watch App/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = IronTracks;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_WKApplication = YES;
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.irontracks.app;
+				INFOPLIST_KEY_WKWatchOnly = NO;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.8;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.irontracks.app.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = NO;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 9.0;
+			};
+			name = Debug;
+		};
 		504EC3141FED79650016851F /* Debug */ = {
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 958DCC722DB07C7200EA8C5F /* debug.xcconfig */;
@@ -495,10 +705,10 @@
 			baseConfigurationReference = 958DCC722DB07C7200EA8C5F /* debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 35;
 				DEVELOPMENT_TEAM = 5XLC55D3YR;
-				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -519,10 +729,10 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 35;
 				DEVELOPMENT_TEAM = 5XLC55D3YR;
-				CODE_SIGN_ENTITLEMENTS = App/App.entitlements;
 				INFOPLIST_FILE = App/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
 				LD_RUNPATH_SEARCH_PATHS = (
@@ -538,13 +748,104 @@
 			};
 			name = Release;
 		};
-		W007W007W007W007 /* Debug */ = {
+		9F3F82D8A8C2C94AB14CDA9E /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = YES;
+				APPLICATION_EXTENSION_API_ONLY = NO;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CODE_SIGN_ENTITLEMENTS = "IronTracksWatch Watch App/IronTracksWatch.entitlements";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 35;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = 5XLC55D3YR;
+				ENABLE_PREVIEWS = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = "IronTracksWatch Watch App/Info.plist";
+				INFOPLIST_KEY_CFBundleDisplayName = IronTracks;
+				INFOPLIST_KEY_UISupportedInterfaceOrientations = "UIInterfaceOrientationPortrait UIInterfaceOrientationPortraitUpsideDown";
+				INFOPLIST_KEY_WKApplication = YES;
+				INFOPLIST_KEY_WKCompanionAppBundleIdentifier = com.irontracks.app;
+				INFOPLIST_KEY_WKWatchOnly = NO;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+				);
+				MARKETING_VERSION = 1.8;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.irontracks.app.watchkitapp;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = NO;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				VALIDATE_PRODUCT = YES;
+				WATCHOS_DEPLOYMENT_TARGET = 9.0;
+			};
+			name = Release;
+		};
+		NS013NS013NS013NS013 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 35;
 				DEVELOPMENT_TEAM = 5XLC55D3YR;
+				INFOPLIST_FILE = NotificationService/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.8;
+				PRODUCT_BUNDLE_IDENTIFIER = com.irontracks.app.NotificationService;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		NS014NS014NS014NS014 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 35;
+				DEVELOPMENT_TEAM = 5XLC55D3YR;
+				INFOPLIST_FILE = NotificationService/Info.plist;
+				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.8;
+				PRODUCT_BUNDLE_IDENTIFIER = com.irontracks.app.NotificationService;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Release;
+		};
+		W007W007W007W007 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
 				CODE_SIGN_ENTITLEMENTS = IronTracksWidgets/IronTracksWidgets.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 35;
+				DEVELOPMENT_TEAM = 5XLC55D3YR;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = IronTracksWidgets/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = IronTracksWidgets;
@@ -569,10 +870,10 @@
 		W008W008W008W008 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = IronTracksWidgets/IronTracksWidgets.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 35;
 				DEVELOPMENT_TEAM = 5XLC55D3YR;
-				CODE_SIGN_ENTITLEMENTS = IronTracksWidgets/IronTracksWidgets.entitlements;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = IronTracksWidgets/Info.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = IronTracksWidgets;
@@ -588,51 +889,6 @@
 				PRODUCT_NAME = "$(TARGET_NAME)";
 				SKIP_INSTALL = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-			};
-			name = Release;
-		};
-		NS013NS013NS013NS013 /* Debug (NotificationService) */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 35;
-				DEVELOPMENT_TEAM = 5XLC55D3YR;
-				INFOPLIST_FILE = NotificationService/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-					"@executable_path/../../Frameworks",
-				);
-				MARKETING_VERSION = 1.8;
-				PRODUCT_BUNDLE_IDENTIFIER = com.irontracks.app.NotificationService;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SKIP_INSTALL = YES;
-				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
-				SWIFT_VERSION = 5.0;
-				TARGETED_DEVICE_FAMILY = "1,2";
-			};
-			name = Debug;
-		};
-		NS014NS014NS014NS014 /* Release (NotificationService) */ = {
-			isa = XCBuildConfiguration;
-			buildSettings = {
-				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 35;
-				DEVELOPMENT_TEAM = 5XLC55D3YR;
-				INFOPLIST_FILE = NotificationService/Info.plist;
-				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
-				LD_RUNPATH_SEARCH_PATHS = (
-					"$(inherited)",
-					"@executable_path/Frameworks",
-					"@executable_path/../../Frameworks",
-				);
-				MARKETING_VERSION = 1.8;
-				PRODUCT_BUNDLE_IDENTIFIER = com.irontracks.app.NotificationService;
-				PRODUCT_NAME = "$(TARGET_NAME)";
-				SKIP_INSTALL = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
 			};
@@ -659,11 +915,11 @@
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
 		};
-		W006W006W006W006 /* Build configuration list for PBXNativeTarget "IronTracksWidgets" */ = {
+		54C7208C5C7B4CF637A41451 /* Build configuration list for PBXNativeTarget "IronTracksWatch Watch App" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				W007W007W007W007 /* Debug */,
-				W008W008W008W008 /* Release */,
+				9F3F82D8A8C2C94AB14CDA9E /* Release */,
+				4716C7DCDA51B2A3EF6B6B78 /* Debug */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
@@ -671,8 +927,17 @@
 		NS015NS015NS015NS015 /* Build configuration list for PBXNativeTarget "NotificationService" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
-				NS013NS013NS013NS013 /* Debug (NotificationService) */,
-				NS014NS014NS014NS014 /* Release (NotificationService) */,
+				NS013NS013NS013NS013 /* Debug */,
+				NS014NS014NS014NS014 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		W006W006W006W006 /* Build configuration list for PBXNativeTarget "IronTracksWidgets" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				W007W007W007W007 /* Debug */,
+				W008W008W008W008 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;
