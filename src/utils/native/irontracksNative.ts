@@ -140,6 +140,16 @@ type IronTracksNativePlugin = {
   addListener(eventName: 'sharePlayState', listenerFunc: (data: { state: 'waiting' | 'joined' | 'invalidated' | 'unknown'; workoutId: string }) => void): Promise<PluginListenerHandle>
   addListener(eventName: 'sharePlayParticipants', listenerFunc: (data: { count: number }) => void): Promise<PluginListenerHandle>
   addListener(eventName: 'sharePlayMessage', listenerFunc: (data: { type: string; payloadJSON: string; sentAtMs: number; fromParticipantId: string }) => void): Promise<PluginListenerHandle>
+  // Watch (WatchConnectivity)
+  watchGetState: () => Promise<{ isPaired: boolean | string; isReachable: boolean | string; isWatchAppInstalled: boolean | string; isSupported: boolean | string }>
+  watchSendDashboard: (opts: { json: string }) => Promise<{ ok: boolean }>
+  watchSendWorkout: (opts: { json: string }) => Promise<{ ok: boolean }>
+  watchSendNearestGyms: (opts: { json: string }) => Promise<{ ok: boolean }>
+  addListener(eventName: 'watchSetLogged', listenerFunc: (data: { payload: string }) => void): Promise<PluginListenerHandle>
+  addListener(eventName: 'watchCardioFinished', listenerFunc: (data: { payload: string }) => void): Promise<PluginListenerHandle>
+  addListener(eventName: 'watchRefreshRequested', listenerFunc: () => void): Promise<PluginListenerHandle>
+  addListener(eventName: 'watchCheckinRequested', listenerFunc: (data: { payload: string }) => void): Promise<PluginListenerHandle>
+  addListener(eventName: 'watchReachabilityChanged', listenerFunc: (data: Record<string, string>) => void): Promise<PluginListenerHandle>
 }
 
 export type HapticStyle =
@@ -213,6 +223,11 @@ const webFallback: IronTracksNativePlugin = {
   endSharePlayWorkout: async () => ({ ok: false }),
   sendSharePlayMessage: async () => ({ ok: false, error: 'not_ios' }),
   getSharePlayState: async () => ({ active: false, participantCount: 0 }),
+  // Watch (WatchConnectivity) — sem-op no web/Android
+  watchGetState: async () => ({ isPaired: false, isReachable: false, isWatchAppInstalled: false, isSupported: false }),
+  watchSendDashboard: async () => ({ ok: false }),
+  watchSendWorkout: async () => ({ ok: false }),
+  watchSendNearestGyms: async () => ({ ok: false }),
 }
 
 // ─── Register plugin ─────────────────────────────────────────────────────────
@@ -1274,3 +1289,100 @@ export const addStoryComposeProgressListener = (callback: (progress: number) => 
     return () => {}
   }
 }
+
+// ─── Watch (WatchConnectivity) ───────────────────────────────────────────────
+// Pequenos wrappers que aceitam objetos JS e serializam pra JSON antes de
+// mandar pro Native. O lado iOS reentregar como Data pro Watch via WCSession.
+
+export interface WatchState {
+  isPaired: boolean
+  isReachable: boolean
+  isWatchAppInstalled: boolean
+  isSupported: boolean
+}
+
+const coerceBool = (v: unknown): boolean => v === true || v === 'true'
+
+export const watchGetState = async (): Promise<WatchState> => {
+  if (!isIosNative()) {
+    return { isPaired: false, isReachable: false, isWatchAppInstalled: false, isSupported: false }
+  }
+  try {
+    const r = await Native.watchGetState()
+    return {
+      isPaired: coerceBool(r.isPaired),
+      isReachable: coerceBool(r.isReachable),
+      isWatchAppInstalled: coerceBool(r.isWatchAppInstalled),
+      isSupported: coerceBool(r.isSupported),
+    }
+  } catch {
+    return { isPaired: false, isReachable: false, isWatchAppInstalled: false, isSupported: false }
+  }
+}
+
+export const watchSendDashboard = async (dashboard: unknown): Promise<boolean> => {
+  if (!isIosNative()) return false
+  try {
+    const json = JSON.stringify(dashboard)
+    const r = await Native.watchSendDashboard({ json })
+    return !!r?.ok
+  } catch {
+    return false
+  }
+}
+
+export const watchSendWorkout = async (workout: unknown): Promise<boolean> => {
+  if (!isIosNative()) return false
+  try {
+    const json = JSON.stringify(workout)
+    const r = await Native.watchSendWorkout({ json })
+    return !!r?.ok
+  } catch {
+    return false
+  }
+}
+
+export const watchSendNearestGyms = async (gyms: unknown[]): Promise<boolean> => {
+  if (!isIosNative()) return false
+  try {
+    const json = JSON.stringify(gyms)
+    const r = await Native.watchSendNearestGyms({ json })
+    return !!r?.ok
+  } catch {
+    return false
+  }
+}
+
+const safeAddListener = <T>(
+  event: 'watchSetLogged' | 'watchCardioFinished' | 'watchRefreshRequested' | 'watchCheckinRequested' | 'watchReachabilityChanged',
+  cb: (data: T) => void,
+): (() => void) => {
+  if (!isIosNative()) return () => {}
+  try {
+    // @ts-expect-error — addListener overloads exigem a string literal
+    const listenerPromise = Native.addListener(event, cb)
+    return () => { listenerPromise.then((l: PluginListenerHandle) => l.remove()).catch(() => {}) }
+  } catch {
+    return () => {}
+  }
+}
+
+export const onWatchSetLogged = (cb: (payload: string) => void) =>
+  safeAddListener<{ payload: string }>('watchSetLogged', (d) => cb(d.payload || ''))
+
+export const onWatchCardioFinished = (cb: (payload: string) => void) =>
+  safeAddListener<{ payload: string }>('watchCardioFinished', (d) => cb(d.payload || ''))
+
+export const onWatchRefreshRequested = (cb: () => void) =>
+  safeAddListener<undefined>('watchRefreshRequested', () => cb())
+
+export const onWatchCheckinRequested = (cb: (payload: string) => void) =>
+  safeAddListener<{ payload: string }>('watchCheckinRequested', (d) => cb(d.payload || ''))
+
+export const onWatchReachabilityChanged = (cb: (state: WatchState) => void) =>
+  safeAddListener<Record<string, string>>('watchReachabilityChanged', (d) => cb({
+    isPaired: coerceBool(d.isPaired),
+    isReachable: coerceBool(d.isReachable),
+    isWatchAppInstalled: coerceBool(d.isWatchAppInstalled),
+    isSupported: coerceBool(d.isSupported),
+  }))
