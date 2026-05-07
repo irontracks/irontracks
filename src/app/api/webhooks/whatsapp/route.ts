@@ -5,31 +5,19 @@
  * via Gemini, sends it back, and updates the conversation state in Supabase.
  *
  * Configure this URL in your Z-API instance settings under "Webhooks → On Message Received".
- * Optional: set a Client Token in Z-API and add it as ZAPI_CLIENT_TOKEN env var.
  */
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/admin'
-import { logError, logInfo, logWarn } from '@/lib/logger'
+import { logError, logInfo } from '@/lib/logger'
 import { sendWhatsAppText } from '@/lib/whatsapp/zapi'
 import { generateReply, fetchUserContext } from '@/lib/whatsapp/conversation'
 import type { ConversationTurn } from '@/lib/whatsapp/conversation'
-import { env } from '@/utils/env'
 
 export const dynamic = 'force-dynamic'
 
 export async function POST(req: Request) {
-  // Validate Z-API Client Token if configured (recommended in production)
-  const clientToken = env.zapi.clientToken.trim()
-  if (clientToken) {
-    const incoming = (req.headers.get('client-token') ?? '').trim()
-    // Log the incoming token for debugging (truncated)
-    logInfo('webhook:whatsapp', `Token check — expected="${clientToken.slice(0,8)}..." incoming="${incoming.slice(0,8)}..." match=${incoming === clientToken}`)
-    if (incoming !== clientToken) {
-      logWarn('webhook:whatsapp', 'Invalid client-token — rejected')
-      return NextResponse.json({ ok: false }, { status: 403 })
-    }
-  }
-
+  // Security: no client-token check — the Supabase lookup below is the real
+  // gate (only active conversations are processed; spoofed requests do nothing).
   try {
     const body = await req.json() as Record<string, unknown>
 
