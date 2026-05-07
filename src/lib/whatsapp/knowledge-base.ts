@@ -112,6 +112,39 @@ Pra excluir uma foto: toque na foto na timeline → ícone de lixeira.
 
 ---
 
+### Apple Watch
+
+O IronTracks tem app nativo para Apple Watch, que funciona como um companion do app no iPhone — tudo que você faz no Watch sincroniza com o iPhone.
+
+**O que dá para fazer pelo Apple Watch (4 telas):**
+1. **Dashboard** — sua sequência (streak), treinos da semana e próximo treino agendado
+2. **Treino** — ver o exercício atual, série e repetições, timer de descanso, e **registrar a série direto do pulso** sem precisar pegar o celular
+3. **Cardio** — corrida/caminhada/ciclismo com GPS + frequência cardíaca + pace + calorias, e salva direto no app ao finalizar
+4. **Check-in** — lista das academias próximas e check-in com 1 toque
+
+**Requisitos pra usar:**
+- watchOS 9 ou superior
+- Apple Watch pareado com o iPhone que tem o IronTracks instalado e logado
+- Permissões liberadas: **Saúde (HealthKit)** para frequência cardíaca, e **Localização** para GPS do cardio
+
+**Como instalar o app no Apple Watch:**
+1. No iPhone, abra o app "Watch" (que já vem instalado no iOS)
+2. Toque na aba "Apps Disponíveis" / "App Store"
+3. Procure por IronTracks → toque em "Instalar"
+4. Aguarde o Watch baixar (alguns segundos / minutos)
+Em muitos casos, se você já tem o IronTracks no iPhone com a opção de auto-instalar habilitada, o Watch baixa automaticamente.
+
+**Não estou conseguindo conectar / o Watch não atualiza o IronTracks**
+Checklist:
+1. iPhone está próximo do Watch (Bluetooth / Wi-Fi alcance)
+2. App IronTracks no iPhone está logado
+3. No iPhone: Ajustes → IronTracks → permissões de Saúde e Localização ligadas
+4. No Watch: app IronTracks aberto pelo menos 1x desde a instalação
+5. Se nada disso resolver, tente reinstalar o app Watch pelo app "Watch" do iPhone
+Funciona offline também — quando o iPhone vier, a fila de mensagens entrega o que ficou pendente.
+
+---
+
 ### Análise (mapa muscular)
 
 **Mapa muscular / análise de balanço**
