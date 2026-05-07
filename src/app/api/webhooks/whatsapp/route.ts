@@ -29,9 +29,12 @@ export async function POST(req: Request) {
 
     const phone = String(body.phone ?? '').trim()
     const text = String(body.body ?? '').trim()
-    if (!phone || !text) return NextResponse.json({ ok: true })
+    if (!phone || !text) {
+      logError('webhook:whatsapp:debug', `Skipping: empty phone="${phone}" text="${text}"`)
+      return NextResponse.json({ ok: true })
+    }
 
-    logInfo('webhook:whatsapp', 'Incoming message', { phone: `****${phone.slice(-4)}` })
+    logError('webhook:whatsapp:debug', `Processing inbound: phone="${phone}" text="${text.slice(0, 40)}"`)
 
     const admin = createAdminClient()
 
@@ -46,10 +49,11 @@ export async function POST(req: Request) {
       .maybeSingle()
 
     if (!conv) {
-      // DEBUG TEMP: log phone that failed lookup
       logError('webhook:whatsapp:debug', `No conv found for phone="${phone}"`)
       return NextResponse.json({ ok: true })
     }
+
+    logError('webhook:whatsapp:debug', `Conv found: id=${conv.id} — generating reply...`)
 
     const history = (Array.isArray(conv.context) ? conv.context : []) as ConversationTurn[]
     const userCtx = await fetchUserContext(String(conv.user_id))
@@ -57,8 +61,12 @@ export async function POST(req: Request) {
     // Generate AI reply
     const { message, shouldClose } = await generateReply(text, history, userCtx)
 
+    logError('webhook:whatsapp:debug', `Reply generated (${message.length} chars) — sending via Z-API...`)
+
     // Send the reply back
-    await sendWhatsAppText(phone, message)
+    const sent = await sendWhatsAppText(phone, message)
+
+    logError('webhook:whatsapp:debug', `Z-API send result: ${sent} — updating DB...`)
 
     // Persist updated conversation
     const updatedHistory: ConversationTurn[] = [
@@ -67,7 +75,7 @@ export async function POST(req: Request) {
       { role: 'model', text: message },
     ]
 
-    await admin
+    const { error: updateError } = await admin
       .from('whatsapp_conversations')
       .update({
         context: updatedHistory,
@@ -77,6 +85,8 @@ export async function POST(req: Request) {
         status: shouldClose ? 'resolved' : 'active',
       })
       .eq('id', String(conv.id))
+
+    logError('webhook:whatsapp:debug', `DB update done. error=${updateError?.message ?? 'none'} shouldClose=${shouldClose}`)
 
     logInfo('webhook:whatsapp', shouldClose ? 'Conversation resolved' : 'Reply sent', {
       convId: conv.id,
