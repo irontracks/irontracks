@@ -22,6 +22,8 @@ export async function POST(req: Request) {
   const clientToken = env.zapi.clientToken.trim()
   if (clientToken) {
     const incoming = (req.headers.get('client-token') ?? '').trim()
+    // Log the incoming token for debugging (truncated)
+    logInfo('webhook:whatsapp', `Token check — expected="${clientToken.slice(0,8)}..." incoming="${incoming.slice(0,8)}..." match=${incoming === clientToken}`)
     if (incoming !== clientToken) {
       logWarn('webhook:whatsapp', 'Invalid client-token — rejected')
       return NextResponse.json({ ok: false }, { status: 403 })
