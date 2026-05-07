@@ -2,21 +2,30 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { parseJsonBody } from '@/utils/zod'
+import { normalizeBrPhone } from '@/lib/whatsapp/zapi'
 import { logError } from '@/lib/logger'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
+import { env } from '@/utils/env'
 
 export const dynamic = 'force-dynamic'
 
 const BodySchema = z
   .object({
     email: z.string().min(1),
-    phone: z.string().optional().nullable(),
+    phone: z.string().min(1),
     full_name: z.string().min(1),
     birth_date: z.string().optional().nullable(),
     role_requested: z.string().optional().nullable(),
     cref: z.string().optional().nullable(),
+    /** One-time token returned by /api/access-request/verify-otp */
+    phone_verified_token: z.string().optional().nullable(),
   })
   .strip()
+
+/** Returns true when Z-API is configured — phone verification is enforced in production. */
+function zapiEnabled(): boolean {
+  return Boolean(env.zapi.instanceId && env.zapi.token)
+}
 
 export async function POST(req: Request) {
   try {
@@ -28,16 +37,12 @@ export async function POST(req: Request) {
 
     const parsedBody = await parseJsonBody(req, BodySchema)
     if (parsedBody.response) return parsedBody.response
-    const { email, phone, full_name, birth_date, role_requested, cref } = parsedBody.data!
+    const { email, phone, full_name, birth_date, role_requested, cref, phone_verified_token } = parsedBody.data!
 
-    // 1. Validation
-    if (!email || !full_name) {
-      return NextResponse.json({ ok: false, error: 'Nome e e-mail são obrigatórios.' }, { status: 400 })
-    }
+    // ── Validation ────────────────────────────────────────────────────────────
 
-    // Teacher specific validation
-    if (role_requested === 'teacher' && !cref) {
-      return NextResponse.json({ ok: false, error: 'CREF é obrigatório para cadastro de professor.' }, { status: 400 })
+    if (!email || !full_name || !phone) {
+      return NextResponse.json({ ok: false, error: 'Nome, e-mail e telefone são obrigatórios.' }, { status: 400 })
     }
 
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -45,9 +50,55 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: 'E-mail inválido.' }, { status: 400 })
     }
 
-    // 2. Check duplicate in access_requests
+    const normalizedPhone = normalizeBrPhone(phone)
+    if (!normalizedPhone) {
+      return NextResponse.json({ ok: false, error: 'Telefone inválido (DDD + número).' }, { status: 400 })
+    }
+
+    if (role_requested === 'teacher' && !cref) {
+      return NextResponse.json({ ok: false, error: 'CREF é obrigatório para cadastro de professor.' }, { status: 400 })
+    }
+
+    // ── Phone verification check ──────────────────────────────────────────────
+
     const supabaseAdmin = createAdminClient()
-    
+    let phoneVerified = false
+
+    if (zapiEnabled()) {
+      if (!phone_verified_token) {
+        return NextResponse.json(
+          { ok: false, error: 'Confirme seu WhatsApp antes de enviar o cadastro.' },
+          { status: 400 },
+        )
+      }
+
+      // Validate the token against phone_verifications
+      const { data: verif } = await supabaseAdmin
+        .from('phone_verifications')
+        .select('id, phone, verified, expires_at')
+        .eq('verify_token', phone_verified_token)
+        .eq('verified', true)
+        .gt('expires_at', new Date().toISOString())
+        .maybeSingle()
+
+      if (!verif || verif.phone !== normalizedPhone) {
+        return NextResponse.json(
+          { ok: false, error: 'Verificação de WhatsApp inválida ou expirada. Tente novamente.' },
+          { status: 400 },
+        )
+      }
+
+      // Consume the token so it cannot be reused
+      await supabaseAdmin
+        .from('phone_verifications')
+        .update({ verify_token: null })
+        .eq('id', String(verif.id))
+
+      phoneVerified = true
+    }
+
+    // ── Duplicate checks ──────────────────────────────────────────────────────
+
     const { data: existingRequest } = await supabaseAdmin
       .from('access_requests')
       .select('id, status')
@@ -58,45 +109,43 @@ export async function POST(req: Request) {
       if (existingRequest.status === 'pending') {
         return NextResponse.json({ ok: true, message: 'Solicitação já está pendente.', id: existingRequest.id })
       }
-      // 'approved' is the canonical approved state (migration normalizes 'accepted' → 'approved')
       if (existingRequest.status === 'approved' || existingRequest.status === 'accepted') {
         return NextResponse.json({ ok: true, message: 'Solicitação já foi aprovada. Faça login.', id: existingRequest.id })
       }
-      // If rejected (deleted), fall through to allow a fresh request
     }
 
-    // 3. Check if profile already exists — user already completed signup
     const { data: existingProfile } = await supabaseAdmin
-        .from('profiles')
-        .select('id, is_approved')
-        .ilike('email', email)
-        .maybeSingle()
+      .from('profiles')
+      .select('id, is_approved')
+      .ilike('email', email)
+      .maybeSingle()
 
     if (existingProfile) {
       if (existingProfile.is_approved) {
         return NextResponse.json({ ok: false, error: 'Usuário já cadastrado e aprovado. Faça login.' }, { status: 400 })
       }
-      // Profile exists but not yet approved — treat as duplicate pending signup
       return NextResponse.json({ ok: true, message: 'Cadastro já realizado. Aguarde a aprovação do administrador.' })
     }
 
-    // 4. Create / Reset Request
+    // ── Upsert access request ─────────────────────────────────────────────────
+
     if (existingRequest?.id && existingRequest.status === 'rejected') {
       const { error: updateError } = await supabaseAdmin
         .from('access_requests')
         .update({
           full_name,
-          phone: phone ?? null,
+          phone,
           birth_date: birth_date ?? null,
-          role_requested: role_requested || 'student',
-          cref: cref || null,
+          role_requested: role_requested ?? 'student',
+          cref: cref ?? null,
+          phone_verified: phoneVerified,
           status: 'pending',
           updated_at: new Date().toISOString(),
         })
         .eq('id', existingRequest.id)
 
       if (updateError) {
-        logError('error', 'Error updating access request:', updateError)
+        logError('access-request/create', 'Error updating request:', updateError)
         return NextResponse.json({ ok: false, error: 'Erro ao atualizar solicitação.' }, { status: 500 })
       }
 
@@ -107,25 +156,26 @@ export async function POST(req: Request) {
       .from('access_requests')
       .insert({
         email,
-        phone: phone ?? null,
+        phone,
         full_name,
         birth_date: birth_date ?? null,
-        role_requested: role_requested || 'student',
-        cref: cref || null,
+        role_requested: role_requested ?? 'student',
+        cref: cref ?? null,
+        phone_verified: phoneVerified,
         status: 'pending',
       })
       .select('id')
       .single()
 
     if (insertError) {
-      logError('error', 'Error inserting access request:', insertError)
+      logError('access-request/create', 'Error inserting request:', insertError)
       return NextResponse.json({ ok: false, error: 'Erro ao salvar solicitação.' }, { status: 500 })
     }
 
     return NextResponse.json({ ok: true, message: 'Solicitação enviada com sucesso!', id: inserted?.id ?? null })
 
   } catch (error) {
-    logError('error', 'Access Request Error:', error)
+    logError('access-request/create', error)
     return NextResponse.json({ ok: false, error: 'Erro interno do servidor.' }, { status: 500 })
   }
 }
