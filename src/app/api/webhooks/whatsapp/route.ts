@@ -19,9 +19,9 @@ export const dynamic = 'force-dynamic'
 
 export async function POST(req: Request) {
   // Validate Z-API Client Token if configured (recommended in production)
-  const clientToken = env.zapi.clientToken
+  const clientToken = env.zapi.clientToken.trim()
   if (clientToken) {
-    const incoming = req.headers.get('client-token') ?? ''
+    const incoming = (req.headers.get('client-token') ?? '').trim()
     if (incoming !== clientToken) {
       logWarn('webhook:whatsapp', 'Invalid client-token — rejected')
       return NextResponse.json({ ok: false }, { status: 403 })
