@@ -4,7 +4,7 @@
  * Receives incoming WhatsApp messages from Z-API, generates an AI reply
  * via Gemini, sends it back, and updates the conversation state in Supabase.
  *
- * Configure this URL in your Z-API instance settings under "Webhooks → On Message Received".
+ * Configure this URL in the Z-API dashboard under "On Message Received".
  */
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/admin'
@@ -15,16 +15,35 @@ import type { ConversationTurn } from '@/lib/whatsapp/conversation'
 
 export const dynamic = 'force-dynamic'
 
+/**
+ * Brazilian mobile numbers should have a leading "9" after the DDD (since
+ * the 2010 reform). Z-API sometimes drops it (12-digit form) while our DB
+ * stores the 13-digit form, or vice-versa. Return both candidates so the
+ * conversation lookup matches either format.
+ */
+function brPhoneCandidates(raw: string): string[] {
+  const digits = raw.replace(/@.+$/, '').replace(/\D/g, '')
+  if (!digits) return []
+
+  // 12 digits: 55 + DDD(2) + local(8) — add the leading 9
+  if (digits.length === 12 && digits.startsWith('55')) {
+    return [digits, `${digits.slice(0, 4)}9${digits.slice(4)}`]
+  }
+  // 13 digits with leading 9 after DDD — also try without it
+  if (digits.length === 13 && digits.startsWith('55') && digits.charAt(4) === '9') {
+    return [digits, `${digits.slice(0, 4)}${digits.slice(5)}`]
+  }
+  return [digits]
+}
+
 export async function POST(req: Request) {
   // Security: no client-token check — the Supabase lookup below is the real
   // gate (only active conversations are processed; spoofed requests do nothing).
   try {
     const body = await req.json() as Record<string, unknown>
 
-    // TEMP: persist raw payload to _debug_zapi so we can read full JSON via SQL
-    try {
-      await createAdminClient().from('_debug_zapi').insert({ payload: body as never })
-    } catch { /* ignore */ }
+    // Ignore messages we sent ourselves, group messages, or empty payloads
+    if (Boolean(body.fromMe) || Boolean(body.isGroup)) return NextResponse.json({ ok: true })
 
     // Z-API v2 sends text messages as { text: { message: "..." } }
     // Older versions / some event types may still use body.body or body.caption
@@ -35,33 +54,25 @@ export async function POST(req: Request) {
       String(body.caption ?? '').trim()
     )
 
-    // Normalize phone: strip WhatsApp suffixes like @c.us / @s.whatsapp.net and digits only
-    const rawPhone = String(body.phone ?? '').trim()
-    const phone = rawPhone.replace(/@.+$/, '').replace(/\D/g, '')
+    const phoneOptions = brPhoneCandidates(String(body.phone ?? ''))
+    if (phoneOptions.length === 0 || !text) return NextResponse.json({ ok: true })
 
-    // DEBUG — always visible in Vercel logs; remove once stable
-    logError('wh:recv', JSON.stringify({ type: body.type, fromMe: body.fromMe, isGroup: body.isGroup, phone, hasText: !!text, textSnip: text.slice(0, 30) }))
-
-    // Ignore messages we sent ourselves or group messages
-    if (Boolean(body.fromMe) || Boolean(body.isGroup)) return NextResponse.json({ ok: true })
-
-    if (!phone || !text) return NextResponse.json({ ok: true })
+    const phone = phoneOptions[0] // canonical phone for sending the reply
 
     logInfo('webhook:whatsapp', 'Incoming message', { phone: `****${phone.slice(-4)}` })
 
     const admin = createAdminClient()
 
     // Find the active conversation for this phone number
+    // (try both 12- and 13-digit formats of the BR mobile number)
     const { data: conv } = await admin
       .from('whatsapp_conversations')
       .select('id, user_id, context')
-      .eq('phone', phone)
+      .in('phone', phoneOptions)
       .eq('status', 'active')
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()
-
-    logError('wh:conv', JSON.stringify({ found: !!conv, phone }))
     if (!conv) return NextResponse.json({ ok: true })
 
     const history = (Array.isArray(conv.context) ? conv.context : []) as ConversationTurn[]
