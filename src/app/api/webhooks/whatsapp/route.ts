@@ -21,25 +21,23 @@ export async function POST(req: Request) {
   try {
     const body = await req.json() as Record<string, unknown>
 
-    // DEBUG TEMP: log raw body fields to diagnose phone format
-    logError('webhook:whatsapp:debug', `fromMe=${body.fromMe} isGroup=${body.isGroup} phone="${body.phone}" type="${body.type}" body="${String(body.body ?? '').slice(0, 60)}" text="${String(body.text ?? '').slice(0, 60)}"`)
-
     // Ignore messages we sent ourselves, group messages, or empty payloads
     if (Boolean(body.fromMe) || Boolean(body.isGroup)) return NextResponse.json({ ok: true })
 
     const phone = String(body.phone ?? '').trim()
-    // Z-API uses `body` for text messages; some event types put content in `text` or `caption`
+
+    // Z-API v2 sends text messages as { text: { message: "..." } }
+    // Older versions / some event types may still use body.body
+    const textObj = body.text as Record<string, unknown> | undefined
     const text = (
+      String(textObj?.message ?? '').trim() ||
       String(body.body ?? '').trim() ||
-      String(body.text ?? '').trim() ||
       String(body.caption ?? '').trim()
     )
-    if (!phone || !text) {
-      logError('webhook:whatsapp:debug', `Skipping: empty phone="${phone}" — raw body keys: ${Object.keys(body).join(',')}`)
-      return NextResponse.json({ ok: true })
-    }
 
-    logError('webhook:whatsapp:debug', `Processing inbound: phone="${phone}" text="${text.slice(0, 40)}"`)
+    if (!phone || !text) return NextResponse.json({ ok: true })
+
+    logInfo('webhook:whatsapp', 'Incoming message', { phone: `****${phone.slice(-4)}` })
 
     const admin = createAdminClient()
 
@@ -53,12 +51,7 @@ export async function POST(req: Request) {
       .limit(1)
       .maybeSingle()
 
-    if (!conv) {
-      logError('webhook:whatsapp:debug', `No conv found for phone="${phone}"`)
-      return NextResponse.json({ ok: true })
-    }
-
-    logError('webhook:whatsapp:debug', `Conv found: id=${conv.id} — generating reply...`)
+    if (!conv) return NextResponse.json({ ok: true })
 
     const history = (Array.isArray(conv.context) ? conv.context : []) as ConversationTurn[]
     const userCtx = await fetchUserContext(String(conv.user_id))
@@ -66,12 +59,8 @@ export async function POST(req: Request) {
     // Generate AI reply
     const { message, shouldClose } = await generateReply(text, history, userCtx)
 
-    logError('webhook:whatsapp:debug', `Reply generated (${message.length} chars) — sending via Z-API...`)
-
     // Send the reply back
-    const sent = await sendWhatsAppText(phone, message)
-
-    logError('webhook:whatsapp:debug', `Z-API send result: ${sent} — updating DB...`)
+    await sendWhatsAppText(phone, message)
 
     // Persist updated conversation
     const updatedHistory: ConversationTurn[] = [
@@ -80,7 +69,7 @@ export async function POST(req: Request) {
       { role: 'model', text: message },
     ]
 
-    const { error: updateError } = await admin
+    await admin
       .from('whatsapp_conversations')
       .update({
         context: updatedHistory,
@@ -90,8 +79,6 @@ export async function POST(req: Request) {
         status: shouldClose ? 'resolved' : 'active',
       })
       .eq('id', String(conv.id))
-
-    logError('webhook:whatsapp:debug', `DB update done. error=${updateError?.message ?? 'none'} shouldClose=${shouldClose}`)
 
     logInfo('webhook:whatsapp', shouldClose ? 'Conversation resolved' : 'Reply sent', {
       convId: conv.id,
