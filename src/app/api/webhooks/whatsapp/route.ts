@@ -21,14 +21,6 @@ export async function POST(req: Request) {
   try {
     const body = await req.json() as Record<string, unknown>
 
-    // Ignore messages we sent ourselves, group messages, or empty payloads
-    if (Boolean(body.fromMe) || Boolean(body.isGroup)) {
-      logInfo('webhook:whatsapp', 'skip:fromMe/group', { fromMe: body.fromMe, isGroup: body.isGroup, type: body.type })
-      return NextResponse.json({ ok: true })
-    }
-
-    const phone = String(body.phone ?? '').trim()
-
     // Z-API v2 sends text messages as { text: { message: "..." } }
     // Older versions / some event types may still use body.body or body.caption
     const textObj = body.text as Record<string, unknown> | undefined
@@ -38,7 +30,15 @@ export async function POST(req: Request) {
       String(body.caption ?? '').trim()
     )
 
-    logInfo('webhook:whatsapp', 'recv', { type: body.type, phone: `****${phone.slice(-4)}`, hasText: !!text })
+    // Normalize phone: strip WhatsApp suffixes like @c.us / @s.whatsapp.net and digits only
+    const rawPhone = String(body.phone ?? '').trim()
+    const phone = rawPhone.replace(/@.+$/, '').replace(/\D/g, '')
+
+    // DEBUG — always visible in Vercel logs; remove once stable
+    logError('wh:recv', JSON.stringify({ type: body.type, fromMe: body.fromMe, isGroup: body.isGroup, phone, hasText: !!text, textSnip: text.slice(0, 30) }))
+
+    // Ignore messages we sent ourselves or group messages
+    if (Boolean(body.fromMe) || Boolean(body.isGroup)) return NextResponse.json({ ok: true })
 
     if (!phone || !text) return NextResponse.json({ ok: true })
 
@@ -55,7 +55,8 @@ export async function POST(req: Request) {
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()
-    logInfo('webhook:whatsapp', 'conv-lookup', { found: !!conv, convId: conv?.id ?? null, phone: `****${phone.slice(-4)}` })
+
+    logError('wh:conv', JSON.stringify({ found: !!conv, phone }))
     if (!conv) return NextResponse.json({ ok: true })
 
     const history = (Array.isArray(conv.context) ? conv.context : []) as ConversationTurn[]
