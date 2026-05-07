@@ -21,6 +21,11 @@ export async function POST(req: Request) {
   try {
     const body = await req.json() as Record<string, unknown>
 
+    // TEMP: persist raw payload to _debug_zapi so we can read full JSON via SQL
+    try {
+      await createAdminClient().from('_debug_zapi').insert({ payload: body as never })
+    } catch { /* ignore */ }
+
     // Z-API v2 sends text messages as { text: { message: "..." } }
     // Older versions / some event types may still use body.body or body.caption
     const textObj = body.text as Record<string, unknown> | undefined
