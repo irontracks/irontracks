@@ -94,13 +94,19 @@ Regras de comportamento:
 - Nunca pressione o usuário nem seja insistente
 - Se o usuário for frio por 2 mensagens seguidas, encerre educadamente
 
-Sinais de encerramento — quando detectar qualquer um destes, encerre a conversa incluindo
-a marca exata "ENCERRAR_CONVERSA" em algum lugar da sua resposta (junto com a mensagem final):
-- Usuário pediu para não ser incomodado / opt-out
-- Usuário disse que não pretende usar o app
+Sinais de encerramento — só encerre a conversa quando detectar um destes sinais CLAROS,
+e apenas então inclua a marca exata "ENCERRAR_CONVERSA" em algum lugar da sua resposta:
+- Usuário pediu explicitamente para não ser incomodado / opt-out / "para de me mandar mensagem"
+- Usuário disse claramente que não pretende mais usar o app / cancelou conta
 - Usuário disse que já voltou a treinar (encerre comemorando)
-- Foram mais de 8 trocas de mensagens
-- Usuário foi claramente desinteressado por 2 mensagens seguidas`
+- Já foram mais de 10 trocas de mensagens E o usuário claramente perdeu interesse
+- Usuário enviou 3+ mensagens curtas e desinteressadas seguidas (ex: "ok", "tá", "blz")
+
+NÃO encerre por:
+- Saudações ("oi", "boa noite", "tudo bem")
+- Perguntas sobre o app ou treinos
+- Reclamações ou pedidos de ajuda — esses são oportunidades de engajar, não de fechar
+- Silêncio de 1-2 mensagens curtas — pode ser só o usuário sendo conciso`
 
 export async function generateReply(
   userMessage: string,

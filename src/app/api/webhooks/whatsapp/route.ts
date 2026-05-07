@@ -63,14 +63,18 @@ export async function POST(req: Request) {
 
     const admin = createAdminClient()
 
-    // Find the active conversation for this phone number
-    // (try both 12- and 13-digit formats of the BR mobile number)
+    // Find the most recent conversation (active or recently resolved) for this
+    // phone. If the user replies after the bot resolved the conversation, we
+    // re-engage on the same thread instead of going silent — but only within a
+    // 24h window to avoid bringing back stale conversations from days ago.
+    const reactivateCutoff = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
     const { data: conv } = await admin
       .from('whatsapp_conversations')
-      .select('id, user_id, context')
+      .select('id, user_id, context, status, last_message_at')
       .in('phone', phoneOptions)
-      .eq('status', 'active')
-      .order('created_at', { ascending: false })
+      .in('status', ['active', 'resolved'])
+      .gte('last_message_at', reactivateCutoff)
+      .order('last_message_at', { ascending: false })
       .limit(1)
       .maybeSingle()
     if (!conv) return NextResponse.json({ ok: true })
