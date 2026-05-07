@@ -22,7 +22,10 @@ export async function POST(req: Request) {
     const body = await req.json() as Record<string, unknown>
 
     // Ignore messages we sent ourselves, group messages, or empty payloads
-    if (Boolean(body.fromMe) || Boolean(body.isGroup)) return NextResponse.json({ ok: true })
+    if (Boolean(body.fromMe) || Boolean(body.isGroup)) {
+      logInfo('webhook:whatsapp', 'skip:fromMe/group', { fromMe: body.fromMe, isGroup: body.isGroup, type: body.type })
+      return NextResponse.json({ ok: true })
+    }
 
     const phone = String(body.phone ?? '').trim()
 
@@ -34,6 +37,8 @@ export async function POST(req: Request) {
       String(body.body ?? '').trim() ||
       String(body.caption ?? '').trim()
     )
+
+    logInfo('webhook:whatsapp', 'recv', { type: body.type, phone: `****${phone.slice(-4)}`, hasText: !!text })
 
     if (!phone || !text) return NextResponse.json({ ok: true })
 
@@ -50,6 +55,7 @@ export async function POST(req: Request) {
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()
+    logInfo('webhook:whatsapp', 'conv-lookup', { found: !!conv, convId: conv?.id ?? null, phone: `****${phone.slice(-4)}` })
     if (!conv) return NextResponse.json({ ok: true })
 
     const history = (Array.isArray(conv.context) ? conv.context : []) as ConversationTurn[]
