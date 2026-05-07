@@ -21,33 +21,19 @@ export async function POST(req: Request) {
   try {
     const body = await req.json() as Record<string, unknown>
 
-    // DEBUG: log extracted fields to diagnose real Z-API payload structure
-    const textObj = body.text as Record<string, unknown> | undefined
-    logError('webhook:zapi:debug', JSON.stringify({
-      type: body.type,
-      fromMe: body.fromMe,
-      isGroup: body.isGroup,
-      phone: body.phone,
-      textMsg: textObj?.message,
-      bodyField: body.body,
-      caption: body.caption,
-      status: body.status,
-    }))
-
     // Ignore messages we sent ourselves, group messages, or empty payloads
     if (Boolean(body.fromMe) || Boolean(body.isGroup)) return NextResponse.json({ ok: true })
 
     const phone = String(body.phone ?? '').trim()
 
     // Z-API v2 sends text messages as { text: { message: "..." } }
-    // Older versions / some event types may still use body.body
+    // Older versions / some event types may still use body.body or body.caption
+    const textObj = body.text as Record<string, unknown> | undefined
     const text = (
       String(textObj?.message ?? '').trim() ||
       String(body.body ?? '').trim() ||
       String(body.caption ?? '').trim()
     )
-
-    logError('webhook:zapi:extracted', JSON.stringify({ phone, text: text.slice(0, 80), hasConv: null }))
 
     if (!phone || !text) return NextResponse.json({ ok: true })
 
@@ -64,8 +50,6 @@ export async function POST(req: Request) {
       .order('created_at', { ascending: false })
       .limit(1)
       .maybeSingle()
-
-    logError('webhook:zapi:conv', JSON.stringify({ found: !!conv, convId: conv?.id ?? null }))
     if (!conv) return NextResponse.json({ ok: true })
 
     const history = (Array.isArray(conv.context) ? conv.context : []) as ConversationTurn[]
