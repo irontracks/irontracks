@@ -21,6 +21,9 @@ export async function POST(req: Request) {
   try {
     const body = await req.json() as Record<string, unknown>
 
+    // DEBUG TEMP: log raw body fields to diagnose phone format
+    logError('webhook:whatsapp:debug', `fromMe=${body.fromMe} isGroup=${body.isGroup} phone="${body.phone}" type="${body.type}"`)
+
     // Ignore messages we sent ourselves, group messages, or empty payloads
     if (Boolean(body.fromMe) || Boolean(body.isGroup)) return NextResponse.json({ ok: true })
 
