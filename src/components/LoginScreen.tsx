@@ -101,6 +101,14 @@ const LoginScreen = () => {
         showRequestModal, setShowRequestModal,
         reqLoading, reqSuccess, setReqSuccess,
         reqError, formData, setFormData,
+        signupOtpSent, signupOtpSending, signupOtpCode, setSignupOtpCode,
+        signupOtpVerifying, signupOtpError, signupPhoneVerifiedToken,
+        setSignupOtpSent, setSignupPhoneVerifiedToken,
+        handleSignupSendOtp, handleSignupVerifyOtp,
+        reqOtpSent, reqOtpSending, reqOtpCode, setReqOtpCode,
+        reqOtpVerifying, reqOtpError, reqPhoneVerifiedToken,
+        setReqOtpSent, setReqPhoneVerifiedToken,
+        handleReqSendOtp, handleReqVerifyOtp,
         handleAppleLogin,
         handleEmailAuth,
         handleRequestSubmit,
@@ -233,13 +241,69 @@ const LoginScreen = () => {
                                                 if (val.length > 2) val = `(${val.slice(0, 2)}) ${val.slice(2)}`;
                                                 if (val.length > 9) val = `${val.slice(0, 10)}-${val.slice(10)}`;
                                                 setEmailData({ ...emailData, phone: val });
+                                                setSignupOtpSent(false);
+                                                setSignupPhoneVerifiedToken(null);
+                                                setSignupOtpCode('');
                                             }}
                                             onBlur={e => validateField('phone', e.target.value)}
-                                            className={`w-full bg-neutral-950 border rounded-xl pl-12 pr-4 py-3 text-white focus:border-yellow-500 focus:outline-none transition-colors text-xs ${validationErrors.phone ? 'border-red-500/60' : 'border-neutral-800'}`}
+                                            className={`w-full bg-neutral-950 border rounded-xl pl-12 pr-4 py-3 text-white focus:border-yellow-500 focus:outline-none transition-colors text-xs ${
+                                                signupPhoneVerifiedToken ? 'border-emerald-500/60' : validationErrors.phone ? 'border-red-500/60' : 'border-neutral-800'
+                                            }`}
                                         />
                                         {validationErrors.phone && <p id="error-phone" className="mt-1 text-xs text-red-400">{validationErrors.phone}</p>}
                                     </div>
                                 </div>
+
+                                {/* WhatsApp OTP verification */}
+                                {emailData.phone.replace(/\D/g, '').length >= 10 && (
+                                    <div className="animate-in fade-in duration-300">
+                                        {signupPhoneVerifiedToken ? (
+                                            <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30">
+                                                <CheckCircle2 size={16} className="text-emerald-400 flex-shrink-0" />
+                                                <span className="text-xs font-bold text-emerald-400">WhatsApp verificado ✓</span>
+                                            </div>
+                                        ) : !signupOtpSent ? (
+                                            <button
+                                                type="button"
+                                                onClick={handleSignupSendOtp}
+                                                disabled={signupOtpSending}
+                                                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-green-600/20 border border-green-600/40 text-green-400 text-xs font-bold hover:bg-green-600/30 transition-colors disabled:opacity-50"
+                                            >
+                                                {signupOtpSending ? <Loader2 size={14} className="animate-spin" /> : <Phone size={14} />}
+                                                {signupOtpSending ? 'Enviando código...' : 'Verificar WhatsApp'}
+                                            </button>
+                                        ) : (
+                                            <div className="space-y-2 animate-in fade-in">
+                                                <p className="text-xs text-neutral-400">Código enviado — verifique seu WhatsApp:</p>
+                                                <div className="flex gap-2">
+                                                    <input
+                                                        type="text"
+                                                        inputMode="numeric"
+                                                        maxLength={6}
+                                                        placeholder="000000"
+                                                        aria-label="Código de verificação WhatsApp"
+                                                        value={signupOtpCode}
+                                                        onChange={e => setSignupOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                                                        className="flex-1 bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-2.5 text-white text-sm text-center tracking-[0.3em] font-mono focus:border-yellow-500 focus:outline-none"
+                                                    />
+                                                    <button
+                                                        type="button"
+                                                        onClick={handleSignupVerifyOtp}
+                                                        disabled={signupOtpVerifying || signupOtpCode.length < 6}
+                                                        className="px-4 py-2.5 rounded-xl bg-yellow-500 text-black text-xs font-black hover:bg-yellow-400 transition-colors disabled:opacity-50"
+                                                    >
+                                                        {signupOtpVerifying ? <Loader2 size={14} className="animate-spin" /> : 'OK'}
+                                                    </button>
+                                                </div>
+                                                {signupOtpError && <p className="text-xs text-red-400">{signupOtpError}</p>}
+                                                <button type="button" onClick={handleSignupSendOtp} disabled={signupOtpSending} className="text-xs text-neutral-500 hover:text-neutral-300 transition-colors">
+                                                    Reenviar código
+                                                </button>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
                                 <div className="pt-2">
                                     <label htmlFor="is-teacher-checkbox" className="flex items-center gap-3 cursor-pointer group">
                                         <div className="relative flex items-center justify-center w-5 h-5">
@@ -415,7 +479,7 @@ const LoginScreen = () => {
 
                         <button
                             type="submit"
-                            disabled={isLoading || (authMode === 'recover' && recoverCooldownLeft > 0)}
+                            disabled={isLoading || (authMode === 'recover' && recoverCooldownLeft > 0) || (authMode === 'signup' && !signupPhoneVerifiedToken)}
                             aria-label={
                                 authMode === 'login' ? 'Entrar na conta' :
                                     authMode === 'signup' ? 'Criar conta' :
@@ -608,15 +672,23 @@ const LoginScreen = () => {
 
                                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                         <div className="space-y-1">
-                                            <label htmlFor="req-phone" className="text-xs font-bold text-neutral-400 uppercase">Telefone</label>
+                                            <label htmlFor="req-phone" className="text-xs font-bold text-neutral-400 uppercase">WhatsApp</label>
                                             <input
                                                 id="req-phone"
-                                                aria-label="Telefone"
+                                                aria-label="Telefone WhatsApp"
                                                 required
                                                 name="phone"
+                                                type="tel"
                                                 value={formData.phone}
-                                                onChange={handleInputChange}
-                                                className="w-full bg-neutral-950 border border-neutral-800 rounded-xl px-4 py-3 text-white focus:border-yellow-500 focus:outline-none transition-colors"
+                                                onChange={e => {
+                                                    handleInputChange(e);
+                                                    setReqOtpSent(false);
+                                                    setReqPhoneVerifiedToken(null);
+                                                    setReqOtpCode('');
+                                                }}
+                                                className={`w-full bg-neutral-950 border rounded-xl px-4 py-3 text-white focus:border-yellow-500 focus:outline-none transition-colors ${
+                                                    reqPhoneVerifiedToken ? 'border-emerald-500/60' : 'border-neutral-800'
+                                                }`}
                                                 placeholder="(11) 99999-9999"
                                             />
                                         </div>
@@ -634,6 +706,56 @@ const LoginScreen = () => {
                                             />
                                         </div>
                                     </div>
+
+                                    {/* WhatsApp OTP — request modal */}
+                                    {formData.phone.replace(/\D/g, '').length >= 10 && (
+                                        <div className="animate-in fade-in duration-300">
+                                            {reqPhoneVerifiedToken ? (
+                                                <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-500/10 border border-emerald-500/30">
+                                                    <CheckCircle2 size={16} className="text-emerald-400 flex-shrink-0" />
+                                                    <span className="text-xs font-bold text-emerald-400">WhatsApp verificado ✓</span>
+                                                </div>
+                                            ) : !reqOtpSent ? (
+                                                <button
+                                                    type="button"
+                                                    onClick={handleReqSendOtp}
+                                                    disabled={reqOtpSending}
+                                                    className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-green-600/20 border border-green-600/40 text-green-400 text-xs font-bold hover:bg-green-600/30 transition-colors disabled:opacity-50"
+                                                >
+                                                    {reqOtpSending ? <Loader2 size={14} className="animate-spin" /> : <Phone size={14} />}
+                                                    {reqOtpSending ? 'Enviando código...' : 'Verificar WhatsApp'}
+                                                </button>
+                                            ) : (
+                                                <div className="space-y-2 animate-in fade-in">
+                                                    <p className="text-xs text-neutral-400">Código enviado — verifique seu WhatsApp:</p>
+                                                    <div className="flex gap-2">
+                                                        <input
+                                                            type="text"
+                                                            inputMode="numeric"
+                                                            maxLength={6}
+                                                            placeholder="000000"
+                                                            aria-label="Código de verificação WhatsApp"
+                                                            value={reqOtpCode}
+                                                            onChange={e => setReqOtpCode(e.target.value.replace(/\D/g, '').slice(0, 6))}
+                                                            className="flex-1 bg-neutral-950 border border-neutral-700 rounded-xl px-4 py-2.5 text-white text-sm text-center tracking-[0.3em] font-mono focus:border-yellow-500 focus:outline-none"
+                                                        />
+                                                        <button
+                                                            type="button"
+                                                            onClick={handleReqVerifyOtp}
+                                                            disabled={reqOtpVerifying || reqOtpCode.length < 6}
+                                                            className="px-4 py-2.5 rounded-xl bg-yellow-500 text-black text-xs font-black hover:bg-yellow-400 transition-colors disabled:opacity-50"
+                                                        >
+                                                            {reqOtpVerifying ? <Loader2 size={14} className="animate-spin" /> : 'OK'}
+                                                        </button>
+                                                    </div>
+                                                    {reqOtpError && <p className="text-xs text-red-400">{reqOtpError}</p>}
+                                                    <button type="button" onClick={handleReqSendOtp} disabled={reqOtpSending} className="text-xs text-neutral-500 hover:text-neutral-300 transition-colors">
+                                                        Reenviar código
+                                                    </button>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
 
                                     <div className="pt-2">
                                         <label htmlFor="req-is-teacher-checkbox" className="flex items-center gap-3 cursor-pointer group">
@@ -672,7 +794,7 @@ const LoginScreen = () => {
 
                                     <button
                                         type="submit"
-                                        disabled={reqLoading}
+                                        disabled={reqLoading || !reqPhoneVerifiedToken}
                                         className="w-full mt-2 bg-yellow-500 hover:bg-yellow-400 text-black py-4 rounded-xl font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2 transition-all disabled:opacity-50"
                                     >
                                         {reqLoading ? <Loader2 className="animate-spin" size={18} /> : 'ENVIAR SOLICITAÇÃO'}

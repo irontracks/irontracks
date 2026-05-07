@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { isIosNative } from '@/utils/platform'
 import { logError } from '@/lib/logger'
 import { apiAuth } from '@/lib/api'
+import type { OtpVerifyResult } from '@/lib/api/auth'
 
 // ─── Capacitor optional imports ───────────────────────────────────────────────
 let Capacitor: { getPlatform: () => string } = { getPlatform: () => 'web' }
@@ -125,6 +126,22 @@ export function useLoginScreen() {
     const [reqSuccess, setReqSuccess] = useState(false)
     const [reqError, setReqError] = useState('')
     const [formData, setFormData] = useState({ full_name: '', email: '', phone: '', birth_date: '', is_teacher: false, cref: '' })
+
+    // ── OTP state — signup flow ───────────────────────────────────────────────
+    const [signupOtpSent, setSignupOtpSent] = useState(false)
+    const [signupOtpSending, setSignupOtpSending] = useState(false)
+    const [signupOtpCode, setSignupOtpCode] = useState('')
+    const [signupOtpVerifying, setSignupOtpVerifying] = useState(false)
+    const [signupOtpError, setSignupOtpError] = useState('')
+    const [signupPhoneVerifiedToken, setSignupPhoneVerifiedToken] = useState<string | null>(null)
+
+    // ── OTP state — request modal ─────────────────────────────────────────────
+    const [reqOtpSent, setReqOtpSent] = useState(false)
+    const [reqOtpSending, setReqOtpSending] = useState(false)
+    const [reqOtpCode, setReqOtpCode] = useState('')
+    const [reqOtpVerifying, setReqOtpVerifying] = useState(false)
+    const [reqOtpError, setReqOtpError] = useState('')
+    const [reqPhoneVerifiedToken, setReqPhoneVerifiedToken] = useState<string | null>(null)
 
     const fieldSchemas = useMemo(() => ({
         email: z.string().min(1, 'E-mail obrigatório').email('E-mail inválido'),
@@ -301,6 +318,7 @@ export function useLoginScreen() {
                 if (isTeacher && !cref) throw new Error('CREF é obrigatório para cadastro de professor.')
                 const cleanPhone = emailData.phone.replace(/\D/g, '')
                 if (cleanPhone.length < 10) throw new Error('Telefone inválido (mínimo 10 dígitos com DDD).')
+                if (!signupPhoneVerifiedToken) throw new Error('Confirme seu WhatsApp antes de criar a conta.')
                 // Step 1: Create access_request FIRST so the whitelist trigger allows the signUp.
                 // The t_enforce_invite_whitelist trigger runs BEFORE INSERT on auth.users and only
                 // allows emails that already have a pending access_request. Without this, signUp
@@ -309,6 +327,7 @@ export function useLoginScreen() {
                     email, full_name: emailData.fullName, phone: emailData.phone,
                     birth_date: emailData.birthDate, role_requested: isTeacher ? 'teacher' : 'student',
                     cref: isTeacher ? cref : null,
+                    phone_verified_token: signupPhoneVerifiedToken,
                 })
                 if (!accessReqJson?.ok) {
                     throw new Error((accessReqJson?.error as string | undefined) || 'Falha ao registrar solicitação de acesso.')
@@ -365,7 +384,59 @@ export function useLoginScreen() {
         } finally {
             if (!holdLoading) setIsLoading(false)
         }
-    }, [authMode, emailData, rememberMe, recoverCooldownLeft, recoveryCode, recoveryPassword2, router])
+    }, [authMode, emailData, rememberMe, recoverCooldownLeft, recoveryCode, recoveryPassword2, router, signupPhoneVerifiedToken])
+
+    // ── OTP handlers — signup ─────────────────────────────────────────────────
+
+    const handleSignupSendOtp = useCallback(async () => {
+        setSignupOtpSending(true); setSignupOtpError(''); setSignupOtpCode('')
+        setSignupPhoneVerifiedToken(null)
+        try {
+            const json = await apiAuth.sendOtp(emailData.phone)
+            if (!json?.ok) throw new Error((json?.error as string | undefined) || 'Erro ao enviar código.')
+            setSignupOtpSent(true)
+        } catch (err: unknown) {
+            setSignupOtpError(err instanceof Error ? err.message : 'Não foi possível enviar o código. Verifique o número e tente novamente.')
+        } finally { setSignupOtpSending(false) }
+    }, [emailData.phone])
+
+    const handleSignupVerifyOtp = useCallback(async () => {
+        if (signupOtpCode.replace(/\D/g, '').length < 6) { setSignupOtpError('Digite os 6 dígitos do código.'); return }
+        setSignupOtpVerifying(true); setSignupOtpError('')
+        try {
+            const json = await apiAuth.verifyOtp(emailData.phone, signupOtpCode.replace(/\D/g, '')) as OtpVerifyResult
+            if (!json?.ok) throw new Error((json?.error as string | undefined) || 'Código incorreto.')
+            setSignupPhoneVerifiedToken(json.token ?? null)
+        } catch (err: unknown) {
+            setSignupOtpError(err instanceof Error ? err.message : 'Código inválido.')
+        } finally { setSignupOtpVerifying(false) }
+    }, [emailData.phone, signupOtpCode])
+
+    // ── OTP handlers — request modal ──────────────────────────────────────────
+
+    const handleReqSendOtp = useCallback(async () => {
+        setReqOtpSending(true); setReqOtpError(''); setReqOtpCode('')
+        setReqPhoneVerifiedToken(null)
+        try {
+            const json = await apiAuth.sendOtp(formData.phone)
+            if (!json?.ok) throw new Error((json?.error as string | undefined) || 'Erro ao enviar código.')
+            setReqOtpSent(true)
+        } catch (err: unknown) {
+            setReqOtpError(err instanceof Error ? err.message : 'Não foi possível enviar o código.')
+        } finally { setReqOtpSending(false) }
+    }, [formData.phone])
+
+    const handleReqVerifyOtp = useCallback(async () => {
+        if (reqOtpCode.replace(/\D/g, '').length < 6) { setReqOtpError('Digite os 6 dígitos do código.'); return }
+        setReqOtpVerifying(true); setReqOtpError('')
+        try {
+            const json = await apiAuth.verifyOtp(formData.phone, reqOtpCode.replace(/\D/g, '')) as OtpVerifyResult
+            if (!json?.ok) throw new Error((json?.error as string | undefined) || 'Código incorreto.')
+            setReqPhoneVerifiedToken(json.token ?? null)
+        } catch (err: unknown) {
+            setReqOtpError(err instanceof Error ? err.message : 'Código inválido.')
+        } finally { setReqOtpVerifying(false) }
+    }, [formData.phone, reqOtpCode])
 
     const handleRequestSubmit = useCallback(async (e: React.FormEvent) => {
         e.preventDefault(); setReqLoading(true); setReqError('')
@@ -373,14 +444,15 @@ export function useLoginScreen() {
         if (!emailRegex.test(formData.email)) { setReqError('Formato de e-mail inválido.'); setReqLoading(false); return }
         const cleanPhone = formData.phone.replace(/\D/g, '')
         if (cleanPhone.length < 10 || cleanPhone.length > 11) { setReqError('Telefone inválido (DDD + Número).'); setReqLoading(false); return }
+        if (!reqPhoneVerifiedToken) { setReqError('Confirme seu WhatsApp antes de enviar.'); setReqLoading(false); return }
         const payload = { ...formData, role_requested: formData.is_teacher ? 'teacher' : 'student', cref: formData.is_teacher ? formData.cref : null }
         try {
-            const json = await apiAuth.createAccessRequest({ email: payload.email, full_name: payload.full_name, phone: payload.phone, birth_date: payload.birth_date, role_requested: payload.role_requested as 'teacher' | 'student', cref: payload.cref })
+            const json = await apiAuth.createAccessRequest({ email: payload.email, full_name: payload.full_name, phone: payload.phone, birth_date: payload.birth_date, role_requested: payload.role_requested as 'teacher' | 'student', cref: payload.cref, phone_verified_token: reqPhoneVerifiedToken })
             if (!json?.ok) throw new Error((json?.error as string | undefined) || 'Erro ao enviar solicitação.')
             setReqSuccess(true)
         } catch (err: unknown) { setReqError(err instanceof Error ? err.message : 'Erro de conexão.') }
         finally { setReqLoading(false) }
-    }, [formData])
+    }, [formData, reqPhoneVerifiedToken])
 
     const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
         const { name, value } = e.target; setFormData(prev => ({ ...prev, [name]: value }))
@@ -402,6 +474,16 @@ export function useLoginScreen() {
         showRequestModal, setShowRequestModal,
         reqLoading, reqSuccess, setReqSuccess,
         reqError, formData, setFormData,
+        // OTP — signup flow
+        signupOtpSent, signupOtpSending, signupOtpCode, setSignupOtpCode,
+        signupOtpVerifying, signupOtpError, signupPhoneVerifiedToken,
+        setSignupOtpSent, setSignupPhoneVerifiedToken,
+        handleSignupSendOtp, handleSignupVerifyOtp,
+        // OTP — request modal
+        reqOtpSent, reqOtpSending, reqOtpCode, setReqOtpCode,
+        reqOtpVerifying, reqOtpError, reqPhoneVerifiedToken,
+        setReqOtpSent, setReqPhoneVerifiedToken,
+        handleReqSendOtp, handleReqVerifyOtp,
         handleGoogleLogin,
         handleAppleLogin,
         handleEmailAuth,
