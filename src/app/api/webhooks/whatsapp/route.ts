@@ -22,15 +22,20 @@ export async function POST(req: Request) {
     const body = await req.json() as Record<string, unknown>
 
     // DEBUG TEMP: log raw body fields to diagnose phone format
-    logError('webhook:whatsapp:debug', `fromMe=${body.fromMe} isGroup=${body.isGroup} phone="${body.phone}" type="${body.type}"`)
+    logError('webhook:whatsapp:debug', `fromMe=${body.fromMe} isGroup=${body.isGroup} phone="${body.phone}" type="${body.type}" body="${String(body.body ?? '').slice(0, 60)}" text="${String(body.text ?? '').slice(0, 60)}"`)
 
     // Ignore messages we sent ourselves, group messages, or empty payloads
     if (Boolean(body.fromMe) || Boolean(body.isGroup)) return NextResponse.json({ ok: true })
 
     const phone = String(body.phone ?? '').trim()
-    const text = String(body.body ?? '').trim()
+    // Z-API uses `body` for text messages; some event types put content in `text` or `caption`
+    const text = (
+      String(body.body ?? '').trim() ||
+      String(body.text ?? '').trim() ||
+      String(body.caption ?? '').trim()
+    )
     if (!phone || !text) {
-      logError('webhook:whatsapp:debug', `Skipping: empty phone="${phone}" text="${text}"`)
+      logError('webhook:whatsapp:debug', `Skipping: empty phone="${phone}" — raw body keys: ${Object.keys(body).join(',')}`)
       return NextResponse.json({ ok: true })
     }
 
