@@ -46,8 +46,8 @@ export async function POST(req: Request) {
       .maybeSingle()
 
     if (!conv) {
-      // User replied to an old/closed conversation — silently ignore
-      logInfo('webhook:whatsapp', 'No active conversation for phone', { phone: `****${phone.slice(-4)}` })
+      // DEBUG TEMP: log phone that failed lookup
+      logError('webhook:whatsapp:debug', `No conv found for phone="${phone}"`)
       return NextResponse.json({ ok: true })
     }
 
