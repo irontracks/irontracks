@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { isCronAuthorized } from '@/utils/cron/auth'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { insertNotifications } from '@/lib/social/notifyFollowers'
+import { getActivelyTrainingUsers } from '@/utils/cron/activeSessionFilter'
 import { logError } from '@/lib/logger'
 
 export const dynamic = 'force-dynamic'
@@ -17,18 +18,23 @@ export async function GET(req: Request) {
     const admin = createAdminClient()
     const todayKey = new Date().toISOString().slice(0, 10)
 
-    // 1. Who trained today?
-    const { data: todayRows } = await admin
-      .from('workouts')
-      .select('user_id')
-      .eq('is_template', false)
-      .gte('date', todayKey)
-      .limit(20000)
+    // 1. Who trained today? (also fetch active sessions in parallel)
+    const [todayResult, activeUsers] = await Promise.all([
+      admin
+        .from('workouts')
+        .select('user_id')
+        .eq('is_template', false)
+        .gte('date', todayKey)
+        .limit(20000),
+      getActivelyTrainingUsers(admin),
+    ])
+    // Merge: "trained today" includes both finished workouts and ongoing sessions
     const trainedToday = new Set(
-      (Array.isArray(todayRows) ? todayRows : [])
+      (Array.isArray(todayResult.data) ? todayResult.data : [])
         .map((r) => String((r as { user_id?: string })?.user_id || '').trim())
         .filter(Boolean),
     )
+    activeUsers.forEach((uid) => trainedToday.add(uid))
     if (!trainedToday.size) return NextResponse.json({ ok: true, sent: 0 })
 
     // 2. Follow graph: follower → set of following

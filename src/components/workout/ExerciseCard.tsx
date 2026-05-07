@@ -107,14 +107,24 @@ function ExerciseCardInner({ ex, exIdx }: { ex: WorkoutExercise; exIdx: number }
   // Completion animation — brief scale+glow when exercise finishes
   const [justCompleted, setJustCompleted] = useState(false);
   const prevAllDoneRef = React.useRef(allSetsDone);
+  // Refs so the effect can read latest values without re-running
+  const collapsedNowRef = React.useRef(collapsedNow);
+  collapsedNowRef.current = collapsedNow;
+  const toggleCollapseRef = React.useRef(toggleCollapse);
+  toggleCollapseRef.current = toggleCollapse;
   useEffect(() => {
     if (allSetsDone && !prevAllDoneRef.current) {
       setJustCompleted(true);
-      const t = setTimeout(() => setJustCompleted(false), 800);
-      return () => clearTimeout(t);
+      const animT = setTimeout(() => setJustCompleted(false), 800);
+      // Auto-collapse after the completion animation plays
+      const collapseT = setTimeout(() => {
+        if (!collapsedNowRef.current) toggleCollapseRef.current(exIdx);
+      }, 600);
+      prevAllDoneRef.current = true;
+      return () => { clearTimeout(animT); clearTimeout(collapseT); };
     }
     prevAllDoneRef.current = allSetsDone;
-  }, [allSetsDone]);
+  }, [allSetsDone, exIdx]);
 
   // PR detection: compare current session max weight with reportHistory
   const isPR = useMemo(() => {
