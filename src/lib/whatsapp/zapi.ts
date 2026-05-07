@@ -33,12 +33,16 @@ export async function sendWhatsAppText(rawPhone: string, message: string): Promi
     return false
   }
 
+  const clientToken = env.zapi.clientToken
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  if (clientToken) headers['Client-Token'] = clientToken
+
   try {
     const res = await fetch(
       `https://api.z-api.io/instances/${instanceId}/token/${token}/send-text`,
       {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({ phone, message }),
       },
     )

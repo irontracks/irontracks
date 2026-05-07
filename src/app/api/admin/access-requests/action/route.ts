@@ -32,9 +32,13 @@ const sendWhatsAppMessage = async (rawPhone: string, fullName: string, accountEx
     ? `Olá ${name}! Seu acesso ao *IronTracks* foi aprovado. Você já pode entrar com seu e-mail e senha. Bons treinos! 💪`
     : `Olá ${name}! Seu acesso ao *IronTracks* foi aprovado. Acesse https://irontracks.com.br para criar sua senha e começar a treinar!`
 
+  const clientToken = env.zapi.clientToken
+  const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+  if (clientToken) headers['Client-Token'] = clientToken
+
   await fetch(`https://api.z-api.io/instances/${instanceId}/token/${token}/send-text`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: JSON.stringify({ phone, message }),
   }).catch((): null => null)
 }
