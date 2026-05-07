@@ -134,6 +134,8 @@ export const env = {
   zapi: {
     get instanceId() { return optionalEnv('ZAPI_INSTANCE_ID') },
     get token() { return optionalEnv('ZAPI_TOKEN') },
+    /** Security token sent by Z-API in the "client-token" header on webhooks */
+    get clientToken() { return optionalEnv('ZAPI_CLIENT_TOKEN') },
   },
 
   // ── YouTube ───────────────────────────────────────────────

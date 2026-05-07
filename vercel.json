@@ -89,6 +89,7 @@
         { "path": "/api/cron/water-reminder", "schedule": "0 17 * * *" },
         { "path": "/api/cron/trial-ending", "schedule": "0 13 * * *" },
         { "path": "/api/cron/teacher-plan-expiring", "schedule": "0 13 * * *" },
-        { "path": "/api/cron/teacher-plan-suspend", "schedule": "0 6 * * *" }
+        { "path": "/api/cron/teacher-plan-suspend", "schedule": "0 6 * * *" },
+        { "path": "/api/cron/whatsapp-reactivation", "schedule": "0 14 * * *" }
     ]
 }
