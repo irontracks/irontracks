@@ -21,6 +21,9 @@ export async function POST(req: Request) {
   try {
     const body = await req.json() as Record<string, unknown>
 
+    // DEBUG TEMP: log full payload to identify real Z-API format
+    logError('webhook:zapi:payload', JSON.stringify(body).slice(0, 400))
+
     // Ignore messages we sent ourselves, group messages, or empty payloads
     if (Boolean(body.fromMe) || Boolean(body.isGroup)) return NextResponse.json({ ok: true })
 
