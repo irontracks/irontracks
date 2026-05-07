@@ -121,11 +121,14 @@ export async function generateReply(
     systemInstruction: `${SYSTEM_PROMPT}\n\n${contextBlock}`,
   })
 
-  // Gemini requires history to start with a 'user' turn.
-  // The first turn in our DB history is always a synthetic user prompt
-  // (inserted by the cron) so the initial bot message has proper context.
+  // Gemini requires history to start with a 'user' turn — strip any
+  // leading 'model' turns (e.g. when the cron sends the initial message
+  // before the user replies for the first time).
+  const firstUserIdx = history.findIndex((t) => t.role === 'user')
+  const geminiHistory = firstUserIdx >= 0 ? history.slice(firstUserIdx) : []
+
   const chat = model.startChat({
-    history: history.map((turn) => ({
+    history: geminiHistory.map((turn) => ({
       role: turn.role,
       parts: [{ text: turn.text }],
     })),
