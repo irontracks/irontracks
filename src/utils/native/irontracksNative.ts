@@ -126,20 +126,6 @@ type IronTracksNativePlugin = {
   queueDelete: (opts: { id: string }) => Promise<{ ok: boolean }>
   queueClear: () => Promise<{ ok: boolean }>
   kvStoreStats: () => Promise<{ available: boolean; kvCount?: number; queueCount?: number; sizeBytes?: number }>
-  // SharePlay (Feature 18) — train together via FaceTime
-  startSharePlayWorkout: (opts: { workoutId: string; workoutName: string; hostName?: string }) => Promise<{ ok: boolean; error?: string }>
-  endSharePlayWorkout: () => Promise<{ ok: boolean }>
-  sendSharePlayMessage: (opts: { type: string; payload: Record<string, unknown> }) => Promise<{ ok: boolean; error?: string }>
-  getSharePlayState: () => Promise<{
-    active: boolean
-    participantCount: number
-    workoutId?: string
-    workoutName?: string
-    hostName?: string
-  }>
-  addListener(eventName: 'sharePlayState', listenerFunc: (data: { state: 'waiting' | 'joined' | 'invalidated' | 'unknown'; workoutId: string }) => void): Promise<PluginListenerHandle>
-  addListener(eventName: 'sharePlayParticipants', listenerFunc: (data: { count: number }) => void): Promise<PluginListenerHandle>
-  addListener(eventName: 'sharePlayMessage', listenerFunc: (data: { type: string; payloadJSON: string; sentAtMs: number; fromParticipantId: string }) => void): Promise<PluginListenerHandle>
   // Watch (WatchConnectivity)
   watchGetState: () => Promise<{ isPaired: boolean | string; isReachable: boolean | string; isWatchAppInstalled: boolean | string; isSupported: boolean | string }>
   watchSendDashboard: (opts: { json: string }) => Promise<{ ok: boolean }>
@@ -219,10 +205,6 @@ const webFallback: IronTracksNativePlugin = {
   queueDelete: async () => ({ ok: false }),
   queueClear: async () => ({ ok: false }),
   kvStoreStats: async () => ({ available: false }),
-  startSharePlayWorkout: async () => ({ ok: false, error: 'not_ios' }),
-  endSharePlayWorkout: async () => ({ ok: false }),
-  sendSharePlayMessage: async () => ({ ok: false, error: 'not_ios' }),
-  getSharePlayState: async () => ({ active: false, participantCount: 0 }),
   // Watch (WatchConnectivity) — sem-op no web/Android
   watchGetState: async () => ({ isPaired: false, isReachable: false, isWatchAppInstalled: false, isSupported: false }),
   watchSendDashboard: async () => ({ ok: false }),
@@ -1137,138 +1119,6 @@ export const nativeKvStoreStats = async (): Promise<NativeKVStoreStats> => {
       sizeBytes: Number(r?.sizeBytes) || 0,
     }
   } catch { return empty }
-}
-
-// ─── SharePlay (Feature 18) ───────────────────────────────────────────────────
-//
-// FaceTime-driven workout co-presence. Two paths to start:
-//   A) User is already in a FaceTime call → tap "Treinar Junto" button →
-//      SharePlay tray appears → user (and peers) tap "Open" → activate succeeds.
-//   B) User taps "Treinar Junto" without a FaceTime active → activate returns
-//      not_activated; UI prompts the user to start a FaceTime first.
-//
-// Once active, every set-completion / exercise-change is mirrored across all
-// participants by serialising the JS state diff into a SharePlay message.
-
-export type SharePlayState = 'inactive' | 'waiting' | 'joined' | 'invalidated' | 'unknown'
-
-export interface SharePlayInfo {
-  active: boolean
-  participantCount: number
-  workoutId?: string
-  workoutName?: string
-  hostName?: string
-}
-
-export const startSharePlayWorkout = async (opts: {
-  workoutId: string
-  workoutName: string
-  hostName?: string
-}): Promise<{ ok: boolean; error?: string }> => {
-  try {
-    if (!isIosNative()) return { ok: false, error: 'not_ios' }
-    if (!opts?.workoutId) return { ok: false, error: 'missing_workoutId' }
-    return await Native.startSharePlayWorkout({
-      workoutId: String(opts.workoutId).slice(0, 64),
-      workoutName: String(opts.workoutName ?? 'Treino').slice(0, 60),
-      hostName: String(opts.hostName ?? '').slice(0, 60),
-    })
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : 'unknown' }
-  }
-}
-
-export const endSharePlayWorkout = async (): Promise<boolean> => {
-  try {
-    if (!isIosNative()) return false
-    const r = await Native.endSharePlayWorkout()
-    return !!r?.ok
-  } catch { return false }
-}
-
-/** Send a typed message to every other participant. The payload is JSON-encoded
- *  on the Swift side so it can hold arbitrary nested objects. */
-export const sendSharePlayMessage = async <T extends Record<string, unknown>>(
-  type: string,
-  payload: T,
-): Promise<boolean> => {
-  try {
-    if (!isIosNative()) return false
-    if (!type) return false
-    const r = await Native.sendSharePlayMessage({ type, payload })
-    return !!r?.ok
-  } catch { return false }
-}
-
-export const getSharePlayState = async (): Promise<SharePlayInfo> => {
-  try {
-    if (!isIosNative()) return { active: false, participantCount: 0 }
-    const r = await Native.getSharePlayState()
-    return {
-      active: !!r?.active,
-      participantCount: Number(r?.participantCount) || 0,
-      workoutId: r?.workoutId ? String(r.workoutId) : undefined,
-      workoutName: r?.workoutName ? String(r.workoutName) : undefined,
-      hostName: r?.hostName ? String(r.hostName) : undefined,
-    }
-  } catch { return { active: false, participantCount: 0 } }
-}
-
-export const addSharePlayStateListener = (callback: (state: SharePlayState) => void): (() => void) => {
-  if (!isIosNative()) return () => { }
-  try {
-    const listenerPromise = Native.addListener('sharePlayState', (data) => {
-      const s = String(data?.state ?? '')
-      const safe: SharePlayState = (s === 'waiting' || s === 'joined' || s === 'invalidated' || s === 'unknown') ? s : 'unknown'
-      try { callback(safe) } catch { /* swallow */ }
-    })
-    return () => { listenerPromise.then((l: PluginListenerHandle) => l.remove()).catch(() => { }) }
-  } catch { return () => { } }
-}
-
-export const addSharePlayParticipantsListener = (callback: (count: number) => void): (() => void) => {
-  if (!isIosNative()) return () => { }
-  try {
-    const listenerPromise = Native.addListener('sharePlayParticipants', (data) => {
-      const n = Number(data?.count)
-      if (Number.isFinite(n)) try { callback(Math.max(0, n)) } catch { /* swallow */ }
-    })
-    return () => { listenerPromise.then((l: PluginListenerHandle) => l.remove()).catch(() => { }) }
-  } catch { return () => { } }
-}
-
-export interface SharePlayIncomingMessage {
-  type: string
-  payload: Record<string, unknown>
-  sentAtMs: number
-  fromParticipantId: string
-}
-
-export const addSharePlayMessageListener = (
-  callback: (msg: SharePlayIncomingMessage) => void,
-): (() => void) => {
-  if (!isIosNative()) return () => { }
-  try {
-    const listenerPromise = Native.addListener('sharePlayMessage', (data) => {
-      try {
-        let payload: Record<string, unknown> = {}
-        try {
-          const raw = String(data?.payloadJSON ?? '{}')
-          const parsed = JSON.parse(raw)
-          if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
-            payload = parsed as Record<string, unknown>
-          }
-        } catch { /* invalid JSON — keep empty */ }
-        callback({
-          type: String(data?.type ?? ''),
-          payload,
-          sentAtMs: Number(data?.sentAtMs) || 0,
-          fromParticipantId: String(data?.fromParticipantId ?? ''),
-        })
-      } catch { /* swallow */ }
-    })
-    return () => { listenerPromise.then((l: PluginListenerHandle) => l.remove()).catch(() => { }) }
-  } catch { return () => { } }
 }
 
 /**
