@@ -59,7 +59,6 @@ import { useUnreadBadges } from '@/hooks/useUnreadBadges'
 import { useNativeAppSetup } from '@/hooks/useNativeAppSetup'
 import { useNativeIntentRouter } from '@/hooks/useNativeIntentRouter'
 import { useBackgroundRefresh } from '@/hooks/useBackgroundRefresh'
-import { useSiriWorkoutSuggestions } from '@/hooks/useSiriWorkoutSuggestions'
 import { useLiveActivityPushSync } from '@/hooks/useLiveActivityPushSync'
 import { useGymGeofence } from '@/hooks/useGymGeofence'
 import { usePushNotifications } from '@/hooks/usePushNotifications'
@@ -324,21 +323,6 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         supabase,
         initialWorkouts: Array.isArray(initialWorkouts) ? (initialWorkouts as Array<Record<string, unknown>>) : undefined,
     })
-
-    // ── Siri Shortcuts suggestions (Feature 19) ──
-    // Pushes the 10 most relevant workouts into the iOS AppEntity cache so
-    // "Hey Siri, iniciar Treino A no IronTracks" works with their actual names.
-    const siriWorkouts = useMemo(() => {
-        const list = Array.isArray(workouts) ? (workouts as Array<Record<string, unknown>>) : []
-        return list
-            .slice(0, 10)
-            .map((w) => ({
-                id: String(w?.id ?? ''),
-                name: String(w?.title ?? w?.name ?? '').trim(),
-            }))
-            .filter((w) => w.id && w.name)
-    }, [workouts])
-    useSiriWorkoutSuggestions(siriWorkouts)
 
     // refreshSyncState, runFlushQueue, syncState effects — handled by useOfflineSync hook above
 
