@@ -6,6 +6,7 @@ import { getSupabaseCookieOptions } from '@/utils/supabase/cookieOptions'
 import { warmupCacheForUser } from '@/utils/cacheWarmup'
 import { notifyAdminsNewSignup } from '@/lib/push/notifyAdmins'
 import { env } from '@/utils/env'
+import { sanitizeNextParam } from '@/utils/auth/safeRedirect'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -78,9 +79,10 @@ export async function GET(request: Request) {
     const cookieStore = await cookies()
     nextFromCookie = String(cookieStore.get(nextCookieName)?.value || '')
   } catch { }
-  const rawNext = String(next || '')
-  const fallbackNext = nextFromCookie || '/dashboard'
-  const safeNext = rawNext.startsWith('/') ? rawNext : fallbackNext.startsWith('/') ? fallbackNext : '/dashboard'
+  // Open-redirect protection: '//evil.com' must NOT be accepted just because
+  // it starts with '/'. See utils/auth/safeRedirect.ts.
+  const fallbackNext = sanitizeNextParam(nextFromCookie, '/dashboard')
+  const safeNext = sanitizeNextParam(next, fallbackNext)
 
   const html = `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"/><meta name="viewport" content="width=device-width, initial-scale=1"/><meta http-equiv="cache-control" content="no-store"/><title>Entrando…</title></head><body style="margin:0;background:#0a0a0a;color:#fff;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;display:flex;min-height:100vh;align-items:center;justify-content:center;padding:24px"><div style="max-width:420px;width:100%"><div style="font-weight:900;font-size:18px;margin-bottom:8px">Entrando…</div><div style="opacity:.8;font-size:13px;line-height:1.4;margin-bottom:16px">Finalizando autenticação e abrindo o app.</div><a href="${safeNext}" style="display:block;text-decoration:none;background:#facc15;color:#000;font-weight:900;padding:12px 14px;border-radius:12px;text-align:center">Continuar</a></div><script>try{window.location.replace(${JSON.stringify(safeNext)})}catch(e){try{window.location.href=${JSON.stringify(safeNext)}}catch(_){}}</script></body></html>`
 
