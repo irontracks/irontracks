@@ -1,6 +1,7 @@
 'use client'
 import Image from 'next/image'
 import { useEffect, useState } from 'react'
+import { clearSessionBackup } from '@/utils/auth/sessionBackup'
 
 // Module-level flag: true after the first LoadingScreen has been shown in this
 // browser session. Subsequent mounts skip the splash-in animation so the logo
@@ -31,10 +32,8 @@ const LoadingScreen = () => {
                 <button
                     className="mt-2 px-6 py-2 rounded-full bg-amber-500 text-black text-sm font-bold"
                     onClick={() => {
-                        try {
-                            localStorage.removeItem('it.logged_in')
-                            localStorage.removeItem('it.session.backup')
-                        } catch { }
+                        try { localStorage.removeItem('it.logged_in') } catch { }
+                        clearSessionBackup()
                         window.location.replace('/')
                     }}
                 >

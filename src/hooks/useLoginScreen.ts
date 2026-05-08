@@ -7,6 +7,7 @@ import { isIosNative } from '@/utils/platform'
 import { logError } from '@/lib/logger'
 import { apiAuth } from '@/lib/api'
 import type { OtpVerifyResult } from '@/lib/api/auth'
+import { writeSessionBackup, readSessionBackup, clearSessionBackup } from '@/utils/auth/sessionBackup'
 
 // ─── Capacitor optional imports ───────────────────────────────────────────────
 let Capacitor: { getPlatform: () => string } = { getPlatform: () => 'web' }
@@ -96,11 +97,8 @@ export function useLoginScreen() {
         if (typeof window === 'undefined') return false
         try {
             if (localStorage.getItem('it.logged_in') === '1') return true
-            const raw = localStorage.getItem('it.session.backup')
-            if (raw) {
-                const backup = JSON.parse(raw) as Record<string, unknown>
-                if (backup?.access_token && backup?.refresh_token) return true
-            }
+            // readSessionBackup applies the 24h expiry and platform check.
+            if (readSessionBackup()) return true
         } catch (e) { logError('hook:useLoginScreen.initLoadingState', e) }
         return false
     })
@@ -181,20 +179,21 @@ export function useLoginScreen() {
         if (savedEmail) { setEmailData(prev => ({ ...prev, email: savedEmail })); setRememberMe(true) }
         if (localStorage.getItem('it.logged_in') === '1') { setIsLoading(true); window.location.replace('/dashboard'); return }
         try {
-            const backupRaw = localStorage.getItem('it.session.backup')
-            if (backupRaw) {
-                const backup = JSON.parse(backupRaw)
-                if (backup?.access_token && backup?.refresh_token) {
-                    setIsLoading(true)
-                    const supabase = createClient()
-                    supabase.auth.setSession({ access_token: backup.access_token, refresh_token: backup.refresh_token }).then(({ error, data }) => {
-                        if (!error && data?.session) {
-                            apiAuth.persistSession(data.session.access_token, data.session.refresh_token)
-                                .then(() => { try { localStorage.setItem('it.logged_in', '1') } catch { }; window.location.replace('/dashboard') })
-                                .catch(() => setIsLoading(false))
-                        } else { setIsLoading(false) }
-                    }).catch(() => setIsLoading(false))
-                }
+            const backup = readSessionBackup()
+            if (backup) {
+                setIsLoading(true)
+                const supabase = createClient()
+                supabase.auth.setSession({ access_token: backup.access_token, refresh_token: backup.refresh_token }).then(({ error, data }) => {
+                    if (!error && data?.session) {
+                        apiAuth.persistSession(data.session.access_token, data.session.refresh_token)
+                            .then(() => { try { localStorage.setItem('it.logged_in', '1') } catch { }; window.location.replace('/dashboard') })
+                            .catch(() => setIsLoading(false))
+                    } else {
+                        // setSession failed → backup is bad/expired. Clear it so we don't loop.
+                        clearSessionBackup()
+                        setIsLoading(false)
+                    }
+                }).catch(() => { clearSessionBackup(); setIsLoading(false) })
             }
         } catch (e) { logError('hook:useLoginScreen.sessionRestore', e) }
     }, [])
@@ -259,7 +258,7 @@ export function useLoginScreen() {
                 if (session?.access_token && session?.refresh_token) {
                     await apiAuth.persistSession(session.access_token, session.refresh_token)
                     // Backup session for restore on WKWebView cookie failures
-                    try { localStorage.setItem('it.session.backup', JSON.stringify({ access_token: session.access_token, refresh_token: session.refresh_token })) } catch { }
+                    writeSessionBackup(session.access_token, session.refresh_token)
                 }
                 try { localStorage.setItem('it.logged_in', '1') } catch { }
                 // CRITICAL: Use full page reload instead of client-side navigation.
@@ -277,7 +276,7 @@ export function useLoginScreen() {
             // Always clean up the logged_in flag to prevent a redirect loop between
             // the root page and the dashboard when authentication fails.
             try { localStorage.removeItem('it.logged_in') } catch { }
-            try { localStorage.removeItem('it.session.backup') } catch { }
+            clearSessionBackup()
             const rawMsg = error instanceof Error ? error.message : 'Falha ao fazer login.'
             // If the error is the Postgres whitelist trigger (account not pre-registered),
             // show the "No Account" modal instead of a raw red error banner.
@@ -307,7 +306,7 @@ export function useLoginScreen() {
                 const session = data?.session
                 if (session?.access_token && session?.refresh_token) {
                     await apiAuth.persistSession(session.access_token, session.refresh_token)
-                    try { localStorage.setItem('it.session.backup', JSON.stringify({ access_token: session.access_token, refresh_token: session.refresh_token })) } catch { }
+                    writeSessionBackup(session.access_token, session.refresh_token)
                 }
                 holdLoading = true; try { localStorage.setItem('it.logged_in', '1') } catch { }
                 window.location.replace('/dashboard')
@@ -373,7 +372,7 @@ export function useLoginScreen() {
                 const session = data?.session
                 if (session?.access_token && session?.refresh_token) {
                     await apiAuth.persistSession(session.access_token, session.refresh_token)
-                    try { localStorage.setItem('it.session.backup', JSON.stringify({ access_token: session.access_token, refresh_token: session.refresh_token })) } catch { }
+                    writeSessionBackup(session.access_token, session.refresh_token)
                 }
                 holdLoading = true; try { localStorage.setItem('it.logged_in', '1') } catch { }
                 window.location.replace('/dashboard')
