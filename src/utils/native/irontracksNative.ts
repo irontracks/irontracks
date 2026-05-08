@@ -105,8 +105,6 @@ type IronTracksNativePlugin = {
   // BGTaskScheduler — schedule next refresh / sync windows
   scheduleBackgroundTasks: () => Promise<{ ok: boolean }>
   addListener(eventName: 'backgroundRefresh', listenerFunc: (data: { kind: 'refresh' | 'sync' }) => void): Promise<PluginListenerHandle>
-  // App Shortcuts dynamic suggestions (Siri)
-  updateSiriWorkoutSuggestions: (opts: { workouts: Array<{ id: string; name: string }> }) => Promise<{ ok: boolean; count: number }>
   // Live Activity push tokens (Feature 11)
   getLiveActivityPushTokens: () => Promise<{ tokens: Array<{ kind: string; token: string }> }>
   addListener(eventName: 'liveActivityPushToken', listenerFunc: (data: { kind: string; activityId: string; token: string }) => void): Promise<PluginListenerHandle>
@@ -194,7 +192,6 @@ const webFallback: IronTracksNativePlugin = {
   checkGeofenceStatus: async () => ({ active: false, authorization: 'denied', gymName: '' }),
   requestAlwaysLocationPermission: async () => ({ status: 'denied' }),
   scheduleBackgroundTasks: async () => ({ ok: false }),
-  updateSiriWorkoutSuggestions: async () => ({ ok: false, count: 0 }),
   getLiveActivityPushTokens: async () => ({ tokens: [] }),
   kvGet: async () => ({ value: null, exists: false }),
   kvSet: async () => ({ ok: false }),
@@ -961,24 +958,6 @@ export const addBackgroundRefreshListener = (
     })
     return () => { listenerPromise.then((l: PluginListenerHandle) => l.remove()).catch(() => { }) }
   } catch { return () => { } }
-}
-
-// ─── App Shortcuts dynamic suggestions (Feature 19) ───────────────────────────
-
-/** Pushes the user's recent / favourite workouts into the AppEntity cache so
- *  Siri can suggest them. Pass an empty array to clear. iOS dedupes & limits. */
-export const updateSiriWorkoutSuggestions = async (
-  workouts: Array<{ id: string; name: string }>,
-): Promise<number> => {
-  try {
-    if (!isIosNative()) return 0
-    const safe = (workouts || [])
-      .filter((w) => w && typeof w.id === 'string' && typeof w.name === 'string' && w.id.trim() && w.name.trim())
-      .slice(0, 10) // Cap at 10 — Siri ignores larger lists anyway
-      .map((w) => ({ id: String(w.id).slice(0, 64), name: String(w.name).slice(0, 60) }))
-    const r = await Native.updateSiriWorkoutSuggestions({ workouts: safe })
-    return Number(r?.count) || 0
-  } catch { return 0 }
 }
 
 // ─── Live Activity push tokens (Feature 11) ───────────────────────────────────
