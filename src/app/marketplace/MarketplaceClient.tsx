@@ -162,7 +162,6 @@ const TIERS = {
       'Coach IA: Ilimitado',
       'Insights: Ilimitado',
       'Wizard: Ilimitado',
-      'Chef IA',
       'Analytics Avançado'
     ]
   }

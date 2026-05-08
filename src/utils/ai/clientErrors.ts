@@ -6,7 +6,7 @@
  * code into something the user can read.
  *
  * Why a separate helper:
- *   - Every AI feature needs the same mapping (chef-ia, insights, coach chat,
+ *   - Every AI feature needs the same mapping (insights, coach chat,
  *     meal plan, etc.). Duplicating the switch in each component rots fast.
  *   - The raw Google SDK error string ("[GoogleGenerativeAI Error] ...")
  *     used to leak into the UI. A catch-all in this helper also covers the
