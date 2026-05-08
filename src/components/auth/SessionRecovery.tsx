@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { trackUserEvent } from '@/lib/telemetry/userActivity'
+import { writeSessionBackup, clearSessionBackup } from '@/utils/auth/sessionBackup'
 
 const LAST_REFRESH_KEY = 'irontracks.auth.lastRefresh'
 const MIN_REFRESH_GAP_MS = 5 * 60 * 1000
@@ -49,15 +50,13 @@ export default function SessionRecovery() {
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       try {
         if (typeof window === 'undefined') return
-        const key = 'it.session.backup'
         if ((event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') && session?.access_token && session?.refresh_token) {
-          window.localStorage.setItem(key, JSON.stringify({
-            access_token: session.access_token,
-            refresh_token: session.refresh_token,
-            expires_at: session.expires_at || 0
-          }))
+          // writeSessionBackup is a no-op outside iOS native and applies a 24h
+          // expiry — keeps long-lived plaintext refresh tokens out of web
+          // localStorage where they're easy XSS targets.
+          writeSessionBackup(session.access_token, session.refresh_token)
         } else if (event === 'SIGNED_OUT') {
-          window.localStorage.removeItem(key)
+          clearSessionBackup()
         }
       } catch { }
     })
