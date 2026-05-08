@@ -9,7 +9,6 @@ import { WorkoutProvider } from './workout/WorkoutContext';
 import type { WorkoutContextType } from './workout/WorkoutContext';
 import { WorkoutTimerProvider } from './workout/WorkoutTimerContext';
 import { useWorkoutLiveActivity } from '@/hooks/useWorkoutLiveActivity';
-import { useSharePlayBroadcast } from '@/hooks/useSharePlayBroadcast';
 import WorkoutHeader from './workout/WorkoutHeader';
 import ExerciseList from './workout/ExerciseList';
 import WorkoutFooter from './workout/WorkoutFooter';
@@ -45,11 +44,6 @@ export default function ActiveWorkout(props: ActiveWorkoutProps & { controlledBy
     logs: (session?.logs ?? {}) as Record<string, unknown>,
     currentExerciseIdx: controller.currentExerciseIdx ?? 0,
   });
-
-  // ── SharePlay broadcast (Feature 18) ──
-  // Auto-broadcasts every newly-completed set to FaceTime peers when a SharePlay
-  // session is active. No-op when no session — cheap to keep mounted.
-  useSharePlayBroadcast((session?.logs ?? {}) as Record<string, unknown>);
 
   // Exit animation — intercept back/finish callbacks to play slide-down before unmounting
   const [isExiting, setIsExiting] = React.useState(false);
