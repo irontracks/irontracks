@@ -9,7 +9,6 @@ import { createWorkout } from '@/actions/workout-crud-actions'
 import VipWeeklySummaryCard from '@/components/vip/VipWeeklySummaryCard'
 
 const VipPeriodizationPanel = dynamic(() => import('@/components/vip/VipPeriodizationPanel'), { ssr: false })
-const SupplementAnalysis = dynamic(() => import('@/components/SupplementAnalysis'), { ssr: false })
 const WorkoutHeatMap = dynamic(() => import('@/components/vip/WorkoutHeatMap'), { ssr: false })
 import VipInsightsPanel from '@/components/vip/VipInsightsPanel'
 import { logError } from '@/lib/logger'
@@ -486,14 +485,6 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
 
       <div id="vip-periodization">
         <VipPeriodizationPanel locked={isLocked} onStartSession={(w) => onStartSession?.(w as Workout)} onOpenWorkoutEditor={(w) => onOpenWorkoutEditor?.(w as Workout)} />
-      </div>
-
-      {/* ── ANÁLISE DE SUPLEMENTAÇÃO IA ──────────────────────────────────── */}
-      <div
-        className="rounded-2xl p-4"
-        style={{ border: '1px solid rgba(255,255,255,0.07)', background: 'rgba(255,255,255,0.02)' }}
-      >
-        <SupplementAnalysis />
       </div>
 
       {/* ── CHAT PAI — Coach IA Premium ─────────────────────────────────── */}
