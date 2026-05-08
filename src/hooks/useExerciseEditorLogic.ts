@@ -2,11 +2,9 @@ import { useCallback } from 'react'
 import { useDialog } from '@/contexts/DialogContext'
 import { createClient } from '@/utils/supabase/client'
 import { normalizeWorkoutTitle } from '@/utils/workoutTitle'
-import { detectCardioFromScanner, detectRestPauseConfig, extractRepsTargets } from '@/utils/training/scannerDetection'
 import { parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
 import { getErrorMessage } from '@/utils/errorMessage'
-import { resolveCanonicalExerciseName } from '@/utils/exerciseCanonical'
 import type { SetDetail, Exercise, Workout } from '@/components/ExerciseEditor/types'
 
 interface UseExerciseEditorLogicParams {
@@ -17,10 +15,7 @@ interface UseExerciseEditorLogicParams {
     onSaved?: () => void
     saving: boolean
     setSaving: (v: boolean) => void
-    setScannerLoading: (v: boolean) => void
-    setScannerError: (v: string) => void
     fileInputRef: React.RefObject<HTMLInputElement>
-    scannerFileInputRef: React.RefObject<HTMLInputElement>
     normalizeMethod: (method: unknown) => string
     buildDefaultSetDetail: (exercise: Exercise, setNumber: number) => SetDetail
     ensureSetDetails: (exercise: Exercise, desiredCount: number) => SetDetail[]
@@ -30,7 +25,6 @@ export function useExerciseEditorLogic({
     workout,
     onSave, onCancel, onChange, onSaved,
     setSaving,
-    setScannerLoading, setScannerError,
     normalizeMethod, buildDefaultSetDetail, ensureSetDetails,
 }: UseExerciseEditorLogicParams) {
     const { confirm, alert, closeDialog, showLoading } = useDialog()
@@ -146,99 +140,6 @@ export function useExerciseEditorLogic({
         }
     }, [workout, getExerciseType, normalizeMethod, updateExercise, alert, confirm])
 
-    const handleScannerFileChange = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
-        try {
-            setScannerError('')
-            const files = e?.target?.files
-            if (!files || files.length === 0) return
-            const selectedFiles = Array.from(files).filter((f) => !!f) as File[]
-            if (selectedFiles.length === 0) return
-            setScannerLoading(true)
-            const allRawExercises: unknown[] = []
-            let detectedTitle = ''
-            for (let i = 0; i < selectedFiles.length; i += 1) {
-                const file = selectedFiles[i] as File
-                const formData = new FormData()
-                formData.append('file', file)
-                const res = await fetch('/api/iron-scanner', { method: 'POST', body: formData })
-                const json = await res.json().catch(() => ({ ok: false, error: 'Resposta inválida do servidor' }))
-                if (!res.ok || !json?.ok) {
-                    const msg = json?.error || 'Não conseguimos ler o treino. Tente uma foto mais nítida.'
-                    setScannerError(msg); await alert(msg, 'Falha na importação'); return
-                }
-                const titleCandidate = String(json?.workoutTitle ?? '').trim()
-                if (!detectedTitle && titleCandidate) detectedTitle = titleCandidate
-                const list = Array.isArray(json.exercises) ? json.exercises : []
-                if (list.length === 0) {
-                    const msg = 'Não encontramos exercícios válidos em uma das imagens.'
-                    setScannerError(msg); await alert(msg, 'Sem exercícios detectados'); return
-                }
-                allRawExercises.push(...list)
-            }
-            if (allRawExercises.length === 0) {
-                const msg = 'Não encontramos exercícios válidos nas imagens selecionadas.'
-                setScannerError(msg); await alert(msg, 'Sem exercícios válidos'); return
-            }
-            const mappedExercises = (allRawExercises as Record<string, unknown>[]).map((item) => {
-                const rawName = String(item?.name || '').trim()
-                const canonical = resolveCanonicalExerciseName(rawName)
-                const name = String(canonical?.canonical || rawName).trim()
-                const setsNum = typeof item?.sets === 'number' ? item.sets : parseInt(String(item?.sets || '0')) || 0
-                const repsRaw = String(item?.reps ?? '').trim()
-                const notesRaw = String(item?.notes ?? '').trim()
-                const baseSets = Number.isFinite(setsNum) && setsNum > 0 ? setsNum : 4
-                const cardioInfo = detectCardioFromScanner(name, repsRaw, notesRaw)
-                if (cardioInfo) {
-                    const minutesStr = String(cardioInfo.minutes)
-                    const exercise: Exercise = { name: cardioInfo.modality, type: 'cardio', method: 'Cardio', sets: 1, reps: minutesStr, rpe: '5', cadence: '', restTime: 0, videoUrl: '', notes: notesRaw }
-                    const setDetails = ensureSetDetails(exercise, 1)
-                    setDetails[0] = { ...(setDetails[0] || buildDefaultSetDetail(exercise, 1)), reps: minutesStr }
-                    return { ...exercise, setDetails }
-                }
-                const restPauseInfo = detectRestPauseConfig(name, repsRaw, notesRaw)
-                const method = restPauseInfo?.method || 'Normal'
-                const reps = restPauseInfo?.normalizedReps || repsRaw || '10'
-                const notes = restPauseInfo?.cleanedNotes ?? notesRaw
-                const exercise: Exercise = { name, sets: baseSets, reps, rpe: '8', cadence: '2020', restTime: 60, method, videoUrl: '', notes }
-                const setDetails = ensureSetDetails(exercise, baseSets)
-                const repsTargets = extractRepsTargets(reps, notesRaw)
-                for (let i = 0; i < setDetails.length; i += 1) {
-                    const target = repsTargets[i]; if (!target) continue
-                    const sd = setDetails[i] || buildDefaultSetDetail(exercise, i + 1)
-                    setDetails[i] = { ...sd, reps: target }
-                }
-                if (method === 'Rest-Pause' && restPauseInfo?.config && setDetails.length > 0) {
-                    const lastIndex = setDetails.length - 1
-                    const last = setDetails[lastIndex] || buildDefaultSetDetail(exercise, lastIndex + 1)
-                    setDetails[lastIndex] = { ...last, advanced_config: { ...(last.advanced_config && typeof last.advanced_config === 'object' ? last.advanced_config : {}), ...restPauseInfo.config } }
-                }
-                return { ...exercise, setDetails }
-            }).filter((ex) => String(ex.name || '').trim().length > 0)
-            if (!mappedExercises.length) {
-                const msg = 'Não encontramos exercícios utilizáveis nas imagens.'
-                setScannerError(msg); await alert(msg, 'Sem exercícios válidos'); return
-            }
-            let titleToApply = ''
-            if (detectedTitle) {
-                try { const ok = await confirm(`Definir título como "${detectedTitle}"?`, 'Scanner'); if (ok) titleToApply = detectedTitle } catch { }
-            }
-            try {
-                const preview = mappedExercises.slice(0, 10).map((x) => `• ${String(x?.name || '').trim()}`).join('\n')
-                const ok = await confirm(`Importar ${mappedExercises.length} exercício(s)?\n\n${preview}${mappedExercises.length > 10 ? '\n…' : ''}`, 'Scanner')
-                if (!ok) return
-            } catch { }
-            onChange?.({ ...(workout || {}), ...(titleToApply ? { title: titleToApply } : {}), exercises: mappedExercises })
-            await alert('Treino importado pela IA. Revise antes de salvar.', 'Importação concluída')
-        } catch (err: unknown) {
-            const msg = getErrorMessage(err) ? String(getErrorMessage(err)) : String(err)
-            setScannerError(msg || 'Não conseguimos ler o treino. Tente uma foto mais nítida.')
-            await alert(msg || 'Não conseguimos ler o treino. Tente uma foto mais nítida.', 'Erro na importação')
-        } finally {
-            setScannerLoading(false)
-            if (e?.target) e.target.value = ''
-        }
-    }, [workout, onChange, setScannerLoading, setScannerError, ensureSetDetails, buildDefaultSetDetail, alert, confirm])
-
     const handleImportJson = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0]; if (!file) return
         try {
@@ -337,7 +238,6 @@ export function useExerciseEditorLogic({
         addExercise,
         toggleExerciseType,
         toggleBiSetWithNext,
-        handleScannerFileChange,
         handleImportJson,
         handleSave,
     }

@@ -24,11 +24,8 @@ interface ExerciseEditorProps {
 const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCancel, onChange, onSaved }) => {
     useDialog();
     const [saving, setSaving] = React.useState(false);
-    const [scannerLoading, setScannerLoading] = React.useState(false);
-    const [scannerError, setScannerError] = React.useState('');
 
     const fileInputRef = React.useRef<HTMLInputElement>(null);
-    const scannerFileInputRef = React.useRef<HTMLInputElement>(null);
 
     const normalizeMethod = React.useCallback((method: unknown) => {
         const raw = String(method || '').trim();
@@ -165,20 +162,16 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
         addExercise,
         toggleExerciseType,
         toggleBiSetWithNext,
-        handleScannerFileChange,
         handleImportJson,
         handleSave,
     } = useExerciseEditorLogic({
         workout,
         onSave, onCancel, onChange, onSaved,
         saving, setSaving,
-        setScannerLoading, setScannerError,
         fileInputRef: fileInputRef as React.RefObject<HTMLInputElement>,
-        scannerFileInputRef: scannerFileInputRef as React.RefObject<HTMLInputElement>,
         normalizeMethod, buildDefaultSetDetail, ensureSetDetails,
     });
 
-    const handleScannerFileClick = () => { if (!scannerLoading && scannerFileInputRef.current) scannerFileInputRef.current.click(); };
     const handleImportJsonClick = () => fileInputRef.current?.click();
 
     if (!workout) return null;
@@ -187,28 +180,14 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
         <div className="h-full flex flex-col bg-neutral-900">
             <WorkoutHeader
                 saving={saving}
-                scannerLoading={scannerLoading}
-                scannerFileInputRef={scannerFileInputRef}
                 fileInputRef={fileInputRef}
                 onSave={handleSave}
                 onCancel={() => onCancel?.()}
-                onScannerFileClick={handleScannerFileClick}
-                onScannerFileChange={handleScannerFileChange}
                 onImportJsonClick={handleImportJsonClick}
                 onImportJson={handleImportJson}
             />
 
             <div className="flex-1 overflow-y-auto p-4 space-y-6">
-                {scannerLoading && (
-                    <div className="mb-3 p-3 rounded-xl border border-yellow-500/40 bg-yellow-500/5 text-yellow-200 text-xs font-semibold">
-                        A IA está lendo seu treino...
-                    </div>
-                )}
-                {!scannerLoading && scannerError && (
-                    <div className="mb-3 p-3 rounded-xl border border-red-500/40 bg-red-900/20 text-red-200 text-xs font-semibold">
-                        {scannerError}
-                    </div>
-                )}
                 <div>
                     <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-3">

@@ -41,9 +41,6 @@ export function useStudentWorkoutCreate({
     const [jsonImportOpen, setJsonImportOpen] = useState(false)
     const jsonFileInputRef = useRef<HTMLInputElement | null>(null)
 
-    // ── Iron Scanner state (placeholder – opens scanner if component exists) ───
-    const [ironScannerOpen, setIronScannerOpen] = useState(false)
-
     // ─── Derived helpers ───────────────────────────────────────────────────────
 
     /** Save a single WorkoutDraft directly to DB as a student workout */
@@ -246,7 +243,6 @@ export function useStudentWorkoutCreate({
         wizardOpen, setWizardOpen,
         toolsPanelOpen, setToolsPanelOpen,
         jsonImportOpen, setJsonImportOpen,
-        ironScannerOpen, setIronScannerOpen,
         jsonFileInputRef,
         // Wizard callbacks
         onWizardGenerate,

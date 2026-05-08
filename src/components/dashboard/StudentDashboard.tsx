@@ -108,7 +108,6 @@ type Props = {
   onNormalizeExercises?: () => MaybePromise<void>
   onNormalizeAiWorkoutTitles?: () => MaybePromise<void>
   onApplyTitleRule?: () => MaybePromise<void>
-  onOpenIronScanner: () => void
   /** Called when user's own story active state changes (for header story ring) */
   onMyStoryStateChange?: (hasActiveStory: boolean) => void
   /** External trigger: open story creator (from header long-press) */
@@ -549,7 +548,6 @@ export default function StudentDashboard(props: Props) {
                       <WorkoutToolsPanel
                         onClose={() => setToolsOpen(false)}
                         onCreateWorkout={props.onCreateWorkout}
-                        onOpenIronScanner={props.onOpenIronScanner}
                         onOpenJsonImport={props.onOpenJsonImport}
                         onExportAll={props.onExportAll}
                         exportingAll={props.exportingAll}
