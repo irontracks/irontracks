@@ -2,6 +2,7 @@ import { createClient } from '@/utils/supabase/server'
 import { redirect } from 'next/navigation'
 import RecoveryBridgeClient from './recovery-bridge-client'
 import LoginGate from './login-gate'
+import { sanitizeNextParam } from '@/utils/auth/safeRedirect'
 
 type SP = Record<string, string | string[] | undefined>
 
@@ -14,7 +15,7 @@ export default async function HomePage({ searchParams }: { searchParams?: Promis
   const errorDescription = typeof sp?.error_description === 'string' ? sp.error_description : ''
 
   if (code) {
-    const safeNext = next && next.startsWith('/') ? next : '/dashboard'
+    const safeNext = sanitizeNextParam(next, '/dashboard')
     const safeType = String(type || '').trim().toLowerCase()
     if (safeType === 'recovery') {
       redirect(

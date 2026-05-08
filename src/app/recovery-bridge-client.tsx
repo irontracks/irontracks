@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
+import { sanitizeNextParam } from '@/utils/auth/safeRedirect'
 
 function parseHashParams(hash: string) {
   try {
@@ -25,8 +26,7 @@ export default function RecoveryBridgeClient(): null {
 
       if (!hasRecoveryHash && !hasRecoveryQuery) return
 
-      const nextRaw = String(url.searchParams.get('next') || '').trim()
-      const next = nextRaw.startsWith('/') ? nextRaw : '/dashboard'
+      const next = sanitizeNextParam(url.searchParams.get('next'), '/dashboard')
 
       const target = new URL('/auth/recovery', window.location.origin)
       target.searchParams.set('next', next)

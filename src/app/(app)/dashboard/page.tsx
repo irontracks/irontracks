@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import DashboardClientEntry from './DashboardClientEntry'
 import { resolveRoleByUser } from '@/utils/auth/route'
 import { safePg } from '@/utils/safePgFilter'
+import { sanitizeNextParam } from '@/utils/auth/safeRedirect'
 
 type SP = Record<string, string | string[] | undefined>
 
@@ -67,7 +68,7 @@ export default async function DashboardPage({ searchParams }: { searchParams?: P
   const code = typeof sp?.code === 'string' ? sp?.code : ''
   const next = typeof sp?.next === 'string' ? sp?.next : ''
   if (code) {
-    const safeNext = next && next.startsWith('/') ? next : '/dashboard'
+    const safeNext = sanitizeNextParam(next, '/dashboard')
     redirect(`/auth/callback?code=${encodeURIComponent(code)}&next=${encodeURIComponent(safeNext)}`)
   }
 
