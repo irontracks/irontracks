@@ -92,7 +92,6 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
     deletingId,
     confirmDeleteId,
     setConfirmDeleteId,
-    importing,
 
     // AI plan
     aiPlanByAssessmentId,
@@ -101,13 +100,10 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
     planModalAssessment,
 
     // Refs
-    scanInputRef,
     planAnchorRefs,
 
     // Handlers
     handleDeleteAssessment,
-    handleScanClick,
-    handleScanFileChange,
     handleGenerateAssessmentPlan,
     handleOpenAssessmentPlanModal,
   } = useAssessmentHistoryData(studentId);
@@ -139,12 +135,7 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
         <AssessmentHeader
           onCreate={() => studentId && router.push(`/assessments/new/${studentId}`)}
           onShowHistory={() => {}}
-          onScan={handleScanClick}
-          importing={importing}
-          studentId={studentId}
           onClose={undefined}
-          scanInputRef={scanInputRef}
-          onScanFileChange={handleScanFileChange}
         />
 
         <div
@@ -171,12 +162,7 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
         <AssessmentHeader
           onCreate={() => setShowForm(true)}
           onShowHistory={() => setShowHistory(true)}
-          onScan={handleScanClick}
-          importing={importing}
-          studentId={studentId}
           onClose={onClose}
-          scanInputRef={scanInputRef}
-          onScanFileChange={handleScanFileChange}
         />
         {latestAssessment && previousAssessment && (
           <AssessmentSummaryCards

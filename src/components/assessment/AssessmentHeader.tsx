@@ -1,31 +1,18 @@
 'use client'
 
-import { Upload, User, X } from 'lucide-react'
-import { useIsIosNative } from '@/hooks/useIsIosNative'
+import { User, X } from 'lucide-react'
 
 type AssessmentHeaderProps = {
   onCreate: () => void
   onShowHistory: () => void
-  onScan: () => void
-  importing: boolean
-  studentId: string | null | undefined
   onClose?: () => void
-  scanInputRef: React.RefObject<HTMLInputElement | null>
-  onScanFileChange: (event: React.ChangeEvent<HTMLInputElement>) => void
 }
 
 export const AssessmentHeader = ({
   onCreate,
   onShowHistory,
-  onScan,
-  importing,
-  studentId,
   onClose,
-  scanInputRef,
-  onScanFileChange,
 }: AssessmentHeaderProps) => {
-  const isIosNativeApp = useIsIosNative()
-  const scanDisabled = importing || !studentId
   return (
     <div
       className="rounded-2xl border p-6 mb-6 relative overflow-hidden"
@@ -52,7 +39,7 @@ export const AssessmentHeader = ({
           </div>
         </div>
         <div className="w-full sm:w-auto flex items-center gap-2">
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 flex-1 sm:flex-none">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 flex-1 sm:flex-none">
             <button
               onClick={onCreate}
               className="w-full min-h-[44px] px-4 py-2 rounded-xl text-black font-black shadow-lg shadow-yellow-500/20 hover:shadow-yellow-500/30 transition-all duration-300 active:scale-95 btn-gold-animated"
@@ -66,23 +53,6 @@ export const AssessmentHeader = ({
             >
               Ver Histórico
             </button>
-            {!isIosNativeApp ? (
-              <button
-                onClick={onScan}
-                disabled={scanDisabled}
-                className={
-                  scanDisabled
-                    ? 'w-full min-h-[44px] px-4 py-2 rounded-xl text-neutral-600 border border-dashed border-neutral-800 cursor-not-allowed font-bold'
-                    : 'w-full min-h-[44px] px-4 py-2 rounded-xl border border-dashed text-neutral-300 font-bold hover:border-yellow-500/50 hover:text-yellow-400 transition-all duration-300 active:scale-95'
-                }
-                style={!scanDisabled ? { background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.12)' } : undefined}
-              >
-                <span className="inline-flex items-center justify-center gap-2">
-                  <Upload className="w-4 h-4" />
-                  {importing ? 'Importando...' : 'Importar Foto/PDF'}
-                </span>
-              </button>
-            ) : null}
           </div>
           {!onClose ? (
             <button
@@ -96,16 +66,6 @@ export const AssessmentHeader = ({
             >
               <X className="w-5 h-5" />
             </button>
-          ) : null}
-          {!isIosNativeApp ? (
-            <input
-              ref={scanInputRef}
-              type="file"
-              accept="image/*,application/pdf"
-              multiple
-              className="hidden"
-              onChange={onScanFileChange}
-            />
           ) : null}
         </div>
       </div>
