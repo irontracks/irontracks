@@ -73,7 +73,11 @@ export function useSignOut({ userId, supabase, onClear }: UseSignOutOptions): Us
     try {
       localStorage.removeItem('activeSession')
       localStorage.removeItem('appView')
+      // Auth-related WKWebView fallback tokens — leaving these in place was
+      // a session-recovery vulnerability on shared devices.
       localStorage.removeItem('it.logged_in')
+      localStorage.removeItem('it.session.backup')
+      localStorage.removeItem('it_remembered_email')
       if (userId) {
         localStorage.removeItem(`irontracks.activeSession.v2.${userId}`)
         localStorage.removeItem(`irontracks.appView.v2.${userId}`)
