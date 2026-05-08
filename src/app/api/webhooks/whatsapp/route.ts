@@ -8,12 +8,24 @@
  */
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/admin'
-import { logError, logInfo } from '@/lib/logger'
+import { logError, logInfo, logWarn } from '@/lib/logger'
 import { sendWhatsAppText } from '@/lib/whatsapp/zapi'
 import { generateReply, fetchUserContext } from '@/lib/whatsapp/conversation'
 import type { ConversationTurn } from '@/lib/whatsapp/conversation'
+import { env } from '@/utils/env'
 
 export const dynamic = 'force-dynamic'
+
+/**
+ * Constant-time string comparison so we don't leak length/timing info to a
+ * caller probing the webhook secret.
+ */
+function safeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false
+  let mismatch = 0
+  for (let i = 0; i < a.length; i++) mismatch |= a.charCodeAt(i) ^ b.charCodeAt(i)
+  return mismatch === 0
+}
 
 /**
  * Brazilian mobile numbers should have a leading "9" after the DDD (since
@@ -37,9 +49,23 @@ function brPhoneCandidates(raw: string): string[] {
 }
 
 export async function POST(req: Request) {
-  // Security: no client-token check — the Supabase lookup below is the real
-  // gate (only active conversations are processed; spoofed requests do nothing).
   try {
+    // ── Security: verify Z-API client token ────────────────────────────────
+    // Z-API sends the token configured under "Account → Security" on every
+    // webhook in the `client-token` header. Reject anything else outright.
+    const expectedToken = env.zapi.clientToken.trim()
+    if (!expectedToken) {
+      logError('webhook:whatsapp', new Error('ZAPI_CLIENT_TOKEN not configured — rejecting all webhooks'))
+      return NextResponse.json({ ok: false, error: 'webhook_not_configured' }, { status: 500 })
+    }
+    const provided = String(req.headers.get('client-token') || '').trim()
+    if (!provided || !safeEqual(provided, expectedToken)) {
+      logWarn('webhook:whatsapp', 'Rejected request without valid client-token', {
+        hasHeader: provided.length > 0,
+      })
+      return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
+    }
+
     const body = await req.json() as Record<string, unknown>
 
     // Ignore messages we sent ourselves, group messages, or empty payloads
