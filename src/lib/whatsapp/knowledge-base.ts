@@ -57,7 +57,7 @@ Durante a execução, toque em "Adicionar Exercício" → busque e selecione →
 No editor do exercício, tem um botão "Duplicar Exercício" e "Duplicar Série" — útil pra repetir configurações iguais sem digitar tudo de novo.
 
 **Treino Express (IA gera em segundos)**
-Botão no dashboard, logo acima da lista de treinos — ícone de raio ⚡, escrito "Treino Express" com o subtítulo "IA gera em segundos · 15–45 min".
+No dashboard, procure o botão amarelo grande "Novo Treino" — logo abaixo dele tem um botão menor com ícone de raio ⚡ escrito "Treino Express" e subtítulo "IA gera em segundos · 15–45 min". Toque nele.
 1. Toque em "Treino Express"
 2. Escolha o tempo: **15 min** (Super rápido), **20 min** (Rápido), **30 min** (Express) ou **45 min** (Completo)
 3. Escolha o foco muscular: Corpo Todo / Superior / Inferior / Empurrar / Puxar / Pernas
