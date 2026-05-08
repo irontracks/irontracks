@@ -44,149 +44,115 @@ const TEST_PAYLOADS: Record<string, { title: string; body: string }> = {
 
 /**
  * GET /api/push/test
+ *
  * Diagnoses the APNs push configuration and sends a real test notification to
- * the currently authenticated user's devices.
+ * the **currently authenticated admin's** devices.
+ *
+ * Auth: requires a valid Supabase session AND `profiles.role = 'admin'`. There
+ * is no secret-based bypass — that was removed because the env secret leaking
+ * (logs, .env.example, CI) would have allowed enumerating device tokens of
+ * any user and pushing arbitrary payloads to them.
  *
  * Optional query params:
  *   ?type=story_comment   → use the sample payload for this type
  *                           (also sets the iOS interruption-level via extra.type)
  *   ?platform=all         → also send via FCM (Android) using sender.ts
- *
- * Returns a JSON summary of what was checked and what happened.
  */
 export async function GET(req: Request) {
   const url = new URL(req.url)
   const type = String(url.searchParams.get('type') || '').trim()
   const platform = String(url.searchParams.get('platform') || 'ios').trim()
-  const secretParam = url.searchParams.get('secret') ?? ''
-  const secretEnv = process.env.PUSH_TEST_SECRET ?? ''
-  const secretOk = secretEnv.length > 0 && secretParam === secretEnv
 
-    try {
-        const admin = createAdminClient()
-
-        // ── Auth + admin guard ─────────────────────────────────────────────────
-        // ?secret=<PUSH_TEST_SECRET> bypasses both session auth and role check —
-        // useful when the native-app session cookie isn't present in the browser.
-        // Without the secret, requires a Supabase session + profile.role = 'admin'.
-        let userId: string
-        if (secretOk) {
-            // Secret mode: accept optional ?uid=<uuid>, otherwise look up by owner email
-            const uidParam = url.searchParams.get('uid') ?? ''
-            if (uidParam) {
-                userId = uidParam
-            } else {
-                // Fall back to finding the account by known owner email
-                const { data: found } = await admin.auth.admin.listUsers()
-                const owner = found?.users?.find((u) => u.email === 'djmkbrasil@gmail.com')
-                if (!owner) return NextResponse.json({ ok: false, error: 'Owner user not found — pass ?uid=<uuid>' }, { status: 404 })
-                userId = owner.id
-            }
-        } else {
-            const supabase = await createClient()
-            const { data: { user } } = await supabase.auth.getUser()
-            if (!user) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
-            const { data: profile } = await supabase
-                .from('profiles')
-                .select('role')
-                .eq('id', user.id)
-                .single()
-            if (profile?.role !== 'admin') {
-                return NextResponse.json({ ok: false, error: 'Forbidden — admin only' }, { status: 403 })
-            }
-            userId = user.id
-        }
-
-        // ── 1. Check env vars ──────────────────────────────────────────────────
-        const cfg = {
-            APNS_KEY_ID: Boolean(env.apns.keyId.trim()),
-            APNS_TEAM_ID: Boolean(env.apns.teamId.trim()),
-            APNS_KEY_P8: Boolean(env.apns.keyP8.trim()),
-            APNS_BUNDLE_ID: env.apns.bundleId || '(not set — using com.irontracks.app)',
-            APNS_PRODUCTION: env.apns.production,
-        }
-        const cfgOk = cfg.APNS_KEY_ID && cfg.APNS_TEAM_ID && cfg.APNS_KEY_P8
-
-        // ── 2. Check if this user has registered device tokens ─────────────────
-        const { data: tokens, error: tokenErr } = await admin
-            .from('device_push_tokens')
-            .select('token, platform, device_id, last_seen_at, updated_at')
-            .eq('user_id', userId)
-
-        // ── 2b. When using secret: also show all recent tokens across ALL users ─
-        // Helps diagnose whether ANY device has registered (e.g. logged in with a
-        // different account than the admin account).
-        let allRecentTokens: Array<{ userId: string; platform: string; tokenPrefix: string; lastSeen: string | null }> = []
-        if (secretOk) {
-            const { data: recent } = await admin
-                .from('device_push_tokens')
-                .select('user_id, token, platform, last_seen_at')
-                .order('last_seen_at', { ascending: false })
-                .limit(20)
-            allRecentTokens = (Array.isArray(recent) ? recent : []).map((t) => ({
-                userId: String(t.user_id || ''),
-                platform: String(t.platform || ''),
-                tokenPrefix: String(t.token || '').slice(0, 12) + '...',
-                lastSeen: t.last_seen_at ?? null,
-            }))
-        }
-
-        const tokenCount = Array.isArray(tokens) ? tokens.length : 0
-        const iosTokenCount = Array.isArray(tokens) ? tokens.filter((t) => String(t.platform || '') === 'ios').length : 0
-
-        // ── 3. Send test push if config is OK ──────────────────────────────────
-        const sample = type && TEST_PAYLOADS[type] ? TEST_PAYLOADS[type] : null
-        const title = sample?.title ?? '🔔 IronTracks — Notificação de Teste'
-        const body = sample?.body ?? 'Se você está vendo isso, as push notifications estão funcionando!'
-        const extra = type ? { type } : undefined
-
-        let pushResult: unknown = 'skipped — APNs config missing or no iOS tokens'
-        if (cfgOk && iosTokenCount > 0) {
-            const delivery = platform === 'all'
-                ? await sendPushToAllPlatforms([userId], title, body, extra, { bypassMasterSwitch: true })
-                : await sendPushToUsers([userId], title, body, extra)
-            pushResult = {
-                sent: true,
-                type: type || '(generic)',
-                summary: `Attempted delivery to ${iosTokenCount} iOS device(s)${platform === 'all' ? ' + Android' : ''}`,
-                details: delivery.map((d) => ({
-                    token: d.token.slice(0, 12) + '...',
-                    status: d.ok ? '✅ OK' : '❌ FAILED',
-                    error: d.error ?? null,
-                })),
-            }
-        }
-
-        return NextResponse.json({
-            ok: true,
-            userId,
-            envVars: cfg,
-            allRecentTokens,
-            envConfigOk: cfgOk,
-            deviceTokens: {
-                total: tokenCount,
-                ios: iosTokenCount,
-                tokenFetchError: tokenErr?.message ?? null,
-                tokens: Array.isArray(tokens)
-                    ? tokens.map((t) => ({
-                        platform: t.platform,
-                        tokenPrefix: String(t.token || '').slice(0, 12) + '...',
-                        deviceId: t.device_id,
-                        lastSeen: t.last_seen_at,
-                    }))
-                    : [],
-            },
-            pushResult,
-            instructions: cfgOk
-                ? (iosTokenCount > 0
-                    ? 'Test push sent. Check Vercel logs for [APNs] entries.'
-                    : 'Config OK but no iOS tokens registered. Open the iOS app and wait for the registration event.')
-                : 'Set APNS_KEY_ID, APNS_TEAM_ID, APNS_KEY_P8 in Vercel Project Settings → Environment Variables.',
-            availableTypes: Object.keys(TEST_PAYLOADS),
-            usage: 'Add ?type=<one_of_availableTypes> to test a specific notification template. Add &platform=all to also push to Android.',
-        })
-    } catch (e) {
-        const msg = e instanceof Error ? e.message : String(e)
-        return NextResponse.json({ ok: false, error: msg }, { status: 500 })
+  try {
+    // ── Auth + admin guard ────────────────────────────────────────────────
+    const supabase = await createClient()
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return NextResponse.json({ ok: false, error: 'Unauthorized' }, { status: 401 })
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+    if (profile?.role !== 'admin') {
+      return NextResponse.json({ ok: false, error: 'Forbidden — admin only' }, { status: 403 })
     }
+    const userId = user.id
+
+    const admin = createAdminClient()
+
+    // ── 1. Check env vars ──────────────────────────────────────────────────
+    const cfg = {
+      APNS_KEY_ID: Boolean(env.apns.keyId.trim()),
+      APNS_TEAM_ID: Boolean(env.apns.teamId.trim()),
+      APNS_KEY_P8: Boolean(env.apns.keyP8.trim()),
+      APNS_BUNDLE_ID: env.apns.bundleId || '(not set — using com.irontracks.app)',
+      APNS_PRODUCTION: env.apns.production,
+    }
+    const cfgOk = cfg.APNS_KEY_ID && cfg.APNS_TEAM_ID && cfg.APNS_KEY_P8
+
+    // ── 2. Check if THIS admin has registered device tokens ───────────────
+    // (We deliberately do NOT list other users' tokens — that was a privacy
+    // leak in the previous version of this endpoint.)
+    const { data: tokens, error: tokenErr } = await admin
+      .from('device_push_tokens')
+      .select('token, platform, device_id, last_seen_at, updated_at')
+      .eq('user_id', userId)
+
+    const tokenCount = Array.isArray(tokens) ? tokens.length : 0
+    const iosTokenCount = Array.isArray(tokens) ? tokens.filter((t) => String(t.platform || '') === 'ios').length : 0
+
+    // ── 3. Send test push if config is OK ──────────────────────────────────
+    const sample = type && TEST_PAYLOADS[type] ? TEST_PAYLOADS[type] : null
+    const title = sample?.title ?? '🔔 IronTracks — Notificação de Teste'
+    const body = sample?.body ?? 'Se você está vendo isso, as push notifications estão funcionando!'
+    const extra = type ? { type } : undefined
+
+    let pushResult: unknown = 'skipped — APNs config missing or no iOS tokens'
+    if (cfgOk && iosTokenCount > 0) {
+      const delivery = platform === 'all'
+        ? await sendPushToAllPlatforms([userId], title, body, extra, { bypassMasterSwitch: true })
+        : await sendPushToUsers([userId], title, body, extra)
+      pushResult = {
+        sent: true,
+        type: type || '(generic)',
+        summary: `Attempted delivery to ${iosTokenCount} iOS device(s)${platform === 'all' ? ' + Android' : ''}`,
+        details: delivery.map((d) => ({
+          token: d.token.slice(0, 12) + '...',
+          status: d.ok ? '✅ OK' : '❌ FAILED',
+          error: d.error ?? null,
+        })),
+      }
+    }
+
+    return NextResponse.json({
+      ok: true,
+      userId,
+      envVars: cfg,
+      envConfigOk: cfgOk,
+      deviceTokens: {
+        total: tokenCount,
+        ios: iosTokenCount,
+        tokenFetchError: tokenErr?.message ?? null,
+        tokens: Array.isArray(tokens)
+          ? tokens.map((t) => ({
+              platform: t.platform,
+              tokenPrefix: String(t.token || '').slice(0, 12) + '...',
+              deviceId: t.device_id,
+              lastSeen: t.last_seen_at,
+            }))
+          : [],
+      },
+      pushResult,
+      instructions: cfgOk
+        ? (iosTokenCount > 0
+          ? 'Test push sent. Check Vercel logs for [APNs] entries.'
+          : 'Config OK but no iOS tokens registered. Open the iOS app and wait for the registration event.')
+        : 'Set APNS_KEY_ID, APNS_TEAM_ID, APNS_KEY_P8 in Vercel Project Settings → Environment Variables.',
+      availableTypes: Object.keys(TEST_PAYLOADS),
+      usage: 'Add ?type=<one_of_availableTypes> to test a specific notification template. Add &platform=all to also push to Android.',
+    })
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    return NextResponse.json({ ok: false, error: msg }, { status: 500 })
+  }
 }
