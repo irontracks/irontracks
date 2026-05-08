@@ -6,6 +6,7 @@ import { parseJsonBody } from '@/utils/zod'
 import { cacheDelete } from '@/utils/cache'
 import { logWarn } from '@/lib/logger'
 import { env } from '@/utils/env'
+import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 
 export const dynamic = 'force-dynamic'
 
@@ -43,6 +44,16 @@ const BodySchema = z
   .passthrough()
 
 export async function POST(req: Request) {
+  // ── Rate limit per source IP ───────────────────────────────────────────
+  // Even with a valid HMAC, a leaked secret + replay storm could thrash the
+  // database. 60 requests/min/IP is enough for legitimate Asaas retries
+  // (they batch up to a few per minute) but blocks brute-force / replay.
+  const ip = getRequestIp(req)
+  const rl = await checkRateLimitAsync(`webhook:asaas:${ip}`, 60, 60_000)
+  if (!rl.allowed) {
+    return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 })
+  }
+
   const secret = env.asaas.webhookSecret.trim()
   const provided = (req.headers.get('x-webhook-secret') || '').trim()
   if (!secret) {
@@ -62,6 +73,16 @@ export async function POST(req: Request) {
   const paymentId = (payment?.id || null) as string | null
   const paymentStatus = (payment?.status || '') as string
   const subscriptionId = (payment?.subscription || null) as string | null
+
+  // ── Reject events without an ID ─────────────────────────────────────────
+  // Real Asaas webhooks always include an event id. Accepting null here would
+  // bypass the unique-index dedup below (every null becomes a fresh row), so
+  // an attacker who learned the secret could replay payment-confirmed events
+  // without limit. We require an id and let the unique index in
+  // asaas_webhook_events.asaas_event_id deduplicate retries.
+  if (!eventId) {
+    return NextResponse.json({ ok: false, error: 'missing_event_id' }, { status: 400 })
+  }
 
   const admin = createAdminClient()
 
