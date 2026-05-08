@@ -4,7 +4,6 @@ import { useRouter } from 'next/navigation';
 import { Plus, FileText, TrendingUp, X, Upload } from 'lucide-react';
 import { AssessmentForm } from './AssessmentForm';
 import { logError, logWarn, logInfo } from '@/lib/logger'
-import { useIsIosNative } from '@/hooks/useIsIosNative'
 import { parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
 
@@ -22,11 +21,8 @@ export default function AssessmentButton({
   className = ''
 }: AssessmentButtonProps) {
   const [showForm, setShowForm] = useState(false);
-  const [importing, setImporting] = useState(false);
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const scanInputRef = useRef<HTMLInputElement | null>(null);
-  const isIosNativeApp = useIsIosNative();
 
   const handleNewAssessment = () => {
     router.push(`/assessments/new/${studentId}`);
@@ -45,45 +41,6 @@ export default function AssessmentButton({
   const handleImportClick = () => {
     if (!fileInputRef.current) return;
     fileInputRef.current.click();
-  };
-
-  const handleScanClick = () => {
-    if (!scanInputRef.current) return;
-    scanInputRef.current.click();
-  };
-
-  const mergeImportedFormData = (base: unknown, incoming: unknown) => {
-    const out: Record<string, unknown> = { ...(base && typeof base === 'object' ? (base as Record<string, unknown>) : {}) };
-    const keys = [
-      'assessment_date',
-      'weight',
-      'height',
-      'age',
-      'gender',
-      'arm_circ',
-      'chest_circ',
-      'waist_circ',
-      'hip_circ',
-      'thigh_circ',
-      'calf_circ',
-      'triceps_skinfold',
-      'biceps_skinfold',
-      'subscapular_skinfold',
-      'suprailiac_skinfold',
-      'abdominal_skinfold',
-      'thigh_skinfold',
-      'calf_skinfold',
-      'observations',
-    ];
-    keys.forEach((k) => {
-      const nextVal = (incoming as Record<string, unknown>)?.[k];
-      if (nextVal === undefined || nextVal === null || nextVal === '') return;
-      const prevVal = (out as Record<string, unknown>)?.[k];
-      if (prevVal === undefined || prevVal === null || prevVal === '') {
-        out[k] = nextVal;
-      }
-    });
-    return out;
   };
 
   const handleImportFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -151,73 +108,6 @@ export default function AssessmentButton({
     } finally {
       if (event.target) {
         event.target.value = "";
-      }
-    }
-  };
-
-  const handleScanFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    try {
-      const files = event.target.files ? Array.from(event.target.files) : [];
-      if (!files.length) return;
-      if (importing) return;
-
-      setImporting(true);
-
-      let mergedFormData: Record<string, unknown> = {};
-
-      for (const file of files) {
-        const form = new FormData();
-        form.append('file', file);
-
-        const res = await fetch('/api/assessment-scanner', {
-          method: 'POST',
-          body: form,
-        });
-
-        const data = await res.json().catch((): unknown => null) as { ok?: boolean; error?: string; formData?: Record<string, unknown> } | null;
-        if (!data || !data.ok) {
-          const msg = String(data?.error || 'Falha ao processar arquivo');
-          if (typeof window !== 'undefined') window.alert(msg);
-          return;
-        }
-
-        const nextForm = data?.formData && typeof data.formData === 'object' ? data.formData : null;
-        if (nextForm) mergedFormData = mergeImportedFormData(mergedFormData, nextForm);
-      }
-
-      const hasCoreField =
-        mergedFormData &&
-        typeof mergedFormData === 'object' &&
-        ('weight' in mergedFormData || 'height' in mergedFormData || 'assessment_date' in mergedFormData);
-
-      if (!hasCoreField) {
-        if (typeof window !== 'undefined') {
-          window.alert('Não foi possível extrair dados suficientes da avaliação.');
-        }
-        return;
-      }
-
-      if (typeof window !== 'undefined') {
-        try {
-          const storageKey = `assessment_import_${studentId}`;
-          window.sessionStorage.setItem(storageKey, JSON.stringify({ formData: mergedFormData }));
-        } catch (error) {
-          logError('error', 'Erro ao salvar avaliação importada na sessão', error);
-          window.alert('Não foi possível preparar os dados importados. Tente novamente.');
-          return;
-        }
-      }
-
-      router.push(`/assessments/new/${studentId}`);
-    } catch (error) {
-      logError('error', 'Erro ao importar avaliação por imagem/PDF', error);
-      if (typeof window !== 'undefined') {
-        window.alert('Falha ao importar avaliação por imagem/PDF.');
-      }
-    } finally {
-      setImporting(false);
-      if (event.target) {
-        event.target.value = '';
       }
     }
   };
@@ -299,21 +189,6 @@ export default function AssessmentButton({
             <Upload className="w-4 h-4 mr-2" />
             Importar JSON
           </button>
-          {!isIosNativeApp ? (
-            <button
-              onClick={handleScanClick}
-              disabled={importing}
-              className={
-                importing
-                  ? "flex-1 inline-flex items-center justify-center px-4 py-2.5 rounded-xl border border-dashed text-neutral-500 cursor-not-allowed"
-                  : "flex-1 inline-flex items-center justify-center px-4 py-2.5 rounded-xl border border-dashed text-neutral-400 hover:border-yellow-500/40 hover:text-yellow-500 transition-all active:scale-95"
-              }
-              style={{ borderColor: importing ? 'rgba(255,255,255,0.04)' : 'rgba(255,255,255,0.1)' }}
-            >
-              <Upload className="w-4 h-4 mr-2" />
-              {importing ? "Importando..." : "Importar Foto/PDF"}
-            </button>
-          ) : null}
           <input
             ref={fileInputRef}
             type="file"
@@ -321,16 +196,6 @@ export default function AssessmentButton({
             className="hidden"
             onChange={handleImportFileChange}
           />
-          {!isIosNativeApp ? (
-            <input
-              ref={scanInputRef}
-              type="file"
-              accept="image/*,application/pdf"
-              multiple
-              className="hidden"
-              onChange={handleScanFileChange}
-            />
-          ) : null}
         </div>
       </div>
     );
@@ -375,30 +240,6 @@ export default function AssessmentButton({
         <FileText className="w-4 h-4 mr-2" />
         Histórico
       </button>
-      {!isIosNativeApp ? (
-        <button
-          onClick={handleScanClick}
-          disabled={importing}
-          className={
-            importing
-              ? "inline-flex items-center px-4 py-2.5 rounded-xl border border-dashed text-neutral-500 cursor-not-allowed"
-              : "inline-flex items-center px-4 py-2.5 rounded-xl border border-dashed text-neutral-400 hover:border-yellow-500/40 hover:text-yellow-500 transition-all active:scale-95"
-          }
-        >
-          <Upload className="w-4 h-4 mr-2" />
-          {importing ? "Importando..." : "Importar Foto/PDF"}
-        </button>
-      ) : null}
-      {!isIosNativeApp ? (
-        <input
-          ref={scanInputRef}
-          type="file"
-          accept="image/*,application/pdf"
-          multiple
-          className="hidden"
-          onChange={handleScanFileChange}
-        />
-      ) : null}
     </div>
   );
 }

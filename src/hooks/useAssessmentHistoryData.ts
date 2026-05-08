@@ -8,7 +8,6 @@ import { generateAssessmentPlanAi } from '@/actions/workout-actions'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { logError } from '@/lib/logger'
 import { safePg, safePgLike } from '@/utils/safePgFilter'
-import { useIsIosNative } from '@/hooks/useIsIosNative'
 
 import {
   AssessmentRow,
@@ -78,7 +77,6 @@ export function useAssessmentHistoryData(studentId?: string) {
   const [editAssessmentId, setEditAssessmentId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
-  const [importing, setImporting] = useState(false)
 
   // ── AI plan state ────────────────────────────────────────────
   const [aiPlanByAssessmentId, setAiPlanByAssessmentId] = useState<Record<string, AiPlanEntry>>({})
@@ -86,32 +84,7 @@ export function useAssessmentHistoryData(studentId?: string) {
   const [planModalAssessment, setPlanModalAssessment] = useState<AssessmentRow | null>(null)
 
   // ── Refs ──────────────────────────────────────────────────────
-  const scanInputRef = useRef<HTMLInputElement | null>(null)
   const planAnchorRefs = useRef<Record<string, HTMLDivElement | null>>({})
-  const isIosNativeApp = useIsIosNative()
-
-  // ── Merge helper for scan import ────────────────────────────
-  const mergeImportedFormData = useCallback(
-    (base: Record<string, unknown>, incoming: Record<string, unknown>) => {
-      const out: Record<string, unknown> = { ...(base && typeof base === 'object' ? base : {}) }
-      const keys = [
-        'assessment_date', 'weight', 'height', 'age', 'gender',
-        'arm_circ', 'chest_circ', 'waist_circ', 'hip_circ', 'thigh_circ', 'calf_circ',
-        'triceps_skinfold', 'biceps_skinfold', 'subscapular_skinfold', 'suprailiac_skinfold',
-        'abdominal_skinfold', 'thigh_skinfold', 'calf_skinfold', 'observations',
-      ]
-      keys.forEach((k) => {
-        const nextVal = incoming?.[k]
-        if (nextVal === undefined || nextVal === null || nextVal === '') return
-        const prevVal = out?.[k]
-        if (prevVal === undefined || prevVal === null || prevVal === '') {
-          out[k] = nextVal
-        }
-      })
-      return out
-    },
-    [],
-  )
 
   // ── Handlers ─────────────────────────────────────────────────
 
@@ -132,86 +105,6 @@ export function useAssessmentHistoryData(studentId?: string) {
       }
     },
     [deleteAssessment],
-  )
-
-  const handleScanClick = useCallback(() => {
-    if (!studentId) return
-    if (!scanInputRef.current) return
-    scanInputRef.current.click()
-  }, [studentId])
-
-  const handleScanFileChange = useCallback(
-    async (event: React.ChangeEvent<HTMLInputElement>) => {
-      try {
-        const files = event.target.files ? Array.from(event.target.files) : []
-        if (!files.length) return
-        if (!studentId) return
-        if (importing) return
-
-        setImporting(true)
-
-        let mergedFormData: Record<string, unknown> = {}
-
-        for (const file of files) {
-          const form = new FormData()
-          form.append('file', file)
-
-          const res = await fetch('/api/assessment-scanner', {
-            method: 'POST',
-            body: form,
-          })
-
-          const data = await res.json().catch((): null => null)
-          if (!data || !data.ok) {
-            const msg = String(data?.error || 'Falha ao processar arquivo')
-            if (typeof window !== 'undefined') window.alert(msg)
-            return
-          }
-
-          const nextForm =
-            data?.formData && typeof data.formData === 'object'
-              ? (data.formData as Record<string, unknown>)
-              : null
-          if (nextForm) mergedFormData = mergeImportedFormData(mergedFormData, nextForm)
-        }
-
-        const hasCoreField =
-          mergedFormData &&
-          typeof mergedFormData === 'object' &&
-          ('weight' in mergedFormData || 'height' in mergedFormData || 'assessment_date' in mergedFormData)
-
-        if (!hasCoreField) {
-          if (typeof window !== 'undefined') {
-            window.alert('Não foi possível extrair dados suficientes da avaliação.')
-          }
-          return
-        }
-
-        if (typeof window !== 'undefined') {
-          try {
-            const storageKey = `assessment_import_${studentId}`
-            window.sessionStorage.setItem(storageKey, JSON.stringify({ formData: mergedFormData }))
-          } catch (err) {
-            logError('error', 'Erro ao salvar avaliação importada na sessão', err)
-            window.alert('Não foi possível preparar os dados importados. Tente novamente.')
-            return
-          }
-        }
-
-        router.push(`/assessments/new/${studentId}`)
-      } catch (err) {
-        logError('error', 'Erro ao importar avaliação por imagem/PDF', err)
-        if (typeof window !== 'undefined') {
-          window.alert('Falha ao importar avaliação por imagem/PDF.')
-        }
-      } finally {
-        setImporting(false)
-        if (event.target) {
-          event.target.value = ''
-        }
-      }
-    },
-    [studentId, importing, mergeImportedFormData, router],
   )
 
   const handleGenerateAssessmentPlan = useCallback(
@@ -671,7 +564,6 @@ export function useAssessmentHistoryData(studentId?: string) {
     deletingId,
     confirmDeleteId,
     setConfirmDeleteId,
-    importing,
 
     // AI plan
     aiPlanByAssessmentId,
@@ -680,14 +572,10 @@ export function useAssessmentHistoryData(studentId?: string) {
     planModalAssessment,
 
     // Refs
-    scanInputRef,
     planAnchorRefs,
-    isIosNativeApp,
 
     // Handlers
     handleDeleteAssessment,
-    handleScanClick,
-    handleScanFileChange,
     handleGenerateAssessmentPlan,
     handleOpenAssessmentPlanModal,
   }
