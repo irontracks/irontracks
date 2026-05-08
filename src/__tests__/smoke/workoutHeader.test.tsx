@@ -11,13 +11,9 @@ const noop = () => { }
 
 const defaultProps = {
     saving: false,
-    scannerLoading: false,
-    scannerFileInputRef: createRef<HTMLInputElement>(),
     fileInputRef: createRef<HTMLInputElement>(),
     onSave: noop,
     onCancel: noop,
-    onScannerFileClick: noop,
-    onScannerFileChange: noop,
     onImportJsonClick: noop,
     onImportJson: noop,
 }
@@ -36,11 +32,6 @@ describe('WorkoutHeader — smoke tests', () => {
     it('renders close button with aria-label', () => {
         render(<WorkoutHeader {...defaultProps} />)
         expect(screen.getByLabelText(/fechar editor/i)).toBeInTheDocument()
-    })
-
-    it('renders scanner import button with aria-label', () => {
-        render(<WorkoutHeader {...defaultProps} />)
-        expect(screen.getByLabelText(/importar treino via ia/i)).toBeInTheDocument()
     })
 
     it('renders JSON import button with aria-label', () => {

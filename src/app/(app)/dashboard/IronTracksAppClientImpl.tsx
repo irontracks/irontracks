@@ -959,9 +959,6 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                     onNormalizeAiWorkoutTitles={handleNormalizeAiWorkoutTitles}
                                     onNormalizeExercises={handleNormalizeExercises}
                                     onApplyTitleRule={handleApplyTitleRule}
-                                    onOpenIronScanner={() => {
-                                        try { openManualWorkoutEditor() } catch { }
-                                    }}
                                     onMyStoryStateChange={handleMyStoryStateChange}
                                     onAddStory={handleAddStoryAction}
                                 />

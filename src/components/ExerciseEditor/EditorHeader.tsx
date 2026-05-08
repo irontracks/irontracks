@@ -1,30 +1,22 @@
 'use client'
 
 import React from 'react'
-import { Save, X, Upload, Image as ImageIcon } from 'lucide-react'
+import { Save, X, Upload } from 'lucide-react'
 
 interface WorkoutHeaderProps {
     saving: boolean
-    scannerLoading: boolean
-    scannerFileInputRef: React.RefObject<HTMLInputElement | null>
     fileInputRef: React.RefObject<HTMLInputElement | null>
     onSave: () => void
     onCancel: () => void
-    onScannerFileClick: () => void
-    onScannerFileChange: (e: React.ChangeEvent<HTMLInputElement>) => void
     onImportJsonClick: () => void
     onImportJson: (e: React.ChangeEvent<HTMLInputElement>) => void
 }
 
 export const WorkoutHeader: React.FC<WorkoutHeaderProps> = ({
     saving,
-    scannerLoading,
-    scannerFileInputRef,
     fileInputRef,
     onSave,
     onCancel,
-    onScannerFileClick,
-    onScannerFileChange,
     onImportJsonClick,
     onImportJson,
 }) => (
@@ -58,26 +50,6 @@ export const WorkoutHeader: React.FC<WorkoutHeaderProps> = ({
             </div>
 
             <div className="flex items-center gap-2 overflow-x-auto whitespace-nowrap [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-                <button
-                    onClick={onScannerFileClick}
-                    disabled={scannerLoading}
-                    aria-label="Importar treino via IA com foto ou PDF"
-                    className="shrink-0 flex items-center gap-2 px-3 py-2 text-yellow-400 hover:text-yellow-300 rounded-full hover:bg-yellow-500/10 transition-colors min-h-[44px] disabled:opacity-60 disabled:cursor-not-allowed"
-                    title="Importar treino via IA (foto/PDF)"
-                >
-                    <ImageIcon size={18} />
-                    <span className="text-sm font-bold hidden sm:inline">Importar Treino (Foto/PDF)</span>
-                    <span className="text-sm font-bold sm:hidden">Importar</span>
-                </button>
-                <input
-                    ref={scannerFileInputRef}
-                    type="file"
-                    accept="image/*,application/pdf"
-                    multiple
-                    aria-label="Selecionar arquivo de treino para escaneamento"
-                    className="hidden"
-                    onChange={onScannerFileChange}
-                />
                 <button
                     onClick={onImportJsonClick}
                     aria-label="Carregar treino a partir de arquivo JSON"
