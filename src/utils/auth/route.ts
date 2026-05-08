@@ -23,11 +23,19 @@ export const getInternalSecret = () => {
   return env.security.internalSecret.trim()
 }
 
+/** Constant-time string comparison — see comment in cron/auth.ts. */
+const safeEqual = (a: string, b: string): boolean => {
+  if (a.length !== b.length) return false
+  let mismatch = 0
+  for (let i = 0; i < a.length; i++) mismatch |= a.charCodeAt(i) ^ b.charCodeAt(i)
+  return mismatch === 0
+}
+
 export const hasValidInternalSecret = (req: Request) => {
   const secret = getInternalSecret()
   if (!secret) return false
   const provided = (req.headers.get('x-internal-secret') || '').trim()
-  return provided === secret
+  return safeEqual(provided, secret)
 }
 
 export async function requireUser() {
