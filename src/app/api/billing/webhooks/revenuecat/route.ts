@@ -8,10 +8,12 @@
  */
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/admin'
-import { cacheDelete } from '@/utils/cache'
+import { cacheDelete, cacheSetNx } from '@/utils/cache'
 import { env } from '@/utils/env'
 import { insertNotifications } from '@/lib/social/notifyFollowers'
 import { waitUntil } from '@vercel/functions'
+import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
+import { logWarn } from '@/lib/logger'
 
 /**
  * Maps Apple/RevenueCat product identifiers to app_plans.id values.
@@ -68,6 +70,16 @@ const INACTIVE_EVENTS = new Set([
 
 export async function POST(request: NextRequest) {
   try {
+    // ── Rate limit per source IP ───────────────────────────────────────────
+    // 60 req/min/IP — comfortable for legitimate RevenueCat retries (they
+    // back off exponentially) but stops a brute-force probe of the bearer
+    // token or a replay storm if the token leaks.
+    const ip = getRequestIp(request)
+    const rl = await checkRateLimitAsync(`webhook:revenuecat:${ip}`, 60, 60_000)
+    if (!rl.allowed) {
+      return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 })
+    }
+
     // The WEBHOOK_AUTH_KEY is the only thing standing between an anonymous POST
     // and a user getting VIP granted. If the secret is unset in production,
     // anyone who discovers the endpoint URL can forge an INITIAL_PURCHASE and
@@ -96,6 +108,24 @@ export async function POST(request: NextRequest) {
         { ok: false, error: 'invalid_payload' },
         { status: 400 },
       )
+    }
+
+    // ── Replay protection ───────────────────────────────────────────────────
+    // RevenueCat includes a unique `id` on every event. cacheSetNx returns
+    // true the first time we see that id; on a replay it returns false and
+    // we short-circuit. The TTL (7 days) covers RevenueCat's retry window
+    // with a healthy margin. Fail-closed: if Upstash is down, cacheSetNx
+    // returns false → we treat as duplicate (RevenueCat will retry).
+    const eventId = String((event as Record<string, unknown>).id ?? '').trim()
+    if (!eventId) {
+      // Real RevenueCat events always have an id; reject the rest to keep
+      // the dedup path watertight.
+      return NextResponse.json({ ok: false, error: 'missing_event_id' }, { status: 400 })
+    }
+    const isFresh = await cacheSetNx(`webhook:revenuecat:event:${eventId}`, '1', 7 * 24 * 60 * 60)
+    if (!isFresh) {
+      logWarn('webhook:revenuecat', 'Replay or dedup-on-outage', { eventId, type: event.type })
+      return NextResponse.json({ ok: true, deduped: true })
     }
 
     const userId = String(event.app_user_id).trim()
