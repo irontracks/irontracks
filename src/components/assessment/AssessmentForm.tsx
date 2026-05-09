@@ -43,7 +43,8 @@ type ResultsStepComponent = typeof ResultsPreview;
 
 type FormStep =
   | {
-      id: 'basic' | 'measurements' | 'skinfolds';
+      // Único step com campos obrigatórios — peso, altura, idade, gênero, data.
+      id: 'basic';
       title: string;
       description: string;
       icon: React.ComponentType<LucideProps>;
@@ -51,10 +52,10 @@ type FormStep =
       required: true;
     }
   | {
-      // Bioimpedância — opcional. Compartilha o shape de step "padrão"
-      // (recebe formData/updateFormData) com basic/measurements/skinfolds,
-      // mas required:false porque o usuário pode pular.
-      id: 'bia';
+      // Steps de coleta opcionais. O usuário pode pular qualquer um deles —
+      // a validação só checa formato dos campos preenchidos. Cobre o caso
+      // do aluno que chega só com PDF da bioimpedância.
+      id: 'bia' | 'measurements' | 'skinfolds';
       title: string;
       description: string;
       icon: React.ComponentType<LucideProps>;
@@ -261,28 +262,31 @@ export const AssessmentForm: React.FC<AssessmentFormProps> = ({
         component: BasicInfoStep,
         required: true
       },
-      {
-        id: 'measurements',
-        title: 'Medidas Corporais',
-        description: 'Circunferências e medidas',
-        icon: Ruler,
-        component: MeasurementStep,
-        required: true
-      },
-      {
-        id: 'skinfolds',
-        title: 'Dobras Cutâneas',
-        description: '7 dobras para análise de composição',
-        icon: Ruler,
-        component: SkinfoldStep,
-        required: true
-      },
+      // Bioimpedância vem cedo no fluxo: o aluno geralmente faz na máquina
+      // (farmácia / clínica) e chega já com o resultado em mãos. Quem só
+      // tem essa avaliação preenche aqui e pode pular dobras/medidas.
       {
         id: 'bia',
         title: 'Bioimpedância',
         description: 'Resultados do aparelho (opcional)',
         icon: Activity,
         component: BIAStep,
+        required: false
+      },
+      {
+        id: 'measurements',
+        title: 'Medidas Corporais',
+        description: 'Circunferências e medidas (opcional)',
+        icon: Ruler,
+        component: MeasurementStep,
+        required: false
+      },
+      {
+        id: 'skinfolds',
+        title: 'Dobras Cutâneas',
+        description: '7 dobras para análise de composição (opcional)',
+        icon: Ruler,
+        component: SkinfoldStep,
         required: false
       },
       {
