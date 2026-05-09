@@ -18,7 +18,11 @@ import { useAssessment } from '@/hooks/useAssessment'
 import { useDialog } from '@/contexts/DialogContext'
 import { logError } from '@/lib/logger'
 import BIAAttachmentInput from './BIAAttachmentInput'
-import { biaExtractionToFormStrings } from '@/utils/storage/biaExtraction'
+import {
+  biaExtractionToFormStrings,
+  biaExtractionToAnthropometry,
+} from '@/utils/storage/biaExtraction'
+import type { BiaExtractionData } from '@/utils/storage/biaExtraction'
 
 interface QuickBIAModalProps {
   isOpen: boolean
@@ -68,6 +72,16 @@ export default function QuickBIAModal({
   const [form, setForm] = useState<FormState>(buildInitial())
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Antropometria extraída pela IA (peso, altura, idade, BMR). Guardada
+  // separada do FormState porque não é editável no modal — vai direto
+  // pro payload pra destravar IMC, TDEE e gráficos. Resetada quando o
+  // anexo é removido.
+  const [extractedAnthro, setExtractedAnthro] = useState<{
+    weight_kg: number | null
+    height_cm: number | null
+    age_years: number | null
+    bmr_kcal: number | null
+  }>({ weight_kg: null, height_cm: null, age_years: null, bmr_kcal: null })
   const { createBiaAssessment } = useAssessment()
   const { alert } = useDialog()
 
@@ -109,6 +123,13 @@ export default function QuickBIAModal({
         bia_metabolic_age: parseNum(form.bia_metabolic_age),
         bia_attachment_url: form.bia_attachment_url || null,
         observations: form.observations || '',
+        // Antropometria extraída pela IA — null quando aparelho não
+        // mediu / IA não conseguiu ler. Alimenta peso/altura/idade/BMR
+        // canônicos do registro.
+        weight_kg: extractedAnthro.weight_kg,
+        height_cm: extractedAnthro.height_cm,
+        age_years: extractedAnthro.age_years,
+        bmr_kcal: extractedAnthro.bmr_kcal,
       }, studentId)
 
       if (!result.success) {
@@ -124,6 +145,7 @@ export default function QuickBIAModal({
         'Pronto',
       )
       setForm(buildInitial())
+      setExtractedAnthro({ weight_kg: null, height_cm: null, age_years: null, bmr_kcal: null })
       onSaved()
       onClose()
     } catch (e) {
@@ -289,8 +311,14 @@ export default function QuickBIAModal({
               </span>
               <BIAAttachmentInput
                 value={form.bia_attachment_url}
-                onChange={(url) => setForm((p) => ({ ...p, bia_attachment_url: url }))}
-                onExtracted={(extracted) => {
+                onChange={(url) => {
+                  setForm((p) => ({ ...p, bia_attachment_url: url }))
+                  // Anexo removido → reseta antropometria extraída.
+                  if (!url) {
+                    setExtractedAnthro({ weight_kg: null, height_cm: null, age_years: null, bmr_kcal: null })
+                  }
+                }}
+                onExtracted={(extracted: BiaExtractionData) => {
                   // IA leu os dados do PDF/foto — sobrescreve só os campos
                   // que vieram com valor (deixa intocados os null pra não
                   // apagar algo que o usuário já tinha digitado).
@@ -304,6 +332,10 @@ export default function QuickBIAModal({
                     bia_visceral_fat: fields.bia_visceral_fat || p.bia_visceral_fat,
                     bia_metabolic_age: fields.bia_metabolic_age || p.bia_metabolic_age,
                   }))
+                  // Antropometria — vai direto pro payload do save (não
+                  // tem campo no form pro usuário editar essas coisas;
+                  // alimentam IMC/TDEE/gráficos diretamente).
+                  setExtractedAnthro(biaExtractionToAnthropometry(extracted))
                   // Limpa erro genérico se existia (o usuário pode ter visto
                   // "informe o %" antes — agora a IA preencheu).
                   setError(null)
