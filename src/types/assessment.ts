@@ -68,6 +68,14 @@ export interface Assessment {
   bia_visceral_fat?: number;
   bia_metabolic_age?: number;
 
+  // Pareamento com outra avaliação (BIA ↔ dobras). Aluno faz BIA na farmácia
+  // e dobras com o personal em datas separadas — o app cruza os dois e
+  // calcula a média. Veja src/utils/calculations/assessmentPairing.ts.
+  // 'full' = avaliação completa do personal (default; retrocompatível).
+  // 'bia'  = registro standalone só de bioimpedância.
+  assessment_type?: 'full' | 'bia';
+  paired_assessment_id?: string | null;
+
   // Metadados
   observations?: string;
   pdf_url?: string;
