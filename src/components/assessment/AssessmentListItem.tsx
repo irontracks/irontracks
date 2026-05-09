@@ -246,7 +246,12 @@ export function AssessmentListItem({
         </div>
 
         <div className="flex flex-col gap-2 mt-1">
-          {/* Row 1: Main actions */}
+          {/* Row 1: Main actions
+              Para registros 'bia' standalone (sem dados antropométricos),
+              alguns botões não fazem sentido — Gerar PDF não tem o que
+              imprimir, Plano IA precisa de dobras/medidas. Mostramos só
+              Detalhes + Excluir destacado. Avaliações 'full' mantêm o
+              layout completo com todas as ações. */}
           <div className="flex items-center gap-2">
             <button
               onClick={() => onToggleDetails(assessmentId)}
@@ -261,7 +266,42 @@ export function AssessmentListItem({
               {isSelected ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
               {isSelected ? 'Ocultar' : 'Detalhes'}
             </button>
-            <AssessmentPDFGenerator
+            {isBiaOnly && (
+              // Botão de excluir destacado com label, já na primeira linha
+              // (registros BIA não têm Row 2). Mantém o mesmo confirm flow
+              // Sim/Não usado pelas avaliações full.
+              confirmDeleteId === assessmentId ? (
+                <div className="flex items-center gap-1 ml-auto">
+                  <button
+                    type="button"
+                    onClick={() => onDelete(assessmentId)}
+                    disabled={deletingId === assessmentId}
+                    className="min-h-[40px] px-3 py-2 rounded-xl bg-red-600 text-white text-sm font-bold hover:bg-red-500 transition-all duration-200 active:scale-95 disabled:opacity-60"
+                  >
+                    {deletingId === assessmentId ? '...' : 'Sim, excluir'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onConfirmDelete(null)}
+                    className="min-h-[40px] px-3 py-2 rounded-xl border border-neutral-700 text-neutral-400 text-sm font-bold hover:text-white transition-all duration-200 active:scale-95"
+                  >
+                    Cancelar
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => onConfirmDelete(assessmentId)}
+                  className="min-h-[40px] ml-auto px-3 py-2 rounded-xl border text-sm font-bold text-red-400 hover:text-red-300 hover:border-red-500/40 transition-all duration-200 active:scale-95 flex items-center gap-1.5"
+                  style={{ background: 'rgba(239,68,68,0.06)', borderColor: 'rgba(239,68,68,0.25)' }}
+                >
+                  <Trash2 className="w-4 h-4" />
+                  Excluir
+                </button>
+              )
+            )}
+            {!isBiaOnly && (
+              <AssessmentPDFGenerator
               formData={{
                 assessment_date: String(assessment.assessment_date ?? ''),
                 weight: String(assessment.weight || ''),
@@ -312,56 +352,61 @@ export function AssessmentListItem({
                   : String(assessment.assessment_date ?? Date.now()),
               )}
             />
-          </div>
-          {/* Row 2: AI + Edit + Delete */}
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => onOpenPlanModal(assessment)}
-              disabled={!!aiPlanState?.loading}
-              className="min-h-[40px] flex-1 px-3 py-2 rounded-xl bg-yellow-500 text-black text-sm font-bold hover:bg-yellow-400 transition-all duration-200 active:scale-95 flex items-center justify-center gap-1.5 disabled:opacity-60"
-            >
-              <Sparkles className="w-4 h-4" />
-              {aiPlanState?.loading ? 'Gerando…' : 'Plano IA'}
-            </button>
-            <button
-              type="button"
-              onClick={() => onEdit(assessmentId)}
-              className="min-h-[40px] px-3 py-2 rounded-xl border text-sm font-bold text-neutral-300 hover:text-white hover:border-yellow-500/40 transition-all duration-200 active:scale-95 flex items-center gap-1.5"
-              style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }}
-            >
-              <Edit3 className="w-4 h-4" />
-              Editar
-            </button>
-            {confirmDeleteId === assessmentId ? (
-              <div className="flex items-center gap-1">
-                <button
-                  type="button"
-                  onClick={() => onDelete(assessmentId)}
-                  disabled={deletingId === assessmentId}
-                  className="min-h-[40px] px-3 py-2 rounded-xl bg-red-600 text-white text-sm font-bold hover:bg-red-500 transition-all duration-200 active:scale-95 disabled:opacity-60"
-                >
-                  {deletingId === assessmentId ? '...' : 'Sim'}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => onConfirmDelete(null)}
-                  className="min-h-[40px] px-3 py-2 rounded-xl border border-neutral-700 text-neutral-400 text-sm font-bold hover:text-white transition-all duration-200 active:scale-95"
-                >
-                  Não
-                </button>
-              </div>
-            ) : (
-              <button
-                type="button"
-                onClick={() => onConfirmDelete(assessmentId)}
-                className="min-h-[40px] px-3 py-2 rounded-xl border text-sm font-bold text-red-400 hover:text-red-300 hover:border-red-500/40 transition-all duration-200 active:scale-95 flex items-center gap-1.5"
-                style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }}
-              >
-                <Trash2 className="w-4 h-4" />
-              </button>
             )}
           </div>
+          {/* Row 2: AI + Edit + Delete — só pra avaliações 'full'.
+              Registros 'bia' standalone já têm o botão Excluir destacado
+              na Row 1 acima. */}
+          {!isBiaOnly && (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => onOpenPlanModal(assessment)}
+                disabled={!!aiPlanState?.loading}
+                className="min-h-[40px] flex-1 px-3 py-2 rounded-xl bg-yellow-500 text-black text-sm font-bold hover:bg-yellow-400 transition-all duration-200 active:scale-95 flex items-center justify-center gap-1.5 disabled:opacity-60"
+              >
+                <Sparkles className="w-4 h-4" />
+                {aiPlanState?.loading ? 'Gerando…' : 'Plano IA'}
+              </button>
+              <button
+                type="button"
+                onClick={() => onEdit(assessmentId)}
+                className="min-h-[40px] px-3 py-2 rounded-xl border text-sm font-bold text-neutral-300 hover:text-white hover:border-yellow-500/40 transition-all duration-200 active:scale-95 flex items-center gap-1.5"
+                style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }}
+              >
+                <Edit3 className="w-4 h-4" />
+                Editar
+              </button>
+              {confirmDeleteId === assessmentId ? (
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => onDelete(assessmentId)}
+                    disabled={deletingId === assessmentId}
+                    className="min-h-[40px] px-3 py-2 rounded-xl bg-red-600 text-white text-sm font-bold hover:bg-red-500 transition-all duration-200 active:scale-95 disabled:opacity-60"
+                  >
+                    {deletingId === assessmentId ? '...' : 'Sim'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => onConfirmDelete(null)}
+                    className="min-h-[40px] px-3 py-2 rounded-xl border border-neutral-700 text-neutral-400 text-sm font-bold hover:text-white transition-all duration-200 active:scale-95"
+                  >
+                    Não
+                  </button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => onConfirmDelete(assessmentId)}
+                  className="min-h-[40px] px-3 py-2 rounded-xl border text-sm font-bold text-red-400 hover:text-red-300 hover:border-red-500/40 transition-all duration-200 active:scale-95 flex items-center gap-1.5"
+                  style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }}
+                >
+                  <Trash2 className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+          )}
         </div>
       </div>
       {isSelected && (
