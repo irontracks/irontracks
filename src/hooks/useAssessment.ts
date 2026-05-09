@@ -30,6 +30,7 @@ import {
   calculateSumSkinfolds,
   combinedBodyFat
 } from '@/utils/calculations/bodyComposition';
+import { tryAutoPair } from '@/utils/calculations/assessmentPairing';
 import { getErrorMessage } from '@/utils/errorMessage';
 import { logError } from '@/lib/logger'
 import { safePg, safePgLike } from '@/utils/safePgFilter'
@@ -42,6 +43,24 @@ interface UseAssessmentReturn {
 
   // Ações
   createAssessment: (data: AssessmentFormData, studentId: string) => Promise<AssessmentResponse>;
+  /**
+   * Cria registro standalone de bioimpedância (sem dobras / medidas /
+   * fotos). Usado pelo QuickBIAModal quando o aluno chega só com o PDF
+   * da farmácia. Auto-pareia com 'full' próxima em ±14 dias.
+   */
+  createBiaAssessment: (
+    data: {
+      assessment_date: string;
+      bia_body_fat_percentage: number | null;
+      bia_lean_mass?: number | null;
+      bia_fat_mass?: number | null;
+      bia_water_percentage?: number | null;
+      bia_visceral_fat?: number | null;
+      bia_metabolic_age?: number | null;
+      observations?: string;
+    },
+    studentId: string,
+  ) => Promise<AssessmentResponse>;
   updateAssessment: (id: string, data: UpdateAssessmentRequest) => Promise<AssessmentResponse>;
   deleteAssessment: (id: string) => Promise<AssessmentResponse>;
   getAssessment: (id: string) => Promise<Assessment | null>;
@@ -230,11 +249,24 @@ export const useAssessment = (): UseAssessmentReturn => {
 
       // Cálculos (com fallback)
       body_fat_percentage: toNumberOrUndefined(row.body_fat_percentage ?? row.bf),
+      body_fat_percentage_skinfold: toNumberOrUndefined(row.body_fat_percentage_skinfold),
       lean_mass: toNumberOrUndefined(row.lean_mass),
       fat_mass: toNumberOrUndefined(row.fat_mass),
       bmr: toNumberOrUndefined(row.bmr),
       tdee: toNumberOrUndefined(row.tdee),
       bmi: toNumberOrUndefined(row.bmi),
+
+      // Bioimpedância (postgres numeric pode vir como string)
+      bia_body_fat_percentage: toNumberOrUndefined(row.bia_body_fat_percentage),
+      bia_lean_mass: toNumberOrUndefined(row.bia_lean_mass),
+      bia_fat_mass: toNumberOrUndefined(row.bia_fat_mass),
+      bia_water_percentage: toNumberOrUndefined(row.bia_water_percentage),
+      bia_visceral_fat: toNumberOrUndefined(row.bia_visceral_fat),
+      bia_metabolic_age: toNumberOrUndefined(row.bia_metabolic_age),
+
+      // Pareamento — strings/null vão direto
+      assessment_type: (row.assessment_type === 'bia' ? 'bia' : 'full') as 'full' | 'bia',
+      paired_assessment_id: row.paired_assessment_id ? String(row.paired_assessment_id) : null,
     } as Assessment;
   }, []);
 
@@ -444,6 +476,11 @@ export const useAssessment = (): UseAssessmentReturn => {
       bia_visceral_fat: biaVisceralFat ?? undefined,
       bia_metabolic_age: biaMetabolicAge ?? undefined,
 
+      // Tipo do registro — esse fluxo (formDataToAssessment) sempre cria
+      // avaliação 'full' (passa pelos steps completos). Registros 'bia'
+      // standalone usam outro caminho (createBiaAssessment).
+      assessment_type: 'full' as const,
+
       observations: data.observations
     };
   }, [user?.id]);
@@ -469,6 +506,23 @@ export const useAssessment = (): UseAssessmentReturn => {
 
       if (insertError) throw insertError;
 
+      // Auto-pair: tenta cruzar essa avaliação 'full' com algum registro
+      // 'bia' standalone do mesmo aluno em ±14 dias. Falha não bloqueia o
+      // fluxo principal — o registro já foi salvo, pareamento é cosmético.
+      try {
+        const pairId = await tryAutoPair(supabase, {
+          id: String(newAssessment.id),
+          student_id: String(newAssessment.student_id),
+          assessment_type: 'full',
+          assessment_date: String(newAssessment.assessment_date),
+        });
+        if (pairId) {
+          (newAssessment as Record<string, unknown>).paired_assessment_id = pairId;
+        }
+      } catch (pairErr) {
+        logError('error', 'Erro ao parear avaliação:', pairErr);
+      }
+
       const normalized = normalizeAssessmentRow(newAssessment);
       setAssessments(prev => [normalized, ...prev]);
 
@@ -481,6 +535,97 @@ export const useAssessment = (): UseAssessmentReturn => {
       setLoading(false);
     }
   }, [supabase, user?.id, resolveStudentRecordId, formDataToAssessment, normalizeAssessmentRow]);
+
+  /**
+   * Cria um registro standalone de bioimpedância (assessment_type='bia').
+   *
+   * Usa quando o aluno chega com o PDF da farmácia/clínica — sem passar
+   * pelo formulário completo de dobras+medidas+fotos. Após inserir,
+   * tenta auto-parear com uma avaliação 'full' do mesmo aluno em ±14 dias.
+   */
+  const createBiaAssessment = useCallback(async (
+    data: {
+      assessment_date: string;
+      bia_body_fat_percentage: number | null;
+      bia_lean_mass?: number | null;
+      bia_fat_mass?: number | null;
+      bia_water_percentage?: number | null;
+      bia_visceral_fat?: number | null;
+      bia_metabolic_age?: number | null;
+      observations?: string;
+    },
+    studentId: string,
+  ): Promise<AssessmentResponse> => {
+    try {
+      setLoading(true);
+      setError(null);
+      if (!user?.id) throw new Error('Usuário não autenticado');
+
+      const resolvedStudentId = await resolveStudentRecordId(studentId);
+
+      // Para registros 'bia' standalone, body_fat_percentage = o valor do
+      // BIA (ele é o único método disponível nesse registro). Massa magra
+      // / fat_mass derivam dele se o aluno pesou na máquina; senão ficam
+      // null e o histórico/gráfico só mostra %BF do BIA.
+      const bia = data.bia_body_fat_percentage;
+
+      const payload = {
+        student_id: resolvedStudentId,
+        trainer_id: user.id,
+        assessment_date: data.assessment_date,
+        // Campos de antropometria zerados — esse registro não os coleta.
+        // O Assessment type permite ausentes e o resto da app já trata
+        // weight/height/age 0 como "não informado".
+        weight: 0,
+        height: 0,
+        age: 0,
+        gender: 'M' as const,
+        // BIA verbatim
+        bia_body_fat_percentage: bia ?? undefined,
+        bia_lean_mass: data.bia_lean_mass ?? undefined,
+        bia_fat_mass: data.bia_fat_mass ?? undefined,
+        bia_water_percentage: data.bia_water_percentage ?? undefined,
+        bia_visceral_fat: data.bia_visceral_fat ?? undefined,
+        bia_metabolic_age: data.bia_metabolic_age ?? undefined,
+        // body_fat_percentage = BIA pra alimentar gráfico/histórico
+        body_fat_percentage: bia ?? undefined,
+        assessment_type: 'bia' as const,
+        observations: data.observations || '',
+      };
+
+      const { data: newAssessment, error: insertError } = await supabase
+        .from('assessments')
+        .insert(payload)
+        .select()
+        .single();
+      if (insertError) throw insertError;
+
+      // Auto-pair com avaliação 'full' próxima
+      try {
+        const pairId = await tryAutoPair(supabase, {
+          id: String(newAssessment.id),
+          student_id: String(newAssessment.student_id),
+          assessment_type: 'bia',
+          assessment_date: String(newAssessment.assessment_date),
+        });
+        if (pairId) {
+          (newAssessment as Record<string, unknown>).paired_assessment_id = pairId;
+        }
+      } catch (pairErr) {
+        logError('error', 'Erro ao parear avaliação BIA:', pairErr);
+      }
+
+      const normalized = normalizeAssessmentRow(newAssessment);
+      setAssessments(prev => [normalized, ...prev]);
+      return { success: true, data: normalized };
+    } catch (e: unknown) {
+      logError('error', 'Erro ao criar avaliação BIA:', e);
+      setError(getErrorMessage(e));
+      return { success: false, error: getErrorMessage(e) };
+    } finally {
+      setLoading(false);
+    }
+  }, [supabase, user?.id, resolveStudentRecordId, normalizeAssessmentRow]);
 
   const updateAssessment = useCallback(async (id: string, data: UpdateAssessmentRequest): Promise<AssessmentResponse> => {
     try {
@@ -538,6 +683,7 @@ export const useAssessment = (): UseAssessmentReturn => {
     loading,
     error,
     createAssessment,
+    createBiaAssessment,
     updateAssessment,
     deleteAssessment,
     getAssessment,

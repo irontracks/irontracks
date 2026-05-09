@@ -1,18 +1,28 @@
 'use client'
 
-import { User, X } from 'lucide-react'
+import { Activity, User, X } from 'lucide-react'
 
 type AssessmentHeaderProps = {
   onCreate: () => void
   onShowHistory: () => void
   onClose?: () => void
+  /**
+   * Quando definido, exibe um botão "+ Bioimpedância" pra registrar
+   * standalone o resultado da máquina externa (farmácia/clínica). O
+   * botão fica oculto se não for fornecido — útil pra contextos onde
+   * só faz sentido a avaliação completa.
+   */
+  onAddBia?: () => void
 }
 
 export const AssessmentHeader = ({
   onCreate,
   onShowHistory,
   onClose,
+  onAddBia,
 }: AssessmentHeaderProps) => {
+  // Layout: 3 colunas quando tem o botão BIA, 2 quando não.
+  const cols = onAddBia ? 'sm:grid-cols-3' : 'sm:grid-cols-2'
   return (
     <div
       className="rounded-2xl border p-6 mb-6 relative overflow-hidden"
@@ -39,13 +49,28 @@ export const AssessmentHeader = ({
           </div>
         </div>
         <div className="w-full sm:w-auto flex items-center gap-2">
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 flex-1 sm:flex-none">
+          <div className={`grid grid-cols-1 ${cols} gap-2 flex-1 sm:flex-none`}>
             <button
               onClick={onCreate}
               className="w-full min-h-[44px] px-4 py-2 rounded-xl text-black font-black shadow-lg shadow-yellow-500/20 hover:shadow-yellow-500/30 transition-all duration-300 active:scale-95 btn-gold-animated"
             >
               + Nova Avaliação
             </button>
+            {onAddBia ? (
+              <button
+                onClick={onAddBia}
+                className="w-full min-h-[44px] px-4 py-2 rounded-xl border font-bold transition-all duration-300 active:scale-95 inline-flex items-center justify-center gap-2"
+                style={{
+                  background: 'rgba(59,130,246,0.08)',
+                  borderColor: 'rgba(59,130,246,0.30)',
+                  color: '#93c5fd',
+                }}
+                title="Registrar resultado da bioimpedância (PDF da farmácia/clínica)"
+              >
+                <Activity className="w-4 h-4" />
+                Bioimpedância
+              </button>
+            ) : null}
             <button
               onClick={onShowHistory}
               className="w-full min-h-[44px] px-4 py-2 rounded-xl border text-neutral-200 font-bold hover:text-yellow-400 hover:border-yellow-500/40 transition-all duration-300 active:scale-95"

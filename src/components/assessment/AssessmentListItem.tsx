@@ -15,6 +15,8 @@ import {
 } from './assessmentUtils'
 import { formatDateCompact, formatWeekdayCompact, safeGender } from './assessmentChartData'
 import type { AiPlanEntry } from '@/hooks/useAssessmentHistoryData'
+import { combinedBodyFat } from '@/utils/calculations/bodyComposition'
+import { resolveBodyFatFromPair } from '@/utils/calculations/assessmentPairing'
 
 const AssessmentPDFGenerator = dynamic(() => import('@/components/assessment/AssessmentPDFGenerator'), { ssr: false })
 const BodyMeasurementMap = dynamic(() => import('@/components/assessment/BodyMeasurementMap'), { ssr: false })
@@ -127,6 +129,11 @@ function AiPlanSection({
 
 interface AssessmentListItemProps {
   assessment: AssessmentRow
+  /**
+   * Contraparte resolvida pelo parent quando essa avaliação está
+   * pareada (full ↔ bia em ±14 dias). null = não tem par.
+   */
+  pairedAssessment?: AssessmentRow | null
   idx: number
   isSelected: boolean
   aiPlanState: AiPlanEntry | undefined
@@ -144,6 +151,7 @@ interface AssessmentListItemProps {
 
 export function AssessmentListItem({
   assessment,
+  pairedAssessment,
   idx,
   isSelected,
   aiPlanState,
@@ -161,6 +169,10 @@ export function AssessmentListItem({
   const assessmentId = String(assessment?.id ?? idx)
   const photos = Array.isArray(assessment?.photos) ? assessment.photos : []
   const ageLabel = String(assessment?.age ?? '-')
+  // Discriminação BIA-only vs full + sinal de pareamento. O hook
+  // normalizeAssessmentRow garante esses 2 campos sempre presentes.
+  const isBiaOnly = String(assessment?.assessment_type ?? 'full') === 'bia'
+  const isPaired = !!assessment?.paired_assessment_id
 
   return (
     <div className="p-5 hover:bg-white/[0.02] transition-colors" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
@@ -175,10 +187,25 @@ export function AssessmentListItem({
                 {formatWeekdayCompact(assessment.date || assessment.assessment_date)}
               </div>
             </div>
-            <div className="shrink-0 flex items-center gap-2">
-              <span className="px-2.5 py-1 bg-yellow-500/15 text-yellow-400 text-xs rounded-full border border-yellow-500/20 font-bold">
-                {ageLabel} anos
-              </span>
+            <div className="shrink-0 flex items-center gap-2 flex-wrap justify-end">
+              {isBiaOnly && (
+                <span className="px-2.5 py-1 bg-blue-500/15 text-blue-300 text-xs rounded-full border border-blue-500/30 font-bold">
+                  Bioimpedância
+                </span>
+              )}
+              {isPaired && (
+                <span
+                  className="px-2.5 py-1 bg-emerald-500/15 text-emerald-300 text-xs rounded-full border border-emerald-500/30 font-bold inline-flex items-center gap-1"
+                  title="Linkada com a contraparte (full ↔ BIA) em ±14 dias"
+                >
+                  🔗 Linkada
+                </span>
+              )}
+              {!isBiaOnly && (
+                <span className="px-2.5 py-1 bg-yellow-500/15 text-yellow-400 text-xs rounded-full border border-yellow-500/20 font-bold">
+                  {ageLabel} anos
+                </span>
+              )}
               {photos.length > 0 && (
                 <span className="px-2.5 py-1 bg-green-500/15 text-green-400 text-xs rounded-full border border-green-500/20 font-bold">
                   Com fotos
@@ -323,6 +350,69 @@ export function AssessmentListItem({
       </div>
       {isSelected && (
         <div className="mt-4 pt-4 border-t border-neutral-700">
+          {/* ── Métodos de %BF ── */}
+          {(() => {
+            // Resolve dobras (Siri) e BIA, puxando do par quando o registro
+            // atual só tem um dos dois (caso típico de pareamento).
+            const breakdown = resolveBodyFatFromPair(
+              {
+                assessment_type: (assessment.assessment_type === 'bia' ? 'bia' : 'full') as 'full' | 'bia',
+                body_fat_percentage_skinfold: typeof assessment.body_fat_percentage_skinfold === 'number'
+                  ? assessment.body_fat_percentage_skinfold : undefined,
+                bia_body_fat_percentage: typeof assessment.bia_body_fat_percentage === 'number'
+                  ? assessment.bia_body_fat_percentage : undefined,
+              },
+              pairedAssessment ? {
+                assessment_type: (pairedAssessment.assessment_type === 'bia' ? 'bia' : 'full') as 'full' | 'bia',
+                body_fat_percentage_skinfold: typeof pairedAssessment.body_fat_percentage_skinfold === 'number'
+                  ? pairedAssessment.body_fat_percentage_skinfold : undefined,
+                bia_body_fat_percentage: typeof pairedAssessment.bia_body_fat_percentage === 'number'
+                  ? pairedAssessment.bia_body_fat_percentage : undefined,
+              } : null,
+            );
+            const combined = combinedBodyFat(breakdown.skinfold, breakdown.bia);
+            const hasBoth = breakdown.skinfold != null && breakdown.bia != null;
+            const hasAny = breakdown.skinfold != null || breakdown.bia != null;
+            if (!hasAny) return null;
+            const cards: Array<{ label: string; value: number | null; sub: string; tone: string }> = [];
+            if (breakdown.skinfold != null) {
+              cards.push({ label: '7 Dobras (Siri)', value: breakdown.skinfold, sub: 'Pollock + Siri', tone: 'rgba(234,179,8,0.10)' });
+            }
+            if (breakdown.bia != null) {
+              cards.push({ label: 'Bioimpedância', value: breakdown.bia, sub: 'Aparelho do usuário', tone: 'rgba(59,130,246,0.10)' });
+            }
+            if (hasBoth && combined != null) {
+              cards.push({ label: 'Média', value: combined, sub: '(dobras + BIA) ÷ 2', tone: 'rgba(34,197,94,0.10)' });
+            }
+            const cols = cards.length === 3 ? 'grid-cols-1 sm:grid-cols-3' : 'grid-cols-1 sm:grid-cols-2';
+            return (
+              <div className="mb-4">
+                <h4 className="font-bold text-white mb-2 text-sm flex items-center gap-2">
+                  Métodos de % Gordura
+                  {pairedAssessment && (
+                    <span className="text-[10px] font-bold text-emerald-300 bg-emerald-500/10 border border-emerald-500/25 rounded-full px-2 py-0.5">
+                      🔗 cruzado com avaliação de {formatDateCompact(String(pairedAssessment.assessment_date ?? pairedAssessment.date ?? ''))}
+                    </span>
+                  )}
+                </h4>
+                <div className={`grid ${cols} gap-3`}>
+                  {cards.map((c) => (
+                    <div
+                      key={c.label}
+                      className="text-center p-3 rounded-xl border border-neutral-800"
+                      style={{ background: c.tone }}
+                    >
+                      <div className="text-[10px] text-neutral-400 uppercase tracking-wide font-bold">{c.label}</div>
+                      <div className="text-xl font-black text-white mt-1">
+                        {c.value != null ? `${c.value.toFixed(1)}%` : '-'}
+                      </div>
+                      <div className="text-[10px] text-neutral-500 mt-0.5">{c.sub}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <h4 className="font-bold text-white mb-2">Dobras Cutâneas (mm)</h4>

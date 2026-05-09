@@ -16,6 +16,7 @@ import {
 import { Calendar, TrendingUp } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { AssessmentForm } from '@/components/assessment/AssessmentForm';
+import QuickBIAModal from '@/components/assessment/QuickBIAModal';
 import { DialogProvider } from '@/contexts/DialogContext';
 import GlobalDialog from '@/components/GlobalDialog';
 import { AssessmentHeader } from '@/components/assessment/AssessmentHeader';
@@ -60,6 +61,7 @@ interface AssessmentHistoryProps {
 export default function AssessmentHistory({ studentId: propStudentId, onClose }: AssessmentHistoryProps) {
   const studentId = propStudentId;
   const router = useRouter();
+  const [quickBiaOpen, setQuickBiaOpen] = React.useState(false);
 
   const {
     // Core data
@@ -136,6 +138,7 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
           onCreate={() => studentId && router.push(`/assessments/new/${studentId}`)}
           onShowHistory={() => {}}
           onClose={undefined}
+          onAddBia={studentId ? () => setQuickBiaOpen(true) : undefined}
         />
 
         <div
@@ -163,6 +166,7 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
           onCreate={() => setShowForm(true)}
           onShowHistory={() => setShowHistory(true)}
           onClose={onClose}
+          onAddBia={studentId ? () => setQuickBiaOpen(true) : undefined}
         />
         {latestAssessment && previousAssessment && (
           <AssessmentSummaryCards
@@ -277,25 +281,38 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
             </h3>
           </div>
           <div id="assessments-history" className="divide-y" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
-            {sortedAssessments.map((assessment, idx) => (
-              <AssessmentListItem
-                key={String(assessment?.id ?? idx)}
-                assessment={assessment}
-                idx={idx}
-                isSelected={selectedAssessment === String(assessment?.id ?? idx)}
-                aiPlanState={aiPlanByAssessmentId[String(assessment.id)]}
-                workoutSessionsLoading={workoutSessionsLoading}
-                tdee={tdeeByAssessmentId.get(String(assessment.id))}
-                deletingId={deletingId}
-                confirmDeleteId={confirmDeleteId}
-                onToggleDetails={(id) => setSelectedAssessment(selectedAssessment === id ? null : id)}
-                onEdit={(id) => { setEditAssessmentId(id); setShowForm(true); }}
-                onDelete={handleDeleteAssessment}
-                onConfirmDelete={setConfirmDeleteId}
-                onOpenPlanModal={handleOpenAssessmentPlanModal}
-                setPlanAnchorRef={(id, el) => { try { planAnchorRefs.current[id] = el } catch {} }}
-              />
-            ))}
+            {sortedAssessments.map((assessment, idx) => {
+              // Resolve a contraparte (full ↔ bia) para essa avaliação. O
+              // pareamento é bidirecional: ambos os registros têm
+              // paired_assessment_id apontando um pro outro. O lookup é em
+              // memória (sem fetch), pois o histórico já carregou tudo.
+              const pairedId = assessment?.paired_assessment_id
+                ? String(assessment.paired_assessment_id)
+                : null;
+              const pairedAssessment = pairedId
+                ? assessments.find((a) => String(a?.id) === pairedId) ?? null
+                : null;
+              return (
+                <AssessmentListItem
+                  key={String(assessment?.id ?? idx)}
+                  assessment={assessment}
+                  pairedAssessment={pairedAssessment}
+                  idx={idx}
+                  isSelected={selectedAssessment === String(assessment?.id ?? idx)}
+                  aiPlanState={aiPlanByAssessmentId[String(assessment.id)]}
+                  workoutSessionsLoading={workoutSessionsLoading}
+                  tdee={tdeeByAssessmentId.get(String(assessment.id))}
+                  deletingId={deletingId}
+                  confirmDeleteId={confirmDeleteId}
+                  onToggleDetails={(id) => setSelectedAssessment(selectedAssessment === id ? null : id)}
+                  onEdit={(id) => { setEditAssessmentId(id); setShowForm(true); }}
+                  onDelete={handleDeleteAssessment}
+                  onConfirmDelete={setConfirmDeleteId}
+                  onOpenPlanModal={handleOpenAssessmentPlanModal}
+                  setPlanAnchorRef={(id, el) => { try { planAnchorRefs.current[id] = el } catch {} }}
+                />
+              );
+            })}
           </div>
         </div>
 
@@ -387,6 +404,19 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
             formatDateCompact={formatDateCompact}
             safeGender={safeGender}
             onClose={() => setShowHistory(false)}
+          />
+        )}
+        {/* Modal pra registrar bioimpedância standalone (PDF da farmácia).
+            Só renderizamos quando há studentId — `onAddBia` no header
+            também depende dele. Após salvar, a página recarrega pra puxar
+            o novo registro com o pareamento já feito. */}
+        {studentId && (
+          <QuickBIAModal
+            isOpen={quickBiaOpen}
+            studentId={studentId}
+            studentName={studentName}
+            onClose={() => setQuickBiaOpen(false)}
+            onSaved={() => { if (typeof window !== 'undefined') location.reload(); }}
           />
         )}
       </div>
