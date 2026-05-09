@@ -37,6 +37,15 @@ interface AssessmentFormData {
   [key: string]: unknown
 }
 
+interface BodyFatBreakdown {
+  /** %BF derivado das 7 dobras (Siri/Pollock). Null = método não usado. */
+  skinfold?: number | null
+  /** %BF do aparelho de bioimpedância. Null = método não usado. */
+  bia?: number | null
+  /** Valor "blended" — média simples quando os dois existem; senão o que houver. */
+  combined?: number | null
+}
+
 interface BodyComposition {
   bodyFatPercentage?: number | null
   sumOfSkinfolds?: number | null
@@ -45,6 +54,8 @@ interface BodyComposition {
   bmi?: number | null
   bmr?: number | null
   tdee?: number | null
+  /** Trio de leituras (dobras / BIA / média). Renderizado como seção extra. */
+  breakdown?: BodyFatBreakdown | null
   [key: string]: unknown
 }
 
@@ -92,6 +103,18 @@ function buildAssessmentHtml(
 
   const bodyFatPercentage = Number(bodyComposition?.bodyFatPercentage ?? 0) || 0
   const sumOfSkinfolds = Number(bodyComposition?.sumOfSkinfolds ?? 0) || 0
+  // Trio de leituras (skinfold / BIA / média) — só é renderizado quando
+  // pelo menos um método foi usado.
+  const breakdown = (bodyComposition?.breakdown && typeof bodyComposition.breakdown === 'object'
+    ? bodyComposition.breakdown
+    : null) as BodyFatBreakdown | null
+  const breakdownSkinfold = breakdown?.skinfold != null && Number.isFinite(breakdown.skinfold)
+    ? Number(breakdown.skinfold) : null
+  const breakdownBia = breakdown?.bia != null && Number.isFinite(breakdown.bia)
+    ? Number(breakdown.bia) : null
+  const breakdownCombined = breakdown?.combined != null && Number.isFinite(breakdown.combined)
+    ? Number(breakdown.combined) : null
+  const hasMultipleMethods = breakdownSkinfold != null && breakdownBia != null
 
   const bmr = Number(metrics?.bmr ?? 0) || 0
   const bmi = Number(metrics?.bmi ?? 0) || 0
@@ -256,6 +279,32 @@ function buildAssessmentHtml(
           </div>
         </div>
       </div>
+
+      ${hasMultipleMethods ? `
+      <div class="section">
+        <h2>Métodos de % Gordura</h2>
+        <div class="grid">
+          <div class="card">
+            <div class="label">7 Dobras (Siri)</div>
+            <div class="value">${breakdownSkinfold != null ? `${breakdownSkinfold.toFixed(1)}%` : '-'}</div>
+            <div class="class-label">Pollock + Siri</div>
+          </div>
+          <div class="card">
+            <div class="label">Bioimpedância</div>
+            <div class="value">${breakdownBia != null ? `${breakdownBia.toFixed(1)}%` : '-'}</div>
+            <div class="class-label">Aparelho do usuário</div>
+          </div>
+          <div class="card">
+            <div class="label">Média</div>
+            <div class="value gold">${breakdownCombined != null ? `${breakdownCombined.toFixed(1)}%` : '-'}</div>
+            <div class="class-label">(dobras + BIA) ÷ 2</div>
+          </div>
+        </div>
+        <p style="font-size:11px;color:#666;margin-top:8px">
+          A <strong>média</strong> é o valor usado nas seções abaixo (massa magra, massa gorda) e no histórico.
+        </p>
+      </div>
+      ` : ''}
 
       <div class="section">
         <h2>Composição Corporal</h2>

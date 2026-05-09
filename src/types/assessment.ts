@@ -44,12 +44,29 @@ export interface Assessment {
   calf_skinfold_right?: number;
 
   // Cálculos (gerados automaticamente)
-  body_fat_percentage?: number; // % gordura
+  // body_fat_percentage = "blended" reading. When both skinfold and BIA were
+  // entered it holds the simple average (a+b)/2. When only one was entered
+  // it holds that value. Used by historical charts/trends so old rows don't
+  // shift in meaning.
+  body_fat_percentage?: number;
+  // The skinfold-only %BF (Siri). Kept separately so the UI can show all
+  // three readings side by side (skinfold / BIA / blended) without losing
+  // the original Siri-derived value.
+  body_fat_percentage_skinfold?: number;
   lean_mass?: number; // massa magra em kg
   fat_mass?: number; // massa gorda em kg
   bmr?: number; // taxa metabólica basal kcal/dia
   tdee?: number; // gasto energético total kcal/dia
   bmi?: number; // índice de massa corporal
+
+  // Bioimpedância (BIA) — manualmente preenchido pelo usuário a partir do
+  // que o aparelho mostra. Todos opcionais.
+  bia_body_fat_percentage?: number;
+  bia_lean_mass?: number;
+  bia_fat_mass?: number;
+  bia_water_percentage?: number;
+  bia_visceral_fat?: number;
+  bia_metabolic_age?: number;
 
   // Metadados
   observations?: string;
@@ -113,6 +130,15 @@ export interface AssessmentFormData {
   calf_skinfold: string;
   calf_skinfold_left: string;
   calf_skinfold_right: string;
+
+  // Bioimpedância — campos opcionais. Strings (igual aos demais campos do
+  // form) para compatibilidade com inputs controlados. Vazio = não usar BIA.
+  bia_body_fat_percentage: string;
+  bia_lean_mass: string;
+  bia_fat_mass: string;
+  bia_water_percentage: string;
+  bia_visceral_fat: string;
+  bia_metabolic_age: string;
 
   // Metadados
   observations: string;
@@ -345,6 +371,29 @@ export const validateAssessmentForm = (data: AssessmentFormData): Record<string,
       }
     }
   });
+
+  // Validação BIA — só roda quando o campo está preenchido. Todos opcionais.
+  // %s ficam em [0, 100]; massas em kg num range fisiológico amplo;
+  // metabolic_age em [10, 120] (mesma faixa de "age").
+  const validateOptional = (
+    field: keyof AssessmentFormData,
+    min: number,
+    max: number,
+    message: string,
+  ) => {
+    const raw = data[field];
+    if (typeof raw !== 'string' || !raw) return;
+    const value = parseFloat(raw.replace(',', '.'));
+    if (Number.isNaN(value) || value < min || value > max) {
+      errors[field] = message;
+    }
+  };
+  validateOptional('bia_body_fat_percentage', 0, 100, 'Percentual entre 0 e 100');
+  validateOptional('bia_water_percentage', 0, 100, 'Percentual entre 0 e 100');
+  validateOptional('bia_lean_mass', 5, 250, 'Massa magra entre 5 e 250 kg');
+  validateOptional('bia_fat_mass', 0, 250, 'Massa gorda entre 0 e 250 kg');
+  validateOptional('bia_visceral_fat', 0, 60, 'Gordura visceral entre 0 e 60');
+  validateOptional('bia_metabolic_age', 10, 120, 'Idade metabólica entre 10 e 120 anos');
 
   return errors;
 };

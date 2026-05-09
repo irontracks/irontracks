@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Download, User, Ruler, Calculator, TrendingUp, FileText, Code } from 'lucide-react';
+import { Download, User, Ruler, Calculator, TrendingUp, FileText, Code, Activity } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import { AssessmentFormData } from '@/types/assessment';
 import {
@@ -10,7 +10,8 @@ import {
   calculateBMR,
   calculateBMI,
   classifyBMI,
-  classifyBodyFat
+  classifyBodyFat,
+  buildBodyFatBreakdown
 } from '@/utils/calculations/bodyComposition';
 import { generateAssessmentPdf } from '@/utils/report/generatePdf';
 import { logError } from '@/lib/logger'
@@ -58,21 +59,45 @@ export default function ResultsPreview({ formData, onBack: _onBack, studentName 
       calf_skinfold: calfSkinAvg
     } as unknown as Parameters<typeof calculateSumSkinfolds>[0]);
 
-    const bodyDensity = (sumOfSkinfolds > 0 && age > 0) ? calculateBodyDensity(sumOfSkinfolds, age, gender) : 1.05;
-    const bodyFatPercentage = calculateBodyFatPercentage(bodyDensity);
+    // %BF do método de dobras (Siri/Pollock) — só calcula se tiver as 7
+    // dobras válidas; senão fica null (usuário pode estar usando só BIA).
+    let skinfoldBF: number | null = null;
+    if (sumOfSkinfolds > 0 && age > 0) {
+      try {
+        const bodyDensity = calculateBodyDensity(sumOfSkinfolds, age, gender);
+        skinfoldBF = calculateBodyFatPercentage(bodyDensity);
+      } catch {
+        skinfoldBF = null;
+      }
+    }
+
+    const biaRaw = parseFloat(String(formData.bia_body_fat_percentage || '').replace(',', '.'));
+    const biaBF = Number.isFinite(biaRaw) && biaRaw > 0 && biaRaw <= 100 ? biaRaw : null;
+
+    // Trio (skinfold / BIA / blended) — usado pra renderizar o card de
+    // métodos. `combined` é o número que vai pro histórico/gráficos.
+    const bodyFatBreakdown = buildBodyFatBreakdown(skinfoldBF, biaBF);
+    const bodyFatPercentage = bodyFatBreakdown.combined ?? 0;
 
     const bmr = (weight > 0 && height > 0 && age > 0) ? calculateBMR(weight, height, age, gender) : 0;
     const bmi = (weight > 0 && height > 0) ? calculateBMI(weight, height) : 0;
     const bmiClassification = bmi ? classifyBMI(bmi) : '—';
-    const bodyFatClassification = classifyBodyFat(bodyFatPercentage, gender, age || 18);
+    const bodyFatClassification = bodyFatBreakdown.combined != null
+      ? classifyBodyFat(bodyFatBreakdown.combined, gender, age || 18)
+      : '—';
 
-    const leanMass = weight > 0 ? weight * (1 - bodyFatPercentage / 100) : 0;
-    const fatMass = weight > 0 ? weight * (bodyFatPercentage / 100) : 0;
+    const leanMass = (weight > 0 && bodyFatBreakdown.combined != null)
+      ? weight * (1 - bodyFatBreakdown.combined / 100)
+      : 0;
+    const fatMass = (weight > 0 && bodyFatBreakdown.combined != null)
+      ? weight * (bodyFatBreakdown.combined / 100)
+      : 0;
 
     return {
       bodyComposition: {
         bodyFatPercentage,
-        sumOfSkinfolds
+        sumOfSkinfolds,
+        breakdown: bodyFatBreakdown,
       },
       bmr,
       bmi,
@@ -224,6 +249,48 @@ export default function ResultsPreview({ formData, onBack: _onBack, studentName 
           </div>
         </div>
       </div>
+
+      {/* Métodos de % Gordura — só renderiza se tiver pelo menos um método */}
+      {(results.bodyComposition.breakdown.skinfold != null || results.bodyComposition.breakdown.bia != null) && (
+        <div className="rounded-2xl border p-5 relative overflow-hidden" style={{ background: 'linear-gradient(160deg, rgba(20,18,10,0.8) 0%, rgba(12,12,12,0.95) 50%)', borderColor: 'rgba(255,255,255,0.06)' }}>
+          <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-yellow-500/20 to-transparent" />
+          <div className="flex items-center gap-2 mb-3">
+            <Activity className="w-5 h-5 text-yellow-500 shrink-0" />
+            <h3 className="text-lg font-bold text-white">Métodos de % Gordura</h3>
+          </div>
+          {/* Quando ambos: 3 cards (dobras / BIA / média). Quando só um: 1 card. */}
+          {(() => {
+            const { skinfold, bia, combined } = results.bodyComposition.breakdown;
+            const cards: Array<{ label: string; value: number | null; sub: string; tone: string }> = [];
+            if (skinfold != null) cards.push({ label: '7 Dobras (Siri)', value: skinfold, sub: 'Pollock + Siri', tone: 'rgba(234,179,8,0.10)' });
+            if (bia != null) cards.push({ label: 'Bioimpedância', value: bia, sub: 'Aparelho do usuário', tone: 'rgba(59,130,246,0.10)' });
+            if (skinfold != null && bia != null && combined != null) {
+              cards.push({ label: 'Média', value: combined, sub: '(dobras + BIA) ÷ 2', tone: 'rgba(34,197,94,0.10)' });
+            }
+            const cols = cards.length === 3 ? 'grid-cols-1 sm:grid-cols-3' : 'grid-cols-1';
+            return (
+              <div className={`grid ${cols} gap-3`}>
+                {cards.map((c) => (
+                  <div
+                    key={c.label}
+                    className="text-center p-3 bg-neutral-900 rounded-xl border border-neutral-800 min-h-[88px] flex flex-col items-center justify-center"
+                    style={{ background: c.tone }}
+                  >
+                    <p className="text-xs text-neutral-400 uppercase tracking-wide font-bold">{c.label}</p>
+                    <p className="text-2xl font-black text-white mt-1">{c.value != null ? `${c.value.toFixed(1)}%` : '—'}</p>
+                    <p className="text-[10px] text-neutral-500 mt-0.5">{c.sub}</p>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+          {results.bodyComposition.breakdown.skinfold != null && results.bodyComposition.breakdown.bia != null && (
+            <p className="text-[11px] text-neutral-500 mt-3 leading-relaxed">
+              A <strong>média</strong> é o valor usado nas seções abaixo (massa magra, massa gorda) e no histórico de evolução.
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Composição Corporal */}
       <div className="rounded-2xl border p-5 relative overflow-hidden" style={{ background: 'linear-gradient(160deg, rgba(20,18,10,0.8) 0%, rgba(12,12,12,0.95) 50%)', borderColor: 'rgba(255,255,255,0.06)' }}>

@@ -8,7 +8,8 @@ import {
   calculateBMR,
   calculateBMI,
   classifyBMI,
-  classifyBodyFat
+  classifyBodyFat,
+  buildBodyFatBreakdown
 } from '@/utils/calculations/bodyComposition';
 import { generateAssessmentPdf } from '@/utils/report/generatePdf';
 import { logError } from '@/lib/logger'
@@ -61,14 +62,29 @@ export async function generateAssessmentPDF({
   const height = Number(formData.height) || 0
   const gender = formData.gender
 
-  const density = (sum > 0 && age > 0) ? calculateBodyDensity(sum, age, gender) : 1.05
-  const bfp = calculateBodyFatPercentage(density)
+  // %BF do método de dobras — só se tiver os dados completos.
+  let skinfoldBF: number | null = null;
+  if (sum > 0 && age > 0) {
+    try {
+      const density = calculateBodyDensity(sum, age, gender);
+      skinfoldBF = calculateBodyFatPercentage(density);
+    } catch {
+      skinfoldBF = null;
+    }
+  }
+  const biaRaw = Number(String(formData.bia_body_fat_percentage || '0').replace(',', '.'));
+  const biaBF = Number.isFinite(biaRaw) && biaRaw > 0 && biaRaw <= 100 ? biaRaw : null;
+  const breakdown = buildBodyFatBreakdown(skinfoldBF, biaBF);
+  const bfp = breakdown.combined ?? 0;
+
   const bmr = (weight > 0 && height > 0 && age > 0) ? calculateBMR(weight, height, age, gender) : 0
   const bmi = (weight > 0 && height > 0) ? calculateBMI(weight, height) : 0
   const bmiClassification = bmi ? classifyBMI(bmi) : ''
-  const bodyFatClassification = classifyBodyFat(bfp, gender, age || 18)
-  const leanMass = weight > 0 ? weight * (1 - bfp / 100) : 0
-  const fatMass = weight > 0 ? weight * (bfp / 100) : 0
+  const bodyFatClassification = breakdown.combined != null
+    ? classifyBodyFat(breakdown.combined, gender, age || 18)
+    : ''
+  const leanMass = (weight > 0 && breakdown.combined != null) ? weight * (1 - breakdown.combined / 100) : 0
+  const fatMass = (weight > 0 && breakdown.combined != null) ? weight * (breakdown.combined / 100) : 0
 
   // Circumference bilateral averages
   const armCirc = avgBilateral(formData, 'arm_circ', 'arm_circ_left', 'arm_circ_right')
@@ -76,7 +92,13 @@ export async function generateAssessmentPDF({
   const calfCirc = avgBilateral(formData, 'calf_circ', 'calf_circ_left', 'calf_circ_right')
 
   const results = {
-    bodyComposition: { bodyFatPercentage: bfp, sumOfSkinfolds: sum },
+    bodyComposition: {
+      bodyFatPercentage: bfp,
+      sumOfSkinfolds: sum,
+      // Trio de leituras — o PDF renderiza a seção "Métodos de % Gordura"
+      // apenas quando ambos skinfold e BIA estão presentes.
+      breakdown,
+    },
     bmr,
     bmi,
     bmiClassification,

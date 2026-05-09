@@ -372,3 +372,69 @@ export const safeCalculateSumSkinfolds = (assessment: Partial<Assessment>): numb
     return null;
   }
 };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Skinfold + BIA reconciliation
+//
+// Many users record both a 7-skinfold (Siri/Pollock) reading and a
+// bioimpedance reading from a scale. Each technique has well-known biases
+// (skinfolds underestimate in lean subjects, BIA fluctuates with hydration),
+// so the most useful "single number" to surface long-term is the simple
+// arithmetic mean of the two when both are available.
+//
+// We deliberately do NOT weight one over the other (option B in the product
+// spec): the UI shows the three readings side by side and lets the user
+// reason about the discrepancy themselves.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const isValidPercent = (v: number | null | undefined): v is number =>
+  typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 100;
+
+/**
+ * Returns the "blended" body-fat % to store/display as the single primary
+ * value. Behaviour:
+ *   - Both inputs valid → simple average (a + b) / 2.
+ *   - Only one input valid → that input.
+ *   - Neither valid → null.
+ *
+ * Exposed as a pure function so it's trivially unit-testable and re-usable
+ * by the UI, the persistence layer (useAssessment) and the PDF generator.
+ */
+export const combinedBodyFat = (
+  skinfoldBF: number | null | undefined,
+  biaBF: number | null | undefined,
+): number | null => {
+  const sf = isValidPercent(skinfoldBF) ? skinfoldBF : null;
+  const bia = isValidPercent(biaBF) ? biaBF : null;
+  if (sf != null && bia != null) return (sf + bia) / 2;
+  if (sf != null) return sf;
+  if (bia != null) return bia;
+  return null;
+};
+
+export type BodyFatBreakdown = {
+  /** Siri-derived value from 7 skinfolds (null if dobras incompletas). */
+  skinfold: number | null;
+  /** Manually entered BIA reading (null if not provided). */
+  bia: number | null;
+  /** Blended value used as the canonical body_fat_percentage. */
+  combined: number | null;
+};
+
+/**
+ * Convenience wrapper that returns the three figures the assessment screens
+ * need to render: skinfold-only, BIA-only, blended. Use this anywhere the UI
+ * shows the trio (ResultsPreview, PDF, history modal).
+ */
+export const buildBodyFatBreakdown = (
+  skinfoldBF: number | null | undefined,
+  biaBF: number | null | undefined,
+): BodyFatBreakdown => {
+  const skinfold = isValidPercent(skinfoldBF) ? (skinfoldBF as number) : null;
+  const bia = isValidPercent(biaBF) ? (biaBF as number) : null;
+  return {
+    skinfold,
+    bia,
+    combined: combinedBodyFat(skinfold, bia),
+  };
+};

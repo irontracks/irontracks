@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   User,
   Ruler,
+  Activity,
   Camera,
   FileText,
   Save,
@@ -21,6 +22,7 @@ import { useDialog } from '@/contexts/DialogContext';
 import { BasicInfoStep } from './BasicInfoStep';
 import { MeasurementStep } from './MeasurementStep';
 import { SkinfoldStep } from './SkinfoldStep';
+import { BIAStep } from './BIAStep';
 import PhotoUploadStep from './PhotoUploadStep';
 import ResultsPreview from './ResultsPreview';
 import { logError } from '@/lib/logger'
@@ -47,6 +49,17 @@ type FormStep =
       icon: React.ComponentType<LucideProps>;
       component: AssessmentStepComponent;
       required: true;
+    }
+  | {
+      // Bioimpedância — opcional. Compartilha o shape de step "padrão"
+      // (recebe formData/updateFormData) com basic/measurements/skinfolds,
+      // mas required:false porque o usuário pode pular.
+      id: 'bia';
+      title: string;
+      description: string;
+      icon: React.ComponentType<LucideProps>;
+      component: AssessmentStepComponent;
+      required: false;
     }
   | {
       id: 'photos';
@@ -105,6 +118,12 @@ const buildDefaultFormData = (): AssessmentFormData => ({
   calf_skinfold: '',
   calf_skinfold_left: '',
   calf_skinfold_right: '',
+  bia_body_fat_percentage: '',
+  bia_lean_mass: '',
+  bia_fat_mass: '',
+  bia_water_percentage: '',
+  bia_visceral_fat: '',
+  bia_metabolic_age: '',
   observations: ''
 });
 
@@ -257,6 +276,14 @@ export const AssessmentForm: React.FC<AssessmentFormProps> = ({
         icon: Ruler,
         component: SkinfoldStep,
         required: true
+      },
+      {
+        id: 'bia',
+        title: 'Bioimpedância',
+        description: 'Resultados do aparelho (opcional)',
+        icon: Activity,
+        component: BIAStep,
+        required: false
       },
       {
         id: 'photos',
