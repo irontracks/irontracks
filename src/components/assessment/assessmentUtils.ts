@@ -42,13 +42,21 @@ export const getBodyFatPercent = (assessment: AssessmentRow): number | null =>
     toPositiveNumberOrNull(assessment?.body_fat_percentage ?? assessment?.bf);
 
 export const getFatMassKg = (assessment: AssessmentRow): number | null => {
+    // 1. Valor calculado/salvo no registro (full assessments computam isso a
+    //    partir de peso × %BF e gravam aqui).
     const stored = toPositiveNumberOrNull(assessment?.fat_mass);
     if (stored) return stored;
+    // 2. Calcular se temos peso+%BF na hora.
     const weight = getWeightKg(assessment);
     const bf = getBodyFatPercent(assessment);
-    if (!weight || !bf) return null;
-    const computed = (weight * bf) / 100;
-    return Number.isFinite(computed) && computed > 0 ? computed : null;
+    if (weight && bf) {
+        const computed = (weight * bf) / 100;
+        if (Number.isFinite(computed) && computed > 0) return computed;
+    }
+    // 3. Fallback para registros 'bia' standalone (peso=0 → cálculo dá 0):
+    //    o aparelho de bioimpedância informa massa gorda direto, persistido
+    //    em bia_fat_mass via extração da IA ou input manual.
+    return toPositiveNumberOrNull(assessment?.bia_fat_mass);
 };
 
 export const getLeanMassKg = (assessment: AssessmentRow): number | null => {
@@ -67,9 +75,13 @@ export const getLeanMassKg = (assessment: AssessmentRow): number | null => {
         }
     }
 
-    if (!weight || !bf) return null;
-    const computed = weight * (1 - bf / 100);
-    return Number.isFinite(computed) && computed > 0 && computed < weight ? computed : null;
+    if (weight && bf) {
+        const computed = weight * (1 - bf / 100);
+        if (Number.isFinite(computed) && computed > 0 && computed < weight) return computed;
+    }
+
+    // Fallback BIA standalone: aparelho informa massa magra direto.
+    return toPositiveNumberOrNull(assessment?.bia_lean_mass);
 };
 
 export const getBmrKcal = (assessment: AssessmentRow): number | null =>
