@@ -10,6 +10,7 @@ import React from 'react';
 import { Activity, Info } from 'lucide-react';
 import { AssessmentFormData } from '@/types/assessment';
 import BIAAttachmentInput from './BIAAttachmentInput';
+import { biaExtractionToFormStrings } from '@/utils/storage/biaExtraction';
 
 interface BIAStepProps {
   formData: AssessmentFormData;
@@ -238,7 +239,20 @@ export const BIAStep: React.FC<BIAStepProps> = ({
             <BIAAttachmentInput
               value={formData.bia_attachment_url || ''}
               onChange={(url) => updateFormData({ bia_attachment_url: url })}
-              helpText="Anexa o PDF ou a foto que a máquina te deu. Aparece no histórico e no relatório."
+              onExtracted={(extracted) => {
+                // IA leu os dados — popula só campos que vieram com valor,
+                // preservando o que o usuário já tenha digitado.
+                const fields = biaExtractionToFormStrings(extracted);
+                const patch: Partial<AssessmentFormData> = {};
+                if (fields.bia_body_fat_percentage) patch.bia_body_fat_percentage = fields.bia_body_fat_percentage;
+                if (fields.bia_lean_mass) patch.bia_lean_mass = fields.bia_lean_mass;
+                if (fields.bia_fat_mass) patch.bia_fat_mass = fields.bia_fat_mass;
+                if (fields.bia_water_percentage) patch.bia_water_percentage = fields.bia_water_percentage;
+                if (fields.bia_visceral_fat) patch.bia_visceral_fat = fields.bia_visceral_fat;
+                if (fields.bia_metabolic_age) patch.bia_metabolic_age = fields.bia_metabolic_age;
+                if (Object.keys(patch).length > 0) updateFormData(patch);
+              }}
+              helpText="Anexa o PDF ou foto. A IA vai ler e preencher os campos sozinha."
             />
           </div>
         </>
