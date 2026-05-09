@@ -18,6 +18,7 @@ import { useAssessment } from '@/hooks/useAssessment'
 import { useDialog } from '@/contexts/DialogContext'
 import { logError } from '@/lib/logger'
 import BIAAttachmentInput from './BIAAttachmentInput'
+import { biaExtractionToFormStrings } from '@/utils/storage/biaExtraction'
 
 interface QuickBIAModalProps {
   isOpen: boolean
@@ -289,7 +290,25 @@ export default function QuickBIAModal({
               <BIAAttachmentInput
                 value={form.bia_attachment_url}
                 onChange={(url) => setForm((p) => ({ ...p, bia_attachment_url: url }))}
-                helpText="Anexa o PDF ou a foto que a máquina te deu. Aparece no histórico e no PDF do treinador."
+                onExtracted={(extracted) => {
+                  // IA leu os dados do PDF/foto — sobrescreve só os campos
+                  // que vieram com valor (deixa intocados os null pra não
+                  // apagar algo que o usuário já tinha digitado).
+                  const fields = biaExtractionToFormStrings(extracted)
+                  setForm((p) => ({
+                    ...p,
+                    bia_body_fat_percentage: fields.bia_body_fat_percentage || p.bia_body_fat_percentage,
+                    bia_lean_mass: fields.bia_lean_mass || p.bia_lean_mass,
+                    bia_fat_mass: fields.bia_fat_mass || p.bia_fat_mass,
+                    bia_water_percentage: fields.bia_water_percentage || p.bia_water_percentage,
+                    bia_visceral_fat: fields.bia_visceral_fat || p.bia_visceral_fat,
+                    bia_metabolic_age: fields.bia_metabolic_age || p.bia_metabolic_age,
+                  }))
+                  // Limpa erro genérico se existia (o usuário pode ter visto
+                  // "informe o %" antes — agora a IA preencheu).
+                  setError(null)
+                }}
+                helpText="Anexa o PDF ou foto. A IA vai ler e preencher os campos sozinha."
               />
             </div>
 
