@@ -9,6 +9,7 @@
 import React from 'react';
 import { Activity, Info } from 'lucide-react';
 import { AssessmentFormData } from '@/types/assessment';
+import BIAAttachmentInput from './BIAAttachmentInput';
 
 interface BIAStepProps {
   formData: AssessmentFormData;
@@ -176,53 +177,71 @@ export const BIAStep: React.FC<BIAStepProps> = ({
 
       {/* Inputs */}
       {enabled && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {BIA_FIELDS.map(({ field, label, unit, placeholder, description }) => {
-            const value = String(formData[field] ?? '');
-            const error = errors[field];
-            const isPrimary = field === 'bia_body_fat_percentage';
-            return (
-              <div key={field} className={isPrimary ? 'sm:col-span-2' : ''}>
-                <label className="text-xs font-bold text-neutral-400 uppercase tracking-wide flex items-center gap-2">
-                  {label}
-                  {isPrimary && (
-                    <span className="text-[10px] font-black text-yellow-500 normal-case tracking-normal">
-                      principal
+        <>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            {BIA_FIELDS.map(({ field, label, unit, placeholder, description }) => {
+              const value = String(formData[field] ?? '');
+              const error = errors[field];
+              const isPrimary = field === 'bia_body_fat_percentage';
+              return (
+                <div key={field} className={isPrimary ? 'sm:col-span-2' : ''}>
+                  <label className="text-xs font-bold text-neutral-400 uppercase tracking-wide flex items-center gap-2">
+                    {label}
+                    {isPrimary && (
+                      <span className="text-[10px] font-black text-yellow-500 normal-case tracking-normal">
+                        principal
+                      </span>
+                    )}
+                  </label>
+                  <div className="relative mt-1">
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={value}
+                      onChange={(e) => handleNumberInput(field, e.target.value)}
+                      placeholder={placeholder}
+                      aria-label={label}
+                      aria-invalid={Boolean(error)}
+                      className="w-full bg-neutral-900 border rounded-xl px-3 py-2.5 text-white text-base outline-none transition-colors pr-12"
+                      style={{
+                        borderColor: error
+                          ? 'rgba(239,68,68,0.45)'
+                          : value
+                            ? 'rgba(234,179,8,0.35)'
+                            : 'rgba(255,255,255,0.08)',
+                      }}
+                    />
+                    <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-neutral-500">
+                      {unit}
                     </span>
+                  </div>
+                  {description && !error && (
+                    <p className="text-xs text-neutral-500 mt-1">{description}</p>
                   )}
-                </label>
-                <div className="relative mt-1">
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    value={value}
-                    onChange={(e) => handleNumberInput(field, e.target.value)}
-                    placeholder={placeholder}
-                    aria-label={label}
-                    aria-invalid={Boolean(error)}
-                    className="w-full bg-neutral-900 border rounded-xl px-3 py-2.5 text-white text-base outline-none transition-colors pr-12"
-                    style={{
-                      borderColor: error
-                        ? 'rgba(239,68,68,0.45)'
-                        : value
-                          ? 'rgba(234,179,8,0.35)'
-                          : 'rgba(255,255,255,0.08)',
-                    }}
-                  />
-                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-neutral-500">
-                    {unit}
-                  </span>
+                  {error && (
+                    <p className="text-xs text-red-400 mt-1">{error}</p>
+                  )}
                 </div>
-                {description && !error && (
-                  <p className="text-xs text-neutral-500 mt-1">{description}</p>
-                )}
-                {error && (
-                  <p className="text-xs text-red-400 mt-1">{error}</p>
-                )}
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+
+          {/* Anexo do PDF/foto da bioimpedância — opcional, mas recomendado
+              pra ter o documento original arquivado junto com os números. */}
+          <div className="space-y-2" role="group" aria-labelledby="bia-attachment-label">
+            <span
+              id="bia-attachment-label"
+              className="text-xs font-bold text-neutral-400 uppercase tracking-wide block"
+            >
+              Comprovante (opcional)
+            </span>
+            <BIAAttachmentInput
+              value={formData.bia_attachment_url || ''}
+              onChange={(url) => updateFormData({ bia_attachment_url: url })}
+              helpText="Anexa o PDF ou a foto que a máquina te deu. Aparece no histórico e no relatório."
+            />
+          </div>
+        </>
       )}
     </div>
   );

@@ -67,6 +67,12 @@ export interface Assessment {
   bia_water_percentage?: number;
   bia_visceral_fat?: number;
   bia_metabolic_age?: number;
+  /**
+   * URL pública do PDF/foto do resultado da bioimpedância anexado pelo
+   * usuário. Aponta pro bucket 'bioimpedance-files' (Supabase Storage).
+   * Quando definido, a UI exibe link/preview no histórico e PDF.
+   */
+  bia_attachment_url?: string | null;
 
   // Pareamento com outra avaliação (BIA ↔ dobras). Aluno faz BIA na farmácia
   // e dobras com o personal em datas separadas — o app cruza os dois e
@@ -147,6 +153,11 @@ export interface AssessmentFormData {
   bia_water_percentage: string;
   bia_visceral_fat: string;
   bia_metabolic_age: string;
+  /**
+   * URL pública do anexo de bioimpedância (PDF/foto). Vazia = nenhum
+   * arquivo anexado. Preenchida pelo BIAAttachmentInput após upload.
+   */
+  bia_attachment_url: string;
 
   // Metadados
   observations: string;

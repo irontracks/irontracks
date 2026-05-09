@@ -125,6 +125,7 @@ const buildDefaultFormData = (): AssessmentFormData => ({
   bia_water_percentage: '',
   bia_visceral_fat: '',
   bia_metabolic_age: '',
+  bia_attachment_url: '',
   observations: ''
 });
 
