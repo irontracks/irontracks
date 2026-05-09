@@ -6,8 +6,8 @@ import { Check, Clock, Save, X } from 'lucide-react';
 import { parseTrainingNumber } from '@/utils/trainingNumber';
 import { useWorkoutContext } from './WorkoutContext';
 import { useWorkoutTimer } from './WorkoutTimerContext';
-import { isObject, buildBlocksByCount } from './utils';
-import { UnknownRecord } from './types';
+import { isObject, buildBlocksByCount, normalizeExerciseKey } from './utils';
+import { UnknownRecord, WorkoutExercise } from './types';
 
 /**
  * ModalsComplexMethods
@@ -27,6 +27,10 @@ export function ModalsComplexMethods() {
         waveModal, setWaveModal, saveWaveModal,
         startTimer,
         deloadSuggestions,
+        // Drop-set per-stage history lookup needs the exercise list (to map
+        // modalKey → exercise name) and the report history.
+        exercises,
+        reportHistory,
     } = useWorkoutContext();
 
     // Ticker drives the 1-second check that turns rest buttons green when done
@@ -246,8 +250,40 @@ export function ModalsComplexMethods() {
                 const modalKey = String((dropSetModal as UnknownRecord | null)?.key ?? '').trim();
                 const suggestionValue = modalKey ? deloadSuggestions[modalKey] : null;
                 const suggestion: DeloadEntrySuggestion | null = isObject(suggestionValue) ? (suggestionValue as DeloadEntrySuggestion) : null;
-                const weightPlaceholder = suggestion?.weight != null ? `${suggestion.weight} kg` : 'kg';
-                const repsPlaceholder = suggestion?.reps != null ? String(suggestion.reps) : 'reps';
+                // Fallbacks if no per-stage history is available — the same single
+                // value applied to every stage (the legacy behaviour, kept as
+                // a safety net only).
+                const fallbackWeightPlaceholder = suggestion?.weight != null ? `${suggestion.weight} kg` : 'kg';
+                const fallbackRepsPlaceholder = suggestion?.reps != null ? String(suggestion.reps) : 'reps';
+
+                // Per-stage history: read dropSetStages[setIdx] from the most
+                // recent log of this exercise, so each stage gets its own
+                // placeholder ("100 kg" → "80 kg" → "60 kg" instead of all "80 kg").
+                const parts = modalKey.split('-');
+                const exIdx = Number(parts[0]);
+                const setIdx = Number(parts[1]);
+                let prevStages: Array<{ weight: number | null; reps: number | null }> | null = null;
+                if (Number.isFinite(exIdx) && Number.isFinite(setIdx) && Array.isArray(exercises)) {
+                    const ex = (exercises as WorkoutExercise[])[exIdx];
+                    const exName = String(ex?.name || '').trim();
+                    if (exName) {
+                        const histEntry = reportHistory?.exercises?.[normalizeExerciseKey(exName)];
+                        const lastItem = histEntry?.items?.length
+                            ? [...histEntry.items].sort((a, b) => Number(b.ts || 0) - Number(a.ts || 0))[0]
+                            : null;
+                        const stagesAtSet = lastItem?.dropSetStages?.[setIdx];
+                        if (Array.isArray(stagesAtSet) && stagesAtSet.length > 0) {
+                            prevStages = stagesAtSet;
+                        }
+                    }
+                }
+                const stagePlaceholder = (idx: number, kind: 'weight' | 'reps'): string => {
+                    const slot = prevStages?.[idx];
+                    if (slot && slot[kind] != null) {
+                        return kind === 'weight' ? `${slot[kind]} kg` : String(slot[kind]);
+                    }
+                    return kind === 'weight' ? fallbackWeightPlaceholder : fallbackRepsPlaceholder;
+                };
                 return (
                     <div
                         className="fixed inset-0 z-[1400] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe"
@@ -306,7 +342,7 @@ export function ModalsComplexMethods() {
                                                                 return { ...prev, stages: list, error: '' };
                                                             });
                                                         }}
-                                                        placeholder={weightPlaceholder}
+                                                        placeholder={stagePlaceholder(idx, 'weight')}
                                                         className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
                                                     />
                                                     <input
@@ -323,7 +359,7 @@ export function ModalsComplexMethods() {
                                                                 return { ...prev, stages: list, error: '' };
                                                             });
                                                         }}
-                                                        placeholder={repsPlaceholder}
+                                                        placeholder={stagePlaceholder(idx, 'reps')}
                                                         className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
                                                     />
                                                 </div>

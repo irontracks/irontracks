@@ -110,8 +110,17 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
         const base = isObject(sessionObj) ? sessionObj : null;
         if (!base) return null;
         const logsObj: UnknownRecord = isObject(base.logs) ? (base.logs as UnknownRecord) : {};
-        // Coleta sets com índice para manter a ordenção correta
-        const indexedSets: Array<{ setIdx: number; weight: number | null; reps: number | null; rpe: number | null; notes: string | null }> = [];
+        // Coleta sets com índice para manter a ordenção correta. We also
+        // capture the raw drop_set.stages so the modal can show per-stage
+        // previous weights instead of a single averaged value.
+        const indexedSets: Array<{
+          setIdx: number;
+          weight: number | null;
+          reps: number | null;
+          rpe: number | null;
+          notes: string | null;
+          dropStages: Array<{ weight: number | null; reps: number | null }> | null;
+        }> = [];
         Object.entries(logsObj).forEach(([key, value]) => {
           try {
             const parts = String(key || '').split('-');
@@ -125,12 +134,26 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
             const reps = toNumber(log.reps ?? null);
             const rpe = toNumber(log.rpe ?? null);
             const notes = typeof log.notes === 'string' && log.notes.trim() ? log.notes.trim() : null;
+            // Preserve drop-set per-stage values for this set (if any).
+            const dropSet = isObject(log.drop_set) ? (log.drop_set as UnknownRecord) : null;
+            const dropStagesRaw = dropSet && Array.isArray(dropSet.stages) ? (dropSet.stages as unknown[]) : null;
+            const dropStages = dropStagesRaw && dropStagesRaw.length > 0
+              ? dropStagesRaw.map((s) => {
+                  const obj = isObject(s) ? (s as UnknownRecord) : {};
+                  const w = toNumber(obj.weight ?? null);
+                  const r = toNumber(obj.reps ?? null);
+                  return {
+                    weight: w != null && Number.isFinite(w) && w > 0 ? w : null,
+                    reps: r != null && Number.isFinite(r) && r > 0 ? r : null,
+                  };
+                })
+              : null;
             const hasValues = weight != null || reps != null;
             const doneRaw = log.done ?? log.isDone ?? log.completed ?? null;
             const done = doneRaw == null ? true : doneRaw === true || String(doneRaw || '').toLowerCase() === 'true';
             if (!done && !hasValues) return;
             if (hasValues) {
-              indexedSets.push({ setIdx: sIdx, weight, reps, rpe, notes });
+              indexedSets.push({ setIdx: sIdx, weight, reps, rpe, notes, dropStages });
             }
           } catch { }
         });
@@ -163,18 +186,32 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
           toDateMs(meta.date) ??
           toDateMs(meta.created_at) ??
           Date.now();
-        // Armazena pesos, reps e RPE individuais por série
-        const setWeights = indexedSets
-          .map(s => s.weight)
-          .filter((v): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0);
-        const setReps = indexedSets
-          .map(s => s.reps)
-          .filter((v): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0);
-        const setRpes = indexedSets
-          .map(s => s.rpe)
-          .filter((v): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0);
-        const setNotes = indexedSets.map(s => s.notes ?? null);
-        const hasAnyNote = setNotes.some(n => n !== null);
+        // Build per-set arrays indexed by setIdx (the index the consumer reads
+        // with `setWeights[setIdx]`). The previous version filtered out null/0
+        // values, which silently shifted later sets down — `setWeights[1]`
+        // could end up holding what was actually set 2's weight whenever set 1
+        // was logged without a value. Now we keep the slot as null and let the
+        // consumer fall back to its own placeholder logic.
+        const maxIdx = indexedSets.reduce((acc, s) => Math.max(acc, s.setIdx), -1);
+        const setsLen = maxIdx + 1;
+        const setWeights: (number | null)[] = Array(setsLen).fill(null);
+        const setReps: (number | null)[] = Array(setsLen).fill(null);
+        const setRpes: (number | null)[] = Array(setsLen).fill(null);
+        const setNotes: (string | null)[] = Array(setsLen).fill(null);
+        const dropSetStages: (Array<{ weight: number | null; reps: number | null }> | null)[] = Array(setsLen).fill(null);
+        const isPosNum = (v: number | null): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0;
+        for (const s of indexedSets) {
+          setWeights[s.setIdx] = isPosNum(s.weight) ? s.weight : null;
+          setReps[s.setIdx] = isPosNum(s.reps) ? s.reps : null;
+          setRpes[s.setIdx] = isPosNum(s.rpe) ? s.rpe : null;
+          setNotes[s.setIdx] = s.notes ?? null;
+          dropSetStages[s.setIdx] = s.dropStages ?? null;
+        }
+        const hasAnyWeight = setWeights.some(v => v !== null);
+        const hasAnyReps = setReps.some(v => v !== null);
+        const hasAnyRpe = setRpes.some(v => v !== null);
+        const hasAnyNote = setNotes.some(v => v !== null);
+        const hasAnyDropStages = dropSetStages.some(v => v !== null);
         return {
           ts,
           avgWeight: avgWeight ?? null,
@@ -182,10 +219,11 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
           totalVolume: Number.isFinite(totalVolume) ? totalVolume : 0,
           topWeight,
           setsCount: sets.length,
-          setWeights: setWeights.length > 0 ? setWeights : null,
-          setReps: setReps.length > 0 ? setReps : null,
-          setRpes: setRpes.length > 0 ? setRpes : null,
+          setWeights: hasAnyWeight ? setWeights : null,
+          setReps: hasAnyReps ? setReps : null,
+          setRpes: hasAnyRpe ? setRpes : null,
           setNotes: hasAnyNote ? setNotes : null,
+          dropSetStages: hasAnyDropStages ? dropSetStages : null,
         };
       } catch (e) {
         logError('hook:useWorkoutDeload.buildHistoryEntry', e);
