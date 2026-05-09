@@ -79,13 +79,20 @@ export default function QuickBIAModal({
     setError(null)
 
     // Data e %BF são os únicos obrigatórios — o resto é extra do aparelho.
+    // Mensagens distintas para "vazio" vs "fora do range" porque o usuário
+    // que viu uma só (a do range) ficou confuso quando não tinha digitado
+    // nada — pensou que o app tinha rejeitado um valor que ele não pôs.
     if (!form.assessment_date) {
       setError('Informe a data da avaliação')
       return
     }
     const biaPct = parseNum(form.bia_body_fat_percentage)
-    if (biaPct == null || biaPct <= 0 || biaPct > 100) {
-      setError('% de gordura inválido (deve estar entre 0 e 100)')
+    if (biaPct == null) {
+      setError('Informe o percentual de gordura (campo principal)')
+      return
+    }
+    if (biaPct <= 0 || biaPct > 100) {
+      setError('Percentual de gordura deve estar entre 0 e 100')
       return
     }
 
