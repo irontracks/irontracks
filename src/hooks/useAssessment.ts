@@ -57,6 +57,7 @@ interface UseAssessmentReturn {
       bia_water_percentage?: number | null;
       bia_visceral_fat?: number | null;
       bia_metabolic_age?: number | null;
+      bia_attachment_url?: string | null;
       observations?: string;
     },
     studentId: string,
@@ -267,6 +268,8 @@ export const useAssessment = (): UseAssessmentReturn => {
       // Pareamento — strings/null vão direto
       assessment_type: (row.assessment_type === 'bia' ? 'bia' : 'full') as 'full' | 'bia',
       paired_assessment_id: row.paired_assessment_id ? String(row.paired_assessment_id) : null,
+      // Anexo (PDF/foto) — pode ser string vazia, null ou URL completa
+      bia_attachment_url: row.bia_attachment_url ? String(row.bia_attachment_url) : null,
     } as Assessment;
   }, []);
 
@@ -475,6 +478,7 @@ export const useAssessment = (): UseAssessmentReturn => {
       bia_water_percentage: biaWaterPct ?? undefined,
       bia_visceral_fat: biaVisceralFat ?? undefined,
       bia_metabolic_age: biaMetabolicAge ?? undefined,
+      bia_attachment_url: data.bia_attachment_url ? data.bia_attachment_url : null,
 
       // Tipo do registro — esse fluxo (formDataToAssessment) sempre cria
       // avaliação 'full' (passa pelos steps completos). Registros 'bia'
@@ -552,6 +556,7 @@ export const useAssessment = (): UseAssessmentReturn => {
       bia_water_percentage?: number | null;
       bia_visceral_fat?: number | null;
       bia_metabolic_age?: number | null;
+      bia_attachment_url?: string | null;
       observations?: string;
     },
     studentId: string,
@@ -587,6 +592,7 @@ export const useAssessment = (): UseAssessmentReturn => {
         bia_water_percentage: data.bia_water_percentage ?? undefined,
         bia_visceral_fat: data.bia_visceral_fat ?? undefined,
         bia_metabolic_age: data.bia_metabolic_age ?? undefined,
+        bia_attachment_url: data.bia_attachment_url ?? null,
         // body_fat_percentage = BIA pra alimentar gráfico/histórico
         body_fat_percentage: bia ?? undefined,
         assessment_type: 'bia' as const,

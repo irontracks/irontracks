@@ -17,6 +17,7 @@ import { X, Activity, Save, Loader2, AlertCircle } from 'lucide-react'
 import { useAssessment } from '@/hooks/useAssessment'
 import { useDialog } from '@/contexts/DialogContext'
 import { logError } from '@/lib/logger'
+import BIAAttachmentInput from './BIAAttachmentInput'
 
 interface QuickBIAModalProps {
   isOpen: boolean
@@ -34,6 +35,7 @@ interface FormState {
   bia_water_percentage: string
   bia_visceral_fat: string
   bia_metabolic_age: string
+  bia_attachment_url: string
   observations: string
 }
 
@@ -45,6 +47,7 @@ const buildInitial = (): FormState => ({
   bia_water_percentage: '',
   bia_visceral_fat: '',
   bia_metabolic_age: '',
+  bia_attachment_url: '',
   observations: '',
 })
 
@@ -96,6 +99,7 @@ export default function QuickBIAModal({
         bia_water_percentage: parseNum(form.bia_water_percentage),
         bia_visceral_fat: parseNum(form.bia_visceral_fat),
         bia_metabolic_age: parseNum(form.bia_metabolic_age),
+        bia_attachment_url: form.bia_attachment_url || null,
         observations: form.observations || '',
       }, studentId)
 
@@ -264,6 +268,22 @@ export default function QuickBIAModal({
                   </div>
                 </div>
               ))}
+            </div>
+
+            {/* Anexo do PDF/foto da máquina — diferencial do registro
+                standalone: o aluno chega exatamente com esse documento. */}
+            <div className="space-y-2" role="group" aria-labelledby="quick-bia-attachment-label">
+              <span
+                id="quick-bia-attachment-label"
+                className="text-xs font-bold text-neutral-400 uppercase tracking-wide block"
+              >
+                Comprovante (opcional)
+              </span>
+              <BIAAttachmentInput
+                value={form.bia_attachment_url}
+                onChange={(url) => setForm((p) => ({ ...p, bia_attachment_url: url }))}
+                helpText="Anexa o PDF ou a foto que a máquina te deu. Aparece no histórico e no PDF do treinador."
+              />
             </div>
 
             {/* Observações */}

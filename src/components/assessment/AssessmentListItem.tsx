@@ -17,6 +17,7 @@ import { formatDateCompact, formatWeekdayCompact, safeGender } from './assessmen
 import type { AiPlanEntry } from '@/hooks/useAssessmentHistoryData'
 import { combinedBodyFat } from '@/utils/calculations/bodyComposition'
 import { resolveBodyFatFromPair } from '@/utils/calculations/assessmentPairing'
+import { FileText, ImageIcon } from 'lucide-react'
 
 const AssessmentPDFGenerator = dynamic(() => import('@/components/assessment/AssessmentPDFGenerator'), { ssr: false })
 const BodyMeasurementMap = dynamic(() => import('@/components/assessment/BodyMeasurementMap'), { ssr: false })
@@ -173,6 +174,12 @@ export function AssessmentListItem({
   // normalizeAssessmentRow garante esses 2 campos sempre presentes.
   const isBiaOnly = String(assessment?.assessment_type ?? 'full') === 'bia'
   const isPaired = !!assessment?.paired_assessment_id
+  // Anexo do PDF/foto da bioimpedância — pode estar nesse registro ou no
+  // par linkado (a UI considera os dois pra decidir se mostra o badge).
+  const hasAttachment = !!(
+    (typeof assessment?.bia_attachment_url === 'string' && assessment.bia_attachment_url)
+    || (pairedAssessment && typeof pairedAssessment.bia_attachment_url === 'string' && pairedAssessment.bia_attachment_url)
+  )
 
   return (
     <div className="p-5 hover:bg-white/[0.02] transition-colors" style={{ borderColor: 'rgba(255,255,255,0.04)' }}>
@@ -199,6 +206,14 @@ export function AssessmentListItem({
                   title="Linkada com a contraparte (full ↔ BIA) em ±14 dias"
                 >
                   🔗 Linkada
+                </span>
+              )}
+              {hasAttachment && (
+                <span
+                  className="px-2.5 py-1 bg-cyan-500/15 text-cyan-300 text-xs rounded-full border border-cyan-500/30 font-bold inline-flex items-center gap-1"
+                  title="Tem anexo (PDF ou foto) da bioimpedância"
+                >
+                  📎 Comprovante
                 </span>
               )}
               {!isBiaOnly && (
@@ -286,6 +301,7 @@ export function AssessmentListItem({
                 bia_water_percentage: String(assessment.bia_water_percentage ?? ''),
                 bia_visceral_fat: String(assessment.bia_visceral_fat ?? ''),
                 bia_metabolic_age: String(assessment.bia_metabolic_age ?? ''),
+                bia_attachment_url: String(assessment.bia_attachment_url ?? ''),
                 observations: '',
               }}
               studentName={String(assessment.student_name ?? '')}
@@ -350,6 +366,60 @@ export function AssessmentListItem({
       </div>
       {isSelected && (
         <div className="mt-4 pt-4 border-t border-neutral-700">
+          {/* ── Anexo do PDF/foto da bioimpedância ── */}
+          {(() => {
+            // Anexo pode estar tanto no registro principal (bia standalone
+            // ou full com BIA preenchido nos steps) quanto no par linkado.
+            const ownAttachment = typeof assessment.bia_attachment_url === 'string'
+              ? assessment.bia_attachment_url
+              : null;
+            const pairedAttachment = pairedAssessment && typeof pairedAssessment.bia_attachment_url === 'string'
+              ? pairedAssessment.bia_attachment_url
+              : null;
+            const attachment = ownAttachment || pairedAttachment;
+            if (!attachment) return null;
+            const isPdf = /\.pdf(\?|$)/i.test(attachment);
+            const isImage = /\.(jpe?g|png|webp|heic|heif)(\?|$)/i.test(attachment);
+            const fromPair = !ownAttachment && !!pairedAttachment;
+            return (
+              <div className="mb-4">
+                <h4 className="font-bold text-white mb-2 text-sm">Comprovante da Bioimpedância</h4>
+                <a
+                  href={attachment}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-3 rounded-xl p-3 border transition-all hover:border-emerald-500/40"
+                  style={{
+                    background: 'rgba(34,197,94,0.06)',
+                    borderColor: 'rgba(34,197,94,0.25)',
+                  }}
+                >
+                  <div
+                    className="w-10 h-10 rounded-lg flex items-center justify-center shrink-0"
+                    style={{ background: 'rgba(34,197,94,0.15)' }}
+                  >
+                    {isPdf ? (
+                      <FileText className="w-5 h-5 text-emerald-400" />
+                    ) : isImage ? (
+                      <ImageIcon className="w-5 h-5 text-emerald-400" />
+                    ) : (
+                      <FileText className="w-5 h-5 text-emerald-400" />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-bold text-white">
+                      {isPdf ? 'Abrir PDF' : isImage ? 'Abrir foto' : 'Abrir arquivo'}
+                    </p>
+                    <p className="text-[11px] text-emerald-300 mt-0.5">
+                      {fromPair ? 'do registro de bioimpedância linkado' : 'do registro atual'}
+                    </p>
+                  </div>
+                  <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wide">↗</span>
+                </a>
+              </div>
+            );
+          })()}
+
           {/* ── Métodos de %BF ── */}
           {(() => {
             // Resolve dobras (Siri) e BIA, puxando do par quando o registro
