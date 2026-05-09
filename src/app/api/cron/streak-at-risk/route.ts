@@ -2,21 +2,33 @@ import { NextResponse } from 'next/server'
 import { isCronAuthorized } from '@/utils/cron/auth'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { insertNotifications } from '@/lib/social/notifyFollowers'
+import { brtDateKey, brtDateKeyDaysAgo } from '@/utils/cron/dateBrt'
 import { logError } from '@/lib/logger'
 
 export const dynamic = 'force-dynamic'
 
 /**
  * Daily cron — fires at 00:00 UTC (21:00 BRT). For each user whose current
- * streak is ≥ 3 and who has NOT trained today (UTC), sends a self push to
+ * streak is ≥ 3 and who has NOT trained today (BRT), sends a self push to
  * preserve the streak.
+ *
+ * Timezone correctness
+ * ────────────────────
+ * `workouts.date` is a UTC timestamp; the user's "hoje" is BRT. We bucket
+ * every workout by its BRT calendar day (via `brtDateKey`) and compare
+ * against the BRT "today". Using `new Date().toISOString().slice(0,10)`
+ * here would silently mis-count: at 00:00 UTC the UTC string is already
+ * the next day, but it's still 21:00 of the same day in BRT — every
+ * afternoon-trainer would be flagged at-risk.
  */
 export async function GET(req: Request) {
   if (!isCronAuthorized(req)) return NextResponse.json({ ok: false, error: 'forbidden' }, { status: 403 })
   try {
     const admin = createAdminClient()
-    const todayKey = new Date().toISOString().slice(0, 10)
-    const sinceIso = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+    const todayKey = brtDateKey()
+    // Pull the last ~31 BRT days. We over-fetch by one UTC day on each side
+    // so timestamps near the BRT day boundary don't get clipped.
+    const sinceIso = new Date(Date.now() - 32 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
 
     const { data: rows } = await admin
       .from('workouts')
@@ -29,23 +41,26 @@ export async function GET(req: Request) {
     const datesByUser = new Map<string, Set<string>>()
     for (const r of Array.isArray(rows) ? rows : []) {
       const uid = String((r as { user_id?: string })?.user_id || '').trim()
-      const date = String((r as { date?: string })?.date || '').slice(0, 10)
-      if (!uid || !date) continue
+      const rawDate = (r as { date?: string })?.date
+      if (!uid || !rawDate) continue
+      // Convert the UTC timestamp to a BRT calendar-day key.
+      const brtKey = brtDateKey(rawDate)
+      if (!brtKey) continue
       if (!datesByUser.has(uid)) datesByUser.set(uid, new Set())
-      datesByUser.get(uid)!.add(date)
+      datesByUser.get(uid)!.add(brtKey)
     }
 
     const atRisk: string[] = []
     datesByUser.forEach((set, uid) => {
-      if (set.has(todayKey)) return // already trained today
-      // Compute streak ending yesterday
-      let cursor = new Date(Date.now() - 24 * 60 * 60 * 1000)
+      if (set.has(todayKey)) return // already trained today (BRT)
+      // Compute streak ending yesterday (BRT)
+      let daysAgo = 1
       let streak = 0
       while (streak < 365) {
-        const key = cursor.toISOString().slice(0, 10)
+        const key = brtDateKeyDaysAgo(daysAgo)
         if (!set.has(key)) break
         streak += 1
-        cursor = new Date(cursor.getTime() - 24 * 60 * 60 * 1000)
+        daysAgo += 1
       }
       if (streak >= 3) atRisk.push(uid)
     })
