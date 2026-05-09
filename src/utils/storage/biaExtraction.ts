@@ -10,12 +10,19 @@
  */
 
 export interface BiaExtractionData {
+  // Antropometria
+  weight_kg: number | null
+  height_cm: number | null
+  age_years: number | null
+  // Composição corporal
   body_fat_percentage: number | null
   lean_mass_kg: number | null
   fat_mass_kg: number | null
   water_percentage: number | null
   visceral_fat: number | null
+  // Metabolismo
   metabolic_age_years: number | null
+  bmr_kcal: number | null
   confidence: 'high' | 'medium' | 'low'
 }
 
@@ -79,6 +86,10 @@ export async function extractBiaFromAttachment(
  * Converte o resultado da IA em strings prontas pra preencher o form
  * (que usa string em todos os campos numéricos). null → '' para deixar
  * o input vazio. Precisão: %s e idades inteiras, kgs com 1 decimal.
+ *
+ * Retorna apenas os 6 campos BIA tradicionais — peso/altura/idade/BMR
+ * são tratados como metadados extras, persistidos no payload via
+ * `biaExtractionToAnthropometry()`.
  */
 export function biaExtractionToFormStrings(data: BiaExtractionData): {
   bia_body_fat_percentage: string
@@ -97,5 +108,30 @@ export function biaExtractionToFormStrings(data: BiaExtractionData): {
     bia_water_percentage: fmt1(data.water_percentage),
     bia_visceral_fat: fmt0(data.visceral_fat),
     bia_metabolic_age: fmt0(data.metabolic_age_years),
+  }
+}
+
+/**
+ * Extrai os campos antropométricos (peso, altura, idade, BMR) que vêm
+ * da BIA quando o aparelho mede esses dados. Vão direto pro payload
+ * de createBiaAssessment, não passam pelo form do usuário.
+ *
+ * Pra que isso é útil:
+ * - destrava cálculo de IMC, TDEE no card do histórico
+ * - permite gráfico de evolução de peso incluir BIAs standalone
+ * - alinha com o "Plano IA" caso o personal queira gerar plano
+ *   com base em BIA (ainda não está conectado, mas dados ficam disponíveis)
+ */
+export function biaExtractionToAnthropometry(data: BiaExtractionData): {
+  weight_kg: number | null
+  height_cm: number | null
+  age_years: number | null
+  bmr_kcal: number | null
+} {
+  return {
+    weight_kg: data.weight_kg,
+    height_cm: data.height_cm,
+    age_years: data.age_years,
+    bmr_kcal: data.bmr_kcal,
   }
 }

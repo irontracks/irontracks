@@ -59,6 +59,13 @@ interface UseAssessmentReturn {
       bia_metabolic_age?: number | null;
       bia_attachment_url?: string | null;
       observations?: string;
+      // Antropometria — quando o aparelho mediu (e a IA extraiu).
+      // Opcionais; passam direto para os campos weight/height/age/bmr
+      // do registro pra destravar IMC, TDEE, gráficos, etc.
+      weight_kg?: number | null;
+      height_cm?: number | null;
+      age_years?: number | null;
+      bmr_kcal?: number | null;
     },
     studentId: string,
   ) => Promise<AssessmentResponse>;
@@ -558,6 +565,10 @@ export const useAssessment = (): UseAssessmentReturn => {
       bia_metabolic_age?: number | null;
       bia_attachment_url?: string | null;
       observations?: string;
+      weight_kg?: number | null;
+      height_cm?: number | null;
+      age_years?: number | null;
+      bmr_kcal?: number | null;
     },
     studentId: string,
   ): Promise<AssessmentResponse> => {
@@ -574,18 +585,46 @@ export const useAssessment = (): UseAssessmentReturn => {
       // null e o histórico/gráfico só mostra %BF do BIA.
       const bia = data.bia_body_fat_percentage;
 
+      // Antropometria — vinda da IA quando o aparelho mediu, ou zero
+      // (placeholder) quando só a BIA foi coletada. Aparelhos como InBody
+      // medem peso/altura, e a idade é informada manualmente pelo
+      // operador antes da medição. Salvar esses valores destrava IMC,
+      // TDEE, gráficos de evolução de peso etc.
+      const weight = typeof data.weight_kg === 'number' && data.weight_kg > 0 ? data.weight_kg : 0;
+      const height = typeof data.height_cm === 'number' && data.height_cm > 0 ? data.height_cm : 0;
+      const age = typeof data.age_years === 'number' && data.age_years > 0 ? Math.round(data.age_years) : 0;
+      const bmr = typeof data.bmr_kcal === 'number' && data.bmr_kcal > 0 ? data.bmr_kcal : undefined;
+
+      // Massa gorda / massa magra: se o aparelho informou, salvamos como
+      // canonical (`fat_mass` / `lean_mass`); se não, deixamos só nos
+      // campos `bia_*` e os getters do UI fazem fallback.
+      const canonicalFatMass = typeof data.bia_fat_mass === 'number' && data.bia_fat_mass > 0
+        ? data.bia_fat_mass : undefined;
+      const canonicalLeanMass = typeof data.bia_lean_mass === 'number' && data.bia_lean_mass > 0
+        ? data.bia_lean_mass : undefined;
+
+      // BMI calculado quando temos peso E altura — caso contrário deixa
+      // o backend/UI tratarem (não persistimos lixo).
+      const bmi = (weight > 0 && height > 0) ? Number(((weight / Math.pow(height / 100, 2))).toFixed(1)) : undefined;
+
       const payload = {
         student_id: resolvedStudentId,
         trainer_id: user.id,
         assessment_date: data.assessment_date,
-        // Campos de antropometria zerados — esse registro não os coleta.
-        // O Assessment type permite ausentes e o resto da app já trata
-        // weight/height/age 0 como "não informado".
-        weight: 0,
-        height: 0,
-        age: 0,
+        weight,
+        height,
+        age,
+        // gender é obrigatório no schema; sem fonte definida no PDF deixa
+        // como 'M' (default). O personal pode editar depois se necessário.
         gender: 'M' as const,
-        // BIA verbatim
+        // Massa magra/gorda canônicas quando vieram da BIA — alimentam
+        // os getters do UI sem precisar do fallback.
+        fat_mass: canonicalFatMass,
+        lean_mass: canonicalLeanMass,
+        bmi,
+        bmr,
+        // BIA verbatim — preservamos os números originais do aparelho
+        // mesmo quando vão também pros campos canônicos.
         bia_body_fat_percentage: bia ?? undefined,
         bia_lean_mass: data.bia_lean_mass ?? undefined,
         bia_fat_mass: data.bia_fat_mass ?? undefined,
