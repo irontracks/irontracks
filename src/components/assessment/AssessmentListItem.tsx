@@ -253,6 +253,12 @@ export function AssessmentListItem({
                 thigh_skinfold_right: '',
                 calf_skinfold_left: '',
                 calf_skinfold_right: '',
+                bia_body_fat_percentage: String(assessment.bia_body_fat_percentage ?? ''),
+                bia_lean_mass: String(assessment.bia_lean_mass ?? ''),
+                bia_fat_mass: String(assessment.bia_fat_mass ?? ''),
+                bia_water_percentage: String(assessment.bia_water_percentage ?? ''),
+                bia_visceral_fat: String(assessment.bia_visceral_fat ?? ''),
+                bia_metabolic_age: String(assessment.bia_metabolic_age ?? ''),
                 observations: '',
               }}
               studentName={String(assessment.student_name ?? '')}

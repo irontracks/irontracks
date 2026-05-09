@@ -27,7 +27,8 @@ import {
   calculateFatMass,
   calculateLeanMass,
   calculateBodyDensity,
-  calculateSumSkinfolds
+  calculateSumSkinfolds,
+  combinedBodyFat
 } from '@/utils/calculations/bodyComposition';
 import { getErrorMessage } from '@/utils/errorMessage';
 import { logError } from '@/lib/logger'
@@ -328,7 +329,9 @@ export const useAssessment = (): UseAssessmentReturn => {
     const thighCirc = avgOrDirect('thigh_circ', 'thigh_circ_left', 'thigh_circ_right');
     const calfCirc = avgOrDirect('calf_circ', 'calf_circ_left', 'calf_circ_right');
 
-    // Calcular métricas
+    // Calcular métricas das dobras (Siri/Pollock). Antes lançava erro quando
+    // o usuário não preenchia dobras suficientes; agora trata isso como
+    // "esse método não foi usado" e delega para a BIA (ou fica vazio).
     const sumSkinfolds = calculateSumSkinfolds({
       triceps_skinfold: triceps ?? undefined,
       biceps_skinfold: biceps ?? undefined,
@@ -339,12 +342,48 @@ export const useAssessment = (): UseAssessmentReturn => {
       calf_skinfold: calfSkin ?? undefined,
     });
 
-    const bodyDensity = calculateBodyDensity(sumSkinfolds, age, gender);
-    const bodyFat = calculateBodyFatPercentage(bodyDensity);
-    const fatMass = calculateFatMass(weight, bodyFat);
-    const leanMass = calculateLeanMass(weight, fatMass);
-    const bmi = calculateBMI(weight, height);
-    const bmr = calculateBMR(weight, height, age, gender);
+    let bodyFatSkinfold: number | null = null;
+    if (sumSkinfolds > 0 && age > 0) {
+      try {
+        const bodyDensity = calculateBodyDensity(sumSkinfolds, age, gender);
+        bodyFatSkinfold = calculateBodyFatPercentage(bodyDensity);
+      } catch {
+        // Dobras incompletas/inconsistentes — segue sem skinfold-derived.
+        bodyFatSkinfold = null;
+      }
+    }
+
+    // Bioimpedância — apenas o %BF é "principal" para a média ponderada;
+    // os demais campos são extras de rastreabilidade salvos verbatim.
+    const biaBodyFat = parseNumberInput(data.bia_body_fat_percentage);
+    const biaLeanMass = parseNumberInput(data.bia_lean_mass);
+    const biaFatMass = parseNumberInput(data.bia_fat_mass);
+    const biaWaterPct = parseNumberInput(data.bia_water_percentage);
+    const biaVisceralFat = parseNumberInput(data.bia_visceral_fat);
+    const biaMetabolicAge = parseNumberInput(data.bia_metabolic_age);
+
+    // %BF "blended" = média simples skinfold + BIA (quando ambos), senão o
+    // que estiver disponível. É esse valor que alimenta histórico/gráficos.
+    const bodyFat = combinedBodyFat(bodyFatSkinfold, biaBodyFat);
+
+    // Massa magra/gorda derivam do %BF blended quando há um. Se nenhum dos
+    // dois métodos foi usado, retornamos undefined em vez de chutar zeros.
+    let fatMass: number | undefined;
+    let leanMass: number | undefined;
+    if (bodyFat != null && weight > 0) {
+      try {
+        fatMass = calculateFatMass(weight, bodyFat);
+        leanMass = calculateLeanMass(weight, fatMass);
+      } catch {
+        fatMass = undefined;
+        leanMass = undefined;
+      }
+    }
+
+    const bmi = weight > 0 && height > 0 ? calculateBMI(weight, height) : 0;
+    const bmr = weight > 0 && height > 0 && age > 0
+      ? calculateBMR(weight, height, age, gender)
+      : 0;
 
     return {
       student_id: studentId,
@@ -386,12 +425,24 @@ export const useAssessment = (): UseAssessmentReturn => {
       calf_skinfold_left: parseNumberInput(data.calf_skinfold_left) ?? undefined,
       calf_skinfold_right: parseNumberInput(data.calf_skinfold_right) ?? undefined,
 
-      // Calculados
-      body_fat_percentage: bodyFat,
+      // Calculados — body_fat_percentage agora é o blended (skinfold+BIA
+      // quando ambos), e mantemos o skinfold-only separado para o UI/PDF.
+      body_fat_percentage: bodyFat ?? undefined,
+      body_fat_percentage_skinfold: bodyFatSkinfold ?? undefined,
       lean_mass: leanMass,
       fat_mass: fatMass,
       bmi,
       bmr,
+
+      // Bioimpedância — todos opcionais. Salvamos verbatim o que o usuário
+      // digitou pra ter rastreabilidade do aparelho (alguns têm extras como
+      // gordura visceral e idade metabólica).
+      bia_body_fat_percentage: biaBodyFat ?? undefined,
+      bia_lean_mass: biaLeanMass ?? undefined,
+      bia_fat_mass: biaFatMass ?? undefined,
+      bia_water_percentage: biaWaterPct ?? undefined,
+      bia_visceral_fat: biaVisceralFat ?? undefined,
+      bia_metabolic_age: biaMetabolicAge ?? undefined,
 
       observations: data.observations
     };
