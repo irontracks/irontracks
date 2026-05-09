@@ -158,16 +158,38 @@ export const normalizeReportHistory = (data: unknown): ReportHistory => {
         const topWeight = typeof it.topWeight === 'number' ? it.topWeight : null;
         const setsCount = Number(it.setsCount);
         const maybeName = typeof it.name === 'string' ? it.name : null;
-        // Preserva pesos, reps e RPE por série para mostrar progressão correta
+        // Preserve per-set arrays with their original indexing — null slots
+        // matter because consumers do `setWeights[setIdx]` and a filtered-out
+        // null would shift subsequent sets down. Same goes for setNotes/RPE.
+        const toPosOrNull = (v: unknown): number | null =>
+          typeof v === 'number' && Number.isFinite(v) && v > 0 ? v : null;
         const setWeights = Array.isArray(it.setWeights)
-          ? (it.setWeights as unknown[]).filter((v): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0)
+          ? (it.setWeights as unknown[]).map(toPosOrNull)
           : undefined;
         const setReps = Array.isArray(it.setReps)
-          ? (it.setReps as unknown[]).filter((v): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0)
+          ? (it.setReps as unknown[]).map(toPosOrNull)
           : undefined;
         const setRpes = Array.isArray(it.setRpes)
-          ? (it.setRpes as unknown[]).filter((v): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0)
+          ? (it.setRpes as unknown[]).map(toPosOrNull)
           : undefined;
+        const setNotes = Array.isArray(it.setNotes)
+          ? (it.setNotes as unknown[]).map((v) => (typeof v === 'string' && v.trim() ? v : null))
+          : undefined;
+        const dropSetStages = Array.isArray(it.dropSetStages)
+          ? (it.dropSetStages as unknown[]).map((slot) => {
+              if (!Array.isArray(slot)) return null;
+              const stages = (slot as unknown[]).map((stage) => {
+                const obj = isObject(stage) ? (stage as UnknownRecord) : {};
+                return {
+                  weight: toPosOrNull(obj.weight),
+                  reps: toPosOrNull(obj.reps),
+                };
+              });
+              return stages.length > 0 ? stages : null;
+            })
+          : undefined;
+        const someNotNull = (arr: unknown[] | undefined): boolean =>
+          Array.isArray(arr) && arr.some((v) => v !== null && v !== undefined);
         return {
           ts,
           avgWeight,
@@ -176,9 +198,11 @@ export const normalizeReportHistory = (data: unknown): ReportHistory => {
           topWeight,
           setsCount: Number.isFinite(setsCount) ? setsCount : 0,
           ...(maybeName ? { name: maybeName } : {}),
-          ...(setWeights && setWeights.length > 0 ? { setWeights } : {}),
-          ...(setReps && setReps.length > 0 ? { setReps } : {}),
-          ...(setRpes && setRpes.length > 0 ? { setRpes } : {}),
+          ...(someNotNull(setWeights) ? { setWeights } : {}),
+          ...(someNotNull(setReps) ? { setReps } : {}),
+          ...(someNotNull(setRpes) ? { setRpes } : {}),
+          ...(someNotNull(setNotes) ? { setNotes } : {}),
+          ...(someNotNull(dropSetStages) ? { dropSetStages } : {}),
         } as ReportHistoryItem;
       })
       .filter((v): v is ReportHistoryItem => v !== null);

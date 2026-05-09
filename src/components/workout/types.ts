@@ -71,14 +71,23 @@ export type ReportHistoryItem = {
   topWeight: number | null;
   setsCount: number;
   name?: string;
-  /** Pesos individuais por série, na ordem de execução */
-  setWeights?: number[] | null;
-  /** Reps individuais por série, na ordem de execução */
-  setReps?: number[] | null;
-  /** RPE individual por série, na ordem de execução */
-  setRpes?: number[] | null;
-  /** Observações individuais por série, na ordem de execução */
+  /**
+   * Per-set arrays. Indexed by setIdx so consumers can reliably read
+   * `setWeights[setIdx]` and get the value for that specific set. A `null`
+   * slot means the set was not logged or had no value (this is intentional —
+   * filtering nulls would shift later sets down and corrupt the lookup).
+   */
+  setWeights?: (number | null)[] | null;
+  setReps?: (number | null)[] | null;
+  setRpes?: (number | null)[] | null;
   setNotes?: (string | null)[] | null;
+  /**
+   * Drop-set per-set, per-stage history. `dropSetStages[setIdx]` is the array
+   * of stage objects logged on that set (or `null` if the set wasn't a drop
+   * set). Lets the drop-set modal placeholder show the actual previous weight
+   * for each stage instead of the same average across all of them.
+   */
+  dropSetStages?: (Array<{ weight: number | null; reps: number | null }> | null)[] | null;
 };
 
 export type ReportHistory = {
