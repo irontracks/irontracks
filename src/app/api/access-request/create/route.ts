@@ -6,6 +6,7 @@ import { normalizeBrPhone } from '@/lib/whatsapp/zapi'
 import { logError } from '@/lib/logger'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { env } from '@/utils/env'
+import { notifyAdminNewSignup } from '@/lib/admin/adminNotifications'
 
 export const dynamic = 'force-dynamic'
 
@@ -171,6 +172,13 @@ export async function POST(req: Request) {
       logError('access-request/create', 'Error inserting request:', insertError)
       return NextResponse.json({ ok: false, error: 'Erro ao salvar solicitação.' }, { status: 500 })
     }
+
+    // Notifica admins in-app (fire-and-forget — não bloqueia a resposta).
+    notifyAdminNewSignup({
+      name: full_name,
+      email,
+      role: role_requested === 'teacher' ? 'teacher' : 'student',
+    }).catch(() => { })
 
     return NextResponse.json({ ok: true, message: 'Solicitação enviada com sucesso!', id: inserted?.id ?? null })
 

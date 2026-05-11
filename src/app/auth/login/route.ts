@@ -5,6 +5,11 @@ import { getSupabaseCookieOptions } from '@/utils/supabase/cookieOptions'
 import { z } from 'zod'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { env } from '@/utils/env'
+import {
+  buildOauthCsrfCookieOptions,
+  generateOauthCsrfToken,
+  OAUTH_CSRF_MAX_AGE_SECONDS,
+} from '@/utils/auth/oauthCsrf'
 
 export const dynamic = 'force-dynamic'
 
@@ -104,6 +109,23 @@ export async function GET(request: Request) {
   const redirectResp = NextResponse.redirect(oauthUrl)
   cookiesToApply.forEach(({ name, value, options }) => { try { redirectResp.cookies.set(name, value, { ...(options || {}) }) } catch { try { redirectResp.cookies.set(name, value) } catch {} } })
   try { redirectResp.cookies.set(nextCookieName, safeNext, { ...(baseCookieOptions || {}), expires: nextCookieExpires, maxAge: nextCookieMaxAgeSeconds }) } catch { try { redirectResp.cookies.set(nextCookieName, safeNext) } catch {} }
+
+  // Token CSRF de defesa em profundidade. Supabase já valida o state
+  // internamente; esse cookie é uma camada extra a ser conferida no
+  // callback. Lax + HttpOnly + Secure (produção).
+  try {
+    const csrfToken = generateOauthCsrfToken()
+    const csrfOpts = buildOauthCsrfCookieOptions(csrfToken, process.env.NODE_ENV === 'production')
+    redirectResp.cookies.set(csrfOpts.name, csrfOpts.value, {
+      httpOnly: csrfOpts.httpOnly,
+      secure: csrfOpts.secure,
+      sameSite: csrfOpts.sameSite,
+      path: csrfOpts.path,
+      maxAge: csrfOpts.maxAge,
+    })
+  } catch { /* não-crítico, fluxo continua */ }
+  // Suprime warning de constante não usada em paths antigos
+  void OAUTH_CSRF_MAX_AGE_SECONDS
 
   return redirectResp
 }

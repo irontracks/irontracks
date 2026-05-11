@@ -18,6 +18,7 @@
  */
 
 import { Crown, X } from 'lucide-react'
+import { AdminNotificationBell } from './AdminNotificationBell'
 
 type AdminPanelHeaderProps = {
   debugError: string | null
@@ -36,6 +37,21 @@ export const AdminPanelHeader = ({
   setSelectedStudent,
   onClose,
 }: AdminPanelHeaderProps) => {
+  // Quando admin clica numa notificação com link tipo "/admin?tab=requests",
+  // extrai a tab e navega via setTab — evita full page reload.
+  const handleNotifNavigate = (link: string) => {
+    try {
+      const u = new URL(link, window.location.origin)
+      const tab = u.searchParams.get('tab')
+      if (tab) {
+        setSelectedStudent(null)
+        setTab(tab)
+      }
+    } catch {
+      // link malformado, ignora
+    }
+  }
+
   return (
     <div className="sticky top-0 z-30 bg-neutral-950/90 backdrop-blur-xl border-b border-neutral-800 pt-safe flex-shrink-0">
       {debugError && (
@@ -68,12 +84,14 @@ export const AdminPanelHeader = ({
             </div>
           </button>
 
-          {/* Subtítulo à direita: indica a categoria/tab ativa.
-              Em telas pequenas oculta o texto e deixa só o botão de fechar. */}
+          {/* Subtítulo à direita: indica a categoria/tab ativa, sino de
+              notificações admin e botão fechar. Em telas pequenas oculta
+              o texto da tab e deixa só os botões. */}
           <div className="flex items-center gap-2 shrink-0">
             <span className="hidden sm:inline text-[10px] font-bold uppercase tracking-widest text-neutral-500">
               {currentTabLabel}
             </span>
+            <AdminNotificationBell onNavigate={handleNotifNavigate} />
             <button
               onClick={() => onClose && onClose()}
               className="w-10 h-10 rounded-full bg-neutral-900/70 hover:bg-neutral-800 text-neutral-300 hover:text-white flex items-center justify-center transition-all border border-neutral-800 active:scale-95"
