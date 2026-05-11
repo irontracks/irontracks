@@ -28,6 +28,9 @@ type AdminPanelHeaderProps = {
   setTab: (value: string) => void
   setSelectedStudent: (value: unknown) => void
   onClose?: () => void
+  /** Quando true, exibe o sino de notificações admin. Teachers não veem
+   *  (a API /api/admin/notifications/list retorna 403 pra non-admins). */
+  isAdmin?: boolean
 }
 
 export const AdminPanelHeader = ({
@@ -36,6 +39,7 @@ export const AdminPanelHeader = ({
   setTab,
   setSelectedStudent,
   onClose,
+  isAdmin = false,
 }: AdminPanelHeaderProps) => {
   // Quando admin clica numa notificação com link tipo "/admin?tab=requests",
   // extrai a tab e navega via setTab — evita full page reload.
@@ -91,7 +95,7 @@ export const AdminPanelHeader = ({
             <span className="hidden sm:inline text-[10px] font-bold uppercase tracking-widest text-neutral-500">
               {currentTabLabel}
             </span>
-            <AdminNotificationBell onNavigate={handleNotifNavigate} />
+            {isAdmin && <AdminNotificationBell onNavigate={handleNotifNavigate} />}
             <button
               onClick={() => onClose && onClose()}
               className="w-10 h-10 rounded-full bg-neutral-900/70 hover:bg-neutral-800 text-neutral-300 hover:text-white flex items-center justify-center transition-all border border-neutral-800 active:scale-95"
