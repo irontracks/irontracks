@@ -3,6 +3,7 @@ import { isCronAuthorized } from '@/utils/cron/auth'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { insertNotifications } from '@/lib/social/notifyFollowers'
 import { getActivelyTrainingUsers } from '@/utils/cron/activeSessionFilter'
+import { brtDateKey } from '@/utils/cron/dateBrt'
 import { logError } from '@/lib/logger'
 
 export const dynamic = 'force-dynamic'
@@ -11,26 +12,41 @@ export const dynamic = 'force-dynamic'
  * Daily cron — fires at 23:00 UTC (20:00 BRT). For each user, counts how
  * many followed users trained today. If at least one, sends a social push
  * to motivate.
+ *
+ * Timezone correctness
+ * ────────────────────
+ * "Today" é o dia BRT (calendário do usuário). Antes usava
+ * `toISOString().slice(0,10)` direto, o que dava UTC — mesmo bug
+ * dos crons streak-at-risk e morning-briefing corrigidos antes.
+ * Agora bucketamos `workouts.date` pelo dia BRT (via brtDateKey) e
+ * comparamos com a BRT "hoje".
  */
 export async function GET(req: Request) {
   if (!isCronAuthorized(req)) return NextResponse.json({ ok: false, error: 'forbidden' }, { status: 403 })
   try {
     const admin = createAdminClient()
-    const todayKey = new Date().toISOString().slice(0, 10)
+    const todayKey = brtDateKey()
+    // Pra cobrir borda UTC ↔ BRT, busca a partir de 32h atrás (1 dia BRT
+    // completo + margem). Filtragem fina por dia BRT é feita em JS.
+    const sinceIso = new Date(Date.now() - 32 * 60 * 60 * 1000).toISOString()
 
     // 1. Who trained today? (also fetch active sessions in parallel)
     const [todayResult, activeUsers] = await Promise.all([
       admin
         .from('workouts')
-        .select('user_id')
+        .select('user_id, date')
         .eq('is_template', false)
-        .gte('date', todayKey)
+        .gte('date', sinceIso)
         .limit(20000),
       getActivelyTrainingUsers(admin),
     ])
     // Merge: "trained today" includes both finished workouts and ongoing sessions
     const trainedToday = new Set(
       (Array.isArray(todayResult.data) ? todayResult.data : [])
+        .filter((r) => {
+          const date = (r as { date?: string })?.date
+          return date ? brtDateKey(date) === todayKey : false
+        })
         .map((r) => String((r as { user_id?: string })?.user_id || '').trim())
         .filter(Boolean),
     )
