@@ -12,7 +12,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  Mic, MicOff, Loader2, Check, X,
+  ArrowLeft, Mic, MicOff, Loader2, Check, X,
   Pencil, Trash2, RotateCcw, Dumbbell, Settings,
 } from 'lucide-react'
 import type { ParsedExercise } from '@/app/api/ai/parse-exercise-voice/route'
@@ -634,9 +634,10 @@ export default function VoiceWorkoutModal({
             onClick={onClose}
             className="w-8 h-8 rounded-xl flex items-center justify-center text-neutral-500 hover:text-white transition-colors"
             style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}
-            aria-label="Fechar"
+            aria-label="Voltar"
+            title="Voltar"
           >
-            <X size={15} />
+            <ArrowLeft size={15} />
           </button>
         </div>
 

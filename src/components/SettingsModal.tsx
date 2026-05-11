@@ -2,7 +2,7 @@
 
 import React, { useEffect, useMemo, useState } from 'react'
 import {
-  X, Save, Download, Trash2, RotateCcw, LogOut, ShieldAlert,
+  ArrowLeft, Save, Download, Trash2, RotateCcw, LogOut, ShieldAlert,
   Layers, Mail, MessageCircle, ChevronRight, ExternalLink,
   HelpCircle, Database, Smartphone, Crown,
 } from 'lucide-react'
@@ -233,8 +233,8 @@ export default function SettingsModal(props: SettingsModalProps) {
               <div className="text-white font-black text-lg truncate">Configurações</div>
             </div>
           </div>
-          <button type="button" onClick={() => props?.onClose?.()} className="w-10 h-10 rounded-xl text-neutral-400 hover:text-white inline-flex items-center justify-center transition-colors" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }} aria-label="Fechar">
-            <X size={18} />
+          <button type="button" onClick={() => props?.onClose?.()} className="w-10 h-10 rounded-xl text-neutral-400 hover:text-white inline-flex items-center justify-center transition-colors" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }} aria-label="Voltar" title="Voltar">
+            <ArrowLeft size={18} />
           </button>
         </div>
 

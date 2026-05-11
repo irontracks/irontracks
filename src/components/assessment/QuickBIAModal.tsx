@@ -13,7 +13,7 @@
 
 import React, { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { X, Activity, Save, Loader2, AlertCircle } from 'lucide-react'
+import { ArrowLeft, Activity, Save, Loader2, AlertCircle } from 'lucide-react'
 import { useAssessment } from '@/hooks/useAssessment'
 import { useDialog } from '@/contexts/DialogContext'
 import { logError } from '@/lib/logger'
@@ -207,9 +207,10 @@ export default function QuickBIAModal({
               onClick={onClose}
               className="w-9 h-9 rounded-xl border flex items-center justify-center text-neutral-400 hover:text-white hover:border-yellow-500/40 transition-all shrink-0"
               style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }}
-              aria-label="Fechar"
+              aria-label="Voltar"
+              title="Voltar"
             >
-              <X className="w-4 h-4" />
+              <ArrowLeft className="w-4 h-4" />
             </button>
           </div>
 

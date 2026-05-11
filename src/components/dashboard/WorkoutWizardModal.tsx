@@ -2,7 +2,7 @@
 // v2: voice workout integration
 import React, { useEffect, useState } from 'react'
 import Image from 'next/image'
-import { X, ChevronLeft, ChevronRight, Sparkles, Loader2, Wand2, Mic } from 'lucide-react'
+import { ArrowLeft, ChevronLeft, ChevronRight, Sparkles, Loader2, Wand2, Mic } from 'lucide-react'
 import VoiceWorkoutModal, { type VoiceExerciseDraft } from './VoiceWorkoutModal'
 import { useVipCredits } from '@/hooks/useVipCredits'
 import { getErrorMessage } from '@/utils/errorMessage'
@@ -345,9 +345,10 @@ export default function WorkoutWizardModal(props: Props) {
               onClick={props.onClose}
               className="w-8 h-8 rounded-lg flex items-center justify-center text-neutral-500 hover:text-white transition-all active:scale-90"
               style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}
-              aria-label="Fechar"
+              aria-label="Voltar"
+              title="Voltar"
             >
-              <X size={16} />
+              <ArrowLeft size={16} />
             </button>
           </div>
 

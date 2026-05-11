@@ -11,7 +11,7 @@
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  Camera, ChevronLeft, ChevronRight, Loader2, Plus, SlidersHorizontal,
+  ArrowLeft, Camera, ChevronLeft, ChevronRight, Loader2, Plus, SlidersHorizontal,
   Trash2, X, ArrowLeftRight,
 } from 'lucide-react'
 import Image from 'next/image'
@@ -210,8 +210,8 @@ function UploadModal({ onClose, onUploaded }: UploadModalProps) {
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-neutral-800">
           <p className="font-black text-white">Nova foto de progresso</p>
-          <button type="button" onClick={onClose} className="w-8 h-8 rounded-full bg-neutral-800 flex items-center justify-center text-neutral-400 hover:text-white">
-            <X size={14} />
+          <button type="button" onClick={onClose} className="w-8 h-8 rounded-full bg-neutral-800 flex items-center justify-center text-neutral-400 hover:text-white" aria-label="Voltar" title="Voltar">
+            <ArrowLeft size={14} />
           </button>
         </div>
 
@@ -567,8 +567,8 @@ export default function ProgressPhotos({ onClose }: ProgressPhotosProps) {
               <p className="font-bold text-white text-sm">{KIND_LABELS[lightbox.kind]} · {fmtDate(lightbox.date)}</p>
               {lightbox.weight_kg && <p className="text-xs text-yellow-500 font-bold">{lightbox.weight_kg}kg</p>}
             </div>
-            <button type="button" onClick={() => setLightbox(null)} className="text-neutral-400">
-              <X size={22} />
+            <button type="button" onClick={() => setLightbox(null)} className="text-neutral-400" aria-label="Voltar" title="Voltar">
+              <ArrowLeft size={22} />
             </button>
           </div>
           {/* eslint-disable-next-line jsx-a11y/no-static-element-interactions, jsx-a11y/click-events-have-key-events */}
