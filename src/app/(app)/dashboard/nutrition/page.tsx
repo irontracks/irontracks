@@ -188,21 +188,35 @@ export default async function NutritionPage() {
     }
   }
 
-  // Fetch today's workout calories from completed sessions
+  // Fetch today's workout calories from completed sessions.
+  // Schema: workout_session_logs.finished_at + duration_seconds. A tabela
+  // legada `workout_sessions` não existe — Postgrest devolvia 404. Estimamos
+  // calorias quando metadata.calories ausente: ~7 kcal/min de treino de força.
   let workoutCaloriesToday = 0
   try {
     const todayStart = `${dateKey}T00:00:00`
     const todayEnd = `${dateKey}T23:59:59`
     const { data: sessions } = await supabase
-      .from('workout_sessions')
-      .select('calories_estimate')
+      .from('workout_session_logs')
+      .select('duration_seconds, metadata')
       .eq('user_id', authUserId)
-      .gte('completed_at', todayStart)
-      .lte('completed_at', todayEnd)
+      .gte('finished_at', todayStart)
+      .lte('finished_at', todayEnd)
     if (Array.isArray(sessions)) {
       for (const s of sessions) {
-        const kcal = Number((s as Record<string, unknown>)?.calories_estimate)
-        if (Number.isFinite(kcal) && kcal > 0) workoutCaloriesToday += kcal
+        const row = s as Record<string, unknown>
+        const meta = (row.metadata && typeof row.metadata === 'object'
+          ? (row.metadata as Record<string, unknown>)
+          : {})
+        const kcalMeta = Number(meta.calories ?? meta.calories_estimate)
+        if (Number.isFinite(kcalMeta) && kcalMeta > 0) {
+          workoutCaloriesToday += kcalMeta
+          continue
+        }
+        const seconds = Number(row.duration_seconds)
+        if (Number.isFinite(seconds) && seconds > 0) {
+          workoutCaloriesToday += Math.round((seconds / 60) * 7)
+        }
       }
     }
   } catch { /* silent — table may not exist or have no data */ }
