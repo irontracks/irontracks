@@ -170,6 +170,7 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
                     setTab={setTab}
                     setSelectedStudent={(value) => setSelectedStudent(value as AdminUser | null)}
                     onClose={onClose}
+                    isAdmin={isAdmin}
                 />
                 {/* Conteúdo scrollable. pb-32 deixa espaço pro bottom tab
                     bar (que tem ~72px de altura incluindo safe area).
