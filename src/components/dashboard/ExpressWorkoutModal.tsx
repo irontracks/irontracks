@@ -6,7 +6,7 @@
  * Uses the same /api/ai/workout-wizard endpoint but skips the multi-step wizard.
  */
 import React, { useState } from 'react'
-import { X, Zap, Loader2 } from 'lucide-react'
+import { ArrowLeft, Zap, Loader2 } from 'lucide-react'
 
 interface WorkoutDraft {
   title: string
@@ -111,10 +111,11 @@ export default function ExpressWorkoutModal({ isOpen, onClose, onUseDraft }: Pro
           <button
             type="button"
             onClick={onClose}
-            aria-label="Fechar"
+            aria-label="Voltar"
+            title="Voltar"
             className="w-8 h-8 rounded-full bg-neutral-900 flex items-center justify-center text-neutral-400 hover:text-white"
           >
-            <X size={14} />
+            <ArrowLeft size={14} />
           </button>
         </div>
 

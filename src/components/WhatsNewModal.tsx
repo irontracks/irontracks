@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useEffect } from 'react'
-import { X } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
 import type { WhatsNewEntry } from '@/content/whatsNew'
 
 type UpdateNotification = {
@@ -68,9 +68,10 @@ export default function WhatsNewModal({ isOpen, entry, update, onClose }: Props)
             onClick={onClose}
             className="w-10 h-10 rounded-xl text-neutral-400 hover:text-white inline-flex items-center justify-center flex-shrink-0 transition-colors"
             style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}
-            aria-label="Fechar"
+            aria-label="Voltar"
+            title="Voltar"
           >
-            <X size={18} />
+            <ArrowLeft size={18} />
           </button>
         </div>
 

@@ -17,7 +17,7 @@
 
 import { useEffect } from 'react'
 import Image from 'next/image'
-import { X } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
 
 interface Props {
   onClose: () => void
@@ -73,9 +73,10 @@ export default function MothersDayModal({
             border: '1px solid rgba(255,255,255,0.15)',
             backdropFilter: 'blur(4px)',
           }}
-          aria-label="Fechar"
+          aria-label="Voltar"
+          title="Voltar"
         >
-          <X size={18} />
+          <ArrowLeft size={18} />
         </button>
 
         <div className="relative w-full" style={{ aspectRatio: '3 / 4' }}>

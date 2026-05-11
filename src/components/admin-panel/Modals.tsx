@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { useAdminPanel } from './AdminPanelContext';
-import { X, UserPlus, Edit3, ArrowLeft } from 'lucide-react';
+import { UserPlus, Edit3, ArrowLeft } from 'lucide-react';
 import HistoryList from '../HistoryList'; // Import relative or alias
 import AdminWorkoutEditor from '../AdminWorkoutEditor'; // Import relative or alias
 // import { AdminWorkout } from '@/types/admin';
@@ -214,9 +214,10 @@ export const Modals: React.FC = () => {
                                 onClick={() => { setExecutionVideoModalOpen(false); setExecutionVideoModalUrl(''); }}
                                 className="w-9 h-9 rounded-xl border flex items-center justify-center text-neutral-500 hover:text-white hover:border-yellow-500/40 transition-all"
                                 style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }}
-                                aria-label="Fechar"
+                                aria-label="Voltar"
+                                title="Voltar"
                             >
-                                <X size={18} />
+                                <ArrowLeft size={18} />
                             </button>
                         </div>
                         <div className="p-4">

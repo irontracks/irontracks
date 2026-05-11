@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { X } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import ExerciseEditor from '@/components/ExerciseEditor';
 import { type SupabaseClient } from '@supabase/supabase-js';
 
@@ -104,9 +104,10 @@ export function HistoryListManualModal({
                         onClick={onClose}
                         className="w-8 h-8 rounded-xl border flex items-center justify-center text-neutral-500 hover:text-white hover:border-yellow-500/40 transition-all"
                         style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }}
-                        aria-label="Fechar"
+                        aria-label="Voltar"
+                        title="Voltar"
                     >
-                        <X size={16} />
+                        <ArrowLeft size={16} />
                     </button>
                 </div>
 

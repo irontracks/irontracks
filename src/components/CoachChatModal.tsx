@@ -1,6 +1,6 @@
 import { useFocusTrap } from '@/hooks/useFocusTrap'
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { X, Send, MessageSquare, User, Bot, Loader2, Sparkles, Save, Trash2, Dumbbell, Check, Plus } from 'lucide-react';
+import { ArrowLeft, Send, MessageSquare, User, Bot, Loader2, Sparkles, Save, Trash2, Dumbbell, Check, Plus } from 'lucide-react';
 import { useVipCredits } from '@/hooks/useVipCredits';
 import { useIsIosNative } from '@/hooks/useIsIosNative';
 import type { Exercise } from '@/types/app';
@@ -237,8 +237,8 @@ export default function CoachChatModal({
                             </div>
                         </div>
                     </div>
-                    <button onClick={handleClose} className="w-10 h-10 rounded-xl flex items-center justify-center text-neutral-400 hover:text-white transition-all active:scale-95" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                        <X size={18} />
+                    <button onClick={handleClose} className="w-10 h-10 rounded-xl flex items-center justify-center text-neutral-400 hover:text-white transition-all active:scale-95" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }} aria-label="Voltar" title="Voltar">
+                        <ArrowLeft size={18} />
                     </button>
                 </div>
 

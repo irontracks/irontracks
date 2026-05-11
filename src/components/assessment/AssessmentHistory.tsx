@@ -25,7 +25,7 @@ import { AssessmentListItem, measurementFields, skinfoldFields } from '@/compone
 import { AssessmentPlanModal } from '@/components/assessment/AssessmentPlanModal';
 import { AssessmentHistoryModal } from './AssessmentHistoryModal';
 import { useAssessmentHistoryData } from '@/hooks/useAssessmentHistoryData';
-import { X } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 
 import {
   getWeightKg,
@@ -376,7 +376,7 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
               >
                 <div className="p-4 border-b border-neutral-800 flex justify-between items-center">
                   <h3 className="font-bold text-white">{editAssessmentId ? 'Editar Avaliação' : 'Nova Avaliação'}</h3>
-                  <button onClick={() => { setShowForm(false); setEditAssessmentId(null); }} className="p-2 hover:bg-neutral-800 rounded-full" aria-label="Fechar"><X className="w-5 h-5 text-neutral-400" /></button>
+                  <button onClick={() => { setShowForm(false); setEditAssessmentId(null); }} className="p-2 hover:bg-neutral-800 rounded-full" aria-label="Voltar" title="Voltar"><ArrowLeft className="w-5 h-5 text-neutral-400" /></button>
                 </div>
                 <div className="p-4 max-h-[80vh] overflow-y-auto bg-neutral-900">
                   <AssessmentForm
