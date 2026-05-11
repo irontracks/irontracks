@@ -34,7 +34,7 @@ export async function GET(req: Request) {
 
     const { data, error } = await admin
       .from('notifications')
-      .select('id, type, title, message, link, metadata, is_read, created_at')
+      .select('id, type, title, message, metadata, is_read, created_at')
       .eq('user_id', userId)
       .in('type', ADMIN_TYPES)
       .order('created_at', { ascending: false })
@@ -47,7 +47,15 @@ export async function GET(req: Request) {
     const rows = Array.isArray(data) ? data : []
     const unreadCount = rows.filter((r) => !((r as { is_read?: boolean }).is_read)).length
 
-    return NextResponse.json({ ok: true, notifications: rows, unreadCount })
+    // Promove metadata.link → link no payload de resposta pra a UI consumir
+    // sem ter que conhecer o detalhe interno (link mora em metadata na tabela).
+    const enriched = rows.map((r) => {
+      const meta = (r as { metadata?: Record<string, unknown> }).metadata
+      const link = meta && typeof meta === 'object' ? String((meta as Record<string, unknown>).link || '') : ''
+      return { ...r, link: link || null }
+    })
+
+    return NextResponse.json({ ok: true, notifications: enriched, unreadCount })
   } catch (e) {
     const message = e instanceof Error ? e.message : String(e)
     return NextResponse.json({ ok: false, error: message }, { status: 500 })
