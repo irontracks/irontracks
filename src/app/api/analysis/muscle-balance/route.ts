@@ -32,12 +32,17 @@ export async function GET(req: Request) {
   const admin = createAdminClient()
   const since = new Date(Date.now() - 28 * 24 * 60 * 60 * 1000).toISOString()
 
-  // Get workout sessions from last 28 days
+  // Get completed workouts from last 28 days.
+  // A tabela legada `workout_sessions` não existe — Postgrest retorna 404.
+  // Treinos completos vivem em `workouts` com is_template=false e notes
+  // JSON contendo `exercises[]` e `logs{}` exatamente no formato esperado.
   const { data: sessions } = await admin
-    .from('workout_sessions')
-    .select('notes, started_at')
+    .from('workouts')
+    .select('notes, completed_at')
     .eq('user_id', auth.user.id)
-    .gte('started_at', since)
+    .eq('is_template', false)
+    .not('completed_at', 'is', null)
+    .gte('completed_at', since)
     .limit(60)
 
   const setsPerMuscle = new Map<MuscleId, number>()
@@ -50,7 +55,7 @@ export async function GET(req: Request) {
       const exercises = Array.isArray(notes.exercises) ? notes.exercises : []
       const logs = notes.logs && typeof notes.logs === 'object' ? notes.logs as Record<string, unknown> : {}
 
-      sessionDates.push(String(session.started_at || '').slice(0, 10))
+      sessionDates.push(String(session.completed_at || '').slice(0, 10))
 
       exercises.forEach((ex: unknown, exIdx: number) => {
         const exObj = ex && typeof ex === 'object' ? ex as Record<string, unknown> : {}

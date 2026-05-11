@@ -155,8 +155,13 @@ async function flush({ preferBeacon }: { preferBeacon: boolean }) {
 
     const body = JSON.stringify({ events: batch })
 
+    // Sempre prefere sendBeacon — é fire-and-forget e o navegador não
+    // cancela a request quando a página navega. preferBeacon só vira
+    // hint pra quando sendBeacon não está disponível: aí o fetch é o
+    // fallback. Antes só usava beacon em hidden/pagehide, e a request
+    // do flushTimer caía no fetch durante navegação inicial → ERR_ABORTED
+    // poluía o console no boot.
     const sent = (() => {
-      if (!preferBeacon) return false
       try {
         if (!navigator?.sendBeacon) return false
         const blob = new Blob([body], { type: 'application/json' })
@@ -172,18 +177,30 @@ async function flush({ preferBeacon }: { preferBeacon: boolean }) {
       return
     }
 
-    const res = await fetch(ENDPOINT, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body,
-      keepalive: true,
-    })
-
-    const ok = res.ok
-    if (ok) {
-      queue = queue.slice(batch.length)
-      writeStored(queue)
+    // Beacon indisponível ou recusou (payload > 64KB). Usa fetch.
+    // Em hidden/pagehide preferBeacon=true: ainda chega aqui se beacon
+    // falhar, mas keepalive garante entrega; em flush normal o fetch
+    // é o caminho esperado quando beacon falha.
+    try {
+      const res = await fetch(ENDPOINT, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body,
+        keepalive: true,
+      })
+      if (res.ok) {
+        queue = queue.slice(batch.length)
+        writeStored(queue)
+      }
+    } catch (e: unknown) {
+      // ERR_ABORTED é esperado durante navegação rápida (página descarregou
+      // antes da request completar). Não polui Sentry/logs com isso.
+      const name = (e as { name?: string } | null)?.name || ''
+      if (name !== 'AbortError') {
+        throw e
+      }
     }
+    void preferBeacon // mantido na API por compatibilidade com flushUserEvents
   } catch (e) { logError('userActivity.flush', e) } finally {
     flushing = false
   }
