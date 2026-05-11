@@ -32,10 +32,9 @@ import {
   AlertCircle,
   Dumbbell,
   Play,
-  BarChart3,
+  TrendingUp,
   MessageSquare,
   Settings,
-  Building2,
   CreditCard,
   BookOpen,
 } from 'lucide-react'
@@ -73,13 +72,17 @@ export const ADMIN_CATEGORIES: readonly CategoryDef[] = [
     id: 'content',
     label: 'Conteúdo',
     icon: Library,
-    tabKeys: ['templates', 'videos', 'vip', 'vip_reports'],
+    // 'vip_reports' foi mesclado em 'vip' (VipTabUnified com toggle interno).
+    tabKeys: ['templates', 'videos', 'vip'],
   },
   {
     id: 'more',
     label: 'Mais',
     icon: MoreHorizontal,
-    tabKeys: ['priorities', 'billing', 'platform_billing', 'errors', 'system', 'guide'],
+    // 'platform_billing' mesclado em 'billing' (FinanceTabUnified).
+    // 'acquisition' é um link pra página /admin/acquisition (page SSR
+    // mais pesada, mantida fora do shell modal).
+    tabKeys: ['priorities', 'billing', 'acquisition', 'errors', 'system', 'guide'],
   },
 ] as const
 
@@ -95,12 +98,13 @@ export const TAB_META: Record<string, { icon: LucideIcon; subtitle: string }> = 
   priorities: { icon: AlertCircle, subtitle: 'Triagem inteligente do coach' },
   templates: { icon: Dumbbell, subtitle: 'Biblioteca de treinos-base' },
   videos: { icon: Play, subtitle: 'Vídeos demonstrativos' },
-  vip_reports: { icon: BarChart3, subtitle: 'Relatórios de uso VIP' },
-  vip: { icon: Crown, subtitle: 'Gestão de assinantes VIP' },
+  // 'vip' agora unifica assinantes + relatórios via VipTabUnified
+  vip: { icon: Crown, subtitle: 'Assinantes VIP + relatórios' },
   errors: { icon: MessageSquare, subtitle: 'Feedbacks reportados' },
   system: { icon: Settings, subtitle: 'Mensagens em massa e manutenção' },
-  platform_billing: { icon: Building2, subtitle: 'Cobrança da plataforma + diagnóstico' },
-  billing: { icon: CreditCard, subtitle: 'Planos de serviço e cobranças dos alunos' },
+  // 'billing' agora unifica cobranças dos alunos + cobrança da plataforma
+  billing: { icon: CreditCard, subtitle: 'Financeiro — cobranças e plataforma' },
+  acquisition: { icon: TrendingUp, subtitle: 'Análise de aquisição (UTM, conversões)' },
   guide: { icon: BookOpen, subtitle: 'Manual completo para professores' },
 }
 
