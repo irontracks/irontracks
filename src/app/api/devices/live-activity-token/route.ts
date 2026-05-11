@@ -10,10 +10,19 @@
  * row instead of accumulating stale tokens.
  */
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
+import { parseJsonBody } from '@/utils/zod'
 
 const norm = (v: unknown) => String(v ?? '').trim()
+
+const BodySchema = z.object({
+  token: z.string().optional(),
+  kind: z.string().optional(),
+  activityId: z.string().optional(),
+  platform: z.string().optional(),
+}).passthrough()
 
 export async function POST(request: Request) {
   try {
@@ -23,8 +32,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
     }
 
-    let body: Record<string, unknown> = {}
-    try { body = await request.json() } catch { /* empty */ }
+    const parsed = await parseJsonBody(request, BodySchema)
+    const body = parsed.data ?? {}
 
     const token = norm(body?.token)
     const kind = norm(body?.kind) // 'rest' | 'workout' | …

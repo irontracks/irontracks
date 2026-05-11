@@ -9,8 +9,15 @@
  * Response: { ok: boolean, results?: Array<{ token, ok, error? }> }
  */
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { sendLiveActivityUpdate } from '@/lib/push/apnsLiveActivity'
+import { parseJsonBody } from '@/utils/zod'
+
+const BodySchema = z.object({
+  kind: z.string().optional(),
+  event: z.string().optional(),
+}).passthrough()
 
 export async function POST(request: Request) {
   try {
@@ -20,8 +27,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
     }
 
-    let body: Record<string, unknown> = {}
-    try { body = await request.json() } catch { /* empty */ }
+    const parsed = await parseJsonBody(request, BodySchema)
+    const body = parsed.data ?? {}
     const kindStr = String(body?.kind ?? 'workout').toLowerCase()
     const eventStr = String(body?.event ?? 'update').toLowerCase()
 

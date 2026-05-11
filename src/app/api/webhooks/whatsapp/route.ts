@@ -7,14 +7,20 @@
  * Configure this URL in the Z-API dashboard under "On Message Received".
  */
 import { NextResponse } from 'next/server'
+import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { logError, logInfo, logWarn } from '@/lib/logger'
 import { sendWhatsAppText } from '@/lib/whatsapp/zapi'
 import { generateReply, fetchUserContext } from '@/lib/whatsapp/conversation'
 import type { ConversationTurn } from '@/lib/whatsapp/conversation'
 import { env } from '@/utils/env'
+import { parseJsonBody } from '@/utils/zod'
 
 export const dynamic = 'force-dynamic'
+
+// Z-API webhook payload é amplo e varia por evento — usamos passthrough
+// pra preservar todas as keys e validamos os campos relevantes inline.
+const ZapiBodySchema = z.object({}).passthrough()
 
 /**
  * Constant-time string comparison so we don't leak length/timing info to a
@@ -66,7 +72,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
     }
 
-    const body = await req.json() as Record<string, unknown>
+    const parsed = await parseJsonBody(req, ZapiBodySchema)
+    const body = (parsed.data ?? {}) as Record<string, unknown>
 
     // Ignore messages we sent ourselves, group messages, or empty payloads
     if (Boolean(body.fromMe) || Boolean(body.isGroup)) return NextResponse.json({ ok: true })
