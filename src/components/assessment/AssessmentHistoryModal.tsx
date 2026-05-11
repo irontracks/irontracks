@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react';
-import { X } from 'lucide-react';
+import { ArrowLeft } from 'lucide-react';
 import dynamic from 'next/dynamic';
 import {
     AssessmentRow,
@@ -74,9 +74,10 @@ export function AssessmentHistoryModal({
                         onClick={onClose}
                         className="w-9 h-9 rounded-xl border flex items-center justify-center text-neutral-500 hover:text-white hover:border-yellow-500/40 transition-all"
                         style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }}
-                        aria-label="Fechar"
+                        aria-label="Voltar"
+                        title="Voltar"
                     >
-                        <X className="w-4 h-4" />
+                        <ArrowLeft className="w-4 h-4" />
                     </button>
                 </div>
 

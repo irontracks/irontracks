@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import { X, Save } from 'lucide-react'
+import { ArrowLeft, Save } from 'lucide-react'
 import { Reorder } from 'framer-motion'
 import { SortableWorkoutItem } from './SortableWorkoutItem'
 
@@ -61,9 +61,10 @@ export function EditWorkoutListModal({
             disabled={savingListEdits}
             className="w-10 h-10 rounded-xl flex items-center justify-center text-neutral-400 hover:text-white transition-all active:scale-95 disabled:opacity-50"
             style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}
-            aria-label="Fechar"
+            aria-label="Voltar"
+            title="Voltar"
           >
-            <X size={18} />
+            <ArrowLeft size={18} />
           </button>
         </div>
 

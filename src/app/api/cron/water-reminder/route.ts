@@ -16,7 +16,10 @@ export async function GET(req: Request) {
   if (!isCronAuthorized(req)) return NextResponse.json({ ok: false, error: 'forbidden' }, { status: 403 })
   try {
     const admin = createAdminClient()
-    const sinceIso = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10)
+    // Cutoff de 14 dias atrás — janela larga, então UTC vs BRT não muda
+    // o resultado em borda. Mantemos timestamp ISO completo pro Postgres
+    // (não fatiamos pra YYYY-MM-DD) pra evitar conversão implícita.
+    const sinceIso = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString()
 
     const { data: rows } = await admin
       .from('workouts')

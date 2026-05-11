@@ -32,8 +32,11 @@ export async function GET(req: Request) {
   try {
     const admin = createAdminClient()
     const now = Date.now()
-    const minAgo = new Date(now - MIN_INACTIVE_DAYS * 86_400_000).toISOString().slice(0, 10)
-    const maxAgo = new Date(now - MAX_INACTIVE_DAYS * 86_400_000).toISOString().slice(0, 10)
+    // Cutoffs MIN/MAX_INACTIVE_DAYS — janelas largas (7-30 dias), então
+    // a diferença UTC vs BRT (3h) é desprezível pro filtro. Mantemos
+    // timestamp ISO completo pra evitar conversão implícita.
+    const minAgo = new Date(now - MIN_INACTIVE_DAYS * 86_400_000).toISOString()
+    const maxAgo = new Date(now - MAX_INACTIVE_DAYS * 86_400_000).toISOString()
 
     // 1. Find users whose last workout falls within the 7-30 day window
     const { data: workoutRows } = await admin

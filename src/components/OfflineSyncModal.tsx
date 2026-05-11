@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, RefreshCw, Trash2, X, Bug, Clock } from 'lucide-react'
+import { AlertTriangle, RefreshCw, Trash2, ArrowLeft, Bug, Clock } from 'lucide-react'
 import { bumpOfflineJob, clearOfflineJobs, flushOfflineQueue, getOfflineQueueSummary, isOnline } from '@/lib/offline/offlineSync'
 import type { QueueSummary, OfflineJob } from '@/lib/offline/offlineSync'
 import { useDialog } from '@/contexts/DialogContext'
@@ -68,8 +68,8 @@ export default function OfflineSyncModal({ open, onClose, userId }: OfflineSyncM
               {state?.online === false ? 'Sem internet agora.' : hasJobs ? 'Fila pronta para sincronizar quando possível.' : 'Nenhuma pendência.'}
             </div>
           </div>
-          <button type="button" onClick={() => onClose?.()} className="w-10 h-10 rounded-xl bg-neutral-950 border border-neutral-800 text-neutral-200 hover:bg-neutral-900 inline-flex items-center justify-center">
-            <X size={18} />
+          <button type="button" onClick={() => onClose?.()} className="w-10 h-10 rounded-xl bg-neutral-950 border border-neutral-800 text-neutral-200 hover:bg-neutral-900 inline-flex items-center justify-center" aria-label="Voltar" title="Voltar">
+            <ArrowLeft size={18} />
           </button>
         </div>
 
