@@ -38,6 +38,7 @@ import {
   CreditCard,
   BookOpen,
   Activity,
+  BarChart3,
 } from 'lucide-react'
 
 export type AdminCategory = 'home' | 'students' | 'content' | 'more'
@@ -83,7 +84,7 @@ export const ADMIN_CATEGORIES: readonly CategoryDef[] = [
     // 'platform_billing' mesclado em 'billing' (FinanceTabUnified).
     // 'acquisition' é um link pra página /admin/acquisition (page SSR
     // mais pesada, mantida fora do shell modal).
-    tabKeys: ['priorities', 'billing', 'acquisition', 'crons', 'errors', 'system', 'guide'],
+    tabKeys: ['priorities', 'billing', 'analytics', 'acquisition', 'crons', 'errors', 'system', 'guide'],
   },
 ] as const
 
@@ -106,6 +107,7 @@ export const TAB_META: Record<string, { icon: LucideIcon; subtitle: string }> = 
   // 'billing' agora unifica cobranças dos alunos + cobrança da plataforma
   billing: { icon: CreditCard, subtitle: 'Financeiro — cobranças e plataforma' },
   acquisition: { icon: TrendingUp, subtitle: 'Análise de aquisição (UTM, conversões)' },
+  analytics: { icon: BarChart3, subtitle: 'DAU/WAU/MAU + pushes + retenção' },
   crons: { icon: Activity, subtitle: 'Status dos jobs agendados' },
   guide: { icon: BookOpen, subtitle: 'Manual completo para professores' },
 }
