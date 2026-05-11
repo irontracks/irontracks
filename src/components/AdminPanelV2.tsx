@@ -28,12 +28,13 @@ const SystemTab = dynamic(() => import('@/components/admin-panel/SystemTab').the
 const ErrorsTab = dynamic(() => import('@/components/admin-panel/ErrorsTab').then(m => ({ default: m.ErrorsTab })), { ssr: false });
 const VideosTab = dynamic(() => import('@/components/admin-panel/VideosTab').then(m => ({ default: m.VideosTab })), { ssr: false });
 const StudentDetailPanel = dynamic(() => import('@/components/admin-panel/StudentDetailPanel').then(m => m.StudentDetailPanel), { ssr: false });
-const AdminVipReports = dynamic(() => import('@/components/admin/AdminVipReports'), { ssr: false });
 const RequestsTab = dynamic(() => import('@/components/admin/RequestsTab'), { ssr: false });
-const VipTab = dynamic(() => import('@/components/admin-panel/VipTab').then(m => ({ default: m.VipTab })), { ssr: false });
-const TeacherBillingTab = dynamic(() => import('@/components/admin-panel/TeacherBillingTab'), { ssr: false });
+// VipTabUnified agrupa VipTab (assinantes) + AdminVipReports (relatórios)
+const VipTabUnified = dynamic(() => import('@/components/admin-panel/VipTabUnified').then(m => ({ default: m.VipTabUnified })), { ssr: false });
 const TeacherManualTab = dynamic(() => import('@/components/admin-panel/TeacherManualTab'), { ssr: false });
-const PlatformBillingTab = dynamic(() => import('@/components/admin-panel/PlatformBillingTab').then(m => ({ default: m.PlatformBillingTab })), { ssr: false });
+// FinanceTabUnified agrupa TeacherBillingTab (cobranças do aluno) + PlatformBillingTab (SaaS)
+const FinanceTabUnified = dynamic(() => import('@/components/admin-panel/FinanceTabUnified').then(m => ({ default: m.FinanceTabUnified })), { ssr: false });
+const AcquisitionTab = dynamic(() => import('@/components/admin-panel/AcquisitionTab').then(m => ({ default: m.AcquisitionTab })), { ssr: false });
 import { Modals } from '@/components/admin-panel/Modals';
 import { logError } from '@/lib/logger';
 import type { AdminUser } from '@/types/admin';
@@ -70,7 +71,7 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
         tab, isAdmin, isTeacher,
         setTab, setSelectedStudent,
         selectedStudent,
-        supabase, debugError,
+        debugError,
     } = ctrl;
 
     // Deferred auth check: wait up to 3s for role to be populated before showing fallback
@@ -85,10 +86,15 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
     // Set de tabs disponíveis para esse role. Precisa ficar AQUI (antes dos
     // early returns de auth) por causa das regras de hooks — useMemo não
     // pode ser chamado condicionalmente.
+    //
+    // Mudanças do refactor 2026-05:
+    //   - 'vip_reports' removida (agora dentro de 'vip' via VipTabUnified)
+    //   - 'platform_billing' removida (agora dentro de 'billing' via FinanceTabUnified)
+    //   - 'acquisition' adicionada (linka pra /admin/acquisition)
     const availableTabs = useMemo<ReadonlySet<string>>(() => {
         const keys = ['dashboard', 'students', 'templates'];
         if (isAdmin) {
-            keys.push('requests', 'teachers', 'videos', 'errors', 'vip', 'vip_reports', 'platform_billing', 'system');
+            keys.push('requests', 'teachers', 'videos', 'errors', 'vip', 'acquisition', 'system');
         }
         if (isTeacher || isAdmin) {
             keys.push('priorities', 'billing', 'guide');
@@ -141,13 +147,13 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
     // bottom tabs e sub-tabs.
     let TAB_LABELS: Record<string, string> = { dashboard: 'VISÃO GERAL', students: 'ALUNOS', templates: 'TREINOS' };
     if (isAdmin) {
-        TAB_LABELS = { ...TAB_LABELS, requests: 'SOLICITAÇÕES', teachers: 'PROFESSORES', videos: 'VÍDEOS', errors: 'FEEDBACK', vip: 'VIP GESTÃO', vip_reports: 'VIP REPORTS', platform_billing: 'PLATAFORMA', system: 'FERRAMENTAS' };
+        TAB_LABELS = { ...TAB_LABELS, requests: 'SOLICITAÇÕES', teachers: 'PROFESSORES', videos: 'VÍDEOS', errors: 'FEEDBACK', vip: 'VIP', acquisition: 'AQUISIÇÃO', system: 'FERRAMENTAS' };
     }
     if (isTeacher && !isAdmin) {
-        TAB_LABELS = { ...TAB_LABELS, priorities: 'PRIORIDADES', billing: 'COBRANÇAS', guide: 'GUIA' };
+        TAB_LABELS = { ...TAB_LABELS, priorities: 'PRIORIDADES', billing: 'FINANCEIRO', guide: 'GUIA' };
     }
     if (isAdmin) {
-        TAB_LABELS = { ...TAB_LABELS, priorities: 'PRIORIDADES', billing: 'COBRANÇAS', guide: 'GUIA' };
+        TAB_LABELS = { ...TAB_LABELS, priorities: 'PRIORIDADES', billing: 'FINANCEIRO', guide: 'GUIA' };
     }
 
     const currentTabLabel = TAB_LABELS[tab] || 'VISÃO GERAL';
@@ -183,12 +189,16 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
                         {tab === 'requests' && !selectedStudent && isAdmin && <TabErrorBoundary name="Solicitações"><RequestsTab /></TabErrorBoundary>}
                         {tab === 'videos' && !selectedStudent && isAdmin && <TabErrorBoundary name="Vídeos"><VideosTab /></TabErrorBoundary>}
                         {tab === 'errors' && !selectedStudent && isAdmin && <TabErrorBoundary name="Feedback"><ErrorsTab /></TabErrorBoundary>}
-                        {tab === 'vip' && !selectedStudent && isAdmin && <TabErrorBoundary name="VIP"><VipTab /></TabErrorBoundary>}
-                        {tab === 'vip_reports' && !selectedStudent && <TabErrorBoundary name="VIP Reports"><AdminVipReports supabase={supabase} /></TabErrorBoundary>}
-                        {tab === 'platform_billing' && !selectedStudent && isAdmin && <TabErrorBoundary name="Plataforma"><PlatformBillingTab /></TabErrorBoundary>}
+                        {/* VIP unificado: VipTabUnified internamente alterna entre
+                            assinantes e relatórios via toggle. */}
+                        {tab === 'vip' && !selectedStudent && isAdmin && <TabErrorBoundary name="VIP"><VipTabUnified /></TabErrorBoundary>}
+                        {tab === 'acquisition' && !selectedStudent && isAdmin && <TabErrorBoundary name="Aquisição"><AcquisitionTab /></TabErrorBoundary>}
                         {tab === 'system' && !selectedStudent && <TabErrorBoundary name="Ferramentas"><SystemTab /></TabErrorBoundary>}
                         {tab === 'teachers' && isAdmin && !selectedStudent && <TabErrorBoundary name="Professores"><TeachersTab /></TabErrorBoundary>}
-                        {tab === 'billing' && !selectedStudent && <TabErrorBoundary name="Cobranças"><TeacherBillingTab /></TabErrorBoundary>}
+                        {/* Financeiro unificado: para teacher mostra só
+                            cobranças dos alunos; para admin mostra toggle
+                            (cobranças / plataforma). */}
+                        {tab === 'billing' && !selectedStudent && <TabErrorBoundary name="Financeiro"><FinanceTabUnified /></TabErrorBoundary>}
                         {tab === 'guide' && !selectedStudent && <TabErrorBoundary name="Guia"><TeacherManualTab /></TabErrorBoundary>}
                         <StudentDetailPanel />
                     </div>
