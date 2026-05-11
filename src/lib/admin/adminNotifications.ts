@@ -70,8 +70,13 @@ export async function notifyAdmins(args: AdminNotifyArgs): Promise<void> {
       title: args.title.slice(0, 120),
       message: args.message.slice(0, 280),
       is_read: false,
-      link: args.link ?? null,
-      metadata: { ...(args.metadata ?? {}), scope: 'admin' },
+      // tabela notifications não tem coluna `link` — guardamos em metadata.
+      // O insertNotifications usa metadata.link no payload do push.
+      metadata: {
+        ...(args.metadata ?? {}),
+        ...(args.link ? { link: args.link } : {}),
+        scope: 'admin',
+      },
     }))
 
     await insertNotifications(rows)
