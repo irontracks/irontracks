@@ -1,21 +1,20 @@
 // ============================================================
-// ⚠️  NÃO ALTERAR O LAYOUT DESTE COMPONENTE  ⚠️
-// ------------------------------------------------------------
-// Layout CORRETO: menu horizontal SUPERIOR (sticky top-0)
-//   → flex flex-col + sticky top-0 border-b + tabs no topo
-//
-// Layout ERRADO (não usar):
-//   → aside sidebar lateral (w-20 lg:w-64)
-//
-// O Trae IDE tende a substituir por sidebar lateral.
-// Se isso acontecer, restaurar do commit: 054d9aa
+// Layout: header sticky + conteúdo scrollable + bottom tab bar.
+// Substituiu o sistema antigo de dropdown "VISÃO GERAL" no header.
+//   - AdminPanelHeader: enxuto (logo + close)
+//   - AdminPanelSubTabs: chips no topo do conteúdo (dentro de cada
+//     categoria com mais de 1 sub-tab)
+//   - AdminPanelBottomTabs: bottom tab bar com 4 categorias fixas
 // ============================================================
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useAdminPanelController } from '@/components/admin-panel/useAdminPanelController';
 import { AdminPanelProvider } from '@/components/admin-panel/AdminPanelContext';
 import { AdminPanelHeader } from '@/components/admin-panel/AdminPanelHeader';
+import { AdminPanelBottomTabs } from '@/components/admin-panel/AdminPanelBottomTabs';
+import { AdminPanelSubTabs } from '@/components/admin-panel/AdminPanelSubTabs';
+import { categoryForTab } from '@/components/admin-panel/adminPanelTabs';
 import { DashboardTab } from '@/components/admin-panel/DashboardTab';
 import { StudentsTab } from '@/components/admin-panel/StudentsTab';
 import { PrioritiesTab } from '@/components/admin-panel/PrioritiesTab';
@@ -69,7 +68,6 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
     const ctrl = useAdminPanelController({ user, onClose });
     const {
         tab, isAdmin, isTeacher,
-        moreTabsOpen, setMoreTabsOpen,
         setTab, setSelectedStudent,
         selectedStudent,
         supabase, debugError,
@@ -83,6 +81,20 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
         const timer = setTimeout(() => setWaited(true), 3000);
         return () => clearTimeout(timer);
     }, [hasAccess]);
+
+    // Set de tabs disponíveis para esse role. Precisa ficar AQUI (antes dos
+    // early returns de auth) por causa das regras de hooks — useMemo não
+    // pode ser chamado condicionalmente.
+    const availableTabs = useMemo<ReadonlySet<string>>(() => {
+        const keys = ['dashboard', 'students', 'templates'];
+        if (isAdmin) {
+            keys.push('requests', 'teachers', 'videos', 'errors', 'vip', 'vip_reports', 'platform_billing', 'system');
+        }
+        if (isTeacher || isAdmin) {
+            keys.push('priorities', 'billing', 'guide');
+        }
+        return new Set(keys);
+    }, [isAdmin, isTeacher]);
 
     // While waiting for role to populate, show loading
     if (!hasAccess && !waited) {
@@ -123,7 +135,10 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
         );
     }
 
-
+    // ── Tabs disponíveis por role ──────────────────────────────────────
+    // Mantém a lógica que existia antes (admin vê tudo, teacher vê
+    // subset). Só converte para um Set/Record consumido pelas novas
+    // bottom tabs e sub-tabs.
     let TAB_LABELS: Record<string, string> = { dashboard: 'VISÃO GERAL', students: 'ALUNOS', templates: 'TREINOS' };
     if (isAdmin) {
         TAB_LABELS = { ...TAB_LABELS, requests: 'SOLICITAÇÕES', teachers: 'PROFESSORES', videos: 'VÍDEOS', errors: 'FEEDBACK', vip: 'VIP GESTÃO', vip_reports: 'VIP REPORTS', platform_billing: 'PLATAFORMA', system: 'FERRAMENTAS' };
@@ -135,41 +150,60 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
         TAB_LABELS = { ...TAB_LABELS, priorities: 'PRIORIDADES', billing: 'COBRANÇAS', guide: 'GUIA' };
     }
 
-    const tabKeys = Object.keys(TAB_LABELS);
     const currentTabLabel = TAB_LABELS[tab] || 'VISÃO GERAL';
+    const activeCategory = categoryForTab(tab);
 
     return (
         <AdminPanelProvider value={ctrl}>
             <div data-tour="adminpanel.root" className="fixed inset-0 z-50 bg-neutral-950 text-white flex flex-col overflow-hidden">
                 <AdminPanelHeader
                     debugError={debugError}
-                    tabLabels={TAB_LABELS}
-                    tabKeys={tabKeys}
-                    tab={tab}
                     currentTabLabel={currentTabLabel}
-                    moreTabsOpen={moreTabsOpen}
-                    setMoreTabsOpen={setMoreTabsOpen}
                     setTab={setTab}
                     setSelectedStudent={(value) => setSelectedStudent(value as AdminUser | null)}
                     onClose={onClose}
                 />
-                <div className="flex-1 min-h-0 overflow-y-auto p-4 pb-20 pb-safe">
-                    {tab === 'dashboard' && !selectedStudent && <TabErrorBoundary name="Visão Geral"><DashboardTab /></TabErrorBoundary>}
-                    {tab === 'priorities' && !selectedStudent && <TabErrorBoundary name="Prioridades"><PrioritiesTab /></TabErrorBoundary>}
-                    {tab === 'students' && !selectedStudent && <TabErrorBoundary name="Alunos"><StudentsTab /></TabErrorBoundary>}
-                    {tab === 'templates' && !selectedStudent && <TabErrorBoundary name="Treinos"><TemplatesTab /></TabErrorBoundary>}
-                    {tab === 'requests' && !selectedStudent && isAdmin && <TabErrorBoundary name="Solicitações"><RequestsTab /></TabErrorBoundary>}
-                    {tab === 'videos' && !selectedStudent && isAdmin && <TabErrorBoundary name="Vídeos"><VideosTab /></TabErrorBoundary>}
-                    {tab === 'errors' && !selectedStudent && isAdmin && <TabErrorBoundary name="Feedback"><ErrorsTab /></TabErrorBoundary>}
-                    {tab === 'vip' && !selectedStudent && isAdmin && <TabErrorBoundary name="VIP"><VipTab /></TabErrorBoundary>}
-                    {tab === 'vip_reports' && !selectedStudent && <TabErrorBoundary name="VIP Reports"><AdminVipReports supabase={supabase} /></TabErrorBoundary>}
-                    {tab === 'platform_billing' && !selectedStudent && isAdmin && <TabErrorBoundary name="Plataforma"><PlatformBillingTab /></TabErrorBoundary>}
-                    {tab === 'system' && !selectedStudent && <TabErrorBoundary name="Ferramentas"><SystemTab /></TabErrorBoundary>}
-                    {tab === 'teachers' && isAdmin && !selectedStudent && <TabErrorBoundary name="Professores"><TeachersTab /></TabErrorBoundary>}
-                    {tab === 'billing' && !selectedStudent && <TabErrorBoundary name="Cobranças"><TeacherBillingTab /></TabErrorBoundary>}
-                    {tab === 'guide' && !selectedStudent && <TabErrorBoundary name="Guia"><TeacherManualTab /></TabErrorBoundary>}
-                    <StudentDetailPanel />
+                {/* Conteúdo scrollable. pb-32 deixa espaço pro bottom tab
+                    bar (que tem ~72px de altura incluindo safe area).
+                    Sub-tabs aparecem com sticky-top dentro deste container. */}
+                <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-2 pb-32">
+                    <AdminPanelSubTabs
+                        category={activeCategory}
+                        currentTab={tab}
+                        availableTabs={availableTabs}
+                        tabLabels={TAB_LABELS}
+                        setTab={setTab}
+                        setSelectedStudent={(value) => setSelectedStudent(value as AdminUser | null)}
+                    />
+                    <div className="pt-2">
+                        {tab === 'dashboard' && !selectedStudent && <TabErrorBoundary name="Visão Geral"><DashboardTab /></TabErrorBoundary>}
+                        {tab === 'priorities' && !selectedStudent && <TabErrorBoundary name="Prioridades"><PrioritiesTab /></TabErrorBoundary>}
+                        {tab === 'students' && !selectedStudent && <TabErrorBoundary name="Alunos"><StudentsTab /></TabErrorBoundary>}
+                        {tab === 'templates' && !selectedStudent && <TabErrorBoundary name="Treinos"><TemplatesTab /></TabErrorBoundary>}
+                        {tab === 'requests' && !selectedStudent && isAdmin && <TabErrorBoundary name="Solicitações"><RequestsTab /></TabErrorBoundary>}
+                        {tab === 'videos' && !selectedStudent && isAdmin && <TabErrorBoundary name="Vídeos"><VideosTab /></TabErrorBoundary>}
+                        {tab === 'errors' && !selectedStudent && isAdmin && <TabErrorBoundary name="Feedback"><ErrorsTab /></TabErrorBoundary>}
+                        {tab === 'vip' && !selectedStudent && isAdmin && <TabErrorBoundary name="VIP"><VipTab /></TabErrorBoundary>}
+                        {tab === 'vip_reports' && !selectedStudent && <TabErrorBoundary name="VIP Reports"><AdminVipReports supabase={supabase} /></TabErrorBoundary>}
+                        {tab === 'platform_billing' && !selectedStudent && isAdmin && <TabErrorBoundary name="Plataforma"><PlatformBillingTab /></TabErrorBoundary>}
+                        {tab === 'system' && !selectedStudent && <TabErrorBoundary name="Ferramentas"><SystemTab /></TabErrorBoundary>}
+                        {tab === 'teachers' && isAdmin && !selectedStudent && <TabErrorBoundary name="Professores"><TeachersTab /></TabErrorBoundary>}
+                        {tab === 'billing' && !selectedStudent && <TabErrorBoundary name="Cobranças"><TeacherBillingTab /></TabErrorBoundary>}
+                        {tab === 'guide' && !selectedStudent && <TabErrorBoundary name="Guia"><TeacherManualTab /></TabErrorBoundary>}
+                        <StudentDetailPanel />
+                    </div>
                 </div>
+                {/* Bottom tab bar — sempre visível enquanto o admin panel
+                    está aberto. Some quando StudentDetailPanel toma a tela
+                    (esse componente é fixed por conta própria e sobrepõe). */}
+                {!selectedStudent && (
+                    <AdminPanelBottomTabs
+                        currentTab={tab}
+                        availableTabs={availableTabs}
+                        setTab={setTab}
+                        setSelectedStudent={(value) => setSelectedStudent(value as AdminUser | null)}
+                    />
+                )}
                 <Modals />
             </div>
         </AdminPanelProvider>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Bar, Doughnut } from 'react-chartjs-2';
 import {
     Chart as ChartJS,
@@ -10,10 +10,31 @@ import {
     Legend,
     ArcElement
 } from 'chart.js';
-import { Users, UserCheck, UserX, AlertTriangle, Clock, Zap } from 'lucide-react';
+import { Users, UserCheck, UserX, AlertTriangle, Clock, Zap, ArrowRight, UserPlus, Dumbbell, Crown } from 'lucide-react';
 import { useAdminPanel } from './AdminPanelContext';
 import { useTeacherPlan } from '@/hooks/useTeacherPlan';
 import dynamic from 'next/dynamic';
+
+/**
+ * Saudação por horário (BRT). "Bom dia / Boa tarde / Boa noite" — usado
+ * na hero do dashboard. Decidido em BRT pra alinhar com o resto do
+ * sistema (crons, datas, etc).
+ */
+function greetingForNowBrt(): string {
+    try {
+        const hourString = new Intl.DateTimeFormat('en-US', {
+            timeZone: 'America/Sao_Paulo',
+            hour: 'numeric',
+            hour12: false,
+        }).format(new Date());
+        const hour = Number(hourString);
+        if (Number.isFinite(hour)) {
+            if (hour >= 5 && hour < 12) return 'Bom dia';
+            if (hour >= 12 && hour < 18) return 'Boa tarde';
+        }
+    } catch { /* fallback below */ }
+    return 'Boa noite';
+}
 
 const TeacherUpgradeModal = dynamic(() => import('@/components/teacher/TeacherUpgradeModal'), { ssr: false });
 
@@ -29,6 +50,7 @@ ChartJS.register(
 
 export const DashboardTab: React.FC = () => {
     const {
+        user,
         isAdmin,
         isTeacher,
         setTab,
@@ -38,11 +60,36 @@ export const DashboardTab: React.FC = () => {
         dashboardCharts,
         coachInboxItems,
         setSelectedStudent,
-        setHistoryOpen
+        setHistoryOpen,
+        setShowRegisterModal,
+        supabase,
     } = useAdminPanel();
 
     const planState = useTeacherPlan();
     const [upgradeOpen, setUpgradeOpen] = useState(false);
+
+    // Saudação contextual — primeiro nome se disponível, fallback genérico.
+    const firstName = String(user?.name ?? user?.email ?? '').split(/[ @]/)[0] || '';
+    const greeting = greetingForNowBrt();
+
+    // CTA dinâmico de solicitações pendentes. Busca quando admin abre o
+    // dashboard. Fica oculto se não houver pendentes ou se o usuário
+    // não for admin (só admin tem acesso à tela de Solicitações).
+    const [pendingRequests, setPendingRequests] = useState<number>(0);
+    useEffect(() => {
+        let cancelled = false;
+        if (!isAdmin || !supabase) return;
+        (async () => {
+            try {
+                const { count } = await supabase
+                    .from('access_requests')
+                    .select('id', { count: 'exact', head: true })
+                    .eq('status', 'pending');
+                if (!cancelled && typeof count === 'number') setPendingRequests(count);
+            } catch { /* silent — banner é cosmético */ }
+        })();
+        return () => { cancelled = true; };
+    }, [isAdmin, supabase]);
 
     const chartOptions = {
         responsive: true,
@@ -67,6 +114,53 @@ export const DashboardTab: React.FC = () => {
 
     return (
         <div className="space-y-6 animate-in fade-in duration-500">
+            {/* ── Hero: Saudação ─────────────────────────────────────────────
+                Primeira coisa que o admin vê. Bem mais leve que o header
+                duplicado antigo: nome + horário + uma frase do contexto.
+            */}
+            <div className="flex flex-col gap-1 pt-1">
+                <h1 className="text-2xl md:text-3xl font-black text-white leading-tight">
+                    {greeting}{firstName ? `, ${firstName}` : ''}{' '}
+                    <span className="text-2xl md:text-3xl">👋</span>
+                </h1>
+                <p className="text-sm text-neutral-400">
+                    {isAdmin
+                        ? 'Resumo do seu negócio hoje.'
+                        : 'Como está o time? Veja seus alunos abaixo.'}
+                </p>
+            </div>
+
+            {/* ── CTA dinâmico — Solicitações pendentes ───────────────────────
+                Aparece SÓ quando há pendência real, e some sozinho quando
+                não tem nada. Toca → vai direto pra tela de solicitações.
+            */}
+            {isAdmin && pendingRequests > 0 && (
+                <button
+                    type="button"
+                    onClick={() => setTab('requests')}
+                    className="w-full flex items-center gap-3 p-4 rounded-2xl border transition-all active:scale-[0.99] hover:bg-amber-500/[0.06]"
+                    style={{
+                        background: 'rgba(245,158,11,0.06)',
+                        borderColor: 'rgba(245,158,11,0.25)',
+                    }}
+                >
+                    <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-400/30 flex items-center justify-center shrink-0">
+                        <UserPlus size={18} className="text-amber-400" />
+                    </div>
+                    <div className="flex-1 text-left min-w-0">
+                        <p className="text-sm font-black text-white">
+                            {pendingRequests === 1
+                                ? '1 solicitação aguardando'
+                                : `${pendingRequests} solicitações aguardando`}
+                        </p>
+                        <p className="text-xs text-neutral-400 mt-0.5">
+                            Toque pra revisar e aprovar
+                        </p>
+                    </div>
+                    <ArrowRight size={18} className="text-amber-400 shrink-0" />
+                </button>
+            )}
+
             {/* KPI Cards */}
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <button
@@ -138,6 +232,54 @@ export const DashboardTab: React.FC = () => {
                         {usersList.filter(u => String(u?.status || '').toLowerCase() === 'pendente').length}
                     </div>
                 </button>
+            </div>
+
+            {/* ── Atalhos rápidos ─────────────────────────────────────────────
+                3 ações que o admin faz com mais frequência. Resumido em
+                botões grandes com ícone — bem mais óbvio que ter que
+                lembrar a localização nos menus.
+            */}
+            <div className="space-y-2">
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-neutral-500 px-1">
+                    Ações rápidas
+                </p>
+                <div className="grid grid-cols-3 gap-2">
+                    <button
+                        type="button"
+                        onClick={() => setShowRegisterModal(true)}
+                        className="flex flex-col items-center justify-center gap-2 py-4 px-2 rounded-2xl border transition-all active:scale-[0.97] hover:bg-white/[0.05]"
+                        style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'rgba(255,255,255,0.08)' }}
+                    >
+                        <div className="w-10 h-10 rounded-xl bg-yellow-500/15 border border-yellow-400/25 flex items-center justify-center">
+                            <UserPlus size={18} className="text-yellow-400" />
+                        </div>
+                        <span className="text-[11px] font-black text-white uppercase tracking-wide">+ Aluno</span>
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setTab('templates')}
+                        className="flex flex-col items-center justify-center gap-2 py-4 px-2 rounded-2xl border transition-all active:scale-[0.97] hover:bg-white/[0.05]"
+                        style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'rgba(255,255,255,0.08)' }}
+                    >
+                        <div className="w-10 h-10 rounded-xl bg-blue-500/15 border border-blue-400/25 flex items-center justify-center">
+                            <Dumbbell size={18} className="text-blue-400" />
+                        </div>
+                        <span className="text-[11px] font-black text-white uppercase tracking-wide">+ Treino</span>
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => setTab(isAdmin ? 'vip' : 'priorities')}
+                        className="flex flex-col items-center justify-center gap-2 py-4 px-2 rounded-2xl border transition-all active:scale-[0.97] hover:bg-white/[0.05]"
+                        style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'rgba(255,255,255,0.08)' }}
+                    >
+                        <div className="w-10 h-10 rounded-xl bg-purple-500/15 border border-purple-400/25 flex items-center justify-center">
+                            <Crown size={18} className="text-purple-400" />
+                        </div>
+                        <span className="text-[11px] font-black text-white uppercase tracking-wide">
+                            {isAdmin ? 'VIP' : 'Coach'}
+                        </span>
+                    </button>
+                </div>
             </div>
 
             {/* ── Plano do Professor ────────────────────────────────────────── */}
