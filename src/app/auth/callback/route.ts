@@ -7,6 +7,8 @@ import { warmupCacheForUser } from '@/utils/cacheWarmup'
 import { notifyAdminsNewSignup } from '@/lib/push/notifyAdmins'
 import { env } from '@/utils/env'
 import { sanitizeNextParam } from '@/utils/auth/safeRedirect'
+import { OAUTH_CSRF_COOKIE } from '@/utils/auth/oauthCsrf'
+import { logWarn } from '@/lib/logger'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -75,10 +77,22 @@ export async function GET(request: Request) {
   }
 
   let nextFromCookie = ''
+  let csrfCookiePresent = false
   try {
     const cookieStore = await cookies()
     nextFromCookie = String(cookieStore.get(nextCookieName)?.value || '')
+    csrfCookiePresent = Boolean(cookieStore.get(OAUTH_CSRF_COOKIE)?.value)
   } catch { }
+
+  // CSRF backup cookie — defesa em profundidade. Supabase já valida o state
+  // PKCE internamente; isso é uma camada extra. Por ora rodamos só em modo
+  // log (não bloqueia) pra coletar telemetria e evitar quebrar logins em
+  // andamento durante o rollout. Em produção, ausência do cookie + presença
+  // de code é suspeita — pode ser cookie expirado, fluxo iniciado em outro
+  // browser, ou CSRF real.
+  if (process.env.NODE_ENV === 'production' && code && !csrfCookiePresent) {
+    logWarn('auth:callback', 'OAuth CSRF cookie absent', { hasCode: !!code, hasError: !!errorParam })
+  }
   // Open-redirect protection: '//evil.com' must NOT be accepted just because
   // it starts with '/'. See utils/auth/safeRedirect.ts.
   const fallbackNext = sanitizeNextParam(nextFromCookie, '/dashboard')
@@ -95,6 +109,10 @@ export async function GET(request: Request) {
   })
   try {
     response.cookies.set(nextCookieName, '', { path: '/', maxAge: 0 })
+  } catch { }
+  // Limpa CSRF cookie após uso — single-use, evita replay
+  try {
+    response.cookies.set(OAUTH_CSRF_COOKIE, '', { path: '/', maxAge: 0 })
   } catch { }
 
   if (!code) {
