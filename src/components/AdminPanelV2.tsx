@@ -36,6 +36,7 @@ const TeacherManualTab = dynamic(() => import('@/components/admin-panel/TeacherM
 const FinanceTabUnified = dynamic(() => import('@/components/admin-panel/FinanceTabUnified').then(m => ({ default: m.FinanceTabUnified })), { ssr: false });
 const AcquisitionTab = dynamic(() => import('@/components/admin-panel/AcquisitionTab').then(m => ({ default: m.AcquisitionTab })), { ssr: false });
 const CronsStatusTab = dynamic(() => import('@/components/admin-panel/CronsStatusTab').then(m => ({ default: m.CronsStatusTab })), { ssr: false });
+const AnalyticsTab = dynamic(() => import('@/components/admin-panel/AnalyticsTab').then(m => ({ default: m.AnalyticsTab })), { ssr: false });
 import { Modals } from '@/components/admin-panel/Modals';
 import { logError } from '@/lib/logger';
 import type { AdminUser } from '@/types/admin';
@@ -95,7 +96,7 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
     const availableTabs = useMemo<ReadonlySet<string>>(() => {
         const keys = ['dashboard', 'students', 'templates'];
         if (isAdmin) {
-            keys.push('requests', 'teachers', 'videos', 'errors', 'vip', 'acquisition', 'crons', 'system');
+            keys.push('requests', 'teachers', 'videos', 'errors', 'vip', 'acquisition', 'analytics', 'crons', 'system');
         }
         if (isTeacher || isAdmin) {
             keys.push('priorities', 'billing', 'guide');
@@ -148,7 +149,7 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
     // bottom tabs e sub-tabs.
     let TAB_LABELS: Record<string, string> = { dashboard: 'VISÃO GERAL', students: 'ALUNOS', templates: 'TREINOS' };
     if (isAdmin) {
-        TAB_LABELS = { ...TAB_LABELS, requests: 'SOLICITAÇÕES', teachers: 'PROFESSORES', videos: 'VÍDEOS', errors: 'FEEDBACK', vip: 'VIP', acquisition: 'AQUISIÇÃO', crons: 'CRONS', system: 'FERRAMENTAS' };
+        TAB_LABELS = { ...TAB_LABELS, requests: 'SOLICITAÇÕES', teachers: 'PROFESSORES', videos: 'VÍDEOS', errors: 'FEEDBACK', vip: 'VIP', acquisition: 'AQUISIÇÃO', analytics: 'ANALYTICS', crons: 'CRONS', system: 'FERRAMENTAS' };
     }
     if (isTeacher && !isAdmin) {
         TAB_LABELS = { ...TAB_LABELS, priorities: 'PRIORIDADES', billing: 'FINANCEIRO', guide: 'GUIA' };
@@ -195,6 +196,7 @@ const AdminPanelV2 = ({ user, onClose }: AdminPanelV2Props) => {
                         {tab === 'vip' && !selectedStudent && isAdmin && <TabErrorBoundary name="VIP"><VipTabUnified /></TabErrorBoundary>}
                         {tab === 'acquisition' && !selectedStudent && isAdmin && <TabErrorBoundary name="Aquisição"><AcquisitionTab /></TabErrorBoundary>}
                         {tab === 'crons' && !selectedStudent && isAdmin && <TabErrorBoundary name="Crons"><CronsStatusTab /></TabErrorBoundary>}
+                        {tab === 'analytics' && !selectedStudent && isAdmin && <TabErrorBoundary name="Analytics"><AnalyticsTab /></TabErrorBoundary>}
                         {tab === 'system' && !selectedStudent && <TabErrorBoundary name="Ferramentas"><SystemTab /></TabErrorBoundary>}
                         {tab === 'teachers' && isAdmin && !selectedStudent && <TabErrorBoundary name="Professores"><TeachersTab /></TabErrorBoundary>}
                         {/* Financeiro unificado: para teacher mostra só
