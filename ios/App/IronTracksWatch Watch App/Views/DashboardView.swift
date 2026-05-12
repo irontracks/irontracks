@@ -102,11 +102,14 @@ struct DashboardView: View {
         .background(Color.black.opacity(0.4), in: RoundedRectangle(cornerRadius: 10))
     }
 
-    // ─── Próximo treino ─────────────────────────────────────────────────
+    // ─── Próximo treino / Treino ativo ──────────────────────────────────
 
     private var nextWorkoutCard: some View {
         Group {
-            if let workout = dashboard.nextWorkout, !workout.exercises.isEmpty {
+            if dashboard.isWorkoutActive, let workout = dashboard.nextWorkout {
+                // Treino em andamento no iPhone — destacar
+                activeWorkoutCard(workout: workout)
+            } else if let workout = dashboard.nextWorkout, !workout.exercises.isEmpty {
                 VStack(alignment: .leading, spacing: 4) {
                     Text(workout.dayLabel.uppercased())
                         .font(.caption2)
@@ -140,6 +143,34 @@ struct DashboardView: View {
                 .background(Color.black.opacity(0.4), in: RoundedRectangle(cornerRadius: 10))
             }
         }
+    }
+
+    // Card destacado quando o iPhone está executando um treino.
+    private func activeWorkoutCard(workout: WatchWorkout) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 4) {
+                Circle()
+                    .fill(Color.green)
+                    .frame(width: 6, height: 6)
+                Text("EM ANDAMENTO")
+                    .font(.caption2.bold())
+                    .foregroundStyle(.green)
+                Spacer()
+            }
+            Text(workout.name)
+                .font(.headline)
+                .lineLimit(1)
+                .foregroundStyle(goldGradient)
+            Text("Treino rodando no iPhone")
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+        .padding(8)
+        .background(Color.green.opacity(0.15), in: RoundedRectangle(cornerRadius: 10))
+        .overlay(
+            RoundedRectangle(cornerRadius: 10)
+                .stroke(Color.green.opacity(0.6), lineWidth: 1)
+        )
     }
 }
 
