@@ -143,7 +143,9 @@ final class WatchSessionManager: NSObject, ObservableObject {
                     weekWorkouts: self.dashboard.weekWorkouts,
                     weekGoal: self.dashboard.weekGoal,
                     nextWorkout: workout,
-                    userName: self.dashboard.userName
+                    userName: self.dashboard.userName,
+                    isWorkoutActive: self.dashboard.isWorkoutActive,
+                    activeWorkoutId: self.dashboard.activeWorkoutId
                 )
                 self.lastSyncDate = Date()
             } catch {

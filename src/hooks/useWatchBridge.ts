@@ -61,6 +61,10 @@ export interface WatchDashboard {
   weekGoal: number
   nextWorkout: WatchWorkout | null
   userName: string
+  /** true quando o iPhone está executando um treino. Garante que o Watch mostre estado correto. */
+  isWorkoutActive: boolean
+  /** id do treino atualmente em andamento (se houver) — espelha activeSession.workout.id. */
+  activeWorkoutId: string | null
 }
 
 export interface WatchGym {

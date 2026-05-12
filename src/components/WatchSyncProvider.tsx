@@ -63,6 +63,10 @@ export default function WatchSyncProvider({
   // Refs estáveis pra callbacks
   const onRefreshRef = useRef(onRefresh)
   useEffect(() => { onRefreshRef.current = onRefresh }, [onRefresh])
+  // Ref do dashboard atual — usada pra responder com snapshot imediato quando
+  // o Watch pede refresh (não esperar o fetch async terminar).
+  const dashboardRef = useRef(dashboard)
+  useEffect(() => { dashboardRef.current = dashboard }, [dashboard])
   const onSetLoggedRef = useRef(onSetLogged)
   useEffect(() => { onSetLoggedRef.current = onSetLogged }, [onSetLogged])
   const onCardioFinishedRef = useRef(onCardioFinished)
@@ -116,6 +120,13 @@ export default function WatchSyncProvider({
       }
     },
     onRefreshRequested: () => {
+      // 1) Reenvia o snapshot atual imediatamente — cobre o caso de Watch frio
+      //    ou applicationContext desatualizado depois de o usuário iniciar treino.
+      const snapshot = dashboardRef.current
+      if (snapshot) {
+        watch.pushDashboard(snapshot).catch(() => {})
+      }
+      // 2) Dispara também o refresh remoto pra trazer dados frescos.
       onRefreshRef.current?.()
     },
     onCheckinRequested: async (gym) => {

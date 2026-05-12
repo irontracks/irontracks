@@ -756,7 +756,11 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         weekGoal: 5,
         nextWorkout: watchNextWorkout,
         userName: String(user?.displayName ?? user?.email ?? ''),
-    }), [streakStats, watchNextWorkout, user?.displayName, user?.email])
+        // Sinaliza ao Watch que há um treino rodando no iPhone — sem isso, o Watch
+        // ficaria parado em "Sem treino do dia" mesmo após o usuário iniciar.
+        isWorkoutActive: Boolean(currentWorkoutId),
+        activeWorkoutId: currentWorkoutId ? String(currentWorkoutId) : null,
+    }), [streakStats, watchNextWorkout, user?.displayName, user?.email, currentWorkoutId])
 
     // Loading overlay starts visible (opacity 1) on both SSR and client.
     // Once isAppLoading becomes false on the client, it fades out.

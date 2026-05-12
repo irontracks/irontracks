@@ -60,13 +60,51 @@ struct WatchDashboard: Codable, Equatable {
     let weekGoal: Int           // meta de treinos da semana
     let nextWorkout: WatchWorkout?
     let userName: String
+    let isWorkoutActive: Bool   // true quando há treino em andamento no iPhone
+    let activeWorkoutId: String?
+
+    init(
+        streakDays: Int,
+        weekWorkouts: Int,
+        weekGoal: Int,
+        nextWorkout: WatchWorkout?,
+        userName: String,
+        isWorkoutActive: Bool = false,
+        activeWorkoutId: String? = nil
+    ) {
+        self.streakDays = streakDays
+        self.weekWorkouts = weekWorkouts
+        self.weekGoal = weekGoal
+        self.nextWorkout = nextWorkout
+        self.userName = userName
+        self.isWorkoutActive = isWorkoutActive
+        self.activeWorkoutId = activeWorkoutId
+    }
+
+    // Decode tolerante: payloads antigos (sem isWorkoutActive/activeWorkoutId) ainda funcionam.
+    enum CodingKeys: String, CodingKey {
+        case streakDays, weekWorkouts, weekGoal, nextWorkout, userName, isWorkoutActive, activeWorkoutId
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.streakDays = try c.decode(Int.self, forKey: .streakDays)
+        self.weekWorkouts = try c.decode(Int.self, forKey: .weekWorkouts)
+        self.weekGoal = try c.decode(Int.self, forKey: .weekGoal)
+        self.nextWorkout = try c.decodeIfPresent(WatchWorkout.self, forKey: .nextWorkout)
+        self.userName = try c.decode(String.self, forKey: .userName)
+        self.isWorkoutActive = (try? c.decode(Bool.self, forKey: .isWorkoutActive)) ?? false
+        self.activeWorkoutId = try? c.decodeIfPresent(String.self, forKey: .activeWorkoutId)
+    }
 
     static let placeholder = WatchDashboard(
         streakDays: 0,
         weekWorkouts: 0,
         weekGoal: 5,
         nextWorkout: nil,
-        userName: "Atleta"
+        userName: "Atleta",
+        isWorkoutActive: false,
+        activeWorkoutId: nil
     )
 }
 
