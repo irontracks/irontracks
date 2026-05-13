@@ -146,7 +146,7 @@ export function TeamChatDrawer({ myUserId, myPhotoURL, participants }: TeamChatD
                             <MessageCircle size={14} className="text-yellow-400" />
                             <span className="text-[10px] font-black text-yellow-500/80 uppercase tracking-[0.2em]">Chat da equipe</span>
                         </div>
-                        <button onClick={() => setOpen(false)} className="w-7 h-7 rounded-xl border flex items-center justify-center text-neutral-500 hover:text-white hover:border-yellow-500/40 transition-all" style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }}>
+                        <button onClick={() => setOpen(false)} className="min-w-[44px] min-h-[44px] rounded-xl border flex items-center justify-center text-neutral-500 hover:text-white hover:border-yellow-500/40 transition-all" style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }} aria-label="Fechar chat da equipe" title="Fechar chat">
                             <ChevronDown size={14} />
                         </button>
                     </div>
