@@ -101,18 +101,32 @@ for (const filePath of allFiles) {
 
         const hasAriaLabel = /aria-label=/.test(attrs)
         const hasAriaLabelledBy = /aria-labelledby=/.test(attrs)
-        if (hasAriaLabel || hasAriaLabelledBy) continue
+        const hasTitle = /\btitle=/.test(attrs)
+        if (hasAriaLabel || hasAriaLabelledBy || hasTitle) continue
 
-        // Remove tags filhas e verifica se há texto real
+        // 2.1) Texto literal entre tags (após remover tags filhas e expressões JSX)
+        // Mantém strings DENTRO de expressões JSX (ex: {t('Salvar')}, {'Salvar'})
+        // pra evitar falso-positivo em botões internacionalizados.
+        const jsxStrings = []
+        for (const sm of inner.matchAll(/\{[^{}]*?(['"`])([^'"`]{2,})\1[^{}]*?\}/g)) {
+            jsxStrings.push(sm[2])
+        }
         const textOnly = inner
-            .replace(/<[^>]+>/g, '')    // remove tags
-            .replace(/\{[^}]+\}/g, '')  // remove expressões JSX
+            .replace(/<[^>]+>/g, '')    // remove tags filhas
+            .replace(/\{[^}]+\}/g, '')  // remove expressões JSX (já capturamos strings acima)
             .replace(/&\w+;/g, ' ')     // remove entidades HTML
             .trim()
 
-        // Só ícone puro: inner contém apenas <Icon>, <svg>, ou expressões
-        const hasOnlyIcon = !textOnly &&
-            (inner.includes('<') || inner.includes('{')) &&
+        // Se alguma string capturada tem 2+ chars, considera "tem texto"
+        const hasJsxText = jsxStrings.some((s) => s.trim().length >= 2)
+
+        // Variável simples como child: {label}, {title} sugere texto dinâmico
+        const hasIdentifierChild = /\{\s*[a-zA-Z_$][\w$]*\s*\}/.test(inner) &&
+            !/<\w/.test(inner) // não tem JSX filho
+
+        // Só ícone puro: sem textOnly, sem string JSX, e tem JSX filho (icone)
+        const hasOnlyIcon = !textOnly && !hasJsxText && !hasIdentifierChild &&
+            inner.includes('<') &&
             !inner.match(/\w{3,}/)  // sem palavra de 3+ letras
 
         if (hasOnlyIcon) {
@@ -159,14 +173,26 @@ for (const filePath of allFiles) {
             const inner   = m[2]
             const lineNum = source.slice(0, m.index).split('\n').length
 
-            if (/aria-label=|aria-labelledby=/.test(attrs)) continue
+            if (/aria-label=|aria-labelledby=|\btitle=/.test(attrs)) continue
+
+            // Mantém strings literais dentro de expressões JSX (ex: {t('Ver')})
+            const jsxStrings = []
+            for (const sm of inner.matchAll(/\{[^{}]*?(['"`])([^'"`]{2,})\1[^{}]*?\}/g)) {
+                jsxStrings.push(sm[2])
+            }
+            const hasJsxText = jsxStrings.some((s) => s.trim().length >= 2)
 
             const textOnly = inner
                 .replace(/<[^>]+>/g, '')
                 .replace(/\{[^}]+\}/g, '')
                 .trim()
 
-            const hasOnlyIcon = !textOnly && inner.includes('<')
+            // {label}, {title} — identifier simples conta como texto
+            const hasIdentifierChild = /\{\s*[a-zA-Z_$][\w$]*\s*\}/.test(inner) &&
+                !/<\w/.test(inner)
+
+            const hasOnlyIcon = !textOnly && !hasJsxText && !hasIdentifierChild &&
+                inner.includes('<')
             if (hasOnlyIcon) {
                 findings.push({
                     level: 'AVISO',
