@@ -1,0 +1,157 @@
+// dashboard/layout.tsx Server — renderiza DashboardClientEntry ENVOLVENDO {children}.
+//
+// Por que existe: sub-rotas (/dashboard/history, /dashboard/admin, etc) NÃO
+// podem renderizar DashboardClientEntry separadamente — isso causaria re-mount
+// do god component a cada navegação. Em App Router, layouts NÃO re-renderizam
+// quando user navega entre sub-rotas, apenas o {children}. Então o app vive
+// no layout uma vez só, e {children} é placeholder (cada page.tsx retorna null
+// porque o IronTracksAppClient lê usePathname() pra decidir o que renderizar).
+import { createClient } from '@/utils/supabase/server'
+import { redirect } from 'next/navigation'
+import DashboardClientEntry from './DashboardClientEntry'
+import { resolveRoleByUser } from '@/utils/auth/route'
+import { safePg } from '@/utils/safePgFilter'
+
+const hydrateWorkouts = async (
+  supabase: Awaited<ReturnType<typeof import('@/utils/supabase/server').createClient>>,
+  rows: unknown[],
+) => {
+  const base = (Array.isArray(rows) ? rows.filter((x) => x && typeof x === 'object') : []) as Record<string, unknown>[]
+  const workoutIds = base.map((w) => (w as Record<string, unknown>)?.id).filter(Boolean)
+  if (!workoutIds.length) return base.map((w) => ({ ...w, exercises: [] }))
+
+  let exercises: Record<string, unknown>[] = []
+  try {
+    const { data } = await supabase
+      .from('exercises')
+      .select('id, workout_id, name, notes, video_url, rest_time, cadence, method, "order", is_unilateral, side_rest_time, transition_time')
+      .in('workout_id', workoutIds)
+      .order('order', { ascending: true })
+      .limit(5000)
+    exercises = Array.isArray(data) ? (data as Record<string, unknown>[]) : []
+  } catch {
+    exercises = []
+  }
+
+  const exerciseIds = exercises.map((e) => e?.id as string | undefined).filter(Boolean)
+  let sets: Record<string, unknown>[] = []
+  if (exerciseIds.length) {
+    try {
+      const { data } = await supabase
+        .from('sets')
+        .select('id, exercise_id, set_number, reps, rpe, weight, is_warmup, advanced_config')
+        .in('exercise_id', exerciseIds)
+        .order('set_number', { ascending: true })
+        .limit(20000)
+      sets = Array.isArray(data) ? (data as Record<string, unknown>[]) : []
+    } catch {
+      sets = []
+    }
+  }
+
+  const setsByExercise = new Map<string, unknown[]>()
+  for (const s of sets) {
+    const eid = s?.exercise_id as string | undefined
+    if (!eid) continue
+    const list = setsByExercise.get(eid) || []
+    list.push(s)
+    setsByExercise.set(eid, list)
+  }
+
+  const exByWorkout = new Map<string, unknown[]>()
+  for (const ex of exercises) {
+    const wid = ex?.workout_id as string | undefined
+    if (!wid) continue
+    const exWithSets = { ...ex, sets: setsByExercise.get(ex.id as string) || [] }
+    const list = exByWorkout.get(wid) || []
+    list.push(exWithSets)
+    exByWorkout.set(wid, list)
+  }
+
+  return base.map((w) => ({ ...w, exercises: exByWorkout.get((w as Record<string, unknown>).id as string) || [] }))
+}
+
+export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
+  const supabase = await createClient()
+  const { data: { user }, error } = await supabase.auth.getUser()
+  if (error || !user?.id) redirect('/?next=/dashboard')
+
+  // Parallel fetch: profile + role + initial workouts
+  const [{ data: profile }, resolved] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select('role, display_name, photo_url')
+      .eq('id', user.id)
+      .maybeSingle(),
+    resolveRoleByUser({ id: user.id, email: user.email ?? null }),
+  ])
+
+  const initialUser = {
+    id: user.id,
+    email: user.email ?? null,
+    user_metadata: user.user_metadata ?? {},
+  }
+
+  const initialProfile = {
+    role: resolved?.role ?? profile?.role ?? null,
+    display_name: profile?.display_name ?? null,
+    photo_url: profile?.photo_url ?? null,
+  }
+
+  let baseWorkouts: unknown[] = []
+  try {
+    const { data } = await supabase
+      .from('workouts')
+      .select('id, name, notes, is_template, user_id, created_by, archived_at, sort_order, created_at, student_id')
+      .eq('is_template', true)
+      .eq('user_id', user.id)
+      .order('name', { ascending: true })
+      .limit(500)
+    baseWorkouts = Array.isArray(data) ? data : []
+  } catch {
+    baseWorkouts = []
+  }
+
+  if (!baseWorkouts.length) {
+    try {
+      const { data } = await supabase.from('workouts').select('id, name, notes, is_template, user_id, created_by, archived_at, sort_order, created_at, student_id').eq('user_id', user.id).order('name', { ascending: true }).limit(500)
+      baseWorkouts = Array.isArray(data) ? data : []
+    } catch {
+      baseWorkouts = []
+    }
+  }
+
+  if (!baseWorkouts.length) {
+    try {
+      const { data: student } = await supabase.from('students').select('id').eq('user_id', user.id).maybeSingle()
+      const studentId = student?.id ? String(student.id) : ''
+      if (studentId) {
+        const { data } = await supabase
+          .from('workouts')
+          .select('id, name, notes, is_template, user_id, created_by, archived_at, sort_order, created_at, student_id')
+          .eq('is_template', true)
+          .or(`user_id.eq.${safePg(studentId)},student_id.eq.${safePg(studentId)}`)
+          .order('name', { ascending: true })
+          .limit(500)
+        baseWorkouts = Array.isArray(data) ? data : []
+      }
+    } catch {
+      baseWorkouts = []
+    }
+  }
+
+  const initialWorkouts = await hydrateWorkouts(supabase, baseWorkouts)
+
+  return (
+    <>
+      <DashboardClientEntry initialUser={initialUser} initialProfile={initialProfile} initialWorkouts={initialWorkouts} />
+      {/*
+        {children} é renderizado mas mantido invisível — cada sub-rota page.tsx
+        retorna null. O IronTracksAppClient lê usePathname() pra decidir view.
+        Sem `{children}`, Next.js reclama de "page without UI" — então mantemos
+        aqui pra completar o slot.
+      */}
+      <div style={{ display: 'none' }} aria-hidden>{children}</div>
+    </>
+  )
+}
