@@ -1,0 +1,15 @@
+# Sentry Android — copy this file to `sentry.properties` (gitignored) and fill in.
+# Required ONLY for symbol/mapping uploads at build time. The runtime SDK reads
+# the DSN from AndroidManifest meta-data (manifestPlaceholders -> SENTRY_DSN),
+# so the app works without this file as long as SENTRY_DSN is passed at build.
+#
+# Get the auth token at: https://sentry.io/settings/account/api/auth-tokens/
+# Required scopes: project:read, project:releases, org:read.
+
+defaults.org=your-org-slug
+defaults.project=irontracks-android
+auth.token=YOUR_SENTRY_AUTH_TOKEN
+
+# Optional: upload native debug symbols (NDK) and ProGuard mappings
+# auto.upload.proguard.mapping=true
+# auto.upload.native.symbols=true

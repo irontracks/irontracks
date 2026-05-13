@@ -800,7 +800,9 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         // ficaria parado em "Sem treino do dia" mesmo após o usuário iniciar.
         isWorkoutActive: Boolean(currentWorkoutId),
         activeWorkoutId: currentWorkoutId ? String(currentWorkoutId) : null,
-    }), [streakStats, watchNextWorkout, user?.displayName, user?.email, currentWorkoutId])
+        // VIP gate: Watch usa pra bloquear treinos/cardio se usuário não-pago.
+        isVip: Boolean(vipAccess?.hasVip),
+    }), [streakStats, watchNextWorkout, user?.displayName, user?.email, currentWorkoutId, vipAccess?.hasVip])
 
     // Loading overlay starts visible (opacity 1) on both SSR and client.
     // Once isAppLoading becomes false on the client, it fades out.

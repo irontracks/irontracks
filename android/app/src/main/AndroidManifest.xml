@@ -30,8 +30,16 @@
             <intent-filter>
                 <action android:name="com.irontracks.REST_TIMER_FIRE" />
                 <action android:name="com.irontracks.APP_NOTIFICATION" />
+                <action android:name="com.irontracks.REST_TIMER_CANCEL" />
             </intent-filter>
         </receiver>
+
+        <!-- Rest timer foreground service (Android 8+). Exempt from Doze/Standby so
+             rest timers fire precisely even when the screen is off mid-workout. -->
+        <service
+            android:name=".RestTimerService"
+            android:exported="false"
+            android:foregroundServiceType="health" />
 
         <provider
             android:name="androidx.core.content.FileProvider"
@@ -42,6 +50,15 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths"></meta-data>
         </provider>
+
+        <!-- Sentry Android — auto-init via meta-data. When SENTRY_DSN placeholder
+             is empty (no build property set) the SDK stays in no-op mode and
+             does NOT send events, so this is safe in dev/local builds. -->
+        <meta-data android:name="io.sentry.dsn" android:value="${SENTRY_DSN}" />
+        <meta-data android:name="io.sentry.environment" android:value="production" />
+        <meta-data android:name="io.sentry.traces.sample-rate" android:value="0.1" />
+        <meta-data android:name="io.sentry.send-default-pii" android:value="false" />
+        <meta-data android:name="io.sentry.auto-init" android:value="true" />
     </application>
 
     <!-- Permissions -->
@@ -52,6 +69,12 @@
     <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
+
+    <!-- Foreground Service for rest timer (Android 8+). FOREGROUND_SERVICE_HEALTH
+         requires API 34+; the service type "health" matches the fitness use case
+         and avoids the stricter media/location categories. -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_HEALTH" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="28" />
 

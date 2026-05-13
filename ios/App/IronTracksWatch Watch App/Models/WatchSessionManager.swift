@@ -21,6 +21,12 @@ final class WatchSessionManager: NSObject, ObservableObject {
     @Published private(set) var lastSyncDate: Date?
     @Published private(set) var hasSession: Bool = false
     @Published private(set) var lastError: String?
+    /// F-019: false até receber o primeiro dashboardUpdate. Persiste entre cold starts.
+    @Published private(set) var hasEverSynced: Bool = false
+    /// F-009: contador de cardios pendentes na fila offline (observável pela UI).
+    @Published private(set) var pendingCardioCount: Int = 0
+
+    private let hasEverSyncedKey = "has_ever_synced_v1"
 
     // ─── WCSession ──────────────────────────────────────────────────────────
     private let session: WCSession?
@@ -35,10 +41,18 @@ final class WatchSessionManager: NSObject, ObservableObject {
         self.session?.delegate = self
         self.session?.activate()
 
+        // F-019: restaura flag de "já sincronizou alguma vez" entre cold starts.
+        self.hasEverSynced = UserDefaults.standard.bool(forKey: hasEverSyncedKey)
+
         // Tenta recuperar estado persistido (latest applicationContext) imediatamente.
         if let context = self.session?.receivedApplicationContext, !context.isEmpty {
             self.handleApplicationContext(context)
+            self.hasEverSynced = true
+            UserDefaults.standard.set(true, forKey: hasEverSyncedKey)
         }
+
+        // Snapshot inicial do contador da fila offline.
+        self.pendingCardioCount = CardioOfflineQueue.shared.pendingCount()
     }
 
     // ─── API pública ────────────────────────────────────────────────────────
@@ -59,12 +73,70 @@ final class WatchSessionManager: NSObject, ObservableObject {
     }
 
     /// Notifica o iPhone que um cardio terminou (com pontos de GPS, FC, etc).
+    /// F-009: se a sessão não estiver ativa OU se tudo falhar, persiste em fila
+    /// offline e drena automático ao reconectar. Nunca perde cardio silenciosamente.
     func sendCardioFinish(_ summary: WatchCardioSummary) {
+        Task { @MainActor in
+            // Caminho A: sessão inativa → vai direto pra fila.
+            guard let session = session, session.activationState == .activated else {
+                CardioOfflineQueue.shared.enqueue(summary)
+                self.pendingCardioCount = CardioOfflineQueue.shared.pendingCount()
+                self.lastError = "Salvo offline — vai sincronizar quando o iPhone estiver perto"
+                return
+            }
+
+            // Caminho B: tenta enviar de uma vez; se falhar, enfileira.
+            let ok = await trySendCardioOnce(summary, session: session)
+            if !ok {
+                CardioOfflineQueue.shared.enqueue(summary)
+                self.pendingCardioCount = CardioOfflineQueue.shared.pendingCount()
+                self.lastError = "Salvo offline — vai sincronizar quando o iPhone estiver perto"
+            }
+        }
+    }
+
+    /// Tenta entregar um cardio uma única vez. Retorna true se conseguiu enfileirar
+    /// no transporte do WCSession (sendMessage OU transferUserInfo). False indica
+    /// erro estrutural (encode falhou, etc) — chamador deve persistir.
+    private func trySendCardioOnce(_ summary: WatchCardioSummary, session: WCSession) async -> Bool {
+        let msg: WatchMessage
         do {
-            let msg = try WatchMessage.encode(.cardioFinish, payload: summary)
-            sendMessage(msg, transmitOffline: true)
+            msg = try WatchMessage.encode(.cardioFinish, payload: summary)
         } catch {
             self.lastError = "cardioFinish encode falhou: \(error.localizedDescription)"
+            return false
+        }
+
+        let dict = msg.toDictionary()
+
+        // sendMessage só funciona com reach instantâneo; senão fallback transferUserInfo
+        // (entrega garantida quando o iPhone aparecer).
+        if session.isReachable {
+            // sendMessage é fire-and-forget aqui — se erro, ainda enfileiramos.
+            return await withCheckedContinuation { cont in
+                session.sendMessage(dict, replyHandler: { _ in
+                    cont.resume(returning: true)
+                }, errorHandler: { _ in
+                    // Falhou sendMessage; tenta transferUserInfo como fallback.
+                    session.transferUserInfo(dict)
+                    cont.resume(returning: true)
+                })
+            }
+        } else {
+            // Sem reach: transferUserInfo é garantia de entrega.
+            session.transferUserInfo(dict)
+            return true
+        }
+    }
+
+    /// Drena a fila offline. Chamado quando o iPhone fica alcançável.
+    private func drainOfflineQueueIfPossible() {
+        guard let session = session, session.activationState == .activated else { return }
+        Task { @MainActor in
+            await CardioOfflineQueue.shared.drain { summary in
+                return await self.trySendCardioOnce(summary, session: session)
+            }
+            self.pendingCardioCount = CardioOfflineQueue.shared.pendingCount()
         }
     }
 
@@ -130,6 +202,11 @@ final class WatchSessionManager: NSObject, ObservableObject {
                 self.dashboard = dash
                 self.lastSyncDate = Date()
                 self.hasSession = true
+                // F-019: primeira sync — persiste pra cold starts seguintes não voltarem ao empty state.
+                if !self.hasEverSynced {
+                    self.hasEverSynced = true
+                    UserDefaults.standard.set(true, forKey: self.hasEverSyncedKey)
+                }
             } catch {
                 self.lastError = "Dashboard decode falhou: \(error.localizedDescription)"
             }
@@ -185,6 +262,10 @@ extension WatchSessionManager: WCSessionDelegate {
             if activationState == .activated, session.isReachable {
                 self.requestRefresh()
             }
+            // F-009: drena fila offline tão logo ativarmos — cardios pendentes saem.
+            if activationState == .activated {
+                self.drainOfflineQueueIfPossible()
+            }
         }
     }
 
@@ -193,6 +274,8 @@ extension WatchSessionManager: WCSessionDelegate {
             self.isReachable = session.isReachable
             if session.isReachable {
                 self.requestRefresh()
+                // F-009: iPhone voltou → drena cardios pendentes imediatamente.
+                self.drainOfflineQueueIfPossible()
             }
         }
     }

@@ -20,20 +20,78 @@ struct DashboardView: View {
     }
 
     var body: some View {
+        Group {
+            if !session.hasEverSynced {
+                // F-019: cold start sem nunca ter recebido nada do iPhone — empty state honesto.
+                firstSyncEmptyState
+            } else {
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 8) {
+                        header
+                        if session.pendingCardioCount > 0 {
+                            pendingCardioBadge
+                        }
+                        streakCard
+                        weekProgressCard
+                        nextWorkoutCard
+                    }
+                    .padding(.horizontal, 6)
+                    .padding(.vertical, 4)
+                }
+                .navigationTitle("IronTracks")
+                .onAppear {
+                    session.requestRefresh()
+                }
+            }
+        }
+    }
+
+    // ─── F-019: empty state pré primeira sincronização ──────────────────
+
+    private var firstSyncEmptyState: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 8) {
-                header
-                streakCard
-                weekProgressCard
-                nextWorkoutCard
+            VStack(spacing: 10) {
+                Image(systemName: "iphone.gen3")
+                    .font(.system(size: 32, weight: .semibold))
+                    .foregroundStyle(goldGradient)
+                    .padding(.top, 6)
+                Text("Abra o IronTracks no iPhone pra sincronizar pela primeira vez")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                    .padding(.horizontal, 4)
+                Button(action: { session.requestRefresh() }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "arrow.clockwise")
+                        Text("Tentar de novo")
+                            .font(.caption.bold())
+                    }
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 6)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.yellow)
             }
             .padding(.horizontal, 6)
-            .padding(.vertical, 4)
         }
         .navigationTitle("IronTracks")
-        .onAppear {
-            session.requestRefresh()
+    }
+
+    // ─── F-009: badge de cardios pendentes ──────────────────────────────
+
+    private var pendingCardioBadge: some View {
+        HStack(spacing: 4) {
+            Image(systemName: "arrow.triangle.2.circlepath")
+                .font(.caption2)
+                .foregroundStyle(.orange)
+            Text("\(session.pendingCardioCount) pendente\(session.pendingCardioCount == 1 ? "" : "s")")
+                .font(.caption2.bold())
+                .foregroundStyle(.orange)
+            Spacer()
         }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 4)
+        .background(Color.orange.opacity(0.15), in: RoundedRectangle(cornerRadius: 6))
     }
 
     // ─── Header ──────────────────────────────────────────────────────────
@@ -156,6 +214,19 @@ struct DashboardView: View {
                     .font(.caption2.bold())
                     .foregroundStyle(.green)
                 Spacer()
+                if !dashboard.isVip {
+                    // Sinalização leve — não bloqueia a view, só comunica que features avançadas precisam VIP.
+                    HStack(spacing: 2) {
+                        Image(systemName: "lock.fill")
+                            .font(.system(size: 8))
+                        Text("VIP")
+                            .font(.system(size: 9, weight: .bold))
+                    }
+                    .foregroundStyle(goldGradient)
+                    .padding(.horizontal, 4)
+                    .padding(.vertical, 1)
+                    .background(Color.black.opacity(0.5), in: Capsule())
+                }
             }
             Text(workout.name)
                 .font(.headline)
