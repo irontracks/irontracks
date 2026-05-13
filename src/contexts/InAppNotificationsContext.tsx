@@ -186,8 +186,12 @@ export function InAppNotificationsProvider(props: InAppNotificationsProviderProp
 
   const durationMs = Number(props?.durationMs ?? 5000)
 
+  // Memoiza value — `notify` e `clear` são estáveis (useCallback). Sem isso,
+  // todo setState interno (toastQueue, etc) re-renderizaria todos os consumers.
+  const contextValue = useMemo(() => ({ notify, clear }), [notify, clear])
+
   return (
-    <InAppNotificationsContext.Provider value={{ notify, clear }}>
+    <InAppNotificationsContext.Provider value={contextValue}>
       {resolvedUserId && props?.disableRealtime !== true ? (
         <RealtimeNotificationBridge userId={resolvedUserId} setNotification={notify} />
       ) : null}

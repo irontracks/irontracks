@@ -78,7 +78,9 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
   // propsRef: stable reference to latest props so callbacks can access them without rebuilding
   const propsRef = useRef(props);
   propsRef.current = props;
-  const ui: UnknownRecord = (session?.ui ?? {}) as UnknownRecord;
+  // Memoiza `ui` pra estabilizar referência — sem isso, o `??` cria literal `{}`
+  // a cada render quando session.ui é null/undefined, invalidando o useMemo do return.
+  const ui: UnknownRecord = useMemo(() => (session?.ui ?? {}) as UnknownRecord, [session?.ui]);
   const settings = props.settings ?? null;
 
   // ticker/timerMinimized now live in WorkoutTimerContext (separate provider)
@@ -474,7 +476,11 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     return { completedSets: done, totalSets: total, progressPct: pct, remainingSets: total - done };
   }, [exercises, logs]);
 
-  return {
+  // Memoiza o contexto inteiro pra não recriar o `value` do WorkoutProvider a
+  // cada render do controller. Sem isso, qualquer mudança no controller (ticker
+  // de pausa, deps do live activity, etc) faria todos os 50-80 consumers
+  // (ExerciseCard, NormalSet, etc) re-renderizarem — anulando React.memo.
+  return useMemo(() => ({
     session,
     workout,
     exercises,
@@ -609,5 +615,56 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     remainingSets,
     currentExSetsCount,
     currentExDoneSets,
-  };
+  }), [
+    session, workout, exercises, logs, ui, settings,
+    collapsed, setCollapsed, finishing,
+    openNotesKeys, setOpenNotesKeys,
+    inviteOpen, setInviteOpen,
+    addExerciseOpen, setAddExerciseOpen, addExerciseDraft, setAddExerciseDraft,
+    organizeOpen, setOrganizeOpen, organizeDraft, setOrganizeDraft,
+    organizeSaving, organizeDirty, organizeError, setOrganizeError,
+    deloadModal, setDeloadModal,
+    clusterModal, setClusterModal,
+    restPauseModal, setRestPauseModal,
+    dropSetModal, setDropSetModal,
+    strippingModal, setStrippingModal,
+    fst7Modal, setFst7Modal,
+    heavyDutyModal, setHeavyDutyModal,
+    pontoZeroModal, setPontoZeroModal,
+    forcedRepsModal, setForcedRepsModal,
+    negativeRepsModal, setNegativeRepsModal,
+    partialRepsModal, setPartialRepsModal,
+    sistema21Modal, setSistema21Modal,
+    waveModal, setWaveModal,
+    groupMethodModal, setGroupMethodModal,
+    postCheckinOpen, setPostCheckinOpen, postCheckinDraft, setPostCheckinDraft,
+    reportHistory, reportHistoryStatus, reportHistoryUpdatedAt,
+    deloadSuggestions,
+    currentExerciseIdx, setCurrentExerciseIdx,
+    editExerciseOpen, setEditExerciseOpen,
+    editExerciseIdx, setEditExerciseIdx,
+    editExerciseDraft, setEditExerciseDraft, editExerciseHasChanges,
+    persistToPlan, setPersistToPlan,
+    linkedWeightExercises, toggleLinkWeights,
+    restPauseRefs, clusterRefs, organizeBaseKeysRef,
+    reportHistoryLoadingRef, reportHistoryLoadingSinceRef,
+    reportHistoryStatusRef, reportHistoryUpdatedAtRef,
+    deloadAiCacheRef, postCheckinResolveRef,
+    getLog, updateLog,
+    // getPlanConfig, getPlannedSet, HELP_TERMS são imports — referência estável,
+    // não precisam estar nas deps. Listados no return acima como conveniência da API.
+    toggleCollapse, addExtraSetToExercise, removeExtraSetFromExercise,
+    openEditExercise, saveEditExercise, swapExerciseName, addExtraExerciseToWorkout,
+    openOrganizeModal, requestCloseOrganize, saveOrganize,
+    finishWorkout, openDeloadModal, startTimer, handleTimerFinish,
+    saveClusterModal, saveRestPauseModal, saveDropSetModal, saveStrippingModal,
+    saveFst7Modal, saveHeavyDutyModal, savePontoZeroModal,
+    saveForcedRepsModal, saveNegativeRepsModal, savePartialRepsModal,
+    saveSistema21Modal, saveWaveModal, saveGroupMethodModal,
+    applyDeloadToExercise, updateDeloadModalFromPercent, updateDeloadModalFromWeight,
+    toggleNotes, alert, confirm,
+    currentExercise, props.onFinish, sendInvite,
+    completedSets, totalSets, progressPct, remainingSets,
+    currentExSetsCount, currentExDoneSets,
+  ]);
 }

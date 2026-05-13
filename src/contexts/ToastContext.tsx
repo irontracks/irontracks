@@ -1,6 +1,6 @@
 'use client'
 
-import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react'
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { ActionToast } from '@/components/ui/ActionToast'
 
 export type ToastType = 'success' | 'error' | 'info'
@@ -15,7 +15,11 @@ interface ToastContextValue {
   toast: (message: string, type?: ToastType, duration?: number) => void
 }
 
-const ToastContext = createContext<ToastContextValue | null>(null)
+// Exportado pra permitir leitura defensiva via `useContext(ToastContext)` em
+// componentes que precisam funcionar mesmo se o provider estiver ausente
+// (ex: WatchSyncProvider em árvores parciais durante hot-reload). Não usar
+// `useToast()` nesses casos — ele lança e quebra Rules of Hooks dentro de try/catch.
+export const ToastContext = createContext<ToastContextValue | null>(null)
 
 let idCounter = 0
 
@@ -49,8 +53,12 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     timers.current.set(id, t)
   }, [dismiss])
 
+  // Memoiza value — `toast` é estável (useCallback), então o context value nunca
+  // muda após o primeiro render. Evita re-render de todos os consumers.
+  const value = useMemo(() => ({ toast }), [toast])
+
   return (
-    <ToastContext.Provider value={{ toast }}>
+    <ToastContext.Provider value={value}>
       {children}
       <div
         aria-live="polite"

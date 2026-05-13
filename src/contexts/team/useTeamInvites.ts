@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react' // useRef pra Set persistente
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { playStartSound } from '@/lib/sounds'
 import { getErrorMessage } from '@/utils/errorMessage'
