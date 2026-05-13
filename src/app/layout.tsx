@@ -51,9 +51,12 @@ export const metadata = {
     title: "IronTracks",
   },
   icons: {
-    icon: [{ url: "/icone.png", type: "image/png" }],
-    shortcut: ["/icone.png"],
-    apple: [{ url: "/icone.png", type: "image/png" }],
+    icon: [
+      { url: "/icone-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/icone-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    shortcut: ["/icone-192.png"],
+    apple: [{ url: "/icone-192.png", sizes: "192x192", type: "image/png" }],
   },
 };
 
@@ -70,8 +73,9 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
   return (
     <html lang="pt-BR">
       <head>
-        <link rel="icon" href="/icone.png" type="image/png" />
-        <link rel="apple-touch-icon" href="/icone.png" />
+        <link rel="icon" href="/icone-192.png" sizes="192x192" type="image/png" />
+        <link rel="icon" href="/icone-512.png" sizes="512x512" type="image/png" />
+        <link rel="apple-touch-icon" href="/icone-192.png" />
         <link rel="preconnect" href="https://enbueukmvgodngydkpzm.supabase.co" />
         <link rel="dns-prefetch" href="https://enbueukmvgodngydkpzm.supabase.co" />
         <link rel="preconnect" href="https://api.cloudinary.com" />

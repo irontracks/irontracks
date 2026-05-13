@@ -95,11 +95,12 @@ export function BiometricLock({ userName, onUnlocked }: BiometricLockProps) {
       {/* Logo / App Name */}
       <div className="flex flex-col items-center gap-3 mb-4">
         <Image
-          src="/icone.png"
+          src="/icone-192.png"
           alt="IronTracks"
-          width={80}
-          height={80}
-          className="rounded-2xl shadow-lg"
+          width={192}
+          height={192}
+          sizes="80px"
+          className="w-20 h-20 rounded-2xl shadow-lg"
           onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
         />
         <h1 id="biometric-lock-title" className="text-2xl font-black text-white tracking-tight">IronTracks</h1>
