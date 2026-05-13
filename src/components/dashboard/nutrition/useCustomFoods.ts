@@ -7,7 +7,7 @@
  */
 'use client'
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { createClient } from '@/utils/supabase/client'
+import { useStableSupabaseClient } from '@/hooks/useStableSupabaseClient'
 
 export interface CustomFood {
   id: string
@@ -60,7 +60,7 @@ export function useCustomFoods(userId: string | null | undefined) {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
-  const supabase = createClient()
+  const supabase = useStableSupabaseClient()
   const cancelledRef = useRef(false)
 
   const load = useCallback(async () => {

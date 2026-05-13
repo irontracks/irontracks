@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { createClient } from '@/utils/supabase/client'
+import { useStableSupabaseClient } from '@/hooks/useStableSupabaseClient'
 
 export type FavoriteMeal = {
   id: string
@@ -11,7 +11,7 @@ export type FavoriteMeal = {
 }
 
 export function useFavoriteMeals(userId: string | undefined) {
-  const supabase = createClient()
+  const supabase = useStableSupabaseClient()
   const [favorites, setFavorites] = useState<FavoriteMeal[]>([])
   const [loading, setLoading] = useState(false)
 
