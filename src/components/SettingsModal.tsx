@@ -219,7 +219,7 @@ export default function SettingsModal(props: SettingsModalProps) {
   if (!isOpen) return null
 
   return (
-    <div role="dialog" aria-modal="true" aria-label="Configurações" ref={focusTrapRef} className="fixed inset-0 z-[1300] flex items-center justify-center p-4 pt-safe" style={{ background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(16px)' }}>
+    <div role="dialog" aria-modal="true" aria-labelledby="settings-modal-title" ref={focusTrapRef} className="fixed inset-0 z-[1300] flex items-center justify-center p-4 pt-safe" style={{ background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(16px)' }}>
       <div className="w-full max-w-lg rounded-2xl overflow-hidden shadow-2xl" style={{ background: 'rgba(12,12,12,0.99)', border: '1px solid rgba(234,179,8,0.22)', boxShadow: '0 0 40px rgba(234,179,8,0.10), 0 30px 80px rgba(0,0,0,0.65)' }}>
 
         {/* Header */}
@@ -230,7 +230,7 @@ export default function SettingsModal(props: SettingsModalProps) {
             </div>
             <div>
               <div className="text-[10px] font-black uppercase tracking-[0.18em] mb-0.5" style={{ color: '#f59e0b' }}>Personalização</div>
-              <div className="text-white font-black text-lg truncate">Configurações</div>
+              <div id="settings-modal-title" className="text-white font-black text-lg truncate">Configurações</div>
             </div>
           </div>
           <button type="button" onClick={() => props?.onClose?.()} className="w-10 h-10 rounded-xl text-neutral-400 hover:text-white inline-flex items-center justify-center transition-colors" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }} aria-label="Voltar" title="Voltar">
