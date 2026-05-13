@@ -45,7 +45,7 @@ const SOURCE_LABELS: Record<string, string> = {
 // ─── Tier Badge ───────────────────────────────────────────────────
 const TierBadge = ({ tier, size = 'md' }: { tier: string; size?: 'sm' | 'md' | 'lg' }) => {
     const config = TIER_CONFIG[tier]
-    if (!config) return <span className="text-[10px] text-neutral-500 uppercase font-bold">FREE</span>
+    if (!config) return <span className="text-[10px] text-neutral-400 uppercase font-bold">FREE</span>
     const Icon = config.icon
     const sizeClass = size === 'sm' ? 'text-[9px] px-1.5 py-0.5 gap-0.5' : size === 'lg' ? 'text-sm px-3 py-1.5 gap-1.5' : 'text-[10px] px-2 py-1 gap-1'
     return (
@@ -97,10 +97,10 @@ const GrantModal = ({ open, onClose, onGrant }: {
                         </div>
                         <div>
                             <h3 className="font-black text-white text-lg">Conceder VIP</h3>
-                            <p className="text-[11px] text-neutral-500">Adicionar acesso VIP a um usuário</p>
+                            <p className="text-[11px] text-neutral-400">Adicionar acesso VIP a um usuário</p>
                         </div>
                     </div>
-                    <button onClick={onClose} className="text-neutral-500 hover:text-white transition-colors" aria-label="Fechar">
+                    <button onClick={onClose} className="text-neutral-400 hover:text-white transition-colors" aria-label="Fechar">
                         <XCircle size={20} />
                     </button>
                 </div>
@@ -108,7 +108,7 @@ const GrantModal = ({ open, onClose, onGrant }: {
                 {/* Form */}
                 <div className="space-y-4">
                     <div>
-                        <label htmlFor="vip-email" className="text-[11px] font-black uppercase tracking-widest text-neutral-500 mb-1.5 block">E-mail do usuário</label>
+                        <label htmlFor="vip-email" className="text-[11px] font-black uppercase tracking-widest text-neutral-400 mb-1.5 block">E-mail do usuário</label>
                         <input
                             id="vip-email"
                             aria-label="E-mail do usuário"
@@ -116,12 +116,12 @@ const GrantModal = ({ open, onClose, onGrant }: {
                             value={email}
                             onChange={e => setEmail(e.target.value)}
                             placeholder="usuario@email.com"
-                            className="w-full bg-neutral-800/60 border border-neutral-700/60 rounded-xl px-4 py-3 text-white text-sm placeholder:text-neutral-600 focus:border-yellow-500/60 focus:outline-none transition-all"
+                            className="w-full bg-neutral-800/60 border border-neutral-700/60 rounded-xl px-4 py-3 text-white text-sm placeholder:text-neutral-400 focus:border-yellow-500/60 focus:outline-none transition-all"
                         />
                     </div>
 
                     <div>
-                        <p className="text-[11px] font-black uppercase tracking-widest text-neutral-500 mb-1.5 block">Plano</p>
+                        <p className="text-[11px] font-black uppercase tracking-widest text-neutral-400 mb-1.5 block">Plano</p>
                         <div className="grid grid-cols-3 gap-2">
                             {(['vip_start', 'vip_pro', 'vip_elite'] as const).map(p => {
                                 const cfg = TIER_CONFIG[p]
@@ -144,7 +144,7 @@ const GrantModal = ({ open, onClose, onGrant }: {
                     </div>
 
                     <div>
-                        <p className="text-[11px] font-black uppercase tracking-widest text-neutral-500 mb-1.5 block">Duração (dias)</p>
+                        <p className="text-[11px] font-black uppercase tracking-widest text-neutral-400 mb-1.5 block">Duração (dias)</p>
                         <div className="flex gap-2">
                             {[7, 14, 30, 90, 365].map(d => (
                                 <button
@@ -267,7 +267,7 @@ export const VipTab: React.FC = () => {
                     </div>
                     <div>
                         <h2 className="text-xl font-black text-white">Gestão VIP</h2>
-                        <p className="text-[11px] text-neutral-500">{items.length} assinantes ativos</p>
+                        <p className="text-[11px] text-neutral-400">{items.length} assinantes ativos</p>
                     </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -309,7 +309,7 @@ export const VipTab: React.FC = () => {
                             <div className="relative">
                                 <div className={`text-[10px] font-black uppercase tracking-widest ${cfg.color} mb-1`}>{cfg.label}</div>
                                 <div className="text-3xl font-black text-white">{count}</div>
-                                <div className="text-[11px] text-neutral-500 mt-0.5">assinantes</div>
+                                <div className="text-[11px] text-neutral-400 mt-0.5">assinantes</div>
                             </div>
                         </button>
                     )
@@ -319,14 +319,14 @@ export const VipTab: React.FC = () => {
             {/* ─── Search + Filter ────────────────────────────────── */}
             <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center">
                 <div className="relative flex-1 w-full">
-                    <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500" />
+                    <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-400" />
                     <input
                         type="text"
                         aria-label="Buscar VIP por nome ou e-mail"
                         placeholder="Buscar VIP por nome ou e-mail…"
                         value={query}
                         onChange={e => setQuery(e.target.value)}
-                        className="w-full bg-neutral-900/60 border border-neutral-800 rounded-2xl pl-11 pr-4 py-3 text-white text-sm placeholder:text-neutral-600 focus:border-yellow-500/60 focus:outline-none transition-all"
+                        className="w-full bg-neutral-900/60 border border-neutral-800 rounded-2xl pl-11 pr-4 py-3 text-white text-sm placeholder:text-neutral-400 focus:border-yellow-500/60 focus:outline-none transition-all"
                     />
                 </div>
                 {tierFilter !== 'all' && (
@@ -353,7 +353,7 @@ export const VipTab: React.FC = () => {
                     <div className="font-black text-white text-base mb-1">
                         {query ? 'Nenhum resultado' : items.length === 0 ? 'Nenhum VIP ativo' : 'Nenhum VIP neste filtro'}
                     </div>
-                    <p className="text-neutral-500 text-sm">
+                    <p className="text-neutral-400 text-sm">
                         {query ? `Nada encontrado para "${query}".` : 'Conceda acesso VIP para começar.'}
                     </p>
                 </div>
@@ -390,7 +390,7 @@ export const VipTab: React.FC = () => {
                                                 </span>
                                             )}
                                         </div>
-                                        <div className="flex items-center gap-3 mt-0.5 text-[11px] text-neutral-500">
+                                        <div className="flex items-center gap-3 mt-0.5 text-[11px] text-neutral-400">
                                             <span className="truncate">{item.email}</span>
                                             {item.valid_until && (
                                                 <span className="flex items-center gap-1 flex-shrink-0">

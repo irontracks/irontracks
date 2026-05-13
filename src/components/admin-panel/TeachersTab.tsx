@@ -64,14 +64,14 @@ const TeacherCard = ({
                             {name}
                         </div>
                         <div className="flex items-center gap-1.5 mt-0.5">
-                            <Mail size={11} className="text-neutral-500 flex-shrink-0" />
-                            <span className="text-[11px] text-neutral-500 truncate">{String(teacher.email || '')}</span>
+                            <Mail size={11} className="text-neutral-400 flex-shrink-0" />
+                            <span className="text-[11px] text-neutral-400 truncate">{String(teacher.email || '')}</span>
                         </div>
                     </div>
                 </div>
                 <button
                     onClick={onEdit}
-                    className="flex-shrink-0 w-8 h-8 rounded-xl bg-neutral-800/80 hover:bg-yellow-500/15 border border-neutral-700/60 hover:border-yellow-500/40 text-neutral-500 hover:text-yellow-400 flex items-center justify-center transition-all duration-200 active:scale-95"
+                    className="flex-shrink-0 w-8 h-8 rounded-xl bg-neutral-800/80 hover:bg-yellow-500/15 border border-neutral-700/60 hover:border-yellow-500/40 text-neutral-400 hover:text-yellow-400 flex items-center justify-center transition-all duration-200 active:scale-95"
                     title="Editar"
                 >
                     <Edit3 size={13} />
@@ -83,16 +83,16 @@ const TeacherCard = ({
                 <div className="bg-neutral-800/50 rounded-2xl px-3 py-2.5 border border-neutral-700/40">
                     <div className="flex items-center gap-1.5 mb-1">
                         <Users size={11} className="text-yellow-500" />
-                        <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider">Alunos</span>
+                        <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">Alunos</span>
                     </div>
                     <div className="text-lg font-black text-white leading-none">
-                        {studentCount !== undefined ? String(studentCount) : <span className="text-neutral-600 text-sm">—</span>}
+                        {studentCount !== undefined ? String(studentCount) : <span className="text-neutral-400 text-sm">—</span>}
                     </div>
                 </div>
                 <div className="bg-neutral-800/50 rounded-2xl px-3 py-2.5 border border-neutral-700/40">
                     <div className="flex items-center gap-1.5 mb-1">
                         <ShieldCheck size={11} className="text-green-500" />
-                        <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-wider">Status</span>
+                        <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">Status</span>
                     </div>
                     <div className="flex items-center gap-1.5">
                         <div className="w-1.5 h-1.5 rounded-full bg-green-500 shadow-[0_0_6px_rgba(34,197,94,0.7)]" />
@@ -103,7 +103,7 @@ const TeacherCard = ({
 
             {/* CREF if exists */}
             {teacher.cref && (
-                <div className="mt-3 flex items-center gap-2 text-[11px] text-neutral-500">
+                <div className="mt-3 flex items-center gap-2 text-[11px] text-neutral-400">
                     <Trophy size={11} className="text-yellow-500/60" />
                     <span className="font-bold">CREF:</span> {String(teacher.cref)}
                 </div>
@@ -111,8 +111,8 @@ const TeacherCard = ({
 
             {/* Phone if exists */}
             {teacher.phone && (
-                <div className="mt-1 flex items-center gap-2 text-[11px] text-neutral-500">
-                    <Phone size={11} className="text-neutral-600" />
+                <div className="mt-1 flex items-center gap-2 text-[11px] text-neutral-400">
+                    <Phone size={11} className="text-neutral-400" />
                     {String(teacher.phone)}
                 </div>
             )}
@@ -166,7 +166,7 @@ const StudentRow = ({ student, vipTier }: { student: AdminUser; vipTier?: string
             </div>
             <div className="min-w-0 flex-1">
                 <div className="font-bold text-white text-sm truncate">{name}</div>
-                <div className="text-[11px] text-neutral-500 truncate">{String(student.email || '')}</div>
+                <div className="text-[11px] text-neutral-400 truncate">{String(student.email || '')}</div>
             </div>
             {vipLabel && vipColor && (
                 <span className={`flex-shrink-0 inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider border ${vipColor.bg} ${vipColor.text} ${vipColor.border}`}>
@@ -176,7 +176,7 @@ const StudentRow = ({ student, vipTier }: { student: AdminUser; vipTier?: string
             )}
             <div className={`flex-shrink-0 px-2 py-1 rounded-lg text-[10px] font-black uppercase ${String(student.status || '').toLowerCase() === 'pago'
                 ? 'bg-green-500/15 text-green-400 border border-green-500/20'
-                : 'bg-neutral-700/50 text-neutral-500 border border-neutral-600/30'
+                : 'bg-neutral-700/50 text-neutral-400 border border-neutral-600/30'
                 }`}>
                 {String(student.status || '—')}
             </div>
@@ -192,12 +192,12 @@ const WorkoutRow = ({ workout }: { workout: Record<string, unknown> }) => (
         </div>
         <div className="min-w-0 flex-1">
             <div className="font-bold text-white text-sm truncate">{String(workout.name || workout.title || 'Treino')}</div>
-            <div className="text-[11px] text-neutral-500">
+            <div className="text-[11px] text-neutral-400">
                 {Array.isArray(workout.exercises) ? `${workout.exercises.length} exercícios` : '—'}
             </div>
         </div>
         {workout.created_at != null && (
-            <div className="flex-shrink-0 text-[10px] text-neutral-600 flex items-center gap-1">
+            <div className="flex-shrink-0 text-[10px] text-neutral-400 flex items-center gap-1">
                 <CalendarDays size={10} />
                 {new Date(String(workout.created_at)).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}
             </div>
@@ -228,11 +228,11 @@ const InboxRow = ({ student }: { student: AdminUser }) => {
 const EmptyState = ({ icon: Icon, title, subtitle }: { icon: React.ElementType; title: string; subtitle: string }) => (
     <div className="flex flex-col items-center justify-center py-12 text-center space-y-3">
         <div className="w-14 h-14 rounded-2xl bg-neutral-800/60 border border-neutral-700/40 flex items-center justify-center">
-            <Icon size={24} className="text-neutral-600" />
+            <Icon size={24} className="text-neutral-400" />
         </div>
         <div>
             <div className="font-black text-white text-sm mb-1">{title}</div>
-            <div className="text-[12px] text-neutral-500">{subtitle}</div>
+            <div className="text-[12px] text-neutral-400">{subtitle}</div>
         </div>
     </div>
 );
@@ -299,7 +299,7 @@ export const TeachersTab: React.FC = () => {
                     >
                         <ChevronLeft size={18} />
                     </button>
-                    <span className="text-xs font-bold uppercase tracking-widest text-neutral-500">Professores</span>
+                    <span className="text-xs font-bold uppercase tracking-widest text-neutral-400">Professores</span>
                 </div>
 
                 {/* Teacher hero card */}
@@ -317,8 +317,8 @@ export const TeachersTab: React.FC = () => {
                                 <div>
                                     <h2 className="text-xl font-black text-white leading-snug">{name}</h2>
                                     <div className="flex items-center gap-1.5 mt-1">
-                                        <Mail size={12} className="text-neutral-500" />
-                                        <span className="text-xs text-neutral-500 truncate">{String(t.email || '')}</span>
+                                        <Mail size={12} className="text-neutral-400" />
+                                        <span className="text-xs text-neutral-400 truncate">{String(t.email || '')}</span>
                                     </div>
                                 </div>
                                 <div className="flex flex-wrap items-center gap-2">
@@ -400,7 +400,7 @@ export const TeachersTab: React.FC = () => {
                                         : color === 'violet' ? 'text-violet-400'
                                             : 'text-red-400'
                                     }`}>{value}</div>
-                                <div className="text-[10px] text-neutral-500 font-bold uppercase tracking-wider">{label}</div>
+                                <div className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider">{label}</div>
                             </div>
                         ))}
                     </div>
@@ -496,10 +496,10 @@ export const TeachersTab: React.FC = () => {
                 <div className="bg-gradient-to-br from-yellow-500/10 to-amber-600/5 border border-yellow-500/20 rounded-2xl p-4">
                     <div className="text-[10px] font-black uppercase tracking-widest text-yellow-500/70 mb-1">Total</div>
                     <div className="text-3xl font-black text-white">{teachersFiltered.length}</div>
-                    <div className="text-[11px] text-neutral-500 mt-0.5">professores cadastrados</div>
+                    <div className="text-[11px] text-neutral-400 mt-0.5">professores cadastrados</div>
                 </div>
                 <div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-4 flex flex-col justify-between">
-                    <div className="text-[10px] font-black uppercase tracking-widest text-neutral-500 mb-2">Novo professor</div>
+                    <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-2">Novo professor</div>
                     <button
                         onClick={() => setShowTeacherModal(true)}
                         className="w-full flex items-center justify-center gap-2 bg-gradient-to-r from-yellow-500 to-amber-500 hover:from-yellow-400 hover:to-amber-400 text-black font-black rounded-xl py-2.5 text-[12px] uppercase tracking-wider transition-all active:scale-95 shadow-lg shadow-yellow-500/20"
@@ -512,14 +512,14 @@ export const TeachersTab: React.FC = () => {
 
             {/* Search */}
             <div className="relative">
-                <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500" />
+                <Search size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-400" />
                 <input
                     type="text"
                     aria-label="Buscar professor por nome ou e-mail"
                     placeholder="Buscar professor por nome ou e-mail…"
                     value={teacherQuery}
                     onChange={(e) => setTeacherQuery(e.target.value)}
-                    className="w-full bg-neutral-900/60 border border-neutral-800 rounded-2xl pl-11 pr-4 py-3.5 text-white text-sm placeholder:text-neutral-600 focus:border-yellow-500/60 focus:outline-none focus:bg-neutral-900/90 transition-all"
+                    className="w-full bg-neutral-900/60 border border-neutral-800 rounded-2xl pl-11 pr-4 py-3.5 text-white text-sm placeholder:text-neutral-400 focus:border-yellow-500/60 focus:outline-none focus:bg-neutral-900/90 transition-all"
                 />
             </div>
 
@@ -533,7 +533,7 @@ export const TeachersTab: React.FC = () => {
                         <div className="font-black text-white text-base mb-1">
                             {teacherQuery ? 'Nenhum resultado' : 'Nenhum professor cadastrado'}
                         </div>
-                        <p className="text-neutral-500 text-sm">
+                        <p className="text-neutral-400 text-sm">
                             {teacherQuery
                                 ? `Nada encontrado para "${teacherQuery}".`
                                 : 'Adicione o primeiro professor para começar.'}

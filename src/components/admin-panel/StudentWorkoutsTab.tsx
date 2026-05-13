@@ -133,13 +133,13 @@ export const StudentWorkoutsTab: React.FC = () => {
                                                 </div>
                                                 <div>
                                                     <p className="text-[11px] font-black uppercase tracking-widest text-yellow-500">Criar Treino</p>
-                                                    <p className="text-[10px] text-neutral-600 font-medium leading-none mt-0.5">Escolha como criar o treino</p>
+                                                    <p className="text-[10px] text-neutral-400 font-medium leading-none mt-0.5">Escolha como criar o treino</p>
                                                 </div>
                                             </div>
 
                                             <div className="p-2 space-y-0.5">
                                                 {/* Group: Criar */}
-                                                <p className="px-3 pt-2 pb-1 text-[9px] font-black uppercase tracking-[0.15em] text-neutral-600">Criar</p>
+                                                <p className="px-3 pt-2 pb-1 text-[9px] font-black uppercase tracking-[0.15em] text-neutral-400">Criar</p>
 
                                                 {/* Wizard IA */}
                                                 <button
@@ -151,7 +151,7 @@ export const StudentWorkoutsTab: React.FC = () => {
                                                     </div>
                                                     <div className="flex-1 text-left">
                                                         <p className="text-[13px] font-bold text-white group-hover:text-yellow-100 leading-tight">Criar automaticamente</p>
-                                                        <p className="text-[10px] text-neutral-600">Wizard com IA</p>
+                                                        <p className="text-[10px] text-neutral-400">Wizard com IA</p>
                                                     </div>
                                                 </button>
 
@@ -165,7 +165,7 @@ export const StudentWorkoutsTab: React.FC = () => {
                                                     </div>
                                                     <div className="flex-1 text-left">
                                                         <p className="text-[13px] font-bold text-white group-hover:text-neutral-100 leading-tight">Criar manualmente</p>
-                                                        <p className="text-[10px] text-neutral-600">Editor completo</p>
+                                                        <p className="text-[10px] text-neutral-400">Editor completo</p>
                                                     </div>
                                                 </button>
 
@@ -173,7 +173,7 @@ export const StudentWorkoutsTab: React.FC = () => {
                                                 <div className="mx-3 my-1 h-px bg-gradient-to-r from-transparent via-white/8 to-transparent" />
 
                                                 {/* Group: Importar */}
-                                                <p className="px-3 pt-2 pb-1 text-[9px] font-black uppercase tracking-[0.15em] text-neutral-600">Importar</p>
+                                                <p className="px-3 pt-2 pb-1 text-[9px] font-black uppercase tracking-[0.15em] text-neutral-400">Importar</p>
 
                                                 {/* Importar JSON */}
                                                 <button
@@ -185,7 +185,7 @@ export const StudentWorkoutsTab: React.FC = () => {
                                                     </div>
                                                     <div className="flex-1 text-left">
                                                         <p className="text-[13px] font-bold text-white group-hover:text-purple-100 leading-tight">Importar JSON</p>
-                                                        <p className="text-[10px] text-neutral-600">Carregar treino de arquivo</p>
+                                                        <p className="text-[10px] text-neutral-400">Carregar treino de arquivo</p>
                                                     </div>
                                                 </button>
 
@@ -199,7 +199,7 @@ export const StudentWorkoutsTab: React.FC = () => {
                                                     </div>
                                                     <div className="flex-1 text-left">
                                                         <p className="text-[13px] font-bold text-white group-hover:text-orange-100 leading-tight">Scanner de Treino</p>
-                                                        <p className="text-[10px] text-neutral-600">Digitalizar treino físico</p>
+                                                        <p className="text-[10px] text-neutral-400">Digitalizar treino físico</p>
                                                     </div>
                                                 </button>
                                             </div>
@@ -320,7 +320,7 @@ export const StudentWorkoutsTab: React.FC = () => {
                         >
                             <div>
                                 <h4 className="font-bold text-white">{normalizeWorkoutTitle(String((w as UnknownRecord)?.name ?? ''))}</h4>
-                                <p className="text-xs text-neutral-500">{Array.isArray((w as UnknownRecord)?.exercises) ? ((w as UnknownRecord).exercises as unknown[]).length : 0} exercícios</p>
+                                <p className="text-xs text-neutral-400">{Array.isArray((w as UnknownRecord)?.exercises) ? ((w as UnknownRecord).exercises as unknown[]).length : 0} exercícios</p>
                             </div>
                             <div className="flex items-center gap-2">
                                 <button onClick={(e) => openEditWorkout(e, w)} className="p-2 bg-neutral-700 hover:bg-yellow-500 text-neutral-300 hover:text-black rounded"><Edit3 size={16} /></button>
@@ -356,7 +356,7 @@ export const StudentWorkoutsTab: React.FC = () => {
             )}
 
             {/* Student workouts */}
-            {studentWorkouts.length === 0 && <p className="text-neutral-500 text-sm">Nenhum treino atribuído.</p>}
+            {studentWorkouts.length === 0 && <p className="text-neutral-400 text-sm">Nenhum treino atribuído.</p>}
             {studentWorkouts.map((w) => (
                 // eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions
                 <div
@@ -366,7 +366,7 @@ export const StudentWorkoutsTab: React.FC = () => {
                 >
                     <div>
                         <h4 className="font-bold text-white">{normalizeWorkoutTitle(String((w as UnknownRecord)?.name ?? ''))}</h4>
-                        <p className="text-xs text-neutral-500">{Array.isArray((w as UnknownRecord)?.exercises) ? ((w as UnknownRecord).exercises as unknown[]).length : 0} exercícios</p>
+                        <p className="text-xs text-neutral-400">{Array.isArray((w as UnknownRecord)?.exercises) ? ((w as UnknownRecord).exercises as unknown[]).length : 0} exercícios</p>
                     </div>
                     <div className="flex items-center gap-2">
                         <button onClick={(e) => openEditWorkout(e, w)} className="p-2 bg-neutral-700 hover:bg-yellow-500 text-neutral-300 hover:text-black rounded"><Edit3 size={16} /></button>
@@ -401,7 +401,7 @@ export const StudentWorkoutsTab: React.FC = () => {
             {/* My templates */}
             <div className="mt-6">
                 <h3 className="font-bold text-yellow-500 text-xs uppercase tracking-widest mb-2">Meus Treinos</h3>
-                {templates.length === 0 && <p className="text-neutral-500 text-sm">Nenhum treino seu encontrado.</p>}
+                {templates.length === 0 && <p className="text-neutral-400 text-sm">Nenhum treino seu encontrado.</p>}
                 {templates.map((t, idx) => (
                     <button
                         key={String(t.id ?? t.name ?? `idx:${idx}`)}
@@ -409,7 +409,7 @@ export const StudentWorkoutsTab: React.FC = () => {
                         className="w-full text-left p-3 bg-neutral-800 hover:bg-neutral-700 rounded-xl border border-neutral-700 flex justify-between group"
                     >
                         <span>{String(t.name ?? '')}</span>
-                        <Plus className="text-neutral-500 group-hover:text-yellow-500" />
+                        <Plus className="text-neutral-400 group-hover:text-yellow-500" />
                     </button>
                 ))}
             </div>

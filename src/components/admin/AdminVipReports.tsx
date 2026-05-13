@@ -274,13 +274,13 @@ export default function AdminVipReports({ supabase }: AdminVipReportsProps) {
                     <div className="flex bg-neutral-900 rounded-lg p-1 border border-neutral-800">
                         <button 
                             onClick={() => setPeriod('7d')}
-                            className={`px-3 py-1.5 text-xs font-bold rounded-md transition-colors ${period === '7d' ? 'bg-neutral-800 text-white' : 'text-neutral-500 hover:text-neutral-300'}`}
+                            className={`px-3 py-1.5 text-xs font-bold rounded-md transition-colors ${period === '7d' ? 'bg-neutral-800 text-white' : 'text-neutral-400 hover:text-neutral-300'}`}
                         >
                             7 Dias
                         </button>
                         <button 
                             onClick={() => setPeriod('30d')}
-                            className={`px-3 py-1.5 text-xs font-bold rounded-md transition-colors ${period === '30d' ? 'bg-neutral-800 text-white' : 'text-neutral-500 hover:text-neutral-300'}`}
+                            className={`px-3 py-1.5 text-xs font-bold rounded-md transition-colors ${period === '30d' ? 'bg-neutral-800 text-white' : 'text-neutral-400 hover:text-neutral-300'}`}
                         >
                             30 Dias
                         </button>
@@ -298,26 +298,26 @@ export default function AdminVipReports({ supabase }: AdminVipReportsProps) {
             {aggregates && (
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                     <div className="bg-neutral-900 p-4 rounded-xl border border-neutral-800">
-                        <div className="text-xs font-bold text-neutral-500 uppercase">Usuários VIP</div>
-                        <div className="text-2xl font-black text-white mt-1">{aggregates.vipUsers} <span className="text-sm font-normal text-neutral-500">/ {aggregates.totalUsers}</span></div>
+                        <div className="text-xs font-bold text-neutral-400 uppercase">Usuários VIP</div>
+                        <div className="text-2xl font-black text-white mt-1">{aggregates.vipUsers} <span className="text-sm font-normal text-neutral-400">/ {aggregates.totalUsers}</span></div>
                     </div>
                     <div className="bg-neutral-900 p-4 rounded-xl border border-neutral-800">
-                        <div className="text-xs font-bold text-neutral-500 uppercase">Utilização Chat</div>
+                        <div className="text-xs font-bold text-neutral-400 uppercase">Utilização Chat</div>
                         <div className="text-2xl font-black text-blue-400 mt-1">
                             {((aggregates.chatTotalUsage / (aggregates.chatCapacity || 1)) * 100).toFixed(1)}%
                         </div>
-                        <div className="text-xs text-neutral-500">{aggregates.chatTotalUsage.toLocaleString()} msgs</div>
+                        <div className="text-xs text-neutral-400">{aggregates.chatTotalUsage.toLocaleString()} msgs</div>
                     </div>
                     <div className="bg-neutral-900 p-4 rounded-xl border border-neutral-800">
-                        <div className="text-xs font-bold text-neutral-500 uppercase">Utilização Insights</div>
+                        <div className="text-xs font-bold text-neutral-400 uppercase">Utilização Insights</div>
                         <div className="text-2xl font-black text-orange-400 mt-1">
                             {((aggregates.insightsTotalUsage / (aggregates.insightsCapacity || 1)) * 100).toFixed(1)}%
                         </div>
-                        <div className="text-xs text-neutral-500">{aggregates.insightsTotalUsage.toLocaleString()} gerações</div>
+                        <div className="text-xs text-neutral-400">{aggregates.insightsTotalUsage.toLocaleString()} gerações</div>
                     </div>
                     <div className="bg-neutral-900 p-4 rounded-xl border border-neutral-800 flex items-center justify-center">
                         <div className="text-center">
-                            <div className="text-xs font-bold text-neutral-500 uppercase mb-1">Status do Sistema</div>
+                            <div className="text-xs font-bold text-neutral-400 uppercase mb-1">Status do Sistema</div>
                             <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-green-500/10 text-green-400 text-xs font-bold border border-green-500/20">
                                 <Zap size={12} /> Operacional
                             </div>
@@ -385,7 +385,7 @@ export default function AdminVipReports({ supabase }: AdminVipReportsProps) {
                                     <td className="px-6 py-4 text-center">
                                         <div className="flex flex-col items-center">
                                             <span className="font-bold text-white">{row.stats.chat.usage.toLocaleString()}</span>
-                                            <span className="text-xs text-neutral-500">de {row.stats.chat.capacity.toLocaleString()}</span>
+                                            <span className="text-xs text-neutral-400">de {row.stats.chat.capacity.toLocaleString()}</span>
                                             <div className="w-16 h-1 mt-1">
                                                 <svg aria-hidden="true" className="w-full h-1" viewBox="0 0 100 4" preserveAspectRatio="none">
                                                     <rect x="0" y="0" width="100" height="4" rx="2" fill="#27272a" />
@@ -405,7 +405,7 @@ export default function AdminVipReports({ supabase }: AdminVipReportsProps) {
                                     <td className="px-6 py-4 text-center">
                                         <div className="flex flex-col items-center">
                                             <span className="font-bold text-white">{row.stats.insights.usage.toLocaleString()}</span>
-                                            <span className="text-xs text-neutral-500">de {row.stats.insights.capacity.toLocaleString()}</span>
+                                            <span className="text-xs text-neutral-400">de {row.stats.insights.capacity.toLocaleString()}</span>
                                             <div className="w-16 h-1 mt-1">
                                                 <svg aria-hidden="true" className="w-full h-1" viewBox="0 0 100 4" preserveAspectRatio="none">
                                                     <rect x="0" y="0" width="100" height="4" rx="2" fill="#27272a" />
@@ -453,7 +453,7 @@ export default function AdminVipReports({ supabase }: AdminVipReportsProps) {
                                     <tr key={row.userId} className="hover:bg-neutral-800/50 transition-colors">
                                         <td className="px-6 py-4">
                                             <div className="text-white font-bold">{row.name}</div>
-                                            <div className="text-xs text-neutral-500">{row.email}</div>
+                                            <div className="text-xs text-neutral-400">{row.email}</div>
                                         </td>
                                         <td className="px-6 py-4 text-center font-mono text-neutral-300">{row.totals.chat.toLocaleString()}</td>
                                         <td className="px-6 py-4 text-center font-mono text-neutral-300">{row.totals.insights.toLocaleString()}</td>
@@ -463,7 +463,7 @@ export default function AdminVipReports({ supabase }: AdminVipReportsProps) {
                                 ))
                             ) : (
                                 <tr>
-                                    <td colSpan={5} className="px-6 py-6 text-center text-neutral-500">
+                                    <td colSpan={5} className="px-6 py-6 text-center text-neutral-400">
                                         Nenhum consumo encontrado para o período selecionado.
                                     </td>
                                 </tr>

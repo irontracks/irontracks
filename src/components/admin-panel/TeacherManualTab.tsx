@@ -93,7 +93,7 @@ function MockupShell({ title, children }: { title: string; children: React.React
         <div className="w-2.5 h-2.5 rounded-full bg-red-500/70" />
         <div className="w-2.5 h-2.5 rounded-full bg-yellow-500/70" />
         <div className="w-2.5 h-2.5 rounded-full bg-green-500/70" />
-        <span className="text-[10px] text-neutral-500 font-medium ml-2 uppercase tracking-widest">{title}</span>
+        <span className="text-[10px] text-neutral-400 font-medium ml-2 uppercase tracking-widest">{title}</span>
       </div>
       <div className="p-4">{children}</div>
     </div>
@@ -151,14 +151,14 @@ export default function TeacherManualTab() {
             key={s.id}
             type="button"
             onClick={() => scrollTo(s.id)}
-            className={`flex items-center gap-2 px-3 py-2 rounded-xl text-left text-xs font-semibold transition-all ${activeSection === s.id ? 'bg-yellow-500/15 text-yellow-400 border border-yellow-500/25' : 'text-neutral-500 hover:text-neutral-300 hover:bg-neutral-800/60'}`}
+            className={`flex items-center gap-2 px-3 py-2 rounded-xl text-left text-xs font-semibold transition-all ${activeSection === s.id ? 'bg-yellow-500/15 text-yellow-400 border border-yellow-500/25' : 'text-neutral-400 hover:text-neutral-300 hover:bg-neutral-800/60'}`}
           >
-            <span className={activeSection === s.id ? 'text-yellow-400' : 'text-neutral-600'}>{s.icon}</span>
+            <span className={activeSection === s.id ? 'text-yellow-400' : 'text-neutral-400'}>{s.icon}</span>
             {s.title}
           </button>
         ))}
         <div className="mt-4 pt-4 border-t border-neutral-800">
-          <p className="text-[10px] text-neutral-600 leading-relaxed">Manual IronTracks para Professores · v1.0</p>
+          <p className="text-[10px] text-neutral-400 leading-relaxed">Manual IronTracks para Professores · v1.0</p>
         </div>
       </nav>
 
@@ -219,7 +219,7 @@ export default function TeacherManualTab() {
                 { label: 'Atrasados', value: '1', color: 'text-red-400' },
               ].map(k => (
                 <div key={k.label} className="rounded-xl bg-neutral-800/60 border border-neutral-700/40 p-3">
-                  <p className="text-[9px] text-neutral-500 uppercase tracking-widest mb-1">{k.label}</p>
+                  <p className="text-[9px] text-neutral-400 uppercase tracking-widest mb-1">{k.label}</p>
                   <p className={`text-xl font-black ${k.color}`}>{k.value}</p>
                 </div>
               ))}
@@ -227,7 +227,7 @@ export default function TeacherManualTab() {
             {/* Plan badge */}
             <div className="rounded-xl bg-neutral-800/40 border border-neutral-700/40 p-3 flex items-center justify-between">
               <div>
-                <p className="text-[9px] text-neutral-500 uppercase tracking-widest mb-1">Seu Plano</p>
+                <p className="text-[9px] text-neutral-400 uppercase tracking-widest mb-1">Seu Plano</p>
                 <p className="text-xs font-bold text-yellow-400">Pro — 7/40 alunos</p>
                 <div className="w-32 h-1.5 rounded-full bg-neutral-700 mt-1.5">
                   <div className="w-[17%] h-full rounded-full bg-green-500" />
@@ -269,7 +269,7 @@ export default function TeacherManualTab() {
           <MockupShell title="PAINEL · ALUNOS">
             {/* Search + filter */}
             <div className="flex gap-2 mb-3">
-              <div className="flex-1 bg-neutral-800 rounded-xl px-3 py-2 text-[11px] text-neutral-500 border border-neutral-700">🔍 Buscar aluno...</div>
+              <div className="flex-1 bg-neutral-800 rounded-xl px-3 py-2 text-[11px] text-neutral-400 border border-neutral-700">🔍 Buscar aluno...</div>
               <MockupBtn>+ Aluno</MockupBtn>
             </div>
             {/* Status pills */}
@@ -290,7 +290,7 @@ export default function TeacherManualTab() {
                   <div className="w-7 h-7 rounded-full bg-neutral-700 flex items-center justify-center text-[10px] font-bold text-white">{name[0]}</div>
                   <div>
                     <p className="text-xs font-semibold text-white">{name}</p>
-                    <p className="text-[10px] text-neutral-500">{i === 0 ? 'último treino: 2d' : i === 1 ? 'último treino: 5d' : 'sem treino'}</p>
+                    <p className="text-[10px] text-neutral-400">{i === 0 ? 'último treino: 2d' : i === 1 ? 'último treino: 5d' : 'sem treino'}</p>
                   </div>
                 </div>
                 <MockupBadge color={i === 2 ? 'text-yellow-400 bg-yellow-500/10 border-yellow-500/20' : 'text-green-400 bg-green-500/10 border-green-500/20'}>
@@ -340,7 +340,7 @@ export default function TeacherManualTab() {
 
           <MockupShell title="PAINEL · TREINOS">
             <div className="flex gap-2 mb-3">
-              <div className="flex-1 bg-neutral-800 rounded-xl px-3 py-2 text-[11px] text-neutral-500 border border-neutral-700">🔍 Buscar treino...</div>
+              <div className="flex-1 bg-neutral-800 rounded-xl px-3 py-2 text-[11px] text-neutral-400 border border-neutral-700">🔍 Buscar treino...</div>
               <MockupBtn yellow><Plus size={10} /> Novo Treino</MockupBtn>
             </div>
             {[
@@ -351,7 +351,7 @@ export default function TeacherManualTab() {
               <div key={w.name} className="flex items-center justify-between py-2.5 border-b border-neutral-800/50 last:border-0">
                 <div>
                   <p className="text-xs font-semibold text-white">{w.name}</p>
-                  <p className="text-[10px] text-neutral-500">{w.exercises} · {w.uses}</p>
+                  <p className="text-[10px] text-neutral-400">{w.exercises} · {w.uses}</p>
                 </div>
                 <div className="flex gap-1.5">
                   <span className="text-[10px] px-2 py-0.5 rounded-full bg-neutral-800 border border-neutral-700 text-neutral-400">Editar</span>
@@ -385,36 +385,36 @@ export default function TeacherManualTab() {
           <MockupShell title="COBRANÇAS · NOVO PLANO">
             <div className="space-y-3">
               <div>
-                <p className="text-[9px] text-neutral-500 uppercase tracking-widest mb-1 font-bold">Nome do Plano *</p>
+                <p className="text-[9px] text-neutral-400 uppercase tracking-widest mb-1 font-bold">Nome do Plano *</p>
                 <div className="bg-neutral-800 rounded-xl px-3 py-2 text-xs text-neutral-300 border border-neutral-700">Mensal Premium</div>
               </div>
               <div>
-                <p className="text-[9px] text-neutral-500 uppercase tracking-widest mb-1 font-bold">Valor (R$)</p>
+                <p className="text-[9px] text-neutral-400 uppercase tracking-widest mb-1 font-bold">Valor (R$)</p>
                 <div className="bg-neutral-800 rounded-xl px-3 py-2 text-xs text-yellow-400 font-bold border border-neutral-700">R$ 250,00</div>
               </div>
               <div>
-                <p className="text-[9px] text-neutral-500 uppercase tracking-widest mb-1 font-bold">Tipo de Cobrança</p>
+                <p className="text-[9px] text-neutral-400 uppercase tracking-widest mb-1 font-bold">Tipo de Cobrança</p>
                 <div className="grid grid-cols-3 gap-1.5">
                   {['Avulso','Mensal','Trimestral','Semestral','Anual'].map((t,i) => (
-                    <span key={t} className={`px-2 py-1.5 rounded-lg text-[9px] font-bold text-center border ${i === 1 ? 'bg-yellow-500/15 border-yellow-500/40 text-yellow-400' : 'bg-neutral-800 border-neutral-700 text-neutral-500'}`}>{t}</span>
+                    <span key={t} className={`px-2 py-1.5 rounded-lg text-[9px] font-bold text-center border ${i === 1 ? 'bg-yellow-500/15 border-yellow-500/40 text-yellow-400' : 'bg-neutral-800 border-neutral-700 text-neutral-400'}`}>{t}</span>
                   ))}
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <p className="text-[9px] text-neutral-500 uppercase tracking-widest mb-1 font-bold">Duração (dias)</p>
+                  <p className="text-[9px] text-neutral-400 uppercase tracking-widest mb-1 font-bold">Duração (dias)</p>
                   <div className="bg-neutral-800 rounded-xl px-3 py-2 text-xs text-neutral-300 border border-neutral-700">30</div>
                 </div>
                 <div>
-                  <p className="text-[9px] text-neutral-500 uppercase tracking-widest mb-1 font-bold">Sessões/semana</p>
+                  <p className="text-[9px] text-neutral-400 uppercase tracking-widest mb-1 font-bold">Sessões/semana</p>
                   <div className="bg-neutral-800 rounded-xl px-3 py-2 text-xs text-neutral-300 border border-neutral-700">3</div>
                 </div>
               </div>
               <div>
-                <p className="text-[9px] text-neutral-500 uppercase tracking-widest mb-1 font-bold">Dias de Treino</p>
+                <p className="text-[9px] text-neutral-400 uppercase tracking-widest mb-1 font-bold">Dias de Treino</p>
                 <div className="flex gap-1.5">
                   {['Seg','Ter','Qua','Qui','Sex','Sáb','Dom'].map((d,i) => (
-                    <span key={d} className={`w-9 h-7 rounded-lg text-[9px] font-bold flex items-center justify-center border ${[0,2,4].includes(i) ? 'bg-yellow-500/20 border-yellow-500/40 text-yellow-400' : 'bg-neutral-800 border-neutral-700 text-neutral-500'}`}>{d}</span>
+                    <span key={d} className={`w-9 h-7 rounded-lg text-[9px] font-bold flex items-center justify-center border ${[0,2,4].includes(i) ? 'bg-yellow-500/20 border-yellow-500/40 text-yellow-400' : 'bg-neutral-800 border-neutral-700 text-neutral-400'}`}>{d}</span>
                   ))}
                 </div>
               </div>
@@ -465,9 +465,9 @@ export default function TeacherManualTab() {
                   <div>
                     <div className="flex items-center gap-2">
                       <p className="text-xs font-bold text-white">{p.name}</p>
-                      {!p.active && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-neutral-700 text-neutral-500 font-bold uppercase">Inativo</span>}
+                      {!p.active && <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-neutral-700 text-neutral-400 font-bold uppercase">Inativo</span>}
                     </div>
-                    <p className="text-[10px] text-yellow-400 font-bold mt-0.5">{p.price} <span className="text-neutral-500 font-normal">· {p.interval} · {p.students}</span></p>
+                    <p className="text-[10px] text-yellow-400 font-bold mt-0.5">{p.price} <span className="text-neutral-400 font-normal">· {p.interval} · {p.students}</span></p>
                   </div>
                   <div className="flex gap-1.5 flex-shrink-0">
                     <span className="p-1.5 rounded-lg bg-neutral-700 text-neutral-400"><Edit2 size={10} /></span>
@@ -491,7 +491,7 @@ export default function TeacherManualTab() {
                   <div className="w-8 h-8 rounded-xl bg-neutral-800 flex items-center justify-center flex-shrink-0">{a.icon}</div>
                   <div>
                     <p className="text-xs font-bold text-white">{a.action}</p>
-                    <p className="text-xs text-neutral-500 mt-0.5">{a.desc}</p>
+                    <p className="text-xs text-neutral-400 mt-0.5">{a.desc}</p>
                   </div>
                 </div>
               ))}
@@ -547,11 +547,11 @@ export default function TeacherManualTab() {
                   <div className="w-8 h-8 rounded-xl bg-neutral-800 flex items-center justify-center">{t.icon}</div>
                   <div>
                     <p className="text-sm font-black text-white">{t.label}</p>
-                    <p className="text-[10px] text-neutral-500">{t.subtitle}</p>
+                    <p className="text-[10px] text-neutral-400">{t.subtitle}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-2 mb-2">
-                  <Calendar size={10} className="text-neutral-600" />
+                  <Calendar size={10} className="text-neutral-400" />
                   <span className="text-[10px] text-neutral-400 font-medium">{t.days}</span>
                 </div>
                 <p className="text-xs text-neutral-400 leading-relaxed">{t.usecase}</p>
@@ -586,10 +586,10 @@ export default function TeacherManualTab() {
                     {row.status ? (
                       <div className="flex items-center gap-2 mt-1">
                         <MockupBadge color={row.status.cls}>{row.status.label}</MockupBadge>
-                        <span className="text-[10px] text-neutral-500">{row.status.plan} {row.status.expires && `· ${row.status.expires}`}</span>
+                        <span className="text-[10px] text-neutral-400">{row.status.plan} {row.status.expires && `· ${row.status.expires}`}</span>
                       </div>
                     ) : (
-                      <p className="text-[10px] text-neutral-600 mt-0.5">Sem plano</p>
+                      <p className="text-[10px] text-neutral-400 mt-0.5">Sem plano</p>
                     )}
                   </div>
                   <MockupBtn>
@@ -625,11 +625,11 @@ export default function TeacherManualTab() {
                 { label: 'Expirado', cls: 'bg-red-500/10 border-red-500/30 text-red-400' },
               ].map((item, i) => (
                 item.arrow
-                  ? <ChevronRight key={i} size={14} className="text-neutral-600 flex-shrink-0" />
+                  ? <ChevronRight key={i} size={14} className="text-neutral-400 flex-shrink-0" />
                   : <span key={i} className={`px-3 py-1.5 rounded-full text-[10px] font-bold border ${item.cls}`}>{item.label}</span>
               ))}
             </div>
-            <p className="text-xs text-neutral-500 mt-3 leading-relaxed">
+            <p className="text-xs text-neutral-400 mt-3 leading-relaxed">
               <strong className="text-yellow-400">Pendente</strong> → aguardando PIX · <strong className="text-green-400">Ativo</strong> → pago e dentro do prazo · <strong className="text-orange-400">Em atraso</strong> → prazo passado sem renovação · <strong className="text-red-400">Expirado</strong> → encerrado definitivamente
             </p>
           </div>
@@ -674,7 +674,7 @@ export default function TeacherManualTab() {
                     <span className="text-xs font-bold text-white">Mensal Premium</span>
                     <MockupBadge color="text-yellow-400 bg-yellow-500/10 border-yellow-500/20"><Clock size={9}/> Pendente</MockupBadge>
                   </div>
-                  <p className="text-[10px] text-neutral-500">Prof. Rafael · R$ 250,00 Mensal</p>
+                  <p className="text-[10px] text-neutral-400">Prof. Rafael · R$ 250,00 Mensal</p>
                 </div>
                 <MockupBtn yellow><QrCode size={10} /> Pagar via PIX</MockupBtn>
               </MockupShell>
@@ -686,7 +686,7 @@ export default function TeacherManualTab() {
             <div className="grid grid-cols-3 gap-3">
               {/* Step 1: Form */}
               <div className="space-y-2">
-                <p className="text-[9px] text-neutral-500 uppercase tracking-widest text-center font-bold">1 · Dados</p>
+                <p className="text-[9px] text-neutral-400 uppercase tracking-widest text-center font-bold">1 · Dados</p>
                 <div className="rounded-xl bg-neutral-800/60 border border-neutral-700/40 p-2 space-y-1.5">
                   <div className="bg-neutral-700/50 rounded-lg px-2 py-1.5 text-[9px] text-neutral-400">Nome completo</div>
                   <div className="bg-neutral-700/50 rounded-lg px-2 py-1.5 text-[9px] text-neutral-400">CPF *</div>
@@ -696,7 +696,7 @@ export default function TeacherManualTab() {
               </div>
               {/* Step 2: QR Code */}
               <div className="space-y-2">
-                <p className="text-[9px] text-neutral-500 uppercase tracking-widest text-center font-bold">2 · QR Code</p>
+                <p className="text-[9px] text-neutral-400 uppercase tracking-widest text-center font-bold">2 · QR Code</p>
                 <div className="rounded-xl bg-neutral-800/60 border border-neutral-700/40 p-2 flex flex-col items-center gap-1.5">
                   <div className="bg-white rounded-lg p-1.5 w-16 h-16 grid grid-cols-4 gap-0.5">
                     {[1,0,1,1,0,1,0,1,1,0,1,0,0,1,1,0].map((v,i) => (
@@ -708,7 +708,7 @@ export default function TeacherManualTab() {
               </div>
               {/* Step 3: Confirmed */}
               <div className="space-y-2">
-                <p className="text-[9px] text-neutral-500 uppercase tracking-widest text-center font-bold">3 · Confirmado</p>
+                <p className="text-[9px] text-neutral-400 uppercase tracking-widest text-center font-bold">3 · Confirmado</p>
                 <div className="rounded-xl bg-green-500/10 border border-green-500/20 p-2 flex flex-col items-center gap-2">
                   <CheckCircle2 size={24} className="text-green-400 mt-2" />
                   <p className="text-[9px] text-green-300 text-center font-bold">Pagamento confirmado!</p>
@@ -762,9 +762,9 @@ export default function TeacherManualTab() {
                   <MockupBadge color={row.badge.cls}>{row.badge.label}</MockupBadge>
                 </div>
                 <div className="grid grid-cols-3 gap-2 text-[10px]">
-                  <div><p className="text-neutral-600">Plano</p><p className="text-neutral-300 font-medium">{row.plan}</p></div>
-                  <div><p className="text-neutral-600">Início</p><p className="text-neutral-300 font-medium">{row.start}</p></div>
-                  <div><p className="text-neutral-600">Venc.</p><p className="text-neutral-300 font-medium">{row.expires}</p></div>
+                  <div><p className="text-neutral-400">Plano</p><p className="text-neutral-300 font-medium">{row.plan}</p></div>
+                  <div><p className="text-neutral-400">Início</p><p className="text-neutral-300 font-medium">{row.start}</p></div>
+                  <div><p className="text-neutral-400">Venc.</p><p className="text-neutral-300 font-medium">{row.expires}</p></div>
                 </div>
               </div>
             ))}
@@ -808,8 +808,8 @@ export default function TeacherManualTab() {
                 </div>
                 <p className="text-xs text-neutral-400 mb-2">{s.desc}</p>
                 <div className="flex gap-1.5 items-center">
-                  <ArrowRight size={10} className="text-neutral-600 flex-shrink-0" />
-                  <p className="text-xs text-neutral-500 italic">{s.action}</p>
+                  <ArrowRight size={10} className="text-neutral-400 flex-shrink-0" />
+                  <p className="text-xs text-neutral-400 italic">{s.action}</p>
                 </div>
               </div>
             ))}
@@ -842,7 +842,7 @@ export default function TeacherManualTab() {
                   <Users size={12} className="text-neutral-400" />
                   <span className="text-sm font-bold text-neutral-200">{p.students}</span>
                 </div>
-                <p className="text-xs text-neutral-500">{p.desc}</p>
+                <p className="text-xs text-neutral-400">{p.desc}</p>
               </div>
             ))}
           </div>
@@ -852,17 +852,17 @@ export default function TeacherManualTab() {
             <div className="flex items-center justify-between">
               <div className="rounded-xl bg-neutral-800 border border-neutral-700 px-3 py-2 flex items-center gap-2">
                 <div className="text-left">
-                  <p className="text-[9px] text-neutral-500 uppercase tracking-widest">Pro</p>
+                  <p className="text-[9px] text-neutral-400 uppercase tracking-widest">Pro</p>
                   <p className="text-xs font-bold text-white">7 / 40 alunos</p>
                   <div className="w-20 h-1 rounded-full bg-neutral-700 mt-1">
                     <div className="w-[17%] h-full rounded-full bg-green-500" />
                   </div>
                 </div>
               </div>
-              <div className="text-center text-[10px] text-neutral-600">→ limite 80%+</div>
+              <div className="text-center text-[10px] text-neutral-400">→ limite 80%+</div>
               <div className="rounded-xl bg-neutral-800 border border-yellow-500/30 px-3 py-2 flex items-center gap-2">
                 <div className="text-left">
-                  <p className="text-[9px] text-neutral-500 uppercase tracking-widest">Pro</p>
+                  <p className="text-[9px] text-neutral-400 uppercase tracking-widest">Pro</p>
                   <p className="text-xs font-bold text-white">33 / 40 alunos</p>
                   <div className="w-20 h-1 rounded-full bg-neutral-700 mt-1">
                     <div className="w-[82%] h-full rounded-full bg-yellow-500" />
