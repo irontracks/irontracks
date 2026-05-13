@@ -47,6 +47,7 @@ const nextConfig: NextConfig = {
       { pathname: '/login-hero.png' },
       { pathname: '/icone.png' },
       { pathname: '/logo-irontracks.png' },
+      { pathname: '/logo-irontracks-splash.webp' },
       { pathname: '/vip-crown.png' },
       { pathname: '/screenshot/**' },
       { pathname: '/rank-**' },
