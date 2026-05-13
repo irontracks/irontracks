@@ -19,7 +19,7 @@ const nextConfig: NextConfig = {
   // lucide-react: saves ~200kb by only importing icons actually used
   // chart.js / react-chartjs-2: only bundles chart types imported
   experimental: {
-    optimizePackageImports: ['lucide-react', 'chart.js', 'react-chartjs-2', '@tanstack/react-virtual', 'framer-motion'],
+    optimizePackageImports: ['lucide-react', 'chart.js', 'react-chartjs-2', '@tanstack/react-virtual', '@tanstack/react-query', 'framer-motion'],
   },
 
   // tsc roda localmente via `npm run deploy` antes de cada push.
