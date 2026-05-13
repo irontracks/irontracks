@@ -1,0 +1,8 @@
+// Template — copie para Sentry.xcconfig e preencha com os valores reais.
+// Sentry.xcconfig é ignorado pelo git para evitar leak do DSN.
+//
+// Onde obter o DSN: https://sentry.io → Settings → Projects → irontracks-ios → Client Keys (DSN)
+// SENTRY_DSN vazio faz SentrySDK.start virar no-op (safe pra dev local).
+
+SENTRY_DSN = https:////o000000.ingest.sentry.io/0000000
+SENTRY_ENVIRONMENT = production

@@ -24,7 +24,25 @@ class RestTimerReceiver : BroadcastReceiver() {
         when (intent.action) {
             "com.irontracks.REST_TIMER_FIRE" -> handleRestTimer(context, intent)
             "com.irontracks.APP_NOTIFICATION" -> handleAppNotification(context, intent)
+            "com.irontracks.REST_TIMER_CANCEL" -> handleCancel(context, intent)
         }
+    }
+
+    private fun handleCancel(context: Context, intent: Intent) {
+        // Stop the foreground service if it's running (Android 8+ path).
+        try {
+            val stopIntent = Intent(context, RestTimerService::class.java).apply {
+                action = RestTimerService.ACTION_STOP
+            }
+            context.stopService(stopIntent)
+        } catch (_: Exception) {}
+
+        // Cancel any visible notifications tied to this id.
+        val id = intent.getStringExtra("id") ?: return
+        val notifId = id.hashCode() and 0x7FFFFFFF
+        val nm = context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        nm.cancel(notifId)
+        nm.cancel(notifId + 1000)
     }
 
     private fun handleRestTimer(context: Context, intent: Intent) {

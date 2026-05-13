@@ -3,6 +3,7 @@ import Capacitor
 import AVFoundation
 import BackgroundTasks
 import WidgetKit
+import Sentry
 
 /// Notification posted when iOS gives us a background slot. JS observes this via
 /// the IronTracksNative plugin and runs the offline-sync + widget-refresh hooks.
@@ -17,6 +18,27 @@ let IronTracksBGSyncTaskID    = "com.irontracks.app.sync"
 class AppDelegate: UIResponder, UIApplicationDelegate {
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
+        // ── Sentry native crash reporting (F-010) ──────────────────────────────
+        // Boot BEFORE anything else so Swift crashes in plugin init / BGTaskScheduler
+        // registration are captured. DSN comes from Sentry.xcconfig → Info.plist;
+        // empty DSN makes SentrySDK.start a no-op (safe for local builds).
+        if let dsn = Bundle.main.object(forInfoDictionaryKey: "SENTRY_DSN") as? String, !dsn.isEmpty {
+            SentrySDK.start { options in
+                options.dsn = dsn
+                options.environment = Bundle.main.object(forInfoDictionaryKey: "SENTRY_ENVIRONMENT") as? String ?? "production"
+                let shortVersion = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "0"
+                let buildNumber = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "0"
+                options.releaseName = "ios@\(shortVersion).\(buildNumber)"
+                options.tracesSampleRate = 0.1
+                options.profilesSampleRate = 0.1
+                // Não envia dados pessoais por padrão
+                options.sendDefaultPii = false
+                // Auto crash + breadcrumbs
+                options.attachStacktrace = true
+                options.enableAutoSessionTracking = true
+            }
+        }
+
         // Allow background music (Spotify / Apple Music) to keep playing during workouts.
         // .playback + .mixWithOthers: our alarm / notification sounds blend in instead of
         // silencing other apps. .duckOthers briefly lowers background audio when we play.

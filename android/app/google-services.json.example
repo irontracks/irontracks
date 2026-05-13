@@ -1,0 +1,25 @@
+{
+  "_comment_": "PLACEHOLDER — do not use. Generate the real google-services.json at https://console.firebase.google.com → Project settings → Your apps → Android → Download google-services.json. Drop it next to this file at android/app/google-services.json (gitignored).",
+  "_comment_app_id_": "Required app package: com.irontracks.app",
+  "_comment_required_apis_": "Enable: Cloud Messaging (FCM)",
+  "_comment_legacy_": "Legacy server keys are deprecated — use the Firebase Admin SDK service account JSON on the backend (already configured in supabase/edge functions).",
+  "project_info": {
+    "project_id": "PLACEHOLDER",
+    "project_number": "PLACEHOLDER",
+    "storage_bucket": "PLACEHOLDER.appspot.com"
+  },
+  "client": [
+    {
+      "client_info": {
+        "android_client_info": {
+          "package_name": "com.irontracks.app"
+        }
+      },
+      "api_key": [
+        {
+          "current_key": "PLACEHOLDER"
+        }
+      ]
+    }
+  ]
+}
