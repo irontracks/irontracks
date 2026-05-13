@@ -109,7 +109,7 @@ export const StudentDetailPanel: React.FC = () => {
                         <div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-4 md:p-6 shadow-[0_16px_40px_rgba(0,0,0,0.35)] mb-6" >
                             <div className="flex items-center justify-between gap-3 mb-4">
                                 <div className="min-w-0" >
-                                    <div className="text-[11px] uppercase tracking-widest text-neutral-500 font-bold" > Aluno </div>
+                                    <div className="text-[11px] uppercase tracking-widest text-neutral-400 font-bold" > Aluno </div>
                                     < h3 className="text-base md:text-lg font-black text-white truncate" > Editar informações </h3>
                                 </div>
                                 < button
@@ -124,12 +124,12 @@ export const StudentDetailPanel: React.FC = () => {
                             </div>
                             < div className="space-y-4" >
                                 <div>
-                                    <label htmlFor="edit-student-name" className="block text-[11px] font-black uppercase tracking-widest text-neutral-500 mb-2" > Nome </label>
-                                    < input id="edit-student-name" aria-label="Nome do aluno" type="text" value={editedStudent.name || ''} onChange={(e) => setEditedStudent(prev => ({ ...prev, name: e.target.value }))} className="w-full min-h-[44px] bg-neutral-900/70 border border-neutral-800 rounded-xl px-3 py-2 text-white placeholder:text-neutral-600 focus:border-yellow-500 focus:outline-none" />
+                                    <label htmlFor="edit-student-name" className="block text-[11px] font-black uppercase tracking-widest text-neutral-400 mb-2" > Nome </label>
+                                    < input id="edit-student-name" aria-label="Nome do aluno" type="text" value={editedStudent.name || ''} onChange={(e) => setEditedStudent(prev => ({ ...prev, name: e.target.value }))} className="w-full min-h-[44px] bg-neutral-900/70 border border-neutral-800 rounded-xl px-3 py-2 text-white placeholder:text-neutral-400 focus:border-yellow-500 focus:outline-none" />
                                 </div>
                                 < div >
-                                    <label htmlFor="edit-student-email" className="block text-[11px] font-black uppercase tracking-widest text-neutral-500 mb-2" > Email </label>
-                                    < input id="edit-student-email" aria-label="Email do aluno" type="email" value={editedStudent.email || ''} onChange={(e) => setEditedStudent(prev => ({ ...prev, email: e.target.value }))} className="w-full min-h-[44px] bg-neutral-900/70 border border-neutral-800 rounded-xl px-3 py-2 text-white placeholder:text-neutral-600 focus:border-yellow-500 focus:outline-none" />
+                                    <label htmlFor="edit-student-email" className="block text-[11px] font-black uppercase tracking-widest text-neutral-400 mb-2" > Email </label>
+                                    < input id="edit-student-email" aria-label="Email do aluno" type="email" value={editedStudent.email || ''} onChange={(e) => setEditedStudent(prev => ({ ...prev, email: e.target.value }))} className="w-full min-h-[44px] bg-neutral-900/70 border border-neutral-800 rounded-xl px-3 py-2 text-white placeholder:text-neutral-400 focus:border-yellow-500 focus:outline-none" />
                                 </div>
                                 < div className="flex gap-3 pt-4" >
                                     <button onClick={handleSaveStudentEdit} className="flex-1 min-h-[44px] px-4 py-3 bg-yellow-500 hover:bg-yellow-400 text-black rounded-xl font-black transition-all duration-300 shadow-lg shadow-yellow-500/15 active:scale-95" > Salvar </button>
@@ -164,7 +164,7 @@ export const StudentDetailPanel: React.FC = () => {
                                 <div className="flex flex-wrap items-center gap-2 w-full">
                                     {isAdmin && (Array.isArray(teachersList) ? teachersList.length : 0) > 0 && (
                                         <div className="flex items-center gap-2 w-full">
-                                            <span className="hidden lg:inline text-[10px] font-black uppercase tracking-widest text-neutral-500"> Professor </span>
+                                            <span className="hidden lg:inline text-[10px] font-black uppercase tracking-widest text-neutral-400"> Professor </span>
                                             {(() => {
                                                 const currentUid = selectedStudent.teacher_id || '';
                                                 const list = Array.isArray(teachersList) ? [...teachersList] : [];
@@ -278,15 +278,15 @@ export const StudentDetailPanel: React.FC = () => {
 
                             < div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-2" >
                                 <div className="bg-neutral-950/40 border border-neutral-800 rounded-2xl p-3" >
-                                    <div className="text-[11px] font-black uppercase tracking-widest text-neutral-500" > Treinos </div>
+                                    <div className="text-[11px] font-black uppercase tracking-widest text-neutral-400" > Treinos </div>
                                     < div className="mt-1 text-lg font-black text-white" > {(Array.isArray(studentWorkouts) ? studentWorkouts.length : 0) + (Array.isArray(syncedWorkouts) ? syncedWorkouts.length : 0)}</div>
                                 </div>
                                 < div className="bg-neutral-950/40 border border-neutral-800 rounded-2xl p-3" >
-                                    <div className="text-[11px] font-black uppercase tracking-widest text-neutral-500" > Avaliações </div>
+                                    <div className="text-[11px] font-black uppercase tracking-widest text-neutral-400" > Avaliações </div>
                                     < div className="mt-1 text-lg font-black text-white" > {Array.isArray(assessments) ? assessments.length : 0} </div>
                                 </div>
                                 < div className="bg-neutral-950/40 border border-neutral-800 rounded-2xl p-3" >
-                                    <div className="text-[11px] font-black uppercase tracking-widest text-neutral-500" > Status </div>
+                                    <div className="text-[11px] font-black uppercase tracking-widest text-neutral-400" > Status </div>
                                     < div className="mt-1 text-lg font-black text-white truncate" > {selectedStatusLabel} </div>
                                 </div>
                             </div>

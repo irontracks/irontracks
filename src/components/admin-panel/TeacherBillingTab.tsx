@@ -73,32 +73,32 @@ function PlanCard({
           <div className="flex items-center gap-2 flex-wrap">
             <p className="font-bold text-white text-sm truncate">{plan.name}</p>
             {!plan.is_active && (
-              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-neutral-700/40 text-neutral-500 border border-neutral-700/40 uppercase tracking-wide">Inativo</span>
+              <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-neutral-700/40 text-neutral-400 border border-neutral-700/40 uppercase tracking-wide">Inativo</span>
             )}
           </div>
           {plan.description && (
-            <p className="text-xs text-neutral-500 mt-0.5 line-clamp-2">{plan.description}</p>
+            <p className="text-xs text-neutral-400 mt-0.5 line-clamp-2">{plan.description}</p>
           )}
           <div className="flex items-center gap-3 mt-2 flex-wrap">
             <span className="text-yellow-400 font-black text-base">{fmtBRL(plan.price_cents)}</span>
-            <span className="text-neutral-500 text-xs">{INTERVAL_LABELS[plan.billing_interval] ?? plan.billing_interval}</span>
-            <span className="text-neutral-600 text-xs">·</span>
-            <span className="text-neutral-500 text-xs">{plan.duration_days}d</span>
+            <span className="text-neutral-400 text-xs">{INTERVAL_LABELS[plan.billing_interval] ?? plan.billing_interval}</span>
+            <span className="text-neutral-400 text-xs">·</span>
+            <span className="text-neutral-400 text-xs">{plan.duration_days}d</span>
             {plan.sessions_per_week != null && (
               <>
-                <span className="text-neutral-600 text-xs">·</span>
-                <span className="text-neutral-500 text-xs">{plan.sessions_per_week}×/sem</span>
+                <span className="text-neutral-400 text-xs">·</span>
+                <span className="text-neutral-400 text-xs">{plan.sessions_per_week}×/sem</span>
               </>
             )}
             {subscriberCount > 0 && (
               <>
-                <span className="text-neutral-600 text-xs">·</span>
-                <span className="text-neutral-500 text-xs flex items-center gap-1"><Users size={10} />{subscriberCount} aluno{subscriberCount !== 1 ? 's' : ''}</span>
+                <span className="text-neutral-400 text-xs">·</span>
+                <span className="text-neutral-400 text-xs flex items-center gap-1"><Users size={10} />{subscriberCount} aluno{subscriberCount !== 1 ? 's' : ''}</span>
               </>
             )}
           </div>
           {plan.training_days && plan.training_days.length > 0 && (
-            <p className="text-[11px] text-neutral-600 mt-1 uppercase tracking-wide">
+            <p className="text-[11px] text-neutral-400 mt-1 uppercase tracking-wide">
               {plan.training_days.map(d => d.charAt(0).toUpperCase() + d.slice(1)).join(' · ')}
             </p>
           )}
@@ -155,11 +155,11 @@ function SubscriptionRow({
                 <span className="text-xs text-neutral-400">{sub.subscription.student_service_plans.name}</span>
               )}
               {sub.subscription.expires_at && (
-                <span className="text-[11px] text-neutral-600">até {fmtDate(sub.subscription.expires_at)}</span>
+                <span className="text-[11px] text-neutral-400">até {fmtDate(sub.subscription.expires_at)}</span>
               )}
             </div>
           ) : (
-            <p className="text-xs text-neutral-600 mt-0.5">Sem plano</p>
+            <p className="text-xs text-neutral-400 mt-0.5">Sem plano</p>
           )}
         </div>
         {activePlans.length > 0 && (
@@ -177,7 +177,7 @@ function SubscriptionRow({
 
       {open && activePlans.length > 0 && (
         <div className="mt-3 pt-3 border-t border-neutral-800/60 space-y-2">
-          <p className="text-[10px] text-neutral-500 uppercase tracking-widest font-bold mb-2">Selecione um plano:</p>
+          <p className="text-[10px] text-neutral-400 uppercase tracking-widest font-bold mb-2">Selecione um plano:</p>
           {activePlans.map(plan => (
             <button
               key={plan.id}
@@ -314,7 +314,7 @@ export default function TeacherBillingTab() {
         <div className="flex items-center justify-between mb-4">
           <div>
             <h3 className="text-white font-black text-base uppercase tracking-widest">Planos de Serviço</h3>
-            <p className="text-xs text-neutral-500 mt-0.5">Crie e gerencie os planos que oferece aos alunos</p>
+            <p className="text-xs text-neutral-400 mt-0.5">Crie e gerencie os planos que oferece aos alunos</p>
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -343,9 +343,9 @@ export default function TeacherBillingTab() {
           <div className="text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3">{plansError}</div>
         ) : plans.length === 0 ? (
           <div className="rounded-2xl border border-neutral-800 bg-neutral-900/30 p-8 text-center">
-            <CreditCard size={32} className="text-neutral-600 mx-auto mb-3" />
+            <CreditCard size={32} className="text-neutral-400 mx-auto mb-3" />
             <p className="text-neutral-400 font-semibold text-sm">Nenhum plano criado</p>
-            <p className="text-neutral-600 text-xs mt-1">Clique em &ldquo;Novo Plano&rdquo; para começar.</p>
+            <p className="text-neutral-400 text-xs mt-1">Clique em &ldquo;Novo Plano&rdquo; para começar.</p>
           </div>
         ) : (
           <div className="space-y-3">
@@ -368,7 +368,7 @@ export default function TeacherBillingTab() {
         <div className="flex items-center justify-between mb-4">
           <div>
             <h3 className="text-white font-black text-base uppercase tracking-widest">Assinaturas dos Alunos</h3>
-            <p className="text-xs text-neutral-500 mt-0.5">Atribua planos e acompanhe o status de cada aluno</p>
+            <p className="text-xs text-neutral-400 mt-0.5">Atribua planos e acompanhe o status de cada aluno</p>
           </div>
           <button
             type="button"
@@ -386,9 +386,9 @@ export default function TeacherBillingTab() {
           </div>
         ) : studentRows.length === 0 ? (
           <div className="rounded-2xl border border-neutral-800 bg-neutral-900/30 p-8 text-center">
-            <Users size={32} className="text-neutral-600 mx-auto mb-3" />
+            <Users size={32} className="text-neutral-400 mx-auto mb-3" />
             <p className="text-neutral-400 font-semibold text-sm">Nenhum aluno vinculado</p>
-            <p className="text-neutral-600 text-xs mt-1">Adicione alunos na aba de Alunos primeiro.</p>
+            <p className="text-neutral-400 text-xs mt-1">Adicione alunos na aba de Alunos primeiro.</p>
           </div>
         ) : (
           <div className="space-y-2">

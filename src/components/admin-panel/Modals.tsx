@@ -56,7 +56,7 @@ export const Modals: React.FC = () => {
                         </h3>
                         <div className="space-y-3">
                             <div>
-                                <label htmlFor="new-student-name" className="text-xs text-neutral-500 uppercase font-bold">Nome Completo</label>
+                                <label htmlFor="new-student-name" className="text-xs text-neutral-400 uppercase font-bold">Nome Completo</label>
                                 <input
                                     id="new-student-name"
                                     type="text"
@@ -68,7 +68,7 @@ export const Modals: React.FC = () => {
                                 />
                             </div>
                             <div>
-                                <label htmlFor="new-student-email" className="text-xs text-neutral-500 uppercase font-bold">Email</label>
+                                <label htmlFor="new-student-email" className="text-xs text-neutral-400 uppercase font-bold">Email</label>
                                 <input
                                     id="new-student-email"
                                     type="email"
@@ -100,7 +100,7 @@ export const Modals: React.FC = () => {
                         </h3>
                         <div className="space-y-3">
                             <div>
-                                <label htmlFor="new-teacher-name" className="text-xs text-neutral-500 uppercase font-bold">Nome Completo</label>
+                                <label htmlFor="new-teacher-name" className="text-xs text-neutral-400 uppercase font-bold">Nome Completo</label>
                                 <input
                                     id="new-teacher-name"
                                     type="text"
@@ -112,7 +112,7 @@ export const Modals: React.FC = () => {
                                 />
                             </div>
                             <div>
-                                <label htmlFor="new-teacher-email" className="text-xs text-neutral-500 uppercase font-bold">Email</label>
+                                <label htmlFor="new-teacher-email" className="text-xs text-neutral-400 uppercase font-bold">Email</label>
                                 <input
                                     id="new-teacher-email"
                                     type="email"
@@ -124,7 +124,7 @@ export const Modals: React.FC = () => {
                                 />
                             </div>
                             <div>
-                                <label htmlFor="new-teacher-phone" className="text-xs text-neutral-500 uppercase font-bold">Telefone</label>
+                                <label htmlFor="new-teacher-phone" className="text-xs text-neutral-400 uppercase font-bold">Telefone</label>
                                 <input
                                     id="new-teacher-phone"
                                     type="tel"
@@ -156,7 +156,7 @@ export const Modals: React.FC = () => {
                         </h3>
                         <div className="space-y-3">
                             <div>
-                                <label htmlFor="edit-teacher-name" className="text-xs text-neutral-500 uppercase font-bold">Nome Completo</label>
+                                <label htmlFor="edit-teacher-name" className="text-xs text-neutral-400 uppercase font-bold">Nome Completo</label>
                                 <input
                                     id="edit-teacher-name"
                                     type="text"
@@ -168,7 +168,7 @@ export const Modals: React.FC = () => {
                                 />
                             </div>
                             <div>
-                                <label htmlFor="edit-teacher-email" className="text-xs text-neutral-500 uppercase font-bold">Email</label>
+                                <label htmlFor="edit-teacher-email" className="text-xs text-neutral-400 uppercase font-bold">Email</label>
                                 <input
                                     id="edit-teacher-email"
                                     type="email"
@@ -180,7 +180,7 @@ export const Modals: React.FC = () => {
                                 />
                             </div>
                             <div>
-                                <label htmlFor="edit-teacher-phone" className="text-xs text-neutral-500 uppercase font-bold">Telefone</label>
+                                <label htmlFor="edit-teacher-phone" className="text-xs text-neutral-400 uppercase font-bold">Telefone</label>
                                 <input
                                     id="edit-teacher-phone"
                                     type="tel"
@@ -212,7 +212,7 @@ export const Modals: React.FC = () => {
                             <button
                                 type="button"
                                 onClick={() => { setExecutionVideoModalOpen(false); setExecutionVideoModalUrl(''); }}
-                                className="w-9 h-9 rounded-xl border flex items-center justify-center text-neutral-500 hover:text-white hover:border-yellow-500/40 transition-all"
+                                className="w-9 h-9 rounded-xl border flex items-center justify-center text-neutral-400 hover:text-white hover:border-yellow-500/40 transition-all"
                                 style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }}
                                 aria-label="Voltar"
                                 title="Voltar"
