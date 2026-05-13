@@ -584,3 +584,18 @@ select {
     background-color: #f5f5f5 !important;
   }
 }
+
+/* Respect user's reduced-motion preference (WCAG 2.3.3, 2.2.2)
+ * Vestibular disorders, ADHD, and photosensitive epilepsy users
+ * should not be forced into animations.
+ */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
