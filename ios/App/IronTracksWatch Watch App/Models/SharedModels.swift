@@ -62,6 +62,7 @@ struct WatchDashboard: Codable, Equatable {
     let userName: String
     let isWorkoutActive: Bool   // true quando há treino em andamento no iPhone
     let activeWorkoutId: String?
+    let isVip: Bool             // true se o usuário tem entitlement VIP ativo
 
     init(
         streakDays: Int,
@@ -70,7 +71,8 @@ struct WatchDashboard: Codable, Equatable {
         nextWorkout: WatchWorkout?,
         userName: String,
         isWorkoutActive: Bool = false,
-        activeWorkoutId: String? = nil
+        activeWorkoutId: String? = nil,
+        isVip: Bool = false
     ) {
         self.streakDays = streakDays
         self.weekWorkouts = weekWorkouts
@@ -79,11 +81,12 @@ struct WatchDashboard: Codable, Equatable {
         self.userName = userName
         self.isWorkoutActive = isWorkoutActive
         self.activeWorkoutId = activeWorkoutId
+        self.isVip = isVip
     }
 
-    // Decode tolerante: payloads antigos (sem isWorkoutActive/activeWorkoutId) ainda funcionam.
+    // Decode tolerante: payloads antigos (sem isWorkoutActive/activeWorkoutId/isVip) ainda funcionam.
     enum CodingKeys: String, CodingKey {
-        case streakDays, weekWorkouts, weekGoal, nextWorkout, userName, isWorkoutActive, activeWorkoutId
+        case streakDays, weekWorkouts, weekGoal, nextWorkout, userName, isWorkoutActive, activeWorkoutId, isVip
     }
 
     init(from decoder: Decoder) throws {
@@ -95,6 +98,7 @@ struct WatchDashboard: Codable, Equatable {
         self.userName = try c.decode(String.self, forKey: .userName)
         self.isWorkoutActive = (try? c.decode(Bool.self, forKey: .isWorkoutActive)) ?? false
         self.activeWorkoutId = try? c.decodeIfPresent(String.self, forKey: .activeWorkoutId)
+        self.isVip = (try? c.decode(Bool.self, forKey: .isVip)) ?? false
     }
 
     static let placeholder = WatchDashboard(
@@ -104,7 +108,8 @@ struct WatchDashboard: Codable, Equatable {
         nextWorkout: nil,
         userName: "Atleta",
         isWorkoutActive: false,
-        activeWorkoutId: nil
+        activeWorkoutId: nil,
+        isVip: false
     )
 }
 

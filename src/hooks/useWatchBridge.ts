@@ -65,6 +65,8 @@ export interface WatchDashboard {
   isWorkoutActive: boolean
   /** id do treino atualmente em andamento (se houver) — espelha activeSession.workout.id. */
   activeWorkoutId: string | null
+  /** true se o usuário tem entitlement VIP ativo (RevenueCat). Watch usa pra gate de features. */
+  isVip: boolean
 }
 
 export interface WatchGym {

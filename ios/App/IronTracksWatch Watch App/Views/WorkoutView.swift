@@ -28,34 +28,42 @@ struct WorkoutView: View {
     }
 
     var body: some View {
-        ScrollView {
-            VStack(spacing: 6) {
-                if let exercise = currentExercise {
-                    progressHeader
-                    exerciseCard(exercise)
-                    if isResting {
-                        restTimerView
-                    } else {
-                        logActionsRow(exercise)
+        Group {
+            if !session.dashboard.isVip {
+                // F-022: bloqueia acesso a feature VIP — não inicia HKWorkoutSession.
+                VipGatePaywallView()
+            } else {
+                ScrollView {
+                    VStack(spacing: 6) {
+                        if let exercise = currentExercise {
+                            progressHeader
+                            exerciseCard(exercise)
+                            if isResting {
+                                restTimerView
+                            } else {
+                                logActionsRow(exercise)
+                            }
+                            if !isResting {
+                                navigationRow
+                            }
+                        } else {
+                            emptyState
+                        }
                     }
-                    if !isResting {
-                        navigationRow
+                    .padding(.horizontal, 4)
+                }
+                .navigationTitle("Treino")
+                .onAppear {
+                    // Inicia HealthKit em modo strength training pra trackear FC durante o treino.
+                    // SOMENTE pra usuários VIP — gate verificado acima.
+                    if !health.isRunning {
+                        health.start(activityType: .traditionalStrengthTraining, locationType: .indoor)
                     }
-                } else {
-                    emptyState
+                }
+                .onDisappear {
+                    // Mantém o workout rodando — usuário pode trocar de aba e voltar.
                 }
             }
-            .padding(.horizontal, 4)
-        }
-        .navigationTitle("Treino")
-        .onAppear {
-            // Inicia HealthKit em modo strength training pra trackear FC durante o treino.
-            if !health.isRunning {
-                health.start(activityType: .traditionalStrengthTraining, locationType: .indoor)
-            }
-        }
-        .onDisappear {
-            // Mantém o workout rodando — usuário pode trocar de aba e voltar.
         }
     }
 

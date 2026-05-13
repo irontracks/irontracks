@@ -42,14 +42,21 @@ struct CardioView: View {
     }
 
     var body: some View {
-        ScrollView {
-            if health.isRunning {
-                activeView
+        Group {
+            if !session.dashboard.isVip {
+                // F-022: bloqueia acesso a feature VIP — não inicia HKWorkoutSession nem GPS.
+                VipGatePaywallView()
             } else {
-                idleView
+                ScrollView {
+                    if health.isRunning {
+                        activeView
+                    } else {
+                        idleView
+                    }
+                }
+                .navigationTitle("Cardio")
             }
         }
-        .navigationTitle("Cardio")
     }
 
     // ─── Tela quando NÃO está rodando ───────────────────────────────────
@@ -183,6 +190,8 @@ struct CardioView: View {
     // ─── Ações ──────────────────────────────────────────────────────────
 
     private func startCardio() {
+        // Defesa em profundidade: nunca iniciar cardio sem VIP, mesmo se UI vazar.
+        guard session.dashboard.isVip else { return }
         if location.authorizationStatus == .notDetermined {
             location.requestAuthorization()
         }
