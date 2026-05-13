@@ -96,7 +96,7 @@ function OptionCard({ emoji, title, desc, selected, onClick, compact }: OptionCa
           <span className={`font-black ${compact ? 'text-xs' : 'text-sm'} ${selected ? 'text-yellow-400' : 'text-white'}`}>
             {title}
           </span>
-          {desc && <span className="text-[10px] text-neutral-500 leading-tight">{desc}</span>}
+          {desc && <span className="text-[10px] text-neutral-400 leading-tight">{desc}</span>}
         </span>
       </span>
       {selected && (
@@ -121,7 +121,7 @@ function StepProgress({ current, total }: { current: number; total: number }) {
             style={i <= current ? { boxShadow: '0 0 6px rgba(234,179,8,0.3)' } : undefined}
           />
           <span className={`text-[9px] font-bold uppercase tracking-wider transition-colors duration-300 ${
-            i === current ? 'text-yellow-400' : i < current ? 'text-yellow-600' : 'text-neutral-600'
+            i === current ? 'text-yellow-400' : i < current ? 'text-yellow-600' : 'text-neutral-400'
           }`}>
             {STEP_META[i]?.icon} {STEP_META[i]?.label}
           </span>
@@ -306,11 +306,11 @@ export default function WorkoutWizardModal(props: Props) {
             <span className="text-[10px] font-mono text-yellow-600 w-5 text-center">{idx + 1}</span>
             <div className="min-w-0 flex-1">
               <div className="text-sm font-bold text-white truncate">{String(ex?.name || 'Exercício')}</div>
-              <div className="text-[11px] text-neutral-500">{String(ex?.sets ?? '')} séries • {String(ex?.reps ?? '')} reps</div>
+              <div className="text-[11px] text-neutral-400">{String(ex?.sets ?? '')} séries • {String(ex?.reps ?? '')} reps</div>
             </div>
           </div>
         ))}
-        {exs.length > limit && <div className="text-xs text-neutral-500 text-center py-1">+ mais {exs.length - limit}</div>}
+        {exs.length > limit && <div className="text-xs text-neutral-400 text-center py-1">+ mais {exs.length - limit}</div>}
       </div>
     )
   }
@@ -341,14 +341,14 @@ export default function WorkoutWizardModal(props: Props) {
                       </span>
                     )}
                   </div>
-                  <div className="text-[11px] text-neutral-500 mt-0.5">{stepSubtitles[step]}</div>
+                  <div className="text-[11px] text-neutral-400 mt-0.5">{stepSubtitles[step]}</div>
                 </div>
               </div>
             </div>
             <button
               type="button"
               onClick={props.onClose}
-              className="w-8 h-8 rounded-lg flex items-center justify-center text-neutral-500 hover:text-white transition-all active:scale-90"
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-neutral-400 hover:text-white transition-all active:scale-90"
               style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}
               aria-label="Voltar"
               title="Voltar"
@@ -378,7 +378,7 @@ export default function WorkoutWizardModal(props: Props) {
                 >
                   <span className="text-2xl">📝</span>
                   <div className="mt-2 font-black text-sm text-white">Criar Manualmente</div>
-                  <div className="text-[11px] text-neutral-500 mt-1">Monte exercício por exercício no editor completo.</div>
+                  <div className="text-[11px] text-neutral-400 mt-1">Monte exercício por exercício no editor completo.</div>
                 </button>
                 {/* IA Auto */}
                 <button
@@ -425,7 +425,7 @@ export default function WorkoutWizardModal(props: Props) {
 
               {/* Mode toggle */}
               <div className="rounded-xl border border-neutral-800 bg-neutral-950/40 p-3">
-                <div className="text-[10px] font-black uppercase tracking-widest text-neutral-500 mb-2">Modo de geração</div>
+                <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-2">Modo de geração</div>
                 <div className="grid grid-cols-2 gap-2">
                   <OptionCard emoji="1️⃣" title="Treino único" desc="Um treino completo" selected={mode === 'single'} onClick={() => setMode('single')} compact />
                   <OptionCard emoji="📅" title="Plano semanal" desc="Programa de vários dias" selected={mode === 'program'} onClick={() => setMode('program')} compact />
@@ -437,7 +437,7 @@ export default function WorkoutWizardModal(props: Props) {
           {/* STEP 1: Objetivo */}
           {step === 1 && (
             <div className="space-y-3">
-              <div className="text-[10px] font-black uppercase tracking-widest text-neutral-500">Qual seu objetivo principal?</div>
+              <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Qual seu objetivo principal?</div>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                 <OptionCard emoji="💪" title="Hipertrofia" desc="Ganho máximo de massa muscular" selected={answers.goal === 'hypertrophy'} onClick={() => setAnswers((p) => ({ ...p, goal: 'hypertrophy' }))} />
                 <OptionCard emoji="🏋️" title="Força" desc="Aumentar cargas e potência" selected={answers.goal === 'strength'} onClick={() => setAnswers((p) => ({ ...p, goal: 'strength' }))} />
@@ -451,7 +451,7 @@ export default function WorkoutWizardModal(props: Props) {
           {step === 2 && (
             <div className="space-y-4">
               <div>
-                <div className="text-[10px] font-black uppercase tracking-widest text-neutral-500">Divisão de treino</div>
+                <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Divisão de treino</div>
                 <div className="mt-2 grid grid-cols-1 sm:grid-cols-3 gap-2">
                   <OptionCard emoji="🔄" title="Full Body" desc="Corpo todo em cada sessão" selected={answers.split === 'full_body'} onClick={() => setAnswers((p) => ({ ...p, split: 'full_body' }))} />
                   <OptionCard emoji="⬆️" title="Upper / Lower" desc="Alternancia superior e inferior" selected={answers.split === 'upper_lower'} onClick={() => setAnswers((p) => ({ ...p, split: 'upper_lower' }))} />
@@ -463,7 +463,7 @@ export default function WorkoutWizardModal(props: Props) {
                 <div className="flex items-center justify-between gap-3">
                   <div>
                     <div className="text-sm font-bold text-white">📆 Dias por semana</div>
-                    <div className="text-[11px] text-neutral-500">Define volume e rotatividade</div>
+                    <div className="text-[11px] text-neutral-400">Define volume e rotatividade</div>
                   </div>
                   <div className="flex gap-1.5">
                     {[2, 3, 4, 5, 6].map((n) => (
@@ -490,7 +490,7 @@ export default function WorkoutWizardModal(props: Props) {
           {step === 3 && (
             <div className="space-y-4">
               <div>
-                <div className="text-[10px] font-black uppercase tracking-widest text-neutral-500">⏱️ Duração da sessão</div>
+                <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400">⏱️ Duração da sessão</div>
                 <div className="mt-2 flex flex-wrap gap-2">
                   {([30, 45, 60, 90, 120] as const).map((m) => (
                     <button
@@ -511,7 +511,7 @@ export default function WorkoutWizardModal(props: Props) {
               </div>
 
               <div>
-                <div className="text-[10px] font-black uppercase tracking-widest text-neutral-500">🏢 Local de treino</div>
+                <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400">🏢 Local de treino</div>
                 <div className="mt-2 grid grid-cols-1 sm:grid-cols-3 gap-2">
                   <OptionCard emoji="🏢" title="Academia" desc="Equipamentos completos" selected={answers.equipment === 'gym'} onClick={() => setAnswers((p) => ({ ...p, equipment: 'gym' }))} />
                   <OptionCard emoji="🏠" title="Casa" desc="Halteres e barras" selected={answers.equipment === 'home'} onClick={() => setAnswers((p) => ({ ...p, equipment: 'home' }))} />
@@ -526,7 +526,7 @@ export default function WorkoutWizardModal(props: Props) {
             <div className="space-y-4">
               {/* Level */}
               <div>
-                <div className="text-[10px] font-black uppercase tracking-widest text-neutral-500">Seu nível de treino</div>
+                <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Seu nível de treino</div>
                 <div className="mt-2 grid grid-cols-3 gap-2">
                   <OptionCard emoji="🌱" title="Iniciante" selected={answers.level === 'beginner'} onClick={() => setAnswers((p) => ({ ...p, level: 'beginner' }))} compact />
                   <OptionCard emoji="🔥" title="Intermediário" selected={answers.level === 'intermediate'} onClick={() => setAnswers((p) => ({ ...p, level: 'intermediate' }))} compact />
@@ -536,7 +536,7 @@ export default function WorkoutWizardModal(props: Props) {
 
               {/* Focus */}
               <div>
-                <div className="text-[10px] font-black uppercase tracking-widest text-neutral-500">Foco muscular</div>
+                <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Foco muscular</div>
                 <div className="mt-2 grid grid-cols-2 sm:grid-cols-3 gap-2">
                   <OptionCard emoji="⚖️" title="Equilibrado" selected={answers.focus === 'balanced'} onClick={() => setAnswers((p) => ({ ...p, focus: 'balanced' }))} compact />
                   <OptionCard emoji="💪" title="Superior" selected={answers.focus === 'upper'} onClick={() => setAnswers((p) => ({ ...p, focus: 'upper' }))} compact />
@@ -550,13 +550,13 @@ export default function WorkoutWizardModal(props: Props) {
               {/* Constraints */}
               <div className="rounded-xl border border-neutral-800 bg-neutral-950/40 p-3">
                 <div className="text-sm font-bold text-white">📋 Preferências e restrições</div>
-                <div className="text-[11px] text-neutral-500 mt-1">Ex.: foco em deltoide lateral, evitar overhead, dor no joelho, sem barra.</div>
+                <div className="text-[11px] text-neutral-400 mt-1">Ex.: foco em deltoide lateral, evitar overhead, dor no joelho, sem barra.</div>
                 <textarea
                   aria-label="Preferências e restrições"
                   value={answers.constraints}
                   onChange={(e) => setAnswers((p) => ({ ...p, constraints: e.target.value }))}
                   rows={3}
-                  className="mt-2 w-full bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white placeholder:text-neutral-600 focus:border-yellow-500 focus:outline-none input-premium-focus resize-none"
+                  className="mt-2 w-full bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white placeholder:text-neutral-400 focus:border-yellow-500 focus:outline-none input-premium-focus resize-none"
                   placeholder="Escreva aqui preferências e restrições..."
                 />
               </div>
@@ -578,7 +578,7 @@ export default function WorkoutWizardModal(props: Props) {
               {/* credits loading/error */}
               {creditsLoading && (
                 <div className="flex items-center justify-center bg-neutral-900/60 p-2 rounded-lg border border-neutral-800">
-                  <div className="text-xs text-neutral-500 animate-pulse">Carregando créditos...</div>
+                  <div className="text-xs text-neutral-400 animate-pulse">Carregando créditos...</div>
                 </div>
               )}
               {creditsError && (

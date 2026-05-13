@@ -64,14 +64,14 @@ export const WorkoutToolsPanel = memo(function WorkoutToolsPanel({
                         </div>
                         <div>
                             <p className="text-[11px] font-black uppercase tracking-widest text-yellow-500">Ferramentas</p>
-                            <p className="text-[10px] text-neutral-600 font-medium leading-none mt-0.5">Ações avançadas do seu treino</p>
+                            <p className="text-[10px] text-neutral-400 font-medium leading-none mt-0.5">Ações avançadas do seu treino</p>
                         </div>
                     </div>
 
                     <div className="p-2 space-y-0.5">
 
                         {/* ── GROUP: Criar ──────────────────────────────── */}
-                        <p className="px-3 pt-2 pb-1 text-[9px] font-black uppercase tracking-[0.15em] text-neutral-600">Criar</p>
+                        <p className="px-3 pt-2 pb-1 text-[9px] font-black uppercase tracking-[0.15em] text-neutral-400">Criar</p>
 
                         {/* Criar automaticamente */}
                         <button
@@ -83,7 +83,7 @@ export const WorkoutToolsPanel = memo(function WorkoutToolsPanel({
                             </div>
                             <div className="flex-1 text-left">
                                 <p className="text-[13px] font-bold text-white group-hover:text-yellow-100 leading-tight">Criar automaticamente</p>
-                                <p className="text-[10px] text-neutral-600">Wizard com IA</p>
+                                <p className="text-[10px] text-neutral-400">Wizard com IA</p>
                             </div>
                         </button>
 
@@ -91,7 +91,7 @@ export const WorkoutToolsPanel = memo(function WorkoutToolsPanel({
                         <div className="mx-3 my-1 h-px bg-gradient-to-r from-transparent via-white/8 to-transparent" />
 
                         {/* ── GROUP: Importar / Exportar ─────────────────── */}
-                        <p className="px-3 pt-2 pb-1 text-[9px] font-black uppercase tracking-[0.15em] text-neutral-600">Importar / Exportar</p>
+                        <p className="px-3 pt-2 pb-1 text-[9px] font-black uppercase tracking-[0.15em] text-neutral-400">Importar / Exportar</p>
 
                         {/* Importar JSON */}
                         <button
@@ -105,7 +105,7 @@ export const WorkoutToolsPanel = memo(function WorkoutToolsPanel({
                             </div>
                             <div className="flex-1 text-left">
                                 <p className="text-[13px] font-bold text-white group-hover:text-purple-100 leading-tight">Importar JSON</p>
-                                <p className="text-[10px] text-neutral-600">Carregar treinos salvos</p>
+                                <p className="text-[10px] text-neutral-400">Carregar treinos salvos</p>
                             </div>
                         </button>
 
@@ -125,7 +125,7 @@ export const WorkoutToolsPanel = memo(function WorkoutToolsPanel({
                                 <p className="text-[13px] font-bold text-neutral-300 group-hover:text-white leading-tight">
                                     {exportingAll ? 'Exportando...' : 'Exportar JSON'}
                                 </p>
-                                <p className="text-[10px] text-neutral-600">Backup dos seus treinos</p>
+                                <p className="text-[10px] text-neutral-400">Backup dos seus treinos</p>
                             </div>
                         </button>
 
@@ -133,7 +133,7 @@ export const WorkoutToolsPanel = memo(function WorkoutToolsPanel({
                         <div className="mx-3 my-1 h-px bg-gradient-to-r from-transparent via-white/8 to-transparent" />
 
                         {/* ── GROUP: Manutenção ─────────────────────────── */}
-                        <p className="px-3 pt-2 pb-1 text-[9px] font-black uppercase tracking-[0.15em] text-neutral-600">Manutenção</p>
+                        <p className="px-3 pt-2 pb-1 text-[9px] font-black uppercase tracking-[0.15em] text-neutral-400">Manutenção</p>
 
                         {/* Padronizar nomes IA */}
                         <button
@@ -156,7 +156,7 @@ export const WorkoutToolsPanel = memo(function WorkoutToolsPanel({
                                 <p className="text-[13px] font-bold text-neutral-300 group-hover:text-white leading-tight">
                                     {normalizingAiTitles ? 'Padronizando...' : 'Padronizar nomes IA'}
                                 </p>
-                                <p className="text-[10px] text-neutral-600">Uniformizar com IA</p>
+                                <p className="text-[10px] text-neutral-400">Uniformizar com IA</p>
                             </div>
                         </button>
 
@@ -181,7 +181,7 @@ export const WorkoutToolsPanel = memo(function WorkoutToolsPanel({
                                 <p className="text-[13px] font-bold text-neutral-300 group-hover:text-white leading-tight">
                                     {normalizingExercises ? 'Normalizando...' : 'Normalizar exercícios'}
                                 </p>
-                                <p className="text-[10px] text-neutral-600">Corrigir nomes duplicados</p>
+                                <p className="text-[10px] text-neutral-400">Corrigir nomes duplicados</p>
                             </div>
                         </button>
 
@@ -206,7 +206,7 @@ export const WorkoutToolsPanel = memo(function WorkoutToolsPanel({
                                 <p className="text-[13px] font-bold text-neutral-300 group-hover:text-white leading-tight">
                                     {applyingTitleRule ? 'Aplicando...' : 'Padronizar títulos'}
                                 </p>
-                                <p className="text-[10px] text-neutral-600">Renomear A/B/C automaticamente</p>
+                                <p className="text-[10px] text-neutral-400">Renomear A/B/C automaticamente</p>
                             </div>
                         </button>
 

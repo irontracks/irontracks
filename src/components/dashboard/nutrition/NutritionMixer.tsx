@@ -89,9 +89,9 @@ function MacroBar({ label, value, goal, color, accent }: { label: string; value:
   return (
     <div className="space-y-1.5">
       <div className="flex items-baseline justify-between">
-        <span className="text-[10px] uppercase tracking-[0.2em] text-neutral-500">{label}</span>
+        <span className="text-[10px] uppercase tracking-[0.2em] text-neutral-400">{label}</span>
         <span className={`text-xs font-bold tabular-nums ${over ? 'text-red-400' : accent}`}>
-          {Math.round(sVal)}<span className="text-neutral-600">/{Math.round(sGoal)}g</span>
+          {Math.round(sVal)}<span className="text-neutral-400">/{Math.round(sGoal)}g</span>
         </span>
       </div>
       <div className="h-1.5 rounded-full bg-white/[0.04] overflow-hidden">
@@ -127,7 +127,7 @@ function QuickAction({ icon, label, onClick, active }: { icon: string; label: st
         }`}
     >
       <span className="text-lg">{icon}</span>
-      <span className={`text-[9px] uppercase tracking-[0.15em] font-semibold ${active ? 'text-yellow-300' : 'text-neutral-500'}`}>{label}</span>
+      <span className={`text-[9px] uppercase tracking-[0.15em] font-semibold ${active ? 'text-yellow-300' : 'text-neutral-400'}`}>{label}</span>
     </button>
   )
 }
@@ -430,7 +430,7 @@ export default function NutritionMixer({
               <span className={`text-2xl font-bold tabular-nums ${calorieOver ? 'text-red-400' : 'text-white'}`}>
                 {Math.round(totals.calories)}
               </span>
-              <span className="text-[10px] text-neutral-500 uppercase tracking-wider">kcal</span>
+              <span className="text-[10px] text-neutral-400 uppercase tracking-wider">kcal</span>
             </div>
           </div>
 
@@ -445,7 +445,7 @@ export default function NutritionMixer({
               Meta: <span className="text-neutral-200 font-semibold">{Math.round(safeGoals.calories)} kcal</span>
             </div>
             {!calorieOver && remaining > 0 && (
-              <div className="text-xs text-neutral-500">
+              <div className="text-xs text-neutral-400">
                 Restam <span className="text-emerald-400 font-semibold">{Math.round(remaining)}</span> kcal
               </div>
             )}
@@ -461,7 +461,7 @@ export default function NutritionMixer({
         </div>
 
         {goalsSource === 'profile' && (
-          <div className="mt-3 text-[10px] text-neutral-600 text-center">Meta via TDEE do perfil • <button type="button" onClick={() => setGoalsOpen(true)} className="text-yellow-500 hover:text-yellow-400">Ajustar</button></div>
+          <div className="mt-3 text-[10px] text-neutral-400 text-center">Meta via TDEE do perfil • <button type="button" onClick={() => setGoalsOpen(true)} className="text-yellow-500 hover:text-yellow-400">Ajustar</button></div>
         )}
       </Card>
 
@@ -469,7 +469,7 @@ export default function NutritionMixer({
       {canViewMacros ? (
         <Card className="p-4 space-y-3">
           <div className="flex items-center justify-between">
-            <span className="text-[10px] uppercase tracking-[0.2em] text-neutral-500 font-semibold">Macronutrientes</span>
+            <span className="text-[10px] uppercase tracking-[0.2em] text-neutral-400 font-semibold">Macronutrientes</span>
             <button type="button" onClick={() => setGoalsOpen(v => !v)} className="text-[10px] text-yellow-500 hover:text-yellow-400 uppercase tracking-wider font-bold">
               {goalsOpen ? '✕ Fechar' : '⚙ Metas'}
             </button>
@@ -484,7 +484,7 @@ export default function NutritionMixer({
               <div className="grid grid-cols-2 gap-3">
                 {(['calories', 'protein', 'carbs', 'fat'] as const).map(f => (
                   <div key={f} className="space-y-1">
-                    <label className="text-[9px] uppercase tracking-wider text-neutral-500 font-bold">
+                    <label className="text-[9px] uppercase tracking-wider text-neutral-400 font-bold">
                       {f === 'calories' ? 'Calorias (kcal)' : f === 'protein' ? 'Proteína (g)' : f === 'carbs' ? 'Carboidratos (g)' : 'Gordura (g)'}
                     </label>
                     <input
@@ -511,7 +511,7 @@ export default function NutritionMixer({
       ) : (
         <Card className="p-4">
           <div className="text-sm font-semibold text-white">Macros no plano Pro</div>
-          <div className="mt-1 text-xs text-neutral-500">Ative para acompanhar proteína, carbo e gordura.</div>
+          <div className="mt-1 text-xs text-neutral-400">Ative para acompanhar proteína, carbo e gordura.</div>
           {!hideVipCtas && (
             <button type="button" onClick={() => (window.location.href = '/marketplace')} className="mt-3 h-9 px-4 rounded-lg bg-yellow-500 text-black text-xs font-bold hover:bg-yellow-400 active:scale-95 transition">
               Ver planos
@@ -596,8 +596,8 @@ export default function NutritionMixer({
       {/* ══ MEAL INPUT ═══════════════════════════════════════════════════ */}
       {isToday && (
         <Card glow="bg-[linear-gradient(180deg,rgba(250,204,21,0.04)_0%,transparent_50%)]" className="p-4">
-          <div className="text-[10px] uppercase tracking-[0.2em] text-neutral-500 font-semibold">Adicionar refeição</div>
-          <div className="mt-1 text-xs text-neutral-600">Ex.: 150g frango + arroz branco + salada</div>
+          <div className="text-[10px] uppercase tracking-[0.2em] text-neutral-400 font-semibold">Adicionar refeição</div>
+          <div className="mt-1 text-xs text-neutral-400">Ex.: 150g frango + arroz branco + salada</div>
           <textarea
             ref={inputRef}
             aria-label="Adicionar refeição"
@@ -605,7 +605,7 @@ export default function NutritionMixer({
             onChange={e => setInput(e.target.value)}
             disabled={isPending || !!schemaMissing}
             rows={2}
-            className="mt-3 w-full rounded-xl bg-white/[0.04] border border-white/[0.08] px-4 py-3 text-sm text-white placeholder:text-neutral-600 focus:outline-none focus:border-yellow-500/30 focus:ring-1 focus:ring-yellow-500/20 resize-none transition"
+            className="mt-3 w-full rounded-xl bg-white/[0.04] border border-white/[0.08] px-4 py-3 text-sm text-white placeholder:text-neutral-400 focus:outline-none focus:border-yellow-500/30 focus:ring-1 focus:ring-yellow-500/20 resize-none transition"
             placeholder={schemaMissing ? 'Nutrição não configurada.' : 'O que você comeu?'}
           />
 
@@ -662,7 +662,7 @@ export default function NutritionMixer({
       {/* ══ ENTRIES LIST ═════════════════════════════════════════════════ */}
       <Card className="p-4">
         <div className="flex items-center justify-between mb-3">
-          <span className="text-[10px] uppercase tracking-[0.2em] text-neutral-500 font-semibold">
+          <span className="text-[10px] uppercase tracking-[0.2em] text-neutral-400 font-semibold">
             Lançamentos {!isToday && `• ${currentDateKey}`}
           </span>
           <button type="button" onClick={() => setEntriesTick(v => v + 1)} className="text-[10px] text-yellow-500 hover:text-yellow-400 uppercase tracking-wider font-bold">
@@ -691,7 +691,7 @@ export default function NutritionMixer({
             <div className="text-center py-8">
               <div className="text-3xl mb-2">🍽️</div>
               <div className="text-sm text-neutral-400 font-medium">Nenhuma refeição {isToday ? 'hoje' : 'neste dia'}</div>
-              <div className="text-xs text-neutral-600 mt-1">Adicione um lançamento para começar</div>
+              <div className="text-xs text-neutral-400 mt-1">Adicione um lançamento para começar</div>
             </div>
           ) : (
             safeEntries.map(item => (

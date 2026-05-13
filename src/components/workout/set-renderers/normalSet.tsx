@@ -177,13 +177,13 @@ const NormalSetInner = ({
   const inputBase =
     'w-full bg-black/40 border border-neutral-700/80 rounded-xl px-2.5 py-2 text-sm text-white ' +
     'outline-none focus:ring-1 ring-yellow-500 focus:border-yellow-500/50 transition-all duration-200 ' +
-    'placeholder:text-neutral-600 placeholder:text-xs focus:placeholder:opacity-0';
+    'placeholder:text-neutral-400 placeholder:text-xs focus:placeholder:opacity-0';
   // Compact variant for reps/RPE (narrow 2fr columns) — reduced padding so
   // 5-char placeholders like "10-12" fit without truncation.
   const inputCompact =
     'w-full bg-black/40 border border-neutral-700/80 rounded-xl px-1.5 py-2 text-sm text-white text-center ' +
     'outline-none focus:ring-1 ring-yellow-500 focus:border-yellow-500/50 transition-all duration-200 ' +
-    'placeholder:text-neutral-600 placeholder:text-xs focus:placeholder:opacity-0';
+    'placeholder:text-neutral-400 placeholder:text-xs focus:placeholder:opacity-0';
 
   const collapseAndScroll = (delay: number) => {
     setTimeout(() => {
@@ -429,7 +429,7 @@ const NormalSetInner = ({
   // what each input means. After the first set, header is hidden to save space.
   const renderUnilateralHeader = () => (
     <div
-      className="grid items-center gap-1.5 px-2.5 text-[9px] uppercase tracking-widest text-neutral-500 font-bold"
+      className="grid items-center gap-1.5 px-2.5 text-[9px] uppercase tracking-widest text-neutral-400 font-bold"
       style={{ gridTemplateColumns: '3fr 2fr 2fr auto' }}
     >
       <span>Peso (kg)</span>
@@ -440,7 +440,7 @@ const NormalSetInner = ({
   );
   const renderBilateralHeader = () => (
     <div
-      className="grid items-center gap-1.5 px-2.5 text-[9px] uppercase tracking-widest text-neutral-500 font-bold"
+      className="grid items-center gap-1.5 px-2.5 text-[9px] uppercase tracking-widest text-neutral-400 font-bold"
       style={{ gridTemplateColumns: '28px 3fr 2fr 2fr auto' }}
     >
       <span />
@@ -467,7 +467,7 @@ const NormalSetInner = ({
               className={
                 isNotesOpen || hasNotes
                   ? 'inline-flex items-center gap-1.5 h-7 px-2.5 rounded-lg text-yellow-500 bg-yellow-500/10 border border-yellow-500/40 text-[11px] font-bold'
-                  : 'inline-flex items-center gap-1.5 h-7 px-2.5 rounded-lg text-neutral-500 bg-black/30 border border-neutral-700 text-[11px] font-bold hover:text-yellow-500'
+                  : 'inline-flex items-center gap-1.5 h-7 px-2.5 rounded-lg text-neutral-400 bg-black/30 border border-neutral-700 text-[11px] font-bold hover:text-yellow-500'
               }
             >
               <MessageSquare size={11} />
@@ -501,7 +501,7 @@ const NormalSetInner = ({
               className={
                 isNotesOpen || hasAnyNote
                   ? 'w-7 h-7 inline-flex items-center justify-center rounded-lg text-yellow-500 bg-yellow-500/10 border border-yellow-500/40 hover:bg-yellow-500/15 transition duration-200'
-                  : 'w-7 h-7 inline-flex items-center justify-center rounded-lg text-neutral-500 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'
+                  : 'w-7 h-7 inline-flex items-center justify-center rounded-lg text-neutral-400 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'
               }
             >
               <MessageSquare size={12} />
@@ -564,7 +564,7 @@ const NormalSetInner = ({
               <button
                 type="button"
                 onClick={() => setIsPickerOpen(p => !p)}
-                className="inline-flex items-center gap-0.5 text-[10px] font-black uppercase tracking-widest text-neutral-600 hover:text-neutral-400 transition-colors"
+                className="inline-flex items-center gap-0.5 text-[10px] font-black uppercase tracking-widest text-neutral-400 hover:text-neutral-400 transition-colors"
               >
                 {String(log.per_set_method || '').trim() || 'Normal'}
                 <ChevronDown size={9} className={`transition-transform ${isPickerOpen ? 'rotate-180' : ''}`} />
@@ -597,8 +597,8 @@ const NormalSetInner = ({
         <div className="px-1 space-y-1.5">
           {prevNote && (
             <div className="flex items-start gap-1.5 px-2.5 py-1.5 rounded-lg bg-neutral-900/60 border border-neutral-800">
-              <span className="text-[9px] font-black uppercase tracking-widest text-neutral-600 shrink-0 mt-0.5">Anterior</span>
-              <p className="text-xs text-neutral-500 italic leading-snug">{prevNote}</p>
+              <span className="text-[9px] font-black uppercase tracking-widest text-neutral-400 shrink-0 mt-0.5">Anterior</span>
+              <p className="text-xs text-neutral-400 italic leading-snug">{prevNote}</p>
             </div>
           )}
           <textarea
