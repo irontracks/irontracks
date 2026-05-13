@@ -55,48 +55,69 @@ export function usePushNotifications(userId?: string | null) {
           }
         }
 
-        const regHandle = await PushNotifications.addListener('registration', async (token: PushToken) => {
-          try {
-            if (!alive) return
-            const value = String(token?.value || '').trim()
-            if (!value) return
-
-            await fetch('/api/push/register', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ token: value, platform, deviceId }),
-              credentials: 'include',
-              cache: 'no-store',
-            }).catch((e) => logWarn('usePushNotifications', 'register fetch failed', e))
-          } catch (e) {
-            logWarn('usePushNotifications', 'registration handler error', e)
+        // Helper: registra um listener cuidando da race entre await e cleanup.
+        // Se !alive logo após o await (ex: SIGNED_OUT durante setup), remove o
+        // handle imediatamente em vez de deixar listener órfão disparando callbacks.
+        const registerListener = async (
+          fn: () => Promise<ListenerHandle | null>,
+        ): Promise<ListenerHandle | null> => {
+          const handle = await fn().catch(() => null)
+          if (!handle) return null
+          if (!alive) {
+            try { handle.remove() } catch { /* ignore */ }
+            return null
           }
-        })
-        handles.push(regHandle)
+          handles.push(handle)
+          return handle
+        }
 
-        const errHandle = await PushNotifications.addListener('registrationError', (err: unknown) => {
-          logWarn('usePushNotifications', 'APNs token registration failed', err)
-        })
-        handles.push(errHandle)
+        await registerListener(() =>
+          PushNotifications.addListener('registration', async (token: PushToken) => {
+            try {
+              if (!alive) return
+              const value = String(token?.value || '').trim()
+              if (!value) return
 
-        const tapHandle = await PushNotifications.addListener('pushNotificationActionPerformed', (action: unknown) => {
-          try {
-            if (!alive) return
-            const act = action && typeof action === 'object' ? (action as Record<string, unknown>) : null
-            const notification = act?.notification && typeof act.notification === 'object'
-              ? (act.notification as Record<string, unknown>) : null
-            const data = notification?.data && typeof notification.data === 'object'
-              ? (notification.data as Record<string, unknown>) : null
-            const link = data ? String(data.link || '').trim() : ''
-            const type = data ? String(data.type || '').trim() : ''
-            if (link || type) {
-              window.dispatchEvent(new CustomEvent('irontracks:push:navigate', { detail: { link, type } }))
+              await fetch('/api/push/register', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ token: value, platform, deviceId }),
+                credentials: 'include',
+                cache: 'no-store',
+              }).catch((e) => logWarn('usePushNotifications', 'register fetch failed', e))
+            } catch (e) {
+              logWarn('usePushNotifications', 'registration handler error', e)
             }
-          } catch (e) {
-            logWarn('usePushNotifications', 'pushNotificationActionPerformed error', e)
-          }
-        }).catch(() => null)
-        if (tapHandle?.remove) handles.push(tapHandle)
+          }),
+        )
+        if (!alive) return
+
+        await registerListener(() =>
+          PushNotifications.addListener('registrationError', (err: unknown) => {
+            logWarn('usePushNotifications', 'APNs token registration failed', err)
+          }),
+        )
+        if (!alive) return
+
+        await registerListener(() =>
+          PushNotifications.addListener('pushNotificationActionPerformed', (action: unknown) => {
+            try {
+              if (!alive) return
+              const act = action && typeof action === 'object' ? (action as Record<string, unknown>) : null
+              const notification = act?.notification && typeof act.notification === 'object'
+                ? (act.notification as Record<string, unknown>) : null
+              const data = notification?.data && typeof notification.data === 'object'
+                ? (notification.data as Record<string, unknown>) : null
+              const link = data ? String(data.link || '').trim() : ''
+              const type = data ? String(data.type || '').trim() : ''
+              if (link || type) {
+                window.dispatchEvent(new CustomEvent('irontracks:push:navigate', { detail: { link, type } }))
+              }
+            } catch (e) {
+              logWarn('usePushNotifications', 'pushNotificationActionPerformed error', e)
+            }
+          }),
+        )
 
         if (!alive) return
 

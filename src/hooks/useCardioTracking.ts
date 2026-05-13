@@ -137,6 +137,10 @@ export function useCardioTracking({
   // Hold the latest full GeoFix (including accuracy) for reading in effects
   // that otherwise only see GeoTrackPoint shape.
   const latestFixRef = useRef<GeoFix | null>(null)
+  // Ref sincronizado com trackPoints — permite ler o último ponto sem stale
+  // closure no effect de pipeline (que agora roda fora de setTrackPoints updater).
+  const trackPointsRef = useRef<GeoTrackPoint[]>([])
+  useEffect(() => { trackPointsRef.current = trackPoints }, [trackPoints])
 
   // ── Timer: advance elapsed + recompute pace/calories every second ────────
   useEffect(() => {
@@ -161,6 +165,10 @@ export function useCardioTracking({
   }, [isTracking, isPaused, bodyWeightKg])
 
   // ── Position pipeline: filter + append + recompute ──────────────────────
+  // Antes: setMetrics era chamado DENTRO do updater do setTrackPoints — anti-pattern.
+  // Em StrictMode dupla execução, setMetrics rodaria 2x. Agora a lógica é puramente
+  // computacional fora dos setStates: lê trackPoints via ref, decide, e chama
+  // os 2 setStates em sequência.
   useEffect(() => {
     if (!isTracking || isPaused || !position) return
     latestFixRef.current = position
@@ -168,49 +176,47 @@ export function useCardioTracking({
     const newPoint = toTrackPoint(position)
     const incoming = { ...newPoint, accuracyMeters: position.accuracyMeters }
 
-    setTrackPoints((prev) => {
-      const last = prev.length > 0 ? prev[prev.length - 1] : null
-      const decision = decideCardioFilter(last, incoming, {
-        maxAccuracyMeters,
-        minMovementMeters,
-        maxRealisticSpeedKmh,
-      })
+    const prev = trackPointsRef.current
+    const last = prev.length > 0 ? prev[prev.length - 1] : null
+    const decision = decideCardioFilter(last, incoming, {
+      maxAccuracyMeters,
+      minMovementMeters,
+      maxRealisticSpeedKmh,
+    })
 
-      if (decision.type === 'reject') {
-        // Keep the accuracy visible so the UI can show signal quality and
-        // "searching for GPS" while we wait for a good fix.
-        setMetrics((p) => ({ ...p, accuracyMeters: position.accuracyMeters }))
-        return prev
-      }
+    if (decision.type === 'reject') {
+      // Keep the accuracy visible so the UI can show signal quality and
+      // "searching for GPS" while we wait for a good fix.
+      setMetrics((p) => ({ ...p, accuracyMeters: position.accuracyMeters }))
+      return
+    }
 
-      const updated = [...prev, newPoint]
-      const totalDist = totalTrackDistance(updated)
-      const elapsed = Math.floor(
-        (Date.now() - startTimeRef.current - pausedDurationRef.current) / 1000,
-      )
+    const updated = [...prev, newPoint]
+    const totalDist = totalTrackDistance(updated)
+    const elapsed = Math.floor(
+      (Date.now() - startTimeRef.current - pausedDurationRef.current) / 1000,
+    )
 
-      // Current speed from the freshest segment
-      let currentSpeed = 0
-      if (updated.length >= 2) {
-        const a = updated[updated.length - 1]
-        const b = updated[updated.length - 2]
-        const sd = haversineDistance(b, a)
-        const st = (a.timestamp - b.timestamp) / 1000
-        currentSpeed = st > 0 ? speedKmh(sd, st) : 0
-      }
-      if (currentSpeed > maxSpeedRef.current) maxSpeedRef.current = currentSpeed
+    // Current speed from the freshest segment
+    let currentSpeed = 0
+    if (updated.length >= 2) {
+      const a = updated[updated.length - 1]
+      const b = updated[updated.length - 2]
+      const sd = haversineDistance(b, a)
+      const st = (a.timestamp - b.timestamp) / 1000
+      currentSpeed = st > 0 ? speedKmh(sd, st) : 0
+    }
+    if (currentSpeed > maxSpeedRef.current) maxSpeedRef.current = currentSpeed
 
-      setMetrics({
-        distanceMeters: totalDist,
-        durationSeconds: elapsed,
-        paceMinKm: avgPaceMinKm(totalDist, elapsed),
-        currentSpeedKmh: Math.round(currentSpeed * 10) / 10,
-        maxSpeedKmh: Math.round(maxSpeedRef.current * 10) / 10,
-        caloriesEstimated: estimateCardioCalories(totalDist, elapsed, bodyWeightKg),
-        accuracyMeters: position.accuracyMeters,
-      })
-
-      return updated
+    setTrackPoints(updated)
+    setMetrics({
+      distanceMeters: totalDist,
+      durationSeconds: elapsed,
+      paceMinKm: avgPaceMinKm(totalDist, elapsed),
+      currentSpeedKmh: Math.round(currentSpeed * 10) / 10,
+      maxSpeedKmh: Math.round(maxSpeedRef.current * 10) / 10,
+      caloriesEstimated: estimateCardioCalories(totalDist, elapsed, bodyWeightKg),
+      accuracyMeters: position.accuracyMeters,
     })
   }, [position, isTracking, isPaused, bodyWeightKg, maxAccuracyMeters, minMovementMeters, maxRealisticSpeedKmh])
 

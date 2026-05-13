@@ -128,8 +128,9 @@ export function useSessionSync({
     const serverSessionSyncWarnedRef = useRef(false)
     // Tracks whether local writes should be suppressed (when teacher is in control).
     // Used as a ref so changing this flag doesn't restart the effects.
+    // Atualização do .current dentro de useEffect (não em render) — react-hooks/refs.
     const suppressLocalWritesRef = useRef(suppressLocalWrites)
-    suppressLocalWritesRef.current = suppressLocalWrites
+    useEffect(() => { suppressLocalWritesRef.current = suppressLocalWrites }, [suppressLocalWrites])
     // Tracks the _savedAt timestamp of the last upsert we wrote to the server.
     // Used by the Realtime handler as a secondary guard (primary = DEVICE_ID).
     const lastLocalUpsertAtRef = useRef<number>(0)
@@ -438,14 +439,19 @@ export function useSessionSync({
     // 5. Heartbeat auto-save (30s interval)
     // Complements the debounced upsert (#3) by ensuring periodic server-side
     // snapshots even when React state hasn't changed. Uses a ref to avoid
-    // restarting the interval on every state change.
+    // restarting the interval on every state change. Atualização do .current
+    // dentro de useEffect (não em render) — pattern do React 19 + lint refs.
     const activeSessionRef = useRef(activeSession)
-    activeSessionRef.current = activeSession
+    useEffect(() => { activeSessionRef.current = activeSession }, [activeSession])
+
+    // Dep boolean nomeado: extraído pra deixar a intenção explícita no array de
+    // deps abaixo (antes era `!!activeSession` inline + eslint-disable).
+    const hasActiveSession = !!activeSession
 
     useEffect(() => {
         const uid = userId ? String(userId) : ''
         if (!uid) return
-        if (!activeSession) return // only run while a session is active
+        if (!hasActiveSession) return // only run while a session is active
 
         const HEARTBEAT_MS = 30_000 // 30 seconds
         let lastHash = ''
@@ -490,10 +496,10 @@ export function useSessionSync({
 
         const intervalId = setInterval(heartbeat, HEARTBEAT_MS)
         return () => clearInterval(intervalId)
-        // Intentionally only depends on userId + activeSession existence (not content)
-        // so the interval is not restarted on every log change.
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [!!activeSession, supabase, userId, isMissingTable, notifyMigrationWarning])
+        // Intencionalmente depende SÓ da existência de activeSession (não do
+        // conteúdo) pra não reiniciar o interval a cada log change. `activeSession`
+        // em si é lido via ref dentro do heartbeat() (ver activeSessionRef acima).
+    }, [hasActiveSession, supabase, userId, isMissingTable, notifyMigrationWarning])
 
     // 6. Prevent accidental tab close during active workout (beforeunload)
     useEffect(() => {

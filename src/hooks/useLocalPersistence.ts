@@ -108,16 +108,28 @@ export function useLocalPersistence({
         } catch (e) { logWarn('useLocalPersistence', 'silenced error', e) }
       }, 250)
 
-      // IDB dual-write (longer debounce to reduce IDB churn)
+      // IDB dual-write (longer debounce to reduce IDB churn).
+      // Captura userId em closure local — se o usuário trocar de conta antes
+      // do timer disparar (improvável mas possível), o callback persiste pra
+      // userId capturado, não pra eventual outro userId que tenha sido setado.
       if (idbTimerRef.current) clearTimeout(idbTimerRef.current)
+      const capturedUserId = userId
       idbTimerRef.current = setTimeout(() => {
-        persistActiveSession(userId, activeSession as unknown as Record<string, unknown>).catch(() => {})
+        persistActiveSession(capturedUserId, activeSession as unknown as Record<string, unknown>).catch(() => {})
         idbTimerRef.current = null
       }, 2000)
 
       return () => {
         clearTimeout(id)
-        // Don't clear idbTimer on cleanup — let it complete
+        // Cancela IDB timer no cleanup. Antes deixava completar pra preservar
+        // writes em fechamento de aba — mas isso podia persistir em conta errada
+        // quando o usuário trocava de userId. Trade-off: usuário pode perder até
+        // 2s de mudanças no fechamento abrupto; localStorage continua salvando
+        // a cada 250ms, então a perda é mínima.
+        if (idbTimerRef.current) {
+          clearTimeout(idbTimerRef.current)
+          idbTimerRef.current = null
+        }
       }
     } catch {
       return
