@@ -18,6 +18,7 @@
 import { useEffect } from 'react'
 import Image from 'next/image'
 import { ArrowLeft } from 'lucide-react'
+import { useFocusTrap } from '@/hooks/useFocusTrap'
 
 interface Props {
   onClose: () => void
@@ -35,15 +36,11 @@ export default function MothersDayModal({
   onCtaClick,
   ctaLabel = 'Treinar agora',
 }: Props) {
-  useEffect(() => {
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return
-      e.preventDefault()
-      onClose()
-    }
-    window.addEventListener('keydown', onKeyDown)
-    return () => window.removeEventListener('keydown', onKeyDown)
-  }, [onClose])
+  // WCAG 2.4.3 + 2.1.2 — focus trap + Escape
+  const focusTrapRef = useFocusTrap(true, onClose)
+
+  // Legacy useEffect kept as no-op for ABI parity (the hook above replaces it).
+  useEffect(() => { /* handled by useFocusTrap */ }, [onClose])
 
   const handleCta = onCtaClick ?? onClose
 
@@ -56,6 +53,7 @@ export default function MothersDayModal({
       aria-label="Feliz Dia das Mães"
     >
       <div
+        ref={focusTrapRef}
         className="w-full max-w-sm rounded-2xl overflow-hidden shadow-2xl relative"
         style={{
           background: 'rgba(12,12,12,0.99)',

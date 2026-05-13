@@ -3,6 +3,7 @@
 import React, { useEffect } from 'react'
 import { ArrowLeft } from 'lucide-react'
 import type { WhatsNewEntry } from '@/content/whatsNew'
+import { useFocusTrap } from '@/hooks/useFocusTrap'
 
 type UpdateNotification = {
   id: string
@@ -21,22 +22,13 @@ type Props = {
 }
 
 export default function WhatsNewModal({ isOpen, entry, update, onClose }: Props) {
+  // WCAG 2.4.3 + 2.1.2 — focus trap + Escape (substitui listener manual abaixo)
+  const focusTrapRef = useFocusTrap(isOpen, onClose)
+
+  // Keep legacy useEffect as no-op to avoid removing in case other handlers expected it.
   useEffect(() => {
     if (!isOpen) return
-    const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key !== 'Escape') return
-      e.preventDefault()
-      onClose()
-    }
-    try {
-      window.addEventListener('keydown', onKeyDown)
-    } catch { }
-    return () => {
-      try {
-        window.removeEventListener('keydown', onKeyDown)
-      } catch { }
-    }
-  }, [isOpen, onClose])
+  }, [isOpen])
 
   const safeEntry = entry && typeof entry === 'object' ? entry : null
   const safeUpdate = update && typeof update === 'object' ? update : null
@@ -53,12 +45,12 @@ export default function WhatsNewModal({ isOpen, entry, update, onClose }: Props)
   const versionLabel = String(safeUpdate?.version || '').trim()
 
   return (
-    <div className="fixed inset-0 z-[1350] flex items-center justify-center p-4 pt-safe" style={{ background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(16px)' }} role="dialog" aria-modal="true" aria-label="WhatsNew">
-      <div className="w-full max-w-lg rounded-2xl overflow-hidden shadow-2xl" style={{ background: 'rgba(12,12,12,0.99)', border: '1px solid rgba(234,179,8,0.22)', boxShadow: '0 0 40px rgba(234,179,8,0.10), 0 30px 80px rgba(0,0,0,0.65)' }}>
+    <div className="fixed inset-0 z-[1350] flex items-center justify-center p-4 pt-safe" style={{ background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(16px)' }} role="dialog" aria-modal="true" aria-labelledby="whatsnew-title">
+      <div ref={focusTrapRef} className="w-full max-w-lg rounded-2xl overflow-hidden shadow-2xl" style={{ background: 'rgba(12,12,12,0.99)', border: '1px solid rgba(234,179,8,0.22)', boxShadow: '0 0 40px rgba(234,179,8,0.10), 0 30px 80px rgba(0,0,0,0.65)' }}>
         <div className="px-5 pt-5 pb-4 flex items-center justify-between gap-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
           <div className="min-w-0">
             <div className="text-[10px] font-black uppercase tracking-[0.18em] mb-0.5" style={{ color: '#f59e0b' }}>Novidades</div>
-            <div className="text-white font-black text-lg truncate">{title}</div>
+            <div id="whatsnew-title" className="text-white font-black text-lg truncate">{title}</div>
             {versionLabel ? (
               <div className="text-xs text-neutral-400 font-bold">v{versionLabel}</div>
             ) : null}

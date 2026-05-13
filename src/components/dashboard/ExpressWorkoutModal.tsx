@@ -7,6 +7,7 @@
  */
 import React, { useState } from 'react'
 import { ArrowLeft, Zap, Loader2 } from 'lucide-react'
+import { useFocusTrap } from '@/hooks/useFocusTrap'
 
 interface WorkoutDraft {
   title: string
@@ -47,6 +48,9 @@ export default function ExpressWorkoutModal({ isOpen, onClose, onUseDraft }: Pro
   const [equipment, setEquipment] = useState('gym')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+
+  // WCAG 2.4.3 + 2.1.2 — Escape fecha (a menos que esteja gerando) + focus trap
+  const focusTrapRef = useFocusTrap(isOpen, loading ? undefined : onClose)
 
   if (!isOpen) return null
 
@@ -91,6 +95,10 @@ export default function ExpressWorkoutModal({ isOpen, onClose, onUseDraft }: Pro
   return (
     <div className="fixed inset-0 z-[1500] flex items-end justify-center bg-black/70 backdrop-blur-sm">
       <div
+        ref={focusTrapRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="express-workout-title"
         className="w-full max-w-md rounded-t-3xl overflow-hidden"
         style={{ background: '#0a0a0a', border: '1px solid rgba(255,255,255,0.08)' }}
       >
@@ -104,7 +112,7 @@ export default function ExpressWorkoutModal({ isOpen, onClose, onUseDraft }: Pro
               <Zap size={16} className="text-yellow-400" />
             </div>
             <div>
-              <p className="font-black text-white text-sm">Treino Express</p>
+              <p id="express-workout-title" className="font-black text-white text-sm">Treino Express</p>
               <p className="text-xs text-white/30">IA gera seu treino em segundos</p>
             </div>
           </div>
