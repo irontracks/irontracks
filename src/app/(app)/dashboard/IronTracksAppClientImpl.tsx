@@ -305,7 +305,9 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
     const [offlineSyncOpen, setOfflineSyncOpen] = useState(false)
     const [showProgressPhotos, setShowProgressPhotos] = useState(false)
 
-    const supabase = useRef(createClient()).current;
+    // useState lazy init: createClient() roda 1x. `useRef(createClient()).current`
+    // alocava nova instância (com listener storage no window) a cada render — leak.
+    const [supabase] = useState(() => createClient());
     const router = useRouter();
 
     // Treinos, estatísticas, pastas de alunos e fetchWorkouts — extraídos para useWorkoutFetch

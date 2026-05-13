@@ -67,14 +67,16 @@ export function AdminNotificationBell({ onNavigate }: Props) {
   const [unread, setUnread] = useState(0)
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
-  const supabaseRef = useRef(createClient())
+  // useState lazy init: createClient() roda 1x. Antes useRef(createClient()) alocava
+  // nova instância (com listener storage no window) a cada render — leak.
+  const [supabase] = useState(() => createClient())
   const dropdownRef = useRef<HTMLDivElement | null>(null)
 
   const fetchNotifs = useCallback(async () => {
     try {
       setLoading(true)
       const res = await adminFetchJson<ListResponse>(
-        supabaseRef.current,
+        supabase,
         '/api/admin/notifications/list',
         { cache: 'no-store' },
       )
@@ -87,7 +89,7 @@ export function AdminNotificationBell({ onNavigate }: Props) {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [supabase])
 
   // Initial fetch + polling
   useEffect(() => {
@@ -115,7 +117,7 @@ export function AdminNotificationBell({ onNavigate }: Props) {
 
   const markAllRead = useCallback(async () => {
     try {
-      await adminFetchJson(supabaseRef.current, '/api/admin/notifications/mark-read', {
+      await adminFetchJson(supabase, '/api/admin/notifications/mark-read', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ all: true }),
@@ -126,7 +128,7 @@ export function AdminNotificationBell({ onNavigate }: Props) {
     } catch {
       // silencioso
     }
-  }, [])
+  }, [supabase])
 
   const handleItemClick = useCallback(
     async (notif: AdminNotification) => {
@@ -134,7 +136,7 @@ export function AdminNotificationBell({ onNavigate }: Props) {
       if (!notif.is_read) {
         setItems((prev) => prev.map((n) => (n.id === notif.id ? { ...n, is_read: true } : n)))
         setUnread((prev) => Math.max(0, prev - 1))
-        adminFetchJson(supabaseRef.current, '/api/admin/notifications/mark-read', {
+        adminFetchJson(supabase, '/api/admin/notifications/mark-read', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ id: notif.id }),
@@ -143,7 +145,7 @@ export function AdminNotificationBell({ onNavigate }: Props) {
       setOpen(false)
       if (notif.link && onNavigate) onNavigate(notif.link)
     },
-    [onNavigate],
+    [onNavigate, supabase],
   )
 
   return (
