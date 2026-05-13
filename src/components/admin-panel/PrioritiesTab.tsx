@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { useAdminPanel } from './AdminPanelContext';
 import type { UnknownRecord } from '@/types/app';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -251,48 +252,52 @@ interface ComposeModalProps {
     onClose: () => void;
 }
 
-const ComposeModal: React.FC<ComposeModalProps> = ({ studentName, text, sending, error, onChange, onSend, onClose }) => (
-    <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-        <div className="w-full max-w-lg bg-neutral-900 border border-neutral-700 rounded-2xl shadow-2xl p-5 space-y-4">
-            <div className="flex items-center justify-between">
-                <h4 className="font-black text-white flex items-center gap-2">
-                    <Send size={16} className="text-yellow-400" />
-                    Mensagem para {studentName || 'aluno'}
-                </h4>
-                <button type="button" onClick={onClose} className="text-neutral-400 hover:text-neutral-300">
-                    <X size={18} />
-                </button>
-            </div>
-            <textarea
-                aria-label={`Mensagem para ${studentName || 'aluno'}`}
-                value={text}
-                onChange={(e) => onChange(e.target.value)}
-                rows={5}
-                className="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-4 py-3 text-sm text-white resize-none focus:outline-none focus:border-yellow-500/60 placeholder-neutral-600"
-                placeholder="Escreva sua mensagem…"
-            />
-            {error && <p className="text-xs text-red-400">{error}</p>}
-            <div className="flex items-center gap-2 justify-end">
-                <button
-                    type="button"
-                    onClick={onClose}
-                    className="px-4 py-2 text-sm font-bold text-neutral-400 hover:text-white transition-colors"
-                >
-                    Cancelar
-                </button>
-                <button
-                    type="button"
-                    onClick={onSend}
-                    disabled={sending || !text.trim()}
-                    className="flex items-center gap-2 px-4 py-2 bg-yellow-500 hover:bg-yellow-400 text-black text-sm font-black rounded-xl disabled:opacity-50 transition-colors"
-                >
-                    <Send size={14} />
-                    {sending ? 'Enviando…' : 'Enviar e marcar feito'}
-                </button>
+const ComposeModal: React.FC<ComposeModalProps> = ({ studentName, text, sending, error, onChange, onSend, onClose }) => {
+    const containerRef = useFocusTrap(true, onClose);
+    const titleId = 'priorities-compose-modal-title';
+    return (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-4" role="dialog" aria-modal="true" aria-labelledby={titleId}>
+            <div ref={containerRef} className="w-full max-w-lg bg-neutral-900 border border-neutral-700 rounded-2xl shadow-2xl p-5 space-y-4">
+                <div className="flex items-center justify-between">
+                    <h4 id={titleId} className="font-black text-white flex items-center gap-2">
+                        <Send size={16} className="text-yellow-400" aria-hidden="true" />
+                        Mensagem para {studentName || 'aluno'}
+                    </h4>
+                    <button type="button" onClick={onClose} className="text-neutral-400 hover:text-neutral-300" aria-label="Fechar">
+                        <X size={18} />
+                    </button>
+                </div>
+                <textarea
+                    aria-label={`Mensagem para ${studentName || 'aluno'}`}
+                    value={text}
+                    onChange={(e) => onChange(e.target.value)}
+                    rows={5}
+                    className="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-4 py-3 text-sm text-white resize-none focus:outline-none focus:border-yellow-500/60 placeholder-neutral-400"
+                    placeholder="Escreva sua mensagem…"
+                />
+                {error && <p className="text-xs text-red-400">{error}</p>}
+                <div className="flex items-center gap-2 justify-end">
+                    <button
+                        type="button"
+                        onClick={onClose}
+                        className="px-4 py-2 text-sm font-bold text-neutral-400 hover:text-white transition-colors"
+                    >
+                        Cancelar
+                    </button>
+                    <button
+                        type="button"
+                        onClick={onSend}
+                        disabled={sending || !text.trim()}
+                        className="flex items-center gap-2 px-4 py-2 bg-yellow-500 hover:bg-yellow-400 text-black text-sm font-black rounded-xl disabled:opacity-50 transition-colors"
+                    >
+                        <Send size={14} aria-hidden="true" />
+                        {sending ? 'Enviando…' : 'Enviar e marcar feito'}
+                    </button>
+                </div>
             </div>
         </div>
-    </div>
-);
+    );
+};
 
 // ─── Main component ───────────────────────────────────────────────────────────
 

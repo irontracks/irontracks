@@ -7,6 +7,7 @@ import {
     UserPlus, XCircle, Calendar, Shield,
     Zap, Star, Trophy, AlertCircle
 } from 'lucide-react'
+import { useFocusTrap } from '@/hooks/useFocusTrap'
 
 // ─── Types ────────────────────────────────────────────────────────
 type VipItem = {
@@ -68,6 +69,8 @@ const GrantModal = ({ open, onClose, onGrant }: {
     const [loading, setLoading] = useState(false)
     const [result, setResult] = useState<string | null>(null)
 
+    const containerRef = useFocusTrap(open, onClose)
+
     if (!open) return null
 
     const handleGrant = async () => {
@@ -86,9 +89,9 @@ const GrantModal = ({ open, onClose, onGrant }: {
     }
 
     return (
-        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(16px)' }} role="dialog" aria-modal="true" aria-label="Conceder acesso VIP">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4" style={{ background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(16px)' }} role="dialog" aria-modal="true" aria-labelledby="vip-grant-modal-title">
             <div role="presentation" className="fixed inset-0" onClick={onClose} />
-            <div className="rounded-3xl w-full max-w-md p-6 space-y-5 relative z-10" style={{ background: 'rgba(10,10,10,0.99)', border: '1px solid rgba(234,179,8,0.2)', boxShadow: '0 0 40px rgba(234,179,8,0.07), 0 32px 80px rgba(0,0,0,0.7)' }}>
+            <div ref={containerRef} className="rounded-3xl w-full max-w-md p-6 space-y-5 relative z-10" style={{ background: 'rgba(10,10,10,0.99)', border: '1px solid rgba(234,179,8,0.2)', boxShadow: '0 0 40px rgba(234,179,8,0.07), 0 32px 80px rgba(0,0,0,0.7)' }}>
                 {/* Header */}
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
@@ -96,7 +99,7 @@ const GrantModal = ({ open, onClose, onGrant }: {
                             <Crown size={18} className="text-yellow-400" />
                         </div>
                         <div>
-                            <h3 className="font-black text-white text-lg">Conceder VIP</h3>
+                            <h3 id="vip-grant-modal-title" className="font-black text-white text-lg">Conceder VIP</h3>
                             <p className="text-[11px] text-neutral-400">Adicionar acesso VIP a um usuário</p>
                         </div>
                     </div>

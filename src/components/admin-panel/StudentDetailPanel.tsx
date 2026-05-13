@@ -12,6 +12,7 @@ import { z } from 'zod';
 import { normalizeWorkoutTitle } from '@/utils/workoutTitle';
 import { updateWorkout } from '@/actions/workout-actions';
 import dynamic from 'next/dynamic';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
 
 import type { AdminUser } from '@/types/admin';
 import { useAdminPanel } from './AdminPanelContext';
@@ -417,9 +418,12 @@ export const StudentDetailPanel: React.FC = () => {
             {/* Edit Student Workout Modal */}
             {
                 editingStudentWorkout && (
-                    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4" role="presentation">
-                        <button type="button" className="absolute inset-0 bg-black/80 backdrop-blur-sm cursor-default" onClick={() => setEditingStudentWorkout(null)} aria-label="Fechar" />
-                        <div className="relative z-10 bg-neutral-900 w-full max-w-3xl rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" role="dialog" aria-modal="true" aria-label="Editar treino do aluno">
+                    <AdminDialog
+                        onClose={() => setEditingStudentWorkout(null)}
+                        ariaLabel="Editar treino do aluno"
+                        overlayClass="fixed inset-0 z-[70] flex items-center justify-center p-4"
+                        panelClass="relative z-10 bg-neutral-900 w-full max-w-3xl rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden"
+                    >
                             <div className="p-4 border-b border-neutral-800 flex justify-between items-center" >
                                 <h3 className="font-bold text-white" > Editar Treino do Aluno </h3>
                                 < button onClick={() => setEditingStudentWorkout(null)} className="px-3 py-1.5 hover:bg-neutral-800 rounded-full inline-flex items-center gap-2 text-neutral-300" > <ArrowLeft size={16} /><span className="text-xs font-bold">Voltar</span > </button>
@@ -474,16 +478,18 @@ export const StudentDetailPanel: React.FC = () => {
                                     onCancel={() => setEditingStudentWorkout(null)}
                                 />
                             </div>
-                        </div>
-                    </div>
+                    </AdminDialog>
                 )}
 
             {/* View Workout Modal */}
             {
                 viewWorkout && (
-                    <div className="fixed inset-0 z-[70] flex items-center justify-center p-4" role="presentation">
-                        <button type="button" className="absolute inset-0 bg-black/80 backdrop-blur-sm cursor-default" onClick={() => setViewWorkout(null)} aria-label="Fechar" />
-                        <div className="relative z-10 bg-neutral-900 w-full max-w-3xl rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" role="dialog" aria-modal="true" aria-label="Visualizar treino">
+                    <AdminDialog
+                        onClose={() => setViewWorkout(null)}
+                        ariaLabel="Visualizar treino"
+                        overlayClass="fixed inset-0 z-[70] flex items-center justify-center p-4"
+                        panelClass="relative z-10 bg-neutral-900 w-full max-w-3xl rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden"
+                    >
                             <div className="p-4 border-b border-neutral-800 flex justify-between items-center" >
                                 <h3 className="font-bold text-white" > Treino: {normalizeWorkoutTitle(String((viewWorkout as UnknownRecord)?.name ?? ''))} </h3>
                                 < button onClick={() => setViewWorkout(null)} className="px-3 py-1.5 hover:bg-neutral-800 rounded-full inline-flex items-center gap-2 text-neutral-300" > <ArrowLeft size={16} /><span className="text-xs font-bold">Voltar</span > </button>
@@ -506,16 +512,18 @@ export const StudentDetailPanel: React.FC = () => {
                                     </div>
                                 </div>
                             </div>
-                        </div>
-                    </div>
+                    </AdminDialog>
                 )}
 
             {/* Export Modal */}
             {
                 exportOpen && viewWorkout && (
-                    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4" role="presentation">
-                        <button type="button" className="absolute inset-0 bg-black/80 backdrop-blur-sm cursor-default" onClick={() => setExportOpen(false)} aria-label="Fechar" />
-                        <div className="relative z-10 bg-neutral-900 w-full max-w-md rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" role="dialog" aria-modal="true" aria-label="Exportar treino">
+                    <AdminDialog
+                        onClose={() => setExportOpen(false)}
+                        ariaLabel="Exportar treino"
+                        overlayClass="fixed inset-0 z-[80] flex items-center justify-center p-4"
+                        panelClass="relative z-10 bg-neutral-900 w-full max-w-md rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden"
+                    >
                             <div className="p-4 border-b border-neutral-800 flex justify-between items-center" >
                                 <h3 className="font-bold text-white" > Como deseja salvar ? </h3>
                                 < button onClick={() => setExportOpen(false)} className="px-3 py-1.5 hover:bg-neutral-800 rounded-full inline-flex items-center gap-2 text-neutral-300" > <ArrowLeft size={16} /><span className="text-xs font-bold">Voltar</span > </button>
@@ -528,16 +536,18 @@ export const StudentDetailPanel: React.FC = () => {
                                     <Download size={18} /> Baixar JSON
                                 </button>
                             </div>
-                        </div>
-                    </div>
+                    </AdminDialog>
                 )}
 
             {/* Execution Video Modal */}
             {
                 executionVideoModalOpen && executionVideoModalUrl ? (
-                    <div className="fixed inset-0 z-[80] flex items-center justify-center p-4" role="presentation">
-                        <button type="button" className="absolute inset-0 bg-black/80 backdrop-blur-sm cursor-default" onClick={() => { setExecutionVideoModalOpen(false); setExecutionVideoModalUrl(''); }} aria-label="Fechar" />
-                        <div className="relative z-10 bg-neutral-900 w-full max-w-3xl rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" role="dialog" aria-modal="true" aria-label="Vídeo de execução">
+                    <AdminDialog
+                        onClose={() => { setExecutionVideoModalOpen(false); setExecutionVideoModalUrl(''); }}
+                        ariaLabel="Vídeo de execução"
+                        overlayClass="fixed inset-0 z-[80] flex items-center justify-center p-4"
+                        panelClass="relative z-10 bg-neutral-900 w-full max-w-3xl rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden"
+                    >
                             <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3" >
                                 <div className="font-black text-white" > Vídeo de execução </div>
                                 < button
@@ -554,11 +564,34 @@ export const StudentDetailPanel: React.FC = () => {
                                     <track kind="captions" />
                                 </video>
                             </div>
-                        </div>
-                    </div>
+                    </AdminDialog>
                 ) : null}
         </>
     );
 };
+
+/**
+ * Wrapper for nested admin modals: applies useFocusTrap (Tab cycle + Esc) and
+ * proper dialog semantics. WCAG 2.4.3 (Focus Order), 2.1.2 (No Keyboard Trap),
+ * 4.1.2 (Name/Role/Value).
+ */
+const AdminDialog: React.FC<{
+    onClose: () => void
+    ariaLabel: string
+    overlayClass: string
+    panelClass: string
+    closeOverlayLabel?: string
+    children: React.ReactNode
+}> = ({ onClose, ariaLabel, overlayClass, panelClass, closeOverlayLabel = 'Fechar', children }) => {
+    const containerRef = useFocusTrap(true, onClose)
+    return (
+        <div className={overlayClass} role="presentation">
+            <button type="button" className="absolute inset-0 bg-black/80 backdrop-blur-sm cursor-default" onClick={onClose} aria-label={closeOverlayLabel} />
+            <div ref={containerRef} className={panelClass} role="dialog" aria-modal="true" aria-label={ariaLabel}>
+                {children}
+            </div>
+        </div>
+    )
+}
 
 export default StudentDetailPanel;
