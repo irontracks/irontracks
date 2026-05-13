@@ -430,7 +430,7 @@ export default function VipPeriodizationPanel({
                         <div className={`text-xs font-black uppercase tracking-wider ${isCurrent ? 'text-yellow-400' : 'text-neutral-400'}`}>
                           Semana {weekNum}
                         </div>
-                        <div className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${isCurrent ? 'bg-yellow-500/10 text-yellow-400' : 'bg-neutral-800 text-neutral-500'}`}>
+                        <div className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${isCurrent ? 'bg-yellow-500/10 text-yellow-400' : 'bg-neutral-800 text-neutral-400'}`}>
                           {phase}
                         </div>
                         {isCurrent && (
@@ -439,7 +439,7 @@ export default function VipPeriodizationPanel({
                           </div>
                         )}
                       </div>
-                      <div className="text-[10px] text-neutral-500 font-bold">{items.length} treino{items.length !== 1 ? 's' : ''}</div>
+                      <div className="text-[10px] text-neutral-400 font-bold">{items.length} treino{items.length !== 1 ? 's' : ''}</div>
                     </summary>
                     <div className="px-2 pb-2 space-y-1.5">
                       {items.map((w) => {
@@ -450,7 +450,7 @@ export default function VipPeriodizationPanel({
                         return (
                           <div key={safeString(w?.id) || `${weekNum}-${day}`} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 rounded-lg px-3 py-2.5" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.04)' }}>
                             <div className="min-w-0">
-                              <div className="text-[10px] text-neutral-500 font-bold">
+                              <div className="text-[10px] text-neutral-400 font-bold">
                                 Dia {day}{date ? ` • ${date}` : ''}
                               </div>
                               <div className="text-sm text-white font-bold truncate">{title}</div>
@@ -509,7 +509,7 @@ export default function VipPeriodizationPanel({
                     <option value={6}>6 semanas</option>
                     <option value={8}>8 semanas</option>
                   </select>
-                  <div className="text-[11px] text-neutral-500">Escolha 4, 6 ou 8 semanas.</div>
+                  <div className="text-[11px] text-neutral-400">Escolha 4, 6 ou 8 semanas.</div>
                 </div>
                 <div className="space-y-1">
                   <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Modelo de progressão</div>
@@ -522,7 +522,7 @@ export default function VipPeriodizationPanel({
                     <option value="linear">Linear</option>
                     <option value="undulating">Undulatória</option>
                   </select>
-                  <div className="text-[11px] text-neutral-500">Linear sobe gradualmente. Undulatória varia estímulo na semana.</div>
+                  <div className="text-[11px] text-neutral-400">Linear sobe gradualmente. Undulatória varia estímulo na semana.</div>
                 </div>
               </div>
 
@@ -539,7 +539,7 @@ export default function VipPeriodizationPanel({
                     <option value="strength">Força</option>
                     <option value="recomp">Recomposição</option>
                   </select>
-                  <div className="text-[11px] text-neutral-500">Define foco de reps, carga e volume.</div>
+                  <div className="text-[11px] text-neutral-400">Define foco de reps, carga e volume.</div>
                 </div>
                 <div className="space-y-1">
                   <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Nível</div>
@@ -553,7 +553,7 @@ export default function VipPeriodizationPanel({
                     <option value="intermediate">Intermediário</option>
                     <option value="advanced">Avançado</option>
                   </select>
-                  <div className="text-[11px] text-neutral-500">Ajusta complexidade e volume do programa.</div>
+                  <div className="text-[11px] text-neutral-400">Ajusta complexidade e volume do programa.</div>
                 </div>
               </div>
 
@@ -571,7 +571,7 @@ export default function VipPeriodizationPanel({
                     className="w-full rounded-xl bg-neutral-950 border border-neutral-800 px-3 py-3 text-white font-bold"
                     aria-label="Dias por semana"
                   />
-                  {daysPerWeekInvalid ? <div className="text-[11px] text-red-300">Use de 2 a 6 dias por semana.</div> : <div className="text-[11px] text-neutral-500">Quantos dias você treina por semana.</div>}
+                  {daysPerWeekInvalid ? <div className="text-[11px] text-red-300">Use de 2 a 6 dias por semana.</div> : <div className="text-[11px] text-neutral-400">Quantos dias você treina por semana.</div>}
                 </div>
                 <div className="space-y-1">
                   <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Duração da sessão</div>
@@ -586,14 +586,14 @@ export default function VipPeriodizationPanel({
                     className="w-full rounded-xl bg-neutral-950 border border-neutral-800 px-3 py-3 text-white font-bold"
                     aria-label="Minutos por sessão"
                   />
-                  {timeMinutesInvalid ? <div className="text-[11px] text-red-300">Use de 30 a 90 minutos.</div> : <div className="text-[11px] text-neutral-500">Tempo médio disponível por treino.</div>}
+                  {timeMinutesInvalid ? <div className="text-[11px] text-red-300">Use de 30 a 90 minutos.</div> : <div className="text-[11px] text-neutral-400">Tempo médio disponível por treino.</div>}
                 </div>
               </div>
 
               <div className="space-y-2">
                 <div>
                   <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Equipamentos disponíveis</div>
-                  <div className="text-[11px] text-neutral-500">Marque onde você realmente vai treinar nesse ciclo.</div>
+                  <div className="text-[11px] text-neutral-400">Marque onde você realmente vai treinar nesse ciclo.</div>
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   <label className="flex items-center gap-2 rounded-xl bg-neutral-950 border border-neutral-800 px-3 py-3 text-sm text-white font-bold">
@@ -631,7 +631,7 @@ export default function VipPeriodizationPanel({
                   className="w-full rounded-xl bg-neutral-950 border border-neutral-800 px-3 py-3 text-white font-bold"
                   aria-label="Data de início"
                 />
-                <div className="text-[11px] text-neutral-500">Define o calendário do programa (formato dd/mm/aaaa). Se vazio, fica sem datas.</div>
+                <div className="text-[11px] text-neutral-400">Define o calendário do programa (formato dd/mm/aaaa). Se vazio, fica sem datas.</div>
               </div>
 
               <div className="space-y-1">
@@ -644,7 +644,7 @@ export default function VipPeriodizationPanel({
                   className="w-full rounded-xl bg-neutral-950 border border-neutral-800 px-3 py-3 text-white font-medium"
                   aria-label="Limitações"
                 />
-                <div className="text-[11px] text-neutral-500">Isso ajuda o sistema a ajustar exercícios e volume.</div>
+                <div className="text-[11px] text-neutral-400">Isso ajuda o sistema a ajustar exercícios e volume.</div>
               </div>
 
               <button

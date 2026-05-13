@@ -66,12 +66,12 @@ function SetRow({ s, idx }: { s: SetDetail; idx: number }) {
         {done ? (
           <CheckCircle2 size={16} className="text-green-400" />
         ) : (
-          <Circle size={16} className={isWarm ? 'text-neutral-600' : 'text-neutral-500'} />
+          <Circle size={16} className={isWarm ? 'text-neutral-400' : 'text-neutral-400'} />
         )}
       </div>
 
       {/* set number */}
-      <span className="text-[11px] font-black uppercase tracking-widest text-neutral-500 w-8 flex-shrink-0">
+      <span className="text-[11px] font-black uppercase tracking-widest text-neutral-400 w-8 flex-shrink-0">
         {isWarm ? 'AQ' : `S${idx + 1}`}
       </span>
 
@@ -81,12 +81,12 @@ function SetRow({ s, idx }: { s: SetDetail; idx: number }) {
           <div className="text-base font-black text-white">
             {s.weight != null ? `${s.weight}` : '—'}
           </div>
-          <div className="text-[9px] text-neutral-600 uppercase tracking-wide">kg</div>
+          <div className="text-[9px] text-neutral-400 uppercase tracking-wide">kg</div>
         </div>
         <div className="text-neutral-700">×</div>
         <div className="text-center min-w-[40px]">
           <div className="text-base font-black text-white">{s.reps ?? '—'}</div>
-          <div className="text-[9px] text-neutral-600 uppercase tracking-wide">reps</div>
+          <div className="text-[9px] text-neutral-400 uppercase tracking-wide">reps</div>
         </div>
         <div className="ml-auto">
           <span className={`text-xs font-bold ${rpeColor(s.rpe)}`}>{rpeLabel(s.rpe)}</span>
@@ -286,11 +286,11 @@ export function TeacherWorkoutMirror() {
     return (
       <div className="flex flex-col items-center justify-center py-16 gap-4 text-center">
         <div className="w-16 h-16 rounded-3xl bg-neutral-800/60 border border-neutral-700 flex items-center justify-center">
-          <Dumbbell size={28} className="text-neutral-600" />
+          <Dumbbell size={28} className="text-neutral-400" />
         </div>
         <div>
           <p className="text-sm font-bold text-neutral-300">Nenhum treino em andamento</p>
-          <p className="text-xs text-neutral-600 mt-1">
+          <p className="text-xs text-neutral-400 mt-1">
             {String(selectedStudent?.name ?? 'O aluno')} não está treinando agora.
           </p>
         </div>
@@ -336,7 +336,7 @@ export function TeacherWorkoutMirror() {
           <button
             type="button"
             onClick={() => void fetchSession()}
-            className="p-1.5 rounded-lg hover:bg-white/10 text-neutral-500 hover:text-white transition-colors"
+            className="p-1.5 rounded-lg hover:bg-white/10 text-neutral-400 hover:text-white transition-colors"
             title="Atualizar"
           >
             <RefreshCw size={13} />
@@ -349,12 +349,12 @@ export function TeacherWorkoutMirror() {
         {/* Sidebar: exercise list */}
         <div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-3 space-y-1.5 overflow-hidden">
           <div className="px-2 pb-2 mb-1 border-b border-neutral-800">
-            <p className="text-[10px] font-black uppercase tracking-widest text-neutral-500">
+            <p className="text-[10px] font-black uppercase tracking-widest text-neutral-400">
               {exercises.length} exercício{exercises.length !== 1 ? 's' : ''}
             </p>
           </div>
           {exercises.length === 0 && (
-            <p className="text-xs text-neutral-600 text-center py-4">Sem exercícios</p>
+            <p className="text-xs text-neutral-400 text-center py-4">Sem exercícios</p>
           )}
           {exercises.map((ex, i) => (
             <ExerciseCard
@@ -372,7 +372,7 @@ export function TeacherWorkoutMirror() {
             {/* Header */}
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="text-[10px] font-black uppercase tracking-widest text-neutral-500 mb-1">
+                <p className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-1">
                   Exercício {activeExIdx + 1}/{exercises.length}
                 </p>
                 <h3 className="text-xl font-black text-white leading-tight">
@@ -385,12 +385,12 @@ export function TeacherWorkoutMirror() {
                     </span>
                   )}
                   {currentEx.restTime != null && (
-                    <span className="text-[10px] font-bold text-neutral-500">
+                    <span className="text-[10px] font-bold text-neutral-400">
                       Rest: {String(currentEx.restTime)}s
                     </span>
                   )}
                   {!!currentEx.cadence && (
-                    <span className="text-[10px] font-bold text-neutral-500">
+                    <span className="text-[10px] font-bold text-neutral-400">
                       Cad: {String(currentEx.cadence)}
                     </span>
                   )}
@@ -401,14 +401,14 @@ export function TeacherWorkoutMirror() {
                 <div className="w-12 h-12 rounded-full border-4 border-neutral-800 flex items-center justify-center relative">
                   <span className="text-xs font-black text-white">{doneSets}/{currentSets.length}</span>
                 </div>
-                <span className="text-[9px] text-neutral-600 uppercase tracking-wide">series</span>
+                <span className="text-[9px] text-neutral-400 uppercase tracking-wide">series</span>
               </div>
             </div>
 
             {/* Sets */}
             {currentSets.length > 0 ? (
               <div className="space-y-2">
-                <div className="grid grid-cols-3 gap-2 text-[9px] font-black uppercase tracking-widest text-neutral-600 px-4 mb-1">
+                <div className="grid grid-cols-3 gap-2 text-[9px] font-black uppercase tracking-widest text-neutral-400 px-4 mb-1">
                   <span />
                   <span className="text-center">PESO × REPS</span>
                   <span className="text-right">RPE</span>
@@ -418,7 +418,7 @@ export function TeacherWorkoutMirror() {
                 ))}
               </div>
             ) : (
-              <div className="flex items-center gap-2 text-neutral-600 py-4">
+              <div className="flex items-center gap-2 text-neutral-400 py-4">
                 <Zap size={16} />
                 <span className="text-sm">Aguardando início das séries...</span>
               </div>
@@ -427,14 +427,14 @@ export function TeacherWorkoutMirror() {
             {/* Notes */}
             {!!currentEx.notes && (
               <div className="bg-neutral-800/50 border border-neutral-700/50 rounded-xl px-4 py-3">
-                <p className="text-[10px] font-black uppercase tracking-widest text-neutral-500 mb-1">Obs</p>
+                <p className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-1">Obs</p>
                 <p className="text-sm text-neutral-300">{String(currentEx.notes)}</p>
               </div>
             )}
           </div>
         ) : (
           <div className="bg-neutral-900/60 border border-neutral-800 rounded-2xl p-8 flex items-center justify-center">
-            <p className="text-sm text-neutral-600">Selecione um exercício</p>
+            <p className="text-sm text-neutral-400">Selecione um exercício</p>
           </div>
         )}
       </div>

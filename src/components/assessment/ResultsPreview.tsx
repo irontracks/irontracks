@@ -194,19 +194,19 @@ export default function ResultsPreview({ formData, onBack: _onBack, studentName 
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div>
-            <p className="text-xs text-neutral-500 uppercase tracking-wide font-bold">Nome</p>
+            <p className="text-xs text-neutral-400 uppercase tracking-wide font-bold">Nome</p>
             <p className="font-semibold text-white text-sm mt-0.5 truncate">{studentName}</p>
           </div>
           <div>
-            <p className="text-xs text-neutral-500 uppercase tracking-wide font-bold">Data</p>
+            <p className="text-xs text-neutral-400 uppercase tracking-wide font-bold">Data</p>
             <p className="font-semibold text-white text-sm mt-0.5">{formatDate(new Date())}</p>
           </div>
           <div>
-            <p className="text-xs text-neutral-500 uppercase tracking-wide font-bold">Idade</p>
+            <p className="text-xs text-neutral-400 uppercase tracking-wide font-bold">Idade</p>
             <p className="font-semibold text-white text-sm mt-0.5">{formData.age} anos</p>
           </div>
           <div>
-            <p className="text-xs text-neutral-500 uppercase tracking-wide font-bold">Gênero</p>
+            <p className="text-xs text-neutral-400 uppercase tracking-wide font-bold">Gênero</p>
             <p className="font-semibold text-white text-sm mt-0.5">{formData.gender === 'M' ? 'Masculino' : 'Feminino'}</p>
           </div>
         </div>
@@ -221,22 +221,22 @@ export default function ResultsPreview({ formData, onBack: _onBack, studentName 
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
           <div className="text-center p-3 bg-neutral-900 rounded-xl min-h-[88px] flex flex-col items-center justify-center">
-            <p className="text-xs text-neutral-500 uppercase tracking-wide font-bold">Peso</p>
+            <p className="text-xs text-neutral-400 uppercase tracking-wide font-bold">Peso</p>
             <p className="text-xl font-black text-white mt-1 whitespace-nowrap">{formData.weight} <span className="text-sm font-bold text-neutral-400">kg</span></p>
           </div>
           <div className="text-center p-3 bg-neutral-900 rounded-xl min-h-[88px] flex flex-col items-center justify-center">
-            <p className="text-xs text-neutral-500 uppercase tracking-wide font-bold">Altura</p>
+            <p className="text-xs text-neutral-400 uppercase tracking-wide font-bold">Altura</p>
             <p className="text-xl font-black text-white mt-1 whitespace-nowrap">{formData.height} <span className="text-sm font-bold text-neutral-400">cm</span></p>
           </div>
           <div className="text-center p-3 bg-neutral-900 rounded-xl min-h-[88px] flex flex-col items-center justify-center">
-            <p className="text-xs text-neutral-500 uppercase tracking-wide font-bold">IMC</p>
+            <p className="text-xs text-neutral-400 uppercase tracking-wide font-bold">IMC</p>
             <p className="text-xl font-black text-white mt-1">{results.bmi.toFixed(1)}</p>
             <p className={`text-[11px] font-bold mt-0.5 ${getClassificationColor(results.bmiClassification)}`}>
               {results.bmiClassification}
             </p>
           </div>
           <div className="text-center p-3 bg-neutral-900 rounded-xl min-h-[88px] flex flex-col items-center justify-center">
-            <p className="text-xs text-neutral-500 uppercase tracking-wide font-bold">Circunf.</p>
+            <p className="text-xs text-neutral-400 uppercase tracking-wide font-bold">Circunf.</p>
             <p className="text-xl font-black text-white mt-1">{[
               formData.arm_circ,
               formData.chest_circ,
@@ -245,7 +245,7 @@ export default function ResultsPreview({ formData, onBack: _onBack, studentName 
               formData.thigh_circ,
               formData.calf_circ
             ].filter(Boolean).length}</p>
-            <p className="text-[11px] text-neutral-500 font-bold">medidas</p>
+            <p className="text-[11px] text-neutral-400 font-bold">medidas</p>
           </div>
         </div>
       </div>
@@ -278,14 +278,14 @@ export default function ResultsPreview({ formData, onBack: _onBack, studentName 
                   >
                     <p className="text-xs text-neutral-400 uppercase tracking-wide font-bold">{c.label}</p>
                     <p className="text-2xl font-black text-white mt-1">{c.value != null ? `${c.value.toFixed(1)}%` : '—'}</p>
-                    <p className="text-[10px] text-neutral-500 mt-0.5">{c.sub}</p>
+                    <p className="text-[10px] text-neutral-400 mt-0.5">{c.sub}</p>
                   </div>
                 ))}
               </div>
             );
           })()}
           {results.bodyComposition.breakdown.skinfold != null && results.bodyComposition.breakdown.bia != null && (
-            <p className="text-[11px] text-neutral-500 mt-3 leading-relaxed">
+            <p className="text-[11px] text-neutral-400 mt-3 leading-relaxed">
               A <strong>média</strong> é o valor usado nas seções abaixo (massa magra, massa gorda) e no histórico de evolução.
             </p>
           )}
@@ -301,22 +301,22 @@ export default function ResultsPreview({ formData, onBack: _onBack, studentName 
         </div>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
           <div className="text-center p-3 bg-neutral-900 rounded-xl border border-neutral-800 min-h-[88px] flex flex-col items-center justify-center">
-            <p className="text-xs text-neutral-500 uppercase tracking-wide font-bold">% Gordura</p>
+            <p className="text-xs text-neutral-400 uppercase tracking-wide font-bold">% Gordura</p>
             <p className="text-xl font-black text-white mt-1">{results.bodyComposition.bodyFatPercentage.toFixed(1)}%</p>
             <p className={`text-[11px] font-bold mt-0.5 ${getClassificationColor(results.bodyFatClassification)}`}>
               {results.bodyFatClassification}
             </p>
           </div>
           <div className="text-center p-3 bg-neutral-900 rounded-xl border border-neutral-800 min-h-[88px] flex flex-col items-center justify-center">
-            <p className="text-xs text-neutral-500 uppercase tracking-wide font-bold">Massa Magra</p>
+            <p className="text-xs text-neutral-400 uppercase tracking-wide font-bold">Massa Magra</p>
             <p className="text-xl font-black text-emerald-400 mt-1 whitespace-nowrap">{results.leanMass.toFixed(1)} <span className="text-sm font-bold">kg</span></p>
           </div>
           <div className="text-center p-3 bg-neutral-900 rounded-xl border border-neutral-800 min-h-[88px] flex flex-col items-center justify-center">
-            <p className="text-xs text-neutral-500 uppercase tracking-wide font-bold">Massa Gorda</p>
+            <p className="text-xs text-neutral-400 uppercase tracking-wide font-bold">Massa Gorda</p>
             <p className="text-xl font-black text-red-400 mt-1 whitespace-nowrap">{results.fatMass.toFixed(1)} <span className="text-sm font-bold">kg</span></p>
           </div>
           <div className="text-center p-3 bg-neutral-900 rounded-xl border border-neutral-800 min-h-[88px] flex flex-col items-center justify-center">
-            <p className="text-xs text-neutral-500 uppercase tracking-wide font-bold">TMB</p>
+            <p className="text-xs text-neutral-400 uppercase tracking-wide font-bold">TMB</p>
             <p className="text-xl font-black text-yellow-400 mt-1 whitespace-nowrap">{results.bmr.toFixed(0)} <span className="text-sm font-bold">kcal</span></p>
           </div>
         </div>
@@ -341,9 +341,9 @@ export default function ResultsPreview({ formData, onBack: _onBack, studentName 
               const display = avg || s.single || (l > 0 ? String(l) : String(r));
               return (
                 <div key={s.label} className="text-center p-2 bg-neutral-800/60 rounded-lg">
-                  <p className="text-[10px] text-neutral-500 uppercase tracking-wide font-bold truncate">{s.label}</p>
+                  <p className="text-[10px] text-neutral-400 uppercase tracking-wide font-bold truncate">{s.label}</p>
                   <p className="text-base font-black text-white mt-0.5">{display}</p>
-                  {hasLR && <p className="text-[9px] text-neutral-600 mt-0.5">E:{s.left} D:{s.right}</p>}
+                  {hasLR && <p className="text-[9px] text-neutral-400 mt-0.5">E:{s.left} D:{s.right}</p>}
                 </div>
               );
             })}
@@ -352,7 +352,7 @@ export default function ResultsPreview({ formData, onBack: _onBack, studentName 
             <p className="text-xs text-neutral-400">
               Soma das dobras: <span className="font-black text-white">{results.bodyComposition.sumOfSkinfolds.toFixed(1)} mm</span>
             </p>
-            <p className="text-[10px] text-neutral-600">
+            <p className="text-[10px] text-neutral-400">
               Pollock 7 dobras
             </p>
           </div>
@@ -395,7 +395,7 @@ export default function ResultsPreview({ formData, onBack: _onBack, studentName 
                   <div key={c.label} className="text-center p-3 bg-neutral-900 rounded-lg">
                     <p className="text-sm text-neutral-400 capitalize">{c.label}</p>
                     <p className="text-lg font-bold text-white">{display} cm</p>
-                    {hasLR && <p className="text-[10px] text-neutral-600 mt-0.5">E:{c.left} D:{c.right}</p>}
+                    {hasLR && <p className="text-[10px] text-neutral-400 mt-0.5">E:{c.left} D:{c.right}</p>}
                   </div>
                 );
               })}
@@ -434,7 +434,7 @@ export default function ResultsPreview({ formData, onBack: _onBack, studentName 
         </div>
       </div>
 
-      <p className="text-sm text-neutral-500 text-center mt-4">
+      <p className="text-sm text-neutral-400 text-center mt-4">
         Os resultados serão salvos no perfil do aluno e poderão ser acessados posteriormente
       </p>
     </motion.div>

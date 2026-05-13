@@ -170,7 +170,7 @@ export const SkinfoldStep: React.FC<SkinfoldStepProps> = ({
           {/* Bilateral inputs */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <div className="block text-xs text-neutral-500 mb-1">Esquerdo</div>
+              <div className="block text-xs text-neutral-400 mb-1">Esquerdo</div>
               <div className="relative">
                 <input
                   type="text"
@@ -179,15 +179,15 @@ export const SkinfoldStep: React.FC<SkinfoldStepProps> = ({
                   value={String(leftVal)}
                   onChange={(e) => handleNumberInput(bilateral.left, e.target.value)}
                   placeholder={s.placeholder}
-                  className={`w-full px-3 py-3 pr-12 border rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 placeholder:text-neutral-600 text-white bg-neutral-900 ${
+                  className={`w-full px-3 py-3 pr-12 border rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 placeholder:text-neutral-400 text-white bg-neutral-900 ${
                     errors[bilateral.left] ? 'border-red-500' : 'border-neutral-700'
                   }`}
                 />
-                <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-neutral-500 text-sm">mm</span>
+                <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-neutral-400 text-sm">mm</span>
               </div>
             </div>
             <div>
-              <div className="block text-xs text-neutral-500 mb-1">Direito</div>
+              <div className="block text-xs text-neutral-400 mb-1">Direito</div>
               <div className="relative">
                 <input
                   type="text"
@@ -196,11 +196,11 @@ export const SkinfoldStep: React.FC<SkinfoldStepProps> = ({
                   value={String(rightVal)}
                   onChange={(e) => handleNumberInput(bilateral.right, e.target.value)}
                   placeholder={s.placeholder}
-                  className={`w-full px-3 py-3 pr-12 border rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 placeholder:text-neutral-600 text-white bg-neutral-900 ${
+                  className={`w-full px-3 py-3 pr-12 border rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 placeholder:text-neutral-400 text-white bg-neutral-900 ${
                     errors[bilateral.right] ? 'border-red-500' : 'border-neutral-700'
                   }`}
                 />
-                <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-neutral-500 text-sm">mm</span>
+                <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-neutral-400 text-sm">mm</span>
               </div>
             </div>
           </div>
@@ -212,7 +212,7 @@ export const SkinfoldStep: React.FC<SkinfoldStepProps> = ({
             </div>
           )}
 
-          <p className="text-xs text-neutral-500">{s.description}</p>
+          <p className="text-xs text-neutral-400">{s.description}</p>
 
           {status !== 'empty' && (
             <div className="flex items-center">
@@ -248,14 +248,14 @@ export const SkinfoldStep: React.FC<SkinfoldStepProps> = ({
               value={formData[s.field]}
               onChange={(e) => handleNumberInput(s.field, e.target.value)}
               placeholder={s.placeholder}
-              className={`w-full px-3 py-3 pr-12 border rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 placeholder:text-neutral-600 text-white bg-neutral-900 ${
+              className={`w-full px-3 py-3 pr-12 border rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 placeholder:text-neutral-400 text-white bg-neutral-900 ${
                 errors[s.field] ? 'border-red-500' : 'border-neutral-700'
               }`}
             />
-            <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-neutral-500 text-sm">mm</span>
+            <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-neutral-400 text-sm">mm</span>
           </div>
 
-          <p className="text-xs text-neutral-500">{s.description}</p>
+          <p className="text-xs text-neutral-400">{s.description}</p>
 
           {status !== 'empty' && (
             <div className="flex items-center">
@@ -380,9 +380,9 @@ export const SkinfoldStep: React.FC<SkinfoldStepProps> = ({
           onChange={(e) => updateFormData({ observations: e.target.value })}
           rows={3}
           placeholder="Anote aqui dificuldades na medição, qualidade da pele, ou outras observações relevantes..."
-          className="w-full px-3 py-3 border border-neutral-700 bg-neutral-800 text-white rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 placeholder:text-neutral-600"
+          className="w-full px-3 py-3 border border-neutral-700 bg-neutral-800 text-white rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 placeholder:text-neutral-400"
         />
-        <p className="text-xs text-neutral-500">
+        <p className="text-xs text-neutral-400">
           Ex: &quot;Dificuldade na dobra subescapular devido a tensão muscular&quot;, &quot;Pele muito fina no tricipital&quot;
         </p>
       </div>

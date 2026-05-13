@@ -252,7 +252,7 @@ export default function TeacherUpgradeModal({ open, onClose, planState }: Teache
               </button>
             )}
             <div className="min-w-0">
-              <p className="text-xs text-neutral-500 uppercase tracking-widest font-medium">
+              <p className="text-xs text-neutral-400 uppercase tracking-widest font-medium">
                 {step === 'invoices' ? 'Histórico' : 'Professor'}
               </p>
               <h2 className="text-white font-bold text-lg leading-tight truncate">
@@ -380,7 +380,7 @@ export default function TeacherUpgradeModal({ open, onClose, planState }: Teache
                           <p className="text-white font-bold text-sm">
                             {isFree ? 'Grátis' : fmtBRL(plan.price_cents)}
                           </p>
-                          {!isFree && <p className="text-[10px] text-neutral-500">/mês</p>}
+                          {!isFree && <p className="text-[10px] text-neutral-400">/mês</p>}
                         </div>
                       </div>
 
@@ -483,7 +483,7 @@ export default function TeacherUpgradeModal({ open, onClose, planState }: Teache
 
               <div className="flex items-center gap-2 my-1">
                 <div className="flex-1 h-px bg-neutral-800" />
-                <span className="text-[10px] uppercase tracking-widest text-neutral-500 font-black">ou</span>
+                <span className="text-[10px] uppercase tracking-widest text-neutral-400 font-black">ou</span>
                 <div className="flex-1 h-px bg-neutral-800" />
               </div>
 
@@ -514,7 +514,7 @@ export default function TeacherUpgradeModal({ open, onClose, planState }: Teache
                   Escaneie o QR code ou copie o código PIX abaixo para concluir o pagamento.
                 </p>
                 {pixResult.due_date && (
-                  <p className="text-xs text-neutral-500 mt-1">
+                  <p className="text-xs text-neutral-400 mt-1">
                     Válido até {new Date(pixResult.due_date).toLocaleDateString('pt-BR')}
                   </p>
                 )}
@@ -533,7 +533,7 @@ export default function TeacherUpgradeModal({ open, onClose, planState }: Teache
 
               {pixResult.pix_payload && (
                 <div className="rounded-xl bg-neutral-900 border border-neutral-800 p-3">
-                  <p className="text-[10px] text-neutral-500 mb-1.5 uppercase tracking-wide">Código PIX Copia e Cola</p>
+                  <p className="text-[10px] text-neutral-400 mb-1.5 uppercase tracking-wide">Código PIX Copia e Cola</p>
                   <p className="text-xs text-neutral-300 break-all font-mono leading-relaxed line-clamp-4">
                     {String(pixResult.pix_payload)}
                   </p>
@@ -570,9 +570,9 @@ export default function TeacherUpgradeModal({ open, onClose, planState }: Teache
                 </div>
               ) : invoices.length === 0 ? (
                 <div className="text-center py-10 px-4">
-                  <Receipt size={32} className="text-neutral-600 mx-auto mb-3" />
+                  <Receipt size={32} className="text-neutral-400 mx-auto mb-3" />
                   <p className="text-sm text-neutral-300 font-bold">Sem faturas ainda</p>
-                  <p className="text-xs text-neutral-500 mt-1">
+                  <p className="text-xs text-neutral-400 mt-1">
                     Suas cobranças aparecerão aqui depois que você assinar um plano pago.
                   </p>
                   <button
@@ -598,7 +598,7 @@ export default function TeacherUpgradeModal({ open, onClose, planState }: Teache
                           </span>
                           <StatusBadge status={inv.status} />
                         </div>
-                        <p className="text-[11px] text-neutral-500">
+                        <p className="text-[11px] text-neutral-400">
                           {fmtDateBR(inv.created_at)}
                           {inv.due_date && inv.status === 'pending' && ` · vence em ${fmtDateBR(inv.due_date)}`}
                           {inv.paid_at && ` · pago em ${fmtDateBR(inv.paid_at)}`}
@@ -667,7 +667,7 @@ export default function TeacherUpgradeModal({ open, onClose, planState }: Teache
               )}
               {activeInvoice.status === 'pending' && activeInvoice.pix_payload && (
                 <div className="rounded-xl bg-neutral-900 border border-neutral-800 p-3">
-                  <p className="text-[10px] text-neutral-500 mb-1.5 uppercase tracking-wide">PIX Copia e Cola</p>
+                  <p className="text-[10px] text-neutral-400 mb-1.5 uppercase tracking-wide">PIX Copia e Cola</p>
                   <p className="text-xs text-neutral-300 break-all font-mono leading-relaxed line-clamp-4">
                     {activeInvoice.pix_payload}
                   </p>

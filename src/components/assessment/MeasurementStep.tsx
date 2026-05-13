@@ -95,13 +95,13 @@ export const MeasurementStep: React.FC<MeasurementStepProps> = ({
           <div className="block text-sm font-bold text-neutral-300">
             {m.label}
           </div>
-          <span className="ml-2 text-xs text-neutral-500">(cm)</span>
+          <span className="ml-2 text-xs text-neutral-400">(cm)</span>
         </div>
 
         <div className="grid grid-cols-2 gap-3">
           {/* Esquerdo */}
           <div>
-            <div className="block text-xs text-neutral-500 mb-1">Esquerdo</div>
+            <div className="block text-xs text-neutral-400 mb-1">Esquerdo</div>
             <div className="relative">
               <input
                 type="text"
@@ -110,11 +110,11 @@ export const MeasurementStep: React.FC<MeasurementStepProps> = ({
                 value={String(leftVal)}
                 onChange={(e) => handleNumberInput(bilateral.left, e.target.value)}
                 placeholder={m.placeholder}
-                className={`w-full px-3 py-3 pr-12 border rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 placeholder:text-neutral-600 text-white bg-neutral-800 ${
+                className={`w-full px-3 py-3 pr-12 border rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 placeholder:text-neutral-400 text-white bg-neutral-800 ${
                   errors[bilateral.left] ? 'border-red-500' : 'border-neutral-700'
                 }`}
               />
-              <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-neutral-500 text-sm">cm</span>
+              <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-neutral-400 text-sm">cm</span>
             </div>
             {errors[bilateral.left] && (
               <p className="text-sm text-red-500 mt-1">{errors[bilateral.left]}</p>
@@ -123,7 +123,7 @@ export const MeasurementStep: React.FC<MeasurementStepProps> = ({
 
           {/* Direito */}
           <div>
-            <div className="block text-xs text-neutral-500 mb-1">Direito</div>
+            <div className="block text-xs text-neutral-400 mb-1">Direito</div>
             <div className="relative">
               <input
                 type="text"
@@ -132,11 +132,11 @@ export const MeasurementStep: React.FC<MeasurementStepProps> = ({
                 value={String(rightVal)}
                 onChange={(e) => handleNumberInput(bilateral.right, e.target.value)}
                 placeholder={m.placeholder}
-                className={`w-full px-3 py-3 pr-12 border rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 placeholder:text-neutral-600 text-white bg-neutral-800 ${
+                className={`w-full px-3 py-3 pr-12 border rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 placeholder:text-neutral-400 text-white bg-neutral-800 ${
                   errors[bilateral.right] ? 'border-red-500' : 'border-neutral-700'
                 }`}
               />
-              <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-neutral-500 text-sm">cm</span>
+              <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-neutral-400 text-sm">cm</span>
             </div>
             {errors[bilateral.right] && (
               <p className="text-sm text-red-500 mt-1">{errors[bilateral.right]}</p>
@@ -151,7 +151,7 @@ export const MeasurementStep: React.FC<MeasurementStepProps> = ({
           </div>
         )}
 
-        <p className="text-xs text-neutral-500">{m.description}</p>
+        <p className="text-xs text-neutral-400">{m.description}</p>
       </div>
     );
   };
@@ -163,7 +163,7 @@ export const MeasurementStep: React.FC<MeasurementStepProps> = ({
         <label htmlFor={`field-${String(m.field)}`} className="block text-sm font-bold text-neutral-300">
           {m.label}
         </label>
-        <span className="ml-2 text-xs text-neutral-500">(cm)</span>
+        <span className="ml-2 text-xs text-neutral-400">(cm)</span>
       </div>
 
       <div className="relative">
@@ -175,14 +175,14 @@ export const MeasurementStep: React.FC<MeasurementStepProps> = ({
           value={formData[m.field]}
           onChange={(e) => handleNumberInput(m.field, e.target.value)}
           placeholder={m.placeholder}
-          className={`w-full px-3 py-3 pr-12 border rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 placeholder:text-neutral-600 text-white bg-neutral-800 ${
+          className={`w-full px-3 py-3 pr-12 border rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 placeholder:text-neutral-400 text-white bg-neutral-800 ${
             errors[m.field] ? 'border-red-500' : 'border-neutral-700'
           }`}
         />
-        <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-neutral-500 text-sm">cm</span>
+        <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-neutral-400 text-sm">cm</span>
       </div>
 
-      <p className="text-xs text-neutral-500">{m.description}</p>
+      <p className="text-xs text-neutral-400">{m.description}</p>
 
       {errors[m.field] && (
         <p className="text-sm text-red-500">{errors[m.field]}</p>
@@ -282,9 +282,9 @@ export const MeasurementStep: React.FC<MeasurementStepProps> = ({
           onChange={(e) => updateFormData({ observations: e.target.value })}
           rows={3}
           placeholder="Anote aqui qualquer observação relevante sobre as medições, condições do aluno, etc."
-          className="w-full px-3 py-3 border border-neutral-700 bg-neutral-800 text-white rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 placeholder:text-neutral-600"
+          className="w-full px-3 py-3 border border-neutral-700 bg-neutral-800 text-white rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 placeholder:text-neutral-400"
         />
-        <p className="text-xs text-neutral-500">
+        <p className="text-xs text-neutral-400">
           Ex: &quot;Aluno estava resfriado&quot;, &quot;Medições tomadas pela manhã&quot;, &quot;Equipamento calibrado em...&quot;
         </p>
       </div>

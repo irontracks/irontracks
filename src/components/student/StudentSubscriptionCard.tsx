@@ -99,7 +99,7 @@ function PixPaymentModal({ subscriptionId, planName, priceCents, existingCharge,
         {/* header */}
         <div className="flex items-center justify-between px-5 pt-5 pb-3 border-b border-neutral-800 flex-shrink-0">
           <div>
-            <p className="text-xs text-neutral-500 uppercase tracking-widest">Pagamento via PIX</p>
+            <p className="text-xs text-neutral-400 uppercase tracking-widest">Pagamento via PIX</p>
             <h2 className="text-white font-bold text-base">{planName}</h2>
           </div>
           <button onClick={onClose} className="p-2 rounded-full text-neutral-400 hover:text-white hover:bg-neutral-800" aria-label="Fechar">
@@ -206,7 +206,7 @@ function PixPaymentModal({ subscriptionId, planName, priceCents, existingCharge,
               )}
 
               {charge.due_date && (
-                <p className="text-xs text-neutral-500 text-center">Vencimento: {fmtDate(charge.due_date)}</p>
+                <p className="text-xs text-neutral-400 text-center">Vencimento: {fmtDate(charge.due_date)}</p>
               )}
 
               <button
@@ -249,7 +249,7 @@ export default function StudentSubscriptionCard() {
     return (
       <div className="rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4 flex items-center gap-3">
         <div className="w-5 h-5 border-2 border-yellow-500/30 border-t-yellow-500 rounded-full animate-spin flex-shrink-0" />
-        <span className="text-sm text-neutral-500">Carregando plano...</span>
+        <span className="text-sm text-neutral-400">Carregando plano...</span>
       </div>
     )
   }
@@ -277,7 +277,7 @@ export default function StudentSubscriptionCard() {
                   {cfg.icon} {cfg.label}
                 </span>
               </div>
-              <p className="text-xs text-neutral-500 mt-0.5 truncate">
+              <p className="text-xs text-neutral-400 mt-0.5 truncate">
                 {teacherName}
                 {plan?.price_cents != null && ` · ${fmtBRL(plan.price_cents)}`}
                 {plan?.billing_interval && ` ${INTERVAL_LABELS[plan.billing_interval] ?? plan.billing_interval}`}
@@ -310,42 +310,42 @@ export default function StudentSubscriptionCard() {
           <div className="mt-4 pt-3 border-t border-white/[0.06] space-y-1.5">
             {subscription.started_at && (
               <div className="flex justify-between text-xs">
-                <span className="text-neutral-500">Início</span>
+                <span className="text-neutral-400">Início</span>
                 <span className="text-neutral-300">{fmtDate(subscription.started_at)}</span>
               </div>
             )}
             {subscription.expires_at && (
               <div className="flex justify-between text-xs">
-                <span className="text-neutral-500">Vencimento</span>
+                <span className="text-neutral-400">Vencimento</span>
                 <span className="text-neutral-300">{fmtDate(subscription.expires_at)}</span>
               </div>
             )}
             {subscription.next_due_date && (
               <div className="flex justify-between text-xs">
-                <span className="text-neutral-500">Próx. cobrança</span>
+                <span className="text-neutral-400">Próx. cobrança</span>
                 <span className="text-neutral-300">{fmtDate(subscription.next_due_date)}</span>
               </div>
             )}
             {plan?.session_duration_minutes && (
               <div className="flex justify-between text-xs">
-                <span className="text-neutral-500">Duração/sessão</span>
+                <span className="text-neutral-400">Duração/sessão</span>
                 <span className="text-neutral-300">{plan.session_duration_minutes} min</span>
               </div>
             )}
             {plan?.sessions_per_week && (
               <div className="flex justify-between text-xs">
-                <span className="text-neutral-500">Sessões/semana</span>
+                <span className="text-neutral-400">Sessões/semana</span>
                 <span className="text-neutral-300">{plan.sessions_per_week}×</span>
               </div>
             )}
             {plan?.training_days && plan.training_days.length > 0 && (
               <div className="flex justify-between text-xs">
-                <span className="text-neutral-500">Dias de treino</span>
+                <span className="text-neutral-400">Dias de treino</span>
                 <span className="text-neutral-300 uppercase">{plan.training_days.join(' · ')}</span>
               </div>
             )}
             {plan?.notes && (
-              <div className="pt-2 text-xs text-neutral-500 border-t border-white/[0.04]">{plan.notes}</div>
+              <div className="pt-2 text-xs text-neutral-400 border-t border-white/[0.04]">{plan.notes}</div>
             )}
           </div>
         )}
