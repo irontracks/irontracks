@@ -129,7 +129,8 @@ export default function PRPrediction({
         <div className="px-3 pb-3 space-y-2">
           {/* Target selector */}
           <div className="flex items-center gap-2">
-            <span className="text-[10px] text-neutral-500 font-bold">Meta:</span>
+            {/* WCAG 1.4.3 AA — text-neutral-500 falha 4.5:1 sobre dark */}
+            <span className="text-[10px] text-neutral-400 font-bold">Meta:</span>
             <div className="flex gap-1">
               {[5, 10, 15, 20].map(increment => {
                 const val = Math.ceil(currentMax / 5) * 5 + increment - 5
@@ -164,13 +165,13 @@ export default function PRPrediction({
                 </span>
               </div>
               {progressRate !== null && progressRate > 0 && (
-                <p className="text-[10px] text-neutral-500 mt-1">
+                <p className="text-[10px] text-neutral-400 mt-1">
                   Ritmo atual: +{progressRate.toFixed(1)}{unit}/semana
                 </p>
               )}
             </div>
           ) : (
-            <p className="text-[10px] text-neutral-500">
+            <p className="text-[10px] text-neutral-400">
               {progressRate !== null && progressRate <= 0
                 ? 'Progressão estagnada — não é possível prever'
                 : 'Dados insuficientes para previsão'

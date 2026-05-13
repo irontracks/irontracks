@@ -30,7 +30,8 @@ function Stat({
     <div className="flex-1 flex flex-col items-center gap-1 min-w-0">
       <div style={{ color }} className="opacity-80">{icon}</div>
       <span className="text-white font-black text-sm leading-none">{value}</span>
-      <span className="text-neutral-500 text-[10px] font-bold uppercase tracking-wide leading-none">{label}</span>
+      {/* WCAG 1.4.3 AA — text-neutral-500 sobre fundo dark falha contraste 4.5:1 → 400 */}
+      <span className="text-neutral-400 text-[10px] font-bold uppercase tracking-wide leading-none">{label}</span>
     </div>
   )
 }
@@ -58,7 +59,7 @@ export default function HealthWidget({ data }: HealthWidgetProps) {
           <HeartPulse size={11} className="text-white" />
         </div>
         <span className="text-[10px] font-black uppercase tracking-[0.18em] text-rose-400">Apple Health</span>
-        <span className="text-[10px] text-neutral-600 ml-auto">hoje</span>
+        <span className="text-[10px] text-neutral-400 ml-auto">hoje</span>
       </div>
 
       {/* Stats row */}

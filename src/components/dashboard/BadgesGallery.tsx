@@ -234,8 +234,9 @@ const BadgesGallery = memo(function BadgesGallery({ badges, currentStreak, total
               </div>
 
               <div className="flex justify-between items-center mt-1.5">
-                <span className="text-[10px] text-neutral-600">Toque para ver o ranking</span>
-                <span className="text-[10px] text-neutral-600">próx. {nextLevelVol.toLocaleString('pt-BR')}kg</span>
+                {/* WCAG 1.4.3 AA — neutral-600 → 400 (contraste 4.5:1 normal text) */}
+                <span className="text-[10px] text-neutral-400">Toque para ver o ranking</span>
+                <span className="text-[10px] text-neutral-400">próx. {nextLevelVol.toLocaleString('pt-BR')}kg</span>
               </div>
             </div>
           </div>
@@ -245,7 +246,7 @@ const BadgesGallery = memo(function BadgesGallery({ badges, currentStreak, total
       {/* Badges grid */}
       {showBadges ? (
         <div>
-          <h3 className="text-xs font-bold text-neutral-500 uppercase tracking-widest mb-2 px-1">
+          <h3 className="text-xs font-bold text-neutral-400 uppercase tracking-widest mb-2 px-1">
             Conquistas ({safeBadges.length})
           </h3>
           <BadgesInline badges={safeBadges} />
@@ -305,8 +306,8 @@ const BadgesGallery = memo(function BadgesGallery({ badges, currentStreak, total
                 <div className="p-4 rounded-xl"
                   style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
                   <div className="font-bold text-neutral-200 text-sm">Ainda não há dados suficientes.</div>
-                  <div className="mt-1.5 text-neutral-500 text-xs">O Iron Rank soma séries concluídas com peso e reps preenchidos.</div>
-                  <div className="mt-1.5 text-neutral-500 text-xs">
+                  <div className="mt-1.5 text-neutral-400 text-xs">O Iron Rank soma séries concluídas com peso e reps preenchidos.</div>
+                  <div className="mt-1.5 text-neutral-400 text-xs">
                     Seu volume: <span className="text-yellow-400 font-black">{Math.round(totalVolumeKg).toLocaleString('pt-BR')}kg</span>
                   </div>
                   <button type="button" onClick={() => setRankReloadKey(v => v + 1)}
