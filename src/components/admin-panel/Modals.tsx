@@ -3,6 +3,7 @@ import { useAdminPanel } from './AdminPanelContext';
 import { UserPlus, Edit3, ArrowLeft } from 'lucide-react';
 import HistoryList from '../HistoryList'; // Import relative or alias
 import AdminWorkoutEditor from '../AdminWorkoutEditor'; // Import relative or alias
+import { useFocusTrap } from '@/hooks/useFocusTrap';
 // import { AdminWorkout } from '@/types/admin';
 
 export const Modals: React.FC = () => {
@@ -48,8 +49,13 @@ export const Modals: React.FC = () => {
         <>
             {/* Register Student Modal */}
             {showRegisterModal && (
-                <div className="fixed inset-0 z-[60] bg-black/85 flex items-center justify-center p-4 pt-safe pb-safe backdrop-blur-md" role="dialog" aria-modal="true" aria-label="Cadastrar novo aluno">
-                    <div className="p-6 rounded-2xl w-full max-w-sm border shadow-2xl animate-in zoom-in-95 duration-200 relative overflow-hidden" style={{ background: 'linear-gradient(160deg, rgba(20,18,10,0.98) 0%, rgba(10,10,10,0.99) 40%)', borderColor: 'rgba(234,179,8,0.12)', boxShadow: '0 32px 64px -16px rgba(0,0,0,0.8), inset 0 1px 0 rgba(234,179,8,0.1)' }}>
+                <ModalShell
+                    onClose={() => setShowRegisterModal(false)}
+                    ariaLabel="Cadastrar novo aluno"
+                    overlayClass="fixed inset-0 z-[60] bg-black/85 flex items-center justify-center p-4 pt-safe pb-safe backdrop-blur-md"
+                    panelClass="p-6 rounded-2xl w-full max-w-sm border shadow-2xl animate-in zoom-in-95 duration-200 relative overflow-hidden"
+                    panelStyle={{ background: 'linear-gradient(160deg, rgba(20,18,10,0.98) 0%, rgba(10,10,10,0.99) 40%)', borderColor: 'rgba(234,179,8,0.12)', boxShadow: '0 32px 64px -16px rgba(0,0,0,0.8), inset 0 1px 0 rgba(234,179,8,0.1)' }}
+                >
                         <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-yellow-500/40 to-transparent" />
                         <h3 className="font-bold text-white text-xl mb-4 flex items-center gap-2">
                             <UserPlus size={24} className="text-yellow-500" /> Novo Aluno
@@ -86,14 +92,18 @@ export const Modals: React.FC = () => {
                                 {registering ? 'Cadastrando...' : 'CADASTRAR'}
                             </button>
                         </div>
-                    </div>
-                </div>
+                </ModalShell>
             )}
 
             {/* Teacher Modal */}
             {showTeacherModal && (
-                <div className="fixed inset-0 z-[60] bg-black/85 flex items-center justify-center p-4 pt-safe pb-safe backdrop-blur-md" role="dialog" aria-modal="true" aria-label="Cadastrar novo professor">
-                    <div className="p-6 rounded-2xl w-full max-w-sm border shadow-2xl animate-in zoom-in-95 duration-200 relative overflow-hidden" style={{ background: 'linear-gradient(160deg, rgba(20,18,10,0.98) 0%, rgba(10,10,10,0.99) 40%)', borderColor: 'rgba(234,179,8,0.12)', boxShadow: '0 32px 64px -16px rgba(0,0,0,0.8), inset 0 1px 0 rgba(234,179,8,0.1)' }}>
+                <ModalShell
+                    onClose={() => setShowTeacherModal(false)}
+                    ariaLabel="Cadastrar novo professor"
+                    overlayClass="fixed inset-0 z-[60] bg-black/85 flex items-center justify-center p-4 pt-safe pb-safe backdrop-blur-md"
+                    panelClass="p-6 rounded-2xl w-full max-w-sm border shadow-2xl animate-in zoom-in-95 duration-200 relative overflow-hidden"
+                    panelStyle={{ background: 'linear-gradient(160deg, rgba(20,18,10,0.98) 0%, rgba(10,10,10,0.99) 40%)', borderColor: 'rgba(234,179,8,0.12)', boxShadow: '0 32px 64px -16px rgba(0,0,0,0.8), inset 0 1px 0 rgba(234,179,8,0.1)' }}
+                >
                         <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-yellow-500/40 to-transparent" />
                         <h3 className="font-bold text-white text-xl mb-4 flex items-center gap-2">
                             <UserPlus size={24} className="text-yellow-500" /> Novo Professor
@@ -142,14 +152,18 @@ export const Modals: React.FC = () => {
                                 {addingTeacher ? 'Salvando...' : 'ADICIONAR'}
                             </button>
                         </div>
-                    </div>
-                </div>
+                </ModalShell>
             )}
 
             {/* Editing Teacher Modal */}
             {editingTeacher && (
-                <div className="fixed inset-0 z-[60] bg-black/85 flex items-center justify-center p-4 pt-safe pb-safe backdrop-blur-md" role="dialog" aria-modal="true" aria-label="Editar professor">
-                    <div className="p-6 rounded-2xl w-full max-w-sm border shadow-2xl animate-in zoom-in-95 duration-200 relative overflow-hidden" style={{ background: 'linear-gradient(160deg, rgba(20,18,10,0.98) 0%, rgba(10,10,10,0.99) 40%)', borderColor: 'rgba(234,179,8,0.12)', boxShadow: '0 32px 64px -16px rgba(0,0,0,0.8), inset 0 1px 0 rgba(234,179,8,0.1)' }}>
+                <ModalShell
+                    onClose={() => setEditingTeacher(null)}
+                    ariaLabel="Editar professor"
+                    overlayClass="fixed inset-0 z-[60] bg-black/85 flex items-center justify-center p-4 pt-safe pb-safe backdrop-blur-md"
+                    panelClass="p-6 rounded-2xl w-full max-w-sm border shadow-2xl animate-in zoom-in-95 duration-200 relative overflow-hidden"
+                    panelStyle={{ background: 'linear-gradient(160deg, rgba(20,18,10,0.98) 0%, rgba(10,10,10,0.99) 40%)', borderColor: 'rgba(234,179,8,0.12)', boxShadow: '0 32px 64px -16px rgba(0,0,0,0.8), inset 0 1px 0 rgba(234,179,8,0.1)' }}
+                >
                         <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-yellow-500/40 to-transparent" />
                         <h3 className="font-bold text-white text-xl mb-4 flex items-center gap-2">
                             <Edit3 size={24} className="text-yellow-500" /> Editar Professor
@@ -198,8 +212,7 @@ export const Modals: React.FC = () => {
                                 SALVAR
                             </button>
                         </div>
-                    </div>
-                </div>
+                </ModalShell>
             )}
 
             {/* Execution Video Modal */}
@@ -282,3 +295,26 @@ const EscapeListener: React.FC<{ onEscape: () => void }> = ({ onEscape }) => {
     }, [onEscape]);
     return null;
 };
+
+/**
+ * Wrapper for admin modals: applies useFocusTrap (Tab cycle + Esc) and proper
+ * role="dialog" + aria-modal="true" + aria-label semantics.
+ * WCAG 2.4.3 (Focus Order), 2.1.2 (No Keyboard Trap), 4.1.2 (Name/Role/Value).
+ */
+const ModalShell: React.FC<{
+    onClose: () => void
+    ariaLabel: string
+    overlayClass: string
+    panelClass: string
+    panelStyle?: React.CSSProperties
+    children: React.ReactNode
+}> = ({ onClose, ariaLabel, overlayClass, panelClass, panelStyle, children }) => {
+    const containerRef = useFocusTrap(true, onClose)
+    return (
+        <div className={overlayClass} role="dialog" aria-modal="true" aria-label={ariaLabel}>
+            <div ref={containerRef} className={panelClass} style={panelStyle}>
+                {children}
+            </div>
+        </div>
+    )
+}
