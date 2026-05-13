@@ -714,8 +714,12 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
             other_user_name: otherUserName || undefined,
             other_user_photo: photoUrl,
         })
-        setView('directChat')
-    }, [setView])
+        // URL real com channelId — habilita deep-link (irontracks://dashboard/chat/<id>).
+        // ChatDirectScreen renderiza usando `directChat` state em memória; deep-link
+        // direto resolve via fallback effect abaixo (deep-link sem state populado).
+        const safeChannelId = channelId || '_'
+        router.push(`/dashboard/chat/${encodeURIComponent(safeChannelId)}`)
+    }, [router])
 
     // Handler estável pra Siri/Shortcuts intents — todas as actions atualmente
     // roteiam pro dashboard. DashboardEffects consome via prop.
@@ -954,7 +958,9 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                                 onOpenReport={(s: unknown) => {
                                                     setReportBackView('vip');
                                                     setReportData({ current: s, previous: null } as unknown as Parameters<typeof setReportData>[0]);
-                                                    setView('report');
+                                                    // URL real com sessionId — habilita deep-link pra relatório específico.
+                                                    const sid = isRecord(s) ? String((s as Record<string, unknown>).id ?? 'active') : 'active'
+                                                    router.push(`/dashboard/report/${encodeURIComponent(sid)}`)
                                                 }}
                                                 onOpenNutrition={() => setNutritionOpen(true)}
                                             />
@@ -1145,7 +1151,12 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                     <HistoryList
                                         user={user as AdminUser}
                                         settings={userSettingsApi?.settings ?? null}
-                                        onViewReport={(s: unknown) => { setReportBackView('history'); setReportData({ current: s, previous: null } as unknown as Parameters<typeof setReportData>[0]); setView('report'); }}
+                                        onViewReport={(s: unknown) => {
+                                            setReportBackView('history');
+                                            setReportData({ current: s, previous: null } as unknown as Parameters<typeof setReportData>[0]);
+                                            const sid = isRecord(s) ? String((s as Record<string, unknown>).id ?? 'active') : 'active'
+                                            router.push(`/dashboard/report/${encodeURIComponent(sid)}`)
+                                        }}
                                         onBack={() => setView('dashboard')}
                                         targetId={user?.id || ''}
                                         targetEmail={user?.email ? String(user.email) : ''}
