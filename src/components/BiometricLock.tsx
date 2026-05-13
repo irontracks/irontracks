@@ -86,7 +86,12 @@ export function BiometricLock({ userName, onUnlocked }: BiometricLockProps) {
   const biometryLabel = biometryType === 'touchID' ? 'Touch ID' : 'Face ID'
 
   return (
-    <div className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-neutral-950 gap-8 px-6 pt-safe pb-safe">
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="biometric-lock-title"
+      className="fixed inset-0 z-[9999] flex flex-col items-center justify-center bg-neutral-950 gap-8 px-6 pt-safe pb-safe"
+    >
       {/* Logo / App Name */}
       <div className="flex flex-col items-center gap-3 mb-4">
         <Image
@@ -97,7 +102,7 @@ export function BiometricLock({ userName, onUnlocked }: BiometricLockProps) {
           className="rounded-2xl shadow-lg"
           onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none' }}
         />
-        <h1 className="text-2xl font-black text-white tracking-tight">IronTracks</h1>
+        <h1 id="biometric-lock-title" className="text-2xl font-black text-white tracking-tight">IronTracks</h1>
         {userName ? (
           <p className="text-neutral-400 text-sm">Olá, {userName.split(' ')[0]}</p>
         ) : null}
@@ -109,7 +114,7 @@ export function BiometricLock({ userName, onUnlocked }: BiometricLockProps) {
         disabled={loading}
         className="flex flex-col items-center gap-3 p-6 rounded-2xl bg-neutral-900 border border-neutral-800 active:scale-95 transition-transform disabled:opacity-50 w-full max-w-xs"
       >
-        <span className="text-5xl">{iconLabel}</span>
+        <span className="text-5xl" aria-hidden="true">{iconLabel}</span>
         <span className="text-white font-bold text-lg">
           {loading ? 'Aguardando…' : `Desbloquear com ${biometryLabel}`}
         </span>
