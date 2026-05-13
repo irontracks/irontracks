@@ -12,6 +12,7 @@
 'use client'
 import { logWarn } from '@/lib/logger'
 import { useRef, useState, useEffect, useMemo } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { createClient } from '@/utils/supabase/client'
 import { getKcalEstimate } from '@/utils/calories/kcalClient'
 import { normalizeExerciseKey, calculateTotalVolume } from '@/utils/report/formatters'
@@ -207,16 +208,30 @@ export const useReportData = ({ session, previousSession, user, settings }: UseR
   }, [])
 
   // ── Fire-and-forget: API call for server logging only ───────────────────
-  // Does NOT update any state. The displayed calories value is in useMemo below.
-  const kcalApiCalledRef = useRef(false)
-  useEffect(() => {
-    if (!session || kcalApiCalledRef.current) return
-    kcalApiCalledRef.current = true
-    getKcalEstimate({ session, workoutId: session?.id ?? null, rpe: null, biologicalSex: String(settings?.biologicalSex ?? '') || null }).catch(
-      (e) => logWarn('useReportData', 'kcal api log failed', e)
-    )
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [session?.id])
+  // PR-F: era `useRef + useEffect` com dedup manual. Agora useQuery com
+  // `staleTime: Infinity` faz dedup nativo por session.id sem flags manuais.
+  // queryFn catch interno preserva "fire-and-forget" — erros não causam
+  // re-render nem afetam outras queries.
+  useQuery({
+    queryKey: ['kcal-api-log', session?.id ?? null],
+    enabled: !!session?.id,
+    queryFn: async () => {
+      try {
+        await getKcalEstimate({
+          session,
+          workoutId: session?.id ?? null,
+          rpe: null,
+          biologicalSex: String(settings?.biologicalSex ?? '') || null,
+        })
+      } catch (e) {
+        logWarn('useReportData', 'kcal api log failed', e)
+      }
+      return true
+    },
+    staleTime: Infinity,
+    gcTime: Infinity,
+    retry: false,
+  })
 
   // ── Sub-hooks composition ────────────────────────────────────────────────
 
@@ -274,38 +289,38 @@ export const useReportData = ({ session, previousSession, user, settings }: UseR
   const outdoorBike = safeSession?.outdoorBike && typeof safeSession.outdoorBike === 'object' ? (safeSession.outdoorBike as AnyObj) : null
 
   // ── GPS cardio track (from cardio_tracks table, linked by workout_id) ─────
-  const [cardioGps, setCardioGps] = useState<AnyObj | null>(null)
-  const cardioWorkoutIdRef = useRef<string | null>(null)
-  useEffect(() => {
-    const workoutId = typeof session?.id === 'string' ? session.id : null
-    if (!workoutId || !supabase) return
-    // Avoid re-fetching if already loaded for this workout
-    if (cardioWorkoutIdRef.current === workoutId) return
-    cardioWorkoutIdRef.current = workoutId
-
-    void (async () => {
-      try {
-        const { data } = await supabase
-          .from('cardio_tracks')
-          .select('id, distance_meters, duration_seconds, avg_pace_min_km, max_speed_kmh, calories_estimated, started_at, finished_at')
-          .eq('workout_id', workoutId)
-          .order('created_at', { ascending: false })
-          .limit(1)
-          .maybeSingle()
-        if (!data) return
-        setCardioGps({
-          id: data.id,
-          distanceMeters: data.distance_meters ?? undefined,
-          durationSeconds: data.duration_seconds ?? undefined,
-          avgPaceMinKm: data.avg_pace_min_km ?? null,
-          maxSpeedKmh: data.max_speed_kmh ?? null,
-          caloriesEstimated: data.calories_estimated ?? undefined,
-          startedAt: data.started_at ?? undefined,
-          finishedAt: data.finished_at ?? undefined,
-        })
-      } catch { /* non-critical, silently ignore */ }
-    })()
-  }, [session?.id, supabase])
+  // PR-F: era useState + useEffect + cardioWorkoutIdRef pra dedup manual. Agora
+  // useQuery com queryKey baseada em workout_id faz dedup nativo. cardio_tracks
+  // é imutável após finish (gravado uma vez) → staleTime 5min reduz refetches.
+  const cardioWorkoutId = typeof session?.id === 'string' ? session.id : null
+  const cardioGpsQuery = useQuery<AnyObj | null>({
+    queryKey: ['cardio-track', cardioWorkoutId],
+    enabled: !!cardioWorkoutId && !!supabase,
+    queryFn: async () => {
+      if (!supabase || !cardioWorkoutId) return null
+      const { data } = await supabase
+        .from('cardio_tracks')
+        .select('id, distance_meters, duration_seconds, avg_pace_min_km, max_speed_kmh, calories_estimated, started_at, finished_at')
+        .eq('workout_id', cardioWorkoutId)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+      if (!data) return null
+      return {
+        id: data.id,
+        distanceMeters: data.distance_meters ?? undefined,
+        durationSeconds: data.duration_seconds ?? undefined,
+        avgPaceMinKm: data.avg_pace_min_km ?? null,
+        maxSpeedKmh: data.max_speed_kmh ?? null,
+        caloriesEstimated: data.calories_estimated ?? undefined,
+        startedAt: data.started_at ?? undefined,
+        finishedAt: data.finished_at ?? undefined,
+      }
+    },
+    staleTime: 5 * 60 * 1000,
+    retry: 1,
+  })
+  const cardioGps = cardioGpsQuery.data ?? null
 
   // Body weight from pre-workout check-in (answers.body_weight_kg), falls back to 75 kg default
   const preCheckinAnswers = (() => {
