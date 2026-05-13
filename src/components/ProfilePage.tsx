@@ -62,7 +62,7 @@ function SectionTitle({ icon: Icon, title, subtitle }: { icon: React.ElementType
       </div>
       <div>
         <p className="text-sm font-bold text-white leading-none">{title}</p>
-        {subtitle && <p className="text-xs text-neutral-500 mt-0.5">{subtitle}</p>}
+        {subtitle && <p className="text-xs text-neutral-400 mt-0.5">{subtitle}</p>}
       </div>
     </div>
   )
@@ -71,7 +71,7 @@ function SectionTitle({ icon: Icon, title, subtitle }: { icon: React.ElementType
 function FieldLabel({ label, hint }: { label: string; hint?: string }) {
   return (
     <div className="mb-1.5">
-      <label className="text-xs font-semibold uppercase tracking-widest text-neutral-500">{label}</label>
+      <label className="text-xs font-semibold uppercase tracking-widest text-neutral-400">{label}</label>
       {hint && <p className="text-[10px] text-yellow-500/60 mt-0.5">{hint}</p>}
     </div>
   )
@@ -285,7 +285,7 @@ export default function ProfilePage({ settings, displayName, onSave, onBack }: P
               <p className="text-sm font-black text-white mb-1">
                 {score >= 90 ? '✅ Perfil completo!' : score >= 60 ? '⚡ Quase lá!' : '📋 Complete seu perfil'}
               </p>
-              <p className="text-xs text-neutral-500 leading-relaxed">
+              <p className="text-xs text-neutral-400 leading-relaxed">
                 {score >= 90
                   ? 'Seus cálculos de calorias estão na máxima precisão.'
                   : missingFields.length > 0
@@ -306,13 +306,13 @@ export default function ProfilePage({ settings, displayName, onSave, onBack }: P
                   <Image src={userPhotoURL} width={64} height={64} className="w-full h-full object-cover" alt="Avatar" unoptimized />
                 ) : (
                   <div className="w-full h-full bg-neutral-800 flex items-center justify-center">
-                    <Camera size={24} className="text-neutral-600" />
+                    <Camera size={24} className="text-neutral-400" />
                   </div>
                 )}
               </div>
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-bold text-white">{displayName || 'Atleta'}</p>
-                {userEmail && <p className="text-[11px] text-neutral-500 truncate">{userEmail}</p>}
+                {userEmail && <p className="text-[11px] text-neutral-400 truncate">{userEmail}</p>}
               </div>
               <button
                 type="button"
@@ -330,7 +330,7 @@ export default function ProfilePage({ settings, displayName, onSave, onBack }: P
                 <User size={14} className="text-neutral-400" />
                 <p className="text-sm font-bold text-white">Nome de exibição</p>
               </div>
-              <p className="text-[11px] text-neutral-500 mb-2">
+              <p className="text-[11px] text-neutral-400 mb-2">
                 Como você aparece pra outros usuários. Pode ter espaços e acentos.
               </p>
               <div className="flex items-center gap-2">
@@ -341,7 +341,7 @@ export default function ProfilePage({ settings, displayName, onSave, onBack }: P
                   onChange={(e) => setNameDraft(e.target.value.slice(0, 60))}
                   placeholder="Seu nome"
                   autoComplete="name"
-                  className="flex-1 bg-neutral-800/80 border border-neutral-700/60 rounded-xl px-3 py-2 text-sm text-white placeholder:text-neutral-600 focus:outline-none focus:border-yellow-500/60 transition-colors"
+                  className="flex-1 bg-neutral-800/80 border border-neutral-700/60 rounded-xl px-3 py-2 text-sm text-white placeholder:text-neutral-400 focus:outline-none focus:border-yellow-500/60 transition-colors"
                 />
                 <button
                   type="button"
@@ -363,11 +363,11 @@ export default function ProfilePage({ settings, displayName, onSave, onBack }: P
                 <AtSign size={14} className="text-neutral-400" />
                 <p className="text-sm font-bold text-white">Nome de usuário (@)</p>
               </div>
-              <p className="text-[11px] text-neutral-500 mb-2">
+              <p className="text-[11px] text-neutral-400 mb-2">
                 Permite que outros te mencionem (@). 3-20 caracteres, letras minúsculas, números e underscore.
               </p>
               <div className="flex items-center gap-2">
-                <span className="text-neutral-500 text-sm">@</span>
+                <span className="text-neutral-400 text-sm">@</span>
                 <input
                   type="text"
                   aria-label="Nome de usuário (handle)"
@@ -376,7 +376,7 @@ export default function ProfilePage({ settings, displayName, onSave, onBack }: P
                   placeholder="seu_handle"
                   autoComplete="off"
                   spellCheck={false}
-                  className="flex-1 bg-neutral-800/80 border border-neutral-700/60 rounded-xl px-3 py-2 text-sm text-white placeholder:text-neutral-600 focus:outline-none focus:border-yellow-500/60 transition-colors"
+                  className="flex-1 bg-neutral-800/80 border border-neutral-700/60 rounded-xl px-3 py-2 text-sm text-white placeholder:text-neutral-400 focus:outline-none focus:border-yellow-500/60 transition-colors"
                 />
                 <button
                   type="button"
@@ -397,7 +397,7 @@ export default function ProfilePage({ settings, displayName, onSave, onBack }: P
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <p className="text-sm font-bold text-white">Trocar Senha</p>
-                  <p className="text-[11px] text-neutral-500">Alterar senha de acesso à conta.</p>
+                  <p className="text-[11px] text-neutral-400">Alterar senha de acesso à conta.</p>
                 </div>
                 <button
                   type="button"
@@ -426,7 +426,7 @@ export default function ProfilePage({ settings, displayName, onSave, onBack }: P
                     onClick={() => set('biologicalSex', opt.value)}
                     className={`flex-1 py-3 rounded-2xl border text-sm font-black transition-all active:scale-95 flex flex-col items-center gap-0.5 ${draft.biologicalSex === opt.value
                       ? 'bg-yellow-500/20 border-yellow-500/50 text-yellow-300'
-                      : 'bg-neutral-800/60 border-neutral-700/40 text-neutral-500 hover:border-neutral-600'}`}
+                      : 'bg-neutral-800/60 border-neutral-700/40 text-neutral-400 hover:border-neutral-600'}`}
                   >
                     <span className="text-base">{opt.icon}</span>
                     <span className="text-[11px]">{opt.label}</span>
@@ -439,7 +439,7 @@ export default function ProfilePage({ settings, displayName, onSave, onBack }: P
             <div className="mb-5">
               <FieldLabel label="Idade" hint="⚡ Melhora a estimativa de TMB" />
               <div className="relative">
-                <Calendar size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-500" />
+                <Calendar size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-400" />
                 <input
                   type="number"
                   aria-label="Idade"
@@ -456,7 +456,7 @@ export default function ProfilePage({ settings, displayName, onSave, onBack }: P
             <div className="mb-0">
               <FieldLabel label="Telefone" hint="Opcional — não será exibido publicamente" />
               <div className="relative">
-                <Phone size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-500" />
+                <Phone size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-400" />
                 <input
                   type="tel"
                   aria-label="Telefone"
@@ -478,7 +478,7 @@ export default function ProfilePage({ settings, displayName, onSave, onBack }: P
               <div>
                 <FieldLabel label="Peso (kg)" hint="⚡ Usado no cálculo de calorias" />
                 <div className="relative">
-                  <Scale size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
+                  <Scale size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
                   <input
                     type="number" step="0.1" min="30" max="300"
                     aria-label="Peso em kg"
@@ -493,7 +493,7 @@ export default function ProfilePage({ settings, displayName, onSave, onBack }: P
               <div>
                 <FieldLabel label="Altura (cm)" hint="⚡ Melhora o cálculo de TMB" />
                 <div className="relative">
-                  <Ruler size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
+                  <Ruler size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
                   <input
                     type="number" step="0.5" min="100" max="250"
                     aria-label="Altura em cm"
@@ -526,7 +526,7 @@ export default function ProfilePage({ settings, displayName, onSave, onBack }: P
             <div>
               <FieldLabel label="Academia" />
               <div className="relative">
-                <Building2 size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
+                <Building2 size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
                 <input
                   type="text"
                   aria-label="Academia"
@@ -554,7 +554,7 @@ export default function ProfilePage({ settings, displayName, onSave, onBack }: P
                     onClick={() => set('trainingFrequencyPerWeek', d)}
                     className={`w-10 h-10 rounded-xl border text-sm font-black transition-all active:scale-95 ${draft.trainingFrequencyPerWeek === d
                       ? 'bg-yellow-500/20 border-yellow-500/50 text-yellow-300'
-                      : 'bg-neutral-800/60 border-neutral-700/40 text-neutral-500 hover:border-neutral-600'}`}
+                      : 'bg-neutral-800/60 border-neutral-700/40 text-neutral-400 hover:border-neutral-600'}`}
                   >
                     {d}
                   </button>
@@ -566,7 +566,7 @@ export default function ProfilePage({ settings, displayName, onSave, onBack }: P
             <div className="mb-5">
               <FieldLabel label="Há quantos anos treina?" />
               <div className="relative">
-                <BarChart3 size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
+                <BarChart3 size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
                 <input
                   type="number" step="0.5" min="0" max="50"
                   aria-label="Anos de treino"
@@ -592,7 +592,7 @@ export default function ProfilePage({ settings, displayName, onSave, onBack }: P
                       : 'bg-neutral-800/40 border-neutral-700/40 text-neutral-400 hover:border-neutral-600'}`}
                   >
                     <span>{opt.label}</span>
-                    <span className={`text-[11px] ${draft.fitnessLevel === opt.value ? '' : 'text-neutral-600'}`}>{opt.desc}</span>
+                    <span className={`text-[11px] ${draft.fitnessLevel === opt.value ? '' : 'text-neutral-400'}`}>{opt.desc}</span>
                   </button>
                 ))}
               </div>
@@ -609,7 +609,7 @@ export default function ProfilePage({ settings, displayName, onSave, onBack }: P
                     onClick={() => set('fitnessGoal', opt.value)}
                     className={`flex flex-col items-center gap-1 py-3 px-2 rounded-2xl border text-sm font-bold transition-all active:scale-95 ${draft.fitnessGoal === opt.value
                       ? 'bg-yellow-500/15 border-yellow-500/40 text-yellow-300 font-black'
-                      : 'bg-neutral-800/40 border-neutral-700/40 text-neutral-500 hover:border-neutral-600'}`}
+                      : 'bg-neutral-800/40 border-neutral-700/40 text-neutral-400 hover:border-neutral-600'}`}
                   >
                     <span className="text-yellow-500/80">{opt.icon}</span>
                     <span className="text-[11px] leading-tight text-center">{opt.label}</span>

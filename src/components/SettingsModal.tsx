@@ -289,19 +289,19 @@ export default function SettingsModal(props: SettingsModalProps) {
               <div className="flex items-center justify-between gap-3 mb-3">
                 <div>
                   <div className="flex items-center gap-2"><Smartphone size={14} className="text-yellow-500" /><div className="text-xs font-black uppercase tracking-widest text-neutral-400">Diagnóstico iOS</div></div>
-                  <div className="text-xs text-neutral-500 mt-0.5">Capacitor, plugins e permissões no device.</div>
+                  <div className="text-xs text-neutral-400 mt-0.5">Capacitor, plugins e permissões no device.</div>
                 </div>
                 <button type="button" disabled={iosDiagBusy} onClick={loadIosDiag} className="px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black disabled:opacity-60">Atualizar</button>
               </div>
               <div className="grid grid-cols-1 gap-2">
                 <div className="rounded-xl bg-neutral-900 border border-neutral-700 p-3">
-                  <div className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">Runtime</div>
+                  <div className="text-[10px] uppercase tracking-widest text-neutral-400 font-bold">Runtime</div>
                   <div className="text-xs text-neutral-200 mt-1">{String(iosDiagObj?.platform ?? 'unknown')} · Capacitor: {Boolean(iosDiagObj?.capacitorPresent) ? 'ok' : 'não'}</div>
-                  <div className="text-[11px] text-neutral-500 mt-1">App: {String(iosDiagApp?.name ?? '') || '—'} · v{String(iosDiagApp?.version ?? '') || '—'} ({String(iosDiagApp?.build ?? '') || '—'})</div>
-                  <div className="text-[11px] text-neutral-500 mt-1">iOS: {String(iosDiagDevice?.osVersion ?? '') || '—'} · Model: {String(iosDiagDevice?.model ?? '') || '—'}</div>
+                  <div className="text-[11px] text-neutral-400 mt-1">App: {String(iosDiagApp?.name ?? '') || '—'} · v{String(iosDiagApp?.version ?? '') || '—'} ({String(iosDiagApp?.build ?? '') || '—'})</div>
+                  <div className="text-[11px] text-neutral-400 mt-1">iOS: {String(iosDiagDevice?.osVersion ?? '') || '—'} · Model: {String(iosDiagDevice?.model ?? '') || '—'}</div>
                 </div>
                 <div className="rounded-xl bg-neutral-900 border border-neutral-700 p-3">
-                  <div className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">Permissões</div>
+                  <div className="text-[10px] uppercase tracking-widest text-neutral-400 font-bold">Permissões</div>
                   <div className="text-[11px] text-neutral-300 mt-1">Notificações: {String(iosDiagNotif?.status ?? '') || 'unknown'}</div>
                   <div className={`text-[11px] mt-1 ${iosDiagNotif?.timeSensitiveStatus === 'disabled' ? 'text-red-400 font-bold' : 'text-neutral-300'}`}>Time Sensitive: {String(iosDiagNotif?.timeSensitiveStatus ?? '—')}</div>
                   <div className="text-[11px] text-neutral-300 mt-1">Push: {String(iosDiagPush?.receive ?? '') || 'unknown'}</div>
@@ -309,7 +309,7 @@ export default function SettingsModal(props: SettingsModalProps) {
                   <div className="text-[11px] text-neutral-300 mt-1">HealthKit: {Boolean(iosDiagObj?.healthKitAvailable) ? 'disponível' : 'não'}</div>
                 </div>
                 <div className="rounded-xl bg-neutral-900 border border-neutral-700 p-3">
-                  <div className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">Plugins</div>
+                  <div className="text-[10px] uppercase tracking-widest text-neutral-400 font-bold">Plugins</div>
                   <div className="text-[11px] text-neutral-400 mt-1 break-words">{iosDiagPlugins.length ? iosDiagPlugins.slice(0, 18).map((v) => String(v || '').trim()).filter(Boolean).join(', ') : '—'}</div>
                 </div>
               </div>
@@ -352,7 +352,7 @@ export default function SettingsModal(props: SettingsModalProps) {
                   <div className="text-sm font-bold text-white">Gerenciar Assinatura</div>
                   <div className="text-xs text-neutral-400">Cancelar ou alterar plano via App Store</div>
                 </div>
-                <ChevronRight size={14} className="text-neutral-500 group-hover:text-yellow-500 transition-colors shrink-0" />
+                <ChevronRight size={14} className="text-neutral-400 group-hover:text-yellow-500 transition-colors shrink-0" />
               </button>
             </div>
           )}
@@ -367,15 +367,15 @@ export default function SettingsModal(props: SettingsModalProps) {
               <button type="button" onClick={() => { try { const s = encodeURIComponent('Suporte IronTracks'); const b = encodeURIComponent('Olá equipe IronTracks,\n\nPreciso de ajuda com:\n\n'); window.location.href = `mailto:irontrackscompany@gmail.com?subject=${s}&body=${b}` } catch { } }} className="w-full flex items-center gap-3 p-3 rounded-xl border hover:border-yellow-500/20 transition-all group" style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'rgba(255,255,255,0.06)' }}>
                 <div className="w-10 h-10 rounded-xl bg-yellow-500/10 border border-yellow-500/20 inline-flex items-center justify-center shrink-0"><Mail size={18} className="text-yellow-500" /></div>
                 <div className="flex-1 text-left min-w-0"><div className="text-sm font-bold text-white">Suporte por E-mail</div><div className="text-xs text-neutral-400 truncate">irontrackscompany@gmail.com</div></div>
-                <ExternalLink size={14} className="text-neutral-500 group-hover:text-yellow-500 transition-colors shrink-0" />
+                <ExternalLink size={14} className="text-neutral-400 group-hover:text-yellow-500 transition-colors shrink-0" />
               </button>
               <button type="button" onClick={() => { try { const a = document.createElement('a'); a.href = 'https://tawk.to/chat/irontracks'; a.target = '_blank'; a.rel = 'noopener noreferrer'; document.body.appendChild(a); a.click(); document.body.removeChild(a) } catch { } }} className="w-full flex items-center gap-3 p-3 rounded-xl border hover:border-green-500/20 transition-all group" style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'rgba(255,255,255,0.06)' }}>
                 <div className="w-10 h-10 rounded-xl bg-green-500/10 border border-green-500/20 inline-flex items-center justify-center shrink-0"><MessageCircle size={18} className="text-green-500" /></div>
                 <div className="flex-1 text-left min-w-0"><div className="text-sm font-bold text-white">Chat em Tempo Real</div><div className="text-xs text-neutral-400">Converse com a equipe agora</div></div>
-                <ChevronRight size={14} className="text-neutral-500 group-hover:text-green-500 transition-colors shrink-0" />
+                <ChevronRight size={14} className="text-neutral-400 group-hover:text-green-500 transition-colors shrink-0" />
               </button>
             </div>
-            <div className="mt-3 text-[11px] text-neutral-500 text-center">Estamos aqui para ajudar! Resposta em até 24h por e-mail.</div>
+            <div className="mt-3 text-[11px] text-neutral-400 text-center">Estamos aqui para ajudar! Resposta em até 24h por e-mail.</div>
           </div>
 
           {/* Dados e Dispositivo */}
@@ -429,7 +429,7 @@ export default function SettingsModal(props: SettingsModalProps) {
 
         {/* Footer */}
         <div className="p-4 flex items-center justify-between gap-2" style={{ borderTop: '1px solid rgba(255,255,255,0.06)', background: 'rgba(255,255,255,0.02)' }}>
-          <div className="text-[10px] text-neutral-600 font-mono">IronTracks</div>
+          <div className="text-[10px] text-neutral-400 font-mono">IronTracks</div>
           <div className="flex items-center gap-2">
             <button type="button" onClick={() => props?.onClose?.()} className="px-4 py-3 rounded-xl border text-neutral-300 font-bold hover:text-white hover:border-yellow-500/30 transition-all" style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }}>Fechar</button>
             <button type="button" disabled={!canSave} onClick={async () => { try { const ok = await props?.onSave?.(draft); if (ok === false) return; props?.onClose?.() } catch (e: unknown) { await alert('Falha ao salvar: ' + (getErrorMessage(e) ?? String(e))) } }} className={canSave ? 'px-4 py-3 rounded-xl font-black hover:shadow-yellow-500/30 inline-flex items-center gap-2 transition-all btn-gold-animated' : 'px-4 py-3 rounded-xl bg-yellow-500/70 text-black font-black cursor-wait inline-flex items-center gap-2'}>

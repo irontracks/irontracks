@@ -26,8 +26,8 @@ export const SetDetailsSection: React.FC<SetDetailsSectionProps> = ({
     return (
         <div className="pt-4 space-y-2">
             <div className="flex items-center justify-between">
-                <div className="text-[10px] text-neutral-500 uppercase font-bold">Séries</div>
-                <div className="text-[10px] text-neutral-600">{setDetails.length}</div>
+                <div className="text-[10px] text-neutral-400 uppercase font-bold">Séries</div>
+                <div className="text-[10px] text-neutral-400">{setDetails.length}</div>
             </div>
 
             {setDetails.map((s, setIdx) => {
@@ -87,7 +87,7 @@ export const SetDetailsSection: React.FC<SetDetailsSectionProps> = ({
                         )) && (
                                 <div className="mt-3 grid grid-cols-2 sm:grid-cols-3 gap-2">
                                     <div>
-                                        <div className="text-[10px] text-neutral-500 uppercase font-bold">
+                                        <div className="text-[10px] text-neutral-400 uppercase font-bold">
                                             {isIsoPlank ? 'Peso corporal (kg)' : 'Carga (kg)'}
                                         </div>
                                         <input
@@ -99,7 +99,7 @@ export const SetDetailsSection: React.FC<SetDetailsSectionProps> = ({
                                         />
                                     </div>
                                     <div>
-                                        <div className="text-[10px] text-neutral-500 uppercase font-bold">
+                                        <div className="text-[10px] text-neutral-400 uppercase font-bold">
                                             {isIsoPlank ? 'Tempo alvo (s)' : 'Reps'}
                                         </div>
                                         <input
@@ -138,7 +138,7 @@ export const SetDetailsSection: React.FC<SetDetailsSectionProps> = ({
                         {(isDropCfg || safeMethod === 'Drop-set') && (
                             <div className="mt-3 space-y-2">
                                 <div className="flex items-center justify-between">
-                                    <div className="text-[10px] text-neutral-500 uppercase font-bold">Drop Set</div>
+                                    <div className="text-[10px] text-neutral-400 uppercase font-bold">Drop Set</div>
                                     <button
                                         type="button"
                                         onClick={() => {
@@ -154,7 +154,7 @@ export const SetDetailsSection: React.FC<SetDetailsSectionProps> = ({
                                 {(Array.isArray(config) ? config : []).map((d: AdvancedConfig, dIdx: number) => (
                                     <div key={dIdx} className="grid grid-cols-[1fr_1fr_auto] gap-2 items-end">
                                         <div>
-                                            <div className="text-[10px] text-neutral-500 uppercase font-bold">Peso (kg)</div>
+                                            <div className="text-[10px] text-neutral-400 uppercase font-bold">Peso (kg)</div>
                                             <input
                                                 type="number"
                                                 aria-label={`Peso drop ${dIdx + 1} em kg`}
@@ -168,7 +168,7 @@ export const SetDetailsSection: React.FC<SetDetailsSectionProps> = ({
                                             />
                                         </div>
                                         <div>
-                                            <div className="text-[10px] text-neutral-500 uppercase font-bold">Reps</div>
+                                            <div className="text-[10px] text-neutral-400 uppercase font-bold">Reps</div>
                                             <input
                                                 type="text"
                                                 aria-label={`Reps drop ${dIdx + 1}`}
@@ -207,25 +207,25 @@ export const SetDetailsSection: React.FC<SetDetailsSectionProps> = ({
                                     </span>
                                 </div>
                                 <div>
-                                    <div className="text-[10px] text-neutral-500 uppercase font-bold">Carga</div>
+                                    <div className="text-[10px] text-neutral-400 uppercase font-bold">Carga</div>
                                     <input type="number" aria-label="Carga em kg" value={(config?.weight ?? '')}
                                         onChange={(e) => updateConfig({ ...(config && typeof config === 'object' ? config : {}), weight: e.target.value === '' ? null : Number(e.target.value) })}
                                         className="w-full bg-black/30 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500" />
                                 </div>
                                 <div>
-                                    <div className="text-[10px] text-neutral-500 uppercase font-bold">Reps Iniciais</div>
+                                    <div className="text-[10px] text-neutral-400 uppercase font-bold">Reps Iniciais</div>
                                     <input type="number" aria-label="Repetições iniciais" value={(config?.initial_reps ?? '')}
                                         onChange={(e) => updateConfig({ ...(config && typeof config === 'object' ? config : {}), initial_reps: e.target.value === '' ? null : Number(e.target.value) })}
                                         className="w-full bg-black/30 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500" />
                                 </div>
                                 <div>
-                                    <div className="text-[10px] text-neutral-500 uppercase font-bold">Pausa (s)</div>
+                                    <div className="text-[10px] text-neutral-400 uppercase font-bold">Pausa (s)</div>
                                     <input type="number" aria-label="Pausa em segundos" value={(config?.rest_time_sec ?? '')}
                                         onChange={(e) => updateConfig({ ...(config && typeof config === 'object' ? config : {}), rest_time_sec: e.target.value === '' ? null : Number(e.target.value) })}
                                         className="w-full bg-black/30 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500" />
                                 </div>
                                 <div>
-                                    <div className="text-[10px] text-neutral-500 uppercase font-bold">Mini-sets</div>
+                                    <div className="text-[10px] text-neutral-400 uppercase font-bold">Mini-sets</div>
                                     <input type="number" aria-label="Número de mini-sets" value={(config?.mini_sets ?? '')}
                                         onChange={(e) => updateConfig({ ...(config && typeof config === 'object' ? config : {}), mini_sets: e.target.value === '' ? null : Number(e.target.value) })}
                                         className="w-full bg-black/30 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500" />
@@ -237,25 +237,25 @@ export const SetDetailsSection: React.FC<SetDetailsSectionProps> = ({
                         {(isClusterCfg || safeMethod === 'Cluster') && !isDropCfg && (
                             <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
                                 <div>
-                                    <div className="text-[10px] text-neutral-500 uppercase font-bold">Carga</div>
+                                    <div className="text-[10px] text-neutral-400 uppercase font-bold">Carga</div>
                                     <input type="number" aria-label="Carga cluster em kg" value={(config?.weight ?? '')}
                                         onChange={(e) => updateConfig({ ...(config && typeof config === 'object' ? config : {}), weight: e.target.value === '' ? null : Number(e.target.value) })}
                                         className="w-full bg-black/30 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500" />
                                 </div>
                                 <div>
-                                    <div className="text-[10px] text-neutral-500 uppercase font-bold">Total Reps</div>
+                                    <div className="text-[10px] text-neutral-400 uppercase font-bold">Total Reps</div>
                                     <input type="number" aria-label="Total de repetições do cluster" value={(config?.total_reps ?? '')}
                                         onChange={(e) => updateConfig({ ...(config && typeof config === 'object' ? config : {}), total_reps: e.target.value === '' ? null : Number(e.target.value) })}
                                         className="w-full bg-black/30 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500" />
                                 </div>
                                 <div>
-                                    <div className="text-[10px] text-neutral-500 uppercase font-bold">Cluster</div>
+                                    <div className="text-[10px] text-neutral-400 uppercase font-bold">Cluster</div>
                                     <input type="number" aria-label="Tamanho do cluster" value={(config?.cluster_size ?? '')}
                                         onChange={(e) => updateConfig({ ...(config && typeof config === 'object' ? config : {}), cluster_size: e.target.value === '' ? null : Number(e.target.value) })}
                                         className="w-full bg-black/30 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500" />
                                 </div>
                                 <div>
-                                    <div className="text-[10px] text-neutral-500 uppercase font-bold">Intra (s)</div>
+                                    <div className="text-[10px] text-neutral-400 uppercase font-bold">Intra (s)</div>
                                     <input type="number" aria-label="Descanso intra-cluster em segundos" value={(config?.intra_rest_sec ?? '')}
                                         onChange={(e) => updateConfig({ ...(config && typeof config === 'object' ? config : {}), intra_rest_sec: e.target.value === '' ? null : Number(e.target.value) })}
                                         className="w-full bg-black/30 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500" />

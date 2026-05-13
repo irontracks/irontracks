@@ -82,7 +82,7 @@ export function HistoryListEditModal({
                 <div className="p-4 space-y-3 max-h-[70vh] overflow-y-auto">
                     <div className="grid grid-cols-2 gap-2">
                         <div>
-                            <div className="text-[10px] uppercase font-bold text-neutral-500">Título</div>
+                            <div className="text-[10px] uppercase font-bold text-neutral-400">Título</div>
                             <input
                                 aria-label="Título"
                                 value={editTitle}
@@ -92,7 +92,7 @@ export function HistoryListEditModal({
                             />
                         </div>
                         <div>
-                            <div className="text-[10px] uppercase font-bold text-neutral-500">Duração (min)</div>
+                            <div className="text-[10px] uppercase font-bold text-neutral-400">Duração (min)</div>
                             <input
                                 aria-label="Duração (min)"
                                 type="number"
@@ -105,7 +105,7 @@ export function HistoryListEditModal({
                     </div>
 
                     <div>
-                        <div className="text-[10px] uppercase font-bold text-neutral-500">Data e Hora</div>
+                        <div className="text-[10px] uppercase font-bold text-neutral-400">Data e Hora</div>
                         <input
                             aria-label="Data e Hora"
                             type="datetime-local"
@@ -117,7 +117,7 @@ export function HistoryListEditModal({
                     </div>
 
                     <div>
-                        <div className="text-[10px] uppercase font-bold text-neutral-500">Notas</div>
+                        <div className="text-[10px] uppercase font-bold text-neutral-400">Notas</div>
                         <textarea
                             aria-label="Notas"
                             value={editNotes}
@@ -135,7 +135,7 @@ export function HistoryListEditModal({
                                 <p className="text-sm font-bold text-white">{ex.name}</p>
                                 <div className="grid grid-cols-4 gap-2">
                                     <div>
-                                        <div className="text-[10px] text-neutral-500">Sets</div>
+                                        <div className="text-[10px] text-neutral-400">Sets</div>
                                         <input
                                             aria-label="Sets"
                                             type="number"
@@ -145,7 +145,7 @@ export function HistoryListEditModal({
                                         />
                                     </div>
                                     <div>
-                                        <div className="text-[10px] text-neutral-500">Reps</div>
+                                        <div className="text-[10px] text-neutral-400">Reps</div>
                                         <input
                                             aria-label="Reps"
                                             value={ex.reps || ''}
@@ -154,7 +154,7 @@ export function HistoryListEditModal({
                                         />
                                     </div>
                                     <div>
-                                        <div className="text-[10px] text-neutral-500">Cadência</div>
+                                        <div className="text-[10px] text-neutral-400">Cadência</div>
                                         <input
                                             aria-label="Cadência"
                                             value={ex.cadence || ''}
@@ -163,7 +163,7 @@ export function HistoryListEditModal({
                                         />
                                     </div>
                                     <div>
-                                        <div className="text-[10px] text-neutral-500">Descanso (s)</div>
+                                        <div className="text-[10px] text-neutral-400">Descanso (s)</div>
                                         <input
                                             aria-label="Descanso (s)"
                                             type="number"
@@ -174,7 +174,7 @@ export function HistoryListEditModal({
                                     </div>
                                 </div>
                                 <div>
-                                    <div className="text-[10px] text-neutral-500">Pesos por série (kg)</div>
+                                    <div className="text-[10px] text-neutral-400">Pesos por série (kg)</div>
                                     <div className="grid grid-cols-4 gap-2">
                                         {Array.from({ length: Number(ex.sets) || 0 }).map((_, sIdx) => (
                                             <input
@@ -189,7 +189,7 @@ export function HistoryListEditModal({
                                     </div>
                                 </div>
                                 <div>
-                                    <div className="text-[10px] text-neutral-500">Reps por série</div>
+                                    <div className="text-[10px] text-neutral-400">Reps por série</div>
                                     <div className="grid grid-cols-4 gap-2">
                                         {Array.from({ length: Number(ex.sets) || 0 }).map((_, sIdx) => (
                                             <input
