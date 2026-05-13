@@ -14,7 +14,7 @@
 
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { getProfileCompletenessScore } from '@/schemas/settings'
-import { createClient } from '@/utils/supabase/client'
+import { useStableSupabaseClient } from '@/hooks/useStableSupabaseClient'
 import type { UserSettings } from '@/schemas/settings'
 
 interface UseProfileCompletionOptions {
@@ -53,7 +53,7 @@ export function useProfileCompletion({
   user,
   alert: alertFn,
 }: UseProfileCompletionOptions): UseProfileCompletionReturn {
-  const supabase = createClient()
+  const supabase = useStableSupabaseClient()
   const [profileDraftName, setProfileDraftName] = useState('')
   const [savingProfile, setSavingProfile] = useState(false)
   const [showCompleteProfile, setShowCompleteProfile] = useState(false)

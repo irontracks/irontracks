@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useCallback } from 'react'
-import { createClient } from '@/utils/supabase/client'
+import { useStableSupabaseClient } from '@/hooks/useStableSupabaseClient'
 import { getErrorMessage } from '@/utils/errorMessage'
 
 type Totals = { calories: number; protein: number; carbs: number; fat: number }
@@ -16,7 +16,7 @@ export function useNutritionGoals(
   userId: string | undefined,
   canViewMacros: boolean,
 ) {
-  const supabase = createClient()
+  const supabase = useStableSupabaseClient()
   const [goalsState, setGoalsState] = useState<Totals>({
     calories: safeNumber(initialGoals?.calories),
     protein: safeNumber(initialGoals?.protein),

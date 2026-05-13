@@ -1,7 +1,7 @@
 'use client'
 
 import { useCallback, useState } from 'react'
-import { createClient } from '@/utils/supabase/client'
+import { useStableSupabaseClient } from '@/hooks/useStableSupabaseClient'
 
 interface UseProfileSaveOptions {
   userId?: string
@@ -10,7 +10,7 @@ interface UseProfileSaveOptions {
 }
 
 export function useProfileSave({ userId, user, alert }: UseProfileSaveOptions) {
-  const supabase = createClient()
+  const supabase = useStableSupabaseClient()
   const [savingProfile, setSavingProfile] = useState(false)
   const [profileDraftName, setProfileDraftName] = useState('')
   const [profileIncomplete, setProfileIncomplete] = useState(false)
