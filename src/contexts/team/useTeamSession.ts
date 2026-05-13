@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react' // useRef pra Set persistente entre renders
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { TeamSession, TeamParticipant } from './types'
 

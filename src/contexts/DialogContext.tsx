@@ -26,7 +26,7 @@ interface DialogContextValue {
     closeDialog: () => void
 }
 
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useMemo } from 'react';
 
 const DialogContext = createContext<DialogContextValue | null>(null);
 
@@ -108,8 +108,16 @@ export const DialogProvider = ({ children }: { children: React.ReactNode }) => {
         }, 30_000);
     }, []);
 
+    // Memoiza o value pra evitar re-render de todos os consumers a cada setDialog.
+    // confirm/alert/prompt/closeDialog/showLoading já são estáveis (useCallback),
+    // então value só muda quando `dialog` mudar — comportamento desejado.
+    const value = useMemo(
+        () => ({ dialog, confirm, alert, prompt, closeDialog, showLoading }),
+        [dialog, confirm, alert, prompt, closeDialog, showLoading]
+    );
+
     return (
-        <DialogContext.Provider value={{ dialog, confirm, alert, prompt, closeDialog, showLoading }}>
+        <DialogContext.Provider value={value}>
             {children}
         </DialogContext.Provider>
     );
