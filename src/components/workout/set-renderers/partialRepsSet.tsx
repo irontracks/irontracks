@@ -10,7 +10,7 @@ import {
 } from '../utils';
 import { UnknownRecord, WorkoutExercise } from '../types';
 
-export const PartialRepsSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: number; setIdx: number }) => {
+const PartialRepsSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: number; setIdx: number }) => {
   const { getLog, updateLog, setPartialRepsModal, openNotesKeys, toggleNotes, startTimer, reportHistory } = useWorkoutContext();
   const key = `${exIdx}-${setIdx}`;
   const log = getLog(key);
@@ -110,3 +110,7 @@ export const PartialRepsSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exI
     </div>
   );
 };
+
+export const PartialRepsSet = React.memo(PartialRepsSetInner, (a, b) =>
+  a.ex === b.ex && a.exIdx === b.exIdx && a.setIdx === b.setIdx,
+);

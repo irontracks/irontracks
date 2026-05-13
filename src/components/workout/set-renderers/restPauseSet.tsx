@@ -13,7 +13,7 @@ import {
 } from '../utils';
 import { UnknownRecord, WorkoutExercise } from '../types';
 
-export const RestPauseSet = ({
+const RestPauseSetInner = ({
   ex, exIdx, setIdx, sstOverride,
 }: {
   ex: WorkoutExercise;
@@ -282,3 +282,7 @@ export const RestPauseSet = ({
     </div>
   );
 };
+
+export const RestPauseSet = React.memo(RestPauseSetInner, (a, b) =>
+  a.ex === b.ex && a.exIdx === b.exIdx && a.setIdx === b.setIdx && a.sstOverride === b.sstOverride,
+);

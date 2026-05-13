@@ -10,7 +10,7 @@ import {
 } from '../utils';
 import { UnknownRecord, WorkoutExercise } from '../types';
 
-export const HeavyDutySet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: number; setIdx: number }) => {
+const HeavyDutySetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: number; setIdx: number }) => {
   const { getLog, updateLog, setHeavyDutyModal, openNotesKeys, toggleNotes, startTimer, reportHistory } = useWorkoutContext();
   const key = `${exIdx}-${setIdx}`;
   const log = getLog(key);
@@ -114,3 +114,7 @@ export const HeavyDutySet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx
     </div>
   );
 };
+
+export const HeavyDutySet = React.memo(HeavyDutySetInner, (a, b) =>
+  a.ex === b.ex && a.exIdx === b.exIdx && a.setIdx === b.setIdx,
+);

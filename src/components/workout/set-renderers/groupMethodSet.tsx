@@ -25,7 +25,7 @@ const GROUP_METHOD_INFO: Record<string, string> = {
 
 const PER_SET_METHODS = ['Normal', 'Drop-Set', 'SST', 'Rest-Pause', 'Cluster', 'Stripping', 'Bi-Set', 'Super-Set'];
 
-export const GroupMethodSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: number; setIdx: number }) => {
+const GroupMethodSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: number; setIdx: number }) => {
   const { getLog, updateLog, setGroupMethodModal, openNotesKeys, toggleNotes, startTimer, getPlanConfig, reportHistory } = useWorkoutContext();
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   const key = `${exIdx}-${setIdx}`;
@@ -206,3 +206,7 @@ export const GroupMethodSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exI
     </div>
   );
 };
+
+export const GroupMethodSet = React.memo(GroupMethodSetInner, (a, b) =>
+  a.ex === b.ex && a.exIdx === b.exIdx && a.setIdx === b.setIdx,
+);
