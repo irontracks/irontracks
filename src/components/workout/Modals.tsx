@@ -51,7 +51,7 @@ const ExerciseSortRow = ({
       </button>
       <div className="min-w-0 flex-1">
         <div className="text-sm font-black text-white truncate">{name}</div>
-        <div className="text-[11px] text-neutral-500">Posição {index + 1}</div>
+        <div className="text-[11px] text-neutral-400">Posição {index + 1}</div>
       </div>
       <div className="flex items-center gap-2">
         <button
@@ -312,7 +312,7 @@ export default function Modals() {
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div className="rounded-xl bg-neutral-950/40 border border-neutral-800 p-3">
-                      <div className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">Peso base</div>
+                      <div className="text-[10px] uppercase tracking-widest text-neutral-400 font-bold">Peso base</div>
                       <div className="mt-2 text-xl font-black text-white">{baseWeight ? `${baseWeight} kg` : '-'}</div>
                     </div>
                     <div className="rounded-xl bg-neutral-950/40 border border-yellow-500/30 p-3">
@@ -322,7 +322,7 @@ export default function Modals() {
                   </div>
                   <div className="grid grid-cols-2 gap-3">
                     <div>
-                      <label htmlFor="deload-reduction" className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">Redução (%)</label>
+                      <label htmlFor="deload-reduction" className="text-[10px] uppercase tracking-widest text-neutral-400 font-bold">Redução (%)</label>
                       <input
                         id="deload-reduction"
                         inputMode="decimal"
@@ -333,7 +333,7 @@ export default function Modals() {
                       />
                     </div>
                     <div>
-                      <label htmlFor="deload-weight" className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">Peso sugerido (kg)</label>
+                      <label htmlFor="deload-weight" className="text-[10px] uppercase tracking-widest text-neutral-400 font-bold">Peso sugerido (kg)</label>
                       <input
                         id="deload-weight"
                         inputMode="decimal"
@@ -370,7 +370,7 @@ export default function Modals() {
                     className={
                       canApply
                         ? 'flex-1 min-h-[44px] rounded-xl bg-yellow-500 text-black font-black hover:bg-yellow-400 inline-flex items-center justify-center gap-2'
-                        : 'flex-1 min-h-[44px] rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-500 font-black'
+                        : 'flex-1 min-h-[44px] rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-400 font-black'
                     }
                   >
                     <Check size={16} />
@@ -388,7 +388,7 @@ export default function Modals() {
           <div className="w-full max-w-md bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <div className="text-[11px] uppercase tracking-widest text-neutral-500 font-bold">Treino ativo</div>
+                <div className="text-[11px] uppercase tracking-widest text-neutral-400 font-bold">Treino ativo</div>
                 <div className="text-lg font-black text-white truncate">Adicionar exercício extra</div>
               </div>
               <button
@@ -401,35 +401,35 @@ export default function Modals() {
             </div>
             <div className="p-4 space-y-3">
               <div>
-                <label htmlFor="add-exercise-name" className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">Nome do exercício</label>
+                <label htmlFor="add-exercise-name" className="text-[10px] uppercase tracking-widest text-neutral-400 font-bold">Nome do exercício</label>
                 <input
                   id="add-exercise-name"
                   value={String(addExerciseDraft?.name ?? '')}
                   onChange={(e) => setAddExerciseDraft((prev) => ({ ...prev, name: e?.target?.value ?? '' }))}
-                  className="mt-2 w-full bg-black/30 border border-neutral-700 rounded-xl px-3 py-3 text-sm text-white outline-none focus:ring-1 ring-yellow-500 placeholder:text-neutral-600 placeholder:opacity-40"
+                  className="mt-2 w-full bg-black/30 border border-neutral-700 rounded-xl px-3 py-3 text-sm text-white outline-none focus:ring-1 ring-yellow-500 placeholder:text-neutral-400 placeholder:opacity-40"
                   placeholder="Ex: Supino reto"
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label htmlFor="add-exercise-sets" className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">Sets</label>
+                  <label htmlFor="add-exercise-sets" className="text-[10px] uppercase tracking-widest text-neutral-400 font-bold">Sets</label>
                   <input
                     id="add-exercise-sets"
                     inputMode="decimal"
                     value={String(addExerciseDraft?.sets ?? '')}
                     onChange={(e) => setAddExerciseDraft((prev) => ({ ...prev, sets: e?.target?.value ?? '' }))}
-                    className="mt-2 w-full bg-black/30 border border-neutral-700 rounded-xl px-3 py-3 text-sm text-white outline-none focus:ring-1 ring-yellow-500 placeholder:text-neutral-600 placeholder:opacity-40"
+                    className="mt-2 w-full bg-black/30 border border-neutral-700 rounded-xl px-3 py-3 text-sm text-white outline-none focus:ring-1 ring-yellow-500 placeholder:text-neutral-400 placeholder:opacity-40"
                     placeholder="3"
                   />
                 </div>
                 <div>
-                  <label htmlFor="add-exercise-rest" className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">Descanso (s)</label>
+                  <label htmlFor="add-exercise-rest" className="text-[10px] uppercase tracking-widest text-neutral-400 font-bold">Descanso (s)</label>
                   <input
                     id="add-exercise-rest"
                     inputMode="decimal"
                     value={String(addExerciseDraft?.restTime ?? '')}
                     onChange={(e) => setAddExerciseDraft((prev) => ({ ...prev, restTime: e?.target?.value ?? '' }))}
-                    className="mt-2 w-full bg-black/30 border border-neutral-700 rounded-xl px-3 py-3 text-sm text-white outline-none focus:ring-1 ring-yellow-500 placeholder:text-neutral-600 placeholder:opacity-40"
+                    className="mt-2 w-full bg-black/30 border border-neutral-700 rounded-xl px-3 py-3 text-sm text-white outline-none focus:ring-1 ring-yellow-500 placeholder:text-neutral-400 placeholder:opacity-40"
                     placeholder="60"
                   />
                 </div>
@@ -460,7 +460,7 @@ export default function Modals() {
           <div className="w-full max-w-md bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <div className="text-[11px] uppercase tracking-widest text-neutral-500 font-bold">Treino ativo</div>
+                <div className="text-[11px] uppercase tracking-widest text-neutral-400 font-bold">Treino ativo</div>
                 <div className="text-lg font-black text-white truncate">Editar exercício</div>
               </div>
               <button
@@ -474,41 +474,41 @@ export default function Modals() {
             </div>
             <div className="p-4 space-y-3">
               <div>
-                <label htmlFor="edit-exercise-name" className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">Nome do exercício</label>
+                <label htmlFor="edit-exercise-name" className="text-[10px] uppercase tracking-widest text-neutral-400 font-bold">Nome do exercício</label>
                 <input
                   id="edit-exercise-name"
                   value={String(editExerciseDraft?.name ?? '')}
                   onChange={(e) => setEditExerciseDraft((prev) => ({ ...prev, name: e?.target?.value ?? '' }))}
-                  className="mt-2 w-full bg-black/30 border border-neutral-700 rounded-xl px-3 py-3 text-sm text-white outline-none focus:ring-1 ring-yellow-500 placeholder:text-neutral-600 placeholder:opacity-40"
+                  className="mt-2 w-full bg-black/30 border border-neutral-700 rounded-xl px-3 py-3 text-sm text-white outline-none focus:ring-1 ring-yellow-500 placeholder:text-neutral-400 placeholder:opacity-40"
                   placeholder="Ex: Supino reto"
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label htmlFor="edit-exercise-sets" className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">Sets</label>
+                  <label htmlFor="edit-exercise-sets" className="text-[10px] uppercase tracking-widest text-neutral-400 font-bold">Sets</label>
                   <input
                     id="edit-exercise-sets"
                     inputMode="decimal"
                     value={String(editExerciseDraft?.sets ?? '')}
                     onChange={(e) => setEditExerciseDraft((prev) => ({ ...prev, sets: e?.target?.value ?? '' }))}
-                    className="mt-2 w-full bg-black/30 border border-neutral-700 rounded-xl px-3 py-3 text-sm text-white outline-none focus:ring-1 ring-yellow-500 placeholder:text-neutral-600 placeholder:opacity-40"
+                    className="mt-2 w-full bg-black/30 border border-neutral-700 rounded-xl px-3 py-3 text-sm text-white outline-none focus:ring-1 ring-yellow-500 placeholder:text-neutral-400 placeholder:opacity-40"
                     placeholder="3"
                   />
                 </div>
                 <div>
-                  <label htmlFor="edit-exercise-rest" className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">Descanso (s)</label>
+                  <label htmlFor="edit-exercise-rest" className="text-[10px] uppercase tracking-widest text-neutral-400 font-bold">Descanso (s)</label>
                   <input
                     id="edit-exercise-rest"
                     inputMode="decimal"
                     value={String(editExerciseDraft?.restTime ?? '')}
                     onChange={(e) => setEditExerciseDraft((prev) => ({ ...prev, restTime: e?.target?.value ?? '' }))}
-                    className="mt-2 w-full bg-black/30 border border-neutral-700 rounded-xl px-3 py-3 text-sm text-white outline-none focus:ring-1 ring-yellow-500 placeholder:text-neutral-600 placeholder:opacity-40"
+                    className="mt-2 w-full bg-black/30 border border-neutral-700 rounded-xl px-3 py-3 text-sm text-white outline-none focus:ring-1 ring-yellow-500 placeholder:text-neutral-400 placeholder:opacity-40"
                     placeholder="60"
                   />
                 </div>
               </div>
               <div>
-                <label htmlFor="edit-exercise-method" className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">Método</label>
+                <label htmlFor="edit-exercise-method" className="text-[10px] uppercase tracking-widest text-neutral-400 font-bold">Método</label>
                 <select
                   id="edit-exercise-method"
                   value={String(editExerciseDraft?.method ?? 'Normal')}
@@ -528,7 +528,7 @@ export default function Modals() {
               <div className="flex items-center justify-between gap-3 py-0.5">
                 <div>
                   <div className="text-sm font-black text-white">Exercício Unilateral</div>
-                  <div className="text-[11px] text-neutral-500">Executa em dois lados (L e R)</div>
+                  <div className="text-[11px] text-neutral-400">Executa em dois lados (L e R)</div>
                 </div>
                 <button
                   type="button"
@@ -545,25 +545,25 @@ export default function Modals() {
               <div className="grid grid-cols-2 gap-3">
                 {editExerciseDraft?.isUnilateral && (
                   <div>
-                    <label htmlFor="edit-exercise-side-rest" className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">Descanso entre lados (s)</label>
+                    <label htmlFor="edit-exercise-side-rest" className="text-[10px] uppercase tracking-widest text-neutral-400 font-bold">Descanso entre lados (s)</label>
                     <input
                       id="edit-exercise-side-rest"
                       inputMode="decimal"
                       value={String(editExerciseDraft?.sideRestTime ?? '')}
                       onChange={(e) => setEditExerciseDraft((prev) => ({ ...prev, sideRestTime: e?.target?.value ?? '' }))}
-                      className="mt-2 w-full bg-black/30 border border-neutral-700 rounded-xl px-3 py-3 text-sm text-white outline-none focus:ring-1 ring-blue-500 placeholder:text-neutral-600 placeholder:opacity-40"
+                      className="mt-2 w-full bg-black/30 border border-neutral-700 rounded-xl px-3 py-3 text-sm text-white outline-none focus:ring-1 ring-blue-500 placeholder:text-neutral-400 placeholder:opacity-40"
                       placeholder="15"
                     />
                   </div>
                 )}
                 <div className={editExerciseDraft?.isUnilateral ? '' : 'col-span-2'}>
-                  <label htmlFor="edit-exercise-transition" className="text-[10px] uppercase tracking-widest text-neutral-500 font-bold">Tempo de troca (s)</label>
+                  <label htmlFor="edit-exercise-transition" className="text-[10px] uppercase tracking-widest text-neutral-400 font-bold">Tempo de troca (s)</label>
                   <input
                     id="edit-exercise-transition"
                     inputMode="decimal"
                     value={String(editExerciseDraft?.transitionTime ?? '')}
                     onChange={(e) => setEditExerciseDraft((prev) => ({ ...prev, transitionTime: e?.target?.value ?? '' }))}
-                    className="mt-2 w-full bg-black/30 border border-neutral-700 rounded-xl px-3 py-3 text-sm text-white outline-none focus:ring-1 ring-yellow-500 placeholder:text-neutral-600 placeholder:opacity-40"
+                    className="mt-2 w-full bg-black/30 border border-neutral-700 rounded-xl px-3 py-3 text-sm text-white outline-none focus:ring-1 ring-yellow-500 placeholder:text-neutral-400 placeholder:opacity-40"
                     placeholder="0 = desativado"
                   />
                 </div>
@@ -614,9 +614,9 @@ export default function Modals() {
           <div className="w-full max-w-lg bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <div className="text-[11px] uppercase tracking-widest text-neutral-500 font-bold">Treino ativo</div>
+                <div className="text-[11px] uppercase tracking-widest text-neutral-400 font-bold">Treino ativo</div>
                 <div className="text-lg font-black text-white truncate">Organizar exercícios</div>
-                <div className="text-xs text-neutral-500">Arraste ou use as setas para reordenar.</div>
+                <div className="text-xs text-neutral-400">Arraste ou use as setas para reordenar.</div>
               </div>
               <button
                 type="button"
@@ -661,7 +661,7 @@ export default function Modals() {
                   organizeSaving
                     ? 'flex-1 min-h-[44px] rounded-xl bg-yellow-500/70 text-black font-black inline-flex items-center justify-center gap-2 cursor-wait'
                     : !organizeDirty
-                      ? 'flex-1 min-h-[44px] rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-500 font-bold'
+                      ? 'flex-1 min-h-[44px] rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-400 font-bold'
                       : 'flex-1 min-h-[44px] rounded-xl bg-yellow-500 text-black font-black hover:bg-yellow-400 inline-flex items-center justify-center gap-2'
                 }
               >
@@ -837,7 +837,7 @@ export default function Modals() {
                     <div key={`cluster-block-${idx}`} className="rounded-xl border border-neutral-800 bg-neutral-950/30 p-3 relative">
                       <div className="flex items-center justify-between gap-2">
                         <div className="text-[10px] uppercase tracking-widest font-bold text-neutral-400">Bloco {idx + 1}</div>
-                        {plannedLabel ? <div className="text-[10px] font-mono text-neutral-500">plan {plannedLabel}</div> : <div />}
+                        {plannedLabel ? <div className="text-[10px] font-mono text-neutral-400">plan {plannedLabel}</div> : <div />}
                       </div>
                       {!isLast && safeRestSec ? (
                         <button
@@ -893,7 +893,7 @@ export default function Modals() {
                           className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
                         />
                       </div>
-                      {!isLast ? <div className="mt-2 text-xs text-neutral-500">Descanso: {safeRestSec}s</div> : null}
+                      {!isLast ? <div className="mt-2 text-xs text-neutral-400">Descanso: {safeRestSec}s</div> : null}
                     </div>
                   );
                 })}

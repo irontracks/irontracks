@@ -364,8 +364,8 @@ const MuscleMapCard = memo(function MuscleMapCard(props: Props) {
               </span>
               {autoSync.lastAt ? (
                 <>
-                  <span className="text-neutral-600">•</span>
-                  <span className="text-neutral-500">
+                  <span className="text-neutral-400">•</span>
+                  <span className="text-neutral-400">
                     Atualizado {new Date(autoSync.lastAt).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
                   </span>
                 </>
@@ -381,7 +381,7 @@ const MuscleMapCard = memo(function MuscleMapCard(props: Props) {
                 e.stopPropagation()
                 setExpanded((v) => !v)
               }}
-              className="text-neutral-500 hover:text-neutral-300 rounded-full hover:bg-neutral-800 transition-colors min-h-[40px] min-w-[40px] flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-yellow-500/40"
+              className="text-neutral-400 hover:text-neutral-300 rounded-full hover:bg-neutral-800 transition-colors min-h-[40px] min-w-[40px] flex items-center justify-center focus:outline-none focus:ring-2 focus:ring-yellow-500/40"
             >
               <motion.span className="inline-flex" animate={{ rotate: expanded ? 180 : 0 }} transition={{ duration: 0.2 }}>
                 <ChevronDown size={18} />
@@ -583,7 +583,7 @@ const MuscleMapCard = memo(function MuscleMapCard(props: Props) {
                 />
                 <div className="mt-3 grid grid-cols-5 gap-1.5 text-[10px] font-black uppercase tracking-widest">
                   <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-2 text-center">
-                    <div className="text-neutral-600">Nenhum</div>
+                    <div className="text-neutral-400">Nenhum</div>
                     <div className="h-2 rounded-full mt-1 bg-neutral-700/40" />
                   </div>
                   <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-2 text-center">
@@ -609,7 +609,7 @@ const MuscleMapCard = memo(function MuscleMapCard(props: Props) {
                 <div className="bg-neutral-950 rounded-2xl border border-neutral-800 p-4">
                   <div className="flex items-center justify-between gap-3">
                     <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Detalhes</div>
-                    <div className="text-[11px] font-black uppercase tracking-widest text-neutral-500">
+                    <div className="text-[11px] font-black uppercase tracking-widest text-neutral-400">
                       {state.status === 'loading' ? 'Carregando…' : state.data ? aiLabel : '—'}
                     </div>
                   </div>
@@ -639,12 +639,12 @@ const MuscleMapCard = memo(function MuscleMapCard(props: Props) {
 
                       {isWeekPayload(state.data) && state.data.topExercisesByMuscle?.[selectedInfo.id]?.length ? (
                         <div className="mt-3 space-y-2">
-                          <div className="text-xs font-black uppercase tracking-widest text-neutral-500">Top exercícios</div>
+                          <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Top exercícios</div>
                           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                             {state.data.topExercisesByMuscle[selectedInfo.id].slice(0, 4).map((x, idx) => (
                               <div key={`${x.name}-${idx}`} className="rounded-xl border border-neutral-800 bg-black px-3 py-2">
                                 <div className="text-xs font-bold text-neutral-200 truncate">{x.name}</div>
-                                <div className="text-[11px] text-neutral-500">{Number(x.setsEq || 0).toLocaleString('pt-BR')} sets eq.</div>
+                                <div className="text-[11px] text-neutral-400">{Number(x.setsEq || 0).toLocaleString('pt-BR')} sets eq.</div>
                               </div>
                             ))}
                           </div>
@@ -701,7 +701,7 @@ const MuscleMapCard = memo(function MuscleMapCard(props: Props) {
                             <div key={idx} className="rounded-xl border border-neutral-800 bg-black p-3">
                               <div className="text-xs font-black uppercase tracking-widest text-neutral-300">{String(a.type || 'Alerta')}</div>
                               <div className="mt-1 text-sm text-neutral-100">{String(a.suggestion || '').trim()}</div>
-                              {String(a.evidence || '').trim() ? <div className="mt-1 text-xs text-neutral-500">{String(a.evidence || '').trim()}</div> : null}
+                              {String(a.evidence || '').trim() ? <div className="mt-1 text-xs text-neutral-400">{String(a.evidence || '').trim()}</div> : null}
                             </div>
                           ))}
                         </div>
@@ -711,13 +711,13 @@ const MuscleMapCard = memo(function MuscleMapCard(props: Props) {
                 })()}
 
                 {state.data?.unknownExercises?.length ? (
-                  <div className="mt-2 text-xs text-neutral-500">
+                  <div className="mt-2 text-xs text-neutral-400">
                     Exercícios sem mapeamento: {state.data.unknownExercises.slice(0, 6).join(', ')}
                   </div>
                 ) : null}
 
                 {Number(state.data?.diagnostics?.estimatedSetsUsed || 0) > 0 ? (
-                  <div className="mt-1 text-xs text-neutral-600">
+                  <div className="mt-1 text-xs text-neutral-400">
                     Estimativa aplicada: {Number(state.data?.diagnostics?.estimatedSetsUsed || 0).toLocaleString('pt-BR')} set(s).
                   </div>
                 ) : null}

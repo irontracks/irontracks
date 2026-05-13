@@ -144,13 +144,13 @@ const RecentAchievements = memo(function RecentAchievements({ userId, badges, sh
               </div>
               <div className="text-white font-black text-[15px] leading-tight">Novos Recordes</div>
               {workoutDateIso && (
-                <div className="text-[10px] text-neutral-500 truncate mt-0.5">
-                  <span className="text-neutral-600">No treino: </span>
+                <div className="text-[10px] text-neutral-400 truncate mt-0.5">
+                  <span className="text-neutral-400">No treino: </span>
                   <span style={{ color: 'rgba(234,179,8,0.75)' }}>{workoutTitle}</span>
                 </div>
               )}
               {!workoutDateIso && (
-                <div className="text-[10px] text-neutral-600 mt-0.5">Faça um treino para ver seus recordes aqui.</div>
+                <div className="text-[10px] text-neutral-400 mt-0.5">Faça um treino para ver seus recordes aqui.</div>
               )}
             </div>
 
@@ -160,7 +160,7 @@ const RecentAchievements = memo(function RecentAchievements({ userId, badges, sh
                 type="button"
                 aria-label={expanded ? 'Recolher' : 'Expandir'}
                 onClick={e => { e.stopPropagation(); setExpanded(v => !v) }}
-                className="w-9 h-9 flex items-center justify-center rounded-xl transition-colors text-neutral-500 hover:text-neutral-200"
+                className="w-9 h-9 flex items-center justify-center rounded-xl transition-colors text-neutral-400 hover:text-neutral-200"
                 style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}
               >
                 <span className={`inline-flex transition-transform duration-200 ${expanded ? 'rotate-180' : ''}`}>
@@ -171,7 +171,7 @@ const RecentAchievements = memo(function RecentAchievements({ userId, badges, sh
                 type="button"
                 aria-label="Fechar"
                 onClick={e => { e.stopPropagation(); setVisible(false) }}
-                className="w-9 h-9 flex items-center justify-center rounded-xl transition-colors text-neutral-600 hover:text-red-400"
+                className="w-9 h-9 flex items-center justify-center rounded-xl transition-colors text-neutral-400 hover:text-red-400"
                 style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}
               >
                 <X size={13} />
@@ -245,7 +245,7 @@ const RecentAchievements = memo(function RecentAchievements({ userId, badges, sh
                     <div className="flex items-center gap-2 py-3 px-3 rounded-xl"
                       style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }}>
                       <Trophy size={13} className="text-neutral-700" />
-                      <span className="text-xs text-neutral-500 font-bold">
+                      <span className="text-xs text-neutral-400 font-bold">
                         {!workoutDateIso
                           ? 'Sem treinos concluídos ainda.'
                           : !withinLast7Days
@@ -260,7 +260,7 @@ const RecentAchievements = memo(function RecentAchievements({ userId, badges, sh
                     <div className="pt-2">
                       <div className="flex items-center gap-2 mb-2">
                         <Star size={10} className="text-yellow-500" />
-                        <span className="text-[9px] font-black uppercase tracking-[0.2em] text-neutral-500">
+                        <span className="text-[9px] font-black uppercase tracking-[0.2em] text-neutral-400">
                           Conquistas ({safeBadges.length})
                         </span>
                       </div>
@@ -282,7 +282,7 @@ function StatChip({ icon, label, value }: { icon: React.ReactNode; label: string
     <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg"
       style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.05)' }}>
       {icon}
-      <span className="text-[10px] text-neutral-600 font-bold">{label}</span>
+      <span className="text-[10px] text-neutral-400 font-bold">{label}</span>
       <span className="text-xs font-black text-white ml-auto">{value}</span>
     </div>
   )
@@ -291,8 +291,8 @@ function StatChip({ icon, label, value }: { icon: React.ReactNode; label: string
 function MetricBadge({ label, value, highlight }: { label: string; value: string; highlight: boolean }) {
   return (
     <div className="flex flex-col items-center">
-      <span className="text-[9px] uppercase font-bold text-neutral-600">{label}</span>
-      <span className={`text-[10px] font-black tabular-nums ${highlight ? 'text-yellow-400' : 'text-neutral-500'}`}>
+      <span className="text-[9px] uppercase font-bold text-neutral-400">{label}</span>
+      <span className={`text-[10px] font-black tabular-nums ${highlight ? 'text-yellow-400' : 'text-neutral-400'}`}>
         {value}
       </span>
     </div>
