@@ -3,6 +3,7 @@ import { AlertTriangle, RefreshCw, Trash2, ArrowLeft, Bug, Clock } from 'lucide-
 import { bumpOfflineJob, clearOfflineJobs, flushOfflineQueue, getOfflineQueueSummary, isOnline } from '@/lib/offline/offlineSync'
 import type { QueueSummary, OfflineJob } from '@/lib/offline/offlineSync'
 import { useDialog } from '@/contexts/DialogContext'
+import { useFocusTrap } from '@/hooks/useFocusTrap'
 
 const formatEta = (ms: number | string | null | undefined) => {
   const n = Number(ms)
@@ -54,16 +55,20 @@ export default function OfflineSyncModal({ open, onClose, userId }: OfflineSyncM
 
   const jobs = useMemo(() => (Array.isArray(state?.jobs) ? state.jobs : []), [state?.jobs])
 
+  // WCAG 2.4.3 + 2.1.2 — Escape fecha + focus trap
+  const handleEscape = useCallback(() => { onClose?.() }, [onClose])
+  const focusTrapRef = useFocusTrap(open, handleEscape)
+
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-[1600] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe" role="dialog" aria-modal="true" aria-label="Sincronização Offline">
+    <div className="fixed inset-0 z-[1600] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe" role="dialog" aria-modal="true" aria-labelledby="offline-sync-title">
       <div role="presentation" className="fixed inset-0" onClick={() => onClose?.()} />
-      <div className="bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden relative z-10">
+      <div ref={focusTrapRef} className="bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden relative z-10">
         <div className="p-4 border-b border-neutral-800 flex items-start justify-between gap-3">
           <div className="min-w-0">
             <div className="text-[11px] uppercase tracking-widest text-neutral-500 font-black">Offline Sync</div>
-            <div className="text-lg font-black text-white">Central de pendências</div>
+            <div id="offline-sync-title" className="text-lg font-black text-white">Central de pendências</div>
             <div className="text-xs text-neutral-400">
               {state?.online === false ? 'Sem internet agora.' : hasJobs ? 'Fila pronta para sincronizar quando possível.' : 'Nenhuma pendência.'}
             </div>

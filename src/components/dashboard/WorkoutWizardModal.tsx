@@ -5,6 +5,7 @@ import Image from 'next/image'
 import { ArrowLeft, ChevronLeft, ChevronRight, Sparkles, Loader2, Wand2, Mic } from 'lucide-react'
 import VoiceWorkoutModal, { type VoiceExerciseDraft } from './VoiceWorkoutModal'
 import { useVipCredits } from '@/hooks/useVipCredits'
+import { useFocusTrap } from '@/hooks/useFocusTrap'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
@@ -192,6 +193,9 @@ export default function WorkoutWizardModal(props: Props) {
   const [error, setError] = useState('')
   const [showVoice, setShowVoice] = useState(false)
 
+  // WCAG 2.4.3 + 2.1.2 — Escape fecha (a menos que gerando/salvando) + focus trap
+  const focusTrapRef = useFocusTrap(isOpen, (generating || savingAll) ? undefined : props.onClose)
+
   const canBack = step > 0
   const canNext = step < 4
   const formatLimit = (limit: number | null | undefined) => (limit == null ? '∞' : limit > 1000 ? '∞' : limit)
@@ -312,8 +316,9 @@ export default function WorkoutWizardModal(props: Props) {
   }
 
   return (
-    <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 pt-safe" style={{ background: 'rgba(0,0,0,0.92)', backdropFilter: 'blur(20px)' }} role="dialog" aria-modal="true" aria-label="WorkoutWizard">
+    <div className="fixed inset-0 z-[2000] flex items-center justify-center p-4 pt-safe" style={{ background: 'rgba(0,0,0,0.92)', backdropFilter: 'blur(20px)' }} role="dialog" aria-modal="true" aria-labelledby="wizard-title">
       <div
+        ref={focusTrapRef}
         className="w-full max-w-2xl rounded-2xl overflow-hidden"
         style={{
           background: 'linear-gradient(180deg, rgba(15,14,10,0.99) 0%, rgba(10,10,10,0.99) 100%)',
@@ -329,7 +334,7 @@ export default function WorkoutWizardModal(props: Props) {
                 <Image src="/icons/btn-novo-treino.png" alt="" width={28} height={28} className="rounded-lg" />
                 <div>
                   <div className="flex items-center gap-2">
-                    <span className="text-sm font-black text-white">Criar Treino</span>
+                    <span id="wizard-title" className="text-sm font-black text-white">Criar Treino</span>
                     {credits?.wizard && (
                       <span className={`text-[10px] px-1.5 py-0.5 rounded-md font-mono ${isWizardExhausted(credits.wizard) ? 'bg-red-500/20 text-red-400 border border-red-500/30' : 'bg-neutral-800 text-neutral-400 border border-neutral-700'}`}>
                         {credits.wizard.used}/{formatLimit(credits.wizard.limit)} créditos
