@@ -274,20 +274,20 @@ const InviteManager = ({ isOpen, onClose, onInvite }: InviteManagerProps) => {
                         <UserPlus size={16} />
                         Convidar Parceiro
                     </h3>
-                    <button onClick={onClose} className="min-w-[44px] min-h-[44px] rounded-xl border flex items-center justify-center text-neutral-500 hover:text-white hover:border-yellow-500/40 transition-all" style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }} aria-label="Fechar convite de parceiro" title="Fechar">
+                    <button onClick={onClose} className="min-w-[44px] min-h-[44px] rounded-xl border flex items-center justify-center text-neutral-400 hover:text-white hover:border-yellow-500/40 transition-all" style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }} aria-label="Fechar convite de parceiro" title="Fechar">
                         <X size={16} />
                     </button>
                 </div>
 
                 <div className="p-4">
                     <div className="relative">
-                        <Search className="absolute left-3 top-3 text-neutral-500" size={18} />
+                        <Search className="absolute left-3 top-3 text-neutral-400" size={18} />
                         <input
                             aria-label="Buscar atleta"
                             value={searchTerm}
                             onChange={e => setSearchTerm(e.target.value)}
                             placeholder="Buscar atleta..."
-                            className="w-full pl-10 pr-4 py-3 rounded-xl border text-white outline-none transition-all placeholder:text-neutral-600 focus:border-yellow-500/40"
+                            className="w-full pl-10 pr-4 py-3 rounded-xl border text-white outline-none transition-all placeholder:text-neutral-400 focus:border-yellow-500/40"
                             style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }}
                         />
                     </div>
@@ -295,13 +295,13 @@ const InviteManager = ({ isOpen, onClose, onInvite }: InviteManagerProps) => {
 
                 <div className="flex-1 overflow-y-auto p-4 pt-0 space-y-2 custom-scrollbar">
                     {loading && (
-                        <div className="text-center py-8 text-neutral-500 animate-pulse">
+                        <div className="text-center py-8 text-neutral-400 animate-pulse">
                             Carregando atletas...
                         </div>
                     )}
 
                     {!loading && users.length === 0 && (
-                        <div className="text-center py-8 text-neutral-500">
+                        <div className="text-center py-8 text-neutral-400">
                             Nenhum atleta encontrado.
                         </div>
                     )}
@@ -327,8 +327,8 @@ const InviteManager = ({ isOpen, onClose, onInvite }: InviteManagerProps) => {
                                     </div>
                                     <div>
                                         <h4 className="font-bold text-white text-sm">{user.displayName || 'Atleta'}</h4>
-                                        <p className="text-[10px] text-neutral-500 font-mono">ID: {(typeof user.id === 'string' ? user.id : String(user.id ?? '')).slice(0, 8) || '--------'}...</p>
-                                        <p className="text-[10px] text-neutral-500 flex items-center gap-1">
+                                        <p className="text-[10px] text-neutral-400 font-mono">ID: {(typeof user.id === 'string' ? user.id : String(user.id ?? '')).slice(0, 8) || '--------'}...</p>
+                                        <p className="text-[10px] text-neutral-400 flex items-center gap-1">
                                             {online ? (
                                                 <span className="text-green-500 flex items-center gap-1">Online agora</span>
                                             ) : (

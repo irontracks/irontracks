@@ -336,10 +336,10 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded, open:
             {!hasItems ? (
                 <div className="flex flex-col items-center justify-center py-16 px-6 gap-3">
                     <div className="w-16 h-16 rounded-3xl bg-neutral-800/80 border border-neutral-700/50 flex items-center justify-center mb-1">
-                        <Sparkles size={28} className="text-neutral-600" />
+                        <Sparkles size={28} className="text-neutral-400" />
                     </div>
-                    <p className="text-sm font-bold text-neutral-500">Tudo em dia!</p>
-                    <p className="text-xs text-neutral-600 text-center">Nenhuma notificação por enquanto.</p>
+                    <p className="text-sm font-bold text-neutral-400">Tudo em dia!</p>
+                    <p className="text-xs text-neutral-400 text-center">Nenhuma notificação por enquanto.</p>
                 </div>
             ) : (
                 <div className="p-3 flex flex-col gap-2">
@@ -372,7 +372,7 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded, open:
                                             )}
                                         </div>
                                         <p className="text-xs text-neutral-400 leading-snug line-clamp-2">{String(item.message ?? "")}</p>
-                                        <p className="text-[10px] text-neutral-600 font-medium mt-1.5">{item.timeAgo}</p>
+                                        <p className="text-[10px] text-neutral-400 font-medium mt-1.5">{item.timeAgo}</p>
                                     </div>
                                 </div>
 
@@ -398,7 +398,7 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded, open:
                                 {item.type !== 'invite' && (
                                     <button
                                         onClick={(e) => handleDelete(String(item.id ?? ""), e)}
-                                        className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 p-1 text-neutral-500 hover:text-red-400 transition-all rounded-lg hover:bg-red-500/10"
+                                        className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 p-1 text-neutral-400 hover:text-red-400 transition-all rounded-lg hover:bg-red-500/10"
                                         aria-label="Remover notificação"
                                     >
                                         <Trash2 size={13} />
@@ -418,7 +418,7 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded, open:
             <div className="w-full">
                 {systemNotifications.length > 0 && (
                     <div className="flex justify-end mb-2 px-1">
-                        <button onClick={handleClearAll} disabled={clearing} className="text-[10px] text-neutral-600 hover:text-red-400 uppercase font-bold tracking-widest transition-colors flex items-center gap-1 disabled:opacity-60">
+                        <button onClick={handleClearAll} disabled={clearing} className="text-[10px] text-neutral-400 hover:text-red-400 uppercase font-bold tracking-widest transition-colors flex items-center gap-1 disabled:opacity-60">
                             <Trash2 size={10} /> Limpar tudo
                         </button>
                     </div>
@@ -476,7 +476,7 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded, open:
                                         <button
                                             onClick={handleClearAll}
                                             disabled={clearing}
-                                            className="flex items-center gap-1 text-[10px] text-neutral-500 hover:text-red-400 font-bold uppercase tracking-wider transition-colors px-2 py-1 rounded-lg hover:bg-red-500/10 disabled:opacity-60"
+                                            className="flex items-center gap-1 text-[10px] text-neutral-400 hover:text-red-400 font-bold uppercase tracking-wider transition-colors px-2 py-1 rounded-lg hover:bg-red-500/10 disabled:opacity-60"
                                         >
                                             <Trash2 size={10} /> Limpar
                                         </button>
@@ -497,7 +497,7 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded, open:
                             {/* Footer */}
                             {hasItems && (
                                 <div className="px-4 py-2.5 border-t border-white/5 flex items-center justify-between">
-                                    <span className="text-[10px] text-neutral-600 font-medium">{allNotifications.length} notificaç{allNotifications.length > 1 ? 'ões' : 'ão'}</span>
+                                    <span className="text-[10px] text-neutral-400 font-medium">{allNotifications.length} notificaç{allNotifications.length > 1 ? 'ões' : 'ão'}</span>
                                     <div className="flex gap-1">
                                         {['default', 'invite', 'pr', 'workout_finished'].map((t) => (
                                             <div key={t} className={`w-1.5 h-1.5 rounded-full ${getTypeConfig(t).dot} opacity-40`} />

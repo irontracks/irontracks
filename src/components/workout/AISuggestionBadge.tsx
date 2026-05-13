@@ -138,7 +138,7 @@ export default function AISuggestionBadge({
   // Error / no data
   if (error || !suggestion) {
     return (
-      <div className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-neutral-800/50 border border-neutral-700/50 text-neutral-500 text-[10px]">
+      <div className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-neutral-800/50 border border-neutral-700/50 text-neutral-400 text-[10px]">
         <Sparkles size={11} />
         <span>{error || 'Sem dados'}</span>
       </div>
@@ -180,7 +180,7 @@ export default function AISuggestionBadge({
         )}
         <X
           size={12}
-          className="shrink-0 text-neutral-500 hover:text-white cursor-pointer"
+          className="shrink-0 text-neutral-400 hover:text-white cursor-pointer"
           onClick={(e) => { e.stopPropagation(); setSuggestion(null); fetchedRef.current = false }}
         />
       </button>
@@ -189,8 +189,8 @@ export default function AISuggestionBadge({
       {expanded && (
         <div className="mt-1.5 px-3 py-2 rounded-xl bg-neutral-900/80 border border-neutral-800/80 space-y-2">
           <div className="flex items-center gap-2 text-[10px]">
-            <span className="text-neutral-500">{confidenceLabel}</span>
-            <span className="text-neutral-600">•</span>
+            <span className="text-neutral-400">{confidenceLabel}</span>
+            <span className="text-neutral-400">•</span>
             <span className={trendColor}>
               {suggestion.trend === 'up' ? 'Tendência ↑' : suggestion.trend === 'down' ? 'Tendência ↓' : 'Estável'}
             </span>
@@ -198,7 +198,7 @@ export default function AISuggestionBadge({
           <p className="text-xs text-neutral-300">{suggestion.reason}</p>
           {suggestion.lastSessions.length > 0 && (
             <div className="space-y-1">
-              <p className="text-[9px] font-bold text-neutral-500 uppercase tracking-wider">Últimas sessões</p>
+              <p className="text-[9px] font-bold text-neutral-400 uppercase tracking-wider">Últimas sessões</p>
               <div className="flex gap-1.5 flex-wrap">
                 {suggestion.lastSessions.map((s, i) => (
                   <span
@@ -206,7 +206,7 @@ export default function AISuggestionBadge({
                     className="inline-flex items-center px-2 py-0.5 rounded-md bg-neutral-800 border border-neutral-700/50 text-[10px] font-mono text-neutral-300"
                   >
                     {s.weight}kg×{s.reps}
-                    <span className="ml-1 text-neutral-600">{s.date.slice(5, 10)}</span>
+                    <span className="ml-1 text-neutral-400">{s.date.slice(5, 10)}</span>
                   </span>
                 ))}
               </div>

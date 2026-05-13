@@ -126,7 +126,7 @@ const RecoveryScore = memo(function RecoveryScore() {
             <span className="text-xl font-bold tabular-nums" style={{ color: cfg.color }}>
               {score}
             </span>
-            <span className="text-[7px] uppercase tracking-wider text-neutral-600 font-medium">
+            <span className="text-[7px] uppercase tracking-wider text-neutral-400 font-medium">
               score
             </span>
           </div>
@@ -135,8 +135,8 @@ const RecoveryScore = memo(function RecoveryScore() {
         {/* Info */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5 mb-1">
-            <Activity size={12} className="text-neutral-500" />
-            <span className="text-[10px] font-semibold text-neutral-500 uppercase tracking-[0.15em]">
+            <Activity size={12} className="text-neutral-400" />
+            <span className="text-[10px] font-semibold text-neutral-400 uppercase tracking-[0.15em]">
               Recuperação
             </span>
           </div>
@@ -149,14 +149,14 @@ const RecoveryScore = memo(function RecoveryScore() {
           {/* HRV + RHR details */}
           <div className="flex items-center gap-3">
             <div className="flex items-center gap-1">
-              <TrendingUp size={10} className="text-neutral-600" />
-              <span className="text-[10px] text-neutral-500">
+              <TrendingUp size={10} className="text-neutral-400" />
+              <span className="text-[10px] text-neutral-400">
                 HRV <span className="font-semibold text-neutral-400">{hrv}ms</span>
               </span>
             </div>
             <div className="flex items-center gap-1">
-              <Heart size={10} className="text-neutral-600" />
-              <span className="text-[10px] text-neutral-500">
+              <Heart size={10} className="text-neutral-400" />
+              <span className="text-[10px] text-neutral-400">
                 FC rep <span className="font-semibold text-neutral-400">{rhr}bpm</span>
               </span>
             </div>

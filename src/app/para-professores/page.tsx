@@ -54,7 +54,7 @@ const DashboardMockup = () => (
     <div className="p-5 space-y-4">
       <div className="flex items-center justify-between">
         <div>
-          <p className="text-[10px] text-neutral-500 uppercase tracking-widest">Painel de Controle</p>
+          <p className="text-[10px] text-neutral-400 uppercase tracking-widest">Painel de Controle</p>
           <p className="text-lg font-black text-white">Visão Geral</p>
         </div>
         <div className="w-9 h-9 rounded-xl bg-yellow-500 flex items-center justify-center text-black font-black text-sm">
@@ -65,7 +65,7 @@ const DashboardMockup = () => (
         {[['28', 'Alunos'], ['6', 'Ativos Hoje'], ['R$4.2k', 'Receita/mês']].map(([v, l]) => (
           <div key={l} className="bg-neutral-800/60 rounded-xl p-3 border border-neutral-700/50">
             <p className="text-base font-black text-white">{v}</p>
-            <p className="text-[9px] text-neutral-500 uppercase tracking-wide mt-0.5">{l}</p>
+            <p className="text-[9px] text-neutral-400 uppercase tracking-wide mt-0.5">{l}</p>
           </div>
         ))}
       </div>
@@ -81,7 +81,7 @@ const DashboardMockup = () => (
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-xs font-bold text-white truncate">{s.name}</p>
-              <p className="text-[9px] text-neutral-500">Último treino: {s.last}</p>
+              <p className="text-[9px] text-neutral-400">Último treino: {s.last}</p>
             </div>
             <span
               className={`text-[9px] font-black px-2 py-0.5 rounded-full ${
@@ -105,7 +105,7 @@ const WorkoutBuilderMockup = () => (
   <MockCard>
     <div className="p-5 space-y-3">
       <div>
-        <p className="text-[10px] text-neutral-500 uppercase tracking-widest mb-1">Editor de Treino</p>
+        <p className="text-[10px] text-neutral-400 uppercase tracking-widest mb-1">Editor de Treino</p>
         <p className="text-base font-black text-white">Treino A — Peito & Tríceps</p>
       </div>
       {[
@@ -123,7 +123,7 @@ const WorkoutBuilderMockup = () => (
           <div className="flex gap-4 mt-1.5">
             {[['Séries', ex.sets], ['Reps', ex.reps], ['RPE', ex.rpe]].map(([l, v]) => (
               <div key={l}>
-                <p className="text-[8px] text-neutral-600 uppercase">{l}</p>
+                <p className="text-[8px] text-neutral-400 uppercase">{l}</p>
                 <p className="text-xs font-black text-neutral-200">{v}</p>
               </div>
             ))}
@@ -148,9 +148,9 @@ const LiveMirrorMockup = () => (
         <span className="ml-auto text-xs font-black text-neutral-400 tabular-nums">32:14</span>
       </div>
       <div>
-        <p className="text-[10px] text-neutral-500 uppercase tracking-widest">Lucas Alves — Treino A</p>
+        <p className="text-[10px] text-neutral-400 uppercase tracking-widest">Lucas Alves — Treino A</p>
         <p className="text-lg font-black text-white">Supino Reto</p>
-        <p className="text-[10px] text-neutral-500 mt-0.5">Exercício 2 / 6</p>
+        <p className="text-[10px] text-neutral-400 mt-0.5">Exercício 2 / 6</p>
       </div>
       <div className="space-y-1.5">
         {[
@@ -169,9 +169,9 @@ const LiveMirrorMockup = () => (
             }`}
           >
             <div className={`w-1.5 h-1.5 rounded-full ${row.done ? 'bg-green-400' : 'bg-neutral-600'}`} />
-            <span className="text-[10px] font-black text-neutral-500 w-6">{row.s}</span>
+            <span className="text-[10px] font-black text-neutral-400 w-6">{row.s}</span>
             <span className="text-xs font-black text-white flex-1">{row.kg} kg × {row.reps}</span>
-            <span className={`text-[10px] font-bold ${row.done ? 'text-yellow-400' : 'text-neutral-600'}`}>
+            <span className={`text-[10px] font-bold ${row.done ? 'text-yellow-400' : 'text-neutral-400'}`}>
               RPE {row.rpe}
             </span>
           </div>
@@ -195,7 +195,7 @@ const BillingMockup = () => (
   <MockCard>
     <div className="p-5 space-y-3">
       <div>
-        <p className="text-[10px] text-neutral-500 uppercase tracking-widest">Cobranças</p>
+        <p className="text-[10px] text-neutral-400 uppercase tracking-widest">Cobranças</p>
         <p className="text-base font-black text-white">Plano Mensal Premium</p>
         <p className="text-xs text-neutral-400 mt-0.5">R$ 197,00 · Mensal · 3× treinos/sem</p>
       </div>
@@ -211,7 +211,7 @@ const BillingMockup = () => (
             </div>
             <div className="flex-1 min-w-0">
               <p className="text-xs font-bold text-white truncate">{r.name}</p>
-              <p className="text-[9px] text-neutral-500">{r.valor} · Vence {r.venc}</p>
+              <p className="text-[9px] text-neutral-400">{r.valor} · Vence {r.venc}</p>
             </div>
             <span
               className={`text-[9px] font-black px-2 py-0.5 rounded-full ${
@@ -240,9 +240,9 @@ const AssessmentMockup = () => (
   <MockCard>
     <div className="p-5 space-y-3">
       <div>
-        <p className="text-[10px] text-neutral-500 uppercase tracking-widest">Avaliação Física</p>
+        <p className="text-[10px] text-neutral-400 uppercase tracking-widest">Avaliação Física</p>
         <p className="text-base font-black text-white">Lucas Alves</p>
-        <p className="text-[10px] text-neutral-500 mt-0.5">09/Abr/2026 · Dobras 7 pontos</p>
+        <p className="text-[10px] text-neutral-400 mt-0.5">09/Abr/2026 · Dobras 7 pontos</p>
       </div>
       <div className="grid grid-cols-2 gap-2">
         {[
@@ -253,16 +253,16 @@ const AssessmentMockup = () => (
         ].map(({ label, value, color }) => (
           <div key={label} className="bg-neutral-800/60 rounded-xl p-3 border border-neutral-700/40">
             <p className={`text-sm font-black ${color}`}>{value}</p>
-            <p className="text-[9px] text-neutral-500 mt-0.5 uppercase tracking-wide">{label}</p>
+            <p className="text-[9px] text-neutral-400 mt-0.5 uppercase tracking-wide">{label}</p>
           </div>
         ))}
       </div>
       <div>
-        <p className="text-[9px] text-neutral-500 uppercase tracking-widest mb-1.5">Circunferências (cm)</p>
+        <p className="text-[9px] text-neutral-400 uppercase tracking-widest mb-1.5">Circunferências (cm)</p>
         <div className="flex flex-wrap gap-1.5">
           {[['Peito', '98'], ['Cintura', '79'], ['Quadril', '96'], ['Braço', '38']].map(([p, v]) => (
             <div key={p} className="bg-neutral-800/50 rounded-lg px-2 py-1 text-[9px]">
-              <span className="text-neutral-500">{p}: </span>
+              <span className="text-neutral-400">{p}: </span>
               <span className="font-black text-white">{v}</span>
             </div>
           ))}
@@ -367,7 +367,7 @@ export default function ParaProfessoresPage() {
                 ['✓', 'Sem cartão de crédito'],
                 ['✓', 'Suporte via WhatsApp'],
               ].map(([icon, text]) => (
-                <div key={text} className="flex items-center gap-2 text-sm text-neutral-500">
+                <div key={text} className="flex items-center gap-2 text-sm text-neutral-400">
                   <span className="text-green-400 font-black">{icon}</span>
                   {text}
                 </div>
@@ -389,7 +389,7 @@ export default function ParaProfessoresPage() {
             ].map(({ value, label }) => (
               <div key={label} className="text-center">
                 <p className="text-2xl font-black text-yellow-400">{value}</p>
-                <p className="text-xs text-neutral-500 mt-1 uppercase tracking-wide">{label}</p>
+                <p className="text-xs text-neutral-400 mt-1 uppercase tracking-wide">{label}</p>
               </div>
             ))}
           </div>
@@ -509,7 +509,7 @@ export default function ParaProfessoresPage() {
                   <span className="text-xl mt-0.5">{icon}</span>
                   <div>
                     <p className="text-sm font-bold text-white">{title}</p>
-                    <p className="text-xs text-neutral-500">{desc}</p>
+                    <p className="text-xs text-neutral-400">{desc}</p>
                   </div>
                 </div>
               ))}
@@ -542,7 +542,7 @@ export default function ParaProfessoresPage() {
               ].map(([title, desc]) => (
                 <div key={title} className="bg-neutral-900/50 rounded-xl p-3 border border-neutral-800">
                   <p className="text-xs font-black text-white">{title}</p>
-                  <p className="text-[10px] text-neutral-500 mt-0.5">{desc}</p>
+                  <p className="text-[10px] text-neutral-400 mt-0.5">{desc}</p>
                 </div>
               ))}
             </div>
@@ -595,7 +595,7 @@ export default function ParaProfessoresPage() {
               >
                 <div className="text-2xl mb-3">{icon}</div>
                 <h3 className="text-sm font-black text-white mb-1.5">{title}</h3>
-                <p className="text-xs text-neutral-500 leading-relaxed">{desc}</p>
+                <p className="text-xs text-neutral-400 leading-relaxed">{desc}</p>
               </div>
             ))}
           </div>
@@ -635,15 +635,15 @@ export default function ParaProfessoresPage() {
                   </div>
                 )}
                 <div className="mb-4">
-                  <p className="text-xs font-black uppercase tracking-widest text-neutral-500">{plan.name}</p>
+                  <p className="text-xs font-black uppercase tracking-widest text-neutral-400">{plan.name}</p>
                   <div className="flex items-end gap-1 mt-2">
                     {plan.price === 0 ? (
                       <span className="text-2xl font-black text-white">Grátis</span>
                     ) : (
                       <>
-                        <span className="text-xs text-neutral-500 mb-1">R$</span>
+                        <span className="text-xs text-neutral-400 mb-1">R$</span>
                         <span className="text-2xl font-black text-white">{plan.price}</span>
-                        <span className="text-xs text-neutral-500 mb-1">/mês</span>
+                        <span className="text-xs text-neutral-400 mb-1">/mês</span>
                       </>
                     )}
                   </div>
@@ -665,7 +665,7 @@ export default function ParaProfessoresPage() {
             ))}
           </div>
 
-          <p className="text-center text-xs text-neutral-600 mt-6">
+          <p className="text-center text-xs text-neutral-400 mt-6">
             Todos os planos incluem suporte, treinos ilimitados e atualizações gratuitas.
           </p>
         </div>
@@ -691,7 +691,7 @@ export default function ParaProfessoresPage() {
           >
             Criar minha conta grátis →
           </Link>
-          <p className="text-xs text-neutral-600 mt-4">
+          <p className="text-xs text-neutral-400 mt-4">
             Sem cartão de crédito. Sem burocracia. Começe em 5 minutos.
           </p>
         </div>
@@ -706,14 +706,14 @@ export default function ParaProfessoresPage() {
             </div>
             <span className="text-sm font-black text-neutral-300">IronTracks</span>
           </div>
-          <p className="text-xs text-neutral-600">
+          <p className="text-xs text-neutral-400">
             © {new Date().getFullYear()} IronTracks. Todos os direitos reservados.
           </p>
           <div className="flex items-center gap-4">
-            <Link href="/auth/login" className="text-xs text-neutral-500 hover:text-white transition-colors">
+            <Link href="/auth/login" className="text-xs text-neutral-400 hover:text-white transition-colors">
               Entrar
             </Link>
-            <Link href="/para-professores" className="text-xs text-neutral-500 hover:text-white transition-colors">
+            <Link href="/para-professores" className="text-xs text-neutral-400 hover:text-white transition-colors">
               Para Professores
             </Link>
           </div>

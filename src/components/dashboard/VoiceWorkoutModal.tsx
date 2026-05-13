@@ -148,7 +148,7 @@ function EditField({
 }) {
   return (
     <label className="flex flex-col gap-0.5">
-      <span className="text-[9px] font-black uppercase tracking-widest text-neutral-500">{label}</span>
+      <span className="text-[9px] font-black uppercase tracking-widest text-neutral-400">{label}</span>
       <input
         aria-label={label}
         type={type}
@@ -182,7 +182,7 @@ function ConfirmedCard({
         <button
           type="button"
           onClick={onEdit}
-          className="w-7 h-7 rounded-lg flex items-center justify-center text-neutral-500 hover:text-yellow-400 hover:bg-yellow-500/10 transition-colors"
+          className="w-7 h-7 rounded-lg flex items-center justify-center text-neutral-400 hover:text-yellow-400 hover:bg-yellow-500/10 transition-colors"
           aria-label="Editar"
         >
           <Pencil size={13} />
@@ -190,7 +190,7 @@ function ConfirmedCard({
         <button
           type="button"
           onClick={onRemove}
-          className="w-7 h-7 rounded-lg flex items-center justify-center text-neutral-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+          className="w-7 h-7 rounded-lg flex items-center justify-center text-neutral-400 hover:text-red-400 hover:bg-red-500/10 transition-colors"
           aria-label="Remover"
         >
           <Trash2 size={13} />
@@ -640,7 +640,7 @@ export default function VoiceWorkoutModal({
           <button
             type="button"
             onClick={onClose}
-            className="w-8 h-8 rounded-xl flex items-center justify-center text-neutral-500 hover:text-white transition-colors"
+            className="w-8 h-8 rounded-xl flex items-center justify-center text-neutral-400 hover:text-white transition-colors"
             style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}
             aria-label="Voltar"
             title="Voltar"
@@ -732,7 +732,7 @@ export default function VoiceWorkoutModal({
                   &ldquo;{displayText}&rdquo;
                 </p>
               ) : (
-                <p className="text-sm text-neutral-500 text-center">
+                <p className="text-sm text-neutral-400 text-center">
                   {isRecording
                     ? 'Ouvindo... fale o exercício'
                     : exercises.length === 0
@@ -771,7 +771,7 @@ export default function VoiceWorkoutModal({
               {/* Example hint */}
               {!isRecording && !displayText && exercises.length === 0 && (
                 <div className="w-full bg-neutral-900/60 border border-neutral-800 rounded-xl p-3">
-                  <p className="text-[10px] font-black uppercase tracking-widest text-neutral-500 mb-1.5">Exemplo</p>
+                  <p className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-1.5">Exemplo</p>
                   <p className="text-xs text-neutral-400 italic leading-relaxed">
                     &ldquo;Supino reto, 4 séries de 12, cadência 2020&rdquo;
                   </p>
@@ -834,7 +834,7 @@ export default function VoiceWorkoutModal({
             <button
               type="button"
               onClick={startRecording}
-              className="text-xs text-neutral-500 hover:text-yellow-400 flex items-center gap-1.5 transition-colors"
+              className="text-xs text-neutral-400 hover:text-yellow-400 flex items-center gap-1.5 transition-colors"
             >
               <RotateCcw size={11} />
               Adicionar mais exercícios

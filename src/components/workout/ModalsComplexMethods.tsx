@@ -203,7 +203,7 @@ export function ModalsComplexMethods() {
                                                     className="w-full bg-black/30 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
                                                 />
                                             </div>
-                                            {!isLast && safeRestSec ? <div className="mt-2 text-xs text-neutral-500">Descanso: {safeRestSec}s</div> : null}
+                                            {!isLast && safeRestSec ? <div className="mt-2 text-xs text-neutral-400">Descanso: {safeRestSec}s</div> : null}
                                         </div>
                                     );
                                 })}
@@ -462,7 +462,7 @@ export function ModalsComplexMethods() {
                                     <div key={idx} className="rounded-xl bg-neutral-800/60 border border-neutral-700 p-3 space-y-2">
                                         <div className="flex items-center justify-between">
                                             <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Bloco {idx + 1}</div>
-                                            {idx < blocks.length - 1 && <div className="text-[10px] text-neutral-500 inline-flex items-center gap-1"><Clock size={10} />{intraSec}s descanso</div>}
+                                            {idx < blocks.length - 1 && <div className="text-[10px] text-neutral-400 inline-flex items-center gap-1"><Clock size={10} />{intraSec}s descanso</div>}
                                         </div>
                                         <div className="grid grid-cols-2 gap-2">
                                             <input inputMode="decimal" value={String(b?.weight ?? '')} onChange={(e) => setFst7Modal((prev) => { if (!prev || typeof prev !== 'object') return prev; const list = [...(prev.blocks as unknown[])]; const cur = (list[idx] && typeof list[idx] === 'object' ? list[idx] : {}) as UnknownRecord; list[idx] = { ...cur, weight: e?.target?.value ?? '' }; return { ...prev, blocks: list, error: '' }; })} placeholder="Peso (kg)" className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500" />
@@ -517,15 +517,15 @@ export function ModalsComplexMethods() {
                                         <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Onda {idx + 1}</div>
                                         <div className="grid grid-cols-3 gap-2">
                                             <div className="space-y-1">
-                                                <div className="text-[10px] text-neutral-500 uppercase tracking-widest">Pesado (reps)</div>
+                                                <div className="text-[10px] text-neutral-400 uppercase tracking-widest">Pesado (reps)</div>
                                                 <input inputMode="numeric" value={w?.heavy != null ? String(w.heavy) : ''} onChange={(e) => { const n = parseTrainingNumber(e?.target?.value); setWaveModal((prev) => { if (!prev || typeof prev !== 'object') return prev; const list = [...(prev.waves as unknown[])]; const cur = (list[idx] && typeof list[idx] === 'object' ? list[idx] : {}) as UnknownRecord; list[idx] = { ...cur, heavy: n != null ? n : null }; return { ...prev, waves: list, error: '' }; }); }} placeholder="3" className="w-full bg-black/30 border border-neutral-700 rounded-lg px-2 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500" />
                                             </div>
                                             <div className="space-y-1">
-                                                <div className="text-[10px] text-neutral-500 uppercase tracking-widest">Médio (reps)</div>
+                                                <div className="text-[10px] text-neutral-400 uppercase tracking-widest">Médio (reps)</div>
                                                 <input inputMode="numeric" value={w?.medium != null ? String(w.medium) : ''} onChange={(e) => { const n = parseTrainingNumber(e?.target?.value); setWaveModal((prev) => { if (!prev || typeof prev !== 'object') return prev; const list = [...(prev.waves as unknown[])]; const cur = (list[idx] && typeof list[idx] === 'object' ? list[idx] : {}) as UnknownRecord; list[idx] = { ...cur, medium: n != null ? n : null }; return { ...prev, waves: list, error: '' }; }); }} placeholder="5" className="w-full bg-black/30 border border-neutral-700 rounded-lg px-2 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500" />
                                             </div>
                                             <div className="space-y-1">
-                                                <div className="text-[10px] text-neutral-500 uppercase tracking-widest">Ultra leve (reps)</div>
+                                                <div className="text-[10px] text-neutral-400 uppercase tracking-widest">Ultra leve (reps)</div>
                                                 <input inputMode="numeric" value={w?.ultra != null ? String(w.ultra) : ''} onChange={(e) => { const n = parseTrainingNumber(e?.target?.value); setWaveModal((prev) => { if (!prev || typeof prev !== 'object') return prev; const list = [...(prev.waves as unknown[])]; const cur = (list[idx] && typeof list[idx] === 'object' ? list[idx] : {}) as UnknownRecord; list[idx] = { ...cur, ultra: n != null ? n : null }; return { ...prev, waves: list, error: '' }; }); }} placeholder="2" className="w-full bg-black/30 border border-neutral-700 rounded-lg px-2 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500" />
                                             </div>
                                         </div>
@@ -710,7 +710,7 @@ export function ModalsComplexMethods() {
                                         <div key={`cluster-block-${idx}`} className="rounded-xl border border-neutral-800 bg-neutral-950/30 p-3 relative">
                                             <div className="flex items-center justify-between gap-2">
                                                 <div className="text-[10px] uppercase tracking-widest font-bold text-neutral-400">Bloco {idx + 1}</div>
-                                                {plannedLabel ? <div className="text-[10px] font-mono text-neutral-500">plan {plannedLabel}</div> : <div />}
+                                                {plannedLabel ? <div className="text-[10px] font-mono text-neutral-400">plan {plannedLabel}</div> : <div />}
                                             </div>
                                             {!isLast && safeRestSec ? (() => {
                                                 const btnKey = `${String(modal.key || '')}-cl-${idx}`;
@@ -774,7 +774,7 @@ export function ModalsComplexMethods() {
                                                     className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
                                                 />
                                             </div>
-                                            {!isLast ? <div className="mt-2 text-xs text-neutral-500">Descanso: {safeRestSec}s</div> : null}
+                                            {!isLast ? <div className="mt-2 text-xs text-neutral-400">Descanso: {safeRestSec}s</div> : null}
                                         </div>
                                     );
                                 })}

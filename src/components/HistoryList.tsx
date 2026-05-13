@@ -119,7 +119,7 @@ const HistoryList: React.FC<HistoryListProps> = ({
                         <button type="button" onClick={onBack} className="cursor-pointer relative z-10 w-10 h-10 flex items-center justify-center rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 transition-all duration-300 active:scale-95" aria-label="Voltar"><ChevronLeft className="pointer-events-none" /></button>
                         <div className="flex-1 min-w-0">
                             <h2 className="text-xl font-black flex items-center gap-2 truncate"><History className="text-yellow-500" /> {title || 'Histórico'}</h2>
-                            <div className="text-[11px] font-bold uppercase tracking-wider text-neutral-500">{rangeLabel}</div>
+                            <div className="text-[11px] font-bold uppercase tracking-wider text-neutral-400">{rangeLabel}</div>
                         </div>
                         <div className="flex items-center gap-2 justify-end shrink-0">
                             {!isReadOnly && historyItems.length > 0 && (
@@ -223,7 +223,7 @@ const HistoryList: React.FC<HistoryListProps> = ({
                                                         <div className="mt-0.5">
                                                             {isSelected
                                                                 ? <CheckCircle2 className={isCardio ? 'text-green-500 fill-green-500/20' : 'text-yellow-500 fill-yellow-500/20'} />
-                                                                : <Circle className="text-neutral-600" />}
+                                                                : <Circle className="text-neutral-400" />}
                                                         </div>
                                                     )}
                                                     <div className="flex-1 min-w-0">
@@ -285,7 +285,7 @@ const HistoryList: React.FC<HistoryListProps> = ({
                                                                         <button
                                                                             type="button"
                                                                             onClick={(e) => handleDeleteClick(e, session)}
-                                                                            className="cursor-pointer relative z-20 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-xl transition-colors bg-neutral-950 text-neutral-500 border border-neutral-800 hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/20 active:scale-95"
+                                                                            className="cursor-pointer relative z-20 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-xl transition-colors bg-neutral-950 text-neutral-400 border border-neutral-800 hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/20 active:scale-95"
                                                                             aria-label="Excluir"
                                                                         >
                                                                             <Trash2 size={16} className="pointer-events-none" />
@@ -294,7 +294,7 @@ const HistoryList: React.FC<HistoryListProps> = ({
                                                                             <button
                                                                                 type="button"
                                                                                 onClick={(e) => { e.stopPropagation(); openEdit(session); }}
-                                                                                className="cursor-pointer relative z-20 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-xl transition-colors bg-neutral-950 text-neutral-500 border border-neutral-800 hover:bg-yellow-500/10 hover:text-yellow-400 hover:border-yellow-500/20 active:scale-95"
+                                                                                className="cursor-pointer relative z-20 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-xl transition-colors bg-neutral-950 text-neutral-400 border border-neutral-800 hover:bg-yellow-500/10 hover:text-yellow-400 hover:border-yellow-500/20 active:scale-95"
                                                                                 aria-label="Editar"
                                                                             >
                                                                                 <Edit3 size={16} className="pointer-events-none" />
@@ -305,7 +305,7 @@ const HistoryList: React.FC<HistoryListProps> = ({
                                                                 {!isSelectionMode && (
                                                                     <ChevronRight
                                                                         size={16}
-                                                                        className={`${isCardio ? 'text-green-600/50 group-hover:text-green-500/60' : 'text-neutral-600 group-hover:text-yellow-500/60'} transition-colors ml-0.5`}
+                                                                        className={`${isCardio ? 'text-green-600/50 group-hover:text-green-500/60' : 'text-neutral-400 group-hover:text-yellow-500/60'} transition-colors ml-0.5`}
                                                                     />
                                                                 )}
                                                             </div>
@@ -342,7 +342,7 @@ const HistoryList: React.FC<HistoryListProps> = ({
             {/* Bulk delete bar */}
             {!isReadOnly && isSelectionMode && (
                 <div className="fixed bottom-0 left-0 right-0 p-4 bg-neutral-950 border-t border-neutral-800 pb-safe z-50 flex justify-between items-center">
-                    <span className="text-neutral-500 text-sm font-bold">{selectedIds.size} selecionado{selectedIds.size !== 1 ? 's' : ''}</span>
+                    <span className="text-neutral-400 text-sm font-bold">{selectedIds.size} selecionado{selectedIds.size !== 1 ? 's' : ''}</span>
                     <button onClick={handleBulkDelete} disabled={selectedIds.size === 0} className="px-4 py-2 bg-red-500/10 text-red-500 rounded-xl font-bold flex items-center gap-2 disabled:opacity-50 hover:bg-red-500/20 transition-colors">
                         <Trash2 size={18} /> Excluir
                     </button>

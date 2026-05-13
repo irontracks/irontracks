@@ -67,7 +67,7 @@ export default function OfflineSyncModal({ open, onClose, userId }: OfflineSyncM
       <div ref={focusTrapRef} className="bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden relative z-10">
         <div className="p-4 border-b border-neutral-800 flex items-start justify-between gap-3">
           <div className="min-w-0">
-            <div className="text-[11px] uppercase tracking-widest text-neutral-500 font-black">Offline Sync</div>
+            <div className="text-[11px] uppercase tracking-widest text-neutral-400 font-black">Offline Sync</div>
             <div id="offline-sync-title" className="text-lg font-black text-white">Central de pendências</div>
             <div className="text-xs text-neutral-400">
               {state?.online === false ? 'Sem internet agora.' : hasJobs ? 'Fila pronta para sincronizar quando possível.' : 'Nenhuma pendência.'}
@@ -81,19 +81,19 @@ export default function OfflineSyncModal({ open, onClose, userId }: OfflineSyncM
         <div className="p-4 space-y-3">
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
             <div className="rounded-xl bg-neutral-950 border border-neutral-800 p-3">
-              <div className="text-[10px] uppercase tracking-widest text-neutral-500 font-black">Pendentes</div>
+              <div className="text-[10px] uppercase tracking-widest text-neutral-400 font-black">Pendentes</div>
               <div className="text-xl font-black text-white">{Number(state?.pending || 0)}</div>
             </div>
             <div className="rounded-xl bg-neutral-950 border border-neutral-800 p-3">
-              <div className="text-[10px] uppercase tracking-widest text-neutral-500 font-black">Falhas</div>
+              <div className="text-[10px] uppercase tracking-widest text-neutral-400 font-black">Falhas</div>
               <div className="text-xl font-black text-white">{Number(state?.failed || 0)}</div>
             </div>
             <div className="rounded-xl bg-neutral-950 border border-neutral-800 p-3">
-              <div className="text-[10px] uppercase tracking-widest text-neutral-500 font-black">Prontos agora</div>
+              <div className="text-[10px] uppercase tracking-widest text-neutral-400 font-black">Prontos agora</div>
               <div className="text-xl font-black text-white">{Number(state?.due || 0)}</div>
             </div>
             <div className="rounded-xl bg-neutral-950 border border-neutral-800 p-3">
-              <div className="text-[10px] uppercase tracking-widest text-neutral-500 font-black">Próxima tentativa</div>
+              <div className="text-[10px] uppercase tracking-widest text-neutral-400 font-black">Próxima tentativa</div>
               <div className="text-xl font-black text-white">{formatEta(state?.nextDueAt)}</div>
             </div>
           </div>
@@ -139,7 +139,7 @@ export default function OfflineSyncModal({ open, onClose, userId }: OfflineSyncM
 
           <div className="rounded-2xl border border-neutral-800 bg-neutral-950/40 overflow-hidden">
             <div className="p-3 border-b border-neutral-800 flex items-center justify-between gap-3">
-              <div className="text-xs font-black uppercase tracking-widest text-neutral-500">Jobs</div>
+              <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Jobs</div>
               {state?.online === false ? (
                 <div className="text-[11px] font-black uppercase tracking-widest text-red-300 bg-red-500/10 border border-red-500/30 px-2.5 py-1 rounded-xl inline-flex items-center gap-2">
                   <AlertTriangle size={14} />

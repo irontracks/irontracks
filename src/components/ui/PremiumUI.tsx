@@ -110,7 +110,7 @@ export function SectionHeader({
                 {title}
             </div>
             {description && (
-                <div className="text-xs text-neutral-500 mt-1">{description}</div>
+                <div className="text-xs text-neutral-400 mt-1">{description}</div>
             )}
         </div>
     )
@@ -236,7 +236,7 @@ export function SettingRow({
         <div className="flex items-center justify-between gap-4 py-3.5" style={{ borderBottom: `1px solid ${surface.divider}` }}>
             <div className="min-w-0">
                 <div className="text-sm font-bold text-white">{label}</div>
-                {description && <div className="text-xs text-neutral-500 mt-0.5">{description}</div>}
+                {description && <div className="text-xs text-neutral-400 mt-0.5">{description}</div>}
             </div>
             <PremiumToggle value={value} onChange={onChange} disabled={disabled} />
         </div>
@@ -347,7 +347,7 @@ export function PremiumLoader({ label = 'Carregando…' }: { label?: string }) {
         <GoldGradientBorder>
             <div className="p-10 flex flex-col items-center gap-3">
                 <Loader2 size={28} className="text-yellow-500 animate-spin" />
-                <div className="text-sm text-neutral-500">{label}</div>
+                <div className="text-sm text-neutral-400">{label}</div>
             </div>
         </GoldGradientBorder>
     )
@@ -358,8 +358,8 @@ export function PremiumEmpty({ icon, message }: { icon?: React.ReactNode; messag
     return (
         <GoldGradientBorder>
             <div className="p-10 flex flex-col items-center gap-3 text-center">
-                {icon && <div className="text-neutral-600">{icon}</div>}
-                <div className="text-sm text-neutral-500">{message}</div>
+                {icon && <div className="text-neutral-400">{icon}</div>}
+                <div className="text-sm text-neutral-400">{message}</div>
             </div>
         </GoldGradientBorder>
     )
@@ -397,7 +397,7 @@ export function PremiumInput({
                     border: `1px solid ${surface.border}`,
                 }}
             >
-                {prefix && <span className="text-neutral-500 flex-shrink-0">{prefix}</span>}
+                {prefix && <span className="text-neutral-400 flex-shrink-0">{prefix}</span>}
                 <input
                     type={type}
                     value={value}
@@ -407,7 +407,7 @@ export function PremiumInput({
                     disabled={disabled}
                     className="bg-transparent outline-none text-sm text-white flex-1 placeholder-neutral-600 disabled:opacity-50"
                 />
-                {suffix && <span className="text-neutral-500 flex-shrink-0">{suffix}</span>}
+                {suffix && <span className="text-neutral-400 flex-shrink-0">{suffix}</span>}
             </div>
         </div>
     )

@@ -68,7 +68,7 @@ export const CheckinsModal = ({
                 {k === '7d' ? '7 dias' : '30 dias'}
               </button>
             ))}
-            <div className="ml-auto text-xs text-neutral-500">
+            <div className="ml-auto text-xs text-neutral-400">
               {checkinsLoading ? 'Carregando…' : `${checkinsRows.length} item(s)`}
             </div>
           </div>
@@ -182,32 +182,32 @@ export const CheckinsModal = ({
                       const answers: UnknownRecord = isPlainRecord(row?.answers) ? row.answers : {}
                       return (
                         <div key={`${row?.id ?? idx}`} className="rounded-xl border border-neutral-800 bg-neutral-950/40 p-3">
-                          <div className="flex items-center gap-2 text-[11px] uppercase tracking-widest text-neutral-500 font-bold">
+                          <div className="flex items-center gap-2 text-[11px] uppercase tracking-widest text-neutral-400 font-bold">
                             <span>{String(row?.kind || '').toUpperCase() || '—'}</span>
                             <span>•</span>
                             <span>{String(row?.created_at || '').slice(0, 10) || '—'}</span>
                           </div>
                           <div className="mt-2 grid grid-cols-2 md:grid-cols-4 gap-2 text-xs text-neutral-300">
                             <div>
-                              <div className="text-neutral-500">Energia</div>
+                              <div className="text-neutral-400">Energia</div>
                               <div className="font-semibold">{toNumberOrNull(row?.energy) ?? '—'}</div>
                             </div>
                             <div>
-                              <div className="text-neutral-500">Dor</div>
+                              <div className="text-neutral-400">Dor</div>
                               <div className="font-semibold">{toNumberOrNull(row?.soreness) ?? '—'}</div>
                             </div>
                             <div>
-                              <div className="text-neutral-500">Humor</div>
+                              <div className="text-neutral-400">Humor</div>
                               <div className="font-semibold">{toNumberOrNull(row?.mood) ?? '—'}</div>
                             </div>
                             <div>
-                              <div className="text-neutral-500">RPE</div>
+                              <div className="text-neutral-400">RPE</div>
                               <div className="font-semibold">{toNumberOrNull(answers?.rpe) ?? '—'}</div>
                             </div>
                           </div>
                           {row?.notes ? <div className="mt-2 text-xs text-neutral-300">{String(row.notes)}</div> : null}
                           {answers?.time_minutes || answers?.timeMinutes ? (
-                            <div className="mt-1 text-xs text-neutral-500">
+                            <div className="mt-1 text-xs text-neutral-400">
                               Tempo: {toNumberOrNull(answers?.time_minutes ?? answers?.timeMinutes) ?? '—'} min
                             </div>
                           ) : null}
