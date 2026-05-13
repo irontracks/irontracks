@@ -289,7 +289,7 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
                     if (allowNotifyRef.current && typeof Notification !== 'undefined' && Notification.permission === 'granted') {
                         new Notification("⏰ Tempo Esgotado!", {
                             body: "Hora de voltar para o treino!",
-                            icon: 'icone.png',
+                            icon: '/icone-192.png',
                             tag: 'timer_finished'
                         });
                     }

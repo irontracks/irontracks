@@ -46,6 +46,8 @@ const nextConfig: NextConfig = {
       { pathname: '/header-dumbbell.png' },
       { pathname: '/login-hero.png' },
       { pathname: '/icone.png' },
+      { pathname: '/icone-192.png' },
+      { pathname: '/icone-512.png' },
       { pathname: '/logo-irontracks.png' },
       { pathname: '/logo-irontracks-splash.webp' },
       { pathname: '/vip-crown.png' },
@@ -155,6 +157,10 @@ const nextConfig: NextConfig = {
       },
       {
         source: '/icone.png',
+        headers: [{ key: 'cache-control', value: 'public, max-age=86400' }],
+      },
+      {
+        source: '/icone-:size.png',
         headers: [{ key: 'cache-control', value: 'public, max-age=86400' }],
       },
       {

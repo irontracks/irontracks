@@ -21,7 +21,7 @@ const OFFLINE_URL='/offline';
 
 const precache = async () => {
   const cache = await caches.open(STATIC_CACHE);
-  await cache.addAll([OFFLINE_URL,'/manifest.json','/icone.png']);
+  await cache.addAll([OFFLINE_URL,'/manifest.json','/icone-192.png']);
 };
 
 self.addEventListener('install', (event) => {
