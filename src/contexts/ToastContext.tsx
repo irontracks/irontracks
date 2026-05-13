@@ -1,7 +1,8 @@
 'use client'
 
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
 import { ActionToast } from '@/components/ui/ActionToast'
+import { useLazyRef } from '@/hooks/useLazyRef'
 
 export type ToastType = 'success' | 'error' | 'info'
 
@@ -25,22 +26,26 @@ let idCounter = 0
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<ToastItem[]>([])
-  const timers = useRef(new Map<string, ReturnType<typeof setTimeout>>())
+  // Lazy init: Map criado 1x. Antes era `useRef(new Map())` que alocava novo
+  // Map a cada render do provider (descartado, mas pressure no GC).
+  const timers = useLazyRef(() => new Map<string, ReturnType<typeof setTimeout>>())
 
-  // Cancel all pending timers when the provider unmounts
+  // Cancel all pending timers when the provider unmounts. `timers` é o objeto ref
+  // estável (useLazyRef retorna mesma identidade entre renders), então pode entrar
+  // nas deps sem disparar re-runs.
   useEffect(() => {
-    const timersRef = timers.current
+    const map = timers.current
     return () => {
-      timersRef.forEach((t) => clearTimeout(t))
-      timersRef.clear()
+      map.forEach((t) => clearTimeout(t))
+      map.clear()
     }
-  }, [])
+  }, [timers])
 
   const dismiss = useCallback((id: string) => {
     const t = timers.current.get(id)
     if (t !== undefined) { clearTimeout(t); timers.current.delete(id) }
     setToasts((prev) => prev.filter((t) => t.id !== id))
-  }, [])
+  }, [timers])
 
   const toast = useCallback((message: string, type: ToastType = 'info', duration = 3500) => {
     const id = String(++idCounter)
@@ -51,7 +56,7 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
     })
     const t = setTimeout(() => { dismiss(id); timers.current.delete(id) }, duration)
     timers.current.set(id, t)
-  }, [dismiss])
+  }, [dismiss, timers])
 
   // Memoiza value — `toast` é estável (useCallback), então o context value nunca
   // muda após o primeiro render. Evita re-render de todos os consumers.
