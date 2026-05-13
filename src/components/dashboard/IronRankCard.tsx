@@ -456,7 +456,7 @@ const IronRankCard = memo(function IronRankCard({
                         ref={rankFocusTrapRef}
                         role="dialog"
                         aria-modal="true"
-                        aria-label="Ranking Global Iron Rank"
+                        aria-labelledby="iron-rank-title"
                         initial={{ opacity: 0, scale: 0.96, y: 12 }} animate={{ opacity: 1, scale: 1, y: 0 }}
                         transition={{ duration: 0.25, ease: [0.16, 1, 0.3, 1] }}
                         className="w-full max-w-lg overflow-hidden rounded-2xl"
@@ -474,7 +474,7 @@ const IronRankCard = memo(function IronRankCard({
                             }} />
                             <div>
                                 <div className="text-[9px] font-black uppercase tracking-[0.22em] text-yellow-500">Iron Rank</div>
-                                <div className="text-white font-black text-lg">Ranking Global</div>
+                                <div id="iron-rank-title" className="text-white font-black text-lg">Ranking Global</div>
                             </div>
                             <button type="button" onClick={() => setRankOpen(false)}
                                 className="w-10 h-10 rounded-xl flex items-center justify-center text-neutral-400 hover:text-white transition-colors"

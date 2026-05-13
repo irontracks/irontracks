@@ -2,6 +2,7 @@
 
 import { X } from 'lucide-react'
 import type { UnknownRecord } from '@/types/app'
+import { useFocusTrap } from '@/hooks/useFocusTrap'
 
 
 type CheckinsModalProps = {
@@ -29,15 +30,18 @@ export const CheckinsModal = ({
   toNumberOrNull,
   isPlainRecord,
 }: CheckinsModalProps) => {
+  // WCAG 2.4.3 + 2.1.2 — focus trap + Escape
+  const focusTrapRef = useFocusTrap(isOpen, onClose)
+
   if (!isOpen) return null
 
   return (
-    <div className="fixed inset-0 z-[1200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe" role="dialog" aria-modal="true" aria-label="Checkins">
-      <div className="w-full max-w-2xl bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden">
+    <div className="fixed inset-0 z-[1200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe" role="dialog" aria-modal="true" aria-labelledby="checkins-title">
+      <div ref={focusTrapRef} className="w-full max-w-2xl bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden">
         <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
           <div className="min-w-0">
             <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Check-ins</div>
-            <div className="text-white font-black text-lg truncate">Histórico</div>
+            <div id="checkins-title" className="text-white font-black text-lg truncate">Histórico</div>
             <div className="text-xs text-neutral-400">Tendências, alertas e sugestões.</div>
           </div>
           <button

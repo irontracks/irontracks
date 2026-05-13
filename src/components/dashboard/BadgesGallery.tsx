@@ -6,6 +6,7 @@ import { Crown, X, ChevronRight } from 'lucide-react'
 import { getIronRankLeaderboard } from '@/actions/workout-actions'
 import BadgesInline, { type Badge } from './BadgesInline'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { useFocusTrap } from '@/hooks/useFocusTrap'
 
 type Props = {
   badges: Badge[]
@@ -55,6 +56,9 @@ const BadgesGallery = memo(function BadgesGallery({ badges, currentStreak, total
   const [leaderboard, setLeaderboard] = useState<
     { userId: string; displayName: string | null; photoUrl: string | null; role: string | null; totalVolumeKg: number }[]
   >([])
+
+  // WCAG 2.4.3 + 2.1.2 — focus trap + Escape (substitui useEffect manual abaixo)
+  const rankFocusTrapRef = useFocusTrap(rankOpen, () => setRankOpen(false))
 
   const safeCurrentUserId = typeof currentUserId === 'string' ? currentUserId : ''
 
@@ -252,6 +256,10 @@ const BadgesGallery = memo(function BadgesGallery({ badges, currentStreak, total
       {showIronRank && rankOpen && (
         <div className="fixed inset-0 z-[1250] bg-black/85 backdrop-blur-sm flex items-center justify-center p-4 pt-safe">
           <div
+            ref={rankFocusTrapRef}
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="badges-iron-rank-title"
             className="w-full max-w-lg overflow-hidden rounded-2xl animate-in fade-in zoom-in-95 slide-in-from-bottom-3 duration-200"
             style={{
               background: 'linear-gradient(160deg, rgba(20,20,20,0.98) 0%, rgba(12,12,12,0.98) 100%)',
@@ -268,7 +276,7 @@ const BadgesGallery = memo(function BadgesGallery({ badges, currentStreak, total
               }} />
               <div className="min-w-0">
                 <div className="text-[9px] font-black uppercase tracking-[0.22em] text-yellow-500">Iron Rank</div>
-                <div className="text-white font-black text-lg truncate">Ranking Global</div>
+                <div id="badges-iron-rank-title" className="text-white font-black text-lg truncate">Ranking Global</div>
               </div>
               <button
                 type="button"
