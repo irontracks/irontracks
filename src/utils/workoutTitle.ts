@@ -61,6 +61,21 @@ const stripTrailingDayHint = (value: unknown): string => {
   )
 }
 
+/**
+ * Remove a marcação de dia da semana do título do treino.
+ *
+ * `formatProgramWorkoutTitle` gera nomes como `"A - PEITO (TERÇA)"`. Em contextos
+ * de compartilhamento (ex: Stories do Instagram), o usuário pode estar postando
+ * num dia diferente do programado e o dia entre parênteses fica confuso visualmente.
+ * Esta função tira só o `(WEEKDAY)` e o `(DIA N)` — mantém prefixo "A - " e o nome.
+ *
+ * Ex:
+ *   "A - PEITO E TRÍCEPS (TERÇA)" → "A - PEITO E TRÍCEPS"
+ *   "C - COSTAS (DIA 3)"          → "C - COSTAS"
+ *   "Peito"                        → "Peito"
+ */
+export const stripWeekdayHint = (value: unknown): string => stripTrailingDayHint(value)
+
 export const formatProgramWorkoutTitle = (draftTitle: unknown, index: unknown, options: unknown): string => {
   const idx = Number(index)
   const safeIndex = Number.isFinite(idx) && idx >= 0 ? Math.floor(idx) : 0

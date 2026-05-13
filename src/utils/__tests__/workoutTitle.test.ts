@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { normalizeWorkoutTitle, workoutTitleKey, formatProgramWorkoutTitle } from '../workoutTitle'
+import { normalizeWorkoutTitle, workoutTitleKey, formatProgramWorkoutTitle, stripWeekdayHint } from '../workoutTitle'
 
 describe('Workout Title Utils', () => {
   describe('normalizeWorkoutTitle', () => {
@@ -49,6 +49,28 @@ describe('Workout Title Utils', () => {
     it('should strip existing day hints', () => {
       const options = { startDay: 'monday' }
       expect(formatProgramWorkoutTitle('Treino A (segunda)', 0, options)).toBe('A - TREINO (SEGUNDA)')
+    })
+  })
+
+  describe('stripWeekdayHint', () => {
+    it('removes weekday parenthetical from program titles', () => {
+      expect(stripWeekdayHint('A - PEITO E TRÍCEPS (TERÇA)')).toBe('A - PEITO E TRÍCEPS')
+      expect(stripWeekdayHint('B - COSTAS (SEGUNDA)')).toBe('B - COSTAS')
+      expect(stripWeekdayHint('C - PERNAS (sábado)')).toBe('C - PERNAS')
+    })
+
+    it('removes "(DIA N)" trailing tag', () => {
+      expect(stripWeekdayHint('A - Treino (Dia 3)')).toBe('A - Treino')
+    })
+
+    it('keeps titles that have no weekday hint untouched', () => {
+      expect(stripWeekdayHint('Peito + Tríceps')).toBe('Peito + Tríceps')
+      expect(stripWeekdayHint('A - PEITO')).toBe('A - PEITO')
+    })
+
+    it('handles empty input', () => {
+      expect(stripWeekdayHint('')).toBe('')
+      expect(stripWeekdayHint(null)).toBe('')
     })
   })
 })
