@@ -23,7 +23,7 @@ export function HistoryEmptyState({ isReadOnly, onAdd }: EmptyProps) {
                     alt=""
                     fill
                     priority
-                    unoptimized
+                    sizes="(max-width: 768px) 100vw, 600px"
                     className="object-cover object-center scale-110"
                 />
                 {/* Bottom fade */}
@@ -78,7 +78,7 @@ export function HistoryEmptyPeriod({ onSeeAll, on90Days }: EmptyPeriodProps) {
                     src="/empty-period.png"
                     alt=""
                     fill
-                    unoptimized
+                    sizes="(max-width: 768px) 100vw, 600px"
                     className="object-cover object-center scale-105"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-neutral-950 via-neutral-950/20 to-transparent" />

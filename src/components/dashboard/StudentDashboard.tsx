@@ -388,7 +388,6 @@ export default function StudentDashboard(props: Props) {
                       width={44}
                       height={44}
                       className="rounded-xl transition-transform duration-300 group-hover:scale-110 drop-shadow-[0_0_8px_rgba(234,179,8,0.4)]"
-                      unoptimized
                     />
                   </span>
                   {/* Text content */}

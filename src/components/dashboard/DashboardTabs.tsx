@@ -79,7 +79,6 @@ export const DashboardTabs = memo(({
         className={`rounded-[4px] transition-all duration-300 ${
           active ? 'brightness-110 drop-shadow-[0_0_6px_rgba(234,179,8,0.5)]' : 'brightness-75 grayscale-[30%]'
         }`}
-        unoptimized
       />
     </div>
   )

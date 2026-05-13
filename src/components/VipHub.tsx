@@ -351,7 +351,7 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
               alt="VIP"
               fill
               priority
-              unoptimized
+              sizes="(max-width: 768px) 100vw, 600px"
               className="object-cover object-center scale-110"
             />
             {/* Bottom gradient fade into card */}

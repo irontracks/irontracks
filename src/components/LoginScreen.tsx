@@ -140,7 +140,7 @@ const LoginScreen = () => {
                         alt=""
                         fill
                         priority
-                        unoptimized
+                        sizes="(max-width: 384px) 100vw, 384px"
                         className="object-cover object-top"
                         draggable={false}
                     />

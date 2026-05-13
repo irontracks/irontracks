@@ -350,7 +350,7 @@ export default function StoryComposer({ open, session, onClose, calories }: Stor
                               : 'border-neutral-700/60 bg-neutral-900/60 hover:border-neutral-600'
                           ].join(' ')}
                         >
-                          <NextImage src={stk.src} alt={stk.alt} width={52} height={52} unoptimized className="object-contain" />
+                          <NextImage src={stk.src} alt={stk.alt} width={52} height={52} className="object-contain" />
                           {selectedSticker === stk.id && (
                             <div className="absolute inset-0 rounded-xl ring-2 ring-yellow-400/60 ring-inset" />
                           )}

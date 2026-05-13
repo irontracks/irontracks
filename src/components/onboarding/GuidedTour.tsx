@@ -216,7 +216,7 @@ export default function GuidedTour({
                         src={step.image}
                         alt={step.title}
                         fill
-                        unoptimized
+                        sizes="(max-width: 768px) 100vw, 600px"
                         className="object-cover object-center"
                         priority
                       />

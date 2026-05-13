@@ -591,7 +591,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose,
                             alt=""
                             fill
                             priority
-                            unoptimized
+                            sizes="100vw"
                             className="object-cover object-center"
                         />
                         {/* Bottom gradient so text is readable */}
@@ -752,7 +752,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose,
                         <div className="shrink-0 text-right flex flex-col items-end gap-0">
                             {/* Athlete header illustration — desktop only */}
                             <div className="hidden sm:block opacity-30 -mb-2">
-                                <NextImage src="/report-athlete-header.png" alt="" width={88} height={88} unoptimized className="object-contain" />
+                                <NextImage src="/report-athlete-header.png" alt="" width={88} height={88} className="object-contain" />
                             </div>
                             <div className="font-mono text-xs font-semibold text-neutral-300">
                                 {formatDate(safeSession?.date)}
@@ -834,7 +834,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose,
                 <div className="mb-3 flex items-center gap-3">
                     <div className="w-14 h-14 rounded-2xl overflow-hidden shrink-0 opacity-90"
                         style={{ background: 'rgba(15,10,30,0.8)', border: '1px solid rgba(100,60,255,0.2)', boxShadow: '0 0 16px rgba(80,40,255,0.12)' }}>
-                        <NextImage src="/report-ai-brain.png" alt="" width={56} height={56} unoptimized className="w-full h-full object-cover" />
+                        <NextImage src="/report-ai-brain.png" alt="" width={56} height={56} className="w-full h-full object-cover" />
                     </div>
                     <div>
                         <div className="text-[10px] font-black uppercase tracking-widest text-purple-400">Análise Inteligente</div>
@@ -890,9 +890,9 @@ const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose,
                     })}
                 </div>
                 <div className="mt-12 pt-6 border-t border-neutral-800 text-center text-xs text-neutral-400 uppercase tracking-widest flex items-center justify-center gap-2">
-                    <NextImage src="/report-barbell-mini.png" alt="" width={18} height={18} unoptimized className="opacity-50 object-contain" />
+                    <NextImage src="/report-barbell-mini.png" alt="" width={18} height={18} className="opacity-50 object-contain" />
                     IronTracks System • {getCurrentDate()}
-                    <NextImage src="/report-barbell-mini.png" alt="" width={18} height={18} unoptimized className="opacity-50 object-contain scale-x-[-1]" />
+                    <NextImage src="/report-barbell-mini.png" alt="" width={18} height={18} className="opacity-50 object-contain scale-x-[-1]" />
                 </div>
             </div>
 

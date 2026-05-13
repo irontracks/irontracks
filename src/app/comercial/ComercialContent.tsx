@@ -198,8 +198,7 @@ function HudCard({ label, badge, imgSrc, imgAlt, imgPosition }: {
       </div>
       <div style={{ position: 'relative' }}>
         <Image src={imgSrc} alt={imgAlt} width={480} height={260}
-          style={{ width: '100%', height: 260, objectFit: 'cover', objectPosition: imgPosition, display: 'block' }}
-          unoptimized />
+          style={{ width: '100%', height: 260, objectFit: 'cover', objectPosition: imgPosition, display: 'block' }} />
         <div style={{
           position: 'absolute', inset: 0,
           background: 'linear-gradient(180deg, rgba(0,0,0,0.45) 0%, transparent 25%, transparent 75%, rgba(7,7,7,0.9) 100%)',
@@ -455,7 +454,7 @@ function FeatCard({
         </div>
         <div style={{ position: 'relative', overflow: 'hidden' }}>
           <div style={{ position: 'absolute', top: 0, left: 0, bottom: 0, width: 48, background: 'linear-gradient(90deg, #141414, transparent)', zIndex: 1, pointerEvents: 'none' }} />
-          <Image src={imgSrc} alt={title} fill style={{ objectFit: 'cover', objectPosition: imgPos ?? 'top' }} unoptimized />
+          <Image src={imgSrc} alt={title} fill sizes="(max-width: 768px) 50vw, 33vw" style={{ objectFit: 'cover', objectPosition: imgPos ?? 'top' }} />
         </div>
       </div>
     )
@@ -476,7 +475,7 @@ function FeatCard({
       {imgSrc && !big && (
         <div style={{ flex: 1, overflow: 'hidden', position: 'relative', minHeight: 160 }}>
           <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 48, background: 'linear-gradient(180deg, #141414, transparent)', zIndex: 1, pointerEvents: 'none' }} />
-          <Image src={imgSrc} alt={title} fill style={{ objectFit: 'cover', objectPosition: imgPos ?? 'top center' }} unoptimized />
+          <Image src={imgSrc} alt={title} fill sizes="(max-width: 768px) 50vw, 33vw" style={{ objectFit: 'cover', objectPosition: imgPos ?? 'top center' }} />
         </div>
       )}
     </div>
@@ -639,7 +638,7 @@ function Showcase() {
                     transition: 'opacity 0.4s ease',
                     width: '100%', height: '100%',
                   }}>
-                    <Image src={s.src} alt={s.label} fill style={{ objectFit: 'cover', objectPosition: 'top' }} unoptimized />
+                    <Image src={s.src} alt={s.label} fill sizes="(max-width: 768px) 100vw, 400px" style={{ objectFit: 'cover', objectPosition: 'top' }} />
                   </div>
                 ))}
               </div>

@@ -20,7 +20,7 @@ export function ReportTeamSection({ isTeamSession, partners, onPartnerPlan }: Re
       <div className="flex items-center gap-3">
         <div className="w-16 h-12 rounded-xl overflow-hidden shrink-0"
           style={{ background: 'rgba(0,0,0,0.4)', border: '1px solid rgba(245,158,11,0.2)' }}>
-          <NextImage src="/report-team-duo.png" alt="" width={64} height={48} unoptimized className="w-full h-full object-cover object-top" />
+          <NextImage src="/report-team-duo.png" alt="" width={64} height={48} className="w-full h-full object-cover object-top" />
         </div>
         <div>
           <p className="text-xs font-bold uppercase tracking-widest text-amber-400">Treino em Equipe</p>
