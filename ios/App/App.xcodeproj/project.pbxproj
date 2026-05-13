@@ -12,7 +12,6 @@
 		2FAD9763203C412B000D30F8 /* config.xml in Resources */ = {isa = PBXBuildFile; fileRef = 2FAD9762203C412B000D30F8 /* config.xml */; };
 		4611E554830F2929AAD10280 /* WorkoutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D63264B20D182409F2E8EB56 /* WorkoutView.swift */; };
 		4D22ABE92AF431CB00220026 /* CapApp-SPM in Frameworks */ = {isa = PBXBuildFile; productRef = 4D22ABE82AF431CB00220026 /* CapApp-SPM */; };
-		SC01SC01SC01SC01SC01SC01 /* Sentry in Frameworks */ = {isa = PBXBuildFile; productRef = SC02SC02SC02SC02SC02SC02 /* Sentry */; };
 		50379B232058CBB4000EE86E /* capacitor.config.json in Resources */ = {isa = PBXBuildFile; fileRef = 50379B222058CBB4000EE86E /* capacitor.config.json */; };
 		504EC3081FED79650016851F /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = 504EC3071FED79650016851F /* AppDelegate.swift */; };
 		504EC30D1FED79650016851F /* Main.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC30B1FED79650016851F /* Main.storyboard */; };
@@ -25,15 +24,18 @@
 		753309CCBBFBBC9322856D0C /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3B78FD61B78C679FF19A936 /* DashboardView.swift */; };
 		79EB81F8ECC1D945D3D265C9 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1A1FFB92F9B0F2046BD57710 /* Assets.xcassets */; };
 		93D071EABBCB7F8D6387AC40 /* SharedModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4F5306B577DAB4CF49320B7 /* SharedModels.swift */; };
+		9B57602656A90ACA6219A635 /* CardioOfflineQueue.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDBFBE6F9F3F728AA2C5781E /* CardioOfflineQueue.swift */; };
 		A7545205D811F9E6EB5A4752 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 408E411FFC584A108ABE64E6 /* ContentView.swift */; };
 		AAAA0002AAAA0002AAAA0002 /* IronTracksNativePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAAA0001AAAA0001AAAA0001 /* IronTracksNativePlugin.swift */; };
 		B588F44A4347B5C1BEB44831 /* IronTracksWatch Watch App.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = ED8BD25E5B0958E7A3CD3698 /* IronTracksWatch Watch App.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		BB1C08C7B06F81EC6C61A1EB /* CheckinView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1774FDD63F12185176BB635F /* CheckinView.swift */; };
 		BBBB0001BBBB0001BBBB0001 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBBB0002BBBB0002BBBB0002 /* SceneDelegate.swift */; };
+		D020BD329DFEB2BBCC69AE7A /* VipGatePaywallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 651BC0018D7F1DC7967BB96D /* VipGatePaywallView.swift */; };
 		E335CEEE42B6C9C7223A91E6 /* WatchBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B30C6B0FBC688E04227E7D4 /* WatchBridge.swift */; };
 		E445517AABE3AE7D00E1F373 /* HealthKitManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDBD28EEA1B02677FB2632AB /* HealthKitManager.swift */; };
 		NS005NS005NS005NS005 /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = NS001NS001NS001NS001 /* NotificationService.swift */; };
 		NS006NS006NS006NS006 /* NotificationService.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = NS002NS002NS002NS002 /* NotificationService.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
+		SC01SC01SC01SC01SC01SC01 /* Sentry in Frameworks */ = {isa = PBXBuildFile; productRef = SC02SC02SC02SC02SC02SC02 /* Sentry */; };
 		W00FW00FW00FW00F /* RestTimerAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = W00AW00AW00AW00A /* RestTimerAttributes.swift */; };
 		W010W010W010W010 /* RestTimerAttributes.swift in Sources */ = {isa = PBXBuildFile; fileRef = W00AW00AW00AW00A /* RestTimerAttributes.swift */; };
 		W011W011W011W011 /* RestTimerWidget.swift in Sources */ = {isa = PBXBuildFile; fileRef = W00BW00BW00BW00B /* RestTimerWidget.swift */; };
@@ -111,6 +113,8 @@
 		504EC3111FED79650016851F /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		504EC3131FED79650016851F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		50B271D01FEDC1A000F3C39B /* public */ = {isa = PBXFileReference; lastKnownFileType = folder; path = public; sourceTree = "<group>"; };
+		651BC0018D7F1DC7967BB96D /* VipGatePaywallView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VipGatePaywallView.swift; sourceTree = "<group>"; };
+		6BC87479BFFEE552E74E8F4E /* NotificationService.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = NotificationService.entitlements; sourceTree = "<group>"; };
 		7C803BD5DF1345C17D4FDE6B /* WatchSessionManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WatchSessionManager.swift; sourceTree = "<group>"; };
 		958DCC722DB07C7200EA8C5F /* debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = debug.xcconfig; path = ../debug.xcconfig; sourceTree = SOURCE_ROOT; };
 		AAAA0001AAAA0001AAAA0001 /* IronTracksNativePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IronTracksNativePlugin.swift; sourceTree = "<group>"; };
@@ -119,6 +123,7 @@
 		D4F5306B577DAB4CF49320B7 /* SharedModels.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SharedModels.swift; sourceTree = "<group>"; };
 		D63264B20D182409F2E8EB56 /* WorkoutView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WorkoutView.swift; sourceTree = "<group>"; };
 		DDBD28EEA1B02677FB2632AB /* HealthKitManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HealthKitManager.swift; sourceTree = "<group>"; };
+		DDBFBE6F9F3F728AA2C5781E /* CardioOfflineQueue.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CardioOfflineQueue.swift; sourceTree = "<group>"; };
 		E1BBCDEF1E0C97D84674225C /* PrivacyInfo.xcprivacy */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = PrivacyInfo.xcprivacy; sourceTree = "<group>"; };
 		E3B78FD61B78C679FF19A936 /* DashboardView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
 		ED8BD25E5B0958E7A3CD3698 /* IronTracksWatch Watch App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; lastKnownFileType = wrapper.application; path = "IronTracksWatch Watch App.app"; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -236,6 +241,7 @@
 				1774FDD63F12185176BB635F /* CheckinView.swift */,
 				E3B78FD61B78C679FF19A936 /* DashboardView.swift */,
 				D63264B20D182409F2E8EB56 /* WorkoutView.swift */,
+				651BC0018D7F1DC7967BB96D /* VipGatePaywallView.swift */,
 			);
 			name = Views;
 			path = Views;
@@ -256,6 +262,7 @@
 			children = (
 				DDBD28EEA1B02677FB2632AB /* HealthKitManager.swift */,
 				264F376959AF0EBA63259D0B /* LocationManager.swift */,
+				DDBFBE6F9F3F728AA2C5781E /* CardioOfflineQueue.swift */,
 			);
 			name = Services;
 			path = Services;
@@ -266,6 +273,7 @@
 			children = (
 				NS001NS001NS001NS001 /* NotificationService.swift */,
 				NS003NS003NS003NS003 /* Info.plist */,
+				6BC87479BFFEE552E74E8F4E /* NotificationService.entitlements */,
 			);
 			path = NotificationService;
 			sourceTree = "<group>";
@@ -375,14 +383,36 @@
 						CreatedOnToolsVersion = 9.2;
 						LastSwiftMigration = 1100;
 						ProvisioningStyle = Automatic;
+						SystemCapabilities = {
+							com.apple.ApplicationGroups.iOS = {
+								enabled = 1;
+							};
+						};
+					};
+					8440180D3C2189B976C0FFF0 = {
+						SystemCapabilities = {
+							com.apple.ApplicationGroups.iOS = {
+								enabled = 1;
+							};
+						};
 					};
 					NS010NS010NS010NS010 = {
 						CreatedOnToolsVersion = 15.0;
 						ProvisioningStyle = Automatic;
+						SystemCapabilities = {
+							com.apple.ApplicationGroups.iOS = {
+								enabled = 1;
+							};
+						};
 					};
 					W001W001W001W001 = {
 						CreatedOnToolsVersion = 14.0;
 						ProvisioningStyle = Automatic;
+						SystemCapabilities = {
+							com.apple.ApplicationGroups.iOS = {
+								enabled = 1;
+							};
+						};
 					};
 				};
 			};
@@ -478,6 +508,8 @@
 				BB1C08C7B06F81EC6C61A1EB /* CheckinView.swift in Sources */,
 				753309CCBBFBBC9322856D0C /* DashboardView.swift in Sources */,
 				4611E554830F2929AAD10280 /* WorkoutView.swift in Sources */,
+				D020BD329DFEB2BBCC69AE7A /* VipGatePaywallView.swift in Sources */,
+				9B57602656A90ACA6219A635 /* CardioOfflineQueue.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -723,6 +755,8 @@
 				OTHER_SWIFT_FLAGS = "$(inherited) \"-D\" \"COCOAPODS\" \"-DDEBUG\"";
 				PRODUCT_BUNDLE_IDENTIFIER = com.irontracks.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SENTRY_DSN = "https://910aedd6d0464ce76c8599d29ca3368b@o4511127064412160.ingest.us.sentry.io/4511127085842432";
+				SENTRY_ENVIRONMENT = production;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -746,6 +780,8 @@
 				MARKETING_VERSION = 1.10;
 				PRODUCT_BUNDLE_IDENTIFIER = com.irontracks.app;
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				SENTRY_DSN = "https://910aedd6d0464ce76c8599d29ca3368b@o4511127064412160.ingest.us.sentry.io/4511127085842432";
+				SENTRY_ENVIRONMENT = production;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "";
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = "1,2";
@@ -801,6 +837,7 @@
 		NS013NS013NS013NS013 /* Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = NotificationService/NotificationService.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 37;
 				DEVELOPMENT_TEAM = 5XLC55D3YR;
@@ -824,6 +861,7 @@
 		NS014NS014NS014NS014 /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
+				CODE_SIGN_ENTITLEMENTS = NotificationService/NotificationService.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 37;
 				DEVELOPMENT_TEAM = 5XLC55D3YR;
