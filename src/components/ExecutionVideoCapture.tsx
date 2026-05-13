@@ -31,7 +31,9 @@ interface ExecutionVideoCaptureProps {
 
 export default function ExecutionVideoCapture(props: ExecutionVideoCaptureProps) {
   const { alert } = useDialog();
-  const supabase = useRef(createClient()).current;
+  // useState lazy init: createClient() roda 1x. Antes `useRef(createClient()).current`
+  // alocava nova instância (com listener storage no window) a cada render.
+  const [supabase] = useState(() => createClient());
   const inputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [processing, setProcessing] = useState(false);
