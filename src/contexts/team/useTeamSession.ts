@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react' // useRef pra Set persistente entre renders
+import { useState, useEffect } from 'react'
+import { useLazyRef } from '@/hooks/useLazyRef'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { TeamSession, TeamParticipant } from './types'
 
@@ -13,7 +14,8 @@ interface UseTeamSessionParams {
 export function useTeamSession({ supabase }: UseTeamSessionParams) {
     const [teamSession, setTeamSession] = useState<TeamSession | null>(null)
     const [loading, setLoading] = useState(false)
-    const joinHandledRef = useRef(new Set())
+    // Lazy init pra evitar alocação de Set a cada render (audit Finding #12).
+    const joinHandledRef = useLazyRef(() => new Set<unknown>())
 
     // 2. Listen to Active Team Session
     useEffect(() => {

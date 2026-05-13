@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useMemo, useRef } from 'react' // useRef pra Set persistente
+import { useState, useEffect, useMemo } from 'react'
+import { useLazyRef } from '@/hooks/useLazyRef'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { playStartSound } from '@/lib/sounds'
 import { getErrorMessage } from '@/utils/errorMessage'
@@ -38,7 +39,8 @@ export function useTeamInvites({
 }: UseTeamInvitesParams) {
     const [incomingInvites, setIncomingInvites] = useState<IncomingInvite[]>([])
     const [acceptedInviteNotice, setAcceptedInviteNotice] = useState<AcceptedInviteNotice | null>(null)
-    const seenAcceptedInviteIdsRef = useRef(new Set())
+    // Lazy init pra evitar alocação de Set a cada render (audit Finding #12).
+    const seenAcceptedInviteIdsRef = useLazyRef(() => new Set<unknown>())
 
     const refetchInvites = useMemo(() => {
         return async () => {
@@ -417,7 +419,7 @@ export function useTeamInvites({
             } catch { }
             try { clearInterval(pollId); } catch { }
         };
-    }, [supabase, user?.id, teamSession?.id, soundOpts]);
+    }, [supabase, user?.id, teamSession?.id, soundOpts, seenAcceptedInviteIdsRef]);
 
     const sendInvite = async (targetUser: unknown, workout: Record<string, unknown>, currentTeamSessionId: string | null = null) => {
         try {
