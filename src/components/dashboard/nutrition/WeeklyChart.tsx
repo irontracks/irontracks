@@ -23,10 +23,15 @@ export default function WeeklyChart({
   const safeGoal = Math.max(1, safeNumber(goal))
   const maxVal = Math.max(safeGoal, ...data.map((d) => safeNumber(d.calories)))
 
+  // WCAG 1.1.1 — descrição textual completa (sr-only) com cada dia + meta
+  const chartDesc = data
+    .map((d) => `${d.date}: ${Math.round(safeNumber(d.calories))} kcal`)
+    .join('; ')
+
   return (
-    <div className="rounded-2xl bg-neutral-900/60 border border-neutral-800/60 p-4 ring-1 ring-neutral-800/50">
+    <div className="rounded-2xl bg-neutral-900/60 border border-neutral-800/60 p-4 ring-1 ring-neutral-800/50" role="img" aria-label={`Calorias dos últimos 7 dias. Meta: ${Math.round(safeGoal)} kcal. ${chartDesc}`}>
       <div className="text-[10px] uppercase tracking-[0.2em] text-neutral-500 mb-3">Últimos 7 dias</div>
-      <div className="flex items-end justify-between gap-1.5" style={{ height: 64 }}>
+      <div className="flex items-end justify-between gap-1.5" style={{ height: 64 }} aria-hidden="true">
         {data.map((day) => {
           const val = safeNumber(day.calories)
           const pct = maxVal > 0 ? Math.max(4, (val / maxVal) * 100) : 4
@@ -57,7 +62,7 @@ export default function WeeklyChart({
         })}
       </div>
       {/* Goal line marker */}
-      <div className="mt-1.5 flex items-center gap-2">
+      <div className="mt-1.5 flex items-center gap-2" aria-hidden="true">
         <div className="flex-1 h-px bg-neutral-700/50 relative">
           <div className="absolute left-0 top-0 h-px bg-yellow-500/30" style={{ width: `${(safeGoal / maxVal) * 100}%` }} />
         </div>

@@ -99,7 +99,14 @@ const RecoveryScore = memo(function RecoveryScore() {
       <div className="flex items-center gap-4">
         {/* Ring chart */}
         <div className="relative shrink-0" style={{ width: 80, height: 80 }}>
-          <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
+          <svg
+            viewBox="0 0 100 100"
+            className="w-full h-full -rotate-90"
+            role="img"
+            aria-label={`Score de recuperação: ${score} de 100, nível ${cfg.label}`}
+          >
+            <title>Score de recuperação: {score}/100</title>
+            <desc>Nível {cfg.label}. HRV {hrv} milissegundos, frequência cardíaca de repouso {rhr} bpm.</desc>
             {/* Background ring */}
             <circle cx="50" cy="50" r="42" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="6" />
             {/* Score ring */}
@@ -115,7 +122,7 @@ const RecoveryScore = memo(function RecoveryScore() {
             />
           </svg>
           {/* Score number */}
-          <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <div className="absolute inset-0 flex flex-col items-center justify-center" aria-hidden="true">
             <span className="text-xl font-bold tabular-nums" style={{ color: cfg.color }}>
               {score}
             </span>
