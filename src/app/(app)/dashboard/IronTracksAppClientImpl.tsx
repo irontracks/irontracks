@@ -23,8 +23,6 @@ const CommunityClient = dynamic(() => import('@/app/(app)/community/CommunityCli
 const WorkoutReport = dynamic(() => import('@/components/WorkoutReport'), { ssr: false });
 const ExerciseEditor = dynamic(() => import('@/components/ExerciseEditor'), { ssr: false });
 const ProfilePage = dynamic(() => import('@/components/ProfilePage'), { ssr: false });
-import { TeamWorkoutProvider } from '@/contexts/TeamWorkoutContext';
-import { InAppNotificationsProvider, useInAppNotifications } from '@/contexts/InAppNotificationsContext';
 import ErrorBoundary from '@/components/ErrorBoundary';
 import ErrorReporterProvider from '@/components/ErrorReporterProvider';
 import { DialogProvider, useDialog } from '@/contexts/DialogContext';
@@ -50,18 +48,11 @@ import { useOfflineSync } from '@/hooks/useOfflineSync'
 import { useVipAccess } from '@/hooks/useVipAccess'
 import { useWorkoutStreak } from '@/hooks/useWorkoutStreak'
 import { useGuidedTour } from '@/hooks/useGuidedTour'
-import { usePresencePing } from '@/hooks/usePresencePing'
-import { useUtmAcquisition } from '@/hooks/useUtmAcquisition'
 import { useProfileCompletion } from '@/hooks/useProfileCompletion'
 import { useWhatsNew } from '@/hooks/useWhatsNew'
 import { useSeasonalCampaign } from '@/hooks/useSeasonalCampaign'
 import { useUnreadBadges } from '@/hooks/useUnreadBadges'
-import { useNativeAppSetup } from '@/hooks/useNativeAppSetup'
-import { useNativeIntentRouter } from '@/hooks/useNativeIntentRouter'
-import { useBackgroundRefresh } from '@/hooks/useBackgroundRefresh'
-import { useLiveActivityPushSync } from '@/hooks/useLiveActivityPushSync'
 import { useGymGeofence } from '@/hooks/useGymGeofence'
-import { usePushNotifications } from '@/hooks/usePushNotifications'
 import { BiometricLock, useBiometricLock } from '@/components/BiometricLock'
 import { useLocalPersistence } from '@/hooks/useLocalPersistence'
 import { useAdminPanelState } from '@/hooks/useAdminPanelState'
@@ -83,8 +74,9 @@ import { useNativeTimerActions } from '@/hooks/useNativeTimerActions'
 import { useAppEffects, isRecord, parseStartedAtMs } from '@/hooks/useAppEffects'
 import { useAppHandlers } from '@/hooks/useAppHandlers'
 import { useWorkoutWizard } from '@/hooks/useWorkoutWizard'
-import WatchSyncProvider from '@/components/WatchSyncProvider'
 import type { WatchDashboard, WatchGym, WatchWorkout } from '@/hooks/useWatchBridge'
+import { DashboardEffects } from './_components/DashboardEffects'
+import { DashboardProviders } from './_components/DashboardProviders'
 
 
 import {
@@ -106,18 +98,7 @@ const VipHub = dynamic(() => import('@/components/VipHub'), { ssr: false });
 
 const appId = 'irontracks-production';
 
-function InAppNotifyBinder({ bind }: { bind?: ((notify: ((payload: unknown) => void) | null) => void) | null }): React.ReactElement | null {
-    const { notify } = useInAppNotifications();
-    const safeBind = typeof bind === 'function' ? bind : null;
-    useEffect(() => {
-        if (!safeBind) return;
-        safeBind(notify as (payload: unknown) => void);
-        return () => {
-            try { safeBind(null); } catch { }
-        };
-    }, [notify, safeBind]);
-    return null;
-}
+// InAppNotifyBinder migrado pra DashboardProviders.tsx (PR#1 refactor).
 
 // mapWorkoutRow moved to @/utils/mapWorkoutRow
 
@@ -133,25 +114,8 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
     // ── Story Ring state: own story status (fed up from StoriesBar) ────────────
     const [hasActiveStory, setHasActiveStory] = useState(false)
     const handleMyStoryStateChange = useCallback((active: boolean) => setHasActiveStory(active), [])
-    // ── Native iOS setup (notifications + biometric lock) ─────────────────────
-    useNativeAppSetup(user?.id)
-    usePushNotifications(user?.id)
-
-    // ── Siri / Shortcuts intents (App Intents) ────────────────────────────────
-    // Voice triggers like "Iniciar treino no IronTracks" route here. Every
-    // intent currently brings the user back to the dashboard — that's where
-    // workouts, streak and history live. Future deep links can branch here.
-    useNativeIntentRouter({
-        onAction: useCallback((_action) => {
-            setView('dashboard')
-        }, []),
-    })
-
-    // ── BGTaskScheduler — opportunistic offline-queue flush + widget refresh ──
-    useBackgroundRefresh()
-
-    // ── Live Activity push tokens — forwarded to backend for APNs updates ─────
-    useLiveActivityPushSync()
+    // Side-effects nativos (push, BG refresh, presence, UTM, intent router) extraídos
+    // pra DashboardEffects — renderizado abaixo dentro do JSX como componente headless.
     const userName = String(user?.displayName || user?.email || '')
 
     // workouts, stats, studentFolders, fetchWorkouts, isFetching — extraídos para useWorkoutFetch
@@ -345,12 +309,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         supabase,
     })
 
-    // Presence ping — extracted to usePresencePing hook
-    usePresencePing(user?.id);
-
-    // First-touch UTM attribution — captures utm_* on first visit
-    // and POSTs them once the user is authenticated.
-    useUtmAcquisition(user?.id);
+    // Presence ping + UTM attribution agora vivem em DashboardEffects (PR#1 refactor).
 
     // What's New modal — extracted to useWhatsNew hook
     const { whatsNewOpen, setWhatsNewOpen, pendingUpdate, setPendingUpdate, closeWhatsNew } = useWhatsNew({
@@ -688,6 +647,12 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         setView('directChat')
     }, [setView])
 
+    // Handler estável pra Siri/Shortcuts intents — todas as actions atualmente
+    // roteiam pro dashboard. DashboardEffects consome via prop.
+    const handleNativeIntent = useCallback((_action: string) => {
+        setView('dashboard')
+    }, [])
+
     const handleExpressUseDraft = useCallback((draft: { title: string; exercises: unknown[] }) => {
         try {
             const title = String(draft?.title || '').trim() || 'Treino Express'
@@ -798,19 +763,21 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
             {isLocked && user?.id ? (
                 <BiometricLock userName={userName} onUnlocked={unlock} />
             ) : null}
-            <InAppNotificationsProvider
-                userId={user?.id || undefined}
-                settings={userSettingsApi?.settings ?? null}
+            <DashboardProviders
+                userId={user?.id ? String(user.id) : undefined}
+                settings={userSettingsApi?.settings && typeof userSettingsApi.settings === 'object'
+                    ? (userSettingsApi.settings as Record<string, unknown>)
+                    : null}
                 onOpenNotifications={handleOpenNotifications}
+                bindInAppNotify={bindInAppNotify}
+                watchDashboard={watchDashboard}
+                watchGyms={watchGyms}
+                onWatchRefresh={() => { fetchWorkouts().catch(() => {}) }}
+                teamUser={user?.id ? { id: String(user.id), email: user?.email ? String(user.email) : null } : null}
+                onStartSession={handleStartSession as unknown as (w: Record<string, unknown>) => void | Promise<void>}
             >
-                <InAppNotifyBinder bind={bindInAppNotify} />
-                {/* Apple Watch sync — headless, no visual output */}
-                <WatchSyncProvider
-                    dashboard={watchDashboard}
-                    nearestGyms={watchGyms}
-                    onRefresh={() => { fetchWorkouts().catch(() => {}) }}
-                />
-                <TeamWorkoutProvider user={user?.id ? { id: String(user.id), email: user?.email ? String(user.email) : null } : null} settings={userSettingsApi?.settings ?? null} onStartSession={handleStartSession}>
+                {/* Side-effects nativos centralizados (push, presence, UTM, intent router, BG refresh) */}
+                <DashboardEffects userId={user?.id} onIntent={handleNativeIntent} />
                     <div className="w-full bg-neutral-900 min-h-screen relative flex flex-col overflow-hidden" suppressHydrationWarning>
                         <IncomingInviteModal onStartSession={handleStartSession} />
                         <InviteAcceptedModal />
@@ -1266,8 +1233,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                             alert={alert}
                         />
                     </div>
-                </TeamWorkoutProvider>
-            </InAppNotificationsProvider>
+            </DashboardProviders>
         </>
     );
 }
