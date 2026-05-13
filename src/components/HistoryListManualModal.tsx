@@ -3,6 +3,7 @@
 import React from 'react';
 import { ArrowLeft } from 'lucide-react';
 import ExerciseEditor from '@/components/ExerciseEditor';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
 import { type SupabaseClient } from '@supabase/supabase-js';
 
 export interface ManualExercise {
@@ -76,6 +77,8 @@ export function HistoryListManualModal({
     onSaveExisting,
     onSaveNew,
 }: ManualModalProps) {
+    // WCAG 2.4.3 Focus Order + 2.1.2 No Keyboard Trap
+    const focusTrapRef = useFocusTrap(true, onClose);
     return (
         <div
             role="button"
@@ -86,9 +89,10 @@ export function HistoryListManualModal({
             onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}
         >
             <div
+                ref={focusTrapRef}
                 role="dialog"
                 aria-modal="true"
-                aria-label="Adicionar Histórico"
+                aria-labelledby="history-manual-title"
                 className="w-full max-w-2xl rounded-2xl border shadow-2xl overflow-hidden relative"
                 style={{
                     background: 'linear-gradient(160deg, rgba(20,18,10,0.98) 0%, rgba(10,10,10,0.99) 40%)',
@@ -98,7 +102,7 @@ export function HistoryListManualModal({
             >
                 <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-yellow-500/40 to-transparent" />
                 <div className="p-4 flex items-center justify-between gap-2" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                    <h3 className="text-xs font-black uppercase tracking-[0.2em] text-yellow-500/80">Adicionar Histórico</h3>
+                    <h3 id="history-manual-title" className="text-xs font-black uppercase tracking-[0.2em] text-yellow-500/80">Adicionar Histórico</h3>
                     <button
                         type="button"
                         onClick={onClose}

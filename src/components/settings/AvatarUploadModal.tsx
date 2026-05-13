@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useRef, useState, useCallback } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { compressImage } from '@/utils/chat/media'
+import { useFocusTrap } from '@/hooks/useFocusTrap'
 import { Camera, Loader2, Check, X } from 'lucide-react'
 import Image from 'next/image'
 
@@ -26,6 +27,18 @@ export default function AvatarUploadModal({ isOpen, onClose, currentPhotoURL, us
   useEffect(() => {
     return () => { if (previewUrl) URL.revokeObjectURL(previewUrl) }
   }, [previewUrl])
+
+  // WCAG 2.4.3 Focus Order + 2.1.2 No Keyboard Trap — Escape fecha quando não está fazendo upload
+  const handleEscape = useCallback(() => {
+    if (uploading) return
+    if (previewUrl) URL.revokeObjectURL(previewUrl)
+    setSelectedFile(null)
+    setPreviewUrl(null)
+    setError('')
+    setSuccess(false)
+    onClose()
+  }, [uploading, previewUrl, onClose])
+  const focusTrapRef = useFocusTrap(isOpen, handleEscape)
 
   if (!isOpen) return null
 
@@ -132,10 +145,10 @@ export default function AvatarUploadModal({ isOpen, onClose, currentPhotoURL, us
   return (
     <div className="fixed inset-0 z-[1400] flex items-center justify-center p-4">
       <button type="button" aria-label="Fechar" onClick={handleClose} className="absolute inset-0 bg-black/80 backdrop-blur-sm border-0 cursor-default" />
-      <div role="dialog" aria-modal="true" aria-label="Trocar foto de perfil" className="relative w-full max-w-sm bg-neutral-900 border border-neutral-800 rounded-2xl p-6 shadow-2xl">
+      <div ref={focusTrapRef} role="dialog" aria-modal="true" aria-labelledby="avatar-modal-title" className="relative w-full max-w-sm bg-neutral-900 border border-neutral-800 rounded-2xl p-6 shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between mb-5">
-          <h2 className="text-lg font-black text-white">Foto de Perfil</h2>
+          <h2 id="avatar-modal-title" className="text-lg font-black text-white">Foto de Perfil</h2>
           <button type="button" onClick={handleClose} className="text-neutral-500 hover:text-white p-1">
             <X size={18} />
           </button>

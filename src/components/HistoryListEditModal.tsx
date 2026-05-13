@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
 
 export interface ManualExercise {
     name: string;
@@ -50,6 +51,8 @@ export function HistoryListEditModal({
     onClose,
     onSave,
 }: EditModalProps) {
+    // WCAG 2.4.3 Focus Order + 2.1.2 No Keyboard Trap
+    const focusTrapRef = useFocusTrap(true, onClose);
     return (
         <div
             role="button"
@@ -60,9 +63,10 @@ export function HistoryListEditModal({
             onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}
         >
             <div
+                ref={focusTrapRef}
                 role="dialog"
                 aria-modal="true"
-                aria-label="Editar Histórico"
+                aria-labelledby="history-edit-title"
                 className="w-full max-w-2xl rounded-2xl border shadow-2xl overflow-hidden relative"
                 style={{
                     background: 'linear-gradient(160deg, rgba(20,18,10,0.98) 0%, rgba(10,10,10,0.99) 40%)',
@@ -72,7 +76,7 @@ export function HistoryListEditModal({
             >
                 <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-yellow-500/40 to-transparent" />
                 <div className="p-4" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-                    <h3 className="text-xs font-black uppercase tracking-[0.2em] text-yellow-500/80">Editar Histórico</h3>
+                    <h3 id="history-edit-title" className="text-xs font-black uppercase tracking-[0.2em] text-yellow-500/80">Editar Histórico</h3>
                 </div>
 
                 <div className="p-4 space-y-3 max-h-[70vh] overflow-y-auto">
