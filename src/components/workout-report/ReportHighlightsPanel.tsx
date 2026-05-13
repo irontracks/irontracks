@@ -37,7 +37,7 @@ export function ReportHighlightsPanel({
           <div className="relative overflow-hidden border border-yellow-500/40 rounded-xl flex flex-col"
             style={{ background: 'linear-gradient(135deg, rgba(234,179,8,0.14), rgba(180,83,9,0.10))', boxShadow: '0 0 18px rgba(234,179,8,0.18), inset 0 0 12px rgba(234,179,8,0.06)' }}>
             <div className="absolute inset-0 opacity-30">
-              <NextImage src="/report-pr.png" alt="" fill unoptimized className="object-cover object-center" />
+              <NextImage src="/report-pr.png" alt="" fill sizes="(max-width: 768px) 50vw, 200px" className="object-cover object-center" />
             </div>
             <div className="relative z-10 p-3 flex flex-col gap-1">
               <div className="text-2xl font-black text-yellow-400">{prCount}</div>

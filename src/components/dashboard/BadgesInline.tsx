@@ -49,7 +49,7 @@ export default function BadgesInline({ badges }: { badges: Badge[] }) {
                 src={src}
                 alt={badge.label}
                 fill
-                unoptimized
+                sizes="56px"
                 className="object-cover"
               />
             </div>

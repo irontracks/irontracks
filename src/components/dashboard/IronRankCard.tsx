@@ -237,7 +237,7 @@ const IronRankCard = memo(function IronRankCard({
                                             src={RANK_EMBLEMS[level]?.src || '/rank-1.png'}
                                             alt={`NIV ${level}`}
                                             fill
-                                            unoptimized
+                                            sizes="44px"
                                             className="object-cover"
                                         />
                                     </div>
@@ -524,7 +524,7 @@ const IronRankCard = memo(function IronRankCard({
                                                 style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.07)' }}>
                                                 {row.photoUrl
                                                     ? <Image src={row.photoUrl} alt="" width={36} height={36} className="w-full h-full object-cover" loading="lazy" />
-                                                    : <NextImage src="/default-avatar.png" alt="" width={36} height={36} className="w-full h-full object-cover" unoptimized />}
+                                                    : <NextImage src="/default-avatar.png" alt="" width={36} height={36} className="w-full h-full object-cover" />}
                                             </div>
                                             <div className="min-w-0 flex-1">
                                                 <div className={['text-sm font-black truncate', isMe ? 'text-yellow-400' : 'text-white'].join(' ')}>

@@ -19,7 +19,7 @@ const nextConfig: NextConfig = {
   // lucide-react: saves ~200kb by only importing icons actually used
   // chart.js / react-chartjs-2: only bundles chart types imported
   experimental: {
-    optimizePackageImports: ['lucide-react', 'chart.js', 'react-chartjs-2', '@tanstack/react-virtual'],
+    optimizePackageImports: ['lucide-react', 'chart.js', 'react-chartjs-2', '@tanstack/react-virtual', 'framer-motion'],
   },
 
   // tsc roda localmente via `npm run deploy` antes de cada push.
@@ -35,6 +35,7 @@ const nextConfig: NextConfig = {
     localPatterns: [
       { pathname: '/api/social/stories/media/**' },
       { pathname: '/illustrations/**' },
+      { pathname: '/icons/**' },
       { pathname: '/badge-**' },
       { pathname: '/muscle-overlays/**' },
       { pathname: '/muscle-overlays-female/**' },

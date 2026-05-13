@@ -326,7 +326,7 @@ export default function WorkoutWizardModal(props: Props) {
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2">
-                <Image src="/icons/btn-novo-treino.png" alt="" width={28} height={28} className="rounded-lg" unoptimized />
+                <Image src="/icons/btn-novo-treino.png" alt="" width={28} height={28} className="rounded-lg" />
                 <div>
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-black text-white">Criar Treino</span>
