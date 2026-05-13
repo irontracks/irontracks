@@ -104,17 +104,17 @@ export function StudentCheckinsTab() {
                     <div className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-4">
                         <div className="text-[11px] font-black uppercase tracking-widest text-yellow-500">Pré</div>
                         <div className="mt-2 grid grid-cols-3 gap-3">
-                            <div><div className="text-[10px] font-black uppercase tracking-widest text-neutral-500">Energia</div><div className="font-black text-white">{preAvgEnergy == null ? '—' : preAvgEnergy.toFixed(1)}</div></div>
-                            <div><div className="text-[10px] font-black uppercase tracking-widest text-neutral-500">Dor</div><div className="font-black text-white">{preAvgSoreness == null ? '—' : preAvgSoreness.toFixed(1)}</div></div>
-                            <div><div className="text-[10px] font-black uppercase tracking-widest text-neutral-500">Tempo</div><div className="font-black text-white">{preAvgTime == null ? '—' : `${Math.round(preAvgTime)}m`}</div></div>
+                            <div><div className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Energia</div><div className="font-black text-white">{preAvgEnergy == null ? '—' : preAvgEnergy.toFixed(1)}</div></div>
+                            <div><div className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Dor</div><div className="font-black text-white">{preAvgSoreness == null ? '—' : preAvgSoreness.toFixed(1)}</div></div>
+                            <div><div className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Tempo</div><div className="font-black text-white">{preAvgTime == null ? '—' : `${Math.round(preAvgTime)}m`}</div></div>
                         </div>
                     </div>
                     <div className="rounded-2xl border border-neutral-800 bg-neutral-950/40 p-4">
                         <div className="text-[11px] font-black uppercase tracking-widest text-yellow-500">Pós</div>
                         <div className="mt-2 grid grid-cols-3 gap-3">
-                            <div><div className="text-[10px] font-black uppercase tracking-widest text-neutral-500">RPE</div><div className="font-black text-white">{postAvgRpe == null ? '—' : postAvgRpe.toFixed(1)}</div></div>
-                            <div><div className="text-[10px] font-black uppercase tracking-widest text-neutral-500">Satisf.</div><div className="font-black text-white">{postAvgSatisfaction == null ? '—' : postAvgSatisfaction.toFixed(1)}</div></div>
-                            <div><div className="text-[10px] font-black uppercase tracking-widest text-neutral-500">Dor</div><div className="font-black text-white">{postAvgSoreness == null ? '—' : postAvgSoreness.toFixed(1)}</div></div>
+                            <div><div className="text-[10px] font-black uppercase tracking-widest text-neutral-400">RPE</div><div className="font-black text-white">{postAvgRpe == null ? '—' : postAvgRpe.toFixed(1)}</div></div>
+                            <div><div className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Satisf.</div><div className="font-black text-white">{postAvgSatisfaction == null ? '—' : postAvgSatisfaction.toFixed(1)}</div></div>
+                            <div><div className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Dor</div><div className="font-black text-white">{postAvgSoreness == null ? '—' : postAvgSoreness.toFixed(1)}</div></div>
                         </div>
                     </div>
                 </div>
@@ -153,7 +153,7 @@ export function StudentCheckinsTab() {
                                     <div className="flex items-start justify-between gap-3">
                                         <div className="min-w-0">
                                             <div className="text-[11px] font-black uppercase tracking-widest text-yellow-500">{kind === 'pre' ? 'Pré' : 'Pós'}</div>
-                                            <div className="text-xs text-neutral-500">{dateLabel}</div>
+                                            <div className="text-xs text-neutral-400">{dateLabel}</div>
                                         </div>
                                         <div className="text-xs text-neutral-300 font-mono">
                                             {kind === 'pre' ? `E:${energy} D:${soreness} T:${timeMinutes}` : `RPE:${rpe} Sat:${mood} D:${soreness}`}

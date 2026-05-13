@@ -118,7 +118,7 @@ function ToggleButton({
     <div className="flex items-center justify-between gap-3 py-3 border-b border-white/5 last:border-0">
       <div className="min-w-0">
         <div className="text-sm font-bold text-white">{label}</div>
-        <div className="text-xs text-neutral-500 mt-0.5">{description}</div>
+        <div className="text-xs text-neutral-400 mt-0.5">{description}</div>
       </div>
       <button
         type="button"
@@ -249,7 +249,7 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
                     <Users size={18} className="text-yellow-500 flex-shrink-0" />
                     {activeTab === 'feed' ? 'Atividades' : activeTab === 'ranking' ? 'Ranking' : activeTab === 'challenges' ? 'Desafios' : 'Seguir Amigos'}
                   </div>
-                  <div className="text-xs text-neutral-500 mt-0.5">
+                  <div className="text-xs text-neutral-400 mt-0.5">
                     {activeTab === 'feed' ? 'Veja o que seus amigos estão fazendo.' : activeTab === 'ranking' ? 'Ranking semanal entre amigos.' : activeTab === 'challenges' ? 'Desafie amigos e veja quem treina mais.' : 'Siga alunos e professores para receber notificações.'}
                   </div>
                 </div>
@@ -280,7 +280,7 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
                     type="button"
                     onClick={() => setActiveTab(tab.key)}
                     className={`flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-lg text-xs font-black uppercase tracking-wider transition-all duration-200 ${
-                      isActive ? 'text-black' : 'text-neutral-500 hover:text-neutral-300'
+                      isActive ? 'text-black' : 'text-neutral-400 hover:text-neutral-300'
                     }`}
                     style={isActive ? {
                       background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 60%, #b45309 100%)',
@@ -308,7 +308,7 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
                 className="mt-3 flex items-center gap-2.5 px-4 py-3 rounded-xl transition-all"
                 style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}
               >
-                <Search size={15} className="text-neutral-500 flex-shrink-0" />
+                <Search size={15} className="text-neutral-400 flex-shrink-0" />
                 <input
                   aria-label="Buscar usuários"
                   value={query}
@@ -317,7 +317,7 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
                   placeholder="Buscar por nome ou tipo (teacher/student)…"
                 />
                 {query && (
-                  <button type="button" onClick={() => setQuery('')} className="text-neutral-600 hover:text-neutral-400 transition-colors">
+                  <button type="button" onClick={() => setQuery('')} className="text-neutral-400 hover:text-neutral-400 transition-colors">
                     <X size={14} />
                   </button>
                 )}
@@ -400,13 +400,13 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
           <GoldGradientBorder>
             <div className="p-8 flex flex-col items-center gap-3">
               <Loader2 size={28} className="text-yellow-500 animate-spin" />
-              <div className="text-sm text-neutral-500">Carregando comunidade…</div>
+              <div className="text-sm text-neutral-400">Carregando comunidade…</div>
             </div>
           </GoldGradientBorder>
         ) : !userId ? (
           <GoldGradientBorder>
             <div className="p-6 text-center">
-              <Users size={32} className="text-neutral-600 mx-auto mb-3" />
+              <Users size={32} className="text-neutral-400 mx-auto mb-3" />
               <div className="text-sm text-neutral-400">Faça login para usar a comunidade.</div>
             </div>
           </GoldGradientBorder>
@@ -447,7 +447,7 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
                   <GoldGradientBorder>
                     <div className="p-8 flex flex-col items-center gap-3">
                       <Loader2 size={28} className="text-yellow-500 animate-spin" />
-                      <div className="text-sm text-neutral-500">Carregando feed…</div>
+                      <div className="text-sm text-neutral-400">Carregando feed…</div>
                     </div>
                   </GoldGradientBorder>
                 ) : feedItems.length === 0 ? (
@@ -494,13 +494,13 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
                           className="w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0"
                           style={{ background: followRequests.length ? 'rgba(234,179,8,0.12)' : 'rgba(255,255,255,0.04)', border: followRequests.length ? '1px solid rgba(234,179,8,0.2)' : '1px solid rgba(255,255,255,0.06)' }}
                         >
-                          <UserPlus size={15} className={followRequests.length ? 'text-yellow-500' : 'text-neutral-500'} />
+                          <UserPlus size={15} className={followRequests.length ? 'text-yellow-500' : 'text-neutral-400'} />
                         </div>
                         <div>
                           <div className="text-xs font-black uppercase tracking-widest" style={{ color: followRequests.length ? '#f59e0b' : 'rgba(255,255,255,0.4)' }}>
                             Pedidos para Seguir
                           </div>
-                          <div className="text-[11px] text-neutral-500">
+                          <div className="text-[11px] text-neutral-400">
                             {followRequests.length ? `${followRequests.length} pendente(s)` : 'Nenhuma solicitação pendente.'}
                           </div>
                         </div>
@@ -570,8 +570,8 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
                         className="px-4 py-2.5 flex items-center gap-2"
                         style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', background: 'rgba(255,255,255,0.01)' }}
                       >
-                        <Bell size={12} className="text-neutral-600 flex-shrink-0" />
-                        <span className="text-[11px] text-neutral-600">Notificações aparecem somente após o usuário aceitar seu pedido.</span>
+                        <Bell size={12} className="text-neutral-400 flex-shrink-0" />
+                        <span className="text-[11px] text-neutral-400">Notificações aparecem somente após o usuário aceitar seu pedido.</span>
                       </div>
                       <div>
                         {filtered.map((p, i) => {

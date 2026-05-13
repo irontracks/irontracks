@@ -240,7 +240,7 @@ export const DashboardTab: React.FC = () => {
                 lembrar a localização nos menus.
             */}
             <div className="space-y-2">
-                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-neutral-500 px-1">
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-neutral-400 px-1">
                     Ações rápidas
                 </p>
                 <div className="grid grid-cols-3 gap-2">
@@ -293,15 +293,15 @@ export const DashboardTab: React.FC = () => {
                             <Zap size={20} className="text-yellow-500" />
                         </div>
                         <div>
-                            <p className="text-xs font-bold text-neutral-500 uppercase tracking-wider">Seu Plano</p>
+                            <p className="text-xs font-bold text-neutral-400 uppercase tracking-wider">Seu Plano</p>
                             <p className="text-white font-black text-lg leading-tight">{planState.plan?.name ?? 'Free'}</p>
                         </div>
                         <div className="h-10 w-px bg-neutral-800" />
                         <div>
-                            <p className="text-xs font-bold text-neutral-500 uppercase tracking-wider">Alunos</p>
+                            <p className="text-xs font-bold text-neutral-400 uppercase tracking-wider">Alunos</p>
                             <p className="text-white font-black text-lg leading-tight">
                                 {planState.studentCount}
-                                <span className="text-neutral-500 font-normal text-sm ml-1">
+                                <span className="text-neutral-400 font-normal text-sm ml-1">
                                     / {planState.maxStudents === 0 ? '∞' : planState.maxStudents}
                                 </span>
                             </p>
@@ -348,7 +348,7 @@ export const DashboardTab: React.FC = () => {
                                 <Clock size={20} className="text-yellow-500" />
                                 Coach Inbox
                             </h3>
-                            <span className="text-xs font-bold text-neutral-500 bg-neutral-900 px-3 py-1 rounded-full border border-neutral-800">
+                            <span className="text-xs font-bold text-neutral-400 bg-neutral-900 px-3 py-1 rounded-full border border-neutral-800">
                                 Alunos inativos (+7 dias)
                             </span>
                         </div>
@@ -356,7 +356,7 @@ export const DashboardTab: React.FC = () => {
                         {coachInboxItems.length === 0 ? (
                             <div className="flex flex-col items-center justify-center py-12 text-center space-y-3">
                                 <div className="p-4 bg-neutral-800/50 rounded-full">
-                                    <UserCheck size={32} className="text-neutral-600" />
+                                    <UserCheck size={32} className="text-neutral-400" />
                                 </div>
                                 <p className="text-neutral-400 text-sm font-medium">Tudo em dia! Nenhum aluno inativo.</p>
                             </div>
@@ -372,7 +372,7 @@ export const DashboardTab: React.FC = () => {
                                                 <div className="font-bold text-white group-hover:text-yellow-500 transition-colors">
                                                     {String(item.name ?? '')}
                                                 </div>
-                                                <div className="text-xs text-neutral-500 flex items-center gap-2">
+                                                <div className="text-xs text-neutral-400 flex items-center gap-2">
                                                     <span className="text-red-400 font-bold">
                                                         {item.hasWorkouts ? `${item.daysSinceLastWorkout} dias sem treino` : 'Nunca treinou'}
                                                     </span>
@@ -422,7 +422,7 @@ export const DashboardTab: React.FC = () => {
                             <Doughnut data={dashboardCharts.statusDistribution.data} options={doughnutOptions} />
                             <div className="absolute inset-0 flex items-center justify-center flex-col pointer-events-none">
                                 <span className="text-3xl font-black text-white">{dashboardCharts.statusTotal}</span>
-                                <span className="text-[10px] font-bold text-neutral-500 uppercase tracking-widest">Alunos</span>
+                                <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">Alunos</span>
                             </div>
                         </div>
                     </div>

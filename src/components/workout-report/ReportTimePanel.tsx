@@ -141,23 +141,23 @@ export const ReportTimePanel = ({ reportRest, reportCadence }: ReportTimePanelPr
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <div className="text-[9px] font-black uppercase tracking-widest text-neutral-600 mb-0.5">Planejado</div>
+                <div className="text-[9px] font-black uppercase tracking-widest text-neutral-400 mb-0.5">Planejado</div>
                 <div className="text-xl font-mono font-black text-white">{formatSec(plannedRest)}</div>
-                <div className="text-[9px] text-neutral-600">média por série</div>
+                <div className="text-[9px] text-neutral-400">média por série</div>
               </div>
               <div>
-                <div className="text-[9px] font-black uppercase tracking-widest text-neutral-600 mb-0.5">Real</div>
-                <div className={`text-xl font-mono font-black ${actualRest != null && actualRest > 0 ? 'text-white' : 'text-neutral-600'}`}>
+                <div className="text-[9px] font-black uppercase tracking-widest text-neutral-400 mb-0.5">Real</div>
+                <div className={`text-xl font-mono font-black ${actualRest != null && actualRest > 0 ? 'text-white' : 'text-neutral-400'}`}>
                   {formatSec(actualRest)}
                 </div>
-                <div className="text-[9px] text-neutral-600">via timer</div>
+                <div className="text-[9px] text-neutral-400">via timer</div>
               </div>
             </div>
 
             <div className="flex items-center gap-2">
               <RestComplianceBadge planned={plannedRest} actual={actualRest} />
               {actualRest == null || actualRest <= 0 ? (
-                <span className="text-[9px] text-neutral-600">Use o timer para rastrear</span>
+                <span className="text-[9px] text-neutral-400">Use o timer para rastrear</span>
               ) : null}
             </div>
 
@@ -181,16 +181,16 @@ export const ReportTimePanel = ({ reportRest, reportCadence }: ReportTimePanelPr
 
             <div className="grid grid-cols-2 gap-3">
               <div>
-                <div className="text-[9px] font-black uppercase tracking-widest text-neutral-600 mb-0.5">Esperada</div>
+                <div className="text-[9px] font-black uppercase tracking-widest text-neutral-400 mb-0.5">Esperada</div>
                 <div className="text-xl font-mono font-black text-white">{formatSec(cadenceExpected)}</div>
-                <div className="text-[9px] text-neutral-600">média por série</div>
+                <div className="text-[9px] text-neutral-400">média por série</div>
               </div>
               <div>
-                <div className="text-[9px] font-black uppercase tracking-widest text-neutral-600 mb-0.5">Real</div>
-                <div className={`text-xl font-mono font-black ${cadenceActual != null && cadenceActual > 0 ? 'text-white' : 'text-neutral-600'}`}>
+                <div className="text-[9px] font-black uppercase tracking-widest text-neutral-400 mb-0.5">Real</div>
+                <div className={`text-xl font-mono font-black ${cadenceActual != null && cadenceActual > 0 ? 'text-white' : 'text-neutral-400'}`}>
                   {formatSec(cadenceActual)}
                 </div>
-                <div className="text-[9px] text-neutral-600">execução medida</div>
+                <div className="text-[9px] text-neutral-400">execução medida</div>
               </div>
             </div>
 
@@ -198,7 +198,7 @@ export const ReportTimePanel = ({ reportRest, reportCadence }: ReportTimePanelPr
               <CadenceBadge pct={cadencePct} />
             </div>
 
-            <div className="text-[9px] text-neutral-600">
+            <div className="text-[9px] text-neutral-400">
               Baseado em {Math.round(cadenceSets ?? 0)} série{(cadenceSets ?? 0) !== 1 ? 's' : ''} verificada{(cadenceSets ?? 0) !== 1 ? 's' : ''}
             </div>
           </div>

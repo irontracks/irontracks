@@ -25,7 +25,7 @@ export const ReportCheckinPanel = ({ preCheckin, postCheckin, recommendations }:
                     <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Pré</div>
                     <div className="mt-2 grid grid-cols-2 gap-3 text-sm">
                         <div>
-                            <div className="text-[10px] font-black uppercase tracking-widest text-neutral-500">Energia</div>
+                            <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Energia</div>
                             <div className="font-black text-white">{(() => {
                                 const e = preCheckin?.energy
                                 if (e == null || String(e) === '') return '—'
@@ -37,19 +37,19 @@ export const ReportCheckinPanel = ({ preCheckin, postCheckin, recommendations }:
                             })()}</div>
                         </div>
                         <div>
-                            <div className="text-[10px] font-black uppercase tracking-widest text-neutral-500">Dor</div>
+                            <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Dor</div>
                             <div className="font-black text-white">
                                 {preCheckin?.soreness != null && String(preCheckin.soreness) !== '' ? String(preCheckin.soreness) : '—'}
                             </div>
                         </div>
                         <div className="col-span-2">
-                            <div className="text-[10px] font-black uppercase tracking-widest text-neutral-500">Tempo disponível</div>
+                            <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Tempo disponível</div>
                             <div className="font-black text-white">
                                 {preCheckin?.timeMinutes != null && String(preCheckin.timeMinutes) !== '' ? `${String(preCheckin.timeMinutes)} min` : '—'}
                             </div>
                         </div>
                         <div className="col-span-2">
-                            <div className="text-[10px] font-black uppercase tracking-widest text-neutral-500">Observações</div>
+                            <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Observações</div>
                             <div className="text-neutral-200">{preCheckin?.notes ? String(preCheckin.notes) : '—'}</div>
                         </div>
                     </div>
@@ -59,23 +59,23 @@ export const ReportCheckinPanel = ({ preCheckin, postCheckin, recommendations }:
                     <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Pós</div>
                     <div className="mt-2 grid grid-cols-2 gap-3 text-sm">
                         <div>
-                            <div className="text-[10px] font-black uppercase tracking-widest text-neutral-500">RPE</div>
+                            <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400">RPE</div>
                             <div className="font-black text-white">{postCheckin?.rpe != null && String(postCheckin.rpe) !== '' ? String(postCheckin.rpe) : '—'}</div>
                         </div>
                         <div>
-                            <div className="text-[10px] font-black uppercase tracking-widest text-neutral-500">Satisfação</div>
+                            <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Satisfação</div>
                             <div className="font-black text-white">
                                 {postCheckin?.satisfaction != null && String(postCheckin.satisfaction) !== '' ? String(postCheckin.satisfaction) : '—'}
                             </div>
                         </div>
                         <div className="col-span-2">
-                            <div className="text-[10px] font-black uppercase tracking-widest text-neutral-500">Dor</div>
+                            <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Dor</div>
                             <div className="font-black text-white">
                                 {postCheckin?.soreness != null && String(postCheckin.soreness) !== '' ? String(postCheckin.soreness) : '—'}
                             </div>
                         </div>
                         <div className="col-span-2">
-                            <div className="text-[10px] font-black uppercase tracking-widest text-neutral-500">Observações</div>
+                            <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Observações</div>
                             <div className="text-neutral-200">{postCheckin?.notes ? String(postCheckin.notes) : '—'}</div>
                         </div>
                     </div>

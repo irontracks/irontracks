@@ -118,7 +118,7 @@ export function AnalyticsTab() {
         {value}
         {suffix ? <span className="text-sm text-neutral-400 ml-1 font-bold">{suffix}</span> : null}
       </div>
-      {sub ? <div className="text-[11px] text-neutral-500 mt-0.5">{sub}</div> : null}
+      {sub ? <div className="text-[11px] text-neutral-400 mt-0.5">{sub}</div> : null}
     </div>
   )
 
@@ -158,14 +158,14 @@ export function AnalyticsTab() {
       )}
 
       {loading && !summary ? (
-        <div className="flex items-center justify-center py-16 text-neutral-500">
+        <div className="flex items-center justify-center py-16 text-neutral-400">
           <Loader2 size={28} className="animate-spin" />
         </div>
       ) : summary ? (
         <>
           {/* ── Usuários ativos (DAU/WAU/MAU + stickiness) ──────── */}
           <section className="space-y-2">
-            <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-neutral-500 px-1">
+            <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-neutral-400 px-1">
               Usuários ativos
             </h3>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -203,14 +203,14 @@ export function AnalyticsTab() {
                 sub="DAU ÷ MAU"
               />
             </div>
-            <p className="text-[10px] text-neutral-600 px-1">
+            <p className="text-[10px] text-neutral-400 px-1">
               Stickiness alto (&gt;20%) = usuários voltam frequente. &lt;10% = app usado pontual.
             </p>
           </section>
 
           {/* ── Treinos ─────────────────────────────────────────── */}
           <section className="space-y-2">
-            <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-neutral-500 px-1">
+            <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-neutral-400 px-1">
               Treinos realizados
             </h3>
             <div className="grid grid-cols-3 gap-2">
@@ -240,7 +240,7 @@ export function AnalyticsTab() {
 
           {/* ── Aquisição ───────────────────────────────────────── */}
           <section className="space-y-2">
-            <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-neutral-500 px-1">
+            <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-neutral-400 px-1">
               Aquisição
             </h3>
             <div className="grid grid-cols-3 gap-2">
@@ -271,7 +271,7 @@ export function AnalyticsTab() {
 
           {/* ── Pushes ──────────────────────────────────────────── */}
           <section className="space-y-2">
-            <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-neutral-500 px-1">
+            <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-neutral-400 px-1">
               Push notifications
             </h3>
             <div className="grid grid-cols-2 gap-2">
@@ -307,7 +307,7 @@ export function AnalyticsTab() {
                       <div key={type} className="space-y-1">
                         <div className="flex items-center justify-between text-xs">
                           <span className="text-neutral-300 truncate">{labelForPushType(type)}</span>
-                          <span className="text-neutral-500 font-bold tabular-nums shrink-0 ml-2">{count}</span>
+                          <span className="text-neutral-400 font-bold tabular-nums shrink-0 ml-2">{count}</span>
                         </div>
                         <div className="h-1.5 rounded-full bg-neutral-800 overflow-hidden">
                           <div

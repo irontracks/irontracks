@@ -15,12 +15,12 @@ function ProfileBadge({ label, value, icon: Icon }: { label: string; value: stri
     <div className={`rounded-xl border p-3 flex items-start gap-2.5 ${empty ? 'border-neutral-800 bg-neutral-900/30' : 'border-neutral-700/60 bg-neutral-900/70'}`}>
       {Icon && (
         <div className={`w-7 h-7 rounded-lg flex items-center justify-center flex-shrink-0 ${empty ? 'bg-neutral-800' : 'bg-yellow-500/15 border border-yellow-500/25'}`}>
-          <Icon size={13} className={empty ? 'text-neutral-600' : 'text-yellow-400'} />
+          <Icon size={13} className={empty ? 'text-neutral-400' : 'text-yellow-400'} />
         </div>
       )}
       <div className="min-w-0 flex-1">
-        <p className="text-[10px] font-black uppercase tracking-widest text-neutral-500">{label}</p>
-        <p className={`text-sm font-bold mt-0.5 ${empty ? 'text-neutral-600 italic' : 'text-white'}`}>
+        <p className="text-[10px] font-black uppercase tracking-widest text-neutral-400">{label}</p>
+        <p className={`text-sm font-bold mt-0.5 ${empty ? 'text-neutral-400 italic' : 'text-white'}`}>
           {empty ? '—' : String(value)}
         </p>
       </div>
@@ -126,7 +126,7 @@ export const StudentProfileTab: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-12 text-neutral-500">
+      <div className="flex items-center justify-center py-12 text-neutral-400">
         <span className="animate-pulse">Carregando perfil...</span>
       </div>
     )
@@ -163,7 +163,7 @@ export const StudentProfileTab: React.FC = () => {
           <p className="text-sm font-black text-white">
             {score >= 90 ? '✅ Perfil completo' : score >= 60 ? '⚡ Perfil parcial' : '📋 Perfil incompleto'}
           </p>
-          <p className="text-xs text-neutral-500 mt-0.5 leading-relaxed">
+          <p className="text-xs text-neutral-400 mt-0.5 leading-relaxed">
             {score >= 90
               ? 'Cálculos de calorias na máxima precisão para este aluno.'
               : missingFields.length > 0
@@ -213,8 +213,8 @@ export const StudentProfileTab: React.FC = () => {
       {!settings && (
         <div className="rounded-2xl border border-neutral-800 bg-neutral-900/30 px-4 py-8 text-center">
           <User size={32} className="mx-auto mb-3 text-neutral-700" />
-          <p className="text-sm font-bold text-neutral-500">Este aluno ainda não preencheu o perfil.</p>
-          <p className="text-xs text-neutral-600 mt-1">Os dados aparecerão aqui quando o aluno acessar Menu → Meu Perfil.</p>
+          <p className="text-sm font-bold text-neutral-400">Este aluno ainda não preencheu o perfil.</p>
+          <p className="text-xs text-neutral-400 mt-1">Os dados aparecerão aqui quando o aluno acessar Menu → Meu Perfil.</p>
         </div>
       )}
     </div>

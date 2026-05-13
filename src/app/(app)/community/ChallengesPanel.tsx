@@ -129,7 +129,7 @@ export default function ChallengesPanel({
       {loading ? (
         <div className="p-8 flex flex-col items-center gap-3">
           <Loader2 size={24} className="text-yellow-500 animate-spin" />
-          <div className="text-xs text-neutral-500">Carregando desafios…</div>
+          <div className="text-xs text-neutral-400">Carregando desafios…</div>
         </div>
       ) : (
         <div className="px-4 py-3 space-y-4">
@@ -150,7 +150,7 @@ export default function ChallengesPanel({
                       type="button"
                       onClick={() => setChallengeType(t)}
                       className={`flex-1 py-2 rounded-lg text-[10px] font-black uppercase tracking-wider flex items-center justify-center gap-1 transition-all ${
-                        isActive ? 'text-black' : 'text-neutral-500'
+                        isActive ? 'text-black' : 'text-neutral-400'
                       }`}
                       style={isActive ? {
                         background: 'linear-gradient(135deg, #f59e0b, #d97706)',
@@ -167,7 +167,7 @@ export default function ChallengesPanel({
 
               <div className="flex items-center gap-3">
                 <div className="flex-1">
-                  <label className="text-[10px] text-neutral-500 uppercase tracking-wider font-bold">Meta</label>
+                  <label className="text-[10px] text-neutral-400 uppercase tracking-wider font-bold">Meta</label>
                   <input
                     aria-label="Meta do desafio"
                     type="number"
@@ -179,7 +179,7 @@ export default function ChallengesPanel({
                   />
                 </div>
                 <div className="flex-1">
-                  <label className="text-[10px] text-neutral-500 uppercase tracking-wider font-bold">Prazo (dias)</label>
+                  <label className="text-[10px] text-neutral-400 uppercase tracking-wider font-bold">Prazo (dias)</label>
                   <input
                     aria-label="Prazo em dias"
                     type="number"
@@ -234,7 +234,7 @@ export default function ChallengesPanel({
                       )}
                       <div className="flex-1 min-w-0">
                         <div className="text-xs font-black text-white truncate">{opponentName}</div>
-                        <div className="text-[10px] text-neutral-500">{meta.targetValue} {cfg.unit} • {daysLeft(meta.deadline as string)}</div>
+                        <div className="text-[10px] text-neutral-400">{meta.targetValue} {cfg.unit} • {daysLeft(meta.deadline as string)}</div>
                       </div>
                     </div>
                     <div className="flex gap-2">
@@ -289,7 +289,7 @@ export default function ChallengesPanel({
                         {cfg.icon}
                         <span className="text-xs font-black text-white">{meta.targetValue} {cfg.unit}</span>
                       </div>
-                      <span className="text-[10px] text-neutral-500">{daysLeft(meta.deadline as string)}</span>
+                      <span className="text-[10px] text-neutral-400">{daysLeft(meta.deadline as string)}</span>
                     </div>
                     <div className="text-[10px] text-neutral-400 mb-2">vs {opponentName}</div>
                     <div className="h-2 rounded-full overflow-hidden" style={{ background: 'rgba(255,255,255,0.06)' }}>
@@ -301,7 +301,7 @@ export default function ChallengesPanel({
                         }}
                       />
                     </div>
-                    <div className="text-[10px] text-neutral-500 mt-1">{progress}/{meta.targetValue} ({pct}%)</div>
+                    <div className="text-[10px] text-neutral-400 mt-1">{progress}/{meta.targetValue} ({pct}%)</div>
                   </div>
                 )
               })}
@@ -311,9 +311,9 @@ export default function ChallengesPanel({
           {/* Empty state */}
           {!creating && pending.length === 0 && active.length === 0 && (
             <div className="p-6 text-center">
-              <Swords size={24} className="text-neutral-600 mx-auto mb-2" />
-              <div className="text-xs text-neutral-500">Nenhum desafio ativo.</div>
-              <div className="text-[10px] text-neutral-600 mt-1">Desafie amigos pelo perfil deles!</div>
+              <Swords size={24} className="text-neutral-400 mx-auto mb-2" />
+              <div className="text-xs text-neutral-400">Nenhum desafio ativo.</div>
+              <div className="text-[10px] text-neutral-400 mt-1">Desafie amigos pelo perfil deles!</div>
             </div>
           )}
         </div>

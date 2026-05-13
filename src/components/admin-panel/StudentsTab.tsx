@@ -193,7 +193,7 @@ export const StudentsTab: React.FC = () => {
                                 </span>
                             )}
                         </div>
-                        <div className="text-xs text-neutral-500 truncate">{s.email}</div>
+                        <div className="text-xs text-neutral-400 truncate">{s.email}</div>
                     </div>
                     {/* VIP badge */}
                     {vipLabel && vipColor && (
@@ -340,14 +340,14 @@ export const StudentsTab: React.FC = () => {
             {/* Search + Filters */}
             <div className="flex flex-col md:flex-row gap-4 justify-between items-start md:items-center bg-neutral-900/50 p-4 rounded-2xl border border-neutral-800 backdrop-blur-sm">
                 <div className="relative w-full md:w-96">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" size={18} />
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" size={18} />
                     <input
                         type="text"
                         aria-label="Buscar alunos"
                         placeholder="Buscar alunos..."
                         value={studentQuery}
                         onChange={(e) => setStudentQuery(e.target.value)}
-                        className="w-full bg-neutral-900 border border-neutral-800 rounded-xl pl-10 pr-4 py-3 text-white placeholder:text-neutral-600 focus:border-yellow-500 focus:outline-none transition-colors"
+                        className="w-full bg-neutral-900 border border-neutral-800 rounded-xl pl-10 pr-4 py-3 text-white placeholder:text-neutral-400 focus:border-yellow-500 focus:outline-none transition-colors"
                     />
                 </div>
 
@@ -436,7 +436,7 @@ export const StudentsTab: React.FC = () => {
             <div className="space-y-8">
                 {(isTeacher || (isAdmin && studentsWithTeacherFiltered.length > 0)) && (
                     <div className="space-y-4">
-                        <h3 className="text-sm font-black text-neutral-500 uppercase tracking-widest px-1">
+                        <h3 className="text-sm font-black text-neutral-400 uppercase tracking-widest px-1">
                             {isTeacher ? 'Meus Alunos' : 'Alunos com Professor'}
                         </h3>
                         <div className="grid gap-3">
@@ -448,7 +448,7 @@ export const StudentsTab: React.FC = () => {
                             }
                             {isTeacher && studentsWithTeacherFiltered.filter(s => s.teacher_id === user.id).length === 0 && (
                                 <div className="text-center py-12 border border-dashed border-neutral-800 rounded-2xl">
-                                    <p className="text-neutral-500 font-medium">Nenhum aluno encontrado.</p>
+                                    <p className="text-neutral-400 font-medium">Nenhum aluno encontrado.</p>
                                 </div>
                             )}
                         </div>
@@ -458,7 +458,7 @@ export const StudentsTab: React.FC = () => {
                 {/* Sem Professor */}
                 {isAdmin && studentsWithoutTeacherFiltered.length > 0 && (
                     <div className="space-y-4">
-                        <h3 className="text-sm font-black text-neutral-500 uppercase tracking-widest px-1">
+                        <h3 className="text-sm font-black text-neutral-400 uppercase tracking-widest px-1">
                             Sem Professor
                         </h3>
                         <div className="grid gap-3">
@@ -471,10 +471,10 @@ export const StudentsTab: React.FC = () => {
                 {isAdmin && studentsWithTeacherFiltered.length === 0 && studentsWithoutTeacherFiltered.length === 0 && (
                     <div className="text-center py-12 border border-dashed border-neutral-800 rounded-2xl">
                         <div className="w-16 h-16 bg-neutral-800 rounded-full flex items-center justify-center mx-auto mb-4">
-                            <User size={32} className="text-neutral-600" />
+                            <User size={32} className="text-neutral-400" />
                         </div>
                         <h3 className="text-white font-bold text-lg mb-1">Nenhum aluno encontrado</h3>
-                        <p className="text-neutral-500">Tente ajustar os filtros ou adicione um novo aluno.</p>
+                        <p className="text-neutral-400">Tente ajustar os filtros ou adicione um novo aluno.</p>
                     </div>
                 )}
             </div>
