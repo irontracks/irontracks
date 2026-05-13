@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useMemo, Suspense, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname, useParams } from 'next/navigation';
 import dynamic from 'next/dynamic';
 
 import { createClient } from '@/utils/supabase/client';
@@ -103,6 +103,46 @@ const appId = 'irontracks-production';
 
 // mapWorkoutRow moved to @/utils/mapWorkoutRow
 
+// ─── Path → view mapping (PR#4a) ────────────────────────────────────────────
+// Sub-rotas reais substituem o `view: string` state. Aqui mapeamos pathname
+// pra view name pra preservar a renderização condicional existente. Quando o
+// pathname não corresponde a nenhuma sub-rota conhecida, retornamos 'dashboard'
+// (homepage default).
+function pathnameToView(pathname: string | null): string {
+    if (!pathname) return 'dashboard'
+    if (pathname === '/dashboard' || pathname === '/dashboard/') return 'dashboard'
+    if (pathname.startsWith('/dashboard/history')) return 'history'
+    if (pathname.startsWith('/dashboard/active')) return 'active'
+    if (pathname.startsWith('/dashboard/report')) return 'report'
+    if (pathname.startsWith('/dashboard/chat/') && pathname.length > '/dashboard/chat/'.length) return 'directChat'
+    if (pathname === '/dashboard/chat' || pathname === '/dashboard/chat/') return 'chatList'
+    if (pathname.startsWith('/dashboard/profile')) return 'profile'
+    if (pathname.startsWith('/dashboard/admin')) return 'admin'
+    if (pathname.startsWith('/dashboard/community')) return 'community'
+    if (pathname.startsWith('/dashboard/assessments')) return 'assessments'
+    if (pathname.startsWith('/dashboard/vip')) return 'vip'
+    if (pathname.startsWith('/dashboard/edit')) return 'edit'
+    return 'dashboard'
+}
+
+function viewToPath(view: string): string {
+    switch (view) {
+        case 'dashboard': return '/dashboard'
+        case 'history': return '/dashboard/history'
+        case 'active': return '/dashboard/active'
+        case 'report': return '/dashboard/report/active'
+        case 'chatList': return '/dashboard/chat'
+        case 'directChat': return '/dashboard/chat/_'
+        case 'profile': return '/dashboard/profile'
+        case 'admin': return '/dashboard/admin'
+        case 'community': return '/dashboard/community'
+        case 'assessments': return '/dashboard/assessments'
+        case 'vip': return '/dashboard/vip'
+        case 'edit': return '/dashboard/edit'
+        default: return '/dashboard'
+    }
+}
+
 function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initialUser?: unknown; initialProfile?: unknown; initialWorkouts?: unknown }) {
     const { confirm, alert } = useDialog();
     const initialUserObj = initialUser && typeof initialUser === 'object' ? (initialUser as Record<string, unknown>) : null
@@ -110,7 +150,22 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
     const initialUserTyped: UserRecord | null = initialUserObj ? ({ ...initialUserObj, id: String(initialUserObj.id || "") } as UserRecord) : null
     const [user, setUser] = useState<UserRecord | null>(initialUserTyped);
     const [authLoading, setAuthLoading] = useState(false);
-    const [view, setView] = useState('dashboard');
+
+    // PR#4a: view agora é derivada do pathname (sub-rotas reais). Mantemos um
+    // setView wrapper que faz router.push pra preservar a API de hooks legados
+    // (useViewNavigation, useAppEffects, useAppHandlers, etc) que chamam
+    // setView('xxx') — o efeito real é navegação.
+    const router = useRouter();
+    const pathname = usePathname()
+    const routeParams = useParams<{ channelId?: string; sessionId?: string }>()
+    const view = useMemo(() => pathnameToView(pathname), [pathname])
+    const setView = useCallback((next: string | ((prev: string) => string)) => {
+        const target = typeof next === 'function' ? (next as (p: string) => string)(view) : next
+        if (target === view) return
+        const url = viewToPath(target)
+        router.push(url)
+    }, [view, router])
+
     const [directChat, setDirectChat] = useState<DirectChatState | null>(null);
     // ── Story Ring state: own story status (fed up from StoriesBar) ────────────
     const [hasActiveStory, setHasActiveStory] = useState(false)
@@ -236,7 +291,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
             // App is in foreground — bring user to dashboard so the start CTA
             // is one tap away. (Local notif handles the killed-app case.)
             setView('dashboard')
-        }, []),
+        }, [setView]),
     })
     const {
         profileIncomplete,
@@ -287,7 +342,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
     // useState lazy init: createClient() roda 1x. `useRef(createClient()).current`
     // alocava nova instância (com listener storage no window) a cada render — leak.
     const [supabase] = useState(() => createClient());
-    const router = useRouter();
+    // router já declarado acima (linha ~158) pra alimentar setView via pathname
 
     // Treinos, estatísticas, pastas de alunos e fetchWorkouts — extraídos para useWorkoutFetch
     const {
@@ -666,7 +721,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
     // roteiam pro dashboard. DashboardEffects consome via prop.
     const handleNativeIntent = useCallback((_action: string) => {
         setView('dashboard')
-    }, [])
+    }, [setView])
 
     const handleExpressUseDraft = useCallback((draft: { title: string; exercises: unknown[] }) => {
         try {
@@ -682,7 +737,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
     useEffect(() => {
         if (!hideVipOnIos) return;
         if (view === 'vip') setView('dashboard');
-    }, [hideVipOnIos, view]);
+    }, [hideVipOnIos, view, setView]);
 
     // Show loading screen while auth resolves — UNLESS we already have cached workouts
     // to show. In that case, render the dashboard immediately (workouts will be
