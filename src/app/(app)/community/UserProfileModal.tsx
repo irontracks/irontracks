@@ -4,6 +4,7 @@ import React, { useCallback, useEffect, useState } from 'react'
 import Image from 'next/image'
 import { X, Dumbbell, Flame, Calendar, Trophy, Loader2, Swords } from 'lucide-react'
 import ChallengesPanel from './ChallengesPanel'
+import { useFocusTrap } from '@/hooks/useFocusTrap'
 
 interface ProfileData {
   profile: { id: string; displayName: string | null; photoUrl: string | null; role: string | null }
@@ -44,6 +45,9 @@ export default function UserProfileModal({
 
   useEffect(() => { load() }, [load])
 
+  // WCAG 2.4.3 + 2.1.2 — focus trap + Escape
+  const focusTrapRef = useFocusTrap(true, onClose)
+
   const p = data?.profile
   const s = data?.stats
   const name = p?.displayName || 'Usuário'
@@ -51,17 +55,25 @@ export default function UserProfileModal({
 
   return (
     <div
+      role="button"
+      tabIndex={-1}
+      aria-label="Fechar perfil"
       className="fixed inset-0 z-[1300] flex items-end sm:items-center justify-center p-4 pt-safe"
       style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(12px)' }}
       onClick={(e) => { if (e.target === e.currentTarget) onClose() }}
+      onKeyDown={(e) => { if (e.key === 'Escape') onClose() }}
     >
       <div
+        ref={focusTrapRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="user-profile-title"
         className="w-full max-w-md rounded-2xl overflow-hidden shadow-2xl max-h-[85vh] overflow-y-auto"
         style={{ background: 'rgba(12,12,12,0.98)', border: '1px solid rgba(234,179,8,0.2)', boxShadow: '0 0 60px rgba(234,179,8,0.08)' }}
       >
         {/* Header */}
         <div className="px-5 pt-5 pb-4 flex items-center justify-between" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
-          <div className="text-[10px] font-black uppercase tracking-[0.18em] text-yellow-500">Perfil</div>
+          <div id="user-profile-title" className="text-[10px] font-black uppercase tracking-[0.18em] text-yellow-500">Perfil</div>
           <button
             type="button"
             onClick={onClose}

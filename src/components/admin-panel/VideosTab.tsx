@@ -319,8 +319,9 @@ export const VideosTab: React.FC = () => {
                       rel="noopener noreferrer"
                       className="shrink-0 w-10 h-10 rounded-lg bg-red-500/20 border border-red-500/30 flex items-center justify-center hover:bg-red-500/30 transition-colors"
                       title="Abrir no YouTube"
+                      aria-label={`Reproduzir ${c.title} no YouTube`}
                     >
-                      <Play size={14} className="text-red-400 fill-red-400" />
+                      <Play size={14} className="text-red-400 fill-red-400" aria-hidden="true" />
                     </a>
                     <div className="flex-1 min-w-0">
                       <a
