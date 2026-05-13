@@ -61,8 +61,13 @@ captures/
 .externalNativeBuild
 .cxx/
 
-# Google Services (e.g. APIs or Firebase)
-# google-services.json
+# Google Services (e.g. APIs or Firebase) — contains FCM sender ID / API key
+google-services.json
+app/google-services.json
+
+# Sentry build-time properties (auth token for symbol upload)
+sentry.properties
+app/sentry.properties
 
 # Freeline
 freeline.py

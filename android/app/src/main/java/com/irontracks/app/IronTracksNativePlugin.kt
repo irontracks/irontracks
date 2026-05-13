@@ -130,6 +130,8 @@ class IronTracksNativePlugin : Plugin(), SensorEventListener {
         val body = call.getString("body") ?: "Hora de voltar para o treino!"
         val repeatCount = call.getInt("repeatCount") ?: 0
         val repeatEverySeconds = call.getInt("repeatEverySeconds") ?: 5
+        val exerciseName = call.getString("exerciseName") ?: ""
+        val seriesNumber = call.getInt("seriesNumber") ?: 0
 
         if (seconds <= 0) {
             call.resolve()
@@ -138,6 +140,32 @@ class IronTracksNativePlugin : Plugin(), SensorEventListener {
 
         createNotificationChannels()
 
+        // ─── Android 8+ (API 26+): use Foreground Service ────────────────
+        // Foreground services are exempt from Doze/Standby, so the timer
+        // fires precisely even on Samsung/Xiaomi when the screen is off.
+        // The AlarmManager path below is kept for API < 26 and as a
+        // safety net if startForegroundService fails.
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            try {
+                val serviceIntent = Intent(context, RestTimerService::class.java).apply {
+                    action = RestTimerService.ACTION_START
+                    putExtra(RestTimerService.EXTRA_REST_SECONDS, seconds)
+                    putExtra(RestTimerService.EXTRA_EXERCISE_NAME, exerciseName)
+                    putExtra(RestTimerService.EXTRA_SERIES_NUMBER, seriesNumber)
+                    putExtra(RestTimerService.EXTRA_TITLE, title)
+                    putExtra(RestTimerService.EXTRA_BODY, body)
+                }
+                ContextCompat.startForegroundService(context, serviceIntent)
+                call.resolve()
+                return
+            } catch (_: Exception) {
+                // Fall through to AlarmManager fallback (e.g.
+                // ForegroundServiceStartNotAllowedException on Android 12+
+                // when started from background).
+            }
+        }
+
+        // ─── Android < 8 (or Foreground Service failure): AlarmManager ───
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         val intent = Intent(context, RestTimerReceiver::class.java).apply {
             action = "com.irontracks.REST_TIMER_FIRE"
@@ -183,7 +211,17 @@ class IronTracksNativePlugin : Plugin(), SensorEventListener {
         val id = call.getString("id") ?: "rest_timer"
         val requestCode = id.hashCode() and 0x7FFFFFFF
 
-        // Cancel alarm
+        // Stop foreground service (Android 8+ path)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            try {
+                val stopIntent = Intent(context, RestTimerService::class.java).apply {
+                    action = RestTimerService.ACTION_STOP
+                }
+                context.stopService(stopIntent)
+            } catch (_: Exception) {}
+        }
+
+        // Cancel alarm (legacy/fallback path)
         val alarmManager = context.getSystemService(Context.ALARM_SERVICE) as AlarmManager
         val intent = Intent(context, RestTimerReceiver::class.java).apply {
             action = "com.irontracks.REST_TIMER_FIRE"
