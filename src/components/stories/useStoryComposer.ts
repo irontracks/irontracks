@@ -9,6 +9,7 @@ import { composeStoryVideoOnIos, cancelNativeStoryCompose } from '@/utils/native
 import { getErrorMessage } from '@/utils/errorMessage'
 import { isIosNative } from '@/utils/platform'
 import { safeString } from '@/utils/guards'
+import { stripWeekdayHint } from '@/utils/workoutTitle'
 import { saveImageToPhotos, saveBlobToPhotos, openAppSettings } from '@/utils/native/irontracksNative'
 import { uploadStoryMedia } from '@/utils/storage/mediaUpload'
 import { logError, logWarn } from '@/lib/logger'
@@ -83,7 +84,11 @@ export function useStoryComposer({ open, session, onClose, caloriesOverride }: U
     useEffect(() => { backgroundUrlRef.current = backgroundUrl }, [backgroundUrl])
 
     const metrics: Metrics = useMemo(() => {
-        const title = safeString(session?.workoutTitle || session?.name || 'Treino')
+        // Remove o "(TERÇA)" / "(DIA 3)" do título — usuário pode estar postando
+        // num dia diferente do programado, e o dia entre parênteses fica confuso
+        // visualmente no Story do Instagram.
+        const rawTitle = safeString(session?.workoutTitle || session?.name || 'Treino')
+        const title = stripWeekdayHint(rawTitle) || rawTitle
         const date = formatDatePt(session?.date || session?.completed_at || session?.completedAt || session?.created_at)
         const s = session && typeof session === 'object' ? (session as Record<string, unknown>) : {}
         const logs = s?.logs && typeof s.logs === 'object' ? (s.logs as Record<string, unknown>) : {}
