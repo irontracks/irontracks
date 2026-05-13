@@ -290,6 +290,13 @@ export default function PerformanceReporter() {
     try {
       const w = window as Window & { __itFetchPatched?: boolean };
       if (w.__itFetchPatched) return;
+      // Sample rate: 5% em prod (reduz overhead + custos de telemetria), 100% em dev.
+      // PerformanceObserver já cobre LCP/FID/CLS/INP nativos acima — este patch
+      // só serve para latência por endpoint, que faz sentido amostrar.
+      const isProd =
+        typeof process !== "undefined" && process.env?.NODE_ENV === "production";
+      const SAMPLE_RATE = isProd ? 0.05 : 1.0;
+      const shouldSample = () => Math.random() < SAMPLE_RATE;
       w.__itFetchPatched = true;
       const originalFetch = window.fetch.bind(window);
       const recent = new Map<string, number>();
@@ -303,38 +310,45 @@ export default function PerformanceReporter() {
         const key = `${method}::${url}`;
         const now = Date.now();
         const last = recent.get(key) || 0;
-        const skip = now - last < 30000;
+        const isApi = url.includes("/api/");
+        // Sample apenas pra chamadas /api/. Dedup por 30s mantém ruído baixo.
+        const sampleThis = isApi && shouldSample();
+        const skip = !sampleThis || now - last < 30000;
         if (!skip) recent.set(key, now);
         try {
           const res = await originalFetch(input, init);
-          const dur = safeNumber(performance.now() - start);
-          if (!skip && dur != null && url.includes("/api/")) {
-            sendMetric(
-              { name: "API_TIME", value: dur },
-              {
-                path: getPathname(),
-                url,
-                method,
-                status: res.status,
-                ok: res.ok,
-              },
-            );
+          if (!skip) {
+            const dur = safeNumber(performance.now() - start);
+            if (dur != null) {
+              sendMetric(
+                { name: "API_TIME", value: dur },
+                {
+                  path: getPathname(),
+                  url,
+                  method,
+                  status: res.status,
+                  ok: res.ok,
+                },
+              );
+            }
           }
           return res;
         } catch (err) {
-          const dur = safeNumber(performance.now() - start);
-          if (!skip && dur != null && url.includes("/api/")) {
-            sendMetric(
-              { name: "API_TIME", value: dur },
-              {
-                path: getPathname(),
-                url,
-                method,
-                status: 0,
-                ok: false,
-                error: String(err || "fetch_error"),
-              },
-            );
+          if (!skip) {
+            const dur = safeNumber(performance.now() - start);
+            if (dur != null) {
+              sendMetric(
+                { name: "API_TIME", value: dur },
+                {
+                  path: getPathname(),
+                  url,
+                  method,
+                  status: 0,
+                  ok: false,
+                  error: String(err || "fetch_error"),
+                },
+              );
+            }
           }
           throw err;
         }
