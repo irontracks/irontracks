@@ -21,7 +21,8 @@ export default function BadgesInline({ badges }: { badges: Badge[] }) {
   if (!safeBadges.length) {
     return (
       <div className="rounded-xl p-4 text-center" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}>
-        <p className="text-xs text-neutral-500 font-bold">Complete treinos para desbloquear conquistas.</p>
+        {/* WCAG 1.4.3 AA — neutral-500 → 400 sobre dark */}
+        <p className="text-xs text-neutral-400 font-bold">Complete treinos para desbloquear conquistas.</p>
       </div>
     )
   }

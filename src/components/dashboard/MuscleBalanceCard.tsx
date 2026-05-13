@@ -56,7 +56,8 @@ export default function MuscleBalanceCard({ muscleData }: MuscleBalanceCardProps
         <Scale size={18} className="text-blue-400 shrink-0" />
         <div className="flex-1 min-w-0">
           <h3 className="font-black text-white text-sm">Balanço Muscular</h3>
-          <p className="text-[10px] text-neutral-500 mt-0.5">
+          {/* WCAG 1.4.3 AA — neutral-500 → 400 pra atingir 4.5:1 sobre fundo dark */}
+          <p className="text-[10px] text-neutral-400 mt-0.5">
             {deficits.length > 0
               ? `${deficits.length} grupo${deficits.length > 1 ? 's' : ''} em déficit`
               : overtrained.length > 0

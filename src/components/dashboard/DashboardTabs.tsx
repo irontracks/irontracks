@@ -42,10 +42,11 @@ export const DashboardTabs = memo(({
     onOpenNutrition?.()
   }, [onOpenNutrition])
 
+  // WCAG 1.4.3 AA — tab labels visíveis precisam de contraste 4.5:1 sobre dark; neutral-500 falha
   const tabCls = (active: boolean) =>
     `flex-1 min-w-0 min-h-[52px] px-1 sm:px-3 rounded-xl text-[10px] sm:text-xs uppercase tracking-tight sm:tracking-wider whitespace-nowrap leading-none overflow-hidden transition-colors duration-200 flex flex-col items-center justify-center gap-[5px] relative z-10 ${active
       ? 'text-yellow-400 font-black'
-      : 'text-neutral-500 hover:text-neutral-300 font-bold'
+      : 'text-neutral-400 hover:text-neutral-200 font-bold'
     }`
 
   const renderIndicator = (active: boolean) =>

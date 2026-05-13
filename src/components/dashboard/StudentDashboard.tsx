@@ -568,7 +568,7 @@ export default function StudentDashboard(props: Props) {
                 {visibleWorkouts.length === 0 && (
                   <div className="text-center">
                     {periodizedLoading ? (
-                      <div className="py-8 text-neutral-500 text-sm animate-pulse">Carregando treinos periodizados...</div>
+                      <div className="py-8 text-neutral-400 text-sm animate-pulse">Carregando treinos periodizados...</div>
                     ) : (
                       <EmptyState
                         variant="workouts"

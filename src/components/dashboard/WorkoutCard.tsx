@@ -160,7 +160,8 @@ function WorkoutCardInner({
           </div>
         )}
         <h3 className="font-black text-white text-base uppercase mb-0.5 pr-28 leading-tight">{String(w?.title || 'Treino')}</h3>
-        <p className="text-[11px] text-neutral-500 font-mono mb-3">
+        {/* WCAG 1.4.3 AA — neutral-500 sobre dark falha contraste 4.5:1 */}
+        <p className="text-[11px] text-neutral-400 font-mono mb-3">
           {(Number.isFinite(Number(w?.exercises_count)) ? Math.max(0, Math.floor(Number(w.exercises_count))) : Array.isArray(w?.exercises) ? w.exercises.length : 0)} exercícios
         </p>
         {w?.archived_at ? (
