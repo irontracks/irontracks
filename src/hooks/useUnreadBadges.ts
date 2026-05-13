@@ -10,7 +10,7 @@
  */
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { logError } from '@/lib/logger'
 
@@ -45,6 +45,18 @@ export function useUnreadBadges({
 }: UseUnreadBadgesOptions): UseUnreadBadgesReturn {
   const [hasUnreadNotification, setHasUnreadNotification] = useState(false)
   const [hasUnreadChat, setHasUnreadChat] = useState(false)
+
+  // Refs reais pra `view`, `userSettings` e `onInAppNotify` — atualizadas via
+  // effect espelho. Sem isso, o canal Realtime de DM era resubscrito a cada
+  // troca de view (`dashboard` → `history` etc), gerando round-trip WS Supabase
+  // por click. O `viewRef = { current: view }` antigo NÃO era ref real (era
+  // objeto recriado a cada execução do effect).
+  const viewRef = useRef(view)
+  const userSettingsRef = useRef(userSettings)
+  const onInAppNotifyRef = useRef(onInAppNotify)
+  useEffect(() => { viewRef.current = view }, [view])
+  useEffect(() => { userSettingsRef.current = userSettings }, [userSettings])
+  useEffect(() => { onInAppNotifyRef.current = onInAppNotify }, [onInAppNotify])
 
   // ─── Notification badge ───────────────────────────────────────────────────
   useEffect(() => {
@@ -114,12 +126,11 @@ export function useUnreadBadges({
   }, [supabase, userId])
 
   // ─── Direct-message badge ─────────────────────────────────────────────────
+  // Deps: apenas [supabase, userId]. `view`/`userSettings`/`onInAppNotify` são
+  // lidos via refs no handler — assim o canal NÃO é resubscrito a cada troca
+  // de view nem a cada novo callback.
   useEffect(() => {
     if (!userId) return
-
-    // R7#6: Use ref to avoid stale closure — handler always reads current view
-    const viewRef = { current: view }
-    const allowNotifyDm = userSettings ? userSettings.notifyDirectMessages !== false : true
 
     const channel = supabase
       .channel(`direct-messages-badge:${userId}`)
@@ -130,6 +141,8 @@ export function useUnreadBadges({
         { event: 'INSERT', schema: 'public', table: 'direct_messages', filter: `receiver_id=eq.${userId}` },
         async (payload) => {
           try {
+            const settings = userSettingsRef.current
+            const allowNotifyDm = settings ? settings.notifyDirectMessages !== false : true
             if (!allowNotifyDm) return
             const msg = payload.new
             if (!msg || msg.sender_id === userId) return
@@ -158,8 +171,9 @@ export function useUnreadBadges({
               body: JSON.stringify({ receiverId: userId, senderName, preview }),
             })
 
-            if (onInAppNotify) {
-              onInAppNotify({ text: preview, senderName, displayName: senderName, photoURL: null })
+            const notify = onInAppNotifyRef.current
+            if (notify) {
+              notify({ text: preview, senderName, displayName: senderName, photoURL: null })
             }
           } catch (e) {
             logError('useUnreadBadges:dm', e)
@@ -171,7 +185,7 @@ export function useUnreadBadges({
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [supabase, userId, userSettings, view, onInAppNotify])
+  }, [supabase, userId])
 
   return {
     hasUnreadNotification,
