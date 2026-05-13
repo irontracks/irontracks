@@ -1,9 +1,10 @@
 'use client'
 
-import React from 'react'
+import React, { useCallback } from 'react'
 import { ArrowLeft, Save } from 'lucide-react'
 import { Reorder } from 'framer-motion'
 import { SortableWorkoutItem } from './SortableWorkoutItem'
+import { useFocusTrap } from '@/hooks/useFocusTrap'
 
 export type EditWorkoutListItem = {
   id: string
@@ -26,6 +27,12 @@ export function EditWorkoutListModal({
   onSave,
   onClose,
 }: EditWorkoutListModalProps) {
+  // WCAG 2.4.3 + 2.1.2 — focus trap + Escape (ignora se está salvando)
+  const handleEscape = useCallback(() => {
+    if (!savingListEdits) onClose()
+  }, [savingListEdits, onClose])
+  const focusTrapRef = useFocusTrap(true, handleEscape)
+
   return (
     <div
       className="fixed inset-0 z-[1200] flex items-center justify-center p-4 pt-safe"
@@ -36,15 +43,23 @@ export function EditWorkoutListModal({
       onClick={() => !savingListEdits && onClose()}
       onKeyDown={(e) => { if (e.key === 'Escape' && !savingListEdits) onClose() }}
     >
+      {/* stopPropagation impede clique no painel de propagar para o backdrop (que fecha) */}
       <div
-        role="none"
-        className="w-full max-w-2xl rounded-2xl overflow-hidden"
+        role="presentation"
+        className="w-full max-w-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+      <div
+        ref={focusTrapRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="edit-list-title"
+        className="w-full rounded-2xl overflow-hidden"
         style={{
           background: 'rgba(10,10,10,0.99)',
           border: '1px solid rgba(234,179,8,0.2)',
           boxShadow: '0 0 40px rgba(234,179,8,0.07), 0 32px 80px rgba(0,0,0,0.7)',
         }}
-        onClick={(e) => e.stopPropagation()}
       >
         <div
           className="p-4 flex items-center justify-between gap-3"
@@ -52,7 +67,7 @@ export function EditWorkoutListModal({
         >
           <div className="min-w-0">
             <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Treinos</div>
-            <div className="text-white font-black text-lg truncate">Organizar</div>
+            <div id="edit-list-title" className="text-white font-black text-lg truncate">Organizar</div>
             <div className="text-xs text-neutral-400">Arraste para reordenar e edite os títulos.</div>
           </div>
           <button
@@ -113,6 +128,7 @@ export function EditWorkoutListModal({
             Salvar
           </button>
         </div>
+      </div>
       </div>
     </div>
   )

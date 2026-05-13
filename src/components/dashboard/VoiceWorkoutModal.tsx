@@ -18,6 +18,7 @@ import {
 import type { ParsedExercise } from '@/app/api/ai/parse-exercise-voice/route'
 import { requestVoicePermissions, openAppSettings, startNativeSpeechRecognition, stopNativeSpeechRecognition } from '@/utils/native/irontracksNative'
 import { isIosNative } from '@/utils/platform'
+import { useFocusTrap } from '@/hooks/useFocusTrap'
 
 // ── Web Speech API types (not fully typed in all TS DOM libs) ─────────────────
 
@@ -583,6 +584,9 @@ export default function VoiceWorkoutModal({
     setPhase('listening')
   }, [])
 
+  // WCAG 2.4.3 + 2.1.2 — focus trap + Escape
+  const focusTrapRef = useFocusTrap(isOpen, onClose)
+
   if (!isOpen) return null
 
   const showListening = phase === 'listening'
@@ -605,6 +609,10 @@ export default function VoiceWorkoutModal({
 
       {/* Panel */}
       <div
+        ref={focusTrapRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="voice-workout-title"
         className="relative w-full sm:max-w-md rounded-t-3xl sm:rounded-2xl overflow-hidden flex flex-col"
         style={{
           background: 'linear-gradient(160deg, #111000 0%, #0a0a0a 30%)',
@@ -626,7 +634,7 @@ export default function VoiceWorkoutModal({
             </div>
             <div>
               <div className="text-[10px] font-black uppercase tracking-[0.18em] text-yellow-500">Criação por Voz</div>
-              <div className="text-white font-black text-base leading-tight">Treino por Voz</div>
+              <div id="voice-workout-title" className="text-white font-black text-base leading-tight">Treino por Voz</div>
             </div>
           </div>
           <button

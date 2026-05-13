@@ -3,6 +3,7 @@
 import React, { memo, useEffect, useMemo, useState } from 'react'
 import { X, ChevronLeft, ChevronRight } from 'lucide-react'
 import { createClient } from '@/utils/supabase/client'
+import { useFocusTrap } from '@/hooks/useFocusTrap'
 
 type Props = {
   isOpen: boolean
@@ -150,15 +151,18 @@ const WorkoutCalendarModal = memo(function WorkoutCalendarModal(props: Props) {
 
   const selectedWorkouts = useMemo(() => workoutsByDayIso.get(selectedDayIso) || [], [selectedDayIso, workoutsByDayIso])
 
+  // WCAG 2.4.3 + 2.1.2 — focus trap + Escape
+  const focusTrapRef = useFocusTrap(isOpen, props.onClose)
+
   if (!isOpen) return null
 
   return (
     <div role="presentation" className="fixed inset-0 z-[1200] flex items-center justify-center p-4 pt-safe" style={{ background: 'rgba(0,0,0,0.88)', backdropFilter: 'blur(16px)' }}>
-      <div role="dialog" aria-modal="true" aria-label="Calendário de treinos" className="w-full max-w-3xl rounded-2xl overflow-hidden" style={{ background: 'rgba(10,10,10,0.99)', border: '1px solid rgba(234,179,8,0.2)', boxShadow: '0 0 40px rgba(234,179,8,0.07), 0 32px 80px rgba(0,0,0,0.7)' }}>
+      <div ref={focusTrapRef} role="dialog" aria-modal="true" aria-labelledby="cal-modal-title" className="w-full max-w-3xl rounded-2xl overflow-hidden" style={{ background: 'rgba(10,10,10,0.99)', border: '1px solid rgba(234,179,8,0.2)', boxShadow: '0 0 40px rgba(234,179,8,0.07), 0 32px 80px rgba(0,0,0,0.7)' }}>
         <div className="p-4 flex items-center justify-between gap-3" style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
           <div className="min-w-0">
             <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Calendário</div>
-            <div className="text-white font-black text-lg truncate">Treinos realizados</div>
+            <div id="cal-modal-title" className="text-white font-black text-lg truncate">Treinos realizados</div>
             <div className="text-xs text-neutral-400">Clique em um dia para ver os treinos.</div>
           </div>
           <button
