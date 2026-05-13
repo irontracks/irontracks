@@ -1,17 +1,21 @@
 /**
  * @module useViewNavigation
  *
- * Implements single-page app–style view transitions between dashboard
- * views (dashboard, history, community, profile, etc.) without triggering
- * full Next.js navigations. Uses `useTransition` for non-blocking updates
- * and native haptic feedback on iOS.
+ * Navegação entre views do dashboard (history, chat, vip, report, etc).
  *
- * @returns `{ navigateTo, isPending }`
+ * PR#4a refactor: hooks agora usam `router.push()` direto em vez de
+ * `setView('xxx')`. Sub-rotas reais existem em
+ * `src/app/(app)/dashboard/{history,active,report,chat,profile}/page.tsx`.
+ *
+ * `useTransition` envolve a navegação pra render não-blocking.
+ *
+ * @returns handlers de navegação memoizados
  */
 'use client'
 import { logWarn } from '@/lib/logger'
 
 import { useCallback, useTransition } from 'react'
+import { useRouter } from 'next/navigation'
 
 export type AppView =
   | 'dashboard'
@@ -24,7 +28,6 @@ export type AppView =
   | 'admin'
 
 interface UseViewNavigationOptions {
-  setView: (view: string) => void
   setShowNotifCenter: (open: boolean) => void
   setHasUnreadNotification: (val: boolean) => void
   setTourOpen: (open: boolean) => void
@@ -33,31 +36,31 @@ interface UseViewNavigationOptions {
 }
 
 export function useViewNavigation({
-  setView,
   setShowNotifCenter,
   setHasUnreadNotification,
   setTourOpen,
   logTourEvent,
   tourVersion,
 }: UseViewNavigationOptions) {
+  const router = useRouter()
   const [, startViewTransition] = useTransition()
   const hideVipOnIos: boolean = false
 
   const openVipView = useCallback(() => {
     if (hideVipOnIos) return
-    startViewTransition(() => setView('vip'))
-  }, [hideVipOnIos, startViewTransition, setView])
+    startViewTransition(() => router.push('/dashboard/vip'))
+  }, [hideVipOnIos, startViewTransition, router])
 
   const handleOpenHistory = useCallback(() => {
     // Prefetch history API in parallel with chunk download — the browser
     // caches the response so HistoryList's fetch() gets a cache hit.
     try { fetch('/api/workouts/history?limit=50', { priority: 'high' as RequestPriority }).catch(() => { }) } catch { }
-    startViewTransition(() => setView('history'))
-  }, [startViewTransition, setView])
+    startViewTransition(() => router.push('/dashboard/history'))
+  }, [startViewTransition, router])
 
   const handleOpenChatList = useCallback(() => {
-    startViewTransition(() => setView('chatList'))
-  }, [startViewTransition, setView])
+    startViewTransition(() => router.push('/dashboard/chat'))
+  }, [startViewTransition, router])
 
   const handleOpenNotifications = useCallback(() => {
     setShowNotifCenter(true)
