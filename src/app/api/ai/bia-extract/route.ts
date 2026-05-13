@@ -96,14 +96,47 @@ function extractJson(text: string): unknown {
 }
 
 /**
- * Baixa o arquivo da URL pública. Aceitamos qualquer host porque a URL
- * vem do Storage do Supabase (controlado por nós) — o bucket é público
- * para esses arquivos especificamente. Limit de tamanho previne abuso
- * caso alguém modifique manualmente o registro no banco.
+ * Valida que a URL aponta pro nosso bucket Supabase Storage.
+ *
+ * Audit Finding #5 (SSRF): antes o único check era `url.includes('/bioimpedance-files/')`
+ * — trivialmente burlado com `http://169.254.169.254/?/bioimpedance-files/`
+ * (instance metadata AWS) ou `http://127.0.0.1:8080/?/bioimpedance-files/`
+ * (port-scan interno). Combinado com `redirect: 'follow'`, atacante podia
+ * fazer o servidor fetchar qualquer URL.
+ *
+ * AGORA valida via `new URL()`:
+ *   - protocol === 'https:'
+ *   - hostname === '<projeto>.supabase.co'
+ *   - pathname COMEÇA com '/storage/v1/object/public/bioimpedance-files/'
+ *     (não apenas contém — burla `?/bioimpedance-files/` em query string)
+ */
+function isAllowedAttachmentUrl(url: string): boolean {
+  try {
+    const u = new URL(url)
+    if (u.protocol !== 'https:') return false
+    // Host esperado vem do env. Aceita o hostname exato do projeto Supabase.
+    const supabaseUrl = env.supabase.url
+    if (!supabaseUrl) return false
+    const allowedHost = new URL(supabaseUrl).hostname
+    if (u.hostname !== allowedHost) return false
+    // Pathname deve começar com o prefixo do bucket — não basta conter.
+    return u.pathname.startsWith('/storage/v1/object/public/bioimpedance-files/')
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Baixa o arquivo do bucket Supabase. `redirect: 'manual'` rejeita 3xx pra
+ * fechar a brecha de redirect-chain SSRF.
  */
 async function downloadAttachment(url: string): Promise<{ ok: true; data: Buffer; mime: string } | { ok: false; error: string }> {
   try {
-    const res = await fetch(url, { redirect: 'follow' })
+    const res = await fetch(url, { redirect: 'manual' })
+    // 3xx tratado como erro — atacante poderia hostar redirect pra IP interno
+    if (res.status >= 300 && res.status < 400) {
+      return { ok: false, error: 'redirect_not_allowed' }
+    }
     if (!res.ok) return { ok: false, error: `download_failed_${res.status}` }
     const contentType = (res.headers.get('content-type') || '').toLowerCase().split(';')[0].trim()
     if (!ALLOWED_MIMES.includes(contentType)) {
@@ -192,10 +225,9 @@ export async function POST(req: Request) {
     if (parsed.response) return parsed.response
     const { url } = parsed.data!
 
-    // Sanity: a URL precisa apontar para o nosso bucket. Não validamos
-    // o host estrito (proxies de CDN podem reescrever) mas o path tem
-    // que conter '/bioimpedance-files/' como camada extra de defesa.
-    if (!url.includes('/bioimpedance-files/')) {
+    // Audit Finding #5: validação estrita de hostname + path prefix em vez
+    // do `url.includes()` antigo que era trivialmente burlado via SSRF.
+    if (!isAllowedAttachmentUrl(url)) {
       return NextResponse.json({ ok: false, error: 'invalid_attachment_url' }, { status: 400 })
     }
 

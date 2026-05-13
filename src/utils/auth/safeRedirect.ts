@@ -1,30 +1,42 @@
 /**
  * Validation helper for `next` / redirect-after-login parameters.
  *
- * The previous pattern (`raw.startsWith('/')`) was insufficient because
- * protocol-relative URLs ("//evil.com") also start with "/" and the browser
- * resolves them to an external host. That allowed an open-redirect:
+ * Audit Finding #2 (XSS via `next` em /auth/callback): a versão anterior só
+ * barrava open-redirect (protocol-relative + scheme com `:`) mas NÃO escapava
+ * `"`, `<`, `>`, `'`. Payloads como `/"><img src=x onerror=...>` passavam o
+ * sanitizer e eram interpolados em `href="..."` no template HTML do callback,
+ * abrindo XSS no contexto do domínio autenticado.
  *
- *     /auth/callback?code=...&next=//attacker.com
+ * AGORA usa allowlist ASCII estrita pra path/query string:
+ *   - alfanuméricos (`a-z`, `A-Z`, `0-9`)
+ *   - `/`, `-`, `_`, `.`, `~` (path segments)
+ *   - `?`, `=`, `&`, `%` (query string)
+ *   - `+` (espaço encodado em alguns clients)
  *
- * After successful login the user would land on the attacker's site with a
- * fresh session cookie set on our domain — perfect for phishing.
+ * Slugs com caracteres não-ASCII devem ser passados encoded (`%C3%A7` etc) —
+ * forma canônica de URL e única que sobrevive ao sanitizer.
  *
- * `sanitizeNextParam` rejects:
- *   - empty / non-string input
- *   - values that don't start with "/"
- *   - protocol-relative URLs:  "//evil.com", "/\\evil.com"
- *   - any colon (catches "javascript:", "data:", schemes generally)
- *
- * Returns the original value when safe; otherwise the fallback.
+ * Continua rejeitando:
+ *   - vazio / não-string
+ *   - não começa com `/`
+ *   - >512 chars
+ *   - protocol-relative (`//evil`, `/\evil`)
+ *   - `:` (esquema)
+ *   - QUALQUER outro char (`"`, `'`, `<`, `>`, espaço cru, etc)
  */
+const NEXT_PARAM_ALLOWED = /^[a-zA-Z0-9/_\-.~?=&%+]+$/
+
 export function sanitizeNextParam(raw: unknown, fallback = '/dashboard'): string {
   const s = typeof raw === 'string' ? raw : ''
   if (!s) return fallback
+  if (s.length > 512) return fallback
   if (!s.startsWith('/')) return fallback
   // Protocol-relative bypass: //evil.com or /\evil.com
   if (s.length > 1 && (s[1] === '/' || s[1] === '\\')) return fallback
   // Anything with a colon could be a scheme (javascript:, data:, http:)
   if (s.includes(':')) return fallback
+  // Allowlist final — rejeita qualquer char que poderia quebrar atributos HTML
+  // ou tags (`"`, `'`, `<`, `>`, etc). Defesa em profundidade vs. XSS.
+  if (!NEXT_PARAM_ALLOWED.test(s)) return fallback
   return s
 }

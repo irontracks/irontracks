@@ -1,22 +1,35 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
+import { requireRoleOrBearer, resolveRoleByUser } from '@/utils/auth/route'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { logError } from '@/lib/logger'
 import { env } from '@/utils/env'
 
 const BodySchema = z.object({
     user_id: z.string().trim().min(1, 'user_id required'),
-    token: z.string().trim().min(1, 'token required'),
+    token: z.string().trim().min(1).optional(),
 })
 
 export const dynamic = 'force-dynamic'
 
 /**
- * Minimal route: deletes a user from auth.users using service_role key.
- * Expects: POST { user_id: string, token: string }
- * The token is the caller's access_token — validated to ensure the caller
- * is a real authenticated user with admin or teacher role.
+ * Deleta um usuário de auth.users (cascata via FKs).
+ *
+ * SEGURANÇA (audit Finding #1 — privilege escalation):
+ *   Antes este endpoint aceitava qualquer caller com role 'admin' OU 'teacher',
+ *   ou qualquer linha em `teachers`. Resultado: qualquer teacher podia deletar
+ *   QUALQUER usuário (incluindo admin, outros teachers, alunos não-seus).
+ *
+ *   AGORA: APENAS admin pode usar esta primitiva. Pra "teacher deletar aluno
+ *   próprio" existe `/api/admin/students/delete` que valida `students.teacher_id`.
+ *
+ *   Cadeia de auth (compat com chamadas via Capacitor / sem cookies):
+ *     1. Cookie auth via `requireRole(['admin'])`
+ *     2. Fallback Bearer header
+ *     3. Fallback body.token
+ *
+ * Expects: POST { user_id: string, token?: string }
  */
 export async function POST(req: Request) {
     try {
@@ -30,48 +43,48 @@ export async function POST(req: Request) {
 
         const admin = createAdminClient()
 
-        // Validate the caller's token
-        const { data: caller, error: callerErr } = await admin.auth.getUser(token)
-        if (callerErr || !caller?.user?.id) {
-            return NextResponse.json({ ok: false, error: 'invalid token' }, { status: 401 })
+        // ─── Auth (admin-only) ───────────────────────────────────────────────
+        // Caminho 1: cookie + bearer header. Caminho 2 (fallback Capacitor antigo):
+        // body.token. Restringimos a `role === 'admin'` — caso "teacher deleta
+        // aluno próprio" passa por /api/admin/students/delete (validação dedicada).
+        let callerId = ''
+        let callerEmail = ''
+        let role = ''
+
+        const primaryAuth = await requireRoleOrBearer(req, ['admin'])
+        if (primaryAuth.ok) {
+            callerId = String(primaryAuth.user?.id || '')
+            callerEmail = primaryAuth.user?.email ? String(primaryAuth.user.email).toLowerCase() : ''
+            role = String(primaryAuth.role || '').toLowerCase()
+        } else if (token) {
+            // Fallback body.token (compat com chamadas antigas do mobile que não
+            // setam Authorization header).
+            const { data: caller, error: callerErr } = await admin.auth.getUser(token)
+            if (callerErr || !caller?.user?.id) {
+                return NextResponse.json({ ok: false, error: 'invalid token' }, { status: 401 })
+            }
+            callerId = caller.user.id
+            callerEmail = String(caller.user.email || '').toLowerCase()
+            const resolved = await resolveRoleByUser({ id: callerId, email: caller.user.email })
+            role = String(resolved.role || '').toLowerCase()
+        } else {
+            return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
         }
 
-        // Check that caller is admin or teacher
-        const callerId = caller.user.id
-        const callerEmail = String(caller.user.email || '').trim().toLowerCase()
-        const adminEmail = env.security.adminEmail.trim().toLowerCase()
-        let isAllowed = false
-
-        // Check env admin email
-        if (adminEmail && callerEmail === adminEmail) isAllowed = true
-
-        // Check profiles.role
-        if (!isAllowed) {
-            try {
-                const { data: profile } = await admin.from('profiles').select('role').eq('id', callerId).maybeSingle()
-                const role = String(profile?.role || '').toLowerCase()
-                if (role === 'admin' || role === 'teacher') isAllowed = true
-            } catch (e) { logError('api:admin:delete-auth-user:check-profile-role', e) }
-        }
-
-        // Check teachers table
-        if (!isAllowed) {
-            try {
-                const { data: t } = await admin.from('teachers').select('id').eq('user_id', callerId).maybeSingle()
-                if (t?.id) isAllowed = true
-            } catch (e) { logError('api:admin:delete-auth-user:check-teachers', e) }
-        }
-
-        if (!isAllowed) {
+        // Verificação final de role (defesa em profundidade — requireRoleOrBearer
+        // já valida, mas o fallback body.token só fez getUser sem checar role).
+        const envAdminEmail = env.security.adminEmail.trim().toLowerCase()
+        const isAdmin = role === 'admin' || (envAdminEmail !== '' && callerEmail === envAdminEmail)
+        if (!isAdmin) {
             return NextResponse.json({ ok: false, error: 'forbidden' }, { status: 403 })
         }
 
-        // Don't allow deleting yourself
+        // Não permite deletar a si mesmo
         if (userId === callerId) {
             return NextResponse.json({ ok: false, error: 'cannot delete yourself' }, { status: 400 })
         }
 
-        // Delete the user from auth.users
+        // ─── Executa ─────────────────────────────────────────────────────────
         const { error: deleteErr } = await admin.auth.admin.deleteUser(userId)
         if (deleteErr) {
             return NextResponse.json({ ok: false, error: String(deleteErr.message || 'failed') }, { status: 400 })
@@ -79,6 +92,11 @@ export async function POST(req: Request) {
 
         return NextResponse.json({ ok: true })
     } catch (e: unknown) {
-        return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
+        logError('api:admin:delete-auth-user', e)
+        // Erro genérico em prod (audit Finding #10) — detalhes só no logger.
+        return NextResponse.json(
+            { ok: false, error: process.env.NODE_ENV === 'development' ? getErrorMessage(e) : 'internal' },
+            { status: 500 },
+        )
     }
 }
