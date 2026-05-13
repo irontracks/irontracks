@@ -1,13 +1,29 @@
 import * as Sentry from "@sentry/nextjs"
 import { isNoiseByName, isNoiseException } from "@/utils/sentryFilters"
 
+// Detect Capacitor native WebView inline (sem import — Sentry init roda muito cedo).
+// Em mobile native, Sentry tracing duplica spans que já cobrimos via crash reports
+// nativos (TestFlight/Play). Zerar a sampleRate em mobile reduz CPU/bateria/quota.
+const isNativeWebView = (): boolean => {
+  try {
+    if (typeof window === "undefined") return false
+    const cap = (window as unknown as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor
+    return typeof cap?.isNativePlatform === "function" ? Boolean(cap.isNativePlatform()) : false
+  } catch {
+    return false
+  }
+}
+
+const isProd = process.env.NEXT_PUBLIC_VERCEL_ENV === "production"
+
 Sentry.init({
   dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
   environment: process.env.NEXT_PUBLIC_VERCEL_ENV ?? "development",
   release: process.env.NEXT_PUBLIC_VERCEL_GIT_COMMIT_SHA,
 
-  // 20% das transações em produção para não estourar cota; 100% em outros ambientes
-  tracesSampleRate: process.env.NEXT_PUBLIC_VERCEL_ENV === "production" ? 0.2 : 1.0,
+  // Tracing: 0% em mobile native (crash reports já cobrem); 20% prod web; 100% dev.
+  // Reduz overhead de spans/I/O no fetch interceptor da WebView.
+  tracesSampleRate: isNativeWebView() ? 0 : isProd ? 0.2 : 1.0,
 
   // 10% das sessões normais, 100% quando há erro
   replaysSessionSampleRate: 0.1,
@@ -41,7 +57,11 @@ Sentry.init({
   },
 })
 
-// Replay carregado de forma lazy para não impactar o bundle inicial (~80KB)
-Sentry.lazyLoadIntegration('replayIntegration').then((integration) => {
-  Sentry.addIntegration(integration())
-}).catch(() => { /* silently ignore if blocked */ })
+// Replay carregado de forma lazy para não impactar o bundle inicial (~80KB).
+// Skip em Capacitor WebView — Replay quase nunca renderiza decentemente em
+// WebView nativa e o overhead de rrweb compromete CPU/bateria.
+if (!isNativeWebView()) {
+  Sentry.lazyLoadIntegration('replayIntegration').then((integration) => {
+    Sentry.addIntegration(integration())
+  }).catch(() => { /* silently ignore if blocked */ })
+}
