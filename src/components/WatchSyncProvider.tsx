@@ -24,7 +24,7 @@
  *   />
  */
 
-import { useEffect, useRef } from 'react'
+import { useContext, useEffect, useRef } from 'react'
 import {
   useWatchBridge,
   type WatchDashboard,
@@ -33,7 +33,7 @@ import {
   type WatchCardioSummary,
 } from '@/hooks/useWatchBridge'
 import { logWarn, logInfo } from '@/lib/logger'
-import { useToast } from '@/contexts/ToastContext'
+import { ToastContext } from '@/contexts/ToastContext'
 
 interface Props {
   /** Estado do dashboard a ser empurrado pro Watch. Pode ser null/undefined enquanto carrega. */
@@ -58,7 +58,11 @@ export default function WatchSyncProvider({
   onCardioFinished,
   onCheckinRequested,
 }: Props) {
-  const toastCtx = useTryToast()
+  // Lê o ToastContext direto via useContext (null-safe: retorna null se sem provider).
+  // NÃO usa useToast() porque ele lança — try/catch em volta de hook viola Rules of Hooks.
+  const toastCtxRaw = useContext(ToastContext)
+  const toastCtx: ((msg: string, kind?: 'success' | 'error' | 'info') => void) | null =
+    toastCtxRaw ? (msg, kind = 'info') => toastCtxRaw.toast(msg, kind) : null
 
   // Refs estáveis pra callbacks
   const onRefreshRef = useRef(onRefresh)
@@ -153,42 +157,24 @@ export default function WatchSyncProvider({
     },
   })
 
-  // Push dashboard quando mudar
+  // Refs estáveis pras funções de push do bridge — evita re-disparo do effect a
+  // cada render, já que `useWatchBridge` retornava objeto não-memoizado.
+  const pushDashboardRef = useRef(watch.pushDashboard)
+  const pushNearestGymsRef = useRef(watch.pushNearestGyms)
+  useEffect(() => { pushDashboardRef.current = watch.pushDashboard }, [watch.pushDashboard])
+  useEffect(() => { pushNearestGymsRef.current = watch.pushNearestGyms }, [watch.pushNearestGyms])
+
+  // Push dashboard quando mudar — deps primitivas só.
   useEffect(() => {
     if (!watch.isPaired || !watch.isWatchAppInstalled || !dashboard) return
-    watch.pushDashboard(dashboard).catch(() => {})
-  }, [
-    watch.isPaired,
-    watch.isWatchAppInstalled,
-    dashboard,
-    watch,
-  ])
+    pushDashboardRef.current(dashboard).catch(() => {})
+  }, [watch.isPaired, watch.isWatchAppInstalled, dashboard])
 
-  // Push academias próximas
+  // Push academias próximas — idem.
   useEffect(() => {
     if (!watch.isPaired || !watch.isWatchAppInstalled || !nearestGyms) return
-    watch.pushNearestGyms(nearestGyms).catch(() => {})
-  }, [
-    watch.isPaired,
-    watch.isWatchAppInstalled,
-    nearestGyms,
-    watch,
-  ])
+    pushNearestGymsRef.current(nearestGyms).catch(() => {})
+  }, [watch.isPaired, watch.isWatchAppInstalled, nearestGyms])
 
   return null
-}
-
-// ─── Helpers ───────────────────────────────────────────────────────────────
-
-// Lê o ToastContext de forma defensiva — se o provider não está acima na
-// árvore por algum motivo, vira no-op em vez de crashar.
-function useTryToast(): ((msg: string, kind?: 'success' | 'error' | 'info') => void) | null {
-  try {
-    const ctx = useToast()
-    return (msg: string, kind: 'success' | 'error' | 'info' = 'info') => {
-      ctx.toast(msg, kind)
-    }
-  } catch {
-    return null
-  }
 }

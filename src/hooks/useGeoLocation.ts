@@ -441,12 +441,22 @@ export function useGeoLocation(): UseGeoLocationResult {
     }
   }, [safeSetStatus])
 
-  // Cleanup on unmount
+  // Cleanup on unmount — limpa AMBOS os caminhos (web: id=number, Capacitor: id=string).
+  // Antes só tratava `typeof id === 'number'`, deixando GPS nativo ligado quando o
+  // usuário fechava a tela de cardio via gesto sem chamar stopWatching → bateria,
+  // calor e privacidade comprometidos.
   useEffect(() => {
+    const wasNative = isNativeRef.current
     return () => {
       const id = watchIdRef.current
       watchIdRef.current = null
-      if (id !== null && typeof id === 'number' && typeof navigator !== 'undefined' && navigator.geolocation) {
+      if (id === null) return
+      if (wasNative && typeof id === 'string') {
+        // Capacitor: dispara fire-and-forget; o hook já foi unmount, não dá pra await.
+        loadCapacitorGeolocation()
+          .then((loaded) => loaded?.geo.clearWatch({ id }))
+          .catch(() => { /* ignore */ })
+      } else if (typeof id === 'number' && typeof navigator !== 'undefined' && navigator.geolocation) {
         try { navigator.geolocation.clearWatch(id) } catch { /* ignore */ }
       }
     }

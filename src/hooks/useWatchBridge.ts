@@ -18,7 +18,7 @@
  * da verdade.
  */
 
-import { useEffect, useState, useCallback, useRef } from 'react'
+import { useEffect, useMemo, useState, useCallback, useRef } from 'react'
 import {
   watchGetState,
   watchSendDashboard,
@@ -214,11 +214,15 @@ export function useWatchBridge(opts: UseWatchBridgeOptions = {}): UseWatchBridge
     return await watchSendNearestGyms(gyms)
   }, [])
 
-  return {
+  // Memoiza retorno pra estabilizar referência. Sem isso, todo consumer (ex:
+  // WatchSyncProvider) que tenha `watch` nas deps de useEffect dispara o effect
+  // a cada render do componente — em sessão ativa, isso causaria centenas de
+  // chamadas/min ao bridge JS↔Swift via WatchConnectivity.
+  return useMemo(() => ({
     ...state,
     pushDashboard,
     pushWorkout,
     pushNearestGyms,
     refreshState,
-  }
+  }), [state, pushDashboard, pushWorkout, pushNearestGyms, refreshState])
 }
