@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import { createClient } from '@/utils/supabase/client'
+import { useFocusTrap } from '@/hooks/useFocusTrap'
 import { Lock, Eye, EyeOff, Loader2, Check, X } from 'lucide-react'
 
 interface ChangePasswordModalProps {
@@ -18,6 +19,18 @@ export default function ChangePasswordModal({ isOpen, onClose, userEmail }: Chan
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
   const [success, setSuccess] = useState(false)
+
+  // WCAG 2.4.3 Focus Order + 2.1.2 No Keyboard Trap — keep focus in modal, Escape closes
+  const handleEscape = useCallback(() => {
+    if (saving) return
+    setCurrentPassword('')
+    setNewPassword('')
+    setConfirmPassword('')
+    setError('')
+    setSuccess(false)
+    onClose()
+  }, [saving, onClose])
+  const focusTrapRef = useFocusTrap(isOpen, handleEscape)
 
   if (!isOpen) return null
 
@@ -82,14 +95,14 @@ export default function ChangePasswordModal({ isOpen, onClose, userEmail }: Chan
   return (
     <div className="fixed inset-0 z-[1400] flex items-center justify-center p-4">
       <button type="button" aria-label="Fechar" onClick={handleClose} className="absolute inset-0 bg-black/80 backdrop-blur-sm border-0 cursor-default" />
-      <div role="dialog" aria-modal="true" aria-label="Trocar senha" className="relative w-full max-w-md bg-neutral-900 border border-neutral-800 rounded-2xl p-6 shadow-2xl">
+      <div ref={focusTrapRef} role="dialog" aria-modal="true" aria-labelledby="cp-title" className="relative w-full max-w-md bg-neutral-900 border border-neutral-800 rounded-2xl p-6 shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 bg-yellow-500/10 rounded-full flex items-center justify-center">
               <Lock size={18} className="text-yellow-500" />
             </div>
-            <h2 className="text-lg font-black text-white">Trocar Senha</h2>
+            <h2 id="cp-title" className="text-lg font-black text-white">Trocar Senha</h2>
           </div>
           <button type="button" onClick={handleClose} className="text-neutral-500 hover:text-white p-1">
             <X size={18} />

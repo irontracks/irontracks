@@ -3,6 +3,7 @@
 import React from 'react';
 import { Download, Loader2 } from 'lucide-react';
 import { PeriodStats } from '@/types/workout';
+import { useFocusTrap } from '@/hooks/useFocusTrap';
 
 export interface PeriodReport {
     type: 'week' | 'month';
@@ -73,6 +74,8 @@ export function HistoryListPeriodReportModal({
     onDownloadPdf,
     onShareReport,
 }: PeriodReportModalProps) {
+    // WCAG 2.4.3 Focus Order + 2.1.2 No Keyboard Trap
+    const focusTrapRef = useFocusTrap(true, onClose);
     const { type, stats } = periodReport;
     const typeLabel = type === 'week' ? 'Resumo semanal' : type === 'month' ? 'Resumo mensal' : 'Resumo';
     const totalVolumeKg = Number(stats?.totalVolumeKg || 0);
@@ -113,6 +116,7 @@ export function HistoryListPeriodReportModal({
                 onClick={(e) => e.stopPropagation()}
             >
             <div
+                ref={focusTrapRef}
                 role="dialog"
                 aria-modal="true"
                 aria-label={typeLabel}
