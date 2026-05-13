@@ -123,7 +123,51 @@ Em ~30s deve aparecer em `sentry.io` → projeto `irontracks-android` → **Issu
 
 ---
 
-## 4. Checklist pré-release
+## 4. Release pipeline (resolve F-017)
+
+Espelha o fluxo iOS:
+
+```bash
+npm run android:release          # bump versionCode + cap:sync + bundleRelease (AAB)
+npm run android:release 12       # força versionCode = 12
+npm run android:release -- --submit  # bump + build + sobe pro Play Console Internal Testing
+```
+
+`scripts/android-release.sh` faz:
+1. `versionCode` bump no `app/build.gradle`
+2. `npm run cap:sync:android` (sincroniza web → android nativo)
+3. `./gradlew :app:bundleRelease` → AAB assinado em `android/app/build/outputs/bundle/release/app-release.aab`
+4. Opcional `--submit`: chama `scripts/android-submit.mjs`
+
+`scripts/android-submit.mjs` faz upload via Google Play Developer API v3:
+1. JWT → OAuth2 access_token (scope `androidpublisher`)
+2. Cria Edit em `applications/{package}/edits`
+3. Upload AAB via `uploadType=media`
+4. Atribui ao track (default `internal`)
+5. Commit do Edit → vira disponível pros testers em ~10 min
+
+### Setup pra `--submit` funcionar (uma vez)
+
+1. **Google Cloud Console** → `IAM & Admin` → `Service Accounts` → criar service account `irontracks-play-release`
+   - Sem roles necessários no Cloud (Play Console gerencia permissões)
+2. **Service Account** → `Keys` → `Add Key` → JSON → download
+   - Salvar em `~/.googlecloud/service-accounts/irontracks-play.json` (não commitar — gitignored)
+3. **Google Play Console** → `Setup` → `API access` → vincular o projeto Cloud + dar acesso à service account criada
+   - Permissões mínimas: `Release apps to production, exclude devices, and use Play App Signing` (no app específico, não global)
+4. **`.env.local`** (opcional, se quiser path custom):
+   ```
+   GOOGLE_PLAY_SERVICE_ACCOUNT=/Users/macmini/.googlecloud/service-accounts/irontracks-play.json
+   ```
+
+### Edge cases
+
+- **Primeiro upload manual obrigatório**: a Play Developer API exige que a primeira versão (versionCode 1+) seja subida manualmente via Play Console UI antes do API conseguir gerenciar tracks. Como o app já está publicado (versionCode 7), esse passo já foi feito.
+- **Internal Testing vs Production**: o script default é `internal`. Pra promover, use `--track production` (cuidado — vai pros usuários reais imediatamente após review).
+- **versionCode conflict**: Play Console rejeita se o `versionCode` já existir. O script sempre bumpa — se quiser repetir, force com `npm run android:release 15`.
+
+---
+
+## 5. Checklist pré-release
 
 - [ ] `android/app/google-services.json` no lugar (não commitado)
 - [ ] `android/app/sentry.properties` no lugar (não commitado), com auth token válido
