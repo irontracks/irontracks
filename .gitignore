@@ -109,6 +109,9 @@ android/capacitor-cordova-android-plugins/
 # RevenueCat dashboard DOM snapshots (not IaC, have no value checked in)
 /rc-*.yml
 
+# Sentry DSN per-build config (committado: Sentry.xcconfig.example)
+ios/App/App/Sentry.xcconfig
+
 # ios-native (Tuist) generated files and Xcode user state
 ios-native/**/Derived/
 ios-native/**/xcuserdata/

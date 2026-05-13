@@ -2303,8 +2303,8 @@ struct WorkoutSharePlayMessage: Codable {
 //
 // Why SQLite3 (not GRDB / SwiftData)?
 //   • Built into iOS — no SPM packages, no project.pbxproj edits needed.
-//   • Same DB can later be opened from a watchOS extension via App Group
-//     (entitlement still TODO — using app sandbox for now).
+//   • Same DB is opened from watchOS extension / Widgets / NotificationService
+//     via App Group `group.com.irontracks.shared` (F-005).
 //   • Indexed columns on `status` + `next_attempt_at` make queue scans
 //     10–100× faster than iterating IDB cursors or one JSON file per job.
 //
@@ -2315,6 +2315,19 @@ final class IronTracksKVStore {
 
     static let shared = IronTracksKVStore()
 
+    /// App Group identifier — compartilhado entre App, Widgets, NotificationService
+    /// e Watch. Mantém o cache acessível por todas as extensões. Definido nos 4
+    /// .entitlements files (F-005). Se o entitlement não estiver presente (ex.
+    /// build local sem provisioning regenerado) o `containerURL(...)` retorna
+    /// nil e o fallback do sandbox individual é usado.
+    static let appGroupIdentifier = "group.com.irontracks.shared"
+
+    /// One-shot migration flag — copia o `cache.db` legado do sandbox individual
+    /// pro App Group container na primeira vez que o store é tocado depois do
+    /// entitlement ser instalado. Sem essa migração usuários existentes perderiam
+    /// streak / offline queue após o update.
+    private static var didMigrate = false
+
     private var db: OpaquePointer?
     private let queue = DispatchQueue(label: "com.irontracks.kvstore", qos: .userInitiated)
     private let schemaVersion: Int32 = 1
@@ -2323,12 +2336,36 @@ final class IronTracksKVStore {
     private static let SQLITE_TRANSIENT_PTR = unsafeBitCast(-1, to: sqlite3_destructor_type.self)
 
     private init() {
-        queue.sync { self.openAndMigrate() }
+        queue.sync {
+            self.migrateLegacyKVStoreIfNeeded()
+            self.openAndMigrate()
+        }
     }
 
-    /// Library/Application Support/IronTracks/cache.db — excluded from iCloud
-    /// backups (we treat this as cache that the server can rebuild).
+    /// Caminho do `cache.db`. Prioriza o App Group container; cai pro sandbox
+    /// individual em Application Support se o entitlement não estiver disponível
+    /// (build de dev sem provisioning regenerado, runtime em ambiente sem App Group).
     private func dbPath() -> String {
+        let fm = FileManager.default
+        // Primeiro tenta App Group (compartilhado com Widgets / NSE / Watch)
+        if let groupURL = fm.containerURL(forSecurityApplicationGroupIdentifier: Self.appGroupIdentifier) {
+            let dir = groupURL.appendingPathComponent("IronTracks", isDirectory: true)
+            if !fm.fileExists(atPath: dir.path) {
+                try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
+            }
+            var dirURL = dir
+            var resourceValues = URLResourceValues()
+            resourceValues.isExcludedFromBackup = true
+            try? dirURL.setResourceValues(resourceValues)
+            return dir.appendingPathComponent("cache.db").path
+        }
+        // Fallback: sandbox individual (comportamento legado)
+        return Self.legacySandboxDBPath()
+    }
+
+    /// Caminho legado em Library/Application Support/IronTracks/cache.db.
+    /// Usado pelo fallback e pela migração one-shot.
+    private static func legacySandboxDBPath() -> String {
         let fm = FileManager.default
         let appSupport = (try? fm.url(for: .applicationSupportDirectory, in: .userDomainMask, appropriateFor: nil, create: true))
             ?? URL(fileURLWithPath: NSTemporaryDirectory())
@@ -2341,6 +2378,45 @@ final class IronTracksKVStore {
         resourceValues.isExcludedFromBackup = true
         try? dirURL.setResourceValues(resourceValues)
         return dir.appendingPathComponent("cache.db").path
+    }
+
+    /// Migra o cache.db do sandbox individual pro App Group container, uma única
+    /// vez por instalação. Idempotente: se o destino já existe, no-op. Copia
+    /// também os WAL/SHM se presentes pra preservar transações em vôo.
+    private func migrateLegacyKVStoreIfNeeded() {
+        guard !Self.didMigrate else { return }
+        Self.didMigrate = true
+
+        let fm = FileManager.default
+        guard let groupURL = fm.containerURL(forSecurityApplicationGroupIdentifier: Self.appGroupIdentifier) else {
+            return // sem App Group, nada pra migrar
+        }
+        let groupDir = groupURL.appendingPathComponent("IronTracks", isDirectory: true)
+        if !fm.fileExists(atPath: groupDir.path) {
+            try? fm.createDirectory(at: groupDir, withIntermediateDirectories: true)
+        }
+        let groupDB = groupDir.appendingPathComponent("cache.db")
+        if fm.fileExists(atPath: groupDB.path) {
+            return // já migrado
+        }
+
+        let legacyDBPath = Self.legacySandboxDBPath()
+        guard fm.fileExists(atPath: legacyDBPath) else { return }
+        let legacyURL = URL(fileURLWithPath: legacyDBPath)
+        do {
+            try fm.copyItem(at: legacyURL, to: groupDB)
+            // Copia WAL/SHM auxiliares se existirem (write-ahead log + shared memory)
+            for suffix in ["-wal", "-shm"] {
+                let src = URL(fileURLWithPath: legacyDBPath + suffix)
+                if fm.fileExists(atPath: src.path) {
+                    let dst = groupDir.appendingPathComponent("cache.db" + suffix)
+                    try? fm.copyItem(at: src, to: dst)
+                }
+            }
+            print("[IronTracksKVStore] Migrated legacy cache.db → App Group container")
+        } catch {
+            print("[IronTracksKVStore] Migration failed: \(error). Falling back to fresh DB.")
+        }
     }
 
     private func openAndMigrate() {
