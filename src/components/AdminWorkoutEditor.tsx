@@ -113,7 +113,8 @@ const AdminWorkoutEditor: React.FC<AdminWorkoutEditorProps> = ({ initialData, on
 
             <div className="space-y-4">
                 {safeExercises.map((ex, idx) => (
-                    <div key={idx} className="p-4 rounded-2xl border relative group overflow-hidden" style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'rgba(255,255,255,0.06)' }}>
+                    // Key estável: id se existir, senão nome+idx — preserva foco ao reordenar.
+                    <div key={String((ex as { id?: string })?.id ?? `${ex?.name || 'ex'}-${idx}`)} className="p-4 rounded-2xl border relative group overflow-hidden" style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'rgba(255,255,255,0.06)' }}>
                         <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-yellow-500/15 to-transparent" />
                         <button
                             onClick={() => handleRemoveExercise(idx)}

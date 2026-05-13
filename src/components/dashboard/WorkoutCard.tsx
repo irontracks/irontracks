@@ -44,7 +44,7 @@ const accentColors = [
 // Component
 // ────────────────────────────────────────────────────────────────
 
-export function WorkoutCard({
+function WorkoutCardInner({
   workout: w,
   idx,
   density,
@@ -234,3 +234,22 @@ export function WorkoutCard({
     </div>
   )
 }
+
+// React.memo com comparador raso pelas props que de fato mudam o render.
+// Sem isso, todo card re-renderizava sempre que o pai (StudentDashboard) mexia
+// em qualquer state interno (busy flags, modais abertos, etc).
+export const WorkoutCard = React.memo(WorkoutCardInner, (a, b) =>
+  a.workout === b.workout &&
+  a.idx === b.idx &&
+  a.density === b.density &&
+  a.isPeriodized === b.isPeriodized &&
+  a.onQuickView === b.onQuickView &&
+  a.onStartSession === b.onStartSession &&
+  a.onRestoreWorkout === b.onRestoreWorkout &&
+  a.onShareWorkout === b.onShareWorkout &&
+  a.onEditWorkout === b.onEditWorkout &&
+  a.onDeleteWorkout === b.onDeleteWorkout &&
+  a.onLoadFullWorkout === b.onLoadFullWorkout &&
+  a.onPeriodizedError === b.onPeriodizedError &&
+  a.onPeriodizedWorkoutLoaded === b.onPeriodizedWorkoutLoaded
+)
