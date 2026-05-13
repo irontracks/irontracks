@@ -61,20 +61,44 @@ const stripTrailingDayHint = (value: unknown): string => {
   )
 }
 
+// Regex que casa abreviações e nomes completos dos dias da semana em português.
+// Inclui as 3 formas mais comuns: completo ("TERÇA"), abreviado 3-letras ("TER"),
+// abreviado com ponto ("TER.").
+const WEEKDAY_TOKEN_RE = /^(segunda(?:-feira)?|terc[aá](?:-feira)?|quarta(?:-feira)?|quinta(?:-feira)?|sexta(?:-feira)?|s[aá]bado|domingo|seg\.?|ter\.?|qua\.?|qui\.?|sex\.?|s[aá]b\.?|dom\.?)\b/i
+
+const stripLeadingDayPrefix = (value: unknown): string => {
+  const s = normalizeDash(value).trim()
+  if (!s) return ''
+  // Casa "TER · ...", "TER - ...", "TERÇA · ...", "Segunda-feira: ...", etc.
+  // Separador obrigatório: ·, -, :, — pra não engolir títulos como "Terapia" ou "Domingo no parque".
+  const m = s.match(/^([a-záâãéêíóôõúç.-]+)\s*[·\-—–:]\s*(.+)$/i)
+  if (!m) return s
+  const head = m[1].trim()
+  if (!WEEKDAY_TOKEN_RE.test(head)) return s
+  return normalizeSpaces(m[2])
+}
+
 /**
  * Remove a marcação de dia da semana do título do treino.
  *
- * `formatProgramWorkoutTitle` gera nomes como `"A - PEITO (TERÇA)"`. Em contextos
- * de compartilhamento (ex: Stories do Instagram), o usuário pode estar postando
- * num dia diferente do programado e o dia entre parênteses fica confuso visualmente.
- * Esta função tira só o `(WEEKDAY)` e o `(DIA N)` — mantém prefixo "A - " e o nome.
+ * Cobre duas formas:
+ *   1. Sufixo gerado por `formatProgramWorkoutTitle`: "A - PEITO (TERÇA)"
+ *   2. Prefixo salvo manualmente pelo usuário: "TER · PULL - DORSAIS + BÍCEPS"
+ *
+ * Em contextos de compartilhamento (ex: Stories do Instagram), o usuário pode
+ * estar postando num dia diferente do programado e o dia fica confuso visualmente.
  *
  * Ex:
- *   "A - PEITO E TRÍCEPS (TERÇA)" → "A - PEITO E TRÍCEPS"
- *   "C - COSTAS (DIA 3)"          → "C - COSTAS"
- *   "Peito"                        → "Peito"
+ *   "A - PEITO E TRÍCEPS (TERÇA)"        → "A - PEITO E TRÍCEPS"
+ *   "C - COSTAS (DIA 3)"                  → "C - COSTAS"
+ *   "TER · PULL - DORSAIS + BÍCEPS"       → "PULL - DORSAIS + BÍCEPS"
+ *   "SEGUNDA-FEIRA: PEITO"                → "PEITO"
+ *   "Peito"                                → "Peito"
  */
-export const stripWeekdayHint = (value: unknown): string => stripTrailingDayHint(value)
+export const stripWeekdayHint = (value: unknown): string => {
+  const noTrailing = stripTrailingDayHint(value)
+  return stripLeadingDayPrefix(noTrailing)
+}
 
 export const formatProgramWorkoutTitle = (draftTitle: unknown, index: unknown, options: unknown): string => {
   const idx = Number(index)

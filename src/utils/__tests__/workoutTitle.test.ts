@@ -53,7 +53,7 @@ describe('Workout Title Utils', () => {
   })
 
   describe('stripWeekdayHint', () => {
-    it('removes weekday parenthetical from program titles', () => {
+    it('removes weekday parenthetical from program titles (trailing)', () => {
       expect(stripWeekdayHint('A - PEITO E TRÍCEPS (TERÇA)')).toBe('A - PEITO E TRÍCEPS')
       expect(stripWeekdayHint('B - COSTAS (SEGUNDA)')).toBe('B - COSTAS')
       expect(stripWeekdayHint('C - PERNAS (sábado)')).toBe('C - PERNAS')
@@ -61,6 +61,27 @@ describe('Workout Title Utils', () => {
 
     it('removes "(DIA N)" trailing tag', () => {
       expect(stripWeekdayHint('A - Treino (Dia 3)')).toBe('A - Treino')
+    })
+
+    it('removes abbreviated leading weekday with middle-dot separator', () => {
+      expect(stripWeekdayHint('TER · PULL - DORSAIS + BÍCEPS')).toBe('PULL - DORSAIS + BÍCEPS')
+      expect(stripWeekdayHint('SEG · PEITO')).toBe('PEITO')
+      expect(stripWeekdayHint('DOM · DESCANSO ATIVO')).toBe('DESCANSO ATIVO')
+      expect(stripWeekdayHint('SÁB · PERNAS')).toBe('PERNAS')
+    })
+
+    it('removes full leading weekday with various separators', () => {
+      expect(stripWeekdayHint('TERÇA · PULL')).toBe('PULL')
+      expect(stripWeekdayHint('SEGUNDA - PEITO')).toBe('PEITO')
+      expect(stripWeekdayHint('SEGUNDA-FEIRA: PEITO')).toBe('PEITO')
+      expect(stripWeekdayHint('Quarta · Costas')).toBe('Costas')
+    })
+
+    it('does not falsely strip words that merely start with weekday letters', () => {
+      // "Terapia" começa com "ter" mas não é um dia da semana
+      expect(stripWeekdayHint('Terapia - Reabilitação')).toBe('Terapia - Reabilitação')
+      // Sem separador depois do dia → não toca
+      expect(stripWeekdayHint('TER PULL')).toBe('TER PULL')
     })
 
     it('keeps titles that have no weekday hint untouched', () => {
