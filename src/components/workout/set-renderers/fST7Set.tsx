@@ -10,7 +10,7 @@ import {
 } from '../utils';
 import { UnknownRecord, WorkoutExercise } from '../types';
 
-export const FST7Set = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: number; setIdx: number }) => {
+const FST7SetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: number; setIdx: number }) => {
   const { getLog, updateLog, setFst7Modal, openNotesKeys, toggleNotes, startTimer, reportHistory } = useWorkoutContext();
   const key = `${exIdx}-${setIdx}`;
   const log = getLog(key);
@@ -118,3 +118,7 @@ export const FST7Set = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: num
     </div>
   );
 };
+
+export const FST7Set = React.memo(FST7SetInner, (a, b) =>
+  a.ex === b.ex && a.exIdx === b.exIdx && a.setIdx === b.setIdx,
+);

@@ -10,7 +10,7 @@ import {
 } from '../utils';
 import { UnknownRecord, WorkoutExercise } from '../types';
 
-export const ForcedRepsSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: number; setIdx: number }) => {
+const ForcedRepsSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: number; setIdx: number }) => {
   const { getLog, updateLog, setForcedRepsModal, openNotesKeys, toggleNotes, startTimer, reportHistory } = useWorkoutContext();
   const key = `${exIdx}-${setIdx}`;
   const log = getLog(key);
@@ -110,3 +110,7 @@ export const ForcedRepsSet = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exId
     </div>
   );
 };
+
+export const ForcedRepsSet = React.memo(ForcedRepsSetInner, (a, b) =>
+  a.ex === b.ex && a.exIdx === b.exIdx && a.setIdx === b.setIdx,
+);
