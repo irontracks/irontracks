@@ -640,7 +640,6 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         handleOpenNotifications,
         handleOpenTour,
     } = useViewNavigation({
-        setView,
         setShowNotifCenter,
         setHasUnreadNotification,
         setTourOpen,
