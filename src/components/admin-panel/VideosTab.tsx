@@ -228,7 +228,7 @@ export const VideosTab: React.FC = () => {
           <br />
           <span className="text-emerald-400 font-bold">≥80</span> auto-aprova ·{' '}
           <span className="text-amber-400 font-bold">50-79</span> fila de revisão ·{' '}
-          <span className="text-neutral-500 font-bold">&lt;50</span> descarta
+          <span className="text-neutral-400 font-bold">&lt;50</span> descarta
         </p>
 
         <div className="flex flex-wrap items-center gap-2">
@@ -289,7 +289,7 @@ export const VideosTab: React.FC = () => {
       {/* Review queue */}
       {queue.length > 0 && (
         <div className="space-y-3">
-          <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-neutral-500 px-1 flex items-center gap-2">
+          <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-neutral-400 px-1 flex items-center gap-2">
             <AlertCircle size={11} className="text-amber-400" />
             Aguardando sua revisão ({queue.length} exercícios)
           </h3>
@@ -302,7 +302,7 @@ export const VideosTab: React.FC = () => {
             >
               <div className="flex items-center justify-between gap-2 mb-3">
                 <h4 className="text-sm font-black text-white truncate">{group.exercise_name}</h4>
-                <span className="text-[10px] uppercase tracking-wider font-bold text-neutral-500">
+                <span className="text-[10px] uppercase tracking-wider font-bold text-neutral-400">
                   {group.candidates.length} sugestões
                 </span>
               </div>
@@ -331,9 +331,9 @@ export const VideosTab: React.FC = () => {
                         className="text-xs font-bold text-white hover:underline truncate block flex items-center gap-1"
                       >
                         {c.title}
-                        <ExternalLink size={10} className="text-neutral-500 shrink-0" />
+                        <ExternalLink size={10} className="text-neutral-400 shrink-0" />
                       </a>
-                      <div className="text-[10px] text-neutral-500 mt-0.5 truncate">
+                      <div className="text-[10px] text-neutral-400 mt-0.5 truncate">
                         {c.channel_title}
                       </div>
                       <div className="flex items-center gap-2 mt-1 text-[10px]">
@@ -341,7 +341,7 @@ export const VideosTab: React.FC = () => {
                           Score: {c.quality_score != null ? Math.round(c.quality_score) : '?'}
                         </span>
                         {c.score_breakdown?.reason && (
-                          <span className="text-neutral-500 truncate">· {c.score_breakdown.reason}</span>
+                          <span className="text-neutral-400 truncate">· {c.score_breakdown.reason}</span>
                         )}
                       </div>
                     </div>
@@ -382,7 +382,7 @@ export const VideosTab: React.FC = () => {
         >
           <CheckCircle2 size={28} className="text-emerald-500 mx-auto mb-2" />
           <p className="text-sm font-bold text-white">Sem vídeos aguardando revisão</p>
-          <p className="text-xs text-neutral-500 mt-1">
+          <p className="text-xs text-neutral-400 mt-1">
             Rode o pipeline pra processar mais exercícios sem vídeo.
           </p>
         </div>
@@ -416,7 +416,7 @@ const StatCard: React.FC<StatCardProps> = ({ label, value, sub, tone }) => {
     >
       <div className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">{label}</div>
       <div className={`text-2xl font-black mt-1 ${toneMap.text}`}>{value}</div>
-      <div className="text-[10px] text-neutral-500 mt-0.5 truncate">{sub}</div>
+      <div className="text-[10px] text-neutral-400 mt-0.5 truncate">{sub}</div>
     </div>
   )
 }
