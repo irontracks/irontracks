@@ -72,14 +72,21 @@ export default function MuscleBalanceCard({ muscleData }: MuscleBalanceCardProps
 
       {expanded && (
         <div className="px-4 pb-4 space-y-1.5">
-          {muscleData.map((m, i) => (
+          {muscleData.map((m, i) => {
+            const statusLabel = m.status === 'deficit' ? 'em déficit' : m.status === 'overtrained' ? 'em excesso' : 'equilibrado'
+            return (
             <div
               key={i}
               className={`flex items-center gap-2 px-2 py-1.5 rounded-lg border ${statusColor(m.status)}`}
+              role="progressbar"
+              aria-valuenow={m.totalSets}
+              aria-valuemin={0}
+              aria-valuemax={Math.max(...muscleData.map((d) => d.totalSets), 1)}
+              aria-label={`${m.name}, ${m.totalSets} séries, ${statusLabel}`}
             >
-              {statusIcon(m.status)}
+              <span aria-hidden="true">{statusIcon(m.status)}</span>
               <span className="text-xs font-bold text-white w-24 truncate">{m.name}</span>
-              <div className="flex-1 h-2 bg-neutral-800 rounded-full overflow-hidden">
+              <div className="flex-1 h-2 bg-neutral-800 rounded-full overflow-hidden" aria-hidden="true">
                 <div
                   className={`h-full rounded-full transition-all ${
                     m.status === 'deficit' ? 'bg-red-500/60' : m.status === 'overtrained' ? 'bg-yellow-500/60' : 'bg-emerald-500/60'
@@ -87,9 +94,10 @@ export default function MuscleBalanceCard({ muscleData }: MuscleBalanceCardProps
                   style={{ width: `${barWidth(m.totalSets)}%` }}
                 />
               </div>
-              <span className="text-[10px] text-neutral-400 font-mono w-12 text-right">{m.totalSets}s</span>
+              <span className="text-[10px] text-neutral-400 font-mono w-12 text-right" aria-hidden="true">{m.totalSets}s</span>
             </div>
-          ))}
+            )
+          })}
           <p className="text-[9px] text-neutral-600 text-center mt-2">
             Média: {Math.round(avgSets)} séries/grupo • Últimas 4 semanas
           </p>

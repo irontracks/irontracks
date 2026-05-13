@@ -75,12 +75,24 @@ export function ReportMusclePieChart({ data }: ReportMusclePieChartProps) {
 
     const top5 = segments.slice(0, 5)
 
+    // WCAG 1.1.1 — descrição textual completa para leitores de tela
+    const chartDesc = top5.map((s) => `${s.label}: ${s.pct} por cento`).join('; ')
+
     return (
         <div className="mb-8 p-4 rounded-2xl border border-neutral-800 bg-neutral-900/60">
             <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-3">💪 Distribuição muscular</div>
             <div className="flex flex-col sm:flex-row items-center gap-6">
                 {/* SVG donut */}
-                <svg viewBox="0 0 160 160" width={140} height={140} className="shrink-0">
+                <svg
+                    viewBox="0 0 160 160"
+                    width={140}
+                    height={140}
+                    className="shrink-0"
+                    role="img"
+                    aria-label={`Distribuição de volume por músculo: ${chartDesc}`}
+                >
+                    <title>Distribuição muscular por volume</title>
+                    <desc>{chartDesc}{segments.length > 5 ? `; mais ${segments.length - 5} grupos` : ''}</desc>
                     {segments.map((seg) => (
                         <path key={seg.id} d={seg.path} fill={seg.color} opacity={0.9} />
                     ))}

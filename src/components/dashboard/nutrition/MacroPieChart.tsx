@@ -43,6 +43,12 @@ const MacroPieChart = memo(function MacroPieChart({ protein, carbs, fat }: Props
 
   if (total <= 0) return null
 
+  // WCAG 1.1.1 — descrição textual completa do gráfico para leitores de tela
+  const macroSummary = ITEMS.map((it, i) => {
+    const pct = total > 0 ? Math.round((kcals[i] / total) * 100) : 0
+    return `${it.label}: ${Math.round(grams[i])} gramas, ${pct} por cento`
+  }).join('; ')
+
   return (
     <div className="rounded-2xl bg-neutral-900/70 border border-neutral-800 p-4 ring-1 ring-neutral-800/70 overflow-hidden w-full">
       <div className="text-[10px] uppercase tracking-[0.18em] text-neutral-400 mb-3 whitespace-nowrap">Distribuição de Macros</div>
@@ -50,13 +56,20 @@ const MacroPieChart = memo(function MacroPieChart({ protein, carbs, fat }: Props
       {/* Donut centrado */}
       <div className="flex justify-center mb-4">
         <div className="relative w-24 h-24">
-          <svg viewBox="0 0 100 100" className="w-full h-full -rotate-90">
+          <svg
+            viewBox="0 0 100 100"
+            className="w-full h-full -rotate-90"
+            role="img"
+            aria-label={`Distribuição de macros: ${Math.round(total)} kcal totais. ${macroSummary}`}
+          >
+            <title>Distribuição de macros</title>
+            <desc>Total: {Math.round(total)} kcal. {macroSummary}</desc>
             <circle cx="50" cy="50" r="38" fill="#27272a" />
             <circle cx="50" cy="50" r="24" fill="#171717" />
             <g dangerouslySetInnerHTML={{ __html: arcs }} />
             <circle cx="50" cy="50" r="24" fill="#171717" />
           </svg>
-          <div className="absolute inset-0 flex items-center justify-center">
+          <div className="absolute inset-0 flex items-center justify-center" aria-hidden="true">
             <div className="text-center">
               <div className="text-[11px] font-bold text-white leading-none">{Math.round(total)}</div>
               <div className="text-[8px] text-neutral-500">kcal</div>

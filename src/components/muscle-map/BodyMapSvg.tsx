@@ -1,7 +1,40 @@
 'use client'
 
 import React, { memo, useMemo } from 'react'
-import type { MuscleId } from '@/utils/muscleMapConfig'
+import { MUSCLE_BY_ID, type MuscleId } from '@/utils/muscleMapConfig'
+
+/**
+ * Hitbox SVG acessível — substitui <rect onClick> "inacessível" por
+ * elemento focável (tabIndex), com role=button, aria-label e
+ * suporte a teclado (Enter/Space). WCAG 2.1.1 + 4.1.2 + 2.4.7.
+ */
+function HitboxRect({
+  x, y, width, height, rx,
+  muscleId, sets, onSelect,
+}: {
+  x: number; y: number; width: number; height: number; rx: number;
+  muscleId: MuscleId; sets?: number; onSelect?: (id: MuscleId) => void;
+}) {
+  const label = MUSCLE_BY_ID[muscleId]?.label || muscleId
+  const handleKey = (e: React.KeyboardEvent<SVGRectElement>) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault()
+      onSelect?.(muscleId)
+    }
+  }
+  return (
+    <rect
+      x={x} y={y} width={width} height={height} rx={rx}
+      fill="transparent"
+      role="button"
+      tabIndex={onSelect ? 0 : -1}
+      aria-label={typeof sets === 'number' ? `${label}, ${sets} séries` : label}
+      style={{ pointerEvents: 'all', cursor: onSelect ? 'pointer' : 'default', outline: 'none' }}
+      onClick={() => onSelect?.(muscleId)}
+      onKeyDown={handleKey}
+    />
+  )
+}
 
 type MuscleState = {
   color?: string
@@ -135,55 +168,43 @@ const BodyMapSvg = memo(function BodyMapSvg({ view, muscles, onSelect, selected,
         })}
       </div>
 
-      {/* Invisible click areas (SVG hitboxes for each muscle group) */}
+      {/* Invisible click areas (SVG hitboxes for each muscle group) — keyboard-accessible */}
       <svg
         viewBox="0 0 200 450"
         className="absolute inset-0 w-full h-full z-20"
         style={{ pointerEvents: 'none' }}
+        role="group"
+        aria-label={view === 'front' ? 'Mapa muscular frontal — selecione um músculo' : 'Mapa muscular posterior — selecione um músculo'}
       >
         <g transform="translate(50, 55) scale(0.52)">
           {view === 'front' ? (
             <>
-              {/* Chest */}
-              <rect x="64" y="66" width="72" height="74" rx="8" fill="transparent" style={{ pointerEvents: 'all', cursor: 'pointer' }} onClick={() => onSelect?.('chest')} />
-              {/* Delts front/side */}
-              <rect x="30" y="56" width="36" height="50" rx="8" fill="transparent" style={{ pointerEvents: 'all', cursor: 'pointer' }} onClick={() => onSelect?.('delts_front')} />
-              <rect x="134" y="56" width="36" height="50" rx="8" fill="transparent" style={{ pointerEvents: 'all', cursor: 'pointer' }} onClick={() => onSelect?.('delts_front')} />
-              {/* Biceps */}
-              <rect x="14" y="114" width="34" height="64" rx="8" fill="transparent" style={{ pointerEvents: 'all', cursor: 'pointer' }} onClick={() => onSelect?.('biceps')} />
-              <rect x="152" y="114" width="34" height="64" rx="8" fill="transparent" style={{ pointerEvents: 'all', cursor: 'pointer' }} onClick={() => onSelect?.('biceps')} />
-              {/* Abs */}
-              <rect x="82" y="132" width="36" height="66" rx="6" fill="transparent" style={{ pointerEvents: 'all', cursor: 'pointer' }} onClick={() => onSelect?.('abs')} />
-              {/* Quads */}
-              <rect x="52" y="210" width="42" height="100" rx="8" fill="transparent" style={{ pointerEvents: 'all', cursor: 'pointer' }} onClick={() => onSelect?.('quads')} />
-              <rect x="106" y="210" width="42" height="100" rx="8" fill="transparent" style={{ pointerEvents: 'all', cursor: 'pointer' }} onClick={() => onSelect?.('quads')} />
-              {/* Calves */}
-              <rect x="48" y="312" width="40" height="90" rx="8" fill="transparent" style={{ pointerEvents: 'all', cursor: 'pointer' }} onClick={() => onSelect?.('calves')} />
-              <rect x="112" y="312" width="40" height="90" rx="8" fill="transparent" style={{ pointerEvents: 'all', cursor: 'pointer' }} onClick={() => onSelect?.('calves')} />
+              <HitboxRect x={64} y={66} width={72} height={74} rx={8} muscleId="chest" sets={muscles.chest?.sets} onSelect={onSelect} />
+              <HitboxRect x={30} y={56} width={36} height={50} rx={8} muscleId="delts_front" sets={muscles.delts_front?.sets} onSelect={onSelect} />
+              <HitboxRect x={134} y={56} width={36} height={50} rx={8} muscleId="delts_front" sets={muscles.delts_front?.sets} onSelect={onSelect} />
+              <HitboxRect x={14} y={114} width={34} height={64} rx={8} muscleId="biceps" sets={muscles.biceps?.sets} onSelect={onSelect} />
+              <HitboxRect x={152} y={114} width={34} height={64} rx={8} muscleId="biceps" sets={muscles.biceps?.sets} onSelect={onSelect} />
+              <HitboxRect x={82} y={132} width={36} height={66} rx={6} muscleId="abs" sets={muscles.abs?.sets} onSelect={onSelect} />
+              <HitboxRect x={52} y={210} width={42} height={100} rx={8} muscleId="quads" sets={muscles.quads?.sets} onSelect={onSelect} />
+              <HitboxRect x={106} y={210} width={42} height={100} rx={8} muscleId="quads" sets={muscles.quads?.sets} onSelect={onSelect} />
+              <HitboxRect x={48} y={312} width={40} height={90} rx={8} muscleId="calves" sets={muscles.calves?.sets} onSelect={onSelect} />
+              <HitboxRect x={112} y={312} width={40} height={90} rx={8} muscleId="calves" sets={muscles.calves?.sets} onSelect={onSelect} />
             </>
           ) : (
             <>
-              {/* Upper back */}
-              <rect x="64" y="52" width="72" height="72" rx="8" fill="transparent" style={{ pointerEvents: 'all', cursor: 'pointer' }} onClick={() => onSelect?.('upper_back')} />
-              {/* Rear delts */}
-              <rect x="30" y="56" width="36" height="44" rx="8" fill="transparent" style={{ pointerEvents: 'all', cursor: 'pointer' }} onClick={() => onSelect?.('delts_rear')} />
-              <rect x="134" y="56" width="36" height="44" rx="8" fill="transparent" style={{ pointerEvents: 'all', cursor: 'pointer' }} onClick={() => onSelect?.('delts_rear')} />
-              {/* Lats */}
-              <rect x="42" y="110" width="46" height="100" rx="8" fill="transparent" style={{ pointerEvents: 'all', cursor: 'pointer' }} onClick={() => onSelect?.('lats')} />
-              <rect x="112" y="110" width="46" height="100" rx="8" fill="transparent" style={{ pointerEvents: 'all', cursor: 'pointer' }} onClick={() => onSelect?.('lats')} />
-              {/* Triceps */}
-              <rect x="14" y="100" width="34" height="74" rx="8" fill="transparent" style={{ pointerEvents: 'all', cursor: 'pointer' }} onClick={() => onSelect?.('triceps')} />
-              <rect x="152" y="100" width="34" height="74" rx="8" fill="transparent" style={{ pointerEvents: 'all', cursor: 'pointer' }} onClick={() => onSelect?.('triceps')} />
-              {/* Spinal erectors */}
-              <rect x="86" y="120" width="28" height="96" rx="6" fill="transparent" style={{ pointerEvents: 'all', cursor: 'pointer' }} onClick={() => onSelect?.('spinal_erectors')} />
-              {/* Glutes */}
-              <rect x="52" y="210" width="96" height="60" rx="8" fill="transparent" style={{ pointerEvents: 'all', cursor: 'pointer' }} onClick={() => onSelect?.('glutes')} />
-              {/* Hamstrings */}
-              <rect x="52" y="258" width="42" height="70" rx="8" fill="transparent" style={{ pointerEvents: 'all', cursor: 'pointer' }} onClick={() => onSelect?.('hamstrings')} />
-              <rect x="106" y="258" width="42" height="70" rx="8" fill="transparent" style={{ pointerEvents: 'all', cursor: 'pointer' }} onClick={() => onSelect?.('hamstrings')} />
-              {/* Calves back */}
-              <rect x="48" y="318" width="40" height="90" rx="8" fill="transparent" style={{ pointerEvents: 'all', cursor: 'pointer' }} onClick={() => onSelect?.('calves')} />
-              <rect x="112" y="318" width="40" height="90" rx="8" fill="transparent" style={{ pointerEvents: 'all', cursor: 'pointer' }} onClick={() => onSelect?.('calves')} />
+              <HitboxRect x={64} y={52} width={72} height={72} rx={8} muscleId="upper_back" sets={muscles.upper_back?.sets} onSelect={onSelect} />
+              <HitboxRect x={30} y={56} width={36} height={44} rx={8} muscleId="delts_rear" sets={muscles.delts_rear?.sets} onSelect={onSelect} />
+              <HitboxRect x={134} y={56} width={36} height={44} rx={8} muscleId="delts_rear" sets={muscles.delts_rear?.sets} onSelect={onSelect} />
+              <HitboxRect x={42} y={110} width={46} height={100} rx={8} muscleId="lats" sets={muscles.lats?.sets} onSelect={onSelect} />
+              <HitboxRect x={112} y={110} width={46} height={100} rx={8} muscleId="lats" sets={muscles.lats?.sets} onSelect={onSelect} />
+              <HitboxRect x={14} y={100} width={34} height={74} rx={8} muscleId="triceps" sets={muscles.triceps?.sets} onSelect={onSelect} />
+              <HitboxRect x={152} y={100} width={34} height={74} rx={8} muscleId="triceps" sets={muscles.triceps?.sets} onSelect={onSelect} />
+              <HitboxRect x={86} y={120} width={28} height={96} rx={6} muscleId="spinal_erectors" sets={muscles.spinal_erectors?.sets} onSelect={onSelect} />
+              <HitboxRect x={52} y={210} width={96} height={60} rx={8} muscleId="glutes" sets={muscles.glutes?.sets} onSelect={onSelect} />
+              <HitboxRect x={52} y={258} width={42} height={70} rx={8} muscleId="hamstrings" sets={muscles.hamstrings?.sets} onSelect={onSelect} />
+              <HitboxRect x={106} y={258} width={42} height={70} rx={8} muscleId="hamstrings" sets={muscles.hamstrings?.sets} onSelect={onSelect} />
+              <HitboxRect x={48} y={318} width={40} height={90} rx={8} muscleId="calves" sets={muscles.calves?.sets} onSelect={onSelect} />
+              <HitboxRect x={112} y={318} width={40} height={90} rx={8} muscleId="calves" sets={muscles.calves?.sets} onSelect={onSelect} />
             </>
           )}
         </g>
