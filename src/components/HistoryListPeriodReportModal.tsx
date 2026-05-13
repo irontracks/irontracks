@@ -123,7 +123,7 @@ export function HistoryListPeriodReportModal({
             >
                 {/* Header */}
                 <div className="p-4 border-b border-neutral-800 bg-gradient-to-r from-neutral-900 to-neutral-900/60">
-                    <div className="text-[11px] uppercase tracking-wider text-neutral-500 font-bold">Relatório de evolução</div>
+                    <div className="text-[11px] uppercase tracking-wider text-neutral-400 font-bold">Relatório de evolução</div>
                     <div className="text-lg font-black text-white">{typeLabel}</div>
                     {uniqueDays > 0 && (
                         <div className="mt-1 text-xs text-neutral-400">
@@ -145,7 +145,7 @@ export function HistoryListPeriodReportModal({
                             { label: 'Dias ativos', value: uniqueDays > 0 ? String(uniqueDays) : '—' },
                         ].map(({ label, value }) => (
                             <div key={label} className="bg-neutral-950 border border-neutral-800 rounded-xl p-3">
-                                <div className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold">{label}</div>
+                                <div className="text-[10px] uppercase tracking-wider text-neutral-400 font-bold">{label}</div>
                                 <div className="text-xl font-black tracking-tight text-white font-mono">{value}</div>
                             </div>
                         ))}
@@ -173,7 +173,7 @@ export function HistoryListPeriodReportModal({
                             },
                         ].map(({ label, value, accent }) => (
                             <div key={label} className={`border rounded-xl p-3 ${accent ? 'bg-yellow-500/10 border-yellow-500/30' : 'bg-neutral-950 border-neutral-800'}`}>
-                                <div className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold">{label}</div>
+                                <div className="text-[10px] uppercase tracking-wider text-neutral-400 font-bold">{label}</div>
                                 <div className={`text-xl font-black tracking-tight font-mono ${accent ? 'text-yellow-400' : 'text-white'}`}>{value}</div>
                             </div>
                         ))}
@@ -182,12 +182,12 @@ export function HistoryListPeriodReportModal({
                     {/* Sparklines */}
                     {sparklineVolumeValues.length >= 2 && (
                         <div className="bg-neutral-950 border border-neutral-800 rounded-xl p-3">
-                            <div className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold mb-3">Tendência das sessões</div>
+                            <div className="text-[10px] uppercase tracking-wider text-neutral-400 font-bold mb-3">Tendência das sessões</div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
                                     <div className="text-[10px] text-neutral-400 mb-1">Volume por sessão</div>
                                     <Sparkline values={sparklineVolumeValues} width={120} height={32} />
-                                    <div className="text-[10px] text-neutral-500 mt-1">
+                                    <div className="text-[10px] text-neutral-400 mt-1">
                                         {sparklineVolumeValues.length} sessão{sparklineVolumeValues.length !== 1 ? 'ões' : ''}
                                     </div>
                                 </div>
@@ -204,7 +204,7 @@ export function HistoryListPeriodReportModal({
                     {/* Top exercises by volume */}
                     {topByVolume.length > 0 && (
                         <div className="bg-neutral-950 border border-neutral-800 rounded-xl p-3">
-                            <div className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold mb-3">Top exercícios por volume</div>
+                            <div className="text-[10px] uppercase tracking-wider text-neutral-400 font-bold mb-3">Top exercícios por volume</div>
                             <div className="space-y-2">
                                 {topByVolume.slice(0, 5).map((ex, idx) => {
                                     const maxVol = topByVolume[0]?.volumeKg || 1;
@@ -223,7 +223,7 @@ export function HistoryListPeriodReportModal({
                                                     style={{ width: `${pct}%` }}
                                                 />
                                             </div>
-                                            <div className="text-[9px] text-neutral-500 mt-0.5">
+                                            <div className="text-[9px] text-neutral-400 mt-0.5">
                                                 {ex.sets} séries · {ex.sessionsCount} sessão{ex.sessionsCount !== 1 ? 'ões' : ''}
                                             </div>
                                         </div>
@@ -235,7 +235,7 @@ export function HistoryListPeriodReportModal({
 
                     {/* AI insights */}
                     <div className="bg-neutral-950 border border-neutral-800 rounded-xl p-3 space-y-3">
-                        <div className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold">✨ Insights</div>
+                        <div className="text-[10px] uppercase tracking-wider text-neutral-400 font-bold">✨ Insights</div>
                         {periodAi.status === 'loading' && (
                             <div className="text-sm text-neutral-300 animate-pulse">Gerando insights...</div>
                         )}
@@ -257,7 +257,7 @@ export function HistoryListPeriodReportModal({
                                     if (!items.length) return null;
                                     return (
                                         <div key={key}>
-                                            <div className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold mb-1">{labels[key]}</div>
+                                            <div className="text-[10px] uppercase tracking-wider text-neutral-400 font-bold mb-1">{labels[key]}</div>
                                             <ul className={`space-y-1 text-sm ${isWarning ? 'text-yellow-400' : 'text-neutral-100'}`}>
                                                 {items.map((item, idx) => (
                                                     <li key={idx}>• {String(item || '').trim()}</li>
@@ -272,7 +272,7 @@ export function HistoryListPeriodReportModal({
 
                     {/* Share text */}
                     <div>
-                        <div className="text-[10px] uppercase tracking-wider text-neutral-500 font-bold mb-1">Texto para compartilhar</div>
+                        <div className="text-[10px] uppercase tracking-wider text-neutral-400 font-bold mb-1">Texto para compartilhar</div>
                         <textarea
                             readOnly
                             aria-label="Texto para compartilhar"

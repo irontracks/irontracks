@@ -170,7 +170,7 @@ const ChatListScreen = ({ user, onClose, onSelectChannel }: ChatListScreenProps)
                     </div>
                 </div>
                 <div className="flex-1 flex items-center justify-center">
-                    <div className="text-neutral-500 text-sm">Carregando...</div>
+                    <div className="text-neutral-400 text-sm">Carregando...</div>
                 </div>
             </div>
         );
@@ -193,22 +193,22 @@ const ChatListScreen = ({ user, onClose, onSelectChannel }: ChatListScreenProps)
                     </div>
                     <div>
                         <h3 className="font-black text-base text-white leading-tight">Conversas</h3>
-                        <p className="text-[11px] text-neutral-500">Chat direto com seus contatos</p>
+                        <p className="text-[11px] text-neutral-400">Chat direto com seus contatos</p>
                     </div>
                 </div>
             </div>
             <div className="px-4 py-2.5" style={{ borderBottom: '1px solid rgba(255,255,255,0.04)', background: 'rgba(255,255,255,0.01)' }}>
-                <h4 className="text-[10px] font-black text-neutral-500 uppercase tracking-[0.18em]">Contatos</h4>
+                <h4 className="text-[10px] font-black text-neutral-400 uppercase tracking-[0.18em]">Contatos</h4>
             </div>
 
             <div className="flex-1 overflow-y-auto pb-[max(env(safe-area-inset-bottom),16px)]">
                 {users.length === 0 ? (
                     <div className="p-10 text-center">
                         <div className="w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.07)' }}>
-                            <MessageSquare size={32} className="text-neutral-600" />
+                            <MessageSquare size={32} className="text-neutral-400" />
                         </div>
                         <p className="text-neutral-400 font-bold">Nenhum contato encontrado</p>
-                        <p className="text-sm text-neutral-600 mt-1">Crie usuários para iniciar conversas</p>
+                        <p className="text-sm text-neutral-400 mt-1">Crie usuários para iniciar conversas</p>
                     </div>
                 ) : (
                     <div>
@@ -232,16 +232,16 @@ const ChatListScreen = ({ user, onClose, onSelectChannel }: ChatListScreenProps)
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center justify-between mb-0.5">
                                         <h4 className="font-black text-white text-sm truncate">{u.display_name}</h4>
-                                        <span className="text-[11px] text-neutral-600 flex-shrink-0 ml-2">{formatLastSeen(u.last_seen ?? null)}</span>
+                                        <span className="text-[11px] text-neutral-400 flex-shrink-0 ml-2">{formatLastSeen(u.last_seen ?? null)}</span>
                                     </div>
-                                    <p className="text-xs text-neutral-600 truncate">Toque para conversar</p>
+                                    <p className="text-xs text-neutral-400 truncate">Toque para conversar</p>
                                 </div>
                                 <MessageSquare size={16} className="text-yellow-500 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0" />
                             </button>
                         ))}
                         {offlineUsers.length > 0 && (
                             <div className="px-4 py-2" style={{ background: 'rgba(255,255,255,0.02)', borderBottom: '1px solid rgba(255,255,255,0.04)', borderTop: '1px solid rgba(255,255,255,0.04)' }}>
-                                <p className="text-[10px] font-black text-neutral-600 uppercase tracking-[0.18em]">● Offline — {offlineUsers.length}</p>
+                                <p className="text-[10px] font-black text-neutral-400 uppercase tracking-[0.18em]">● Offline — {offlineUsers.length}</p>
                             </div>
                         )}
                         {offlineUsers.map((u) => (
@@ -259,11 +259,11 @@ const ChatListScreen = ({ user, onClose, onSelectChannel }: ChatListScreenProps)
                                 <div className="flex-1 min-w-0">
                                     <div className="flex items-center justify-between mb-0.5">
                                         <h4 className="font-black text-neutral-300 text-sm truncate">{u.display_name}</h4>
-                                        <span className="text-[11px] text-neutral-600 flex-shrink-0 ml-2">{formatLastSeen(u.last_seen ?? null)}</span>
+                                        <span className="text-[11px] text-neutral-400 flex-shrink-0 ml-2">{formatLastSeen(u.last_seen ?? null)}</span>
                                     </div>
-                                    <p className="text-xs text-neutral-600 truncate">Toque para conversar</p>
+                                    <p className="text-xs text-neutral-400 truncate">Toque para conversar</p>
                                 </div>
-                                <MessageSquare size={16} className="text-neutral-600 opacity-0 group-hover:opacity-60 transition-opacity flex-shrink-0" />
+                                <MessageSquare size={16} className="text-neutral-400 opacity-0 group-hover:opacity-60 transition-opacity flex-shrink-0" />
                             </button>
                         ))}
                     </div>

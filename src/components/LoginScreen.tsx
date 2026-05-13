@@ -206,7 +206,7 @@ const LoginScreen = () => {
                         {authMode === 'signup' && (
                             <div className="space-y-4">
                                 <div className="relative">
-                                    <User size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500" />
+                                    <User size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-400" />
                                     <input
                                         required
                                         type="text"
@@ -225,7 +225,7 @@ const LoginScreen = () => {
 
                                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                                     <div className="relative">
-                                        <Calendar size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500" />
+                                        <Calendar size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-400" />
                                         <input
                                             required
                                             type="date"
@@ -237,7 +237,7 @@ const LoginScreen = () => {
                                         />
                                     </div>
                                     <div className="relative">
-                                        <Phone size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500" />
+                                        <Phone size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-400" />
                                         <input
                                             required
                                             type="tel"
@@ -308,7 +308,7 @@ const LoginScreen = () => {
                                                     </button>
                                                 </div>
                                                 {signupOtpError && <p className="text-xs text-red-400">{signupOtpError}</p>}
-                                                <button type="button" onClick={handleSignupSendOtp} disabled={signupOtpSending} className="text-xs text-neutral-500 hover:text-neutral-300 transition-colors">
+                                                <button type="button" onClick={handleSignupSendOtp} disabled={signupOtpSending} className="text-xs text-neutral-400 hover:text-neutral-300 transition-colors">
                                                     Reenviar código
                                                 </button>
                                             </div>
@@ -360,7 +360,7 @@ const LoginScreen = () => {
 
                         <div className="space-y-1">
                             <div className="relative">
-                                <Mail size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500" />
+                                <Mail size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-400" />
                                 <input
                                     required
                                     type="email"
@@ -383,7 +383,7 @@ const LoginScreen = () => {
                             <div className="space-y-4">
                                 <div>
                                     <div className="relative">
-                                        <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500" />
+                                        <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-400" />
                                         <input
                                             required
                                             type={showPassword ? "text" : "password"}
@@ -401,7 +401,7 @@ const LoginScreen = () => {
                                         <button
                                             type="button"
                                             onClick={() => setShowPassword(v => !v)}
-                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-yellow-400 transition-colors p-1"
+                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-yellow-400 transition-colors p-1"
                                             aria-label={showPassword ? 'Ocultar senha' : 'Mostrar senha'}
                                         >
                                             {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
@@ -413,7 +413,7 @@ const LoginScreen = () => {
                                 {authMode === 'signup' && (
                                     <div>
                                         <div className="relative">
-                                            <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-500" />
+                                            <Lock size={18} className="absolute left-4 top-1/2 -translate-y-1/2 text-neutral-400" />
                                             <input
                                                 required
                                                 type={showPassword ? "text" : "password"}
@@ -453,7 +453,7 @@ const LoginScreen = () => {
                                             </svg>
                                         </div>
                                     </div>
-                                    <span className="text-[11px] font-bold text-neutral-500 group-hover:text-neutral-300 transition-colors uppercase tracking-wider">Lembrar meu e-mail</span>
+                                    <span className="text-[11px] font-bold text-neutral-400 group-hover:text-neutral-300 transition-colors uppercase tracking-wider">Lembrar meu e-mail</span>
                                 </label>
                             </div>
                         )}
@@ -547,7 +547,7 @@ const LoginScreen = () => {
 
                         {authMode === 'recover' && (
                             <div className="space-y-2">
-                                <p className="text-[11px] text-neutral-500 text-center leading-relaxed px-2">
+                                <p className="text-[11px] text-neutral-400 text-center leading-relaxed px-2">
                                     Enviaremos um link para você definir sua senha e acessar sua conta existente.
                                 </p>
                                 <button
@@ -567,7 +567,7 @@ const LoginScreen = () => {
 
                         {authMode === 'recover_code' && (
                             <div className="space-y-2">
-                                <p className="text-[11px] text-neutral-500 text-center leading-relaxed px-2">
+                                <p className="text-[11px] text-neutral-400 text-center leading-relaxed px-2">
                                     Use um código de recuperação gerado nas configurações para redefinir sua senha sem e-mail.
                                 </p>
                                 <button
@@ -622,7 +622,7 @@ const LoginScreen = () => {
                     <div className="relative w-full max-w-md bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden">
                         <div className="p-6 border-b border-neutral-800 flex justify-between items-center bg-neutral-900/50">
                             <h3 className="text-lg font-black text-white italic">PEDIR ACESSO</h3>
-                            <button onClick={() => setShowRequestModal(false)} className="text-neutral-500 hover:text-white">
+                            <button onClick={() => setShowRequestModal(false)} className="text-neutral-400 hover:text-white">
                                 <X size={20} />
                             </button>
                         </div>
@@ -761,7 +761,7 @@ const LoginScreen = () => {
                                                         </button>
                                                     </div>
                                                     {reqOtpError && <p className="text-xs text-red-400">{reqOtpError}</p>}
-                                                    <button type="button" onClick={handleReqSendOtp} disabled={reqOtpSending} className="text-xs text-neutral-500 hover:text-neutral-300 transition-colors">
+                                                    <button type="button" onClick={handleReqSendOtp} disabled={reqOtpSending} className="text-xs text-neutral-400 hover:text-neutral-300 transition-colors">
                                                         Reenviar código
                                                     </button>
                                                 </div>

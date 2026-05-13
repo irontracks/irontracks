@@ -75,11 +75,11 @@ function HandleEditor({ userId }: { userId?: string }) {
                 <AtSign size={14} className="text-neutral-400" />
                 <div className="text-sm font-bold text-white">@ Nome de usuário</div>
             </div>
-            <div className="text-[11px] text-neutral-500 mb-2">
+            <div className="text-[11px] text-neutral-400 mb-2">
                 Permite que outros te mencionem (@). 3-20 caracteres, letras minúsculas, números e underscore.
             </div>
             <div className="flex items-center gap-2">
-                <span className="text-neutral-500 text-sm">@</span>
+                <span className="text-neutral-400 text-sm">@</span>
                 <input
                     type="text"
                     aria-label="Nome de usuário (handle)"
@@ -88,7 +88,7 @@ function HandleEditor({ userId }: { userId?: string }) {
                     placeholder="seu_handle"
                     autoComplete="off"
                     spellCheck={false}
-                    className="flex-1 bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white placeholder:text-neutral-600 focus:outline-none focus:border-yellow-500/60"
+                    className="flex-1 bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white placeholder:text-neutral-400 focus:outline-none focus:border-yellow-500/60"
                 />
                 <button
                     type="button"
@@ -124,13 +124,13 @@ export function SettingsProfileSection({ draft, setValue, userId, userPhotoURL, 
                             <Image src={userPhotoURL} width={56} height={56} className="w-full h-full object-cover" alt="Avatar" unoptimized />
                         ) : (
                             <div className="w-full h-full bg-neutral-800 flex items-center justify-center">
-                                <Camera size={20} className="text-neutral-600" />
+                                <Camera size={20} className="text-neutral-400" />
                             </div>
                         )}
                     </div>
                     <div className="flex-1 min-w-0">
                         <div className="text-sm font-bold text-white">Foto de Perfil</div>
-                        <div className="text-[11px] text-neutral-500">Visível para outros usuários.</div>
+                        <div className="text-[11px] text-neutral-400">Visível para outros usuários.</div>
                     </div>
                     <button type="button" onClick={() => onOpenAvatarUpload?.()}
                         className="px-3 py-2 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 text-xs font-bold hover:bg-neutral-750 transition-colors">
@@ -168,7 +168,7 @@ export function SettingsProfileSection({ draft, setValue, userId, userPhotoURL, 
                     <div className="flex items-center justify-between gap-3">
                         <div>
                             <div className="text-sm font-bold text-white">Trocar Senha</div>
-                            <div className="text-[11px] text-neutral-500">Alterar senha de acesso à conta.</div>
+                            <div className="text-[11px] text-neutral-400">Alterar senha de acesso à conta.</div>
                         </div>
                         <button type="button" onClick={() => onOpenChangePassword?.()}
                             className="px-3 py-2 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 text-xs font-bold hover:bg-neutral-750 transition-colors flex items-center gap-1.5">
@@ -984,7 +984,7 @@ export function SettingsHealthKitSection({
 
             {/* Descrição clara dos dados acessados — exigido pela Guideline 2.5.1 */}
             <div className="rounded-xl bg-neutral-900/60 border border-neutral-800 p-3 mb-4 space-y-2.5">
-                <div className="text-[10px] font-black uppercase tracking-widest text-neutral-500 mb-1">O que o IronTracks acessa no Apple Health</div>
+                <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-1">O que o IronTracks acessa no Apple Health</div>
                 <div className="flex items-start gap-2.5">
                     <div className="w-1.5 h-1.5 rounded-full bg-rose-400 shrink-0 mt-1.5" />
                     <div>
@@ -999,7 +999,7 @@ export function SettingsHealthKitSection({
                         <div className="text-[11px] text-neutral-400 leading-relaxed">Lê a contagem de passos diários para contexto no resumo de atividade.</div>
                     </div>
                 </div>
-                <div className="pt-1 text-[10px] text-neutral-500 leading-relaxed border-t border-neutral-800/60">
+                <div className="pt-1 text-[10px] text-neutral-400 leading-relaxed border-t border-neutral-800/60">
                     Seus dados de saúde nunca são compartilhados com terceiros. Você pode revogar o acesso em Ajustes → Privacidade e Segurança → Saúde → IronTracks.
                 </div>
             </div>
@@ -1129,20 +1129,20 @@ export function SettingsGymGeofenceSection({
             </div>
 
             <div className="rounded-xl bg-neutral-900/60 border border-neutral-800 p-3 mb-4 space-y-2.5">
-                <div className="text-[10px] font-black uppercase tracking-widest text-neutral-500 mb-1">Como funciona</div>
+                <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-1">Como funciona</div>
                 <div className="text-[11px] text-neutral-400 leading-relaxed">
                     Salve sua academia favorita e o IronTracks te avisa automaticamente assim que você chega lá — mesmo com o app fechado. Detecção sem GPS contínuo (zero impacto na bateria).
                 </div>
-                <div className="pt-1 text-[10px] text-neutral-500 leading-relaxed border-t border-neutral-800/60">
+                <div className="pt-1 text-[10px] text-neutral-400 leading-relaxed border-t border-neutral-800/60">
                     Sua localização nunca sai do dispositivo para esse uso. Só o nome da academia é salvo na sua conta.
                 </div>
             </div>
 
             {hasGym ? (
                 <div className="rounded-xl bg-neutral-900 border border-neutral-700 p-3 mb-3">
-                    <div className="text-[10px] font-black uppercase tracking-widest text-neutral-500 mb-1">Academia favorita</div>
+                    <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-1">Academia favorita</div>
                     <div className="text-sm font-bold text-white truncate">{gymName}</div>
-                    <div className="text-[10px] text-neutral-500 mt-0.5">
+                    <div className="text-[10px] text-neutral-400 mt-0.5">
                         {lat?.toFixed(5)}, {lng?.toFixed(5)}
                     </div>
                 </div>
@@ -1150,7 +1150,7 @@ export function SettingsGymGeofenceSection({
 
             {/* Nome (editável antes de capturar) */}
             <div className="mb-3">
-                <label htmlFor="favorite-gym-name" className="text-[10px] font-black uppercase tracking-widest text-neutral-500 mb-1 block">Nome da academia</label>
+                <label htmlFor="favorite-gym-name" className="text-[10px] font-black uppercase tracking-widest text-neutral-400 mb-1 block">Nome da academia</label>
                 <input
                     id="favorite-gym-name"
                     type="text"
@@ -1159,7 +1159,7 @@ export function SettingsGymGeofenceSection({
                     placeholder="Smart Fit Centro"
                     maxLength={60}
                     aria-label="Nome da academia favorita"
-                    className="w-full min-h-[44px] px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 placeholder:text-neutral-600 text-sm"
+                    className="w-full min-h-[44px] px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 placeholder:text-neutral-400 text-sm"
                 />
             </div>
 

@@ -199,7 +199,7 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
                                 <ArrowLeft size={16} />
                                 <span>Voltar</span>
                             </button>
-                            <p className="text-xs font-bold text-neutral-500 uppercase">Nome do Treino</p>
+                            <p className="text-xs font-bold text-neutral-400 uppercase">Nome do Treino</p>
                         </div>
                     </div>
                     <input
@@ -213,7 +213,7 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
 
                 <div className="space-y-4">
                     <div className="flex items-center justify-between">
-                        <p className="text-xs font-bold text-neutral-500 uppercase">Exercícios ({workout.exercises?.length || 0})</p>
+                        <p className="text-xs font-bold text-neutral-400 uppercase">Exercícios ({workout.exercises?.length || 0})</p>
                     </div>
 
                     {(workout.exercises || []).map((exercise, index) => {
@@ -270,7 +270,7 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
                                         )}
                                         <button
                                             onClick={() => removeExercise(index)}
-                                            className="text-neutral-600 hover:text-red-500 p-1 transition-colors"
+                                            className="text-neutral-400 hover:text-red-500 p-1 transition-colors"
                                         >
                                             <Trash2 size={16} />
                                         </button>
@@ -279,7 +279,7 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
                                     <div className="space-y-4 pr-0 pt-6">
                                         {exerciseType === 'cardio' ? (
                                             <div>
-                                                <p className="text-[10px] text-neutral-500 uppercase font-bold mb-1 block">Modalidade</p>
+                                                <p className="text-[10px] text-neutral-400 uppercase font-bold mb-1 block">Modalidade</p>
                                                 <select
                                                     aria-label="Modalidade"
                                                     value={exercise.name || ''}
@@ -318,7 +318,7 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
 
                                         <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
                                             <div>
-                                                <p className="text-[10px] text-neutral-500 uppercase font-bold text-center block mb-1">Sets</p>
+                                                <p className="text-[10px] text-neutral-400 uppercase font-bold text-center block mb-1">Sets</p>
                                                 <div className="flex items-center gap-1">
                                                     <input
                                                         aria-label="Número de sets"
@@ -337,7 +337,7 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
                                                 </div>
                                             </div>
                                             <div>
-                                                <p className="text-[10px] text-neutral-500 uppercase font-bold text-center block mb-1">Reps</p>
+                                                <p className="text-[10px] text-neutral-400 uppercase font-bold text-center block mb-1">Reps</p>
                                                 <input
                                                     aria-label="Repetições"
                                                     type="text"
@@ -361,7 +361,7 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
                                                 />
                                             </div>
                                             <div>
-                                                <p className="text-[10px] text-neutral-500 uppercase font-bold text-center block mb-1">Rest(s)</p>
+                                                <p className="text-[10px] text-neutral-400 uppercase font-bold text-center block mb-1">Rest(s)</p>
                                                 <input
                                                     aria-label="Descanso em segundos"
                                                     type="number"
@@ -371,7 +371,7 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
                                                 />
                                             </div>
                                             <div>
-                                                <p className="text-[10px] text-neutral-500 uppercase font-bold text-center block mb-1 inline-flex items-center justify-center gap-1 group">
+                                                <p className="text-[10px] text-neutral-400 uppercase font-bold text-center block mb-1 inline-flex items-center justify-center gap-1 group">
                                                     Cad
                                                     <HelpHint title={HELP_TERMS.cadence.title} text={HELP_TERMS.cadence.text} tooltip={HELP_TERMS.cadence.tooltip} className="h-4 w-4 text-[10px]" />
                                                 </p>
@@ -384,7 +384,7 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
                                                 />
                                             </div>
                                             <div>
-                                                <p className="text-[10px] text-neutral-500 uppercase font-bold text-center block mb-1 inline-flex items-center justify-center gap-1 group">
+                                                <p className="text-[10px] text-neutral-400 uppercase font-bold text-center block mb-1 inline-flex items-center justify-center gap-1 group">
                                                     Método
                                                     {(() => {
                                                         const m = String(safeMethod || 'Normal');
@@ -457,7 +457,7 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
                                                     />
                                                 </div>
                                                 <div>
-                                                    <p className="text-[10px] text-neutral-500 uppercase font-bold mb-1 block">Notas</p>
+                                                    <p className="text-[10px] text-neutral-400 uppercase font-bold mb-1 block">Notas</p>
                                                     <textarea
                                                         aria-label="Notas do exercício"
                                                         value={exercise.notes || ''}
@@ -508,7 +508,7 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
 
                 <button
                     onClick={addExercise}
-                    className="w-full py-4 border-2 border-dashed border-neutral-800 text-neutral-500 rounded-xl font-bold hover:bg-neutral-800 hover:text-white hover:border-neutral-700 transition-all flex items-center justify-center gap-2"
+                    className="w-full py-4 border-2 border-dashed border-neutral-800 text-neutral-400 rounded-xl font-bold hover:bg-neutral-800 hover:text-white hover:border-neutral-700 transition-all flex items-center justify-center gap-2"
                 >
                     <Plus size={20} /> Adicionar Exercício
                 </button>

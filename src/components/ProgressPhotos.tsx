@@ -103,15 +103,15 @@ function BeforeAfterSlider({ before, after }: { before: ProgressPhoto; after: Pr
       {before.weight_kg != null && after.weight_kg != null && (
         <div className="flex gap-3 text-center">
           <div className="flex-1 bg-neutral-900 rounded-xl p-3">
-            <p className="text-xs text-neutral-500 mb-0.5">Antes</p>
+            <p className="text-xs text-neutral-400 mb-0.5">Antes</p>
             <p className="text-lg font-black text-white">{before.weight_kg}kg</p>
           </div>
           <div className="flex-1 bg-neutral-900 rounded-xl p-3">
-            <p className="text-xs text-neutral-500 mb-0.5">Depois</p>
+            <p className="text-xs text-neutral-400 mb-0.5">Depois</p>
             <p className="text-lg font-black text-white">{after.weight_kg}kg</p>
           </div>
           <div className="flex-1 bg-neutral-900 rounded-xl p-3">
-            <p className="text-xs text-neutral-500 mb-0.5">Mudança</p>
+            <p className="text-xs text-neutral-400 mb-0.5">Mudança</p>
             <p className={`text-lg font-black ${after.weight_kg - before.weight_kg < 0 ? 'text-green-400' : 'text-yellow-400'}`}>
               {after.weight_kg - before.weight_kg > 0 ? '+' : ''}{(after.weight_kg - before.weight_kg).toFixed(1)}kg
             </p>
@@ -235,7 +235,7 @@ function UploadModal({ onClose, onUploaded }: UploadModalProps) {
               onClick={() => fileRef.current?.click()}
               onDragOver={(e) => e.preventDefault()}
               onDrop={handleDrop}
-              className="w-full aspect-[3/4] rounded-2xl border-2 border-dashed border-neutral-700 flex flex-col items-center justify-center gap-3 text-neutral-500 hover:border-yellow-500/50 hover:text-yellow-500 transition-colors"
+              className="w-full aspect-[3/4] rounded-2xl border-2 border-dashed border-neutral-700 flex flex-col items-center justify-center gap-3 text-neutral-400 hover:border-yellow-500/50 hover:text-yellow-500 transition-colors"
             >
               <Camera size={32} />
               <span className="text-sm font-bold">Toque para tirar foto ou fazer upload</span>
@@ -255,7 +255,7 @@ function UploadModal({ onClose, onUploaded }: UploadModalProps) {
 
           {/* Kind selector */}
           <div>
-            <p className="text-xs font-bold text-neutral-500 uppercase tracking-widest mb-2">Tipo de foto</p>
+            <p className="text-xs font-bold text-neutral-400 uppercase tracking-widest mb-2">Tipo de foto</p>
             <div className="grid grid-cols-4 gap-2">
               {(Object.entries(KIND_LABELS) as [ProgressPhoto['kind'], string][]).map(([k, label]) => (
                 <button
@@ -277,7 +277,7 @@ function UploadModal({ onClose, onUploaded }: UploadModalProps) {
 
           {/* Weight */}
           <div>
-            <p className="text-xs font-bold text-neutral-500 uppercase tracking-widest mb-2">Peso (opcional)</p>
+            <p className="text-xs font-bold text-neutral-400 uppercase tracking-widest mb-2">Peso (opcional)</p>
             <div className="flex items-center gap-2">
               <input
                 aria-label="Peso em kg"
@@ -290,13 +290,13 @@ function UploadModal({ onClose, onUploaded }: UploadModalProps) {
                 max="500"
                 className="flex-1 bg-neutral-900 border border-neutral-700 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-yellow-500"
               />
-              <span className="text-neutral-500 text-sm font-bold">kg</span>
+              <span className="text-neutral-400 text-sm font-bold">kg</span>
             </div>
           </div>
 
           {/* Notes */}
           <div>
-            <p className="text-xs font-bold text-neutral-500 uppercase tracking-widest mb-2">Notas (opcional)</p>
+            <p className="text-xs font-bold text-neutral-400 uppercase tracking-widest mb-2">Notas (opcional)</p>
             <textarea
               aria-label="Notas sobre a foto"
               value={notes}
@@ -399,7 +399,7 @@ export default function ProgressPhotos({ onClose }: ProgressPhotosProps) {
           </button>
           <div>
             <p className="font-black text-white">Diário de Progresso</p>
-            <p className="text-xs text-neutral-500">{photos.length} {photos.length === 1 ? 'foto' : 'fotos'}</p>
+            <p className="text-xs text-neutral-400">{photos.length} {photos.length === 1 ? 'foto' : 'fotos'}</p>
           </div>
         </div>
         <div className="flex items-center gap-2">
@@ -429,7 +429,7 @@ export default function ProgressPhotos({ onClose }: ProgressPhotosProps) {
         {/* Before/After comparison */}
         {compareMode && photoA && photoB && (
           <div className="p-4 border-b border-neutral-800">
-            <p className="text-xs font-bold text-neutral-500 uppercase tracking-widest mb-3">Comparação</p>
+            <p className="text-xs font-bold text-neutral-400 uppercase tracking-widest mb-3">Comparação</p>
             <BeforeAfterSlider before={photoA} after={photoB} />
           </div>
         )}
@@ -475,7 +475,7 @@ export default function ProgressPhotos({ onClose }: ProgressPhotosProps) {
             </div>
             <div>
               <p className="font-black text-neutral-400">Nenhuma foto ainda</p>
-              <p className="text-sm text-neutral-600 mt-1">Comece a registrar seu progresso visualmente</p>
+              <p className="text-sm text-neutral-400 mt-1">Comece a registrar seu progresso visualmente</p>
             </div>
             <button
               type="button"

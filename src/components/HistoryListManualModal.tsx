@@ -106,7 +106,7 @@ export function HistoryListManualModal({
                     <button
                         type="button"
                         onClick={onClose}
-                        className="w-8 h-8 rounded-xl border flex items-center justify-center text-neutral-500 hover:text-white hover:border-yellow-500/40 transition-all"
+                        className="w-8 h-8 rounded-xl border flex items-center justify-center text-neutral-400 hover:text-white hover:border-yellow-500/40 transition-all"
                         style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }}
                         aria-label="Voltar"
                         title="Voltar"
@@ -120,14 +120,14 @@ export function HistoryListManualModal({
                         <button
                             type="button"
                             onClick={() => setManualTab('existing')}
-                            className={`flex-1 px-3 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all ${manualTab === 'existing' ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/20' : 'text-neutral-500 hover:text-neutral-300'}`}
+                            className={`flex-1 px-3 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all ${manualTab === 'existing' ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/20' : 'text-neutral-400 hover:text-neutral-300'}`}
                         >
                             Usar Treino
                         </button>
                         <button
                             type="button"
                             onClick={() => setManualTab('new')}
-                            className={`flex-1 px-3 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all ${manualTab === 'new' ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/20' : 'text-neutral-500 hover:text-neutral-300'}`}
+                            className={`flex-1 px-3 py-2 rounded-lg text-xs font-black uppercase tracking-wider transition-all ${manualTab === 'new' ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/20' : 'text-neutral-400 hover:text-neutral-300'}`}
                         >
                             Treino Novo
                         </button>
@@ -136,7 +136,7 @@ export function HistoryListManualModal({
 
                 <div className="p-4 space-y-3 max-h-[70vh] overflow-y-auto">
                     <div>
-                        <div className="text-[10px] uppercase font-bold text-neutral-500">Data e Hora</div>
+                        <div className="text-[10px] uppercase font-bold text-neutral-400">Data e Hora</div>
                         <input
                             aria-label="Data e Hora"
                             type="datetime-local"
@@ -147,7 +147,7 @@ export function HistoryListManualModal({
                         />
                     </div>
                     <div>
-                        <div className="text-[10px] uppercase font-bold text-neutral-500">Duração (min)</div>
+                        <div className="text-[10px] uppercase font-bold text-neutral-400">Duração (min)</div>
                         <input
                             aria-label="Duração (min)"
                             type="number"
@@ -158,7 +158,7 @@ export function HistoryListManualModal({
                         />
                     </div>
                     <div>
-                        <div className="text-[10px] uppercase font-bold text-neutral-500">Notas</div>
+                        <div className="text-[10px] uppercase font-bold text-neutral-400">Notas</div>
                         <textarea
                             aria-label="Notas"
                             value={manualNotes}
@@ -169,7 +169,7 @@ export function HistoryListManualModal({
 
                     {manualTab === 'existing' && (
                         <div className="space-y-2">
-                            <div className="text-[10px] uppercase font-bold text-neutral-500">Selecionar Treino</div>
+                            <div className="text-[10px] uppercase font-bold text-neutral-400">Selecionar Treino</div>
                             <select
                                 aria-label="Selecionar Treino"
                                 value={selectedTemplate?.id || ''}
@@ -199,24 +199,24 @@ export function HistoryListManualModal({
                                             <p className="text-sm font-bold text-white">{ex.name}</p>
                                             <div className="grid grid-cols-4 gap-2">
                                                 <div>
-                                                    <div className="text-[10px] text-neutral-500">Sets</div>
+                                                    <div className="text-[10px] text-neutral-400">Sets</div>
                                                     <input aria-label="Sets" type="number" value={ex.sets} onChange={(e) => updateManualExercise(idx, 'sets', e.target.value)} className="w-full bg-neutral-900 rounded p-2 text-center text-sm" />
                                                 </div>
                                                 <div>
-                                                    <div className="text-[10px] text-neutral-500">Reps</div>
+                                                    <div className="text-[10px] text-neutral-400">Reps</div>
                                                     <input aria-label="Reps" value={ex.reps || ''} onChange={(e) => updateManualExercise(idx, 'reps', e.target.value)} className="w-full bg-neutral-900 rounded p-2 text-center text-sm" />
                                                 </div>
                                                 <div>
-                                                    <div className="text-[10px] text-neutral-500">Cadência</div>
+                                                    <div className="text-[10px] text-neutral-400">Cadência</div>
                                                     <input aria-label="Cadência" value={ex.cadence || ''} onChange={(e) => updateManualExercise(idx, 'cadence', e.target.value)} className="w-full bg-neutral-900 rounded p-2 text-center text-sm" />
                                                 </div>
                                                 <div>
-                                                    <div className="text-[10px] text-neutral-500">Descanso (s)</div>
+                                                    <div className="text-[10px] text-neutral-400">Descanso (s)</div>
                                                     <input aria-label="Descanso (s)" type="number" value={ex.restTime || 0} onChange={(e) => updateManualExercise(idx, 'restTime', e.target.value)} className="w-full bg-neutral-900 rounded p-2 text-center text-sm" />
                                                 </div>
                                             </div>
                                             <div>
-                                                <div className="text-[10px] text-neutral-500">Pesos por série (kg)</div>
+                                                <div className="text-[10px] text-neutral-400">Pesos por série (kg)</div>
                                                 <div className="grid grid-cols-4 gap-2">
                                                     {Array.from({ length: Number(ex.sets) || 0 }).map((_, sIdx) => (
                                                         <input
@@ -224,14 +224,14 @@ export function HistoryListManualModal({
                                                             aria-label={`Peso série ${sIdx + 1}`}
                                                             value={String(ex.weights?.[sIdx] ?? '')}
                                                             onChange={(e) => updateManualExercise(idx, 'weight', [sIdx, e.target.value])}
-                                                            className="w-full bg-neutral-900 rounded p-2 text-center text-sm text-white outline-none focus:ring-1 ring-yellow-500 placeholder:text-neutral-600 placeholder:opacity-40 focus:placeholder:opacity-0"
+                                                            className="w-full bg-neutral-900 rounded p-2 text-center text-sm text-white outline-none focus:ring-1 ring-yellow-500 placeholder:text-neutral-400 placeholder:opacity-40 focus:placeholder:opacity-0"
                                                             placeholder={`#${sIdx + 1}`}
                                                         />
                                                     ))}
                                                 </div>
                                             </div>
                                             <div>
-                                                <div className="text-[10px] text-neutral-500">Reps por série</div>
+                                                <div className="text-[10px] text-neutral-400">Reps por série</div>
                                                 <div className="grid grid-cols-4 gap-2">
                                                     {Array.from({ length: Number(ex.sets) || 0 }).map((_, sIdx) => (
                                                         <input
@@ -239,7 +239,7 @@ export function HistoryListManualModal({
                                                             aria-label={`Reps série ${sIdx + 1}`}
                                                             value={String(ex.repsPerSet?.[sIdx] ?? '')}
                                                             onChange={(e) => updateManualExercise(idx, 'rep', [sIdx, e.target.value])}
-                                                            className="w-full bg-neutral-900 rounded p-2 text-center text-sm text-white outline-none focus:ring-1 ring-yellow-500 placeholder:text-neutral-600 placeholder:opacity-40 focus:placeholder:opacity-0"
+                                                            className="w-full bg-neutral-900 rounded p-2 text-center text-sm text-white outline-none focus:ring-1 ring-yellow-500 placeholder:text-neutral-400 placeholder:opacity-40 focus:placeholder:opacity-0"
                                                             placeholder={`#${sIdx + 1}`}
                                                         />
                                                     ))}
