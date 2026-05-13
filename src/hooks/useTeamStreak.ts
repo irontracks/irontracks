@@ -5,12 +5,17 @@
  * Fetches partner data and computes badge tier (bronze → iron) based
  * on consecutive co-sessions. Used by the community and dashboard pages.
  *
- * @param userId - Current user ID
- * @returns `{ partners: TeamStreakData[], loading, refresh }`
+ * Reescrito em PR-C (REACT19_MIGRATION_PLAN) usando TanStack Query v5.
+ * API pública preservada: `{ streaks, loading, error, refetch }`.
+ *
+ * @param myUserId - Current user ID
+ * @param partnerUserId - Optional filter pra estatísticas com um parceiro específico
+ * @returns `{ streaks, loading, error, refetch }`
  */
 'use client'
-import { useState, useEffect, useCallback } from 'react'
-import { createClient } from '@/utils/supabase/client'
+import { useCallback } from 'react'
+import { useQuery } from '@tanstack/react-query'
+import { useStableSupabaseClient } from '@/hooks/useStableSupabaseClient'
 import { logError } from '@/lib/logger'
 
 export interface TeamStreakData {
@@ -38,64 +43,65 @@ export function getBadgeInfo(count: number) {
  * users appear in the participants JSON array.
  */
 export function useTeamStreak(myUserId: string, partnerUserId?: string | null) {
-    const [streaks, setStreaks] = useState<TeamStreakData[]>([])
-    const [loading, setLoading] = useState(false)
-    const [error, setError] = useState<string | null>(null)
+    const supabase = useStableSupabaseClient()
 
-    const fetch = useCallback(async () => {
-        if (!myUserId) return
-        setLoading(true)
-        setError(null)
-        try {
-            const supabase = createClient()
-            // Fetch all team sessions this user participated in
-            const { data, error: err } = await supabase
-                .from('team_sessions')
-                .select('id, created_at, participants')
-                .filter('participants', 'cs', JSON.stringify([{ uid: myUserId }]))
-                .order('created_at', { ascending: false })
-                .limit(200)
-            if (err) throw err
+    const query = useQuery<TeamStreakData[]>({
+        queryKey: ['team-streak', myUserId, partnerUserId ?? null],
+        enabled: !!myUserId,
+        queryFn: async (): Promise<TeamStreakData[]> => {
+            try {
+                const { data, error } = await supabase
+                    .from('team_sessions')
+                    .select('id, created_at, participants')
+                    .filter('participants', 'cs', JSON.stringify([{ uid: myUserId }]))
+                    .order('created_at', { ascending: false })
+                    .limit(200)
+                if (error) throw error
 
-            const rows = Array.isArray(data) ? data : []
+                const rows = Array.isArray(data) ? data : []
 
-            // Count co-sessions per partner
-            const coSessions: Record<string, { count: number; name: string; lastAt: string | null }> = {}
-            for (const row of rows) {
-                const parts = Array.isArray(row.participants) ? row.participants as Array<Record<string, unknown>> : []
-                for (const p of parts) {
-                    const uid = String(p.uid || p.user_id || '')
-                    if (!uid || uid === myUserId) continue
-                    if (partnerUserId && uid !== partnerUserId) continue
-                    const prev = coSessions[uid]
-                    coSessions[uid] = {
-                        count: (prev?.count ?? 0) + 1,
-                        name: prev?.name || String(p.name || p.display_name || 'Parceiro'),
-                        lastAt: prev?.lastAt ?? (row.created_at ? String(row.created_at) : null),
+                // Count co-sessions per partner
+                const coSessions: Record<string, { count: number; name: string; lastAt: string | null }> = {}
+                for (const row of rows) {
+                    const parts = Array.isArray(row.participants) ? row.participants as Array<Record<string, unknown>> : []
+                    for (const p of parts) {
+                        const uid = String(p.uid || p.user_id || '')
+                        if (!uid || uid === myUserId) continue
+                        if (partnerUserId && uid !== partnerUserId) continue
+                        const prev = coSessions[uid]
+                        coSessions[uid] = {
+                            count: (prev?.count ?? 0) + 1,
+                            name: prev?.name || String(p.name || p.display_name || 'Parceiro'),
+                            lastAt: prev?.lastAt ?? (row.created_at ? String(row.created_at) : null),
+                        }
                     }
                 }
+
+                return Object.entries(coSessions)
+                    .map(([partnerId, d]) => ({
+                        partnerId,
+                        partnerName: d.name,
+                        count: d.count,
+                        lastSessionAt: d.lastAt,
+                        badge: getBadgeInfo(d.count)?.badge ?? null,
+                    }))
+                    .sort((a, b) => b.count - a.count)
+            } catch (e) {
+                logError('useTeamStreak', e)
+                throw e
             }
+        },
+        staleTime: 60_000,
+    })
 
-            const result: TeamStreakData[] = Object.entries(coSessions)
-                .map(([partnerId, d]) => ({
-                    partnerId,
-                    partnerName: d.name,
-                    count: d.count,
-                    lastSessionAt: d.lastAt,
-                    badge: getBadgeInfo(d.count)?.badge ?? null,
-                }))
-                .sort((a, b) => b.count - a.count)
+    const refetch = useCallback(() => {
+        void query.refetch()
+    }, [query])
 
-            setStreaks(result)
-        } catch (e: unknown) {
-            setError('Erro ao carregar streak.')
-            logError('useTeamStreak', e)
-        } finally {
-            setLoading(false)
-        }
-    }, [myUserId, partnerUserId])
-
-    useEffect(() => { fetch() }, [fetch])
-
-    return { streaks, loading, error, refetch: fetch }
+    return {
+        streaks: query.data ?? [],
+        loading: query.isLoading,
+        error: query.error ? 'Erro ao carregar streak.' : null,
+        refetch,
+    }
 }

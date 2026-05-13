@@ -2,8 +2,12 @@
 /**
  * useTeacherPlan
  * Fetches the current teacher's plan status, student count and upgrade eligibility.
+ *
+ * Reescrito em PR-C (REACT19_MIGRATION_PLAN) usando TanStack Query v5.
+ * API pública preservada (TeacherPlanState).
  */
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { apiTeacherBilling } from '@/lib/api/teacher-billing'
 import type { TeacherMyPlanResult, TeacherPlanRow } from '@/lib/api/teacher-billing'
 
@@ -20,34 +24,27 @@ export interface TeacherPlanState {
 }
 
 export function useTeacherPlan(): TeacherPlanState {
-  const [loading, setLoading] = useState(true)
-  const [data, setData] = useState<TeacherMyPlanResult | null>(null)
-  const [error, setError] = useState<string | null>(null)
+  const query = useQuery<TeacherMyPlanResult>({
+    queryKey: ['teacher-plan'],
+    queryFn: () => apiTeacherBilling.getMyPlan(),
+    staleTime: 60_000,
+  })
 
-  const fetch = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const result = await apiTeacherBilling.getMyPlan()
-      setData(result)
-    } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : String(e))
-    } finally {
-      setLoading(false)
-    }
-  }, [])
+  const data = query.data
 
-  useEffect(() => { void fetch() }, [fetch])
+  const refetch = useCallback(() => {
+    void query.refetch()
+  }, [query])
 
   return {
-    loading,
+    loading: query.isLoading,
     plan: (data?.plan as TeacherPlanRow | undefined) ?? null,
     status: data?.status ?? 'active',
     validUntil: data?.valid_until ?? null,
     studentCount: data?.student_count ?? 0,
     maxStudents: data?.max_students ?? 2,
     canAddStudent: data?.can_add_student ?? true,
-    error,
-    refetch: fetch,
+    error: query.error ? (query.error as Error).message : null,
+    refetch,
   }
 }

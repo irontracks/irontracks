@@ -1,10 +1,22 @@
 /**
  * useStudentSubscription — fetches the student's active/pending subscription,
  * teacher info, and latest charge from /api/student/my-subscription.
+ *
+ * Reescrito em PR-C (REACT19_MIGRATION_PLAN) usando TanStack Query v5.
+ * API pública preservada (StudentSubscriptionState).
  */
-import { useCallback, useEffect, useState } from 'react'
+'use client'
+
+import { useCallback } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { apiStudentBilling } from '@/lib/api/student-billing'
 import type { StudentSubscription, StudentCharge } from '@/lib/api/student-billing'
+
+interface StudentSubscriptionResponse {
+  subscription?: StudentSubscription | null
+  teacher?: Record<string, unknown> | null
+  charge?: StudentCharge | null
+}
 
 export interface StudentSubscriptionState {
   loading: boolean
@@ -15,28 +27,23 @@ export interface StudentSubscriptionState {
 }
 
 export function useStudentSubscription(): StudentSubscriptionState {
-  const [loading, setLoading] = useState(true)
-  const [subscription, setSubscription] = useState<StudentSubscription | null>(null)
-  const [teacher, setTeacher] = useState<Record<string, unknown> | null>(null)
-  const [charge, setCharge] = useState<StudentCharge | null>(null)
+  const query = useQuery<StudentSubscriptionResponse>({
+    queryKey: ['student-subscription'],
+    queryFn: () => apiStudentBilling.getMySubscription(),
+    staleTime: 60_000,
+  })
 
-  const fetch = useCallback(async () => {
-    setLoading(true)
-    try {
-      const res = await apiStudentBilling.getMySubscription()
-      setSubscription(res.subscription ?? null)
-      setTeacher(res.teacher ?? null)
-      setCharge(res.charge ?? null)
-    } catch {
-      setSubscription(null)
-      setTeacher(null)
-      setCharge(null)
-    } finally {
-      setLoading(false)
-    }
-  }, [])
+  const data = query.data
 
-  useEffect(() => { void fetch() }, [fetch])
+  const refetch = useCallback(() => {
+    void query.refetch()
+  }, [query])
 
-  return { loading, subscription, teacher, charge, refetch: fetch }
+  return {
+    loading: query.isLoading,
+    subscription: data?.subscription ?? null,
+    teacher: data?.teacher ?? null,
+    charge: data?.charge ?? null,
+    refetch,
+  }
 }

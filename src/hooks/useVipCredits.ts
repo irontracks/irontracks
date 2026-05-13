@@ -3,13 +3,17 @@
  *
  * Tracks per-feature credit usage vs. limits for the current VIP tier.
  * Returns remaining credits for chat, wizard, and insights, along with
- * human-readable labels. Decrements locally on use and re-syncs with
- * the server periodically.
+ * human-readable labels.
+ *
+ * Reescrito em PR-C (REACT19_MIGRATION_PLAN) usando TanStack Query v5.
+ * API pública preservada: `{ credits, loading, error, refresh }`.
  *
  * @returns `{ credits, loading, error, refresh }`
  */
-import { useState, useEffect, useRef, useCallback } from 'react';
-import { logError, logWarn } from '@/lib/logger'
+'use client'
+
+import { useCallback } from 'react'
+import { useQuery } from '@tanstack/react-query'
 
 interface VipCredits {
     chat?: { used: number; limit: number | null; label?: string }
@@ -19,52 +23,34 @@ interface VipCredits {
     [key: string]: unknown
 }
 
+interface VipCreditsResponse {
+    ok?: boolean
+    credits?: VipCredits
+    error?: string
+}
+
 export function useVipCredits() {
-    const [credits, setCredits] = useState<VipCredits | null>(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-
-    const fetchCredits = async (signal?: AbortSignal) => {
-        try {
-            const res = await fetch('/api/user/vip-credits', signal ? { signal } : undefined);
-            const data = await res.json();
-            if (data.ok) {
-                setCredits(data.credits);
-                setError(null);
-            } else {
-                setError(data.error || 'Erro na API');
-            }
-        } catch (err) {
-            if ((err as { name?: string })?.name === 'AbortError') return; // expected on unmount, ignore
-            logError('error', 'Failed to fetch VIP credits', err);
-            setError((err as Error).message);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const controllerRef = useRef<AbortController | null>(null);
-
-    useEffect(() => {
-        const controller = new AbortController();
-        controllerRef.current = controller;
-        fetchCredits(controller.signal).catch((err) => {
-            if ((err as { name?: string })?.name === 'AbortError') return;
-            logWarn('warn', 'useVipCredits: unexpected error', err);
-        });
-        return () => { controller.abort(); controllerRef.current = null; };
-    }, []);
+    const query = useQuery<VipCredits>({
+        queryKey: ['vip-credits'],
+        queryFn: async ({ signal }): Promise<VipCredits> => {
+            const res = await fetch('/api/user/vip-credits', { signal })
+            const data = (await res.json()) as VipCreditsResponse
+            if (!data.ok) throw new Error(data.error || 'Erro na API')
+            return data.credits ?? {}
+        },
+        // Credits podem mudar a qualquer momento (uso AI, etc); 30s é razoável.
+        staleTime: 30_000,
+    })
 
     const refresh = useCallback(() => {
-        // Abort any in-flight refresh before starting a new one
-        controllerRef.current?.abort();
-        const controller = new AbortController();
-        controllerRef.current = controller;
-        fetchCredits(controller.signal).catch((err) => {
-            if ((err as { name?: string })?.name === 'AbortError') return;
-            logWarn('warn', 'useVipCredits.refresh: unexpected error', err);
-        });
-    }, []);
+        // refetch nativo do Query — aborta in-flight + dispara novo fetch
+        void query.refetch()
+    }, [query])
 
-    return { credits, loading, error, refresh };
+    return {
+        credits: query.data ?? null,
+        loading: query.isLoading,
+        error: query.error ? (query.error as Error).message : null,
+        refresh,
+    }
 }
