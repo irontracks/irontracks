@@ -2,41 +2,96 @@
  * @module modalStore
  *
  * Store Zustand pra controle de modais globais do dashboard.
+ * Substitui ~11 useStates que viviam em IronTracksAppClientImpl (REACT_AUDIT.md #20).
  *
- * Substitui ~20 useStates que viviam em IronTracksAppClientImpl.tsx, conforme
- * refactor planejado no REACT_AUDIT.md finding #20. Justificativa:
- *
- * - 20 useStates no god component re-renderizavam toda a árvore a cada toggle.
- * - 20 Contexts seria pior (cada Provider re-renderiza consumers — vide finding #4).
+ * Justificativa (vs Context ou useState local):
+ * - 11 useStates no god component re-renderizavam toda a árvore a cada toggle.
+ * - 11 Contexts seria pior — cada Provider re-renderiza consumers (vide finding #4).
  * - Zustand vive fora da árvore React: `useModalStore(s => s.wizardOpen)` só
  *   re-renderiza quando ESSE slice muda. Crítico em mobile WKWebView.
  *
- * Padrão: cada modal é um slice com `{open: bool, payload?: T}` + `set/close`.
- * Refs (ex: `preCheckinResolveRef` pra Promise-handshake) vivem fora do store
- * — store guarda só estado serializável.
- *
- * Skeleton vazio nesta fase (PR#0). Slices serão adicionados em PR#2.
+ * Convenções:
+ * - Cada modal: `{xxxOpen|xxxPayload, setXxxOpen|setXxxPayload}`.
+ * - Refs/Promises (ex: preCheckinResolveRef) NÃO entram no store — vivem em
+ *   React refs no hook que dispara o handshake.
+ * - Modais retornados por hooks dedicados (useWhatsNew, useSeasonalCampaign,
+ *   useActiveSession.editActive, useActiveSession.preCheckin) NÃO entram aqui —
+ *   ficam no hook que possui a lógica.
  */
 'use client'
 
 import { create } from 'zustand'
 
 interface ModalStoreState {
-  // ─── Slices virão em PR#2. Pra cada modal:
-  //   xxxOpen: boolean
-  //   openXxx: (payload?: T) => void
-  //   closeXxx: () => void
-  //
-  // Slice list planejada:
-  //   - createWizard, expressWorkout, standaloneCardio, nutrition
-  //   - quickViewWorkout, settings, offlineSync, progressPhotos
-  //   - notifCenter, preCheckin, whatsNew, mothersDay
-  //   - import, jsonImport, export, share
-  //   - openStudent, coachPending, completeProfile, editActive
-  //
-  // Por enquanto, store fica vazio (importado mas sem consumers) pra validar
-  // setup de Zustand + tree-shaking + tipos.
-  _placeholder?: never
+  // ─── Boolean toggles ────────────────────────────────────────────────────
+  createWizardOpen: boolean
+  setCreateWizardOpen: (v: boolean) => void
+
+  expressWorkoutOpen: boolean
+  setExpressWorkoutOpen: (v: boolean) => void
+
+  standaloneCardioOpen: boolean
+  setStandaloneCardioOpen: (v: boolean) => void
+
+  nutritionOpen: boolean
+  setNutritionOpen: (v: boolean) => void
+
+  settingsOpen: boolean
+  setSettingsOpen: (v: boolean) => void
+
+  coachPending: boolean
+  setCoachPending: (v: boolean) => void
+
+  showNotifCenter: boolean
+  setShowNotifCenter: (v: boolean) => void
+
+  offlineSyncOpen: boolean
+  setOfflineSyncOpen: (v: boolean) => void
+
+  showProgressPhotos: boolean
+  setShowProgressPhotos: (v: boolean) => void
+
+  // ─── Slices com payload ────────────────────────────────────────────────
+  // Tipagem propositalmente unknown pra evitar deps cíclicas com tipos de domínio;
+  // consumers fazem cast no ponto de uso.
+  quickViewWorkout: unknown | null
+  setQuickViewWorkout: (v: unknown | null) => void
+
+  openStudent: Record<string, unknown> | null
+  setOpenStudent: (v: Record<string, unknown> | null) => void
 }
 
-export const useModalStore = create<ModalStoreState>(() => ({}))
+export const useModalStore = create<ModalStoreState>((set) => ({
+  createWizardOpen: false,
+  setCreateWizardOpen: (v) => set({ createWizardOpen: v }),
+
+  expressWorkoutOpen: false,
+  setExpressWorkoutOpen: (v) => set({ expressWorkoutOpen: v }),
+
+  standaloneCardioOpen: false,
+  setStandaloneCardioOpen: (v) => set({ standaloneCardioOpen: v }),
+
+  nutritionOpen: false,
+  setNutritionOpen: (v) => set({ nutritionOpen: v }),
+
+  settingsOpen: false,
+  setSettingsOpen: (v) => set({ settingsOpen: v }),
+
+  coachPending: false,
+  setCoachPending: (v) => set({ coachPending: v }),
+
+  showNotifCenter: false,
+  setShowNotifCenter: (v) => set({ showNotifCenter: v }),
+
+  offlineSyncOpen: false,
+  setOfflineSyncOpen: (v) => set({ offlineSyncOpen: v }),
+
+  showProgressPhotos: false,
+  setShowProgressPhotos: (v) => set({ showProgressPhotos: v }),
+
+  quickViewWorkout: null,
+  setQuickViewWorkout: (v) => set({ quickViewWorkout: v }),
+
+  openStudent: null,
+  setOpenStudent: (v) => set({ openStudent: v }),
+}))

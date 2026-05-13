@@ -77,6 +77,7 @@ import { useWorkoutWizard } from '@/hooks/useWorkoutWizard'
 import type { WatchDashboard, WatchGym, WatchWorkout } from '@/hooks/useWatchBridge'
 import { DashboardEffects } from './_components/DashboardEffects'
 import { DashboardProviders } from './_components/DashboardProviders'
+import { useModalStore } from '@/lib/state/modalStore'
 
 
 import {
@@ -141,11 +142,19 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
             .catch(() => {})
     }, [user?.id])
     const [currentWorkout, setCurrentWorkout] = useState<ActiveSession | null>(null);
-    const [createWizardOpen, setCreateWizardOpen] = useState(false)
-    const [expressWorkoutOpen, setExpressWorkoutOpen] = useState(false)
-    const [standaloneCardioOpen, setStandaloneCardioOpen] = useState(false)
-    const [nutritionOpen, setNutritionOpen] = useState(false)
-    const [quickViewWorkout, setQuickViewWorkout] = useState<ActiveSession | null>(null);
+    // Modal flags migrados pro Zustand store (PR#2). Cada seletor só re-renderiza
+    // este componente quando ESSE slice muda — antes 11 useStates causavam
+    // re-render global do god component a cada toggle.
+    const createWizardOpen = useModalStore((s) => s.createWizardOpen)
+    const setCreateWizardOpen = useModalStore((s) => s.setCreateWizardOpen)
+    const expressWorkoutOpen = useModalStore((s) => s.expressWorkoutOpen)
+    const setExpressWorkoutOpen = useModalStore((s) => s.setExpressWorkoutOpen)
+    const standaloneCardioOpen = useModalStore((s) => s.standaloneCardioOpen)
+    const setStandaloneCardioOpen = useModalStore((s) => s.setStandaloneCardioOpen)
+    const nutritionOpen = useModalStore((s) => s.nutritionOpen)
+    const setNutritionOpen = useModalStore((s) => s.setNutritionOpen)
+    const quickViewWorkout = useModalStore((s) => s.quickViewWorkout) as ActiveSession | null
+    const setQuickViewWorkout = useModalStore((s) => s.setQuickViewWorkout) as (v: ActiveSession | null) => void
     const [reportData, setReportData] = useState({ current: null, previous: null });
     const mainScrollRef = useRef<HTMLDivElement | null>(null);
     const [reportBackView, setReportBackView] = useState('dashboard');
@@ -181,7 +190,8 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
     // and Live Activity deeplinks — extracted to useNativeTimerActions hook
     useNativeTimerActions({ handleCloseTimer, setActiveSession })
 
-    const [settingsOpen, setSettingsOpen] = useState(false)
+    const settingsOpen = useModalStore((s) => s.settingsOpen)
+    const setSettingsOpen = useModalStore((s) => s.setSettingsOpen)
     const [isCoach, setIsCoach] = useState(false);
     const initialRole = String(initialProfileObj?.role || '').toLowerCase()
     // VIP access & status — extracted to useVipAccess hook
@@ -190,9 +200,12 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         initialRole,
     })
 
-    const [coachPending, setCoachPending] = useState(false);
-    const [openStudent, setOpenStudent] = useState<Record<string, unknown> | null>(null);
-    const [showNotifCenter, setShowNotifCenter] = useState(false);
+    const coachPending = useModalStore((s) => s.coachPending)
+    const setCoachPending = useModalStore((s) => s.setCoachPending)
+    const openStudent = useModalStore((s) => s.openStudent)
+    const setOpenStudent = useModalStore((s) => s.setOpenStudent)
+    const showNotifCenter = useModalStore((s) => s.showNotifCenter)
+    const setShowNotifCenter = useModalStore((s) => s.setShowNotifCenter)
 
     // Profile completion state — extracted to useProfileCompletion hook
     const userSettingsApi = useUserSettings(user?.id)
@@ -266,8 +279,10 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
             ? (userSettingsApi.settings as Record<string, unknown>)
             : null,
     })
-    const [offlineSyncOpen, setOfflineSyncOpen] = useState(false)
-    const [showProgressPhotos, setShowProgressPhotos] = useState(false)
+    const offlineSyncOpen = useModalStore((s) => s.offlineSyncOpen)
+    const setOfflineSyncOpen = useModalStore((s) => s.setOfflineSyncOpen)
+    const showProgressPhotos = useModalStore((s) => s.showProgressPhotos)
+    const setShowProgressPhotos = useModalStore((s) => s.setShowProgressPhotos)
 
     // useState lazy init: createClient() roda 1x. `useRef(createClient()).current`
     // alocava nova instância (com listener storage no window) a cada render — leak.
@@ -626,7 +641,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
             const m = e instanceof Error ? e.message : String(e)
             await alert('Erro: ' + m)
         }
-    }, [alert])
+    }, [alert, setCoachPending])
 
     const handleSelectChannel = useCallback((c: unknown) => {
         const ch = isRecord(c) ? c : {}
@@ -662,7 +677,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         } finally {
             setExpressWorkoutOpen(false)
         }
-    }, [setCurrentWorkout, setView])
+    }, [setCurrentWorkout, setView, setExpressWorkoutOpen])
 
     useEffect(() => {
         if (!hideVipOnIos) return;
