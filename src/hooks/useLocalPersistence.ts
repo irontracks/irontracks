@@ -38,46 +38,43 @@ export function useLocalPersistence({
   activeSession,
 }: UseLocalPersistenceOptions): void {
   // ─── Restore view on mount ────────────────────────────────────────────────
+  // PR#4a: sub-rotas reais existem. URL é source of truth agora.
+  // O restore antigo do localStorage causava LOOP de navegação:
+  //   1. User em /dashboard/admin (salvou appView=admin)
+  //   2. Click "Fechar" → router.push('/dashboard') → re-mount
+  //   3. useLocalPersistence mount lê appView=admin → setView('admin') →
+  //      router.push('/dashboard/admin') → re-mount
+  //   4. ∞ loop (tela piscando entre skeleton/conteúdo)
+  //
+  // Fix: só restaurar 'active' (treino em andamento) quando ESSA é a real
+  // intenção. Outras views vêm da URL — Capacitor preserva URL ao retomar.
   useEffect(() => {
     try {
       if (!userId) return
-      const scopedViewKey = `irontracks.appView.v2.${userId}`
-      const scopedSessionKey = `irontracks.activeSession.v2.${userId}`
+      // Só atua se estamos na raiz /dashboard. Em sub-rotas (/dashboard/admin,
+      // /dashboard/history, etc), URL já indica onde user está — não interferir.
+      if (typeof window !== 'undefined' && window.location.pathname !== '/dashboard') {
+        return
+      }
 
+      const scopedSessionKey = `irontracks.activeSession.v2.${userId}`
       const savedSession = localStorage.getItem(scopedSessionKey)
+      // Único caso onde forçamos navegação: restore-after-crash de treino ativo
+      // (user matou app no meio de sessão e voltou — vai pra /dashboard/active).
       if (savedSession) {
         setView('active')
-        return
       }
-
-      const raw = localStorage.getItem(scopedViewKey) || localStorage.getItem('appView')
-      const savedView = raw ? String(raw) : ''
-      if (!savedView) {
-        setView('dashboard')
-        return
-      }
-
-      // Only restore views that don't require companion state.
-      // 'active' needs activeSession, 'report' needs reportData.current,
-      // 'directChat' needs directChat object — all would render nothing (black screen).
-      const SAFE_VIEWS = new Set([
-        'dashboard', 'history', 'edit', 'assessments',
-        'community', 'vip', 'chat', 'chatList', 'globalChat', 'admin',
-      ])
-      if (!SAFE_VIEWS.has(savedView)) {
-        setView('dashboard')
-        return
-      }
-
-      setView(savedView)
-    } catch {
-      setView('dashboard')
+      // Outros casos: respeitar URL atual. View string legada vai sair em PR futuro.
+    } catch (e) {
+      logWarn('useLocalPersistence', 'restore failed (non-critical)', e)
     }
     // Intentionally only on mount (userId change) — not on every view change
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId])
 
   // ─── Persist current view on every change ────────────────────────────────
+  // Mantido pra compat e debug, mas o valor não é mais usado pra restore.
+  // Pode ser removido em PR futuro quando view: string for migrado completo.
   useEffect(() => {
     try {
       if (!userId) return
