@@ -125,7 +125,9 @@ export function HistoryListEditModal({
 
                     <div className="space-y-2">
                         {editExercises.map((ex, idx) => (
-                            <div key={idx} className="p-3 rounded-xl border space-y-2" style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'rgba(255,255,255,0.06)' }}>
+                            // Key combina nome + index pra preservar identidade quando exercícios
+                            // não tem id estável (são derivados do session.exercises legado).
+                            <div key={`${ex?.name || 'ex'}-${idx}`} className="p-3 rounded-xl border space-y-2" style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'rgba(255,255,255,0.06)' }}>
                                 <p className="text-sm font-bold text-white">{ex.name}</p>
                                 <div className="grid grid-cols-4 gap-2">
                                     <div>

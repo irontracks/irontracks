@@ -65,7 +65,10 @@ function useInputField(externalValue: string, onChange: (v: string) => void) {
   return { value: localValue, handleChange, handleFocus, handleBlur };
 }
 
-export const NormalSet = ({
+// React.memo defensivo. Mesmo consumindo WorkoutContext (que dispara re-render
+// quando muda — agora memoizado, ver useActiveWorkoutController), evita renders
+// quando o pai (ExerciseCard) re-renderizar por outro motivo com as mesmas props.
+const NormalSetInner = ({
   ex,
   exIdx,
   setIdx,
@@ -614,3 +617,7 @@ export const NormalSet = ({
     </div>
   );
 };
+
+export const NormalSet = React.memo(NormalSetInner, (a, b) =>
+  a.ex === b.ex && a.exIdx === b.exIdx && a.setIdx === b.setIdx && a.setsCount === b.setsCount,
+);

@@ -232,8 +232,16 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
                         const setsCount = Math.max(setsFromField, setsFromDetails);
                         const setDetails = ensureSetDetails(exercise, setsCount);
 
+                        // Key estável: prioriza id do exercício; fallback combina nome + index pra
+                        // não perder identidade ao reordenar. `index` puro causava foco "pular" entre
+                        // inputs ao arrastar exercícios.
+                        const stableKey = String(
+                            (exercise as { id?: string; _itx_exKey?: string })?.id
+                            ?? (exercise as { _itx_exKey?: string })?._itx_exKey
+                            ?? `${exercise?.name || 'ex'}-${index}`
+                        );
                         return (
-                            <React.Fragment key={index}>
+                            <React.Fragment key={stableKey}>
                                 <div
                                     className={`bg-neutral-800 p-4 border border-neutral-700 relative group transition-all hover:border-neutral-600 ${linkedFromPrev ? '-mt-4 rounded-t-none border-t-0' : 'rounded-xl'} ${isBiSet && hasNext ? 'rounded-b-none' : ''}`}
                                 >

@@ -247,20 +247,28 @@ export const useReportData = ({ session, previousSession, user, settings }: UseR
 
   // ── Derived values ───────────────────────────────────────────────────────
 
-  const effectivePreviousSession = (() => {
+  const effectivePreviousSession = useMemo(() => {
     if (!previousSession) return resolvedPreviousSession
     const prevUserId = previousSession?.user_id ?? previousSession?.userId ?? previousSession?.student_id ?? previousSession?.studentId ?? null
     if (prevUserId && targetUserId && String(prevUserId) !== String(targetUserId)) return resolvedPreviousSession
     return previousSession
-  })()
+  }, [previousSession, resolvedPreviousSession, targetUserId])
 
   const sessionLogs: Record<string, unknown> = useMemo(
     () => safeSession?.logs && typeof safeSession.logs === 'object' ? (safeSession.logs as Record<string, unknown>) : {},
     [safeSession?.logs]
   )
-  const prevSessionLogs: Record<string, unknown> = effectivePreviousSession?.logs && typeof effectivePreviousSession.logs === 'object' ? (effectivePreviousSession.logs as Record<string, unknown>) : {}
-  const currentVolume = calculateTotalVolume(sessionLogs)
-  const prevVolume = effectivePreviousSession ? calculateTotalVolume(prevSessionLogs) : 0
+  const prevSessionLogs: Record<string, unknown> = useMemo(
+    () => effectivePreviousSession?.logs && typeof effectivePreviousSession.logs === 'object'
+      ? (effectivePreviousSession.logs as Record<string, unknown>)
+      : {},
+    [effectivePreviousSession?.logs]
+  )
+  const currentVolume = useMemo(() => calculateTotalVolume(sessionLogs), [sessionLogs])
+  const prevVolume = useMemo(
+    () => effectivePreviousSession ? calculateTotalVolume(prevSessionLogs) : 0,
+    [effectivePreviousSession, prevSessionLogs]
+  )
   const volumeDelta = prevVolume > 0 ? ((currentVolume - prevVolume) / prevVolume) * 100 : 0
   const durationInMinutes = (Number(safeSession?.totalTime) || 0) / 60
   const outdoorBike = safeSession?.outdoorBike && typeof safeSession.outdoorBike === 'object' ? (safeSession.outdoorBike as AnyObj) : null
@@ -431,7 +439,9 @@ export const useReportData = ({ session, previousSession, user, settings }: UseR
   const reportWeekly = reportMeta?.weekly && typeof reportMeta.weekly === 'object' ? (reportMeta.weekly as AnyObj) : null
   const reportLoadFlags = reportMeta?.loadFlags && typeof reportMeta.loadFlags === 'object' ? (reportMeta.loadFlags as AnyObj) : null
 
-  const prevLogsMap = (() => {
+  // Memoizado: era IIFE executada a cada render. Iterações sobre exercícios
+  // × logs.entries() não são gratuitas no caminho de visualização do report.
+  const prevLogsMap = useMemo(() => {
     try {
       const fromPerExercise = prevByExercise?.logsByExercise && typeof prevByExercise.logsByExercise === 'object'
         ? prevByExercise.logsByExercise : null
@@ -462,16 +472,16 @@ export const useReportData = ({ session, previousSession, user, settings }: UseR
         })
     }
     return out
-  })()
+  }, [prevByExercise?.logsByExercise, effectivePreviousSession, prevSessionLogs])
 
-  const prevBaseMsMap = (() => {
+  const prevBaseMsMap = useMemo(() => {
     try {
       const m = prevByExercise?.baseMsByExercise && typeof prevByExercise.baseMsByExercise === 'object'
         ? prevByExercise.baseMsByExercise : null
       if (m && Object.keys(m).length) return m
     } catch (e) { logWarn('useReportData', 'prevBaseMsMap failed', e) }
     return {}
-  })()
+  }, [prevByExercise?.baseMsByExercise])
 
   // ── Set completion rate ──────────────────────────────────────────────────
   const { setsCompleted, setsPlanned, setCompletionPct } = useMemo(() => {

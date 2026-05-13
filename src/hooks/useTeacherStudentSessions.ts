@@ -26,19 +26,37 @@ type ActiveMap = Record<string, StudentActiveSession>
 export function useTeacherStudentSessions(
   supabase: SupabaseClient | null,
   teacherUserId: string | undefined,
+  /**
+   * Lista opcional de student IDs. Quando passada, filtra a query inicial e o
+   * canal Realtime por `user_id=in.(...)` — reduz spam de UPDATEs em teachers
+   * com muitos alunos (RLS já filtra mas continua entregando todas as linhas
+   * permitidas). Em horários de pico isso é significativo: cada keystroke do
+   * aluno gera UPDATE; sem filtro, todos os alunos triplicam o tráfego.
+   */
+  studentUserIds?: readonly string[],
 ): ActiveMap {
   const [activeMap, setActiveMap] = useState<ActiveMap>({})
   const channelRef = useRef<RealtimeChannel | null>(null)
 
+  // Memoiza o filtro pra não recriar o canal a cada render quando a lista
+  // tem o mesmo conteúdo. Stringify ordenado pra deps estáveis.
+  const filterKey = studentUserIds && studentUserIds.length > 0
+    ? [...studentUserIds].sort().join(',')
+    : ''
+
   useEffect(() => {
     if (!supabase || !teacherUserId) return
     let mounted = true
+    const ids = filterKey ? filterKey.split(',') : null
+    const realtimeFilter = ids ? `user_id=in.(${ids.join(',')})` : undefined
 
     const load = async () => {
       try {
-        const { data, error } = await supabase
+        let query = supabase
           .from('active_workout_sessions')
           .select('user_id, started_at, updated_at, controlled_by, control_status')
+        if (ids) query = query.in('user_id', ids)
+        const { data, error } = await query
 
         if (!mounted) return
         if (error) { logError('useTeacherStudentSessions.load', error); return }
@@ -63,7 +81,12 @@ export function useTeacherStudentSessions(
         .channel(`teacher-student-sessions:${teacherUserId}`)
         .on(
           'postgres_changes',
-          { event: '*', schema: 'public', table: 'active_workout_sessions' },
+          {
+            event: '*',
+            schema: 'public',
+            table: 'active_workout_sessions',
+            ...(realtimeFilter ? { filter: realtimeFilter } : {}),
+          },
           (payload: Record<string, unknown>) => {
             if (!mounted) return
             const ev = String(payload?.eventType ?? '').toUpperCase()
@@ -111,7 +134,7 @@ export function useTeacherStudentSessions(
         }
       } catch (e) { logWarn('useTeacherStudentSessions', 'cleanup failed', { error: String(e) }) }
     }
-  }, [supabase, teacherUserId])
+  }, [supabase, teacherUserId, filterKey])
 
   return activeMap
 }
