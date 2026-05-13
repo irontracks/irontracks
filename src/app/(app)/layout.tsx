@@ -5,6 +5,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { safePgLike } from '@/utils/safePgFilter'
 import OfflineBanner from '@/components/OfflineBanner'
 import { UpdateAvailableBanner } from '@/components/update/UpdateAvailableBanner'
+import { QueryProvider } from './_providers/QueryProvider'
 import React from 'react'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
@@ -16,7 +17,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
     // Admins e Professores sempre têm acesso liberado
     if (role === 'admin' || role === 'teacher') {
-      return children
+      return <QueryProvider>{children}</QueryProvider>
     }
 
     const { data: profile } = await supabase
@@ -84,11 +85,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   }
 
   return (
-    <>
+    <QueryProvider>
       <OfflineBanner />
       {/* UpdateAvailableBanner self-gates to iOS native only via isIosNative() */}
       <UpdateAvailableBanner />
       {children}
-    </>
+    </QueryProvider>
   )
 }

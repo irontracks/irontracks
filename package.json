@@ -71,6 +71,8 @@
     "@supabase/auth-js": "^2.89.0",
     "@supabase/ssr": "^0.8.0",
     "@supabase/supabase-js": "^2.87.3",
+    "@tanstack/react-query": "^5.100.10",
+    "@tanstack/react-query-devtools": "^5.100.10",
     "@tanstack/react-virtual": "^3.13.19",
     "@types/leaflet": "^1.9.21",
     "@upstash/ratelimit": "^2.0.8",
