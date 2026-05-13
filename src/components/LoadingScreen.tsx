@@ -55,13 +55,12 @@ const LoadingScreen = () => {
             {/* Background removed via luminance-as-alpha so the gold mark
                 floats freely over the splash bg with no card edges. */}
             <Image
-                src="/logo-irontracks-transparent.png"
+                src="/logo-irontracks-splash.webp"
                 alt="IronTracks"
-                width={460}
-                height={460}
+                width={1024}
+                height={1024}
                 priority
-                unoptimized
-                sizes="460px"
+                sizes="(max-width: 800px) 90vmin, 800px"
                 className="w-[90vmin] h-[90vmin] max-w-[800px] max-h-[800px] object-contain"
             />
 
