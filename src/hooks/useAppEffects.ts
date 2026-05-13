@@ -125,17 +125,46 @@ export function useAppEffects({
     return () => { clearTimeout(t) }
   }, [authLoading, userId, router])
 
-  // ── Preload common modal chunks 1s after mount ────────────────
+  // ── Preload common modal chunks staggered (idle-priority) ────
+  // Escalonado em 1.5s/2.5s/3.5s/4.5s/5.5s/6.5s pra não competir com bootstrap
+  // (/api/dashboard/bootstrap + /api/gps/gyms + push register no mesmo boot).
+  // Cada slot usa requestIdleCallback quando disponível pra rodar apenas
+  // quando CPU/network estão idle — fallback setTimeout pra Safari/iOS WebView.
   useEffect(() => {
-    const t = setTimeout(() => {
-      void import('@/components/SettingsModal')
-      void import('@/components/dashboard/WorkoutWizardModal')
-      void import('@/components/HistoryList')
-      void import('@/components/ActiveWorkout')
-      void import('@/components/IncomingInviteModal')
-      void import('@/components/InviteAcceptedModal')
-    }, 1000)
-    return () => clearTimeout(t)
+    type IdleWindow = typeof window & {
+      requestIdleCallback?: (cb: () => void, opts?: { timeout?: number }) => number
+      cancelIdleCallback?: (id: number) => void
+    }
+    const w = window as IdleWindow
+    const idleHandles: number[] = []
+    const timeoutHandles: number[] = []
+
+    const schedule = (delayMs: number, run: () => void) => {
+      const t = window.setTimeout(() => {
+        if (typeof w.requestIdleCallback === 'function') {
+          const idle = w.requestIdleCallback(() => { try { run() } catch { } }, { timeout: 2000 })
+          idleHandles.push(idle)
+        } else {
+          try { run() } catch { }
+        }
+      }, delayMs)
+      timeoutHandles.push(t)
+    }
+
+    // Ordem ordenada por probabilidade de uso imediato.
+    schedule(1500, () => { void import('@/components/SettingsModal') })
+    schedule(2500, () => { void import('@/components/dashboard/WorkoutWizardModal') })
+    schedule(3500, () => { void import('@/components/HistoryList') })
+    schedule(4500, () => { void import('@/components/ActiveWorkout') })
+    schedule(5500, () => { void import('@/components/IncomingInviteModal') })
+    schedule(6500, () => { void import('@/components/InviteAcceptedModal') })
+
+    return () => {
+      timeoutHandles.forEach((t) => clearTimeout(t))
+      if (typeof w.cancelIdleCallback === 'function') {
+        idleHandles.forEach((id) => { try { w.cancelIdleCallback!(id) } catch { } })
+      }
+    }
   }, [])
 
   // ── Audio unlock on first user interaction ────────────────────
