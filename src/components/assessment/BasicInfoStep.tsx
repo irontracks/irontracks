@@ -57,7 +57,7 @@ export const BasicInfoStep: React.FC<BasicInfoStepProps> = ({
             type="date"
             value={formData.assessment_date}
             onChange={(e) => handleInputChange('assessment_date', e.target.value)}
-            className={`w-full px-3 py-3 border rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 placeholder:text-neutral-600 text-white bg-neutral-800 ${
+            className={`w-full px-3 py-3 border rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 placeholder:text-neutral-400 text-white bg-neutral-800 ${
               errors.assessment_date ? 'border-red-500' : 'border-neutral-700'
             }`}
             max={new Date().toISOString().split('T')[0]}
@@ -82,11 +82,11 @@ export const BasicInfoStep: React.FC<BasicInfoStepProps> = ({
               value={formData.weight}
               onChange={(e) => handleNumberInput('weight', e.target.value)}
               placeholder="Ex: 75.5"
-              className={`w-full px-3 py-3 pr-12 border rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 placeholder:text-neutral-600 text-white bg-neutral-800 ${
+              className={`w-full px-3 py-3 pr-12 border rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 placeholder:text-neutral-400 text-white bg-neutral-800 ${
                 errors.weight ? 'border-red-500' : 'border-neutral-700'
               }`}
             />
-            <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-neutral-500 text-sm">kg</span>
+            <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-neutral-400 text-sm">kg</span>
           </div>
           {errors.weight && (
             <p className="text-sm text-red-500">{errors.weight}</p>
@@ -108,11 +108,11 @@ export const BasicInfoStep: React.FC<BasicInfoStepProps> = ({
               value={formData.height}
               onChange={(e) => handleNumberInput('height', e.target.value)}
               placeholder="Ex: 175"
-              className={`w-full px-3 py-3 pr-12 border rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 placeholder:text-neutral-600 text-white bg-neutral-800 ${
+              className={`w-full px-3 py-3 pr-12 border rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 placeholder:text-neutral-400 text-white bg-neutral-800 ${
                 errors.height ? 'border-red-500' : 'border-neutral-700'
               }`}
             />
-            <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-neutral-500 text-sm">cm</span>
+            <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-neutral-400 text-sm">cm</span>
           </div>
           {errors.height && (
             <p className="text-sm text-red-500">{errors.height}</p>
@@ -134,11 +134,11 @@ export const BasicInfoStep: React.FC<BasicInfoStepProps> = ({
               value={formData.age}
               onChange={(e) => handleIntegerInput('age', e.target.value)}
               placeholder="Ex: 25"
-              className={`w-full px-3 py-3 pr-12 border rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 placeholder:text-neutral-600 text-white bg-neutral-800 ${
+              className={`w-full px-3 py-3 pr-12 border rounded-xl shadow-sm focus:outline-none focus:ring-2 focus:ring-yellow-500 focus:border-yellow-500 placeholder:text-neutral-400 text-white bg-neutral-800 ${
                 errors.age ? 'border-red-500' : 'border-neutral-700'
               }`}
             />
-            <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-neutral-500 text-sm">anos</span>
+            <span className="absolute right-3 top-1/2 transform -translate-y-1/2 text-neutral-400 text-sm">anos</span>
           </div>
           {errors.age && (
             <p className="text-sm text-red-500">{errors.age}</p>
