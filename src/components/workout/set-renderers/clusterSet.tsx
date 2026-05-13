@@ -163,7 +163,7 @@ const ClusterSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: nu
             <button
               type="button"
               onClick={() => toggleNotes(key)} aria-label="Observações"
-              className={isNotesOpen || hasAnyNote ? 'w-7 h-7 inline-flex items-center justify-center rounded-lg text-yellow-500 bg-yellow-500/10 border border-yellow-500/40' : 'w-7 h-7 inline-flex items-center justify-center rounded-lg text-neutral-500 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'}
+              className={isNotesOpen || hasAnyNote ? 'w-7 h-7 inline-flex items-center justify-center rounded-lg text-yellow-500 bg-yellow-500/10 border border-yellow-500/40' : 'w-7 h-7 inline-flex items-center justify-center rounded-lg text-neutral-400 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'}
             >
               <MessageSquare size={12} />
             </button>
@@ -189,7 +189,7 @@ const ClusterSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: nu
                   updateLog(key, { weight: v, advanced_config: cfg ?? log.advanced_config ?? null });
                 }}
                 placeholder={weightPlaceholder}
-                className="w-24 bg-black/30 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white placeholder:text-neutral-500/70 outline-none focus:ring-1 ring-yellow-500"
+                className="w-24 bg-black/30 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white placeholder:text-neutral-400/70 outline-none focus:ring-1 ring-yellow-500"
               />
               <button
                 type="button"
@@ -268,7 +268,7 @@ const ClusterSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: nu
                 className={
                   canDone
                     ? 'inline-flex items-center justify-center gap-2 min-h-[40px] px-3 py-2 rounded-xl bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 font-black hover:bg-yellow-500/20 hover:border-yellow-500/50 active:scale-95 transition duration-150 sm:w-auto'
-                    : 'inline-flex items-center justify-center gap-2 min-h-[40px] px-3 py-2 rounded-xl bg-neutral-800/40 border border-neutral-800 text-neutral-500 font-bold cursor-not-allowed sm:w-auto'
+                    : 'inline-flex items-center justify-center gap-2 min-h-[40px] px-3 py-2 rounded-xl bg-neutral-800/40 border border-neutral-800 text-neutral-400 font-bold cursor-not-allowed sm:w-auto'
                 }
               >
                 <Check size={16} />
@@ -279,7 +279,7 @@ const ClusterSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: nu
         )}
       </div>
 
-      {!done && !canDone && <div className="pl-12 text-[11px] text-neutral-500 font-semibold">Preencha as reps de todos os blocos para concluir.</div>}
+      {!done && !canDone && <div className="pl-12 text-[11px] text-neutral-400 font-semibold">Preencha as reps de todos os blocos para concluir.</div>}
       {!done && plannedBlocks.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {plannedBlocks.map((planned, idx) => {
@@ -288,7 +288,7 @@ const ClusterSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: nu
               <div key={`${key}-block-${idx}`} className="bg-neutral-900/40 border border-neutral-800 rounded-xl p-3">
                 <div className="flex items-center justify-between gap-2">
                   <div className="text-[10px] uppercase tracking-widest font-bold text-neutral-400">Bloco {idx + 1}</div>
-                  <div className="text-[10px] font-mono text-neutral-500">plan {String(planned)}</div>
+                  <div className="text-[10px] font-mono text-neutral-400">plan {String(planned)}</div>
                 </div>
                 <input
                   inputMode="decimal"
@@ -324,8 +324,8 @@ const ClusterSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: nu
         <div className="space-y-1.5">
           {prevNote && (
             <div className="flex items-start gap-1.5 px-2.5 py-1.5 rounded-lg bg-neutral-900/60 border border-neutral-800">
-              <span className="text-[9px] font-black uppercase tracking-widest text-neutral-600 shrink-0 mt-0.5">Anterior</span>
-              <p className="text-xs text-neutral-500 italic leading-snug">{prevNote}</p>
+              <span className="text-[9px] font-black uppercase tracking-widest text-neutral-400 shrink-0 mt-0.5">Anterior</span>
+              <p className="text-xs text-neutral-400 italic leading-snug">{prevNote}</p>
             </div>
           )}
           <textarea

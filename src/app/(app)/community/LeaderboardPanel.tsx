@@ -52,7 +52,7 @@ export default function LeaderboardPanel({ userId }: { userId: string }) {
     return (
       <div className="p-8 flex flex-col items-center gap-3">
         <Loader2 size={28} className="text-yellow-500 animate-spin" />
-        <div className="text-sm text-neutral-500">Calculando ranking…</div>
+        <div className="text-sm text-neutral-400">Calculando ranking…</div>
       </div>
     )
   }
@@ -60,8 +60,8 @@ export default function LeaderboardPanel({ userId }: { userId: string }) {
   if (!rankings) {
     return (
       <div className="p-8 flex flex-col items-center gap-3 text-center">
-        <Trophy size={28} className="text-neutral-600" />
-        <div className="text-sm text-neutral-500">Siga amigos para ver o ranking.</div>
+        <Trophy size={28} className="text-neutral-400" />
+        <div className="text-sm text-neutral-400">Siga amigos para ver o ranking.</div>
       </div>
     )
   }
@@ -82,7 +82,7 @@ export default function LeaderboardPanel({ userId }: { userId: string }) {
               type="button"
               onClick={() => setCategory(cat)}
               className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all duration-200 ${
-                isActive ? 'text-white' : 'text-neutral-500 hover:text-neutral-300'
+                isActive ? 'text-white' : 'text-neutral-400 hover:text-neutral-300'
               }`}
               style={isActive ? { background: `${c.color}20`, border: `1px solid ${c.color}30` } : { background: 'transparent' }}
             >
@@ -96,7 +96,7 @@ export default function LeaderboardPanel({ userId }: { userId: string }) {
       {/* Ranking List */}
       {currentEntries.length === 0 ? (
         <div className="p-6 text-center">
-          <div className="text-sm text-neutral-500">Nenhum dado esta semana.</div>
+          <div className="text-sm text-neutral-400">Nenhum dado esta semana.</div>
         </div>
       ) : (
         <div>
@@ -156,7 +156,7 @@ export default function LeaderboardPanel({ userId }: { userId: string }) {
                   <div className="text-sm font-black" style={{ color: cfg.color }}>
                     {category === 'volume' ? Math.round(entry.value).toLocaleString('pt-BR') : entry.value}
                   </div>
-                  <div className="text-[9px] text-neutral-600 uppercase tracking-wider">{entry.unit}</div>
+                  <div className="text-[9px] text-neutral-400 uppercase tracking-wider">{entry.unit}</div>
                 </div>
               </div>
             )

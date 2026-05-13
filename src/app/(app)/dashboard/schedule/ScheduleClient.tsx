@@ -373,7 +373,7 @@ export default function SchedulePage() {
           <div className="flex items-center gap-2">
             <Calendar size={20} className="text-yellow-500" />
             <div className="text-right">
-              <div className="text-[10px] uppercase text-neutral-500 font-bold">Coach</div>
+              <div className="text-[10px] uppercase text-neutral-400 font-bold">Coach</div>
               <div className="text-sm font-black tracking-tight">Agenda do Dia</div>
             </div>
           </div>
@@ -382,7 +382,7 @@ export default function SchedulePage() {
         <main className="flex-1 px-4 py-4 pb-[max(env(safe-area-inset-bottom),96px)] space-y-4">
           <section className="flex items-center justify-between gap-3">
             <div>
-              <div className="text-xs font-bold uppercase text-neutral-500 mb-1">Data</div>
+              <div className="text-xs font-bold uppercase text-neutral-400 mb-1">Data</div>
               <input
                 type="date"
                 value={selectedDate}
@@ -412,7 +412,7 @@ export default function SchedulePage() {
             </div>
           ) : safeAppointments.length === 0 ? (
             <div className="mt-4 bg-neutral-800 border border-neutral-700 rounded-2xl px-4 py-6 flex flex-col items-center text-center">
-              <Calendar size={32} className="text-neutral-500 mb-3" />
+              <Calendar size={32} className="text-neutral-400 mb-3" />
               <h2 className="text-base font-bold mb-1">Nenhum agendamento para este dia</h2>
               <p className="text-xs text-neutral-400 mb-4">Aproveite o descanso! ☕</p>
             </div>
@@ -496,7 +496,7 @@ export default function SchedulePage() {
               <form onSubmit={handleSubmitAppointment} className="space-y-4">
                 <div className="grid grid-cols-2 gap-3">
                   <div className="space-y-1">
-                    <label className="text-[11px] font-bold uppercase text-neutral-500">Data</label>
+                    <label className="text-[11px] font-bold uppercase text-neutral-400">Data</label>
                     <input
                       type="date"
                       value={form.date}
@@ -505,7 +505,7 @@ export default function SchedulePage() {
                     />
                   </div>
                   <div className="space-y-1">
-                    <label className="text-[11px] font-bold uppercase text-neutral-500">Hora início</label>
+                    <label className="text-[11px] font-bold uppercase text-neutral-400">Hora início</label>
                     <input
                       type="time"
                       value={form.startTime}
@@ -515,7 +515,7 @@ export default function SchedulePage() {
                   </div>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[11px] font-bold uppercase text-neutral-500">Hora fim (opcional)</label>
+                  <label className="text-[11px] font-bold uppercase text-neutral-400">Hora fim (opcional)</label>
                   <input
                     type="time"
                     value={form.endTime}
@@ -524,7 +524,7 @@ export default function SchedulePage() {
                   />
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[11px] font-bold uppercase text-neutral-500">Aluno</label>
+                  <label className="text-[11px] font-bold uppercase text-neutral-400">Aluno</label>
                   <select
                     value={form.studentId}
                     onChange={e => setForm(prev => ({ ...prev, studentId: e.target.value }))}
@@ -539,7 +539,7 @@ export default function SchedulePage() {
                   </select>
                 </div>
                 <div className="space-y-1">
-                  <label className="text-[11px] font-bold uppercase text-neutral-500">Tipo</label>
+                  <label className="text-[11px] font-bold uppercase text-neutral-400">Tipo</label>
                   <select
                     value={form.type}
                     onChange={e => setForm(prev => ({ ...prev, type: e.target.value as FormState['type'] }))}

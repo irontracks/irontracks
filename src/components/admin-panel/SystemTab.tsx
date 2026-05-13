@@ -281,7 +281,7 @@ export const SystemTab: React.FC = () => {
                 </h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                     <div className="flex flex-col gap-2">
-                        <label htmlFor="sys-student-select" className="text-[11px] font-black uppercase tracking-widest text-neutral-500">Aluno cadastrado</label>
+                        <label htmlFor="sys-student-select" className="text-[11px] font-black uppercase tracking-widest text-neutral-400">Aluno cadastrado</label>
                         <select
                             id="sys-student-select"
                             value={selectedStudentKey}
@@ -298,7 +298,7 @@ export const SystemTab: React.FC = () => {
                         </select>
                     </div>
                     <div className="flex flex-col gap-2">
-                        <label htmlFor="sys-grant-email" className="text-[11px] font-black uppercase tracking-widest text-neutral-500">Email do aluno</label>
+                        <label htmlFor="sys-grant-email" className="text-[11px] font-black uppercase tracking-widest text-neutral-400">Email do aluno</label>
                         <input
                             id="sys-grant-email"
                             aria-label="Email do aluno"
@@ -310,7 +310,7 @@ export const SystemTab: React.FC = () => {
                         />
                     </div>
                     <div className="flex flex-col gap-2">
-                        <label htmlFor="sys-grant-userid" className="text-[11px] font-black uppercase tracking-widest text-neutral-500">user_id do aluno</label>
+                        <label htmlFor="sys-grant-userid" className="text-[11px] font-black uppercase tracking-widest text-neutral-400">user_id do aluno</label>
                         <input
                             id="sys-grant-userid"
                             aria-label="user_id do aluno"
@@ -322,7 +322,7 @@ export const SystemTab: React.FC = () => {
                         />
                     </div>
                     <div className="flex flex-col gap-2">
-                        <label htmlFor="sys-grant-plan" className="text-[11px] font-black uppercase tracking-widest text-neutral-500">Plano da degustação</label>
+                        <label htmlFor="sys-grant-plan" className="text-[11px] font-black uppercase tracking-widest text-neutral-400">Plano da degustação</label>
                         <select
                             id="sys-grant-plan"
                             value={grantPlan}
@@ -336,7 +336,7 @@ export const SystemTab: React.FC = () => {
                         </select>
                     </div>
                     <div className="flex flex-col gap-2">
-                        <label htmlFor="sys-grant-days" className="text-[11px] font-black uppercase tracking-widest text-neutral-500">Dias de degustação</label>
+                        <label htmlFor="sys-grant-days" className="text-[11px] font-black uppercase tracking-widest text-neutral-400">Dias de degustação</label>
                         <input
                             id="sys-grant-days"
                             aria-label="Dias de degustação"
@@ -418,7 +418,7 @@ export const SystemTab: React.FC = () => {
                     </div>
                 ) : null}
                 <div className="mt-6 flex items-center justify-between gap-3">
-                    <div className="text-xs uppercase tracking-widest text-neutral-500 font-bold">Histórico</div>
+                    <div className="text-xs uppercase tracking-widest text-neutral-400 font-bold">Histórico</div>
                     <button
                         type="button"
                         onClick={loadGrantHistory}

@@ -467,7 +467,7 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
                   {icon}
                   <div className="text-xs font-black text-white uppercase tracking-wider">{label}</div>
                 </div>
-                <div className="text-[11px] text-neutral-500">{sub}</div>
+                <div className="text-[11px] text-neutral-400">{sub}</div>
               </button>
             ))}
           </div>
@@ -516,7 +516,7 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
             <button
               type="button"
               onClick={() => setMessages([])}
-              className="w-9 h-9 rounded-xl flex items-center justify-center text-neutral-500 hover:text-red-400 transition-all active:scale-95"
+              className="w-9 h-9 rounded-xl flex items-center justify-center text-neutral-400 hover:text-red-400 transition-all active:scale-95"
               style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.06)' }}
               aria-label="Limpar conversa"
             >
@@ -542,7 +542,7 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
                 : { background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }
               }
             >
-              <div className={`text-[11px] font-black ${mode === m.key ? 'text-yellow-400' : 'text-neutral-500'}`}>{m.label}</div>
+              <div className={`text-[11px] font-black ${mode === m.key ? 'text-yellow-400' : 'text-neutral-400'}`}>{m.label}</div>
             </button>
           ))}
         </div>
@@ -558,7 +558,7 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
                 </div>
               </div>
               <p className="text-sm font-bold text-neutral-300">Olá{name ? `, ${name.split(' ')[0]}` : ''}! 👋</p>
-              <p className="text-xs mt-1.5 text-neutral-600 max-w-xs mx-auto">
+              <p className="text-xs mt-1.5 text-neutral-400 max-w-xs mx-auto">
                 Sou seu Iron Coach com acesso completo aos seus treinos, avaliação física e progressão. Como posso ajudar?
               </p>
               {/* Data sources indicator */}
@@ -672,7 +672,7 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
           {/* Presets */}
           <div className="flex gap-1.5 mb-3 overflow-x-auto pb-1 no-scrollbar">
             {presets.map((p) => (
-              <button key={p} onClick={() => setDraft(p)} className="whitespace-nowrap px-3 py-1.5 rounded-lg text-[11px] font-bold text-neutral-500 hover:text-yellow-400 transition-all active:scale-[0.97]" style={{ background: 'rgba(234,179,8,0.04)', border: '1px solid rgba(234,179,8,0.1)' }}>
+              <button key={p} onClick={() => setDraft(p)} className="whitespace-nowrap px-3 py-1.5 rounded-lg text-[11px] font-bold text-neutral-400 hover:text-yellow-400 transition-all active:scale-[0.97]" style={{ background: 'rgba(234,179,8,0.04)', border: '1px solid rgba(234,179,8,0.1)' }}>
                 {p}
               </button>
             ))}
@@ -686,7 +686,7 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
               onKeyDown={(e) => e.key === 'Enter' && send()}
               placeholder="Pergunte ao Iron Coach..."
               aria-label="Mensagem para o Coach IA"
-              className="flex-1 rounded-xl px-4 py-3 text-sm text-white placeholder:text-neutral-600 focus:outline-none transition-all input-premium-focus"
+              className="flex-1 rounded-xl px-4 py-3 text-sm text-white placeholder:text-neutral-400 focus:outline-none transition-all input-premium-focus"
               style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(234,179,8,0.12)' }}
             />
             <button

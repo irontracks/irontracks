@@ -105,8 +105,8 @@ const StudentEvolution = ({ user, onClose }: StudentEvolutionProps) => {
                 <button type="button" onClick={onClose} className="px-3 py-2 rounded-xl border text-neutral-400 hover:text-white hover:border-yellow-500/40 transition-all active:scale-95 inline-flex items-center gap-2" style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }}><ArrowLeft className="w-4 h-4" /><span className="text-xs font-bold">Voltar</span></button>
             </div>
             <div className="flex p-1 rounded-2xl mb-8" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.06)' }}>
-                <button type="button" onClick={() => setMode('simple')} className={`cursor-pointer relative z-10 flex-1 py-3 rounded-xl font-black text-xs uppercase tracking-widest transition-all ${mode === 'simple' ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/20' : 'text-neutral-500 hover:text-neutral-300'}`}>Resumo</button>
-                <button type="button" onClick={() => setMode('complete')} className={`cursor-pointer relative z-10 flex-1 py-3 rounded-xl font-black text-xs uppercase tracking-widest transition-all ${mode === 'complete' ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/20' : 'text-neutral-500 hover:text-neutral-300'}`}>Detalhado</button>
+                <button type="button" onClick={() => setMode('simple')} className={`cursor-pointer relative z-10 flex-1 py-3 rounded-xl font-black text-xs uppercase tracking-widest transition-all ${mode === 'simple' ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/20' : 'text-neutral-400 hover:text-neutral-300'}`}>Resumo</button>
+                <button type="button" onClick={() => setMode('complete')} className={`cursor-pointer relative z-10 flex-1 py-3 rounded-xl font-black text-xs uppercase tracking-widest transition-all ${mode === 'complete' ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/20' : 'text-neutral-400 hover:text-neutral-300'}`}>Detalhado</button>
             </div>
             {mode === 'simple' && (
                 <div className="text-center py-10">
@@ -135,9 +135,9 @@ const StudentEvolution = ({ user, onClose }: StudentEvolutionProps) => {
                                 <div key={key} className="py-4 last:border-0" style={{ borderBottom: '1px solid rgba(255,255,255,0.04)' }}>
                                     <div className="flex justify-between items-center mb-2">
                                         <span className="font-mono text-neutral-400">{formatDate(obj?.date as string | number | Date | null)}</span>
-                                        <div className="text-right"><span className="font-black text-xl text-white block">{String(obj?.bf ?? '-')}%</span><span className="text-[10px] text-neutral-500 uppercase">Gordura</span></div>
+                                        <div className="text-right"><span className="font-black text-xl text-white block">{String(obj?.bf ?? '-')}%</span><span className="text-[10px] text-neutral-400 uppercase">Gordura</span></div>
                                     </div>
-                                    <div className="grid grid-cols-4 gap-2 text-[10px] text-neutral-500 p-2 rounded-xl" style={{ background: 'rgba(255,255,255,0.02)' }}>
+                                    <div className="grid grid-cols-4 gap-2 text-[10px] text-neutral-400 p-2 rounded-xl" style={{ background: 'rgba(255,255,255,0.02)' }}>
                                         <div className="text-center"><span className="block font-bold text-white">{String(obj?.weight || '-')}kg</span>Peso</div>
                                         <div className="text-center"><span className="block font-bold text-white">{String(obj?.waist || '-')}cm</span>Cintura</div>
                                         <div className="text-center"><span className="block font-bold text-white">{String(obj?.arm || '-')}cm</span>Braço</div>
@@ -149,7 +149,7 @@ const StudentEvolution = ({ user, onClose }: StudentEvolutionProps) => {
                         </div>
                         <div className="p-6 rounded-2xl border" style={{ background: 'linear-gradient(160deg, rgba(20,18,10,0.8) 0%, rgba(12,12,12,0.95) 50%)', borderColor: 'rgba(255,255,255,0.06)' }}>
                             <h3 className="text-[10px] font-black mb-6 text-yellow-500/80 uppercase tracking-[0.2em]">Galeria</h3>
-                        {safePhotos.length === 0 && <p className="text-neutral-500 text-sm">Nenhuma foto.</p>}
+                        {safePhotos.length === 0 && <p className="text-neutral-400 text-sm">Nenhuma foto.</p>}
                         <div className="grid grid-cols-2 gap-3">
                             {safePhotos.map((p, idx) => {
                                 const pobj = (p || {}) as Record<string, unknown>;
@@ -160,7 +160,7 @@ const StudentEvolution = ({ user, onClose }: StudentEvolutionProps) => {
                                         {url ? (
                                             <Image src={url} alt="Foto de progresso" fill className="object-cover" sizes="(max-width: 768px) 50vw, 33vw" />
                                         ) : (
-                                            <div className="absolute inset-0 flex items-center justify-center text-neutral-500 text-xs">Sem imagem</div>
+                                            <div className="absolute inset-0 flex items-center justify-center text-neutral-400 text-xs">Sem imagem</div>
                                         )}
                                         <div className="absolute bottom-0 inset-x-0 bg-black/60 p-2 text-[10px] text-center text-white">{formatDate(pobj?.date as string | number | Date | null)}</div>
                                     </div>

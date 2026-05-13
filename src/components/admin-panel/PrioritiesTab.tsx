@@ -119,7 +119,7 @@ const ItemCard: React.FC<ItemCardProps> = ({ item, isActioning, onDone, onSnooze
                     </div>
                     <span className="text-white font-bold text-sm truncate">{item.student_name || '—'}</span>
                 </div>
-                <span className="text-[11px] text-neutral-500 whitespace-nowrap shrink-0 pt-0.5">
+                <span className="text-[11px] text-neutral-400 whitespace-nowrap shrink-0 pt-0.5">
                     {formatLastWorkout(item.last_workout_at)}
                 </span>
             </div>
@@ -157,7 +157,7 @@ const ItemCard: React.FC<ItemCardProps> = ({ item, isActioning, onDone, onSnooze
                     Feito
                 </button>
                 {isActioning && (
-                    <span className="text-xs text-neutral-500 animate-pulse">Salvando…</span>
+                    <span className="text-xs text-neutral-400 animate-pulse">Salvando…</span>
                 )}
             </div>
         </div>
@@ -196,7 +196,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, loading, error,
                     onChange={(e) => onChange(key, Number(e.target.value))}
                     className="w-24 bg-neutral-800 border border-neutral-700 rounded-lg px-3 py-1.5 text-white text-sm font-mono focus:outline-none focus:border-yellow-500/60"
                 />
-                <span className="text-xs text-neutral-500">{hint}</span>
+                <span className="text-xs text-neutral-400">{hint}</span>
             </div>
         </label>
     );
@@ -205,7 +205,7 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, loading, error,
         <div className="bg-neutral-900/70 border border-neutral-800 rounded-xl p-5 space-y-4">
             <div className="flex items-center justify-between mb-1">
                 <h4 className="font-black text-white text-sm">Configurações do Inbox</h4>
-                <button type="button" onClick={onClose} className="text-neutral-500 hover:text-neutral-300">
+                <button type="button" onClick={onClose} className="text-neutral-400 hover:text-neutral-300">
                     <X size={16} />
                 </button>
             </div>
@@ -259,7 +259,7 @@ const ComposeModal: React.FC<ComposeModalProps> = ({ studentName, text, sending,
                     <Send size={16} className="text-yellow-400" />
                     Mensagem para {studentName || 'aluno'}
                 </h4>
-                <button type="button" onClick={onClose} className="text-neutral-500 hover:text-neutral-300">
+                <button type="button" onClick={onClose} className="text-neutral-400 hover:text-neutral-300">
                     <X size={18} />
                 </button>
             </div>
@@ -476,7 +476,7 @@ export const PrioritiesTab: React.FC = () => {
             {/* Items */}
             {!prioritiesLoading && !prioritiesError && (
                 items.length === 0 ? (
-                    <div className="py-12 flex flex-col items-center gap-2 text-neutral-500">
+                    <div className="py-12 flex flex-col items-center gap-2 text-neutral-400">
                         <CheckCheck size={28} />
                         <p className="text-sm font-bold">Tudo certo!</p>
                         <p className="text-xs">Nenhum alerta pendente no momento.</p>

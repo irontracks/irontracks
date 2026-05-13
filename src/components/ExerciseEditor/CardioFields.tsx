@@ -49,7 +49,7 @@ export const CardioFields: React.FC<CardioFieldsProps> = ({
         <>
             <div className="grid grid-cols-2 gap-4">
                 <div>
-                    <div className="text-[10px] text-neutral-500 uppercase font-bold text-center block mb-1">
+                    <div className="text-[10px] text-neutral-400 uppercase font-bold text-center block mb-1">
                         {isBikeOutdoor ? 'Tempo (minutos) (opcional)' : 'Tempo (minutos)'}
                     </div>
                     <input
@@ -147,7 +147,7 @@ export const CardioFields: React.FC<CardioFieldsProps> = ({
                             </div>
                         )}
                         {!hitInvalid && workSec > 0 && (
-                            <div className="mt-2 text-[10px] text-neutral-500 font-mono text-center">
+                            <div className="mt-2 text-[10px] text-neutral-400 font-mono text-center">
                                 Resumo: {config.rounds || '?'} rounds de {workSec}s ativo / {restSec}s descanso
                             </div>
                         )}
@@ -155,13 +155,13 @@ export const CardioFields: React.FC<CardioFieldsProps> = ({
                 )}
 
                 <details className="group">
-                    <summary className="flex items-center gap-2 text-[10px] font-bold text-neutral-500 uppercase cursor-pointer hover:text-yellow-500 transition-colors select-none">
+                    <summary className="flex items-center gap-2 text-[10px] font-bold text-neutral-400 uppercase cursor-pointer hover:text-yellow-500 transition-colors select-none">
                         <span>Parâmetros de Equipamento</span>
                         <span className="group-open:rotate-180 transition-transform">▼</span>
                     </summary>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3 animate-in slide-in-from-top-2 duration-200 bg-neutral-900/30 p-3 rounded-xl">
                         <div>
-                            <div className="text-[10px] text-neutral-500 uppercase font-bold block mb-1">Inclinação (%)</div>
+                            <div className="text-[10px] text-neutral-400 uppercase font-bold block mb-1">Inclinação (%)</div>
                             <input
                                 type="number"
                                 aria-label="Inclinação da esteira em porcentagem"
@@ -172,7 +172,7 @@ export const CardioFields: React.FC<CardioFieldsProps> = ({
                             />
                         </div>
                         <div>
-                            <div className="text-[10px] text-neutral-500 uppercase font-bold block mb-1">Velocidade</div>
+                            <div className="text-[10px] text-neutral-400 uppercase font-bold block mb-1">Velocidade</div>
                             <input
                                 type="number"
                                 step="0.1"
@@ -184,7 +184,7 @@ export const CardioFields: React.FC<CardioFieldsProps> = ({
                             />
                         </div>
                         <div>
-                            <div className="text-[10px] text-neutral-500 uppercase font-bold block mb-1">Carga/Nível</div>
+                            <div className="text-[10px] text-neutral-400 uppercase font-bold block mb-1">Carga/Nível</div>
                             <input
                                 type="number"
                                 aria-label="Carga ou nível de resistência do equipamento"
@@ -195,7 +195,7 @@ export const CardioFields: React.FC<CardioFieldsProps> = ({
                             />
                         </div>
                         <div>
-                            <div className="text-[10px] text-neutral-500 uppercase font-bold block mb-1">FC Alvo (BPM)</div>
+                            <div className="text-[10px] text-neutral-400 uppercase font-bold block mb-1">FC Alvo (BPM)</div>
                             <input
                                 type="number"
                                 aria-label="Frequência cardíaca alvo em BPM"

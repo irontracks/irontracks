@@ -492,7 +492,7 @@ export default function MarketplaceClient() {
                     <p className="text-xs text-neutral-400 font-medium mt-0.5">{tier.tagline}</p>
                   </div>
                 </div>
-                <ChevronRight className="text-neutral-600 group-hover:text-white transition-colors" />
+                <ChevronRight className="text-neutral-400 group-hover:text-white transition-colors" />
               </div>
             </button>
           )
@@ -533,9 +533,9 @@ export default function MarketplaceClient() {
             onClick={() => setBillingCycle('month')}
             className={`relative p-4 rounded-2xl border text-left transition-all ${billingCycle === 'month' ? `bg-neutral-900 ${tier.border} shadow-lg` : 'bg-neutral-900/30 border-neutral-800 hover:bg-neutral-900'}`}
           >
-            <div className="text-xs font-bold text-neutral-500 uppercase tracking-wider mb-1">Mensal</div>
+            <div className="text-xs font-bold text-neutral-400 uppercase tracking-wider mb-1">Mensal</div>
             <div className="text-xl font-black text-white">{formatMoney(monthlyPrice)}</div>
-            <div className="text-[10px] text-neutral-500 mt-1">Cobrado todo mês</div>
+            <div className="text-[10px] text-neutral-400 mt-1">Cobrado todo mês</div>
           </button>
 
           {!isIosNative ? (
@@ -546,9 +546,9 @@ export default function MarketplaceClient() {
               <div className="absolute -top-3 right-4 bg-green-500 text-black text-[10px] font-black px-2 py-0.5 rounded-full">
                 ECONOMIZE 17%
               </div>
-              <div className="text-xs font-bold text-neutral-500 uppercase tracking-wider mb-1">Anual</div>
+              <div className="text-xs font-bold text-neutral-400 uppercase tracking-wider mb-1">Anual</div>
               <div className="text-xl font-black text-white">{formatMoney(yearlyMonthlyEquivalent)}</div>
-              <div className="text-[10px] text-neutral-500 mt-1">Cobrado {formatMoney(yearlyPrice)}/ano</div>
+              <div className="text-[10px] text-neutral-400 mt-1">Cobrado {formatMoney(yearlyPrice)}/ano</div>
             </button>
           ) : null}
         </div>
@@ -610,10 +610,10 @@ export default function MarketplaceClient() {
             <div className="p-5 space-y-4">
               <div className="flex items-center justify-between bg-neutral-950 p-4 rounded-2xl border border-neutral-800">
                 <div>
-                  <div className="text-xs font-bold uppercase tracking-wider text-neutral-500 mb-1">{selectedPlan.name}</div>
+                  <div className="text-xs font-bold uppercase tracking-wider text-neutral-400 mb-1">{selectedPlan.name}</div>
                   <div className="text-2xl font-black text-white">{formatMoney(selectedPlan.price_cents)}</div>
                 </div>
-                <div className="text-right text-xs text-neutral-500 bg-neutral-900 px-3 py-1 rounded-lg border border-neutral-800">
+                <div className="text-right text-xs text-neutral-400 bg-neutral-900 px-3 py-1 rounded-lg border border-neutral-800">
                   {selectedPlan.interval === 'year' ? 'Anual' : 'Mensal'}
                 </div>
               </div>
@@ -713,7 +713,7 @@ export default function MarketplaceClient() {
                     <button
                       type="button"
                       onClick={cancelPendingAttempt}
-                      className="w-full text-center text-xs font-bold text-neutral-500 hover:text-white underline py-2"
+                      className="w-full text-center text-xs font-bold text-neutral-400 hover:text-white underline py-2"
                     >
                       Cancelar tentativa pendente
                     </button>
