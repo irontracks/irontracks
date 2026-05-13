@@ -31,6 +31,8 @@
     "cap:open:android": "npx cap open android",
     "ios:release": "bash scripts/ios-release.sh",
     "ios:submit": "node scripts/ios-submit.mjs",
+    "android:release": "bash scripts/android-release.sh",
+    "android:submit": "node scripts/android-submit.mjs",
     "analyze": "ANALYZE=true npm run build",
     "e2e": "playwright test",
     "e2e:ui": "playwright test --ui",
