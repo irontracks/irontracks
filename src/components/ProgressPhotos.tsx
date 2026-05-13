@@ -210,7 +210,7 @@ function UploadModal({ onClose, onUploaded }: UploadModalProps) {
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-neutral-800">
           <p className="font-black text-white">Nova foto de progresso</p>
-          <button type="button" onClick={onClose} className="w-8 h-8 rounded-full bg-neutral-800 flex items-center justify-center text-neutral-400 hover:text-white" aria-label="Voltar" title="Voltar">
+          <button type="button" onClick={onClose} className="min-w-[44px] min-h-[44px] rounded-full bg-neutral-800 flex items-center justify-center text-neutral-400 hover:text-white" aria-label="Voltar" title="Voltar">
             <ArrowLeft size={14} />
           </button>
         </div>

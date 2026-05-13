@@ -274,7 +274,7 @@ const InviteManager = ({ isOpen, onClose, onInvite }: InviteManagerProps) => {
                         <UserPlus size={16} />
                         Convidar Parceiro
                     </h3>
-                    <button onClick={onClose} className="w-8 h-8 rounded-xl border flex items-center justify-center text-neutral-500 hover:text-white hover:border-yellow-500/40 transition-all" style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }}>
+                    <button onClick={onClose} className="min-w-[44px] min-h-[44px] rounded-xl border flex items-center justify-center text-neutral-500 hover:text-white hover:border-yellow-500/40 transition-all" style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }} aria-label="Fechar convite de parceiro" title="Fechar">
                         <X size={16} />
                     </button>
                 </div>
