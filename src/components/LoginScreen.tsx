@@ -64,9 +64,21 @@ function GoldParticles() {
     }
     animRef.current = requestAnimationFrame(animate)
 
+    // Pausa o RAF quando aba/app sai de foreground — economiza CPU/bateria.
+    // Crucial em Capacitor WebView (iOS continua executando JS em background).
+    const onVisibility = () => {
+      if (document.hidden) {
+        cancelAnimationFrame(animRef.current)
+      } else {
+        animRef.current = requestAnimationFrame(animate)
+      }
+    }
+    document.addEventListener('visibilitychange', onVisibility)
+
     return () => {
       cancelAnimationFrame(animRef.current)
       window.removeEventListener('resize', resize)
+      document.removeEventListener('visibilitychange', onVisibility)
     }
   }, [])
 
