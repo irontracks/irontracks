@@ -52,10 +52,24 @@ export function useLocalPersistence({
   useEffect(() => {
     try {
       if (!userId) return
-      // Só atua se estamos na raiz /dashboard. Em sub-rotas (/dashboard/admin,
-      // /dashboard/history, etc), URL já indica onde user está — não interferir.
-      if (typeof window !== 'undefined' && window.location.pathname !== '/dashboard') {
-        return
+      // Atua na raiz /dashboard E em /dashboard/active/* (B-012):
+      //
+      // - /dashboard (root): caminho clássico após login/cold-launch.
+      // - /dashboard/active[/<sessionId>]: user crashou DENTRO do treino ativo
+      //   e Capacitor preservou a URL ao reabrir. Sem o restore, a sub-rota
+      //   tenta hidratar via sessionId da URL — que pode ser stale/órfão — e
+      //   o snapshot do localStorage fica intacto mas inacessível.
+      //
+      // Outras sub-rotas (/dashboard/admin, /dashboard/history, etc) continuam
+      // respeitando a URL pra evitar o loop original (PR#4a).
+      //
+      // Caso já estejamos em /dashboard/active, o setView('active') vira no-op
+      // (IronTracksAppClientImpl linha 164: `if (target === view) return`).
+      if (typeof window !== 'undefined') {
+        const path = window.location.pathname
+        const isDashboardRoot = path === '/dashboard' || path === '/dashboard/'
+        const isActiveRoute = path === '/dashboard/active' || path.startsWith('/dashboard/active/')
+        if (!isDashboardRoot && !isActiveRoute) return
       }
 
       const scopedSessionKey = `irontracks.activeSession.v2.${userId}`
