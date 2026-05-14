@@ -15,7 +15,19 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { SupabaseClient, RealtimeChannel } from '@supabase/supabase-js'
 import { logError, logWarn } from '@/lib/logger'
+import { isIosNative, isAndroidNative } from '@/utils/platform'
 import type { ActiveWorkoutSession } from '@/types/app'
+
+// Runtime feature check: fetch `keepalive` permite que o request continue mesmo
+// se a página for descarregada (suportado em iOS Safari/WKWebView 15+, Chrome,
+// Firefox modernos). Avaliado uma vez no module load — não muda em runtime.
+const FETCH_KEEPALIVE_SUPPORTED: boolean = (() => {
+  try {
+    return typeof Request !== 'undefined' && 'keepalive' in new Request('http://localhost/')
+  } catch {
+    return false
+  }
+})()
 
 const isRecord = (v: unknown): v is Record<string, unknown> =>
   v !== null && typeof v === 'object' && !Array.isArray(v)
@@ -188,6 +200,108 @@ export function useTeacherControl(
   // Cleanup pending save on unmount
   useEffect(() => () => {
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
+  }, [])
+
+  // ─── Force flush on app pause / tab hidden / page hide ─────────────────────
+  //
+  // Espelha a estratégia do useLocalPersistence (PR #104), mas pro lado do
+  // professor. O debounce de 800ms acima é cancelado no unmount — em mobile,
+  // quando o iOS/Android suspende o WebView (professor backgroundou app,
+  // bloqueou tela, trocou de app), o setTimeout pode ser perdido antes de
+  // disparar, e a última edição feita pelo professor NUNCA chega no banco.
+  // O aluno continua vendo o valor velho.
+  //
+  // Fix: escutar lifecycle events e disparar `flushSave` imediato. Como o
+  // endpoint é PATCH + Bearer auth header, `navigator.sendBeacon` não serve
+  // (só faz POST sem headers customizáveis). Usamos `fetch keepalive: true`
+  // como caminho primário — suportado em iOS WKWebView 15+ e permite que
+  // o request termine mesmo após o documento ser descarregado. Fallback é
+  // fetch normal (best-effort).
+  //
+  // Refs garantem que o listener leia os valores mais recentes sem
+  // reagendar a cada mudança.
+  const studentUserIdRef = useRef(studentUserId)
+  const getAuthHeadersRef = useRef(getAuthHeaders)
+  useEffect(() => { studentUserIdRef.current = studentUserId }, [studentUserId])
+  useEffect(() => { getAuthHeadersRef.current = getAuthHeaders }, [getAuthHeaders])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const flushImmediate = () => {
+      const state = sessionRef.current
+      const sid = studentUserIdRef.current
+      if (!state || !sid) return
+
+      // Cancela debounce pendente — não faz sentido disparar de novo em 800ms
+      // se o app pode estar morto até lá.
+      if (saveTimerRef.current) {
+        clearTimeout(saveTimerRef.current)
+        saveTimerRef.current = null
+      }
+
+      // Fire-and-forget. Não dá pra await aqui — o handler de lifecycle
+      // precisa retornar síncrono pra que o browser não pause antes do
+      // request ser enfileirado.
+      ;(async () => {
+        try {
+          const savedAt = Date.now()
+          const patchedState = { ...state, _deviceId: TEACHER_DEVICE_ID, _savedAt: savedAt }
+          const headers = await getAuthHeadersRef.current()
+          const init: RequestInit = {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json', ...headers },
+            body: JSON.stringify({ state: patchedState }),
+          }
+          if (FETCH_KEEPALIVE_SUPPORTED) {
+            init.keepalive = true
+          }
+          // Fire e esquece — o request continua via keepalive mesmo se a
+          // página for descarregada. Erros aqui são best-effort.
+          fetch(`/api/teacher/student-session/${sid}`, init)
+            .then((res) => {
+              if (res.ok) lastTeacherSaveAtRef.current = savedAt
+            })
+            .catch(() => { /* page may already be gone */ })
+        } catch (e) {
+          logWarn('useTeacherControl.flushImmediate', 'flush failed', { error: String(e) })
+        }
+      })()
+    }
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') flushImmediate()
+    }
+    const onPageHide = () => flushImmediate()
+
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    window.addEventListener('pagehide', onPageHide)
+
+    // Capacitor App lifecycle — só carrega dinâmico em mobile pra não
+    // inflar o bundle web. `appStateChange` com isActive=false dispara
+    // ANTES do JS ser pausado pelo iOS, então é o caminho mais cedo.
+    let capListenerHandle: { remove: () => void } | null = null
+    let capListenerCancelled = false
+    if (isIosNative() || isAndroidNative()) {
+      import('@capacitor/app').then(({ App }) => {
+        if (capListenerCancelled) return
+        App.addListener('appStateChange', (state: { isActive?: boolean }) => {
+          if (!state?.isActive) flushImmediate()
+        })
+          .then((h) => {
+            if (capListenerCancelled) { h.remove(); return }
+            capListenerHandle = h
+          })
+          .catch((e) => logWarn('useTeacherControl.flush', 'capacitor listener add failed', { error: String(e) }))
+      }).catch((e) => logWarn('useTeacherControl.flush', 'capacitor import failed', { error: String(e) }))
+    }
+
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+      window.removeEventListener('pagehide', onPageHide)
+      capListenerCancelled = true
+      capListenerHandle?.remove()
+    }
   }, [])
 
   return { session, isLoading, isSaving, sessionEnded, patchState }
