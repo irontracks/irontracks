@@ -102,7 +102,20 @@ export function DashboardHeader({
 
     return (
         <>
-            <div className="bg-neutral-950 flex justify-between items-center fixed top-0 left-0 right-0 z-40 border-b border-zinc-800 px-6 shadow-lg pt-[env(safe-area-inset-top)] min-h-[calc(4rem+env(safe-area-inset-top))] overflow-x-hidden">
+            {/*
+              overflow-x-clip (não -hidden): a spec CSS força overflow-y a se
+              tornar `auto` quando overflow-x é hidden/scroll/auto. Isso
+              CLIPAVA verticalmente o dropdown do HeaderActionsMenu (avatar
+              menu não abria visualmente — o state mudava, mas o painel
+              caía fora do container scrollável invisível do header).
+              overflow-x-clip clipa horizontalmente SEM criar scroll, então
+              overflow-y permanece visible e o dropdown escapa a base do
+              header normalmente. Suporte: iOS 16+, Chrome 90+, Firefox 81+
+              (em iOS 15 cai como `visible` graciosamente — sem clipping
+              mas funcional, e ninguém em prod ainda roda iOS 15 com
+              Capacitor 8).
+            */}
+            <div className="bg-neutral-950 flex justify-between items-center fixed top-0 left-0 right-0 z-40 border-b border-zinc-800 px-6 shadow-lg pt-[env(safe-area-inset-top)] min-h-[calc(4rem+env(safe-area-inset-top))] overflow-x-clip">
                 {/*
                   Logo + VIP badge container. Previously this whole block was a
                   single <button> wrapping the logo AND the VIP <button>, which
