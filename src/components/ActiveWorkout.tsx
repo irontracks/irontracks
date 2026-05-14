@@ -181,12 +181,15 @@ export default function ActiveWorkout(props: ActiveWorkoutProps & { controlledBy
         initial={{ y: '100%' }}
         animate={{ y: isExiting ? '100%' : 0 }}
         transition={{ type: 'spring', damping: 30, stiffness: 300 }}
-        className="fixed inset-0 z-[50] flex flex-col bg-neutral-950 text-white"
+        className="fixed inset-0 z-[50] flex flex-col bg-neutral-950 text-white overflow-x-hidden"
       >
         <WorkoutHeader />
 
-        {/* Scrollable content — sits below the fixed header */}
-        <div className="flex-1 overflow-y-auto">
+        {/* Scrollable content — sits below the fixed header. overflow-x-hidden
+            here as belt + suspenders: even if some descendant (an exercise
+            card, the footer, a long copy line) overshoots the viewport width,
+            it gets clipped instead of letting the modal pan side-to-side. */}
+        <div className="flex-1 overflow-y-auto overflow-x-hidden">
           {/* Teacher control badge — subtle indicator when a teacher is controlling */}
           {props.controlledByName && (
             <div className="bg-indigo-500/10 border-b border-indigo-500/20 px-4 py-2 flex items-center gap-2 text-sm">
