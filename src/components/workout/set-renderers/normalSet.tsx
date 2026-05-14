@@ -374,7 +374,7 @@ const NormalSetInner = ({
           )}
         </div>
         {/* 4-column grid — no notes slot here; notes lives below both rows */}
-        <div className="grid items-center gap-1.5" style={{ gridTemplateColumns: '3fr 2fr 2fr auto' }}>
+        <div className="grid items-center gap-1.5 min-w-0" style={{ gridTemplateColumns: 'minmax(0,3fr) minmax(0,2fr) minmax(0,2fr) 76px' }}>
           {/* Weight */}
           <input
             inputMode="decimal"
@@ -415,7 +415,7 @@ const NormalSetInner = ({
           <button
             type="button"
             onClick={onComplete}
-            className={`inline-flex items-center justify-center gap-1 h-9 px-3 rounded-xl font-black text-xs whitespace-nowrap active:scale-95 transition-all duration-150 ${btnColor}`}
+            className={`inline-flex items-center justify-center gap-1 h-9 w-[76px] rounded-xl font-black text-xs whitespace-nowrap active:scale-95 transition-all duration-150 ${btnColor}`}
           >
             <Check size={13} />
             {sideDone ? '✓' : `${side} ✓`}
@@ -429,25 +429,25 @@ const NormalSetInner = ({
   // what each input means. After the first set, header is hidden to save space.
   const renderUnilateralHeader = () => (
     <div
-      className="grid items-center gap-1.5 px-2.5 text-[9px] uppercase tracking-widest text-neutral-400 font-bold"
-      style={{ gridTemplateColumns: '3fr 2fr 2fr auto' }}
+      className="grid items-center gap-1.5 px-2.5 text-[9px] uppercase tracking-widest text-neutral-400 font-bold min-w-0"
+      style={{ gridTemplateColumns: 'minmax(0,3fr) minmax(0,2fr) minmax(0,2fr) 76px' }}
     >
       <span>Peso (kg)</span>
       <span className="text-center">Reps</span>
       <span className="text-center">RPE</span>
-      <span className="w-14" />
+      <span />
     </div>
   );
   const renderBilateralHeader = () => (
     <div
-      className="grid items-center gap-1.5 px-2.5 text-[9px] uppercase tracking-widest text-neutral-400 font-bold"
-      style={{ gridTemplateColumns: '28px 3fr 2fr 2fr auto' }}
+      className="grid items-center gap-1.5 px-2.5 text-[9px] uppercase tracking-widest text-neutral-400 font-bold min-w-0"
+      style={{ gridTemplateColumns: '28px minmax(0,3fr) minmax(0,2fr) minmax(0,2fr) 76px' }}
     >
       <span />
       <span>Peso (kg)</span>
       <span className="text-center">Reps</span>
       <span className="text-center">RPE</span>
-      <span className="w-14" />
+      <span />
     </div>
   );
 
@@ -491,7 +491,7 @@ const NormalSetInner = ({
           {/* Order: 💬 | peso | reps | rpe | OK
               Notes is FIRST (left side) so it never aligns with footer buttons (DROP etc.) */}
           <div className="grid items-center gap-1.5"
-            style={{ gridTemplateColumns: '28px 3fr 2fr 2fr auto' }}>
+            style={{ gridTemplateColumns: '28px minmax(0,3fr) minmax(0,2fr) minmax(0,2fr) 76px' }}>
 
             {/* Notes toggle — leftmost, far from footer buttons */}
             <button
@@ -548,7 +548,7 @@ const NormalSetInner = ({
               type="button"
               onClick={handleComplete}
               className={[
-                'inline-flex items-center justify-center gap-1 h-9 px-3 rounded-xl font-black text-xs whitespace-nowrap active:scale-95 transition-all duration-150',
+                'inline-flex items-center justify-center gap-1 h-9 w-[76px] rounded-xl font-black text-xs whitespace-nowrap active:scale-95 transition-all duration-150',
                 done
                   ? 'bg-emerald-500 text-black shadow-sm shadow-emerald-500/30'
                   : 'bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 hover:border-yellow-500/40',
