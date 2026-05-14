@@ -108,25 +108,34 @@ export function useAppEffects({
   }, [])
 
   // Grace period: useSessionSync restaura a sessão de forma assíncrona
-  // (localStorage → IDB → server). O safety net abaixo via roda antes do
-  // setActiveSession ser aplicado (state update fica na fila do React no
-  // primeiro render) e reset "active" para "dashboard" erroneamente.
-  // 2 s é suficiente para localStorage (sync), IDB (~100 ms) e server fetch.
+  // (localStorage sync → IDB ~100ms → server ~500-2000ms). O safety net
+  // abaixo NÃO pode rodar antes do restore completar.
+  //
+  // BUG ORIGINAL: o timer começava no MOUNT (t=0). Em cold start, auth pode
+  // demorar 2-4 s — o timer de 2 s expirava antes de userId estar disponível,
+  // e o restore nunca rodava. Safety net via: view='active' + session=null →
+  // reset para dashboard, destruindo o treino em andamento.
+  //
+  // FIX: o timer só começa quando userId fica disponível pela primeira vez.
+  // 4 s cobre: localStorage (sync) + IDB (~100 ms) + server fetch (~2 s).
+  // authLoading=true também bloqueia o safety net como guard adicional.
   const sessionRestoreGraceRef = useRef(true)
   useEffect(() => {
-    const t = setTimeout(() => { sessionRestoreGraceRef.current = false }, 2000)
+    if (!userId) return
+    sessionRestoreGraceRef.current = true
+    const t = setTimeout(() => { sessionRestoreGraceRef.current = false }, 4000)
     return () => clearTimeout(t)
-  }, [])
+  }, [userId])
 
   // ── View safety net — reset to dashboard if companion state is missing ──
   useEffect(() => {
     if (view === 'directChat' && !directChat) { setView('dashboard'); return }
     if (view === 'report' && !reportDataCurrent) { setView('dashboard'); return }
-    // Não resetar 'active' durante o grace period de restore — o
-    // useSessionSync precisa de até 2 s para hidratar activeSession.
-    if (view === 'active' && !activeSession && !sessionRestoreGraceRef.current) { setView('dashboard'); return }
+    // Não resetar 'active' enquanto: (a) auth ainda carregando, ou (b) dentro
+    // do grace period pós-userId — useSessionSync precisa de tempo pra hidratar.
+    if (view === 'active' && !activeSession && !authLoading && !sessionRestoreGraceRef.current) { setView('dashboard'); return }
     if (view === 'profile' && !userId) { setView('dashboard'); return }
-  }, [view, directChat, activeSession, reportDataCurrent, userId, setView])
+  }, [view, directChat, activeSession, reportDataCurrent, userId, authLoading, setView])
 
   // ── Redirect to login when no user ────────────────────────────
   useEffect(() => {

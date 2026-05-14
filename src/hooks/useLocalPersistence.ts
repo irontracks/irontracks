@@ -98,7 +98,17 @@ export function useLocalPersistence({
     } catch (e) { logWarn('useLocalPersistence', 'silenced error', e) }
   }, [view, userId])
 
-  // ─── Persist active session (debounced 250 ms localStorage + 2s IDB) ──────
+  // ─── Persist active session (localStorage imediato + IDB debounced 2s) ─────
+  //
+  // localStorage: escrita IMEDIATA (sem debounce). O debounce anterior de 250ms
+  // criava uma janela de perda: iOS pode matar o WebView a qualquer momento, e
+  // se o app fechasse dentro desse intervalo o dado não estava em disco. A
+  // escrita de localStorage é síncrona e rápida (~1ms) — sem impacto perceptível
+  // mesmo que activeSession mude a cada série completada.
+  //
+  // IDB: debounce de 2s mantido. Escrita assíncrona — debounce reduz churn no
+  // IndexedDB sem risco, pois o flushImmediate() abaixo garante a escrita IDB
+  // na hora que o app vai pra background (independente do timer).
   const idbTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => {
     try {
@@ -107,23 +117,20 @@ export function useLocalPersistence({
       if (!activeSession) {
         localStorage.removeItem(key)
         localStorage.removeItem('activeSession')
-        // Clear IDB too
         clearPersistedSession(userId).catch(() => {})
         if (idbTimerRef.current) { clearTimeout(idbTimerRef.current); idbTimerRef.current = null }
         return
       }
 
       const payload = JSON.stringify({ ...(activeSession || {}), _savedAt: Date.now() })
-      const id = setTimeout(() => {
-        try {
-          localStorage.setItem(key, payload)
-        } catch (e) { logWarn('useLocalPersistence', 'silenced error', e) }
-      }, 250)
 
-      // IDB dual-write (longer debounce to reduce IDB churn).
-      // Captura userId em closure local — se o usuário trocar de conta antes
-      // do timer disparar (improvável mas possível), o callback persiste pra
-      // userId capturado, não pra eventual outro userId que tenha sido setado.
+      // Escrita imediata — sem setTimeout, sem debounce.
+      try {
+        localStorage.setItem(key, payload)
+      } catch (e) { logWarn('useLocalPersistence', 'silenced error', e) }
+
+      // IDB dual-write (debounce reduz churn — async, então é seguro).
+      // Captura userId em closure — protege contra troca de conta antes do timer.
       if (idbTimerRef.current) clearTimeout(idbTimerRef.current)
       const capturedUserId = userId
       idbTimerRef.current = setTimeout(() => {
@@ -131,25 +138,10 @@ export function useLocalPersistence({
         idbTimerRef.current = null
       }, 2000)
 
-      return () => {
-        clearTimeout(id)
-        // INTENCIONALMENTE NÃO cancela o idbTimer no cleanup.
-        //
-        // O cleanup roda quando o usuário fecha/backgrounda o app (regressão
-        // do commit d779330): se cancelássemos, a escrita debounced de 2s
-        // nunca completaria e a sessão ativa seria perdida no próximo
-        // launch. Foi exatamente o bug reportado em prod.
-        //
-        // E o cancel em re-run normal (mudança de activeSession) JÁ é feito
-        // na linha 112 (`clearTimeout(idbTimerRef.current)` antes do novo
-        // setTimeout). Então cleanup-cancel era redundante pra esse caminho
-        // E maléfico no caminho de unmount.
-        //
-        // A proteção "wrong user na troca de conta" — motivação original do
-        // d779330 — segue garantida pelo `capturedUserId` da closure: o
-        // callback persiste pro UID capturado no momento do agendamento,
-        // não pro UID atual.
-      }
+      // Sem return de cleanup para localStorage (escrita já ocorreu).
+      // idbTimerRef INTENCIONALMENTE não é cancelado no cleanup — ver comentário
+      // original: cancel no unmount impedia a escrita IDB de completar quando o
+      // app vai pro background, causando perda de sessão no próximo launch.
     } catch {
       return
     }
