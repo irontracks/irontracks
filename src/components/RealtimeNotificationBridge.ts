@@ -1,6 +1,7 @@
 import { useEffect } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { RealtimeChannel } from '@supabase/supabase-js'
+import { logWarn } from '@/lib/logger'
 
 interface RealtimeNotificationBridgeProps {
   userId: string | number | null
@@ -22,7 +23,8 @@ const RealtimeNotificationBridge = ({ userId, setNotification }: RealtimeNotific
     let supabase: ReturnType<typeof createClient>
     try {
       supabase = createClient()
-    } catch {
+    } catch (e) {
+      logWarn('RealtimeNotificationBridge', 'createClient failed', e)
       return
     }
     let channel: RealtimeChannel | null = null
@@ -82,12 +84,14 @@ const RealtimeNotificationBridge = ({ userId, setNotification }: RealtimeNotific
                   senderName: title,
                   type: rawType || 'broadcast',
                 })
-              } catch {
+              } catch (e) {
+                logWarn('RealtimeNotificationBridge', 'realtime payload parse', e)
                 return
               }
             })
             .subscribe()
-        } catch {
+        } catch (e) {
+          logWarn('RealtimeNotificationBridge', 'channel subscribe failed', e)
           return
         }
       })()
@@ -96,7 +100,8 @@ const RealtimeNotificationBridge = ({ userId, setNotification }: RealtimeNotific
       mounted = false
       try {
         if (channel) supabase.removeChannel(channel)
-      } catch {
+      } catch (e) {
+        logWarn('RealtimeNotificationBridge', 'channel unsubscribe failed', e)
         return
       }
     }

@@ -408,13 +408,46 @@ export function useTeamBroadcast({
             )
             .subscribe()
 
-        // Polling fallback every 5s (catches anything postgres_changes missed)
+        // Polling fallback every 15s (catches anything postgres_changes missed)
         // R9#3: Reduced from 5s to 15s — N users × 5s poll = excessive DB queries
-        const poll = setInterval(loadPersistedMessages, 15_000)
+        // B-010: pausa o poll quando aba está em background (drenava quota Supabase).
+        // Ao voltar pra visible, dispara 1 load imediato pra recuperar mensagens novas.
+        let pollId: ReturnType<typeof setInterval> | null = null
+        const startPoll = () => {
+            if (pollId !== null) return
+            pollId = setInterval(loadPersistedMessages, 15_000)
+        }
+        const stopPoll = () => {
+            if (pollId !== null) {
+                clearInterval(pollId)
+                pollId = null
+            }
+        }
+        const onVisibilityChange = () => {
+            if (typeof document === 'undefined') return
+            if (document.hidden) {
+                stopPoll()
+            } else {
+                loadPersistedMessages()
+                startPoll()
+            }
+        }
+
+        if (typeof document === 'undefined' || !document.hidden) startPoll()
+        try {
+            if (typeof document !== 'undefined') {
+                document.addEventListener('visibilitychange', onVisibilityChange)
+            }
+        } catch { /* SSR guard */ }
 
         return () => {
             supabase.removeChannel(rtChannel)
-            clearInterval(poll)
+            stopPoll()
+            try {
+                if (typeof document !== 'undefined') {
+                    document.removeEventListener('visibilitychange', onVisibilityChange)
+                }
+            } catch { /* SSR guard */ }
         }
     }, [teamSession?.id, user?.id, supabase])
 

@@ -6,7 +6,7 @@ import { createClient } from '@/utils/supabase/client'
 import { useAssessment } from '@/hooks/useAssessment'
 import { generateAssessmentPlanAi } from '@/actions/workout-actions'
 import { getErrorMessage } from '@/utils/errorMessage'
-import { logError } from '@/lib/logger'
+import { logError, logWarn } from '@/lib/logger'
 import { safePg, safePgLike } from '@/utils/safePgFilter'
 
 import {
@@ -159,7 +159,9 @@ export function useAssessmentHistoryData(studentId?: string) {
         setTimeout(() => {
           try {
             planAnchorRefs.current[id]?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-          } catch {}
+          } catch (e) {
+            logWarn('useAssessmentHistoryData', 'scrollIntoView plan anchor failed', e)
+          }
         }, 50)
       } catch (e) {
         const id = String(assessment?.id || '')
@@ -190,7 +192,9 @@ export function useAssessmentHistoryData(studentId?: string) {
         setPlanModalAssessment(assessment)
         setPlanModalOpen(true)
         await handleGenerateAssessmentPlan(assessment, { openDetails: false })
-      } catch {}
+      } catch (e) {
+        logWarn('useAssessmentHistoryData', 'open assessment plan modal failed', e)
+      }
     },
     [handleGenerateAssessmentPlan],
   )
@@ -361,7 +365,9 @@ export function useAssessmentHistoryData(studentId?: string) {
             .lte('completed_at', toIso)
             .order('completed_at', { ascending: true })
           if (!wErr && Array.isArray(data)) rows.push(...data)
-        } catch {}
+        } catch (e) {
+          logWarn('useAssessmentHistoryData', 'fetch workouts by user_id (completed_at) failed', e)
+        }
 
         try {
           const { data, error: wErr } = await supabase
@@ -373,7 +379,9 @@ export function useAssessmentHistoryData(studentId?: string) {
             .lte('completed_at', toIso)
             .order('completed_at', { ascending: true })
           if (!wErr && Array.isArray(data)) rows.push(...data)
-        } catch {}
+        } catch (e) {
+          logWarn('useAssessmentHistoryData', 'fetch workouts by student_id (completed_at) failed', e)
+        }
 
         if (fromDay && toDay) {
           try {
@@ -386,7 +394,9 @@ export function useAssessmentHistoryData(studentId?: string) {
               .lte('date', toDay)
               .order('date', { ascending: true })
             if (!wErr && Array.isArray(data)) rows.push(...data)
-          } catch {}
+          } catch (e) {
+            logWarn('useAssessmentHistoryData', 'fetch workouts by user_id (date) failed', e)
+          }
 
           try {
             const { data, error: wErr } = await supabase
@@ -398,7 +408,9 @@ export function useAssessmentHistoryData(studentId?: string) {
               .lte('date', toDay)
               .order('date', { ascending: true })
             if (!wErr && Array.isArray(data)) rows.push(...data)
-          } catch {}
+          } catch (e) {
+            logWarn('useAssessmentHistoryData', 'fetch workouts by student_id (date) failed', e)
+          }
         }
 
         const byId = new Map<string, AssessmentRow>()
@@ -425,7 +437,9 @@ export function useAssessmentHistoryData(studentId?: string) {
                 const sum = exerciseDurations.reduce<number>((acc: number, v: unknown) => acc + (Number(v) || 0), 0)
                 if (Number.isFinite(sum) && sum > 0) rawSeconds = sum
               }
-            } catch {}
+            } catch (e) {
+              logWarn('useAssessmentHistoryData', 'parse exerciseDurations from notes failed', e)
+            }
           }
           if (!rawSeconds) return
           const seconds = Math.min(rawSeconds, MAX_SESSION_SECONDS)

@@ -259,20 +259,42 @@ export function useTeamInvites({
             .subscribe();
 
         const POLL_MS = 20_000;
-        const pollId = setInterval(() => {
-            try { refetchInvites(); } catch { }
-        }, POLL_MS);
+        // B-010: pausa o poll de 20s quando aba está em background (drenava quota Supabase).
+        // Integra com o handleVisibility existente (que já faz refetch ao retornar) pra
+        // não duplicar listener — pausa o interval em hidden e retoma em visible.
+        let pollId: ReturnType<typeof setInterval> | null = null;
+        const startPoll = () => {
+            if (pollId !== null) return;
+            pollId = setInterval(() => {
+                try { refetchInvites(); } catch { }
+            }, POLL_MS);
+        };
+        const stopPoll = () => {
+            if (pollId !== null) {
+                clearInterval(pollId);
+                pollId = null;
+            }
+        };
 
         const handleVisibility = () => {
             try {
-                if (typeof document !== 'undefined' && document.visibilityState === 'visible') {
+                if (typeof document === 'undefined') return;
+                if (document.visibilityState === 'visible') {
                     refetchInvites();
+                    startPoll();
+                } else {
+                    stopPoll();
                 }
             } catch { }
         };
         const handleFocus = () => {
             try { refetchInvites(); } catch { }
         };
+
+        // Inicia o poll só se já estivermos visíveis.
+        if (typeof document === 'undefined' || document.visibilityState === 'visible') {
+            startPoll();
+        }
 
         try {
             if (typeof document !== 'undefined') document.addEventListener('visibilitychange', handleVisibility);
@@ -288,7 +310,7 @@ export function useTeamInvites({
             } catch {
                 return;
             }
-            try { clearInterval(pollId); } catch { }
+            stopPoll();
             try {
                 if (typeof document !== 'undefined') document.removeEventListener('visibilitychange', handleVisibility);
             } catch { }
@@ -406,9 +428,40 @@ export function useTeamInvites({
                 .subscribe();
         } catch (e) { logError('useTeamInvites.subscribeAccepted', e) }
 
-        const pollId = setInterval(() => {
-            try { pollAccepted(); } catch { }
-        }, 20_000);
+        // B-010: pausa o poll de 20s quando aba está em background (drenava quota Supabase).
+        // Ao voltar pra visible, dispara 1 pollAccepted imediato pra recuperar invites
+        // aceitos durante o background sem esperar o próximo tick.
+        let pollId: ReturnType<typeof setInterval> | null = null;
+        const startPoll = () => {
+            if (pollId !== null) return;
+            pollId = setInterval(() => {
+                try { pollAccepted(); } catch { }
+            }, 20_000);
+        };
+        const stopPoll = () => {
+            if (pollId !== null) {
+                clearInterval(pollId);
+                pollId = null;
+            }
+        };
+        const onVisibilityChange = () => {
+            try {
+                if (typeof document === 'undefined' || !mounted) return;
+                if (document.hidden) {
+                    stopPoll();
+                } else {
+                    pollAccepted();
+                    startPoll();
+                }
+            } catch { }
+        };
+
+        if (typeof document === 'undefined' || !document.hidden) startPoll();
+        try {
+            if (typeof document !== 'undefined') {
+                document.addEventListener('visibilitychange', onVisibilityChange);
+            }
+        } catch { }
 
         try { pollAccepted(); } catch { }
 
@@ -417,7 +470,12 @@ export function useTeamInvites({
             try {
                 if (channel) supabase.removeChannel(channel);
             } catch { }
-            try { clearInterval(pollId); } catch { }
+            stopPoll();
+            try {
+                if (typeof document !== 'undefined') {
+                    document.removeEventListener('visibilitychange', onVisibilityChange);
+                }
+            } catch { }
         };
     }, [supabase, user?.id, teamSession?.id, soundOpts, seenAcceptedInviteIdsRef]);
 

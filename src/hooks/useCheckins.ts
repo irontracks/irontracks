@@ -53,12 +53,11 @@ export const useCheckins = ({
 }: UseCheckinsParams): UseCheckinsReturn => {
   const [checkinsByKind, setCheckinsByKind] = useState<{ pre: AnyObj | null; post: AnyObj | null }>({ pre: null, post: null })
 
+  const id = workoutId ? String(workoutId) : ''
+  const hasActiveQuery = !!id && !!supabase
+
   useEffect(() => {
-    const id = workoutId ? String(workoutId) : ''
-    if (!id || !supabase) {
-      const timer = setTimeout(() => { setCheckinsByKind({ pre: null, post: null }) }, 0)
-      return () => { clearTimeout(timer) }
-    }
+    if (!hasActiveQuery) return
 
     const baseMs = toDateMs(sessionDate) ?? toDateMs(sessionCompletedAt) ?? Date.now()
     const validBaseMs = Number.isFinite(baseMs) ? baseMs : null
@@ -68,7 +67,7 @@ export const useCheckins = ({
     let cancelled = false
     ;(async () => {
       try {
-        const { data } = await supabase
+        const { data } = await supabase!
           .from('workout_checkins')
           .select('kind, energy, mood, soreness, notes, answers, created_at')
           .eq('workout_id', id)
@@ -90,7 +89,7 @@ export const useCheckins = ({
         // Secondary lookup: pre check-in may be linked to planned_workout_id
         if (!next.pre && originWorkoutId && targetUserId && windowStartIso && windowEndIso) {
           try {
-            const { data: preRow } = await supabase
+            const { data: preRow } = await supabase!
               .from('workout_checkins')
               .select('kind, energy, mood, soreness, notes, answers, created_at')
               .eq('user_id', targetUserId)
@@ -106,13 +105,22 @@ export const useCheckins = ({
         }
 
         setCheckinsByKind(next)
-      } catch {
+      } catch (e) {
+        logWarn('useCheckins', 'primary checkin lookup failed', e)
         if (!cancelled) setCheckinsByKind({ pre: null, post: null })
       }
     })()
 
     return () => { cancelled = true }
-  }, [workoutId, originWorkoutId, sessionDate, sessionCompletedAt, supabase, targetUserId])
+  }, [id, hasActiveQuery, originWorkoutId, sessionDate, sessionCompletedAt, supabase, targetUserId])
 
+  // Derived output: when there's no active query (workoutId falsy or supabase
+  // null) return empty state without touching React state. This avoids the
+  // setTimeout(0) + setState dance the previous version used to dodge the
+  // "no setState in effect" rule, and is also why this hook doesn't need
+  // to reset checkinsByKind on workoutId change — the gate happens here.
+  if (!hasActiveQuery) {
+    return { preCheckin: null, postCheckin: null }
+  }
   return { preCheckin: checkinsByKind.pre, postCheckin: checkinsByKind.post }
 }

@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect } from 'react'
+import { useEffect, useRef } from 'react'
 import { isNativePlatform } from '@/utils/platform'
 import { logWarn } from '@/lib/logger'
 
@@ -9,7 +9,16 @@ type PushPermission = { receive: string }
 type PushToken = { value: string }
 type DeviceId = { identifier: string }
 
+// TTL para dedupe do mesmo action ID (ms). Em iOS, WKWebView pode re-entregar
+// o mesmo `pushNotificationActionPerformed` durante cold-launch + warm-launch.
+const ACTION_DEDUPE_TTL_MS = 5000
+
 export function usePushNotifications(userId?: string | null) {
+  // Persiste entre re-mounts (hot reload em dev / re-execução do effect): se
+  // o último action ID for igual ao recebido dentro do TTL, ignorar o dispatch
+  // pra evitar navegação duplicada.
+  const lastActionRef = useRef<{ id: string; at: number } | null>(null)
+
   useEffect(() => {
     if (!isNativePlatform()) return
     if (!userId) return
@@ -111,7 +120,25 @@ export function usePushNotifications(userId?: string | null) {
               const link = data ? String(data.link || '').trim() : ''
               const type = data ? String(data.type || '').trim() : ''
               if (link || type) {
+                // Dedupe: iOS WKWebView pode re-entregar o mesmo action durante
+                // cold-launch + warm-launch. Se o mesmo action ID chegou nos
+                // últimos 5s, skip o dispatch pra evitar navegação duplicada.
+                // Se ID for falsy (raro), pular dedupe e dispatchar sempre.
+                const actionId = notification ? String(notification.id || '').trim() : ''
+                const now = Date.now()
+                const last = lastActionRef.current
+                if (
+                  actionId &&
+                  last &&
+                  last.id === actionId &&
+                  now - last.at < ACTION_DEDUPE_TTL_MS
+                ) {
+                  return
+                }
                 window.dispatchEvent(new CustomEvent('irontracks:push:navigate', { detail: { link, type } }))
+                if (actionId) {
+                  lastActionRef.current = { id: actionId, at: now }
+                }
               }
             } catch (e) {
               logWarn('usePushNotifications', 'pushNotificationActionPerformed error', e)
