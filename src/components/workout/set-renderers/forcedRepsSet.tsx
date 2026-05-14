@@ -104,7 +104,7 @@ const ForcedRepsSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx:
               <p className="text-xs text-neutral-500 italic leading-snug">{prevNote}</p>
             </div>
           )}
-          <textarea value={notesValue} onChange={(e) => updateLog(key, { notes: e?.target?.value ?? '' })} placeholder="Observações da série" rows={2} aria-label="Observações da série" className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500" />
+          <textarea value={notesValue} onChange={(e) => updateLog(key, { notes: e?.target?.value ?? '' })} placeholder="Observações da série" rows={2} aria-label="Observações da série" className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500" />
         </div>
       )}
     </div>

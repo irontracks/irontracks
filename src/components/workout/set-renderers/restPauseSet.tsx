@@ -168,7 +168,7 @@ const RestPauseSetInner = ({
                 onFocus={weightField.onFocus}
                 onBlur={weightField.onBlur}
                 placeholder={weightPlaceholder}
-                className="w-24 bg-black/30 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white placeholder:text-neutral-400/70 outline-none focus:ring-1 ring-yellow-500"
+                className="w-24 bg-black/30 border border-neutral-700 rounded-xl px-3 py-2 text-[16px] text-white placeholder:text-neutral-400/70 outline-none focus:ring-1 ring-yellow-500"
               />
               <button
                 type="button"
@@ -275,7 +275,7 @@ const RestPauseSetInner = ({
             onBlur={notesField.onBlur}
             placeholder="Observações da série"
             rows={2}
-            className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+            className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500"
           />
         </div>
       )}
