@@ -102,7 +102,7 @@ export function DashboardHeader({
 
     return (
         <>
-            <div className="bg-neutral-950 flex justify-between items-center fixed top-0 left-0 right-0 z-40 border-b border-zinc-800 px-6 shadow-lg pt-[env(safe-area-inset-top)] min-h-[calc(4rem+env(safe-area-inset-top))]">
+            <div className="bg-neutral-950 flex justify-between items-center fixed top-0 left-0 right-0 z-40 border-b border-zinc-800 px-6 shadow-lg pt-[env(safe-area-inset-top)] min-h-[calc(4rem+env(safe-area-inset-top))] overflow-x-hidden">
                 {/*
                   Logo + VIP badge container. Previously this whole block was a
                   single <button> wrapping the logo AND the VIP <button>, which
