@@ -747,12 +747,17 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
     // refreshed silently in the background once auth completes).
     const hasCachedWorkouts = Array.isArray(workouts) && workouts.length > 0
     const isDashboardReady = userSettingsApi.loaded; // streakLoading intentionally excluded (secondary data, must not block app)
-    // Three-layer guard: (1) view is not 'active', (2) no active session exists yet,
-    // (3) normal auth + settings loading conditions.
-    // This guarantees the LoadingScreen overlay NEVER covers an active workout.
-    const isAppLoading = view !== 'active' && !activeSession && (
+    // Quando view='active' mas activeSession=null: o WKWebView foi morto pelo iOS
+    // enquanto o app estava em background. A shell nativa preservou a URL
+    // /dashboard/active, mas o JS recomeçou do zero — activeSession ainda não foi
+    // restaurado do localStorage/Supabase. Sem este guard, isAppLoading=false e o
+    // LoadingScreen some, deixando tela preta até o restore completar.
+    // Com o guard: LoadingScreen permanece visível (≤ 2s) até activeSession chegar.
+    // Quando activeSession estiver preenchido, a condição vira false e o treino aparece.
+    const isSessionRestoring = view === 'active' && !activeSession
+    const isAppLoading = isSessionRestoring || (view !== 'active' && !activeSession && (
         (authLoading && !hasCachedWorkouts) || (!user?.id && !hasCachedWorkouts) || !isDashboardReady
-    );
+    ));
 
     const currentWorkoutId = activeSession?.workout?.id;
     let nextWorkout = null;
