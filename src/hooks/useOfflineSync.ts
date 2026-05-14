@@ -115,14 +115,54 @@ export function useOfflineSync({ userId, settings }: UseOfflineSyncOptions = {})
   // always call the latest version without causing listener churn.
   }, []);
 
-  // Auto-flush every 15s if there are pending items
+  // Auto-flush every 15s if there are pending items.
+  // B-008: pausa o interval quando aba fica em background (drenava bateria + dados móveis).
+  // Ao retornar pra visible, dispara 1 flush imediato em vez de esperar próximo tick.
   useEffect(() => {
     if (!userId) return;
     if (!isOnline()) return;
     if ((syncState?.pending || 0) <= 0) return;
-    const t = setInterval(() => { runFlushQueue(); }, 15_000);
-    return () => clearInterval(t);
-  }, [runFlushQueue, syncState?.pending, userId]);
+
+    let intervalId: ReturnType<typeof setInterval> | null = null;
+    const tick = () => { flushRef.current(); };
+    const start = () => {
+      if (intervalId !== null) return;
+      intervalId = setInterval(tick, 15_000);
+    };
+    const stop = () => {
+      if (intervalId !== null) {
+        clearInterval(intervalId);
+        intervalId = null;
+      }
+    };
+    const onVisibilityChange = () => {
+      if (typeof document === 'undefined') return;
+      if (document.hidden) {
+        stop();
+      } else {
+        tick();
+        start();
+      }
+    };
+
+    if (typeof document === 'undefined' || !document.hidden) start();
+    try {
+      if (typeof document !== 'undefined') {
+        document.addEventListener('visibilitychange', onVisibilityChange);
+      }
+    } catch { /* SSR guard */ }
+
+    return () => {
+      stop();
+      try {
+        if (typeof document !== 'undefined') {
+          document.removeEventListener('visibilitychange', onVisibilityChange);
+        }
+      } catch { /* SSR guard */ }
+    };
+  // flushRef é stable ref atualizada a cada render (linha 91), garantindo que o tick
+  // sempre chame a versão mais recente de runFlushQueue sem causar reset do interval.
+  }, [syncState?.pending, userId]);
 
   return { syncState, setSyncState, refreshSyncState, runFlushQueue };
 }

@@ -88,11 +88,16 @@ export function useTeamPresence({ user, supabase, teamSession, teamworkV2Enabled
     }, [supabase, teamSession?.id, teamworkV2Enabled, user?.id]);
 
     // Presence heartbeat
+    // B-009: pausa o heartbeat quando aba está em background (drenava quota Supabase
+    // sem benefício, pois ninguém vê o status). Ao voltar pra visible, faz upsert
+    // imediato pra atualizar last_seen e sinalizar pro server que o usuário voltou.
     useEffect(() => {
         if (!teamworkV2Enabled) return;
         if (!teamSession?.id) return;
         if (!user?.id) return;
         let cancelled = false;
+        let intervalId: ReturnType<typeof setInterval> | null = null;
+
         const upsert = async () => {
             try {
                 await supabase
@@ -104,14 +109,47 @@ export function useTeamPresence({ user, supabase, teamSession, teamworkV2Enabled
             } catch (e) { logWarn("useTeamPresence", "silenced", e)
             }
         };
-        const t = setInterval(() => {
+        const tick = () => {
             if (cancelled) return;
             upsert();
-        }, 15000);
+        };
+        const start = () => {
+            if (intervalId !== null) return;
+            intervalId = setInterval(tick, 15000);
+        };
+        const stop = () => {
+            if (intervalId !== null) {
+                clearInterval(intervalId);
+                intervalId = null;
+            }
+        };
+        const onVisibilityChange = () => {
+            if (typeof document === 'undefined' || cancelled) return;
+            if (document.hidden) {
+                stop();
+            } else {
+                upsert();
+                start();
+            }
+        };
+
+        // Disparo inicial + inicia interval só se já estivermos visíveis.
         upsert();
+        if (typeof document === 'undefined' || !document.hidden) start();
+        try {
+            if (typeof document !== 'undefined') {
+                document.addEventListener('visibilitychange', onVisibilityChange);
+            }
+        } catch { /* SSR guard */ }
+
         return () => {
             cancelled = true;
-            clearInterval(t);
+            stop();
+            try {
+                if (typeof document !== 'undefined') {
+                    document.removeEventListener('visibilitychange', onVisibilityChange);
+                }
+            } catch { /* SSR guard */ }
         };
     }, [presenceStatus, supabase, teamSession?.id, teamworkV2Enabled, user?.id]);
 
