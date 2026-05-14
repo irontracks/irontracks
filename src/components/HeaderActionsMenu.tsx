@@ -1,6 +1,7 @@
 'use client'
 
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import Image from 'next/image'
 import {
   Bell,
@@ -137,7 +138,12 @@ export default function HeaderActionsMenu({
   const [open, setOpen] = useState(false)
   const [cancellingVip, setCancellingVip] = useState(false)
   const [hideVipCtas, setHideVipCtas] = useState(false)
+  const [portalMounted, setPortalMounted] = useState(false)
+  const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({})
+  const openedAtRef = useRef(0)
+  const triggerRef = useRef<HTMLButtonElement>(null)
   useEffect(() => { setHideVipCtas(isIosNative()) }, [])
+  useEffect(() => { setPortalMounted(true) }, [])
 
   useEffect(() => {
     if (!open) return
@@ -149,6 +155,11 @@ export default function HeaderActionsMenu({
   }, [open])
 
   const close = () => setOpen(false)
+  const closeFromBackdrop = () => {
+    // Guard contra ghost clicks do iOS WKWebView (~300ms após abrir)
+    if (Date.now() - openedAtRef.current < 350) return
+    setOpen(false)
+  }
 
   const cancelVip = async () => {
     if (cancellingVip) return
@@ -213,14 +224,25 @@ export default function HeaderActionsMenu({
   }
   const handleClick = () => {
     if (didLongPress.current) { didLongPress.current = false; return }
-    // Short tap ALWAYS opens menu
-    setOpen((v) => !v)
+    const next = !open
+    if (next && triggerRef.current) {
+      const rect = triggerRef.current.getBoundingClientRect()
+      setDropdownStyle({
+        position: 'fixed',
+        right: `${window.innerWidth - rect.right}px`,
+        top: `${rect.bottom + 8}px`,
+        zIndex: 9999,
+      })
+      openedAtRef.current = Date.now()
+    }
+    setOpen(next)
   }
 
   return (
     <div className="relative">
       {/* Story Ring Avatar trigger */}
       <button
+        ref={triggerRef}
         type="button"
         data-tour="header-menu"
         aria-label="Menu"
@@ -269,20 +291,21 @@ export default function HeaderActionsMenu({
         )}
       </button>
 
-      {open && (
+      {open && portalMounted && createPortal(
         <>
-          {/* Backdrop */}
+          {/* Backdrop — fora do stacking context do header, sem clipping */}
           <button
             type="button"
             aria-label="Fechar menu"
-            onClick={close}
-            className="fixed inset-0 z-40"
+            onClick={closeFromBackdrop}
+            style={{ position: 'fixed', inset: 0, zIndex: 9998 }}
           />
 
-          {/* Dropdown panel */}
+          {/* Dropdown panel — portal no document.body, posição calculada via getBoundingClientRect */}
           <div
-            className="absolute right-0 mt-2 w-[min(18rem,calc(100vw-2rem))] z-50 rounded-2xl overflow-hidden animate-dropdown-in"
+            className="w-[min(18rem,calc(100vw-2rem))] rounded-2xl overflow-hidden animate-dropdown-in"
             style={{
+              ...dropdownStyle,
               background: 'linear-gradient(160deg, #161200 0%, #0c0c0c 25%)',
               boxShadow:
                 '0 32px 64px -12px rgba(0,0,0,0.95), 0 0 0 1px rgba(234,179,8,0.18), inset 0 1px 0 rgba(234,179,8,0.22)',
@@ -441,7 +464,8 @@ export default function HeaderActionsMenu({
             {/* Gold shimmer bottom line */}
             <div className="h-px bg-gradient-to-r from-transparent via-yellow-500/20 to-transparent" />
           </div>
-        </>
+        </>,
+        document.body
       )}
     </div>
   )
