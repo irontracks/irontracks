@@ -107,11 +107,24 @@ export function useAppEffects({
     } catch { }
   }, [])
 
+  // Grace period: useSessionSync restaura a sessão de forma assíncrona
+  // (localStorage → IDB → server). O safety net abaixo via roda antes do
+  // setActiveSession ser aplicado (state update fica na fila do React no
+  // primeiro render) e reset "active" para "dashboard" erroneamente.
+  // 2 s é suficiente para localStorage (sync), IDB (~100 ms) e server fetch.
+  const sessionRestoreGraceRef = useRef(true)
+  useEffect(() => {
+    const t = setTimeout(() => { sessionRestoreGraceRef.current = false }, 2000)
+    return () => clearTimeout(t)
+  }, [])
+
   // ── View safety net — reset to dashboard if companion state is missing ──
   useEffect(() => {
     if (view === 'directChat' && !directChat) { setView('dashboard'); return }
     if (view === 'report' && !reportDataCurrent) { setView('dashboard'); return }
-    if (view === 'active' && !activeSession) { setView('dashboard'); return }
+    // Não resetar 'active' durante o grace period de restore — o
+    // useSessionSync precisa de até 2 s para hidratar activeSession.
+    if (view === 'active' && !activeSession && !sessionRestoreGraceRef.current) { setView('dashboard'); return }
     if (view === 'profile' && !userId) { setView('dashboard'); return }
   }, [view, directChat, activeSession, reportDataCurrent, userId, setView])
 

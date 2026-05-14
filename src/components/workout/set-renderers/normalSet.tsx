@@ -198,7 +198,9 @@ const NormalSetInner = ({
         const firstSetOfNext = document.querySelector<HTMLElement>(`[data-set-first="${exIdx + 1}"]`);
         const nextCard = document.querySelector<HTMLElement>(`[data-exercise-idx="${exIdx + 1}"]`);
         const target = firstSetOfNext ?? nextCard;
-        if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        // 'instant' evita o auto-zoom do iOS WKWebView que ocorre com 'smooth'
+        // após um large layout shift (colapso do ExerciseCard via flushSync).
+        if (target) target.scrollIntoView({ behavior: 'instant', block: 'start' });
       } catch { /* silenced */ }
     }, delay);
   };
