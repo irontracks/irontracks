@@ -12,6 +12,7 @@
 'use client'
 import { logWarn } from '@/lib/logger'
 import { persistActiveSession, clearPersistedSession } from '@/lib/offline/activeSessionPersistence'
+import { isIosNative, isAndroidNative } from '@/utils/platform'
 
 import { useEffect, useRef } from 'react'
 import type { ActiveWorkoutSession } from '@/types/app'
@@ -139,4 +140,82 @@ export function useLocalPersistence({
       return
     }
   }, [activeSession, userId])
+
+  // ─── Force flush on app pause / tab hidden / page hide ─────────────────────
+  //
+  // O PR #99 removeu o cancel do idbTimer no cleanup, mas isso só ajuda em
+  // unmounts NORMAIS (mudança de view, troca de conta). Em mobile, quando o
+  // iOS/Android suspende o WebView — usuário trocou de app, deu swipe-up no
+  // home, locked screen — o JS para de rodar imediatamente. Se o debounce de
+  // 250ms (localStorage) ou 2s (IDB) ainda não disparou, a sessão é PERDIDA.
+  //
+  // Fix: escutar lifecycle events e fazer flush SÍNCRONO do localStorage
+  // (sempre completa antes do kill) + best-effort IDB. Padrões cobertos:
+  //   • `visibilitychange` (hidden) — disparado pelo Safari/WKWebView em
+  //     background; mais confiável que pagehide no iOS.
+  //   • `pagehide` — fallback web (Chrome desktop, Firefox).
+  //   • Capacitor `App.appStateChange` — disparado pelo plugin nativo
+  //     antes do JS pausar; é o caminho mais cedo em iOS/Android nativo.
+  //
+  // O activeSession e userId são acessados via ref pra que o listener
+  // sempre veja o valor mais recente sem reagendar a cada mudança.
+  const activeSessionRef = useRef(activeSession)
+  const userIdRef = useRef(userId)
+  useEffect(() => { activeSessionRef.current = activeSession }, [activeSession])
+  useEffect(() => { userIdRef.current = userId }, [userId])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const flushImmediate = () => {
+      const s = activeSessionRef.current
+      const uid = userIdRef.current
+      if (!s || !uid) return
+      try {
+        const key = `irontracks.activeSession.v2.${uid}`
+        const payload = JSON.stringify({ ...(s as object), _savedAt: Date.now() })
+        localStorage.setItem(key, payload)
+      } catch (e) {
+        logWarn('useLocalPersistence.flush', 'localStorage flush failed', e)
+      }
+      // Best-effort IDB persist. Em iOS nativo isso dispara `nativeKvSet`
+      // via Capacitor bridge — pode ou não completar antes do kill, mas
+      // localStorage acima já garantiu o caminho síncrono.
+      persistActiveSession(uid, s as unknown as Record<string, unknown>).catch(() => {})
+    }
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') flushImmediate()
+    }
+    const onPageHide = () => flushImmediate()
+
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    window.addEventListener('pagehide', onPageHide)
+
+    // Capacitor App lifecycle — só carrega dinâmico em mobile pra não
+    // inflar o bundle web. `appStateChange` dispara com isActive=false
+    // ANTES do JS ser pausado pelo iOS, então é o caminho mais cedo.
+    let capListenerHandle: { remove: () => void } | null = null
+    let capListenerCancelled = false
+    if (isIosNative() || isAndroidNative()) {
+      import('@capacitor/app').then(({ App }) => {
+        if (capListenerCancelled) return
+        App.addListener('appStateChange', (state: { isActive?: boolean }) => {
+          if (!state?.isActive) flushImmediate()
+        })
+          .then((h) => {
+            if (capListenerCancelled) { h.remove(); return }
+            capListenerHandle = h
+          })
+          .catch((e) => logWarn('useLocalPersistence.flush', 'capacitor listener add failed', e))
+      }).catch((e) => logWarn('useLocalPersistence.flush', 'capacitor import failed', e))
+    }
+
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+      window.removeEventListener('pagehide', onPageHide)
+      capListenerCancelled = true
+      capListenerHandle?.remove()
+    }
+  }, [])
 }
