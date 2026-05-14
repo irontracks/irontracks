@@ -118,15 +118,22 @@ export function useLocalPersistence({
 
       return () => {
         clearTimeout(id)
-        // Cancela IDB timer no cleanup. Antes deixava completar pra preservar
-        // writes em fechamento de aba — mas isso podia persistir em conta errada
-        // quando o usuário trocava de userId. Trade-off: usuário pode perder até
-        // 2s de mudanças no fechamento abrupto; localStorage continua salvando
-        // a cada 250ms, então a perda é mínima.
-        if (idbTimerRef.current) {
-          clearTimeout(idbTimerRef.current)
-          idbTimerRef.current = null
-        }
+        // INTENCIONALMENTE NÃO cancela o idbTimer no cleanup.
+        //
+        // O cleanup roda quando o usuário fecha/backgrounda o app (regressão
+        // do commit d779330): se cancelássemos, a escrita debounced de 2s
+        // nunca completaria e a sessão ativa seria perdida no próximo
+        // launch. Foi exatamente o bug reportado em prod.
+        //
+        // E o cancel em re-run normal (mudança de activeSession) JÁ é feito
+        // na linha 112 (`clearTimeout(idbTimerRef.current)` antes do novo
+        // setTimeout). Então cleanup-cancel era redundante pra esse caminho
+        // E maléfico no caminho de unmount.
+        //
+        // A proteção "wrong user na troca de conta" — motivação original do
+        // d779330 — segue garantida pelo `capturedUserId` da closure: o
+        // callback persiste pro UID capturado no momento do agendamento,
+        // não pro UID atual.
       }
     } catch {
       return
