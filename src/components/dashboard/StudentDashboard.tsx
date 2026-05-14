@@ -265,7 +265,7 @@ export default function StudentDashboard(props: Props) {
   const vipLabel = String(props.vipLabel || 'VIP')
 
   return (
-    <div className={density === 'compact' ? 'p-4 space-y-3 pb-24' : 'p-4 space-y-4 pb-24'}>
+    <div className={density === 'compact' ? 'p-4 space-y-3 pb-24 overflow-x-hidden' : 'p-4 space-y-4 pb-24 overflow-x-hidden'}>
       {props.profileIncomplete && <ProfileIncompleteBanner settings={props.settings as import('@/schemas/settings').UserSettings | null} onComplete={props.onOpenCompleteProfile} />}
 
       <>
