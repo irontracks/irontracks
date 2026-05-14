@@ -620,4 +620,47 @@ export function useSessionSync({
             capListenerHandle?.remove()
         }
     }, [])
+
+    // 8. Resume restore — WKWebView process termination recovery
+    //
+    // Cenário: iOS mata o processo WebView por memória enquanto o app está em
+    // background (o app nativo continua vivo, mas o JS é destruído). Quando o
+    // usuário volta, o WKWebView reinicia do zero — React monta fresh, activeSession
+    // começa null — e o effect #1 (restore on mount) JÁ rodou nessa sessão de
+    // processo e não roda de novo (restoredForUserRef guard).
+    //
+    // Resultado sem este fix: tela preta (active workout tentando renderizar com
+    // session=null) → usuário fecha → reabre → treino sumido.
+    //
+    // Fix: escutar visibilitychange (visible). Se o app volta ao foco e activeSession
+    // ainda é null mas localStorage tem um snapshot, restaurar imediatamente —
+    // sem esperar o flow completo de cold-start.
+    //
+    // Usa activeSessionRef (ref, não state) pra evitar re-register a cada mudança
+    // de activeSession. O guard `if (activeSessionRef.current) return` garante
+    // que sessões já hidratadas não sejam sobrescritas pelo restore.
+    useEffect(() => {
+        if (typeof document === 'undefined') return
+        const uid = userId ? String(userId) : ''
+        if (!uid) return
+
+        const onResume = () => {
+            if (document.visibilityState !== 'visible') return
+            if (activeSessionRef.current) return // sessão já em estado — nada a restaurar
+
+            const scopedKey = `irontracks.activeSession.v2.${uid}`
+            try {
+                const raw = localStorage.getItem(scopedKey) || localStorage.getItem('activeSession')
+                if (!raw) return
+                const parsed: unknown = parseJsonWithSchema(raw, z.record(z.unknown()))
+                if (!isRecord(parsed) || !parsed.startedAt || !parsed.workout) return
+                const clean = sanitizeRestoredSession(parsed as Record<string, unknown>)
+                setActiveSession(clean as unknown as ActiveWorkoutSession)
+                setView('active')
+            } catch { }
+        }
+
+        document.addEventListener('visibilitychange', onResume)
+        return () => document.removeEventListener('visibilitychange', onResume)
+    }, [userId, setActiveSession, setView])
 }
