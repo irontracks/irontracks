@@ -33,6 +33,11 @@ interface UseWorkoutLiveActivityArgs {
   logs: Record<string, unknown>
   /** Index of the exercise the user is currently focused on. */
   currentExerciseIdx: number
+  /** True while a rest countdown is active. While rest is on, the workout LA
+   *  is ended so the rest LA (started independently by RestTimerOverlay) is
+   *  the only Live Activity in the Dynamic Island. When rest ends, the
+   *  workout LA restarts automatically with the same `workoutStartMs`. */
+  restActive?: boolean
 }
 
 const isObj = (v: unknown): v is Record<string, unknown> =>
@@ -65,6 +70,7 @@ export function useWorkoutLiveActivity({
   exercises,
   logs,
   currentExerciseIdx,
+  restActive = false,
 }: UseWorkoutLiveActivityArgs): void {
   // ── Compute the current snapshot ──────────────────────────────────────────
   const snapshot = useMemo(() => {
@@ -115,11 +121,31 @@ export function useWorkoutLiveActivity({
   const pendingUpdateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Start exactly once when we have a valid start time. The hook callsite
-  // remounts when entering / leaving ActiveWorkout, so this is the right scope.
+  // remounts when entering / leaving ActiveWorkout, so this is the right
+  // scope. The `restActive` dep lets us pause/resume the workout LA so the
+  // rest countdown (started separately by RestTimerOverlay) is the only
+  // Live Activity shown in the Dynamic Island during rest — otherwise iOS
+  // picks one and it's usually the workout total, which the user perceived
+  // as "the rest timer isn't there".
   useEffect(() => {
     if (!isIosNative()) return
-    if (startedRef.current) return
     if (!Number.isFinite(workoutStartMs) || workoutStartMs <= 0) return
+
+    // During rest: hand the Dynamic Island slot over to the rest LA.
+    if (restActive) {
+      if (startedRef.current) {
+        if (pendingUpdateTimerRef.current) {
+          clearTimeout(pendingUpdateTimerRef.current)
+          pendingUpdateTimerRef.current = null
+        }
+        void endWorkoutLiveActivity()
+        startedRef.current = false
+      }
+      return
+    }
+
+    // Rest finished (or never started): make sure the workout LA is up.
+    if (startedRef.current) return
     startedRef.current = true
     void startWorkoutLiveActivity({
       workoutName,
@@ -134,10 +160,10 @@ export function useWorkoutLiveActivity({
       void endWorkoutLiveActivity()
       startedRef.current = false
     }
-    // We intentionally start with the FIRST snapshot — subsequent changes
-    // flow through the dedicated update effect below.
+    // Snapshot/workoutName changes flow through the dedicated update effect
+    // below — we only re-run this lifecycle for start/end transitions.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [workoutStartMs])
+  }, [workoutStartMs, restActive])
 
   // ── Throttled updates: max 1 per second ───────────────────────────────────
   useEffect(() => {
