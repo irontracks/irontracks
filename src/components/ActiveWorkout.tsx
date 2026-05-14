@@ -248,7 +248,10 @@ export default function ActiveWorkout(props: ActiveWorkoutProps & { controlledBy
           )}
 
           {/* GPS Cardio Tracking Panel */}
-          <CardioGPSPanel workoutId={props.session?.workout?.id} />
+          <CardioGPSPanel
+            workoutId={props.session?.workout?.id}
+            userId={String(props.settings?.userId ?? props.session?.userId ?? '') || null}
+          />
           <ExerciseList />
         </div>
 

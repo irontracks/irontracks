@@ -5,6 +5,13 @@ import { useGeoLocation, type GeoFix, type TrackingStatus } from './useGeoLocati
 import { totalTrackDistance, avgPaceMinKm, speedKmh, haversineDistance } from '@/utils/geoUtils'
 import type { GeoTrackPoint } from '@/utils/geoUtils'
 import { decideCardioFilter, estimateCardioCalories } from '@/utils/cardioFilters'
+import {
+  persistActiveCardio,
+  recoverActiveCardio,
+  clearPersistedCardio,
+} from '@/lib/offline/cardioPersistence'
+import { logWarn } from '@/lib/logger'
+import { isIosNative, isAndroidNative } from '@/utils/platform'
 
 interface CardioMetrics {
   /** Total distance in meters. */
@@ -42,6 +49,13 @@ interface UseCardioTrackingOptions {
    * running or trail-biking pace but far below car speeds. Default 45.
    */
   maxRealisticSpeedKmh?: number
+  /**
+   * Owner user id. When provided, the hook persists the live cardio state
+   * to IDB (debounced + lifecycle flush) so a crash/kill mid-run can be
+   * resumed. Without it, persistence is disabled and behavior is identical
+   * to the legacy in-memory hook.
+   */
+  userId?: string | null
 }
 
 interface UseCardioTrackingResult {
@@ -72,6 +86,18 @@ interface UseCardioTrackingResult {
     finishedAt: string
   } | null
   reset: () => void
+  /**
+   * Snapshot of a previously-persisted cardio session found on mount.
+   * Null when there's nothing to resume. The UI should show a "Retomar?"
+   * banner while this is set AND `isTracking` is false.
+   */
+  recoveredCardio: Record<string, unknown> | null
+  /** Restore the persisted state into the live hook and resume tracking. */
+  resumeRecoveredCardio: () => Promise<void>
+  /** Drop the persisted state and dismiss the banner. */
+  discardRecoveredCardio: () => Promise<void>
+  /** Force-clear the persisted cardio (e.g. after a successful server save). */
+  finalizePersistedCardio: () => Promise<void>
 }
 
 const EMPTY_METRICS: CardioMetrics = {
@@ -114,6 +140,7 @@ export function useCardioTracking({
   maxAccuracyMeters = 30,
   minMovementMeters = 5,
   maxRealisticSpeedKmh = 45,
+  userId = null,
 }: UseCardioTrackingOptions = {}): UseCardioTrackingResult {
   const {
     position,
@@ -286,6 +313,171 @@ export function useCardioTracking({
     latestFixRef.current = null
   }, [stopWatching])
 
+  // ── Persistence: dual-write to IDB so a kill mid-run doesn't lose data ──
+  //
+  // The cardio hook used to keep `trackPoints` + `metrics` in useState only,
+  // with a single server save at `stop()`. App killed mid-run (iOS suspend,
+  // low-memory kill, user swipes away) → 100% of the GPS trail gone. Now we
+  // mirror `useLocalPersistence`'s strategy: debounce-write while running,
+  // sync-flush on lifecycle pause, recover on next mount.
+
+  const [recoveredCardio, setRecoveredCardio] = useState<Record<string, unknown> | null>(null)
+
+  // Refs synced with state — used by the lifecycle flush listener that
+  // doesn't re-bind on every tick, and by the stop()/callbacks below.
+  const isTrackingRef = useRef(isTracking)
+  const metricsRef = useRef(metrics)
+  const userIdRef = useRef<string | null>(userId)
+  useEffect(() => { isTrackingRef.current = isTracking }, [isTracking])
+  useEffect(() => { metricsRef.current = metrics }, [metrics])
+  useEffect(() => { userIdRef.current = userId }, [userId])
+
+  // ── Recovery: check IDB on mount for a persisted run ───────────────────
+  useEffect(() => {
+    if (!userId) return
+    let cancelled = false
+    recoverActiveCardio(userId)
+      .then((state) => {
+        if (cancelled || !state) return
+        setRecoveredCardio(state)
+      })
+      .catch(() => { /* non-critical */ })
+    return () => { cancelled = true }
+  }, [userId])
+
+  // ── Debounced IDB write while cardio is active ─────────────────────────
+  //
+  // "Active" detection: `isTracking === true` AND we have a startTimeRef
+  // (i.e. start() was called and the clock is running). We persist even
+  // while paused — pause is a temporary halt, not "no cardio". Discarding
+  // paused state would lose a perfectly resumable run.
+  const idbDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => {
+    if (!userId) return
+    if (!isTracking) return
+    if (startTimeRef.current <= 0) return
+
+    if (idbDebounceRef.current) clearTimeout(idbDebounceRef.current)
+    const capturedUserId = userId
+    idbDebounceRef.current = setTimeout(() => {
+      persistActiveCardio(capturedUserId, {
+        trackPoints,
+        metrics,
+        startedAt: startTimeRef.current,
+        startedAtIso: startedAtRef.current,
+        pausedDurationMs: pausedDurationRef.current,
+        maxSpeedKmh: maxSpeedRef.current,
+        isPaused,
+        bodyWeightKg,
+      }).catch(() => { /* best effort */ })
+      idbDebounceRef.current = null
+    }, 5000)
+
+    // INTENCIONALMENTE NÃO cancela no cleanup — mesmo motivo do PR #99 em
+    // useLocalPersistence: cleanup roda quando app é backgroundado, e
+    // cancelar abortaria a escrita debounced. O re-run normal já chama
+    // clearTimeout antes do novo setTimeout acima.
+  }, [trackPoints, metrics, isTracking, isPaused, userId, bodyWeightKg])
+
+  // ── Lifecycle flush — visibilitychange / pagehide / Capacitor pause ─────
+  //
+  // Espelha o listener de useLocalPersistence: quando o iOS/Android
+  // suspende o WebView (user trocou de app, swipe-up, lock screen), o JS
+  // para de rodar e o debounce de 5s acima não chega a disparar.
+  // Aqui fazemos flush IMEDIATO (sem debounce) via persistActiveCardio.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+
+    const flushImmediate = () => {
+      const uid = userIdRef.current
+      if (!uid) return
+      if (!isTrackingRef.current) return
+      if (startTimeRef.current <= 0) return
+      const state: Record<string, unknown> = {
+        trackPoints: trackPointsRef.current,
+        metrics: metricsRef.current,
+        startedAt: startTimeRef.current,
+        startedAtIso: startedAtRef.current,
+        pausedDurationMs: pausedDurationRef.current,
+        maxSpeedKmh: maxSpeedRef.current,
+      }
+      persistActiveCardio(uid, state).catch(() => { /* best effort */ })
+    }
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') flushImmediate()
+    }
+    const onPageHide = () => flushImmediate()
+
+    document.addEventListener('visibilitychange', onVisibilityChange)
+    window.addEventListener('pagehide', onPageHide)
+
+    // Capacitor App lifecycle — dynamic import so the web bundle stays slim
+    let capListenerHandle: { remove: () => void } | null = null
+    let capListenerCancelled = false
+    if (isIosNative() || isAndroidNative()) {
+      import('@capacitor/app').then(({ App }) => {
+        if (capListenerCancelled) return
+        App.addListener('appStateChange', (state: { isActive?: boolean }) => {
+          if (!state?.isActive) flushImmediate()
+        })
+          .then((h) => {
+            if (capListenerCancelled) { h.remove(); return }
+            capListenerHandle = h
+          })
+          .catch((e) => logWarn('useCardioTracking.flush', 'capacitor listener add failed', e))
+      }).catch((e) => logWarn('useCardioTracking.flush', 'capacitor import failed', e))
+    }
+
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+      window.removeEventListener('pagehide', onPageHide)
+      capListenerCancelled = true
+      capListenerHandle?.remove()
+    }
+  }, [])
+
+  // ── Recovery callbacks ─────────────────────────────────────────────────
+
+  const resumeRecoveredCardio = useCallback(async () => {
+    if (!recoveredCardio) return
+    const points = Array.isArray(recoveredCardio.trackPoints)
+      ? (recoveredCardio.trackPoints as GeoTrackPoint[])
+      : []
+    const startedAtMs = Number(recoveredCardio.startedAt || 0)
+    if (!startedAtMs) return
+
+    const recoveredMetrics = (recoveredCardio.metrics && typeof recoveredCardio.metrics === 'object')
+      ? (recoveredCardio.metrics as CardioMetrics)
+      : EMPTY_METRICS
+    const pausedDurationMs = Number(recoveredCardio.pausedDurationMs || 0)
+    const recoveredMaxSpeed = Number(recoveredCardio.maxSpeedKmh || 0)
+    const recoveredStartedAtIso = typeof recoveredCardio.startedAtIso === 'string'
+      ? recoveredCardio.startedAtIso
+      : new Date(startedAtMs).toISOString()
+
+    startTimeRef.current = startedAtMs
+    pausedDurationRef.current = pausedDurationMs
+    maxSpeedRef.current = recoveredMaxSpeed
+    startedAtRef.current = recoveredStartedAtIso
+
+    setTrackPoints(points)
+    setMetrics(recoveredMetrics)
+    setIsTracking(true)
+    setIsPaused(false)
+    setRecoveredCardio(null)
+    await startWatching()
+  }, [recoveredCardio, startWatching])
+
+  const discardRecoveredCardio = useCallback(async () => {
+    if (userId) await clearPersistedCardio(userId)
+    setRecoveredCardio(null)
+  }, [userId])
+
+  const finalizePersistedCardio = useCallback(async () => {
+    if (userId) await clearPersistedCardio(userId)
+  }, [userId])
+
   const hasReliableFix =
     !!position && position.accuracyMeters <= maxAccuracyMeters
 
@@ -302,5 +494,9 @@ export function useCardioTracking({
     resume,
     stop,
     reset,
+    recoveredCardio,
+    resumeRecoveredCardio,
+    discardRecoveredCardio,
+    finalizePersistedCardio,
   }
 }

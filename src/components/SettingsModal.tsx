@@ -119,14 +119,24 @@ export default function SettingsModal(props: SettingsModalProps) {
   }, [isOpen])
 
   // ── iOS diagnostics ──────────────────────────────────────────────────────
+  // B-007: convertidos os `require()` síncronos em `import()` dinâmicos. Em
+  // arquivo "use client" (ESM), `require()` quebra silenciosamente em Next.js
+  // 16 + Turbopack — o try/catch externo engolia o erro e o painel iOS Diag
+  // SEMPRE aparecia vazio em prod, dando impressão de "feature quebrada em
+  // iOS" quando era só o bundler.
   const loadIosDiag = async () => {
     try {
       setIosDiagBusy(true)
-      const capCore = require('@capacitor/core')
-      const appMod = require('@capacitor/app')
-      const pushMod = require('@capacitor/push-notifications')
-      const deviceMod = require('@capacitor/device')
-      const Capacitor = capCore?.Capacitor
+      const [capCore, appMod, pushMod, deviceMod] = await Promise.all([
+        import('@capacitor/core').catch(() => null),
+        import('@capacitor/app').catch(() => null),
+        import('@capacitor/push-notifications').catch(() => null),
+        import('@capacitor/device').catch(() => null),
+      ])
+      // Capacitor typings expõem só `getPlatform`/`isNativePlatform`; o objeto
+      // `Plugins` é runtime-only. Cast pra interface ampliada pra ler sem
+      // perder type-safety do resto.
+      const Capacitor = capCore?.Capacitor as ({ getPlatform?: () => string; Plugins?: Record<string, unknown> } | undefined)
       const capacitorPresent = !!Capacitor
       const platform = String(Capacitor?.getPlatform?.() || 'unknown')
       const pluginNames = Capacitor?.Plugins ? Object.keys(Capacitor.Plugins) : []
