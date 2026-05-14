@@ -40,13 +40,14 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         }
 
         // Allow background music (Spotify / Apple Music) to keep playing during workouts.
-        // .playback + .mixWithOthers: our alarm / notification sounds blend in instead of
-        // silencing other apps. .duckOthers briefly lowers background audio when we play.
+        // .playback + .mixWithOthers: our alarm / timer sounds blend in without silencing
+        // or ducking other apps. .duckOthers was removed — activating the session on launch
+        // with duckOthers immediately lowers Spotify volume even before any sound plays.
         // Speech recognition temporarily overrides to .record and restores on completion.
         try? AVAudioSession.sharedInstance().setCategory(
             .playback,
             mode: .default,
-            options: [.mixWithOthers, .duckOthers, .allowAirPlay, .allowBluetoothA2DP]
+            options: [.mixWithOthers, .allowAirPlay, .allowBluetoothA2DP]
         )
         try? AVAudioSession.sharedInstance().setActive(true)
 
