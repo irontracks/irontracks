@@ -200,19 +200,25 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
             }
         };
         document.addEventListener('visibilitychange', onVisible);
+        // B-007: substituído `require('@capacitor/app')` síncrono por `import()`
+        // dinâmico. O require em arquivo "use client" (ESM) quebra silenciosamente
+        // no Next.js 16 + Turbopack — o try/catch engolia o erro e o listener
+        // appStateChange NUNCA registrava, deixando o alarm tocar indefinidamente
+        // quando user voltava do background. Dynamic import funciona em ambos os
+        // ambientes (CommonJS legacy e ESM moderno).
         let handle: { remove: () => void } | null = null;
-        try {
-            const appMod = require('@capacitor/app');
-            const App = appMod?.App;
-            if (App?.addListener) {
-                App.addListener('appStateChange', (state: { isActive?: boolean }) => {
-                    if (state?.isActive) stopAlarm(true);
-                }).then((h: { remove: () => void }) => {
-                    handle = h;
-                }).catch(() => { });
-            }
-        } catch { }
+        let cancelled = false;
+        import('@capacitor/app').then(({ App }) => {
+            if (cancelled || !App?.addListener) return;
+            App.addListener('appStateChange', (state: { isActive?: boolean }) => {
+                if (state?.isActive) stopAlarm(true);
+            }).then((h) => {
+                if (cancelled) { try { h.remove(); } catch { } return; }
+                handle = h;
+            }).catch(() => { });
+        }).catch(() => { });
         return () => {
+            cancelled = true;
             document.removeEventListener('visibilitychange', onVisible);
             if (handle) {
                 try { handle.remove(); } catch { }
