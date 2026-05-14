@@ -109,12 +109,30 @@ export function useLocalPersistence({
   // IDB: debounce de 2s mantido. Escrita assíncrona — debounce reduz churn no
   // IndexedDB sem risco, pois o flushImmediate() abaixo garante a escrita IDB
   // na hora que o app vai pra background (independente do timer).
+  //
+  // RACE CONDITION GUARD (B-014):
+  // No WKWebView restart, React monta com activeSession=null. Quando userId
+  // fica disponível, este effect dispara com activeSession=null → apagaria o
+  // localStorage ANTES do useSessionSync conseguir lê-lo. Resultado: restore
+  // falha, treino some.
+  //
+  // Fix: só apagar localStorage se activeSession foi setado NESTE mount (ou seja,
+  // o usuário explicitamente finalizou/cancelou). Nunca apagar no mount inicial
+  // com session=null — pode ser um restore em andamento.
+  const sessionEverSetRef = useRef(false)
+  useEffect(() => {
+    if (activeSession) sessionEverSetRef.current = true
+  }, [activeSession])
+
   const idbTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => {
     try {
       if (!userId) return
       const key = `irontracks.activeSession.v2.${userId}`
       if (!activeSession) {
+        // Guard: não apagar no mount inicial (restore pode estar em andamento).
+        // Só limpa quando sabemos que havia sessão ativa e foi encerrada.
+        if (!sessionEverSetRef.current) return
         localStorage.removeItem(key)
         localStorage.removeItem('activeSession')
         clearPersistedSession(userId).catch(() => {})
