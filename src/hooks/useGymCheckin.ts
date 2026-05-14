@@ -70,7 +70,7 @@ const wasAlreadyChecked = (gymId: string): boolean => {
 
 const markChecked = (gymId: string): void => {
   if (typeof window === 'undefined') return
-  try { window.localStorage.setItem(buildCheckinKey(gymId), '1') } catch {}
+  try { window.localStorage.setItem(buildCheckinKey(gymId), '1') } catch (e) { logWarn('useGymCheckin', 'localStorage setItem failed', e) }
 }
 
 export function useGymCheckin(
