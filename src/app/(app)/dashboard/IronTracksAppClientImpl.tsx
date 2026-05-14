@@ -752,9 +752,28 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
     // /dashboard/active, mas o JS recomeçou do zero — activeSession ainda não foi
     // restaurado do localStorage/Supabase. Sem este guard, isAppLoading=false e o
     // LoadingScreen some, deixando tela preta até o restore completar.
-    // Com o guard: LoadingScreen permanece visível (≤ 2s) até activeSession chegar.
+    // Com o guard: LoadingScreen permanece visível até activeSession chegar.
     // Quando activeSession estiver preenchido, a condição vira false e o treino aparece.
-    const isSessionRestoring = view === 'active' && !activeSession
+    //
+    // CAP DE 5s (B-014): isSessionRestoring não pode ficar true pra sempre —
+    // LoadingScreen mostra "Não foi possível carregar" após 8s. Se o restore não
+    // completou em 5s (localStorage vazio, auth lento, sem rede), expiramos e
+    // redirecionamos pro dashboard. O safety net em useAppEffects também redireciona,
+    // mas pode demorar mais — este cap garante que o LoadingScreen nunca chega aos 8s.
+    const [sessionRestoringExpired, setSessionRestoringExpired] = useState(false)
+    useEffect(() => {
+        if (view !== 'active' || activeSession) {
+            setSessionRestoringExpired(false)
+            return
+        }
+        const t = setTimeout(() => {
+            setSessionRestoringExpired(true)
+            setView('dashboard') // navegar imediatamente, não esperar o safety net
+        }, 5000)
+        return () => clearTimeout(t)
+    }, [view, activeSession, setView])
+
+    const isSessionRestoring = view === 'active' && !activeSession && !sessionRestoringExpired
     const isAppLoading = isSessionRestoring || (view !== 'active' && !activeSession && (
         (authLoading && !hasCachedWorkouts) || (!user?.id && !hasCachedWorkouts) || !isDashboardReady
     ));
