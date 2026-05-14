@@ -516,7 +516,7 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
             {isFinished && !isTransition && (
                 <div
                     role="presentation"
-                    className={`fixed inset-0 z-[2000] backdrop-blur-sm flex flex-col items-center justify-center px-6 ${isSideRest ? 'bg-blue-600/90' : 'bg-green-600/90'}`}
+                    className={`fixed inset-0 z-[2000] backdrop-blur-sm flex flex-col items-center justify-center px-6 overflow-x-hidden ${isSideRest ? 'bg-blue-600/90' : 'bg-green-600/90'}`}
                     onClick={(e) => e.stopPropagation()}
                     onPointerDown={(e) => e.stopPropagation()}
                     onTouchStart={(e) => e.stopPropagation()}
@@ -528,7 +528,7 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
                     ) : context?.nextSetLabel ? (
                         <>
                             <p className="text-white/70 font-bold mt-2 text-sm uppercase tracking-widest">Próxima</p>
-                            <p className="text-white font-black mt-1 text-2xl text-center leading-tight">{context.nextSetLabel}</p>
+                            <p className="text-white font-black mt-1 text-2xl text-center leading-tight max-w-full break-words px-2">{context.nextSetLabel}</p>
                         </>
                     ) : (
                         <p className="text-white/80 font-bold mt-2 text-lg">{finishedLabel}</p>
@@ -536,8 +536,8 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
                 </div>
             )}
 
-            <div className="fixed bottom-0 left-0 right-0 bg-neutral-950/97 backdrop-blur-xl border-t border-neutral-800/80 py-2 px-4 shadow-2xl z-[2100] animate-slide-up pb-safe">
-                <div className="flex items-center gap-3 max-w-md mx-auto">
+            <div className="fixed bottom-0 left-0 right-0 bg-neutral-950/97 backdrop-blur-xl border-t border-neutral-800/80 py-2 px-4 shadow-2xl z-[2100] animate-slide-up pb-safe overflow-x-hidden">
+                <div className="flex items-center gap-3 max-w-md mx-auto min-w-0">
                     {/* Circular SVG ring — compact size matching bar height */}
                     <div className="relative flex-shrink-0" style={{ width: 68, height: 68 }}>
                         <svg width="68" height="68" viewBox="0 0 96 96" style={{ transform: 'rotate(-90deg)' }}>
