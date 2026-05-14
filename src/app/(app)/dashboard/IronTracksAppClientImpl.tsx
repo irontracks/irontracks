@@ -1046,6 +1046,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                         <CardioGPSPanel
                                             standalone
                                             onRequestClose={() => setStandaloneCardioOpen(false)}
+                                            userId={user?.id ? String(user.id) : null}
                                             bodyWeightKg={
                                                 typeof (userSettingsApi?.settings as Record<string, unknown> | null | undefined)?.bodyWeightKg === 'number'
                                                     ? (userSettingsApi?.settings as Record<string, unknown>).bodyWeightKg as number

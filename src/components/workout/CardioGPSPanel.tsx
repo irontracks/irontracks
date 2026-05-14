@@ -20,6 +20,11 @@ interface CardioGPSPanelProps {
   standalone?: boolean
   /** Called when user finishes the post-cardio flow in standalone mode */
   onRequestClose?: () => void
+  /**
+   * Owner user id. Enables IDB-backed crash recovery — without it,
+   * a kill mid-run still drops the GPS trail (legacy behavior).
+   */
+  userId?: string | null
 }
 
 // ─── Utils ────────────────────────────────────────────────────────────────────
@@ -272,6 +277,7 @@ export default function CardioGPSPanel({
   bodyWeightKg,
   standalone,
   onRequestClose,
+  userId,
 }: CardioGPSPanelProps) {
   const {
     isTracking,
@@ -286,7 +292,11 @@ export default function CardioGPSPanel({
     resume,
     stop,
     reset,
-  } = useCardioTracking({ bodyWeightKg })
+    recoveredCardio,
+    resumeRecoveredCardio,
+    discardRecoveredCardio,
+    finalizePersistedCardio,
+  } = useCardioTracking({ bodyWeightKg, userId })
   const [saving, setSaving] = useState(false)
   const [savedTrackId, setSavedTrackId] = useState<string | null>(null)
   const [saveError, setSaveError] = useState<string | null>(null)
@@ -348,6 +358,9 @@ export default function CardioGPSPanel({
           paceMinKm: result.metrics.paceMinKm,
           caloriesEstimated: result.metrics.caloriesEstimated,
         })
+        // Server save succeeded — clear the IDB zombie so recovery on next
+        // mount doesn't offer to resume a run that already lives in the DB.
+        await finalizePersistedCardio()
         onSaved?.(data.track.id)
       } else {
         setSaveError('Não foi possível salvar a rota. Tente novamente.')
@@ -357,7 +370,7 @@ export default function CardioGPSPanel({
     } finally {
       setSaving(false)
     }
-  }, [stop, workoutId, onSaved, activityType])
+  }, [stop, workoutId, onSaved, activityType, finalizePersistedCardio])
 
   const handleReset = useCallback(() => {
     reset()
@@ -374,6 +387,31 @@ export default function CardioGPSPanel({
     isTracking && (gpsStatus === 'requesting-permission' || gpsStatus === 'acquiring' || !hasReliableFix)
   const startDisabled = gpsIsDenied || gpsIsUnavailable
   const signal = gpsSignalLabel(metrics.accuracyMeters)
+
+  // ── Recovery banner: only when we have persisted state AND no live run ─────
+  const recoveryBanner = recoveredCardio && !isTracking && !savedTrackId ? (
+    <div className="rounded-xl border border-yellow-500/30 bg-yellow-500/10 p-4 mb-3 flex flex-col gap-3">
+      <p className="text-sm text-yellow-100">
+        🏃 Você tem uma corrida em andamento. Retomar?
+      </p>
+      <div className="flex gap-2">
+        <button
+          type="button"
+          onClick={() => { void resumeRecoveredCardio() }}
+          className="px-3 py-1.5 rounded-lg bg-yellow-500 text-black font-semibold text-sm"
+        >
+          Retomar
+        </button>
+        <button
+          type="button"
+          onClick={() => { void discardRecoveredCardio() }}
+          className="px-3 py-1.5 rounded-lg bg-neutral-700 text-white text-sm"
+        >
+          Descartar
+        </button>
+      </div>
+    </div>
+  ) : null
 
   // ── Shared pieces ──────────────────────────────────────────────────────────
 
@@ -587,6 +625,7 @@ export default function CardioGPSPanel({
                 </span>
               </div>
             )}
+            {recoveryBanner}
             {gpsBanners}
             {gpsSignalBar}
             {activityTypeSelector}
@@ -608,6 +647,7 @@ export default function CardioGPSPanel({
   // ── Accordion content (inside a workout) — keep the old flat layout ────────
   const content = (
     <div className="px-4 pb-4">
+      {recoveryBanner}
       {gpsBanners}
       {gpsSignalBar}
       {activityTypeSelector}
