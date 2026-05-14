@@ -27,7 +27,7 @@ android {
         applicationId "com.irontracks.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 7
+        versionCode 8
         versionName "1.6.1"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         // SENTRY_DSN is injected into AndroidManifest via manifestPlaceholders.

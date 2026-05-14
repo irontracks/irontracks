@@ -9,20 +9,25 @@
 			<key>orderHint</key>
 			<integer>0</integer>
 		</dict>
-		<key>IronTracksWatch Watch App.xcscheme_^#shared#^_</key>
+		<key>IronTracksWatch Watch App (Notification).xcscheme_^#shared#^_</key>
 		<dict>
 			<key>orderHint</key>
-			<integer>12</integer>
+			<integer>14</integer>
 		</dict>
-		<key>IronTracksWidgets.xcscheme_^#shared#^_</key>
+		<key>IronTracksWatch Watch App.xcscheme_^#shared#^_</key>
 		<dict>
 			<key>orderHint</key>
 			<integer>13</integer>
 		</dict>
-		<key>NotificationService.xcscheme_^#shared#^_</key>
+		<key>IronTracksWidgets.xcscheme_^#shared#^_</key>
 		<dict>
 			<key>orderHint</key>
 			<integer>11</integer>
+		</dict>
+		<key>NotificationService.xcscheme_^#shared#^_</key>
+		<dict>
+			<key>orderHint</key>
+			<integer>12</integer>
 		</dict>
 		<key>RestTimerLiveActivity.xcscheme_^#shared#^_</key>
 		<dict>
