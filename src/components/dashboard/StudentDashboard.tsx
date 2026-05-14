@@ -265,7 +265,11 @@ export default function StudentDashboard(props: Props) {
   const vipLabel = String(props.vipLabel || 'VIP')
 
   return (
-    <div className={density === 'compact' ? 'p-4 space-y-3 pb-24 overflow-x-hidden' : 'p-4 space-y-4 pb-24 overflow-x-hidden'}>
+    // B-004: overflow-x-clip em vez de -hidden — hidden força overflow-y a virar
+    // `auto` pela spec CSS, clipando o WorkoutToolsPanel (dropdown absolute right-0
+    // dentro do dashboard) verticalmente em iPhone SE / iPad split-view. Mesmo
+    // fix do PR #103 (avatar menu).
+    <div className={density === 'compact' ? 'p-4 space-y-3 pb-24 overflow-x-clip' : 'p-4 space-y-4 pb-24 overflow-x-clip'}>
       {props.profileIncomplete && <ProfileIncompleteBanner settings={props.settings as import('@/schemas/settings').UserSettings | null} onComplete={props.onOpenCompleteProfile} />}
 
       <>

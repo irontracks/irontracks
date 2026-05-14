@@ -21,6 +21,7 @@ import type { SupabaseClient, RealtimeChannel } from '@supabase/supabase-js'
 import type { ActiveWorkoutSession } from '@/types/app'
 import { logError, logWarn } from '@/lib/logger'
 import { recoverActiveSession } from '@/lib/offline/activeSessionPersistence'
+import { isIosNative, isAndroidNative } from '@/utils/platform'
 
 const isRecord = (v: unknown): v is Record<string, unknown> =>
     v !== null && typeof v === 'object' && !Array.isArray(v)
@@ -126,6 +127,12 @@ export function useSessionSync({
 }: UseSessionSyncParams) {
     const serverSessionSyncRef = useRef<{ timer: ReturnType<typeof setTimeout> | null; lastKey: string }>({ timer: null, lastKey: '' })
     const serverSessionSyncWarnedRef = useRef(false)
+    // Ref para o `run` atual do effect #3. Permite que o lifecycle listener
+    // (visibilitychange / pagehide / Capacitor appStateChange) dispare o
+    // upsert pendente IMEDIATAMENTE quando o app entra em background, antes
+    // do JS pausar. Sem isso, o debounce de 900ms é cancelado no cleanup e
+    // a última atualização do servidor é perdida (multi-device fica stale).
+    const pendingServerFlushRef = useRef<(() => Promise<void>) | null>(null)
     // Tracks whether local writes should be suppressed (when teacher is in control).
     // Used as a ref so changing this flag doesn't restart the effects.
     // Atualização do .current dentro de useEffect (não em render) — react-hooks/refs.
@@ -423,7 +430,17 @@ export function useSessionSync({
             serverSessionSyncRef.current.timer = timerId
         } catch { }
 
-        return () => { try { if (timerId) clearTimeout(timerId) } catch { } }
+        // Expõe o `run` atual para o flush lifecycle (effect abaixo). Cada
+        // re-run deste effect substitui o callback pelo `run` mais recente,
+        // que captura o `activeSession` correto via closure.
+        pendingServerFlushRef.current = run
+
+        return () => {
+            try { if (timerId) clearTimeout(timerId) } catch { }
+            // Não limpamos pendingServerFlushRef aqui — o próximo run do
+            // effect sobrescreve, e em unmount real (logout) o hook inteiro
+            // some junto.
+        }
     }, [activeSession, supabase, userId, inAppNotify, setActiveSession, setView, isMissingTable, notifyMigrationWarning])
 
     // 4. Session ticker (1s interval)
@@ -515,4 +532,92 @@ export function useSessionSync({
         window.addEventListener('beforeunload', handler)
         return () => window.removeEventListener('beforeunload', handler)
     }, [activeSession])
+
+    // 7. Force server flush on app pause / tab hidden / page hide
+    //
+    // O effect #3 já faz upsert debounced (900ms). Quando o usuário backgrounda
+    // o app (lock screen, swipe up, troca de app) dentro desses 900ms da
+    // última série, o cleanup cancela o timer e o servidor fica com estado
+    // velho — outro device do mesmo user puxa stale state.
+    //
+    // useLocalPersistence (PR #104) já cobre o caminho LOCAL (localStorage +
+    // IDB) com listeners equivalentes. Este effect espelha a estratégia pro
+    // servidor: dispara o `run()` pendente sincronamente assim que o app sair
+    // de foco, garantindo que o último estado chegue no Supabase.
+    //
+    // Padrões cobertos (mesmos do useLocalPersistence):
+    //   • `visibilitychange` (hidden) — iOS/Safari/WKWebView background.
+    //   • `pagehide` — fallback web (Chrome desktop, Firefox).
+    //   • Capacitor `App.appStateChange` — caminho mais cedo em iOS/Android.
+    //
+    // O upsert é best-effort: chamamos a função supabase normal (sem keepalive)
+    // porque o supabase-js já gerencia auth headers e o JS costuma ter alguns
+    // ms antes de pausar de fato. Se o request for cancelado, localStorage/IDB
+    // local já cobrem a sessão pra restore no próximo launch.
+    //
+    // suppressLocalWritesRef: quando true (professor controla aluno) NÃO
+    // disparamos flush — o professor é a fonte da verdade.
+    useEffect(() => {
+        if (typeof window === 'undefined') return
+
+        const flushImmediate = () => {
+            // Respeita controle do professor — student não deve sobrescrever
+            // edições do teacher mesmo no flush de background.
+            if (suppressLocalWritesRef.current) return
+
+            const pending = pendingServerFlushRef.current
+            if (!pending) return
+
+            // Cancela o debounce pendente pra evitar double-fire (o run vai
+            // ser chamado já-já síncrono mesmo).
+            try {
+                if (serverSessionSyncRef.current?.timer) {
+                    clearTimeout(serverSessionSyncRef.current.timer)
+                    serverSessionSyncRef.current.timer = null
+                }
+            } catch { }
+
+            // Dispara o upsert imediatamente. É async mas não dá pra await —
+            // o JS pode pausar a qualquer momento. Best-effort: supabase-js
+            // mantém o fetch em flight e o iOS dá ~5s de runtime no background
+            // antes do hard suspend, suficiente pro request curto completar
+            // na maioria dos casos. Erros vão pro logWarn dentro do próprio
+            // run() (catch interno).
+            try { void pending() } catch (e) { logError('hook:useSessionSync.flushImmediate', e) }
+        }
+
+        const onVisibilityChange = () => {
+            if (document.visibilityState === 'hidden') flushImmediate()
+        }
+        const onPageHide = () => flushImmediate()
+
+        document.addEventListener('visibilitychange', onVisibilityChange)
+        window.addEventListener('pagehide', onPageHide)
+
+        // Capacitor App lifecycle — só importa dinâmico em mobile nativo pra
+        // não inflar o bundle web. `appStateChange` com isActive=false dispara
+        // ANTES do JS ser pausado pelo iOS, então é o caminho mais cedo.
+        let capListenerHandle: { remove: () => void } | null = null
+        let capListenerCancelled = false
+        if (isIosNative() || isAndroidNative()) {
+            import('@capacitor/app').then(({ App }) => {
+                if (capListenerCancelled) return
+                App.addListener('appStateChange', (state: { isActive?: boolean }) => {
+                    if (!state?.isActive) flushImmediate()
+                })
+                    .then((h) => {
+                        if (capListenerCancelled) { h.remove(); return }
+                        capListenerHandle = h
+                    })
+                    .catch((e) => logWarn('useSessionSync.flush', 'capacitor listener add failed', e))
+            }).catch((e) => logWarn('useSessionSync.flush', 'capacitor import failed', e))
+        }
+
+        return () => {
+            document.removeEventListener('visibilitychange', onVisibilityChange)
+            window.removeEventListener('pagehide', onPageHide)
+            capListenerCancelled = true
+            capListenerHandle?.remove()
+        }
+    }, [])
 }
