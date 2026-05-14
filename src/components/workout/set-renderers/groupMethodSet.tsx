@@ -111,7 +111,7 @@ const GroupMethodSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx
                 value={weightValue}
                 onChange={(e) => updateLog(key, { weight: e?.target?.value ?? '' })}
                 placeholder={histWeight != null ? `${histWeight} kg` : plannedWeight != null ? `${plannedWeight} kg` : 'Peso (kg)'}
-                className="flex-1 min-w-0 bg-black/30 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white placeholder:text-neutral-400 outline-none focus:ring-1 ring-yellow-500"
+                className="flex-1 min-w-0 bg-black/30 border border-neutral-700 rounded-xl px-3 py-2 text-[16px] text-white placeholder:text-neutral-400 outline-none focus:ring-1 ring-yellow-500"
               />
               <input
                 type="number"
@@ -120,7 +120,7 @@ const GroupMethodSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx
                 value={repsValue}
                 onChange={(e) => updateLog(key, { reps: e?.target?.value ?? '' })}
                 placeholder={plannedReps || (histReps != null ? String(histReps) : 'Reps')}
-                className="w-20 shrink-0 bg-black/30 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white placeholder:text-neutral-400 outline-none focus:ring-1 ring-yellow-500"
+                className="w-20 shrink-0 bg-black/30 border border-neutral-700 rounded-xl px-3 py-2 text-[16px] text-white placeholder:text-neutral-400 outline-none focus:ring-1 ring-yellow-500"
               />
               <input
                 type="number"
@@ -129,7 +129,7 @@ const GroupMethodSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx
                 value={rpeValue}
                 onChange={(e) => updateLog(key, { rpe: e?.target?.value ?? '' })}
                 placeholder={histRpe != null ? String(histRpe) : 'RPE'}
-                className="w-16 shrink-0 bg-black/30 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white placeholder:text-yellow-400/50 outline-none focus:ring-1 ring-yellow-500"
+                className="w-16 shrink-0 bg-black/30 border border-neutral-700 rounded-xl px-3 py-2 text-[16px] text-white placeholder:text-yellow-400/50 outline-none focus:ring-1 ring-yellow-500"
               />
             </div>
             {/* Row 2: badge método + botões de ação */}
@@ -199,7 +199,7 @@ const GroupMethodSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx
             onChange={(e) => updateLog(key, { notes: e?.target?.value ?? '' })}
             placeholder="Observações da série"
             rows={2}
-            className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+            className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500"
           />
         </div>
       )}

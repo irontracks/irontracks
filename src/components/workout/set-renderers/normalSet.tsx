@@ -175,13 +175,13 @@ const NormalSetInner = ({
 
   // Shared input style — weight column (3fr, roomy)
   const inputBase =
-    'w-full bg-black/40 border border-neutral-700/80 rounded-xl px-2.5 py-2 text-sm text-white ' +
+    'w-full bg-black/40 border border-neutral-700/80 rounded-xl px-2.5 py-2 text-[16px] text-white ' +
     'outline-none focus:ring-1 ring-yellow-500 focus:border-yellow-500/50 transition-all duration-200 ' +
     'placeholder:text-neutral-400 placeholder:text-xs focus:placeholder:opacity-0';
   // Compact variant for reps/RPE (narrow 2fr columns) — reduced padding so
   // 5-char placeholders like "10-12" fit without truncation.
   const inputCompact =
-    'w-full bg-black/40 border border-neutral-700/80 rounded-xl px-1.5 py-2 text-sm text-white text-center ' +
+    'w-full bg-black/40 border border-neutral-700/80 rounded-xl px-1.5 py-2 text-[16px] text-white text-center ' +
     'outline-none focus:ring-1 ring-yellow-500 focus:border-yellow-500/50 transition-all duration-200 ' +
     'placeholder:text-neutral-400 placeholder:text-xs focus:placeholder:opacity-0';
 
@@ -612,7 +612,7 @@ const NormalSetInner = ({
             onBlur={(e) => notesField.handleBlur(e as React.FocusEvent<HTMLTextAreaElement>)}
             placeholder="Observações da série (opcional)"
             rows={2}
-            className="w-full bg-black/30 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500 shadow-sm shadow-yellow-500/10 transition duration-200"
+            className="w-full bg-black/30 border border-neutral-700 rounded-xl px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500 shadow-sm shadow-yellow-500/10 transition duration-200"
           />
         </div>
       )}
