@@ -912,7 +912,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                         {/* Main Content */}
                         <div
                             ref={mainScrollRef}
-                            className="flex-1 overflow-y-auto custom-scrollbar relative"
+                            className="flex-1 overflow-y-auto overflow-x-hidden custom-scrollbar relative"
                             style={({
                                 ['--dashboard-sticky-top' as unknown as keyof React.CSSProperties]: isHeaderVisible
                                     ? 'calc(4rem + env(safe-area-inset-top))'
