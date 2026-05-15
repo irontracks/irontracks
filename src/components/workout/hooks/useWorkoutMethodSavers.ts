@@ -51,6 +51,9 @@ export interface UseWorkoutMethodSaversProps {
     // Log helpers
     getLog: (key: string) => UnknownRecord;
     updateLog: (key: string, patch: unknown) => void;
+
+    // Timer (optional — only needed for methods that auto-start rest timer on save)
+    startTimer?: (seconds: unknown, context: unknown) => void;
 }
 
 // ─── Hook ─────────────────────────────────────────────────────────────────────
@@ -84,6 +87,7 @@ export function useWorkoutMethodSavers({
     setGroupMethodModal,
     getLog,
     updateLog,
+    startTimer,
 }: UseWorkoutMethodSaversProps) {
 
     // ─── Cluster ──────────────────────────────────────────────────────────────
@@ -242,6 +246,7 @@ export function useWorkoutMethodSavers({
             const lastWeight = String(stages[stages.length - 1]?.weight ?? '').trim();
             const rpeRaw = String(m?.rpe ?? '').trim();
             const rpeVal = rpeRaw ? parseTrainingNumber(rpeRaw) : null;
+            const restSec = parseTrainingNumber(m?.restSec) ?? 0;
             updateLog(key, {
                 done: !!getLog(key)?.done,
                 weight: lastWeight,
@@ -250,6 +255,9 @@ export function useWorkoutMethodSavers({
                 drop_set: { stages },
             });
             setDropSetModal(null);
+            if (startTimer && restSec > 0) {
+                startTimer(restSec, { kind: 'rest', key });
+            }
         } catch (e) { logError('hook:useWorkoutMethodSavers.saveDropSet', e) }
     };
 
