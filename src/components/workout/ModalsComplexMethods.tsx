@@ -90,7 +90,7 @@ export function ModalsComplexMethods() {
                                             setRestPauseModal((prev) => (prev && typeof prev === 'object' ? { ...prev, miniSets: v ?? 0, error: '' } : prev));
                                         }}
                                         placeholder="Minis (ex.: 2)"
-                                        className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+                                        className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500"
                                     />
                                     <input
                                         inputMode="decimal"
@@ -100,7 +100,7 @@ export function ModalsComplexMethods() {
                                             setRestPauseModal((prev) => (prev && typeof prev === 'object' ? { ...prev, pauseSec: v ?? 15, error: '' } : prev));
                                         }}
                                         placeholder="Descanso (s) (ex.: 15)"
-                                        className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+                                        className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500"
                                     />
                                     <input
                                         inputMode="decimal"
@@ -110,7 +110,7 @@ export function ModalsComplexMethods() {
                                             setRestPauseModal((prev) => (prev && typeof prev === 'object' ? { ...prev, weight: v, error: '' } : prev));
                                         }}
                                         placeholder="kg"
-                                        className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+                                        className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500"
                                     />
                                 </div>
                                 <div className="mt-2 flex items-center justify-end">
@@ -184,7 +184,7 @@ export function ModalsComplexMethods() {
                                                         setRestPauseModal((prev) => (prev && typeof prev === 'object' ? { ...prev, weight: v, error: '' } : prev));
                                                     }}
                                                     placeholder="kg"
-                                                    className="w-full bg-black/30 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+                                                    className="w-full bg-black/30 border border-neutral-700 rounded-xl px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500"
                                                 />
                                                 <input
                                                     inputMode="decimal"
@@ -200,7 +200,7 @@ export function ModalsComplexMethods() {
                                                         });
                                                     }}
                                                     placeholder="reps"
-                                                    className="w-full bg-black/30 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+                                                    className="w-full bg-black/30 border border-neutral-700 rounded-xl px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500"
                                                 />
                                             </div>
                                             {!isLast && safeRestSec ? <div className="mt-2 text-xs text-neutral-400">Descanso: {safeRestSec}s</div> : null}
@@ -218,7 +218,7 @@ export function ModalsComplexMethods() {
                                         setRestPauseModal((prev) => (prev && typeof prev === 'object' ? { ...prev, rpe: v, error: '' } : prev));
                                     }}
                                     placeholder="RPE (0-10)"
-                                    className="mt-2 w-full bg-black/30 border border-yellow-500/30 rounded-xl px-3 py-2 text-sm text-yellow-500 font-bold outline-none focus:ring-1 ring-yellow-500"
+                                    className="mt-2 w-full bg-black/30 border border-yellow-500/30 rounded-xl px-3 py-2 text-[16px] text-yellow-500 font-bold outline-none focus:ring-1 ring-yellow-500"
                                 />
                             </div>
                         </div>
@@ -343,7 +343,7 @@ export function ModalsComplexMethods() {
                                                             });
                                                         }}
                                                         placeholder={stagePlaceholder(idx, 'weight')}
-                                                        className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+                                                        className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500"
                                                     />
                                                     <input
                                                         inputMode="decimal"
@@ -360,7 +360,7 @@ export function ModalsComplexMethods() {
                                                             });
                                                         }}
                                                         placeholder={stagePlaceholder(idx, 'reps')}
-                                                        className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+                                                        className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500"
                                                     />
                                                 </div>
                                             </div>
@@ -416,8 +416,8 @@ export function ModalsComplexMethods() {
                                     <div key={idx} className="rounded-xl bg-neutral-800/60 border border-neutral-700 p-3 space-y-2">
                                         <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Etapa {idx + 1}</div>
                                         <div className="grid grid-cols-2 gap-2">
-                                            <input inputMode="decimal" value={String(s?.weight ?? '')} onChange={(e) => setStrippingModal((prev) => { if (!prev || typeof prev !== 'object') return prev; const list = [...(prev.stages as unknown[])]; const cur = (list[idx] && typeof list[idx] === 'object' ? list[idx] : {}) as UnknownRecord; list[idx] = { ...cur, weight: e?.target?.value ?? '' }; return { ...prev, stages: list, error: '' }; })} placeholder="Peso (kg)" className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500" />
-                                            <input inputMode="decimal" value={s?.reps != null ? String(s.reps) : ''} onChange={(e) => { const n = parseTrainingNumber(e?.target?.value); setStrippingModal((prev) => { if (!prev || typeof prev !== 'object') return prev; const list = [...(prev.stages as unknown[])]; const cur = (list[idx] && typeof list[idx] === 'object' ? list[idx] : {}) as UnknownRecord; list[idx] = { ...cur, reps: n != null && n > 0 ? n : null }; return { ...prev, stages: list, error: '' }; }); }} placeholder="Reps" className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500" />
+                                            <input inputMode="decimal" value={String(s?.weight ?? '')} onChange={(e) => setStrippingModal((prev) => { if (!prev || typeof prev !== 'object') return prev; const list = [...(prev.stages as unknown[])]; const cur = (list[idx] && typeof list[idx] === 'object' ? list[idx] : {}) as UnknownRecord; list[idx] = { ...cur, weight: e?.target?.value ?? '' }; return { ...prev, stages: list, error: '' }; })} placeholder="Peso (kg)" className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500" />
+                                            <input inputMode="decimal" value={s?.reps != null ? String(s.reps) : ''} onChange={(e) => { const n = parseTrainingNumber(e?.target?.value); setStrippingModal((prev) => { if (!prev || typeof prev !== 'object') return prev; const list = [...(prev.stages as unknown[])]; const cur = (list[idx] && typeof list[idx] === 'object' ? list[idx] : {}) as UnknownRecord; list[idx] = { ...cur, reps: n != null && n > 0 ? n : null }; return { ...prev, stages: list, error: '' }; }); }} placeholder="Reps" className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500" />
                                         </div>
                                     </div>
                                 ))}
@@ -465,8 +465,8 @@ export function ModalsComplexMethods() {
                                             {idx < blocks.length - 1 && <div className="text-[10px] text-neutral-400 inline-flex items-center gap-1"><Clock size={10} />{intraSec}s descanso</div>}
                                         </div>
                                         <div className="grid grid-cols-2 gap-2">
-                                            <input inputMode="decimal" value={String(b?.weight ?? '')} onChange={(e) => setFst7Modal((prev) => { if (!prev || typeof prev !== 'object') return prev; const list = [...(prev.blocks as unknown[])]; const cur = (list[idx] && typeof list[idx] === 'object' ? list[idx] : {}) as UnknownRecord; list[idx] = { ...cur, weight: e?.target?.value ?? '' }; return { ...prev, blocks: list, error: '' }; })} placeholder="Peso (kg)" className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500" />
-                                            <input inputMode="decimal" value={b?.reps != null ? String(b.reps) : ''} onChange={(e) => { const n = parseTrainingNumber(e?.target?.value); setFst7Modal((prev) => { if (!prev || typeof prev !== 'object') return prev; const list = [...(prev.blocks as unknown[])]; const cur = (list[idx] && typeof list[idx] === 'object' ? list[idx] : {}) as UnknownRecord; list[idx] = { ...cur, reps: n != null && n > 0 ? n : null }; return { ...prev, blocks: list, error: '' }; }); }} placeholder="Reps" className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500" />
+                                            <input inputMode="decimal" value={String(b?.weight ?? '')} onChange={(e) => setFst7Modal((prev) => { if (!prev || typeof prev !== 'object') return prev; const list = [...(prev.blocks as unknown[])]; const cur = (list[idx] && typeof list[idx] === 'object' ? list[idx] : {}) as UnknownRecord; list[idx] = { ...cur, weight: e?.target?.value ?? '' }; return { ...prev, blocks: list, error: '' }; })} placeholder="Peso (kg)" className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500" />
+                                            <input inputMode="decimal" value={b?.reps != null ? String(b.reps) : ''} onChange={(e) => { const n = parseTrainingNumber(e?.target?.value); setFst7Modal((prev) => { if (!prev || typeof prev !== 'object') return prev; const list = [...(prev.blocks as unknown[])]; const cur = (list[idx] && typeof list[idx] === 'object' ? list[idx] : {}) as UnknownRecord; list[idx] = { ...cur, reps: n != null && n > 0 ? n : null }; return { ...prev, blocks: list, error: '' }; }); }} placeholder="Reps" className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500" />
                                         </div>
                                     </div>
                                 ))}
@@ -501,7 +501,7 @@ export function ModalsComplexMethods() {
                                 <div className="grid grid-cols-2 gap-3">
                                     <div className="space-y-1">
                                         <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Peso base (kg)</div>
-                                        <input inputMode="decimal" value={String(waveModal.weight ?? '')} onChange={(e) => setWaveModal((prev) => prev && typeof prev === 'object' ? { ...prev, weight: e?.target?.value ?? '', error: '' } : prev)} placeholder="Ex: 80" className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500" />
+                                        <input inputMode="decimal" value={String(waveModal.weight ?? '')} onChange={(e) => setWaveModal((prev) => prev && typeof prev === 'object' ? { ...prev, weight: e?.target?.value ?? '', error: '' } : prev)} placeholder="Ex: 80" className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500" />
                                     </div>
                                     <div className="space-y-1">
                                         <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Nº de ondas</div>
@@ -518,22 +518,22 @@ export function ModalsComplexMethods() {
                                         <div className="grid grid-cols-3 gap-2">
                                             <div className="space-y-1">
                                                 <div className="text-[10px] text-neutral-400 uppercase tracking-widest">Pesado (reps)</div>
-                                                <input inputMode="numeric" value={w?.heavy != null ? String(w.heavy) : ''} onChange={(e) => { const n = parseTrainingNumber(e?.target?.value); setWaveModal((prev) => { if (!prev || typeof prev !== 'object') return prev; const list = [...(prev.waves as unknown[])]; const cur = (list[idx] && typeof list[idx] === 'object' ? list[idx] : {}) as UnknownRecord; list[idx] = { ...cur, heavy: n != null ? n : null }; return { ...prev, waves: list, error: '' }; }); }} placeholder="3" className="w-full bg-black/30 border border-neutral-700 rounded-lg px-2 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500" />
+                                                <input inputMode="numeric" value={w?.heavy != null ? String(w.heavy) : ''} onChange={(e) => { const n = parseTrainingNumber(e?.target?.value); setWaveModal((prev) => { if (!prev || typeof prev !== 'object') return prev; const list = [...(prev.waves as unknown[])]; const cur = (list[idx] && typeof list[idx] === 'object' ? list[idx] : {}) as UnknownRecord; list[idx] = { ...cur, heavy: n != null ? n : null }; return { ...prev, waves: list, error: '' }; }); }} placeholder="3" className="w-full bg-black/30 border border-neutral-700 rounded-lg px-2 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500" />
                                             </div>
                                             <div className="space-y-1">
                                                 <div className="text-[10px] text-neutral-400 uppercase tracking-widest">Médio (reps)</div>
-                                                <input inputMode="numeric" value={w?.medium != null ? String(w.medium) : ''} onChange={(e) => { const n = parseTrainingNumber(e?.target?.value); setWaveModal((prev) => { if (!prev || typeof prev !== 'object') return prev; const list = [...(prev.waves as unknown[])]; const cur = (list[idx] && typeof list[idx] === 'object' ? list[idx] : {}) as UnknownRecord; list[idx] = { ...cur, medium: n != null ? n : null }; return { ...prev, waves: list, error: '' }; }); }} placeholder="5" className="w-full bg-black/30 border border-neutral-700 rounded-lg px-2 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500" />
+                                                <input inputMode="numeric" value={w?.medium != null ? String(w.medium) : ''} onChange={(e) => { const n = parseTrainingNumber(e?.target?.value); setWaveModal((prev) => { if (!prev || typeof prev !== 'object') return prev; const list = [...(prev.waves as unknown[])]; const cur = (list[idx] && typeof list[idx] === 'object' ? list[idx] : {}) as UnknownRecord; list[idx] = { ...cur, medium: n != null ? n : null }; return { ...prev, waves: list, error: '' }; }); }} placeholder="5" className="w-full bg-black/30 border border-neutral-700 rounded-lg px-2 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500" />
                                             </div>
                                             <div className="space-y-1">
                                                 <div className="text-[10px] text-neutral-400 uppercase tracking-widest">Ultra leve (reps)</div>
-                                                <input inputMode="numeric" value={w?.ultra != null ? String(w.ultra) : ''} onChange={(e) => { const n = parseTrainingNumber(e?.target?.value); setWaveModal((prev) => { if (!prev || typeof prev !== 'object') return prev; const list = [...(prev.waves as unknown[])]; const cur = (list[idx] && typeof list[idx] === 'object' ? list[idx] : {}) as UnknownRecord; list[idx] = { ...cur, ultra: n != null ? n : null }; return { ...prev, waves: list, error: '' }; }); }} placeholder="2" className="w-full bg-black/30 border border-neutral-700 rounded-lg px-2 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500" />
+                                                <input inputMode="numeric" value={w?.ultra != null ? String(w.ultra) : ''} onChange={(e) => { const n = parseTrainingNumber(e?.target?.value); setWaveModal((prev) => { if (!prev || typeof prev !== 'object') return prev; const list = [...(prev.waves as unknown[])]; const cur = (list[idx] && typeof list[idx] === 'object' ? list[idx] : {}) as UnknownRecord; list[idx] = { ...cur, ultra: n != null ? n : null }; return { ...prev, waves: list, error: '' }; }); }} placeholder="2" className="w-full bg-black/30 border border-neutral-700 rounded-lg px-2 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500" />
                                             </div>
                                         </div>
                                     </div>
                                 ))}
                                 <div className="space-y-1">
                                     <div className="text-xs font-black uppercase tracking-widest text-neutral-400">RPE (opcional)</div>
-                                    <input inputMode="decimal" value={String(waveModal.rpe ?? '')} onChange={(e) => setWaveModal((prev) => prev && typeof prev === 'object' ? { ...prev, rpe: e?.target?.value ?? '' } : prev)} placeholder="1–10" className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500" />
+                                    <input inputMode="decimal" value={String(waveModal.rpe ?? '')} onChange={(e) => setWaveModal((prev) => prev && typeof prev === 'object' ? { ...prev, rpe: e?.target?.value ?? '' } : prev)} placeholder="1–10" className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500" />
                                 </div>
                             </div>
                             <div className="p-4 border-t border-neutral-800 flex items-center justify-between gap-2">
@@ -621,7 +621,7 @@ export function ModalsComplexMethods() {
                                                 });
                                             }}
                                             placeholder="Total reps (ex.: 12)"
-                                            className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+                                            className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500"
                                         />
                                         <input
                                             inputMode="decimal"
@@ -635,7 +635,7 @@ export function ModalsComplexMethods() {
                                                 });
                                             }}
                                             placeholder="Blocos (ex.: 3)"
-                                            className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+                                            className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500"
                                         />
                                         <input
                                             inputMode="decimal"
@@ -649,7 +649,7 @@ export function ModalsComplexMethods() {
                                                 });
                                             }}
                                             placeholder="Descanso (s) (ex.: 15)"
-                                            className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+                                            className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500"
                                         />
                                     </div>
                                     <div className="mt-2 flex items-center justify-end">
@@ -748,7 +748,7 @@ export function ModalsComplexMethods() {
                                                         });
                                                     }}
                                                     placeholder="kg"
-                                                    className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+                                                    className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500"
                                                 />
                                                 <input
                                                     inputMode="decimal"
@@ -771,7 +771,7 @@ export function ModalsComplexMethods() {
                                                         });
                                                     }}
                                                     placeholder="reps"
-                                                    className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+                                                    className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500"
                                                 />
                                             </div>
                                             {!isLast ? <div className="mt-2 text-xs text-neutral-400">Descanso: {safeRestSec}s</div> : null}
@@ -789,7 +789,7 @@ export function ModalsComplexMethods() {
                                         setClusterModal((prev) => (prev && typeof prev === 'object' ? { ...prev, rpe: v, error: '' } : prev));
                                     }}
                                     placeholder="RPE (0-10)"
-                                    className="mt-2 w-full bg-black/30 border border-yellow-500/30 rounded-lg px-3 py-2 text-sm text-yellow-500 font-bold outline-none focus:ring-1 ring-yellow-500"
+                                    className="mt-2 w-full bg-black/30 border border-yellow-500/30 rounded-lg px-3 py-2 text-[16px] text-yellow-500 font-bold outline-none focus:ring-1 ring-yellow-500"
                                 />
                             </div>
                         </div>
