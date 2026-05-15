@@ -407,6 +407,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     setFst7Modal, setHeavyDutyModal, setPontoZeroModal, setForcedRepsModal,
     setNegativeRepsModal, setPartialRepsModal, setSistema21Modal, setWaveModal, setGroupMethodModal,
     getLog, updateLog,
+    startTimer,
   });
 
   // ── Toggle exercise notes ──────────────────────────────────────────────
