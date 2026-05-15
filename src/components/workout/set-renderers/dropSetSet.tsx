@@ -128,7 +128,8 @@ const DropSetSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: nu
                   weight: String(s?.weight ?? '').trim(),
                   reps: parseTrainingNumber(s?.reps) ?? null,
                 }));
-                setDropSetModal({ key, label: modeLabel, stages: baseStages, error: '' });
+                const restSec = parseTrainingNumber(ex.rest_time ?? (ex as unknown as Record<string, unknown>).restTime) ?? 0;
+                setDropSetModal({ key, label: modeLabel, stages: baseStages, restSec, rpe: log.rpe ?? '', error: '' });
               }}
               className="shrink-0 bg-black/30 border border-neutral-700 rounded-lg px-2 py-2 text-sm text-white outline-none hover:border-yellow-500/60 hover:text-yellow-500 transition-colors inline-flex items-center justify-center gap-1.5"
             >

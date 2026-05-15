@@ -240,10 +240,13 @@ export function useWorkoutMethodSavers({
                 total += reps;
             }
             const lastWeight = String(stages[stages.length - 1]?.weight ?? '').trim();
+            const rpeRaw = String(m?.rpe ?? '').trim();
+            const rpeVal = rpeRaw ? parseTrainingNumber(rpeRaw) : null;
             updateLog(key, {
                 done: !!getLog(key)?.done,
                 weight: lastWeight,
                 reps: String(total || ''),
+                rpe: rpeVal ?? null,
                 drop_set: { stages },
             });
             setDropSetModal(null);

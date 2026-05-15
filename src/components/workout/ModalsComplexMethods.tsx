@@ -320,52 +320,94 @@ export function ModalsComplexMethods() {
                                     <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Etapas</div>
                                 </div>
 
-                                {Array.isArray(dropSetModal?.stages) &&
-                                    ((dropSetModal as UnknownRecord).stages as unknown[]).map((stage, idx) => {
-                                        const st = isObject(stage) ? (stage as UnknownRecord) : ({} as UnknownRecord);
-                                        const w = String(st.weight ?? '');
-                                        const r = st.reps == null ? '' : String(st.reps);
-                                        return (
-                                            <div key={`stage-${idx}`} className="rounded-xl border border-neutral-800 bg-neutral-950/30 p-3">
-                                                <div className="text-[10px] uppercase tracking-widest font-bold text-neutral-400 mb-2">Etapa {idx + 1}</div>
-                                                <div className="grid grid-cols-2 gap-2">
-                                                    <input
-                                                        inputMode="decimal"
-                                                        value={w}
-                                                        onChange={(e) => {
-                                                            const v = e?.target?.value ?? '';
-                                                            setDropSetModal((prev) => {
-                                                                if (!prev || typeof prev !== 'object') return prev;
-                                                                const list = Array.isArray(prev.stages) ? [...prev.stages] : [];
-                                                                const cur = list[idx] && typeof list[idx] === 'object' ? list[idx] : {};
-                                                                list[idx] = { ...cur, weight: v };
-                                                                return { ...prev, stages: list, error: '' };
-                                                            });
-                                                        }}
-                                                        placeholder={stagePlaceholder(idx, 'weight')}
-                                                        className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500"
-                                                    />
-                                                    <input
-                                                        inputMode="decimal"
-                                                        value={r}
-                                                        onChange={(e) => {
-                                                            const n = parseTrainingNumber(e?.target?.value);
-                                                            const next = n != null && n > 0 ? n : null;
-                                                            setDropSetModal((prev) => {
-                                                                if (!prev || typeof prev !== 'object') return prev;
-                                                                const list = Array.isArray(prev.stages) ? [...prev.stages] : [];
-                                                                const cur = list[idx] && typeof list[idx] === 'object' ? list[idx] : {};
-                                                                list[idx] = { ...cur, reps: next };
-                                                                return { ...prev, stages: list, error: '' };
-                                                            });
-                                                        }}
-                                                        placeholder={stagePlaceholder(idx, 'reps')}
-                                                        className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500"
-                                                    />
+                                {(() => {
+                                        const modal = dropSetModal as UnknownRecord;
+                                        const modalRestSec = Number(modal.restSec ?? 0);
+                                        const safeRestSec = Number.isFinite(modalRestSec) && modalRestSec > 0 ? modalRestSec : 0;
+                                        const stagesList = Array.isArray(modal.stages) ? (modal.stages as unknown[]) : [];
+                                        return stagesList.map((stage, idx) => {
+                                            const st = isObject(stage) ? (stage as UnknownRecord) : ({} as UnknownRecord);
+                                            const w = String(st.weight ?? '');
+                                            const r = st.reps == null ? '' : String(st.reps);
+                                            const isLast = idx >= stagesList.length - 1;
+                                            const btnKey = `${String(modal.key || '')}-ds-${idx}`;
+                                            const timerDone = safeRestSec > 0 ? isRestDone(btnKey, safeRestSec) : false;
+                                            return (
+                                                <div key={`stage-${idx}`} className="rounded-xl border border-neutral-800 bg-neutral-950/30 p-3 relative">
+                                                    <div className="flex items-center gap-2 mb-2">
+                                                        <div className="text-[10px] uppercase tracking-widest font-bold text-neutral-400">Etapa {idx + 1}</div>
+                                                    </div>
+                                                    {!isLast && safeRestSec ? (
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                startTimer(safeRestSec, { kind: 'drop_set', key: modal.key, stageIndex: idx });
+                                                                setRestStartedAt(prev => ({ ...prev, [btnKey]: Date.now() }));
+                                                            }}
+                                                            className={timerDone
+                                                                ? 'absolute top-3 right-3 inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-500 text-black active:scale-95 transition-transform z-10'
+                                                                : 'absolute top-3 right-3 inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 hover:bg-neutral-800 active:scale-95 transition-transform z-10'
+                                                            }
+                                                            aria-label={timerDone ? 'Descanso concluído' : `Iniciar descanso ${safeRestSec}s`}
+                                                        >
+                                                            {timerDone ? <Check size={14} /> : <Clock size={14} className="text-yellow-500" />}
+                                                            <span className="text-xs font-black">{timerDone ? 'OK' : `${safeRestSec}s`}</span>
+                                                        </button>
+                                                    ) : null}
+                                                    <div className="grid grid-cols-2 gap-2">
+                                                        <input
+                                                            inputMode="decimal"
+                                                            value={w}
+                                                            onChange={(e) => {
+                                                                const v = e?.target?.value ?? '';
+                                                                setDropSetModal((prev) => {
+                                                                    if (!prev || typeof prev !== 'object') return prev;
+                                                                    const list = Array.isArray(prev.stages) ? [...prev.stages] : [];
+                                                                    const cur = list[idx] && typeof list[idx] === 'object' ? list[idx] : {};
+                                                                    list[idx] = { ...cur, weight: v };
+                                                                    return { ...prev, stages: list, error: '' };
+                                                                });
+                                                            }}
+                                                            placeholder={stagePlaceholder(idx, 'weight')}
+                                                            className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500"
+                                                        />
+                                                        <input
+                                                            inputMode="decimal"
+                                                            value={r}
+                                                            onChange={(e) => {
+                                                                const n = parseTrainingNumber(e?.target?.value);
+                                                                const next = n != null && n > 0 ? n : null;
+                                                                setDropSetModal((prev) => {
+                                                                    if (!prev || typeof prev !== 'object') return prev;
+                                                                    const list = Array.isArray(prev.stages) ? [...prev.stages] : [];
+                                                                    const cur = list[idx] && typeof list[idx] === 'object' ? list[idx] : {};
+                                                                    list[idx] = { ...cur, reps: next };
+                                                                    return { ...prev, stages: list, error: '' };
+                                                                });
+                                                            }}
+                                                            placeholder={stagePlaceholder(idx, 'reps')}
+                                                            className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500"
+                                                        />
+                                                    </div>
+                                                    {!isLast && safeRestSec ? <div className="mt-2 text-xs text-neutral-400">Descanso: {safeRestSec}s</div> : null}
                                                 </div>
-                                            </div>
-                                        );
-                                    })}
+                                            );
+                                        });
+                                    })()}
+
+                                <div className="rounded-xl border border-neutral-800 bg-neutral-950/30 p-3">
+                                    <div className="text-xs font-black uppercase tracking-widest text-neutral-400">RPE da série</div>
+                                    <input
+                                        inputMode="decimal"
+                                        value={String((dropSetModal as UnknownRecord)?.rpe ?? '')}
+                                        onChange={(e) => {
+                                            const v = e?.target?.value ?? '';
+                                            setDropSetModal((prev) => (prev && typeof prev === 'object' ? { ...prev, rpe: v } : prev));
+                                        }}
+                                        placeholder="RPE (0-10)"
+                                        className="mt-2 w-full bg-black/30 border border-yellow-500/30 rounded-xl px-3 py-2 text-[16px] text-yellow-500 font-bold outline-none focus:ring-1 ring-yellow-500"
+                                    />
+                                </div>
                             </div>
 
                             <div className="p-4 border-t border-neutral-800 flex items-center justify-between gap-2">
