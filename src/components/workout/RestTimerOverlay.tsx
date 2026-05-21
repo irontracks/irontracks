@@ -59,6 +59,16 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
     // Without this, the overlay stays visible for 1-2 frames after tap, during which
     // re-renders can interfere with the button's click handling on iOS WKWebView.
     const [dismissed, setDismissed] = useState(false);
+    // Flash dismiss: tapping the green "BORA!" flash hides ONLY the flash,
+    // keeping the bottom bar (timer + START + AUTO) visible. Lets the user
+    // peek at the upcoming sets in the workout list below WITHOUT pressing
+    // START — START would begin the exercise execution timer.
+    //
+    // Tracked as "which targetTime was the flash dismissed for" instead of a
+    // plain boolean: when the next rest starts, targetTime changes and the
+    // flash automatically shows again — no setState-in-effect needed.
+    const [flashDismissedForTarget, setFlashDismissedForTarget] = useState<number | null>(null);
+    const flashDismissed = targetTime != null && flashDismissedForTarget === targetTime;
     // AUTO: persisted in localStorage so the user's preference survives across
     // sets, sessions and app restarts. When ON, the overlay auto-advances 500 ms
     // after the countdown reaches zero.
@@ -518,12 +528,15 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
 
     return (
         <>
-            {/* Finished flash — pointer capture prevents accidental taps on workout modal below */}
-            {isFinished && !isTransition && (
+            {/* Finished flash — tap anywhere to hide it (keeps the bottom bar
+                so the user can scan the upcoming sets before pressing START).
+                stopPropagation still guards against the tap leaking to the
+                workout modal below. */}
+            {isFinished && !isTransition && !flashDismissed && (
                 <div
                     role="presentation"
-                    className={`fixed inset-0 z-[2000] backdrop-blur-sm flex flex-col items-center justify-center px-6 overflow-x-hidden ${isSideRest ? 'bg-blue-600/90' : 'bg-green-600/90'}`}
-                    onClick={(e) => e.stopPropagation()}
+                    className={`fixed inset-0 z-[2000] backdrop-blur-sm flex flex-col items-center justify-center px-6 overflow-x-hidden cursor-pointer ${isSideRest ? 'bg-blue-600/90' : 'bg-green-600/90'}`}
+                    onClick={(e) => { e.stopPropagation(); setFlashDismissedForTarget(targetTime ?? null); }}
                     onPointerDown={(e) => e.stopPropagation()}
                     onTouchStart={(e) => e.stopPropagation()}
                 >
@@ -539,6 +552,10 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
                     ) : (
                         <p className="text-white/80 font-bold mt-2 text-lg">{finishedLabel}</p>
                     )}
+                    {/* Tap hint — sits near the bottom, above the fixed bar */}
+                    <p className="absolute bottom-28 left-0 right-0 text-center text-white/55 font-bold text-xs uppercase tracking-widest">
+                        Toque para ver o treino
+                    </p>
                 </div>
             )}
 
