@@ -168,7 +168,7 @@ export default function Modals() {
                   aria-labelledby="checkin-rpe-label"
                   value={String(postCheckinDraft?.rpe ?? '')}
                   onChange={(e) => setPostCheckinDraft((prev) => ({ ...prev, rpe: String(e.target.value || '') }))}
-                  className="w-full min-h-[44px] bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white"
+                  className="w-full min-h-[44px] bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-2 text-[16px] text-white"
                 >
                   <option value="">Não informar</option>
                   {Array.from({ length: 10 }).map((_, i) => (
@@ -205,7 +205,7 @@ export default function Modals() {
                   aria-labelledby="checkin-soreness-label"
                   value={String(postCheckinDraft?.soreness ?? '')}
                   onChange={(e) => setPostCheckinDraft((prev) => ({ ...prev, soreness: String(e.target.value || '') }))}
-                  className="w-full min-h-[44px] bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white"
+                  className="w-full min-h-[44px] bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-2 text-[16px] text-white"
                 >
                   <option value="">Não informar</option>
                   {Array.from({ length: 11 }).map((_, i) => (
@@ -222,7 +222,7 @@ export default function Modals() {
                   aria-label="Observações do treino"
                   value={String(postCheckinDraft?.notes || '')}
                   onChange={(e) => setPostCheckinDraft((prev) => ({ ...prev, notes: String(e.target.value || '') }))}
-                  className="w-full min-h-[90px] bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white outline-none"
+                  className="w-full min-h-[90px] bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-2 text-[16px] text-white outline-none"
                   placeholder="Ex.: treino pesado, boa técnica, ajustar carga na próxima…"
                 />
               </div>
@@ -328,7 +328,7 @@ export default function Modals() {
                         inputMode="decimal"
                         value={Number.isFinite(reductionPct) ? String(reductionPct) : ''}
                         onChange={(e) => updateDeloadModalFromPercent(e?.target?.value ?? '')}
-                        className="mt-2 w-full bg-black/30 border border-neutral-700 rounded-xl px-3 py-3 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+                        className="mt-2 w-full bg-black/30 border border-neutral-700 rounded-xl px-3 py-3 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500"
                         placeholder="12"
                       />
                     </div>
@@ -339,7 +339,7 @@ export default function Modals() {
                         inputMode="decimal"
                         value={Number.isFinite(suggestedWeight) ? String(suggestedWeight) : ''}
                         onChange={(e) => updateDeloadModalFromWeight(e?.target?.value ?? '')}
-                        className="mt-2 w-full bg-black/30 border border-neutral-700 rounded-xl px-3 py-3 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+                        className="mt-2 w-full bg-black/30 border border-neutral-700 rounded-xl px-3 py-3 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500"
                         placeholder="100"
                       />
                     </div>
@@ -406,7 +406,7 @@ export default function Modals() {
                   id="add-exercise-name"
                   value={String(addExerciseDraft?.name ?? '')}
                   onChange={(e) => setAddExerciseDraft((prev) => ({ ...prev, name: e?.target?.value ?? '' }))}
-                  className="mt-2 w-full bg-black/30 border border-neutral-700 rounded-xl px-3 py-3 text-sm text-white outline-none focus:ring-1 ring-yellow-500 placeholder:text-neutral-400 placeholder:opacity-40"
+                  className="mt-2 w-full bg-black/30 border border-neutral-700 rounded-xl px-3 py-3 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500 placeholder:text-neutral-400 placeholder:opacity-40"
                   placeholder="Ex: Supino reto"
                 />
               </div>
@@ -418,7 +418,7 @@ export default function Modals() {
                     inputMode="decimal"
                     value={String(addExerciseDraft?.sets ?? '')}
                     onChange={(e) => setAddExerciseDraft((prev) => ({ ...prev, sets: e?.target?.value ?? '' }))}
-                    className="mt-2 w-full bg-black/30 border border-neutral-700 rounded-xl px-3 py-3 text-sm text-white outline-none focus:ring-1 ring-yellow-500 placeholder:text-neutral-400 placeholder:opacity-40"
+                    className="mt-2 w-full bg-black/30 border border-neutral-700 rounded-xl px-3 py-3 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500 placeholder:text-neutral-400 placeholder:opacity-40"
                     placeholder="3"
                   />
                 </div>
@@ -429,7 +429,7 @@ export default function Modals() {
                     inputMode="decimal"
                     value={String(addExerciseDraft?.restTime ?? '')}
                     onChange={(e) => setAddExerciseDraft((prev) => ({ ...prev, restTime: e?.target?.value ?? '' }))}
-                    className="mt-2 w-full bg-black/30 border border-neutral-700 rounded-xl px-3 py-3 text-sm text-white outline-none focus:ring-1 ring-yellow-500 placeholder:text-neutral-400 placeholder:opacity-40"
+                    className="mt-2 w-full bg-black/30 border border-neutral-700 rounded-xl px-3 py-3 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500 placeholder:text-neutral-400 placeholder:opacity-40"
                     placeholder="60"
                   />
                 </div>
@@ -479,7 +479,7 @@ export default function Modals() {
                   id="edit-exercise-name"
                   value={String(editExerciseDraft?.name ?? '')}
                   onChange={(e) => setEditExerciseDraft((prev) => ({ ...prev, name: e?.target?.value ?? '' }))}
-                  className="mt-2 w-full bg-black/30 border border-neutral-700 rounded-xl px-3 py-3 text-sm text-white outline-none focus:ring-1 ring-yellow-500 placeholder:text-neutral-400 placeholder:opacity-40"
+                  className="mt-2 w-full bg-black/30 border border-neutral-700 rounded-xl px-3 py-3 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500 placeholder:text-neutral-400 placeholder:opacity-40"
                   placeholder="Ex: Supino reto"
                 />
               </div>
@@ -491,7 +491,7 @@ export default function Modals() {
                     inputMode="decimal"
                     value={String(editExerciseDraft?.sets ?? '')}
                     onChange={(e) => setEditExerciseDraft((prev) => ({ ...prev, sets: e?.target?.value ?? '' }))}
-                    className="mt-2 w-full bg-black/30 border border-neutral-700 rounded-xl px-3 py-3 text-sm text-white outline-none focus:ring-1 ring-yellow-500 placeholder:text-neutral-400 placeholder:opacity-40"
+                    className="mt-2 w-full bg-black/30 border border-neutral-700 rounded-xl px-3 py-3 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500 placeholder:text-neutral-400 placeholder:opacity-40"
                     placeholder="3"
                   />
                 </div>
@@ -502,7 +502,7 @@ export default function Modals() {
                     inputMode="decimal"
                     value={String(editExerciseDraft?.restTime ?? '')}
                     onChange={(e) => setEditExerciseDraft((prev) => ({ ...prev, restTime: e?.target?.value ?? '' }))}
-                    className="mt-2 w-full bg-black/30 border border-neutral-700 rounded-xl px-3 py-3 text-sm text-white outline-none focus:ring-1 ring-yellow-500 placeholder:text-neutral-400 placeholder:opacity-40"
+                    className="mt-2 w-full bg-black/30 border border-neutral-700 rounded-xl px-3 py-3 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500 placeholder:text-neutral-400 placeholder:opacity-40"
                     placeholder="60"
                   />
                 </div>
@@ -513,7 +513,7 @@ export default function Modals() {
                   id="edit-exercise-method"
                   value={String(editExerciseDraft?.method ?? 'Normal')}
                   onChange={(e) => setEditExerciseDraft((prev) => ({ ...prev, method: String(e.target.value || 'Normal') }))}
-                  className="mt-2 w-full min-h-[44px] bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white"
+                  className="mt-2 w-full min-h-[44px] bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-2 text-[16px] text-white"
                 >
                   <option value="Normal">Normal</option>
                   <option value="Drop-set">Drop-set</option>
@@ -551,7 +551,7 @@ export default function Modals() {
                       inputMode="decimal"
                       value={String(editExerciseDraft?.sideRestTime ?? '')}
                       onChange={(e) => setEditExerciseDraft((prev) => ({ ...prev, sideRestTime: e?.target?.value ?? '' }))}
-                      className="mt-2 w-full bg-black/30 border border-neutral-700 rounded-xl px-3 py-3 text-sm text-white outline-none focus:ring-1 ring-blue-500 placeholder:text-neutral-400 placeholder:opacity-40"
+                      className="mt-2 w-full bg-black/30 border border-neutral-700 rounded-xl px-3 py-3 text-[16px] text-white outline-none focus:ring-1 ring-blue-500 placeholder:text-neutral-400 placeholder:opacity-40"
                       placeholder="15"
                     />
                   </div>
@@ -563,7 +563,7 @@ export default function Modals() {
                     inputMode="decimal"
                     value={String(editExerciseDraft?.transitionTime ?? '')}
                     onChange={(e) => setEditExerciseDraft((prev) => ({ ...prev, transitionTime: e?.target?.value ?? '' }))}
-                    className="mt-2 w-full bg-black/30 border border-neutral-700 rounded-xl px-3 py-3 text-sm text-white outline-none focus:ring-1 ring-yellow-500 placeholder:text-neutral-400 placeholder:opacity-40"
+                    className="mt-2 w-full bg-black/30 border border-neutral-700 rounded-xl px-3 py-3 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500 placeholder:text-neutral-400 placeholder:opacity-40"
                     placeholder="0 = desativado"
                   />
                 </div>
@@ -749,7 +749,7 @@ export default function Modals() {
                         });
                       }}
                       placeholder="Total reps (ex.: 12)"
-                      className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+                      className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500"
                     />
                     <input
                       inputMode="decimal"
@@ -763,7 +763,7 @@ export default function Modals() {
                         });
                       }}
                       placeholder="Blocos (ex.: 3)"
-                      className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+                      className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500"
                     />
                     <input
                       inputMode="decimal"
@@ -777,7 +777,7 @@ export default function Modals() {
                         });
                       }}
                       placeholder="Descanso (s) (ex.: 15)"
-                      className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+                      className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500"
                     />
                   </div>
                   <div className="mt-2 flex items-center justify-end">
@@ -867,7 +867,7 @@ export default function Modals() {
                             });
                           }}
                           placeholder="kg"
-                          className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+                          className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500"
                         />
                         <input
                           inputMode="decimal"
@@ -890,7 +890,7 @@ export default function Modals() {
                             });
                           }}
                           placeholder="reps"
-                          className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+                          className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500"
                         />
                       </div>
                       {!isLast ? <div className="mt-2 text-xs text-neutral-400">Descanso: {safeRestSec}s</div> : null}
@@ -908,7 +908,7 @@ export default function Modals() {
                     setClusterModal((prev) => (prev && typeof prev === 'object' ? { ...prev, rpe: v, error: '' } : prev));
                   }}
                   placeholder="RPE (0-10)"
-                  className="mt-2 w-full bg-black/30 border border-yellow-500/30 rounded-lg px-3 py-2 text-sm text-yellow-500 font-bold outline-none focus:ring-1 ring-yellow-500"
+                  className="mt-2 w-full bg-black/30 border border-yellow-500/30 rounded-lg px-3 py-2 text-[16px] text-yellow-500 font-bold outline-none focus:ring-1 ring-yellow-500"
                 />
               </div>
             </div>
