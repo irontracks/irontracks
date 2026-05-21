@@ -168,8 +168,21 @@ Este projeto usa **Tailwind v4** (não v3). A sintaxe e configuração são dife
 - Instalar pacotes pesados sem verificar impacto no bundle (`npm run analyze`)
 - Modificar fluxos de autenticação sem testar login completo
 - Deixar listeners do Supabase Realtime sem unsubscribe no cleanup
+- **Refatorar código fora do escopo da tarefa atual** — se identificar algo para melhorar, reportar via `mcp__ccd_session__spawn_task` mas não tocar agora
+- Usar comandos destrutivos (`rm -rf`, etc.) sem confirmação explícita
+- Executar migrations de banco sem confirmar "sim" com o usuário
+- Modificar `.env.local` ou variáveis de ambiente diretamente
+- Adicionar dependências sem confirmar por que são necessárias primeiro
 
 ## Fluxo de trabalho correto
+
+### Antes de começar qualquer tarefa complexa
+1. **Use Plan Mode** (`/plan`) — leia o plano completo antes de pressionar Enter para executar
+2. **Declare as fronteiras negativas** no prompt: "faça X, **não toque** em middleware.ts, auth, schema do banco"
+3. **Commit de checkpoint** antes de iniciar: `git add -p && git commit -m "checkpoint antes de <tarefa>"` — isola a mudança e facilita o diff depois
+4. **Leia o diff** antes de aceitar: `git diff` mostra arquivos inesperados sendo tocados
+
+### Execução
 ```
 editar código
   → npx tsc --noEmit           (zero erros)
