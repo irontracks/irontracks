@@ -50,7 +50,7 @@ export const PlankSetInput: React.FC<Props> = ({ ex, exIdx, setIdx, setsCount })
   const startedAtRef = useRef<number>(0)
 
   const inputBase =
-    'w-full bg-black/40 border border-neutral-700/80 rounded-xl px-3 py-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500 focus:border-yellow-500/50'
+    'w-full bg-black/40 border border-neutral-700/80 rounded-xl px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500 focus:border-yellow-500/50'
 
   const collapseAndScroll = useCallback((delay: number) => {
     setTimeout(() => {
