@@ -276,7 +276,7 @@ export default function DashboardModals(props: DashboardModalsProps) {
                     >
                         {/* Modal card */}
                         <div
-                            className="relative w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-[0_-20px_80px_rgba(0,0,0,0.7)] sm:shadow-[0_40px_120px_rgba(0,0,0,0.8)] border border-white/[0.07] animate-in slide-in-from-bottom-4 sm:fade-in sm:slide-in-from-bottom-0 duration-300"
+                            className="relative w-full sm:max-w-lg rounded-t-3xl sm:rounded-3xl overflow-hidden shadow-[0_-20px_80px_rgba(0,0,0,0.7)] sm:shadow-[0_40px_120px_rgba(0,0,0,0.8)] border border-white/[0.07] animate-in slide-in-from-bottom-4 sm:fade-in sm:slide-in-from-bottom-0 duration-300 flex flex-col min-h-[88vh] sm:min-h-0 sm:max-h-[90vh]"
                             onClick={(e) => e.stopPropagation()}
                         >
                             {/* Glassmorphism bg layers */}
@@ -285,7 +285,7 @@ export default function DashboardModals(props: DashboardModalsProps) {
                             <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-yellow-500/40 to-transparent" />
 
                             {/* Content */}
-                            <div className="relative">
+                            <div className="relative flex flex-col flex-1 overflow-hidden">
                                 {/* Handle bar (mobile) */}
                                 <div className="sm:hidden flex justify-center pt-3 pb-0">
                                     <div className="w-10 h-1 rounded-full bg-white/15" />
@@ -320,7 +320,7 @@ export default function DashboardModals(props: DashboardModalsProps) {
                                 <div className="mx-5 h-px bg-gradient-to-r from-transparent via-yellow-500/20 to-transparent mb-1" />
 
                                 {/* Exercise list */}
-                                <div className="px-3 py-2 max-h-[52vh] overflow-y-auto space-y-2">
+                                <div className="px-3 py-2 flex-1 overflow-y-auto space-y-2">
                                     {exCount === 0 && (
                                         <div className="flex flex-col items-center justify-center py-10 text-center gap-3">
                                             <div className="w-12 h-12 rounded-2xl bg-neutral-800/60 border border-neutral-700/40 flex items-center justify-center">
@@ -395,7 +395,7 @@ export default function DashboardModals(props: DashboardModalsProps) {
                                 <div className="mx-5 h-px bg-gradient-to-r from-transparent via-white/[0.08] to-transparent" />
 
                                 {/* CTA Footer */}
-                                <div className="p-4 flex gap-3">
+                                <div className="p-4 flex gap-3 mt-auto">
                                     <button
                                         type="button"
                                         onClick={() => setQuickViewWorkout(null)}
