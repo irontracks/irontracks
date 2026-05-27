@@ -12,6 +12,8 @@ import {
   normalizeExerciseKey,
 } from '../utils';
 import { UnknownRecord, WorkoutExercise } from '../types';
+import type { SetType } from '@/types/workout';
+import { SetTypePopover, SET_TYPE_META, resolveSetType, useLongPress } from '../SetTypePopover';
 
 // ── Local-state input ─────────────────────────────────────────────────────
 // The workout ticker fires every 1 s and causes a full context re-render.
@@ -82,6 +84,7 @@ const NormalSetInner = ({
   const {
     getLog,
     updateLog,
+    updateSetType,
     getPlanConfig,
     getPlannedSet,
     startTimer,
@@ -95,10 +98,35 @@ const NormalSetInner = ({
   const completeBusyRef = useRef(false);
   const [isPickerOpen, setIsPickerOpen] = useState(false);
 
+  // Set type popover (long-press on the set-number badge). The anchor rect is
+  // captured at open time so the popover stays glued even if the badge
+  // re-renders during the interaction.
+  const [setTypeAnchor, setSetTypeAnchor] = useState<DOMRect | null>(null);
+  const badgeRef = useRef<HTMLButtonElement | null>(null);
+
   const key = `${exIdx}-${setIdx}`;
   const log = getLog(key);
   const cfg = getPlanConfig(ex, setIdx);
   const plannedSet = getPlannedSet(ex, setIdx);
+
+  // Effective set type: log wins (per-session override), then planned template,
+  // then legacy is_warmup. Defaults to 'working'.
+  const setType: SetType = resolveSetType({
+    set_type: (log.set_type ?? (plannedSet as UnknownRecord)?.set_type) as SetType | undefined,
+    is_warmup: log.is_warmup ?? (plannedSet as UnknownRecord)?.is_warmup,
+  });
+  const typeMeta = SET_TYPE_META[setType];
+  const isMuted = setType !== 'working';
+
+  const openSetTypePopover = useCallback(() => {
+    const rect = badgeRef.current?.getBoundingClientRect() ?? null;
+    setSetTypeAnchor(rect);
+  }, []);
+  const closeSetTypePopover = useCallback(() => setSetTypeAnchor(null), []);
+  const handleSetTypeSelect = useCallback((next: SetType) => {
+    updateSetType(exIdx, setIdx, next);
+  }, [updateSetType, exIdx, setIdx]);
+  const longPressHandlers = useLongPress(openSetTypePopover);
   const restTime = parseTrainingNumber(ex?.restTime ?? ex?.rest_time);
 
   // Unilateral config — explicit flag, with fallback to name detection
@@ -443,8 +471,9 @@ const NormalSetInner = ({
   const renderBilateralHeader = () => (
     <div
       className="grid items-center gap-1.5 px-2.5 text-[9px] uppercase tracking-widest text-neutral-400 font-bold min-w-0"
-      style={{ gridTemplateColumns: '28px minmax(0,3fr) minmax(0,2fr) minmax(0,2fr) 76px' }}
+      style={{ gridTemplateColumns: '32px 28px minmax(0,3fr) minmax(0,2fr) minmax(0,2fr) 76px' }}
     >
+      <span className="text-center">Set</span>
       <span />
       <span>Peso (kg)</span>
       <span className="text-center">Reps</span>
@@ -488,14 +517,32 @@ const NormalSetInner = ({
             done
               ? 'bg-emerald-950/30 border-emerald-500/30'
               : 'bg-neutral-900/50 border-neutral-800/80',
+            isMuted ? typeMeta.rowOpacityClass : '',
           ].join(' ')}
         >
-          {/* Order: 💬 | peso | reps | rpe | OK
-              Notes is FIRST (left side) so it never aligns with footer buttons (DROP etc.) */}
+          {/* Order: # | 💬 | peso | reps | rpe | OK
+              Set-number badge is leftmost. Long-press it to mark this set as
+              warmup or feeler (popover) — taps do nothing to avoid accidents
+              during sweaty workouts. */}
           <div className="grid items-center gap-1.5"
-            style={{ gridTemplateColumns: '28px minmax(0,3fr) minmax(0,2fr) minmax(0,2fr) 76px' }}>
+            style={{ gridTemplateColumns: '32px 28px minmax(0,3fr) minmax(0,2fr) minmax(0,2fr) 76px' }}>
 
-            {/* Notes toggle — leftmost, far from footer buttons */}
+            {/* Set-number badge with long-press → SetTypePopover */}
+            <button
+              ref={badgeRef}
+              type="button"
+              aria-label={`Série ${setIdx + 1} – ${typeMeta.label}. Mantenha pressionado para mudar tipo.`}
+              {...longPressHandlers}
+              className={[
+                'h-7 inline-flex items-center justify-center rounded-lg text-[11px] font-black tracking-tight border transition-colors select-none touch-none',
+                typeMeta.badgeClass,
+              ].join(' ')}
+              style={{ WebkitTouchCallout: 'none', WebkitUserSelect: 'none' }}
+            >
+              {setIdx + 1}{typeMeta.suffix}
+            </button>
+
+            {/* Notes toggle — far from footer buttons */}
             <button
               type="button"
               aria-label={isNotesOpen ? 'Fechar observações' : 'Observações'}
@@ -593,6 +640,15 @@ const NormalSetInner = ({
         </div>
         </>
       )}
+
+      {/* Set-type popover (long-press anchored) */}
+      <SetTypePopover
+        open={setTypeAnchor !== null}
+        anchorRect={setTypeAnchor}
+        current={setType}
+        onSelect={handleSetTypeSelect}
+        onClose={closeSetTypePopover}
+      />
 
       {/* Notes textarea — shared between L and R */}
       {isNotesOpen && (

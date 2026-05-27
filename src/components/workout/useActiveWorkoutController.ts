@@ -213,6 +213,15 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     } catch (e) { logError('hook:useActiveWorkoutController.updateLog', e) }
   }, [exercises, linkedWeightExercises, broadcastMyLog, getLog]);
 
+  // ── Set type (working / warmup / feeler) ─────────────────────────────────
+  // Writes to the active log so the change is part of the session payload on
+  // finish. `is_warmup` is kept in sync for retrocompat with older readers
+  // (mapWorkoutRow, history report HTML, etc) that still branch on it.
+  const updateSetType = useCallback((exIdx: number, setIdx: number, type: 'working' | 'warmup' | 'feeler') => {
+    const key = `${exIdx}-${setIdx}`;
+    updateLog(key, { set_type: type, is_warmup: type === 'warmup' });
+  }, [updateLog]);
+
   // ── Apply partner exercise control updates ───────────────────────────────
   const exerciseControlUpdates = teamWorkout.exerciseControlUpdates
   const lastAppliedUpdateTs = useRef(0)
@@ -571,6 +580,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     // Methods
     getLog,
     updateLog,
+    updateSetType,
     getPlanConfig,
     getPlannedSet,
     toggleCollapse,
@@ -651,7 +661,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     reportHistoryLoadingRef, reportHistoryLoadingSinceRef,
     reportHistoryStatusRef, reportHistoryUpdatedAtRef,
     deloadAiCacheRef, postCheckinResolveRef,
-    getLog, updateLog,
+    getLog, updateLog, updateSetType,
     // getPlanConfig, getPlannedSet, HELP_TERMS são imports — referência estável,
     // não precisam estar nas deps. Listados no return acima como conveniência da API.
     toggleCollapse, addExtraSetToExercise, removeExtraSetFromExercise,

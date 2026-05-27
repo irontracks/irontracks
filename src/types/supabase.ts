@@ -2113,6 +2113,7 @@ export type Database = {
           reps: string | null
           rpe: number | null
           set_number: number | null
+          set_type: string
           weight: number | null
         }
         Insert: {
@@ -2125,6 +2126,7 @@ export type Database = {
           reps?: string | null
           rpe?: number | null
           set_number?: number | null
+          set_type?: string
           weight?: number | null
         }
         Update: {
@@ -2137,6 +2139,7 @@ export type Database = {
           reps?: string | null
           rpe?: number | null
           set_number?: number | null
+          set_type?: string
           weight?: number | null
         }
         Relationships: [
@@ -3655,6 +3658,7 @@ export type Database = {
           rpe: number | null
           session_id: string
           set_number: number
+          set_type: string | null
           volume: number | null
           weight: number | null
         }
@@ -3670,6 +3674,7 @@ export type Database = {
           rpe?: number | null
           session_id: string
           set_number?: number
+          set_type?: string | null
           volume?: number | null
           weight?: number | null
         }
@@ -3685,6 +3690,7 @@ export type Database = {
           rpe?: number | null
           session_id?: string
           set_number?: number
+          set_type?: string | null
           volume?: number | null
           weight?: number | null
         }

@@ -13,12 +13,14 @@ import { estimateCaloriesMet } from '@/utils/calories/metEstimate'
 
 const getSetTag = (log: unknown): string | null => {
   if (!isRecord(log)) return null
-  const isWarmup = !!(log.is_warmup ?? log.isWarmup)
-  if (isWarmup) return 'Aquecimento'
+  const rawType = (log.set_type ?? log.setType) as string | null | undefined
+  if (rawType === 'warmup') return 'Aquecimento'
+  if (rawType === 'feeler') return 'Reconhecimento'
+  if (!rawType && (log.is_warmup ?? log.isWarmup)) return 'Aquecimento'
   const cfg = log.advanced_config ?? log.advancedConfig
   const cfgObj = isRecord(cfg) ? cfg : null
-  const rawType = cfgObj ? (cfgObj.type ?? cfgObj.kind ?? cfgObj.mode) : null
-  const t = String(rawType || '').toLowerCase()
+  const cfgType = cfgObj ? (cfgObj.type ?? cfgObj.kind ?? cfgObj.mode) : null
+  const t = String(cfgType || '').toLowerCase()
   if (!t) return null
   if (t.includes('drop')) return 'Drop-set'
   if (t.includes('rest')) return 'Rest-pause'
@@ -574,9 +576,13 @@ export function buildReportHTML(
           ? 'color:#f87171;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.25)'
           : 'color:#737373;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08)'
       const zebra = rowIdx % 2 === 0 ? '' : 'background:rgba(255,255,255,0.025)'
+      // Non-working sets (Aquecimento / Reconhecimento) render muted so the
+      // reader naturally focuses on the sets that count toward stats.
+      const isAuxiliary = tag === 'Aquecimento' || tag === 'Reconhecimento'
+      const auxStyle = isAuxiliary ? 'opacity:0.55;' : ''
 
       let rowHtml = `
-        <tr style="${zebra}">
+        <tr style="${auxStyle}${zebra}">
           <td class="td-mono td-muted">#${escapeHtml(String(set?.index || ''))}${tagHtml}</td>
           <td class="td-weight">${escapeHtml(String(weight))}</td>
           <td class="td-mono td-center">${escapeHtml(String(reps))}</td>

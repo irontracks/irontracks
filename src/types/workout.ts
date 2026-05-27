@@ -1,5 +1,12 @@
 import { z } from 'zod'
 
+// ─── Set type taxonomy ──────────────────────────────────────────────────────
+// 'working' counts toward volume, PRs, and progression analytics.
+// 'warmup' and 'feeler' are tracked but excluded from stats.
+export const SET_TYPES = ['working', 'warmup', 'feeler'] as const
+export type SetType = (typeof SET_TYPES)[number]
+export const SetTypeSchema = z.enum(SET_TYPES)
+
 // ─── Zod Validation Schemas (API layer) ─────────────────────────────────────
 
 export const SetDetailSchema = z.object({
@@ -8,6 +15,7 @@ export const SetDetailSchema = z.object({
     weight: z.number().nullable().optional(),
     rpe: z.number().min(0).max(10).nullable().optional(),
     is_warmup: z.boolean().optional(),
+    set_type: SetTypeSchema.optional(),
     completed: z.boolean().optional(),
     advanced_config: z.unknown().nullable().optional(),
     duration_seconds: z.number().int().positive().nullable().optional(),
@@ -99,6 +107,7 @@ export interface WorkoutSet {
     rpe?: number | null
     weight?: number | null
     isWarmup: boolean
+    setType?: SetType
     advancedConfig?: unknown
     completed?: boolean
     durationSeconds?: number | null

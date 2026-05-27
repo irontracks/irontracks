@@ -76,6 +76,7 @@ export const SetRowSchema = z.object({
   set_number: z.number().int().default(1),
   completed: z.boolean().default(false),
   is_warmup: z.boolean().nullable(),
+  set_type: z.enum(['working', 'warmup', 'feeler']).nullable().optional(),
   advanced_config: z.unknown().nullable(),
   duration_seconds: z.number().int().positive().nullable(),
 })
@@ -88,6 +89,7 @@ export const SetSchema = SetRowSchema.transform((row) => ({
   setNumber: row.set_number,
   completed: row.completed,
   isWarmup: row.is_warmup,
+  setType: row.set_type ?? (row.is_warmup ? 'warmup' : 'working'),
   advancedConfig: row.advanced_config,
   durationSeconds: row.duration_seconds,
 }))
