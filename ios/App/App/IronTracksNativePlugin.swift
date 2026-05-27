@@ -311,7 +311,18 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin, CLLocationMana
     // ─── Notifications ─────────────────────────────────────────────────────────
 
     @objc func requestNotificationPermission(_ call: CAPPluginCall) {
-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .sound, .badge]) { granted, _ in
+        // .timeSensitive é REQUIRED em runtime — a entitlement
+        // com.apple.developer.usernotifications.time-sensitive sozinha não basta.
+        // Sem isso o iOS rebaixa silenciosamente interruptionLevel=.timeSensitive
+        // pra .active, suprimindo o alerta quando app está em background ou
+        // Foco/DND ativo. Foi o que quebrou o aviso de fim do timer de descanso.
+        // Commit 322e0304 removeu por engano (assumiu deprecação falsa — o option
+        // foi INTRODUZIDO em iOS 15, não deprecado).
+        var options: UNAuthorizationOptions = [.alert, .sound, .badge]
+        if #available(iOS 15.0, *) {
+            options.insert(.timeSensitive)
+        }
+        UNUserNotificationCenter.current().requestAuthorization(options: options) { granted, _ in
             call.resolve(["granted": granted])
         }
     }
