@@ -21,12 +21,18 @@ import {
  *  2. Registers REST_TIMER notification category with "Pular" / "+30s" actions
  *
  * Safe to call on every mount — debounced by localStorage key per userId.
+ *
+ * Storage key bump v2 → v3: força re-request da permissão pra usuários
+ * existentes depois que `.timeSensitive` foi adicionado em
+ * IronTracksNativePlugin.swift requestNotificationPermission. iOS atualiza
+ * a authorization silenciosamente (sem prompt) quando o app já tem permissão
+ * — basta a entitlement estar presente (já está em App.entitlements).
  */
 export function useNativeAppSetup(userId?: string | null) {
   useEffect(() => {
     if (!isNativePlatform()) return
     const stableId = String(userId || '').trim()
-    const storageKey = stableId ? `irontracks.native.setup.v2.${stableId}` : `irontracks.native.setup.v2.global`
+    const storageKey = stableId ? `irontracks.native.setup.v3.${stableId}` : `irontracks.native.setup.v3.global`
     if (typeof window !== 'undefined' && localStorage.getItem(storageKey)) return
 
     // Register notification categories first (no permission required)
