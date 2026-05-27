@@ -53,13 +53,18 @@ export const buildExercisesPayload = (workout: unknown): unknown[] => {
             for (let i = 0; i < numSets; i += 1) {
                 const s = Array.isArray(setDetails) ? (setDetails[i] || null) : null
                 const sObj = s && typeof s === 'object' ? (s as Record<string, unknown>) : ({} as Record<string, unknown>)
+                const rawType = (sObj.set_type ?? sObj.setType) as string | undefined
+                const setType = rawType === 'warmup' || rawType === 'feeler' || rawType === 'working'
+                    ? rawType
+                    : ((sObj.is_warmup ?? sObj.isWarmup) ? 'warmup' : 'working')
                 sets.push({
                     weight: sObj.weight ?? null,
                     reps: (sObj.reps ?? exObj.reps) ?? null,
                     rpe: (sObj.rpe ?? exObj.rpe) ?? null,
                     set_number: (sObj.set_number ?? sObj.setNumber) ?? (i + 1),
                     completed: false,
-                    is_warmup: !!(sObj.is_warmup ?? sObj.isWarmup),
+                    is_warmup: setType === 'warmup',
+                    set_type: setType,
                     advanced_config: (sObj.advanced_config ?? sObj.advancedConfig) ?? null,
                 })
             }

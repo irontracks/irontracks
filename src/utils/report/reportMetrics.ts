@@ -44,6 +44,11 @@ const buildLogVolume = (logs: UnknownRecord, exerciseIndex: number) => {
     const done = doneRaw == null ? true : doneRaw === true || String(doneRaw || '').toLowerCase() === 'true'
     if (!done) return
 
+    // ── Skip warmup / feeler sets — they don't count toward exercise stats ─
+    const rawType = (value.set_type ?? value.setType) as string | null | undefined
+    if (rawType === 'warmup' || rawType === 'feeler') return
+    if (!rawType && (value.is_warmup || value.isWarmup)) return
+
     // ── Drop-set: sum each stage's volume; use first-stage (main) weight as avg ──
     const dropSet = isObject(value.drop_set) ? (value.drop_set as UnknownRecord) : null
     const dropStages = dropSet && Array.isArray(dropSet.stages) ? (dropSet.stages as unknown[]) : []

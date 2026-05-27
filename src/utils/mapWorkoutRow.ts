@@ -35,14 +35,21 @@ export const mapWorkoutRow = (w: unknown): Record<string, unknown> => {
                 const setsCount = sortedSets.length || (isCardio ? 1 : 4)
 
                 const setDetails = sortedSets.map(
-                    (s: Record<string, unknown>, idx: number) => ({
-                        set_number: s?.set_number ?? idx + 1,
-                        reps: s?.reps ?? null,
-                        rpe: s?.rpe ?? null,
-                        weight: s?.weight ?? null,
-                        is_warmup: !!(s?.is_warmup ?? s?.isWarmup),
-                        advanced_config: s?.advanced_config ?? s?.advancedConfig ?? null,
-                    })
+                    (s: Record<string, unknown>, idx: number) => {
+                        const rawType = (s?.set_type ?? s?.setType) as string | null | undefined
+                        const setType = rawType === 'warmup' || rawType === 'feeler' || rawType === 'working'
+                            ? rawType
+                            : ((s?.is_warmup ?? s?.isWarmup) ? 'warmup' : 'working')
+                        return {
+                            set_number: s?.set_number ?? idx + 1,
+                            reps: s?.reps ?? null,
+                            rpe: s?.rpe ?? null,
+                            weight: s?.weight ?? null,
+                            is_warmup: setType === 'warmup',
+                            set_type: setType,
+                            advanced_config: s?.advanced_config ?? s?.advancedConfig ?? null,
+                        }
+                    }
                 )
 
                 const nonEmptyReps = setDetails

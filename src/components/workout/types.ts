@@ -1,7 +1,9 @@
 
 import type { Exercise, Workout, UserRecord, ActiveWorkoutSession, UnknownRecord } from '@/types/app';
+import type { SetType } from '@/types/workout';
 
 export type { UnknownRecord } from '@/types/app';
+export type { SetType } from '@/types/workout';
 
 export type UserProfile = Partial<UserRecord> & { id?: string };
 
@@ -29,6 +31,8 @@ export type WorkoutSetDetail = {
   weight?: number | null;
   is_warmup?: boolean | null;
   isWarmup?: boolean | null;
+  set_type?: SetType | null;
+  setType?: SetType | null;
   advanced_config?: unknown;
   advancedConfig?: unknown;
   notes?: string | null;
