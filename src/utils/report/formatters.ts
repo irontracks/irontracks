@@ -105,6 +105,17 @@ const parseWeightValue = (raw: unknown): number => {
 }
 
 /**
+ * Whether a logged set should contribute to volume / PR / progression stats.
+ * Returns false for warmup or feeler ("reconhecimento") sets.
+ */
+const isWorkingSet = (log: Record<string, unknown>): boolean => {
+    const raw = (log.set_type ?? log.setType) as string | null | undefined
+    if (raw === 'warmup' || raw === 'feeler') return false
+    if (raw === 'working') return true
+    return !(log.is_warmup ?? log.isWarmup)
+}
+
+/**
  * Calculate volume from cluster blocks (each block has its own weight × reps).
  */
 const calculateClusterVolume = (cluster: unknown): number => {
@@ -131,6 +142,8 @@ export const calculateTotalVolume = (logs: unknown): number => {
         const safeLogs: Record<string, unknown> = isRecord(logs) ? logs : {}
         Object.values(safeLogs).forEach((log: unknown) => {
             if (!isRecord(log)) return
+            // Skip warmup / feeler sets — they should not influence volume.
+            if (!isWorkingSet(log)) return
 
             // Check for cluster data first (each block may have different weight)
             const clusterVol = calculateClusterVolume(log.cluster)
