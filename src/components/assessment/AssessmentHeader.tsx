@@ -1,6 +1,6 @@
 'use client'
 
-import { Activity, User, X } from 'lucide-react'
+import { Activity, Camera, User, X } from 'lucide-react'
 
 type AssessmentHeaderProps = {
   onCreate: () => void
@@ -13,6 +13,11 @@ type AssessmentHeaderProps = {
    * só faz sentido a avaliação completa.
    */
   onAddBia?: () => void
+  /**
+   * Quando definido, exibe o botão "Por Foto" que abre a avaliação por
+   * foto com laudo de IA (composição corporal via Gemini Vision).
+   */
+  onPhotoAssessment?: () => void
 }
 
 export const AssessmentHeader = ({
@@ -20,9 +25,11 @@ export const AssessmentHeader = ({
   onShowHistory,
   onClose,
   onAddBia,
+  onPhotoAssessment,
 }: AssessmentHeaderProps) => {
-  // Layout: 3 colunas quando tem o botão BIA, 2 quando não.
-  const cols = onAddBia ? 'sm:grid-cols-3' : 'sm:grid-cols-2'
+  // Layout: nº de colunas = nº de botões (Nova + Histórico são fixos).
+  const count = 2 + (onAddBia ? 1 : 0) + (onPhotoAssessment ? 1 : 0)
+  const cols = count >= 4 ? 'sm:grid-cols-4' : count === 3 ? 'sm:grid-cols-3' : 'sm:grid-cols-2'
   return (
     <div
       className="rounded-2xl border p-6 mb-6 relative overflow-hidden"
@@ -69,6 +76,21 @@ export const AssessmentHeader = ({
               >
                 <Activity className="w-4 h-4" />
                 Bioimpedância
+              </button>
+            ) : null}
+            {onPhotoAssessment ? (
+              <button
+                onClick={onPhotoAssessment}
+                className="w-full min-h-[44px] px-4 py-2 rounded-xl border font-bold transition-all duration-300 active:scale-95 inline-flex items-center justify-center gap-2"
+                style={{
+                  background: 'rgba(168,85,247,0.08)',
+                  borderColor: 'rgba(168,85,247,0.30)',
+                  color: '#d8b4fe',
+                }}
+                title="Avaliação por foto com laudo de IA (composição corporal)"
+              >
+                <Camera className="w-4 h-4" />
+                Por Foto
               </button>
             ) : null}
             <button

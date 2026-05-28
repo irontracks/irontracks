@@ -24,6 +24,7 @@ import { AssessmentSummaryCards } from '@/components/assessment/AssessmentSummar
 import { AssessmentListItem, measurementFields, skinfoldFields } from '@/components/assessment/AssessmentListItem';
 import { AssessmentPlanModal } from '@/components/assessment/AssessmentPlanModal';
 import { AssessmentHistoryModal } from './AssessmentHistoryModal';
+import { BodyPhotoCaptureModal } from '@/components/body-photo/BodyPhotoCaptureModal';
 import { useAssessmentHistoryData } from '@/hooks/useAssessmentHistoryData';
 import { ArrowLeft } from 'lucide-react';
 
@@ -62,6 +63,7 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
   const studentId = propStudentId;
   const router = useRouter();
   const [quickBiaOpen, setQuickBiaOpen] = React.useState(false);
+  const [photoModalOpen, setPhotoModalOpen] = React.useState(false);
 
   const {
     // Core data
@@ -139,6 +141,7 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
           onShowHistory={() => {}}
           onClose={undefined}
           onAddBia={studentId ? () => setQuickBiaOpen(true) : undefined}
+          onPhotoAssessment={() => setPhotoModalOpen(true)}
         />
 
         <div
@@ -154,6 +157,11 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
           <h2 className="text-xl font-black text-white mb-2">Nenhuma avaliação encontrada</h2>
           <p className="text-neutral-500 text-sm">Este aluno ainda não possui avaliações físicas registradas.</p>
         </div>
+        <BodyPhotoCaptureModal
+          open={photoModalOpen}
+          onClose={() => setPhotoModalOpen(false)}
+          studentUserId={studentId ?? null}
+        />
       </div>
     );
   }
@@ -167,6 +175,7 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
           onShowHistory={() => setShowHistory(true)}
           onClose={onClose}
           onAddBia={studentId ? () => setQuickBiaOpen(true) : undefined}
+          onPhotoAssessment={() => setPhotoModalOpen(true)}
         />
         {latestAssessment && previousAssessment && (
           <AssessmentSummaryCards
@@ -419,6 +428,13 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
             onSaved={() => { if (typeof window !== 'undefined') location.reload(); }}
           />
         )}
+        {/* Avaliação por foto (laudo IA). studentUserId define self vs personal:
+            o action compara com o usuário logado pra decidir trainer_id. */}
+        <BodyPhotoCaptureModal
+          open={photoModalOpen}
+          onClose={() => setPhotoModalOpen(false)}
+          studentUserId={studentId ?? null}
+        />
       </div>
     </DialogProvider>
   );
