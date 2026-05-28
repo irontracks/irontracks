@@ -94,6 +94,52 @@ export const BodyPhotoLaudoSchema = z.object({
 })
 export type BodyPhotoLaudo = z.infer<typeof BodyPhotoLaudoSchema>
 
+// ─── Correlação treino × corpo (Sprint 3) ───────────────────────────────────
+// O diferencial: cruza o laudo da foto com o volume REAL treinado na janela
+// entre a avaliação anterior e a atual (ou últimos 90 dias).
+
+export const BodyPhotoCorrelationSchema = z.object({
+    /** Frase-resumo de impacto (ex.: "Seu peitoral evoluiu — alto volume em supino no período"). */
+    headline: z.string().max(300).default(''),
+    /** Narrativa correlacionando treino executado e físico observado. */
+    narrative: z.string().max(2000).default(''),
+    whatIsWorking: z.array(z.string().max(240)).max(8).default([]),
+    whatIsMissing: z.array(z.string().max(240)).max(8).default([]),
+    /** Ligações grupo muscular ↔ treino no período. */
+    links: z.array(z.object({
+        muscleGroup: z.string().max(60),
+        observation: z.string().max(300),
+        trend: z.enum(['supported', 'undertrained', 'overtrained', 'neutral']),
+    })).max(15).default([]),
+    nextFocus: z.array(z.object({
+        focus: z.string().max(80),
+        action: z.string().max(300),
+    })).max(6).default([]),
+    confidence: z.enum(['high', 'medium', 'low']).default('medium'),
+})
+export type BodyPhotoCorrelation = z.infer<typeof BodyPhotoCorrelationSchema>
+
+export const CORRELATION_TREND_LABELS_PT: Record<
+    BodyPhotoCorrelation['links'][number]['trend'],
+    string
+> = {
+    supported: 'Sustentado pelo treino',
+    undertrained: 'Pouco treinado',
+    overtrained: 'Possível excesso',
+    neutral: 'Neutro',
+}
+
+/** Estatísticas da janela de treino retornadas junto da correlação. */
+export interface TrainingWindowSummary {
+    fromIso: string
+    toIso: string
+    hasPreviousAssessment: boolean
+    sessions: number
+    totalVolumeKg: number
+    totalSets: number
+    topExercises: Array<{ name: string; volumeKg: number; sets: number }>
+}
+
 // ─── Entidades (linhas do banco) ─────────────────────────────────────────────
 
 export interface BodyPhotoAssessment {

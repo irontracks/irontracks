@@ -3,7 +3,7 @@
  * CRUD de escrita fica em src/actions/bodyPhotoAssessment-actions.ts;
  * aqui ficam as chamadas às API routes (leitura com signed URLs + análise IA).
  */
-import type { BodyPhotoAssessment, BodyPhotoAssessmentPhoto, BodyPhotoLaudo } from '@/types/bodyPhotoAssessment'
+import type { BodyPhotoAssessment, BodyPhotoAssessmentPhoto, BodyPhotoLaudo, BodyPhotoCorrelation, TrainingWindowSummary } from '@/types/bodyPhotoAssessment'
 
 export interface BodyPhotoListItem extends BodyPhotoAssessment {
     thumbnailUrl: string | null
@@ -48,6 +48,23 @@ export async function analyzeBodyPhoto(
         const json = await res.json().catch(() => ({ ok: false, error: 'invalid_response' }))
         if (!res.ok || !json.ok) return { ok: false, error: json.error || 'Falha na análise.', message: json.message }
         return { ok: true, analysis: json.analysis as BodyPhotoLaudo }
+    } catch (e) {
+        return { ok: false, error: e instanceof Error ? e.message : 'Erro de rede.' }
+    }
+}
+
+export async function fetchBodyPhotoCorrelation(
+    assessmentId: string,
+): Promise<{ ok: boolean; correlation?: BodyPhotoCorrelation; window?: TrainingWindowSummary; error?: string; message?: string }> {
+    try {
+        const res = await fetch('/api/ai/body-composition-correlation', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ assessmentId }),
+        })
+        const json = await res.json().catch(() => ({ ok: false, error: 'invalid_response' }))
+        if (!res.ok || !json.ok) return { ok: false, error: json.error || 'Falha na correlação.', message: json.message }
+        return { ok: true, correlation: json.correlation as BodyPhotoCorrelation, window: json.window as TrainingWindowSummary }
     } catch (e) {
         return { ok: false, error: e instanceof Error ? e.message : 'Erro de rede.' }
     }

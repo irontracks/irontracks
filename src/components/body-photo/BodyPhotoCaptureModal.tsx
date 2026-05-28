@@ -2,12 +2,13 @@
 
 import React, { useCallback, useRef, useState } from 'react'
 import NextImage from 'next/image'
-import { Camera, X, Check, Loader2, Sparkles, RotateCcw } from 'lucide-react'
+import { Camera, X, Check, Loader2, Sparkles, RotateCcw, Dumbbell } from 'lucide-react'
 import { createBodyPhotoAssessment } from '@/actions/bodyPhotoAssessment-actions'
-import { analyzeBodyPhoto } from '@/lib/api/bodyPhoto'
+import { analyzeBodyPhoto, fetchBodyPhotoCorrelation } from '@/lib/api/bodyPhoto'
 import { compressBodyPhoto, uploadBodyPhoto, type CompressedPhoto } from '@/utils/storage/bodyPhotoUpload'
-import { BODY_PHOTO_POSES, POSE_LABELS_PT, type BodyPhotoPose, type BodyPhotoLaudo } from '@/types/bodyPhotoAssessment'
+import { BODY_PHOTO_POSES, POSE_LABELS_PT, type BodyPhotoPose, type BodyPhotoLaudo, type BodyPhotoCorrelation, type TrainingWindowSummary } from '@/types/bodyPhotoAssessment'
 import { BodyPhotoLaudoView } from './BodyPhotoLaudoView'
+import { BodyPhotoCorrelationView } from './BodyPhotoCorrelationView'
 
 type Stage = 'capture' | 'processing' | 'result' | 'error'
 
@@ -47,11 +48,30 @@ export const BodyPhotoCaptureModal: React.FC<Props> = ({ open, onClose, studentU
     const [progress, setProgress] = useState('')
     const [laudo, setLaudo] = useState<BodyPhotoLaudo | null>(null)
     const [errorMsg, setErrorMsg] = useState('')
+    const [assessmentId, setAssessmentId] = useState<string | null>(null)
+    const [correlation, setCorrelation] = useState<{ data: BodyPhotoCorrelation; window: TrainingWindowSummary } | null>(null)
+    const [correlationLoading, setCorrelationLoading] = useState(false)
+    const [correlationError, setCorrelationError] = useState('')
     const inputRefs = useRef<Record<BodyPhotoPose, HTMLInputElement | null>>({ front: null, side: null, back: null })
 
     const reset = useCallback(() => {
         setStage('capture'); setPhotos({}); setProgress(''); setLaudo(null); setErrorMsg(''); setBusyPose(null)
+        setAssessmentId(null); setCorrelation(null); setCorrelationLoading(false); setCorrelationError('')
     }, [])
+
+    const handleCorrelate = useCallback(async () => {
+        if (!assessmentId) return
+        setCorrelationLoading(true); setCorrelationError('')
+        try {
+            const res = await fetchBodyPhotoCorrelation(assessmentId)
+            if (!res.ok || !res.correlation || !res.window) throw new Error(res.message || res.error || 'Falha na correlação.')
+            setCorrelation({ data: res.correlation, window: res.window })
+        } catch (e) {
+            setCorrelationError(e instanceof Error ? e.message : 'Erro inesperado.')
+        } finally {
+            setCorrelationLoading(false)
+        }
+    }, [assessmentId])
 
     const handleClose = useCallback(() => {
         if (stage === 'processing') return // não fecha no meio da análise
@@ -82,6 +102,7 @@ export const BodyPhotoCaptureModal: React.FC<Props> = ({ open, onClose, studentU
             const created = await createBodyPhotoAssessment({ studentUserId: studentUserId ?? null })
             if (!created.ok) throw new Error(created.error || 'Falha ao criar avaliação.')
             const id = created.data.id
+            setAssessmentId(id)
 
             for (const pose of BODY_PHOTO_POSES) {
                 const photo = photos[pose]
@@ -196,7 +217,34 @@ export const BodyPhotoCaptureModal: React.FC<Props> = ({ open, onClose, studentU
                         </div>
                     )}
 
-                    {stage === 'result' && laudo ? <BodyPhotoLaudoView laudo={laudo} /> : null}
+                    {stage === 'result' && laudo ? (
+                        <div className="space-y-5">
+                            <BodyPhotoLaudoView laudo={laudo} />
+
+                            {/* Correlação treino × corpo (on-demand) */}
+                            <div className="pt-2 border-t border-neutral-800">
+                                {correlation ? (
+                                    <BodyPhotoCorrelationView correlation={correlation.data} window={correlation.window} />
+                                ) : (
+                                    <div className="text-center py-2">
+                                        <p className="text-sm text-neutral-400 mb-3">
+                                            Cruze este laudo com o que você de fato treinou no período — só o IronTracks faz isso.
+                                        </p>
+                                        <button
+                                            onClick={handleCorrelate}
+                                            disabled={correlationLoading}
+                                            className="inline-flex items-center justify-center gap-2 min-h-[44px] px-5 rounded-xl border font-bold transition active:scale-95 disabled:opacity-50"
+                                            style={{ background: 'rgba(168,85,247,0.08)', borderColor: 'rgba(168,85,247,0.3)', color: '#d8b4fe' }}
+                                        >
+                                            {correlationLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Dumbbell className="w-4 h-4" />}
+                                            {correlationLoading ? 'Cruzando com seus treinos…' : 'Correlação com treino'}
+                                        </button>
+                                        {correlationError ? <p className="mt-2 text-sm text-red-400">{correlationError}</p> : null}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    ) : null}
 
                     {stage === 'error' && (
                         <div className="py-10 flex flex-col items-center text-center gap-4">
