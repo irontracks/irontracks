@@ -68,6 +68,8 @@ export const buildExercisesPayload = (workout: unknown): unknown[] => {
                     advanced_config: (sObj.advanced_config ?? sObj.advancedConfig) ?? null,
                 })
             }
+            const sideRestRaw = exObj.sideRestTime ?? exObj.side_rest_time
+            const transitionRaw = exObj.transitionTime ?? exObj.transition_time
             return {
                 name: safeString(exObj.name || ''),
                 notes: safeString(exObj.notes || ''),
@@ -76,6 +78,9 @@ export const buildExercisesPayload = (workout: unknown): unknown[] => {
                 cadence: exObj.cadence ?? null,
                 method: exObj.method ?? null,
                 order: idx,
+                is_unilateral: !!(exObj.isUnilateral ?? exObj.is_unilateral),
+                side_rest_time: typeof sideRestRaw === 'number' && sideRestRaw > 0 ? sideRestRaw : null,
+                transition_time: typeof transitionRaw === 'number' && transitionRaw > 0 ? transitionRaw : null,
                 sets,
             }
         })
