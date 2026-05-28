@@ -28,6 +28,7 @@ const RestPauseSetInner = ({
     getPlannedSet,
     startTimer,
     setRestPauseModal,
+    restPauseDraftsRef,
     deloadSuggestions,
     openNotesKeys,
     toggleNotes,
@@ -173,6 +174,11 @@ const RestPauseSetInner = ({
               <button
                 type="button"
                 onClick={() => {
+                  const draft = restPauseDraftsRef?.current?.[key];
+                  if (draft && typeof draft === 'object') {
+                    setRestPauseModal({ ...(draft as UnknownRecord), error: '' });
+                    return;
+                  }
                   const baseWeight = String(log?.weight ?? cfg?.weight ?? '').trim();
                   const baseRpe = String(log?.rpe ?? '').trim();
                   const minisInput = Array.from({ length: miniSets }).map((_, idx) => {

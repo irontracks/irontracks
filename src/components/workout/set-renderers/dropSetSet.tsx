@@ -18,6 +18,7 @@ const DropSetSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: nu
     updateLog,
     getPlannedSet,
     setDropSetModal,
+    dropSetDraftsRef,
     openNotesKeys,
     toggleNotes,
     reportHistory,
@@ -124,6 +125,11 @@ const DropSetSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: nu
             <button
               type="button"
               onClick={() => {
+                const draft = dropSetDraftsRef?.current?.[key];
+                if (draft && typeof draft === 'object') {
+                  setDropSetModal({ ...(draft as UnknownRecord), error: '' });
+                  return;
+                }
                 const baseStages = stages.map((s) => ({
                   weight: String(s?.weight ?? '').trim(),
                   reps: parseTrainingNumber(s?.reps) ?? null,
