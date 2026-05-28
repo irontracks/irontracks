@@ -131,6 +131,8 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     groupMethodModal, setGroupMethodModal,
     restPauseRefs,
     clusterRefs,
+    restPauseDraftsRef,
+    dropSetDraftsRef,
   } = useWorkoutModals(collapsedKey);
 
 
@@ -569,6 +571,8 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     // Refs
     restPauseRefs,
     clusterRefs,
+    restPauseDraftsRef,
+    dropSetDraftsRef,
     organizeBaseKeysRef,
     reportHistoryLoadingRef,
     reportHistoryLoadingSinceRef,
@@ -657,7 +661,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     editExerciseDraft, setEditExerciseDraft, editExerciseHasChanges,
     persistToPlan, setPersistToPlan,
     linkedWeightExercises, toggleLinkWeights,
-    restPauseRefs, clusterRefs, organizeBaseKeysRef,
+    restPauseRefs, clusterRefs, restPauseDraftsRef, dropSetDraftsRef, organizeBaseKeysRef,
     reportHistoryLoadingRef, reportHistoryLoadingSinceRef,
     reportHistoryStatusRef, reportHistoryUpdatedAtRef,
     deloadAiCacheRef, postCheckinResolveRef,

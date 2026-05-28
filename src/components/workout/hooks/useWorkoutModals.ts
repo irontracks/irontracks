@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { draftOrderKeys } from '@/lib/workoutReorder';
 import type { UnknownRecord } from '../types';
 
@@ -108,8 +108,34 @@ export function useWorkoutModals(collapsedKey: string | null) {
     // ---- Advanced set method modals ----
     const [deloadModal, setDeloadModal] = useState<UnknownRecord | null>(null);
     const [clusterModal, setClusterModal] = useState<UnknownRecord | null>(null);
-    const [restPauseModal, setRestPauseModal] = useState<UnknownRecord | null>(null);
-    const [dropSetModal, setDropSetModal] = useState<UnknownRecord | null>(null);
+
+    // Draft refs: persist in-progress modal edits across dismiss/reopen (cleared on workout end via unmount)
+    const restPauseDraftsRef = useRef<Record<string, UnknownRecord>>({});
+    const dropSetDraftsRef = useRef<Record<string, UnknownRecord>>({});
+
+    const [restPauseModal, setRestPauseModalRaw] = useState<UnknownRecord | null>(null);
+    const setRestPauseModal = useCallback((action: UnknownRecord | null | ((prev: UnknownRecord | null) => UnknownRecord | null)) => {
+        setRestPauseModalRaw((prev) => {
+            const next = typeof action === 'function' ? action(prev) : action;
+            if (next === null && prev !== null) {
+                const k = typeof prev.key === 'string' ? prev.key : null;
+                if (k) restPauseDraftsRef.current[k] = prev;
+            }
+            return next;
+        });
+    }, []);
+
+    const [dropSetModal, setDropSetModalRaw] = useState<UnknownRecord | null>(null);
+    const setDropSetModal = useCallback((action: UnknownRecord | null | ((prev: UnknownRecord | null) => UnknownRecord | null)) => {
+        setDropSetModalRaw((prev) => {
+            const next = typeof action === 'function' ? action(prev) : action;
+            if (next === null && prev !== null) {
+                const k = typeof prev.key === 'string' ? prev.key : null;
+                if (k) dropSetDraftsRef.current[k] = prev;
+            }
+            return next;
+        });
+    }, []);
     const [strippingModal, setStrippingModal] = useState<UnknownRecord | null>(null);
     const [fst7Modal, setFst7Modal] = useState<UnknownRecord | null>(null);
     const [heavyDutyModal, setHeavyDutyModal] = useState<UnknownRecord | null>(null);
@@ -173,5 +199,7 @@ export function useWorkoutModals(collapsedKey: string | null) {
         // Refs
         restPauseRefs,
         clusterRefs,
+        restPauseDraftsRef,
+        dropSetDraftsRef,
     };
 }
