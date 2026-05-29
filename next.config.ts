@@ -40,7 +40,6 @@ const nextConfig: NextConfig = {
       { pathname: '/muscle-overlays/**' },
       { pathname: '/muscle-overlays-female/**' },
       { pathname: '/body-types/**' },
-      { pathname: '/poses/**' },
       { pathname: '/onboarding-**' },
       { pathname: '/body-**' },
       { pathname: '/default-avatar.png' },

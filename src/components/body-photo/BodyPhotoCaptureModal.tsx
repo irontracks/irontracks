@@ -26,6 +26,7 @@ const PoseGuide = ({ pose, gender }: { pose: BodyPhotoPose; gender: 'M' | 'F' })
         alt=""
         fill
         sizes="(max-width: 640px) 100vw, 200px"
+        unoptimized
         className="object-contain p-3 opacity-75 pointer-events-none select-none"
         style={{ mixBlendMode: 'lighten' }}
     />
