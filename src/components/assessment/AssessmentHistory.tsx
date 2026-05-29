@@ -161,6 +161,7 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
           open={photoModalOpen}
           onClose={() => setPhotoModalOpen(false)}
           studentUserId={studentId ?? null}
+          gender={safeGender(latestAssessment?.gender)}
         />
       </div>
     );
@@ -434,6 +435,7 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
           open={photoModalOpen}
           onClose={() => setPhotoModalOpen(false)}
           studentUserId={studentId ?? null}
+          gender={safeGender(latestAssessment?.gender)}
         />
       </div>
     </DialogProvider>
