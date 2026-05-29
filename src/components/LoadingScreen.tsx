@@ -54,15 +54,20 @@ const LoadingScreen = () => {
         >
             {/* Background removed via luminance-as-alpha so the gold mark
                 floats freely over the splash bg with no card edges. */}
-            <Image
-                src="/logo-irontracks-splash.webp"
-                alt="IronTracks"
-                width={1024}
-                height={1024}
-                priority
-                sizes="(max-width: 800px) 90vmin, 800px"
-                className="w-[90vmin] h-[90vmin] max-w-[800px] max-h-[800px] object-contain"
-            />
+            <div className="relative w-[90vmin] h-[90vmin] max-w-[800px] max-h-[800px]">
+                <Image
+                    src="/logo-irontracks-splash.webp"
+                    alt="IronTracks"
+                    width={1024}
+                    height={1024}
+                    priority
+                    sizes="(max-width: 800px) 90vmin, 800px"
+                    className="w-full h-full object-contain"
+                />
+                {/* Brilho metálico: faixa de luz diagonal varrendo a FORMA do
+                    logo (recortada via mask) em loop sutil, como metal polido. */}
+                <div className="logo-shine absolute inset-0 pointer-events-none" aria-hidden="true" />
+            </div>
 
             {/* Progress bar — directly under the logo */}
             <div className="mt-2 w-24 h-[3px] bg-neutral-800 rounded-full overflow-hidden">
@@ -98,6 +103,23 @@ const LoadingScreen = () => {
             @keyframes shimmer {
                 0%   { transform: translateX(-100%); }
                 100% { transform: translateX(100%); }
+            }
+            .logo-shine {
+                background: linear-gradient(115deg, transparent 40%, rgba(255,255,255,0.6) 50%, transparent 60%);
+                background-size: 250% 100%;
+                background-repeat: no-repeat;
+                -webkit-mask: url('/logo-irontracks-splash.webp') center / contain no-repeat;
+                        mask: url('/logo-irontracks-splash.webp') center / contain no-repeat;
+                mix-blend-mode: screen;
+                animation: logo-shine 3.5s ease-in-out infinite;
+            }
+            @keyframes logo-shine {
+                0%   { background-position: 200% 0; }
+                35%  { background-position: -120% 0; }
+                100% { background-position: -120% 0; }
+            }
+            @media (prefers-reduced-motion: reduce) {
+                .logo-shine { animation: none; }
             }
         `}</style>
     </div>
