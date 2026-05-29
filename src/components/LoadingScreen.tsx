@@ -61,6 +61,7 @@ const LoadingScreen = () => {
                     width={1024}
                     height={1024}
                     priority
+                    unoptimized
                     sizes="(max-width: 800px) 90vmin, 800px"
                     className="w-full h-full object-contain"
                 />
