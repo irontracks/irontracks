@@ -195,7 +195,7 @@ export const BodyPhotoCaptureModal: React.FC<Props> = ({ open, onClose, studentU
                                                 </button>
                                                 <input
                                                     ref={(el) => { inputRefs.current[pose] = el }}
-                                                    type="file" accept="image/*" capture="environment" className="hidden"
+                                                    type="file" accept="image/*" className="hidden"
                                                     aria-label={`Foto ${POSE_LABELS_PT[pose]}`}
                                                     onChange={(e) => handleFile(pose, e.target.files)}
                                                 />
