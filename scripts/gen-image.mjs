@@ -76,6 +76,7 @@ try {
     options: {
       prompt: { type: 'string', short: 'p' },
       'prompt-file': { type: 'string', short: 'f' },
+      image: { type: 'string', short: 'i', multiple: true },
       model: { type: 'string', short: 'm', default: 'both' },
       output: { type: 'string', short: 'o', default: 'tests/generated-images' },
       name: { type: 'string', short: 'n' },
@@ -134,6 +135,26 @@ if (!['nano', 'imagen', 'both'].includes(MODEL)) {
   process.exit(1)
 }
 
+// ── Reference images (Nano Banana only — for editing/consistency) ─────────────
+const MIME_BY_EXT = { '.png': 'image/png', '.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.webp': 'image/webp' }
+const refImagePaths = values.image || []
+const refImageParts = []
+for (const p of refImagePaths) {
+  const abs = path.resolve(p)
+  const ext = path.extname(abs).toLowerCase()
+  const mimeType = MIME_BY_EXT[ext]
+  if (!mimeType) {
+    console.error(`Unsupported reference image type "${ext}" (${abs}). Use png/jpg/webp.`)
+    process.exit(1)
+  }
+  const data = (await fs.readFile(abs)).toString('base64')
+  refImageParts.push({ inlineData: { mimeType, data } })
+}
+if (refImageParts.length > 0 && MODEL === 'imagen') {
+  console.error('Reference images (--image) are only supported with --model nano (Imagen ignores them).')
+  process.exit(1)
+}
+
 const ASPECT = values['aspect-ratio']
 if (!['1:1', '9:16', '16:9', '3:4', '4:3'].includes(ASPECT)) {
   console.error(`Invalid --aspect-ratio "${ASPECT}". Use: 1:1, 9:16, 16:9, 3:4, 4:3`)
@@ -156,8 +177,10 @@ async function generateNano() {
   const model = 'gemini-2.5-flash-image'
   console.log(`[nano] ${model}…`)
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${API_KEY}`
+  const requestParts = [...refImageParts, { text: prompt }]
+  if (refImageParts.length > 0) console.log(`[nano] using ${refImageParts.length} reference image(s)`)
   const body = {
-    contents: [{ parts: [{ text: prompt }] }],
+    contents: [{ parts: requestParts }],
     generationConfig: { responseModalities: ['IMAGE'] },
   }
   const res = await fetch(url, {

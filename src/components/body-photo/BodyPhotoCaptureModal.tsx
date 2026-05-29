@@ -18,18 +18,17 @@ const POSE_HINT: Record<BodyPhotoPose, string> = {
     back: 'De costas, postura reta, braços relaxados.',
 }
 
-// Silhueta guia simples por pose (overlay translúcido pra enquadrar o corpo).
-const PoseSilhouette = ({ pose }: { pose: BodyPhotoPose }) => (
-    <svg viewBox="0 0 100 200" className="w-full h-full opacity-20" fill="none" stroke="currentColor" strokeWidth="2">
-        {/* cabeça */}
-        <circle cx="50" cy="22" r="13" />
-        {/* tronco + membros (variação leve por pose só pra orientar) */}
-        {pose === 'side' ? (
-            <path d="M50 35 C58 55 58 75 55 100 C54 130 56 160 58 190 M50 50 C44 70 44 90 46 110" strokeLinecap="round" />
-        ) : (
-            <path d="M50 35 L50 38 M30 60 C40 45 60 45 70 60 L66 110 L58 110 L55 190 M45 110 L42 190 M34 110 L40 60 M66 110 L60 60" strokeLinecap="round" strokeLinejoin="round" />
-        )}
-    </svg>
+// Guia de pose: manequim 3D clay (mesmo estilo do mapa muscular), por pose e gênero.
+// Overlay translúcido com mixBlendMode 'lighten' pra o fundo preto sumir no card escuro.
+const PoseGuide = ({ pose, gender }: { pose: BodyPhotoPose; gender: 'M' | 'F' }) => (
+    <NextImage
+        src={`/poses/${pose}-${gender === 'F' ? 'f' : 'm'}.webp`}
+        alt=""
+        fill
+        sizes="(max-width: 640px) 100vw, 200px"
+        className="object-contain p-3 opacity-75 pointer-events-none select-none"
+        style={{ mixBlendMode: 'lighten' }}
+    />
 )
 
 interface Props {
@@ -37,11 +36,13 @@ interface Props {
     onClose: () => void
     /** user_id do aluno (fluxo personal). Omitido = autoavaliação. */
     studentUserId?: string | null
+    /** Gênero pra escolher o manequim do guia de pose. Default 'M'. */
+    gender?: 'M' | 'F'
     /** Chamado após gerar o laudo com sucesso (ex.: recarregar histórico). */
     onSaved?: () => void
 }
 
-export const BodyPhotoCaptureModal: React.FC<Props> = ({ open, onClose, studentUserId, onSaved }) => {
+export const BodyPhotoCaptureModal: React.FC<Props> = ({ open, onClose, studentUserId, gender = 'M', onSaved }) => {
     const [stage, setStage] = useState<Stage>('capture')
     const [photos, setPhotos] = useState<Partial<Record<BodyPhotoPose, CompressedPhoto>>>({})
     const [busyPose, setBusyPose] = useState<BodyPhotoPose | null>(null)
@@ -164,7 +165,7 @@ export const BodyPhotoCaptureModal: React.FC<Props> = ({ open, onClose, studentU
                                                 {photo ? (
                                                     <NextImage src={photo.previewDataUrl} alt={POSE_LABELS_PT[pose]} fill className="object-cover" unoptimized />
                                                 ) : (
-                                                    <div className="absolute inset-0 p-4"><PoseSilhouette pose={pose} /></div>
+                                                    <PoseGuide pose={pose} gender={gender} />
                                                 )}
                                                 {photo ? (
                                                     <div className="absolute top-2 right-2 w-6 h-6 rounded-full bg-emerald-500 text-black flex items-center justify-center">
