@@ -112,6 +112,11 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
     handleOpenAssessmentPlanModal,
   } = useAssessmentHistoryData(studentId);
 
+  // Gênero pro guia de pose do modal de foto. Melhor fonte disponível é a
+  // última avaliação (profiles não tem gênero); cai em 'M' só quando o aluno
+  // ainda não tem nenhuma avaliação salva.
+  const poseGender = safeGender(latestAssessment?.gender);
+
   if (loading) {
     return (
       <div className="p-6 flex items-center justify-center min-h-[40vh]">
@@ -161,7 +166,7 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
           open={photoModalOpen}
           onClose={() => setPhotoModalOpen(false)}
           studentUserId={studentId ?? null}
-          gender={safeGender(latestAssessment?.gender)}
+          gender={poseGender}
         />
       </div>
     );
@@ -435,7 +440,7 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
           open={photoModalOpen}
           onClose={() => setPhotoModalOpen(false)}
           studentUserId={studentId ?? null}
-          gender={safeGender(latestAssessment?.gender)}
+          gender={poseGender}
         />
       </div>
     </DialogProvider>
