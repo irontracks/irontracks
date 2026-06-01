@@ -30,19 +30,6 @@ export interface AccessRequestResult {
   [key: string]: unknown
 }
 
-export interface OtpResult {
-  ok: boolean
-  error?: string
-  [key: string]: unknown
-}
-
-export interface OtpVerifyResult {
-  ok: boolean
-  token?: string
-  error?: string
-  [key: string]: unknown
-}
-
 // ─── Client ───────────────────────────────────────────────────────────────────
 
 export const apiAuth = {
@@ -73,16 +60,8 @@ export const apiAuth = {
     birth_date?: string
     role_requested: 'teacher' | 'student'
     cref?: string | null
-    phone_verified_token?: string | null
     [key: string]: unknown
   }) =>
     apiPost<AccessRequestResult>('/api/access-request/create', payload),
 
-  /** POST send WhatsApp OTP to the given phone number */
-  sendOtp: (phone: string) =>
-    apiPost<OtpResult>('/api/access-request/send-otp', { phone }),
-
-  /** POST verify WhatsApp OTP — returns a one-time token on success */
-  verifyOtp: (phone: string, code: string) =>
-    apiPost<OtpVerifyResult>('/api/access-request/verify-otp', { phone, code }),
 }

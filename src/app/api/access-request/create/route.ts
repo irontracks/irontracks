@@ -5,7 +5,6 @@ import { parseJsonBody } from '@/utils/zod'
 import { normalizeBrPhone } from '@/lib/whatsapp/zapi'
 import { logError } from '@/lib/logger'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
-import { env } from '@/utils/env'
 import { notifyAdminNewSignup } from '@/lib/admin/adminNotifications'
 
 export const dynamic = 'force-dynamic'
@@ -18,15 +17,8 @@ const BodySchema = z
     birth_date: z.string().optional().nullable(),
     role_requested: z.string().optional().nullable(),
     cref: z.string().optional().nullable(),
-    /** One-time token returned by /api/access-request/verify-otp */
-    phone_verified_token: z.string().optional().nullable(),
   })
   .strip()
-
-/** Returns true when Z-API is configured — phone verification is enforced in production. */
-function zapiEnabled(): boolean {
-  return Boolean(env.zapi.instanceId && env.zapi.token)
-}
 
 export async function POST(req: Request) {
   try {
@@ -38,7 +30,7 @@ export async function POST(req: Request) {
 
     const parsedBody = await parseJsonBody(req, BodySchema)
     if (parsedBody.response) return parsedBody.response
-    const { email, phone, full_name, birth_date, role_requested, cref, phone_verified_token } = parsedBody.data!
+    const { email, phone, full_name, birth_date, role_requested, cref } = parsedBody.data!
 
     // ── Validation ────────────────────────────────────────────────────────────
 
@@ -63,40 +55,6 @@ export async function POST(req: Request) {
     // ── Phone verification check ──────────────────────────────────────────────
 
     const supabaseAdmin = createAdminClient()
-    let phoneVerified = false
-
-    if (zapiEnabled()) {
-      if (!phone_verified_token) {
-        return NextResponse.json(
-          { ok: false, error: 'Confirme seu WhatsApp antes de enviar o cadastro.' },
-          { status: 400 },
-        )
-      }
-
-      // Validate the token against phone_verifications
-      const { data: verif } = await supabaseAdmin
-        .from('phone_verifications')
-        .select('id, phone, verified, expires_at')
-        .eq('verify_token', phone_verified_token)
-        .eq('verified', true)
-        .gt('expires_at', new Date().toISOString())
-        .maybeSingle()
-
-      if (!verif || verif.phone !== normalizedPhone) {
-        return NextResponse.json(
-          { ok: false, error: 'Verificação de WhatsApp inválida ou expirada. Tente novamente.' },
-          { status: 400 },
-        )
-      }
-
-      // Consume the token so it cannot be reused
-      await supabaseAdmin
-        .from('phone_verifications')
-        .update({ verify_token: null })
-        .eq('id', String(verif.id))
-
-      phoneVerified = true
-    }
 
     // ── Duplicate checks ──────────────────────────────────────────────────────
 
@@ -139,7 +97,7 @@ export async function POST(req: Request) {
           birth_date: birth_date ?? null,
           role_requested: role_requested ?? 'student',
           cref: cref ?? null,
-          phone_verified: phoneVerified,
+          phone_verified: false,
           status: 'pending',
           updated_at: new Date().toISOString(),
         })
@@ -162,7 +120,7 @@ export async function POST(req: Request) {
         birth_date: birth_date ?? null,
         role_requested: role_requested ?? 'student',
         cref: cref ?? null,
-        phone_verified: phoneVerified,
+        phone_verified: false,
         status: 'pending',
       })
       .select('id')
