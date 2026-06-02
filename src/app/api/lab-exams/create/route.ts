@@ -45,7 +45,7 @@ export async function POST(request: Request) {
     const access = await checkVipFeatureAccess(auth.supabase, userId, 'lab_exams')
     if (!access.allowed) {
       return NextResponse.json(
-        { ok: false, error: 'vip_required', message: 'A análise de exames é exclusiva para assinantes VIP.' },
+        { ok: false, error: 'vip_required', message: 'A análise de exames é exclusiva para assinantes VIP. Se você já assina, tente sair e entrar novamente.' },
         { status: 403 },
       )
     }

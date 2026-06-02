@@ -39,7 +39,10 @@ export function LabExamUploadModal({ open, onClose, studentUserId, onSaved }: Pr
   }, [])
 
   const handleClose = useCallback(() => {
-    if (stage === 'processing') return
+    if (stage === 'processing') {
+      // Não bloqueia o fechamento — pede confirmação pra não prender o usuário
+      if (typeof window !== 'undefined' && !window.confirm('O processamento ainda está em andamento. Fechar mesmo assim?')) return
+    }
     reset(); onClose()
   }, [stage, reset, onClose])
 
@@ -112,14 +115,15 @@ export function LabExamUploadModal({ open, onClose, studentUserId, onSaved }: Pr
               <p className="text-[11px] text-neutral-500">Protocolo integrado por IA</p>
             </div>
           </div>
-          <button onClick={handleClose} disabled={stage === 'processing'} aria-label="Fechar"
-            className="w-9 h-9 rounded-xl border border-neutral-700 text-neutral-400 hover:text-white hover:border-yellow-500/40 transition disabled:opacity-40 flex items-center justify-center">
+          {/* Fechar sempre disponível; durante processing pergunta antes (não bloqueia) */}
+          <button onClick={handleClose} aria-label="Fechar"
+            className="w-9 h-9 rounded-xl border border-neutral-700 text-neutral-400 hover:text-white hover:border-yellow-500/40 transition flex items-center justify-center">
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Body */}
-        <div className="flex-1 overflow-y-auto p-5">
+        {/* Body — min-h evita reflow/zoom no iOS quando conteúdo muda de tamanho */}
+        <div className="flex-1 overflow-y-auto p-5 min-h-[40vh]">
           {stage === 'select' && (
             <div className="space-y-4">
               <p className="text-sm text-neutral-400">
@@ -228,7 +232,7 @@ export function LabExamUploadModal({ open, onClose, studentUserId, onSaved }: Pr
             </div>
           )}
           {stage === 'error' && (
-            <button onClick={() => setStage('select')} className="w-full min-h-[48px] rounded-xl border border-neutral-700 text-neutral-200 font-bold hover:border-yellow-500/40 transition active:scale-95">
+            <button onClick={() => { setErrorMsg(''); setStage('select') }} className="w-full min-h-[48px] rounded-xl border border-neutral-700 text-neutral-200 font-bold hover:border-yellow-500/40 transition active:scale-95">
               Tentar de novo
             </button>
           )}
