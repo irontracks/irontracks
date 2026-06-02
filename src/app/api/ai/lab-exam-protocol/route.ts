@@ -27,6 +27,7 @@ import { aggregateTrainingWindow } from '@/utils/bodyPhoto/trainingWindow'
 import { LabProtocolSchema } from '@/schemas/labExam'
 
 export const dynamic = 'force-dynamic'
+export const maxDuration = 120 // Gemini Pro cruzando 4 fontes pode levar >30s
 
 const BodySchema = z.object({ examId: z.string().uuid() }).strip()
 

@@ -71,6 +71,12 @@
         },
         "src/app/api/billing/**/*.ts": {
             "maxDuration": 30
+        },
+        "src/app/api/ai/lab-exam-extract/route.ts": {
+            "maxDuration": 120
+        },
+        "src/app/api/ai/lab-exam-protocol/route.ts": {
+            "maxDuration": 120
         }
     },
     "rewrites": [

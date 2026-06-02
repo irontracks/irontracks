@@ -24,6 +24,7 @@ import { logError } from '@/lib/logger'
 import { LabExamExtractedSchema, LAB_MARKER_CATEGORIES, LAB_MARKER_STATUSES } from '@/schemas/labExam'
 
 export const dynamic = 'force-dynamic'
+export const maxDuration = 120 // PDF grande + Gemini Flash pode levar >30s
 
 const BUCKET = 'lab-exams'
 const MAX_FILE_BYTES = 20 * 1024 * 1024
