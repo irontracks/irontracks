@@ -80,6 +80,14 @@ const applyTierDefaults = (tier: string, limits: VipTierLimits) => {
     if (normalized === 'vip_pro') {
       return { ...limits, offline: true, lab_exams: true }
     }
+    if (normalized === 'vip_start') {
+      return { ...limits, lab_exams: true }
+    }
+    // Qualquer plano VIP não mapeado ainda recebe lab_exams (feature básica de todo VIP).
+    // Isso garante que novos planos não fiquem sem acesso por omissão.
+    if (normalized.startsWith('vip_')) {
+      return { ...limits, lab_exams: true }
+    }
     return limits
   } catch {
     return limits
@@ -112,7 +120,7 @@ const applyTierCaps = (tier: string, limits: VipTierLimits) => {
         analytics: false,
         offline: false,
         chef_ai: false,
-        lab_exams: false,
+        lab_exams: true, // disponível em todo VIP (start/pro/elite)
       }
     }
     if (normalized === 'vip_pro') {
