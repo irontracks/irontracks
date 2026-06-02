@@ -12,6 +12,7 @@ export type VipTierLimits = {
   analytics: boolean
   offline: boolean
   chef_ai: boolean
+  lab_exams: boolean // análise de exames laboratoriais por IA (Gemini Pro) — pro+
 }
 
 export type VipEntitlementSource =
@@ -38,7 +39,8 @@ export const FREE_LIMITS: VipTierLimits = {
   nutrition_macros: false,
   analytics: false,
   offline: false,
-  chef_ai: false
+  chef_ai: false,
+  lab_exams: false
 }
 
 // Admin/Teacher gets everything unlimited
@@ -50,7 +52,8 @@ export const UNLIMITED_LIMITS: VipTierLimits = {
   nutrition_macros: true,
   analytics: true,
   offline: true,
-  chef_ai: true
+  chef_ai: true,
+  lab_exams: true
 }
 
 const normalizePlanId = (raw: unknown) => {
@@ -72,10 +75,10 @@ const applyTierDefaults = (tier: string, limits: VipTierLimits) => {
   try {
     const normalized = normalizePlanId(tier)
     if (normalized === 'vip_elite') {
-      return { ...limits, nutrition_macros: true, analytics: true, offline: true, chef_ai: true }
+      return { ...limits, nutrition_macros: true, analytics: true, offline: true, chef_ai: true, lab_exams: true }
     }
     if (normalized === 'vip_pro') {
-      return { ...limits, offline: true }
+      return { ...limits, offline: true, lab_exams: true }
     }
     return limits
   } catch {
@@ -109,6 +112,7 @@ const applyTierCaps = (tier: string, limits: VipTierLimits) => {
         analytics: false,
         offline: false,
         chef_ai: false,
+        lab_exams: false,
       }
     }
     if (normalized === 'vip_pro') {
@@ -122,6 +126,7 @@ const applyTierCaps = (tier: string, limits: VipTierLimits) => {
         analytics: false,
         offline: true,
         chef_ai: false,
+        lab_exams: true,
       }
     }
     if (normalized === 'vip_elite') {
@@ -135,6 +140,7 @@ const applyTierCaps = (tier: string, limits: VipTierLimits) => {
         analytics: true,
         offline: true,
         chef_ai: true,
+        lab_exams: true,
       }
     }
     return limits
