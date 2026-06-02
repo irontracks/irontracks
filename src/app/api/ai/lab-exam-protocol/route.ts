@@ -48,32 +48,223 @@ function extractJson(text: string): unknown {
 
 const dayStr = (d: Date) => d.toISOString().slice(0, 10)
 
+// ─── Camada de Atenuação Fisiológica: sinais computados no backend ──────────────
+// Em vez de confiar 100% na aritmética do LLM, pré-calculamos os gatilhos da
+// calibração e injetamos o veredito pronto no prompt. Determinístico e auditável.
+
+interface ExtractedMarker {
+  name?: string
+  value?: number | null
+  unit?: string | null
+  refMin?: number | null
+  refMax?: number | null
+  status?: string
+}
+
+/** Classifica o usuário como atleta de força ativo a partir da janela de treino. */
+function computeAthleteContext(training: { sessions: number; totalVolumeKg: number; totalSets: number }) {
+  const { sessions, totalVolumeKg, totalSets } = training
+  const isActiveAthlete = sessions >= 20 || totalVolumeKg > 30_000 || totalSets > 400
+  // Nível pra calibrar a intensidade da atenuação.
+  const level =
+    sessions >= 40 || totalVolumeKg > 80_000
+      ? 'alto_volume'
+      : isActiveAthlete
+        ? 'ativo'
+        : 'baixo_ou_sem_dados'
+  return { isActiveAthlete, level, sessions, totalVolumeKg, totalSets }
+}
+
+/** Busca o primeiro marcador cujo nome casa o regex e tem valor numérico. */
+function findMarker(markers: ExtractedMarker[], re: RegExp): ExtractedMarker | null {
+  for (const m of markers) {
+    const name = String(m?.name || '')
+    if (re.test(name) && typeof m?.value === 'number' && Number.isFinite(m.value)) return m
+  }
+  return null
+}
+
+/**
+ * Deriva os sinais usados pelas regras de calibração (TG/HDL, ferro vs ferritina,
+ * função renal). Tudo defensivo — se um marcador não existe, retorna null e a IA
+ * cai no comportamento padrão pra aquele eixo.
+ */
+function deriveLabSignals(rawMarkers: unknown) {
+  const markers: ExtractedMarker[] = Array.isArray((rawMarkers as { markers?: unknown })?.markers)
+    ? ((rawMarkers as { markers: ExtractedMarker[] }).markers)
+    : Array.isArray(rawMarkers)
+      ? (rawMarkers as ExtractedMarker[])
+      : []
+  if (markers.length === 0) return null
+
+  const hdl = findMarker(markers, /hdl/i)
+  const tg = findMarker(markers, /triglic|triglyc/i)
+  // Ferro sérico: contém "ferro" mas NÃO "ferritina".
+  const ferro = markers.find(
+    (m) => /ferro|iron/i.test(String(m?.name || '')) && !/ferritina|ferritin/i.test(String(m?.name || '')) && typeof m?.value === 'number',
+  ) || null
+  const ferritina = findMarker(markers, /ferritina|ferritin/i)
+  const creatinina = findMarker(markers, /creatinina|creatinine/i)
+  const egfr = findMarker(markers, /tfg|egfr|filtra|ckd.?epi/i)
+
+  const isHigh = (m: ExtractedMarker | null) =>
+    m != null && typeof m.value === 'number' && typeof m.refMax === 'number' && m.value > m.refMax
+  const isLowOrNormal = (m: ExtractedMarker | null) =>
+    m != null && typeof m.value === 'number' && typeof m.refMax === 'number' && m.value <= m.refMax
+
+  const tgHdlRatio =
+    hdl?.value && tg?.value && hdl.value > 0 ? Number((tg.value / hdl.value).toFixed(2)) : null
+
+  return {
+    tgHdlRatio,
+    perfilLipidicoCardioprotetor:
+      typeof hdl?.value === 'number' && typeof tg?.value === 'number'
+        ? hdl.value > 60 && tg.value < 100
+        : null,
+    hdl: hdl?.value ?? null,
+    triglicerides: tg?.value ?? null,
+    // Ferro alto isolado (estoques seguros) → atenuar; ambos altos → sobrecarga real.
+    ferroAltoIsolado: ferro && ferritina ? isHigh(ferro) && isLowOrNormal(ferritina) : null,
+    sobrecargaFerroReal: ferro && ferritina ? isHigh(ferro) && isHigh(ferritina) : null,
+    ferroSerico: ferro?.value ?? null,
+    ferritina: ferritina?.value ?? null,
+    creatinina: creatinina?.value ?? null,
+    egfr: egfr?.value ?? null,
+    // Faixa renal G2 (60-89) = zona de atenuação pra atletas.
+    egfrEmFaixaAtenuavel: typeof egfr?.value === 'number' ? egfr.value >= 60 && egfr.value <= 89 : null,
+  }
+}
+
 const PROMPT_HEADER = [
-  'Você é uma equipe multidisciplinar (médico do esporte, nutricionista esportivo e educador físico)',
-  'analisando os EXAMES LABORATORIAIS de um praticante de musculação, cruzando com a avaliação física',
-  'e o treino REAL executado nos últimos ~90 dias.',
+  // ── IDENTIDADE ────────────────────────────────────────────────────────────────
+  'IDENTIDADE: Você é uma equipe de elite em medicina esportiva composta por:',
+  '  • Médico do esporte especialista em fisiologia do exercício',
+  '  • Nefrologista esportivo (interpretação renal para atletas)',
+  '  • Cardiologista esportivo (lipidograma e risco cardiovascular em alta performance)',
+  '  • Nutricionista esportivo de alto rendimento',
+  '  • Preparador físico sênior com acesso ao histórico real de treino',
   '',
-  'OBJETIVO: gerar um protocolo prático e integrado conectando os MARCADORES alterados às ações de',
-  'treino, dieta e suplementação. Sempre justifique cada recomendação citando o marcador específico',
-  '(ex.: "Vitamina D 18 ng/mL, abaixo de 30"). Priorize o que mais impacta saúde e performance.',
+  'Você analisa EXAMES LABORATORIAIS de praticantes de musculação e esportes de força,',
+  'cruzando com avaliação física e histórico real de treino dos últimos 90 dias.',
+  'Seu objetivo é gerar um protocolo prático de OTIMIZAÇÃO DE PERFORMANCE E CONTROLE DE DANOS,',
+  'não um laudo clínico conservador para população sedentária.',
   '',
-  'REGRAS CRÍTICAS:',
-  '- Para marcadores muito alterados ou de risco (ex.: glicemia/HbA1c altas, função renal/hepática',
-  '  alterada, hormônios muito fora), gere um item em "medicalAlerts" orientando procurar o médico.',
-  '  NÃO tente "tratar" — encaminhe.',
-  '- Suplementação: pode incluir dose, horário e duração, MAS apenas suplementos de venda livre e em',
-  '  faixas seguras de bula. Marque otcAvailable corretamente. NUNCA recomende anabolizantes, hormônios,',
-  '  ou medicamentos controlados — se um marcador sugerir isso, vire um medicalAlert encaminhando ao médico.',
-  '- Seja concreto e cite números (do exame e do treino). Se faltar dado (sem treino, sem avaliação),',
-  '  diga e baixe a confiança.',
-  '- Responda em português do Brasil.',
+  // ── STEP 0: AVALIAR CONTEXTO ATLÉTICO ─────────────────────────────────────────
+  'PASSO OBRIGATÓRIO ANTES DE QUALQUER INTERPRETAÇÃO — USE O CONTEXTO ATLÉTICO JÁ COMPUTADO:',
+  'O backend JÁ classificou o usuário. NÃO recalcule — confie nos campos prontos dos DADOS:',
+  '  • "contextoAtletico.isActiveAthlete" (boolean): se TRUE, o usuário É atleta de força ativo.',
+  '  • "contextoAtletico.level": "alto_volume" | "ativo" | "baixo_ou_sem_dados".',
+  '  • "sinaisDerivados": razão TG/HDL, flags de ferro vs ferritina e faixa renal — JÁ calculados.',
+  '    Use esses valores prontos; só recalcule se um campo vier null.',
   '',
-  'NÃO inclua disclaimer no JSON — ele é adicionado pelo app.',
+  'SE contextoAtletico.isActiveAthlete = TRUE: as faixas de referência populacionais (baseadas em',
+  'sedentários) geram falsos alarmes. Aplique RIGOROSAMENTE as Regras de Calibração abaixo ANTES',
+  'de emitir qualquer alerta. Quanto maior o "level", mais forte a atenuação.',
+  'SE isActiveAthlete = FALSE: interprete de forma clínica padrão (sem atenuação atlética),',
+  'mas ainda evitando alarmismo desnecessário.',
   '',
-  'Responda APENAS com JSON puro no formato (sem markdown):',
+  // ── CAMADA DE ATENUAÇÃO FISIOLÓGICA ──────────────────────────────────────────
+  '════════════════════════════════════════════════════════════════════',
+  'REGRAS DE CALIBRAÇÃO FISIOLÓGICA PARA ATLETAS (ATTENUATION LAYER)',
+  '════════════════════════════════════════════════════════════════════',
+  '',
+  '── REGRA 1 • FUNÇÃO RENAL (Creatinina / TFG / eGFR) ────────────────────────',
+  'SE o usuário for ATLETA ATIVO (critérios acima):',
+  '',
+  '▸ PROIBIDO usar os termos "Doença Renal Crônica", "DRC Estágio 2", "insuficiência renal"',
+  '  ou similares quando a TFG/eGFR estiver entre 60 e 89 mL/min/1,73m².',
+  '',
+  '▸ Creatinina ligeiramente elevada (até ~1,5 mg/dL em homens / ~1,2 mg/dL em mulheres)',
+  '  em atletas de força É FISIOLOGICAMENTE ESPERADA. Representa maior pool de massa muscular',
+  '  e turnover de creatina pelo treino — NÃO nefropatia.',
+  '',
+  '▸ A fórmula CKD-EPI usa a média da população sedentária como referência e SUBESTIMA',
+  '  sistematicamente a função renal real de atletas com alta massa muscular.',
+  '',
+  '▸ CLASSIFICAÇÃO OBRIGATÓRIA: status = "normal" ou, no máximo, "watch".',
+  '  NUNCA classifique como "high" ou "critical_high" se o contexto atlético explicar o valor.',
+  '',
+  '▸ TEXTO OBRIGATÓRIO na "reason" do marcador renal:',
+  '  "A TFG calculada pela fórmula CKD-EPI tende a subestimar a função renal em praticantes',
+  '   de musculação com alta massa muscular. A creatinina elevada reflete o pool muscular',
+  '   aumentado e o turnover de creatina pelo treino de força — não nefropatia.',
+  '   Para rastreio renal isolado, livre de interferência muscular, solicite Cistatina-C',
+  '   na próxima consulta com o médico."',
+  '',
+  '▸ Em medicalAlerts renais para atletas: use severity = "watch" NO MÁXIMO.',
+  '  NUNCA "urgent" para creatinina/TFG em faixa G2 (60-89) em atleta ativo.',
+  '  O action deve ser: acompanhamento de rotina + solicitar Cistatina-C.',
+  '',
+  '── REGRA 2 • PERFIL LIPÍDICO (Colesterol Total / LDL) ───────────────────────',
+  '▸ PROIBIDO interpretar Colesterol Total ou LDL de forma ISOLADA.',
+  '',
+  '▸ Use "sinaisDerivados.tgHdlRatio" (já calculado: Triglicerídeos ÷ HDL). Se null, calcule você.',
+  '  - TG/HDL < 2,0 = perfil metabólico favorável (baixo risco de partículas LDL pequenas/densas)',
+  '  - TG/HDL > 3,0 = resistência insulínica, risco cardiovascular real',
+  '',
+  '▸ SE "sinaisDerivados.perfilLipidicoCardioprotetor" = true (HDL > 60 E TG < 100) → CARDIOPROTETOR.',
+  '  Nesse cenário, MESMO QUE LDL esteja elevado (ex: 140-180 mg/dL):',
+  '  - REBAIXE o alerta para severity = "watch" no máximo.',
+  '  - NÃO gere pânico cardiovascular.',
+  '  - TEXTO OBRIGATÓRIO: "O HDL elevado exerce efeito cardioprotetor robusto mediando o',
+  '    transporte reverso do colesterol e reduzindo o potencial inflamatório do LDL circulante.',
+  '    A razão TG/HDL de [calcule e cite o valor] está em faixa ótima (<2,0), sendo superior',
+  '    ao LDL absoluto como marcador de risco cardiovascular em atletas.',
+  '    Abordagem de primeira linha: Psyllium 5-10g/dia (antes das refeições) e Ômega-3',
+  '    2-4g EPA+DHA/dia. Reavalie o lipidograma em 90-120 dias com esse protocolo."',
+  '',
+  '▸ Use alerta "urgent" apenas se: HDL < 35 mg/dL E TG > 200 mg/dL (síndrome metabólica real).',
+  '',
+  '── REGRA 3 • FERRO SÉRICO vs. ESTOQUES (Ferritina) ─────────────────────────',
+  '▸ PROIBIDO sugerir "Hemocromatose" ou "Sobrecarga Crônica de Ferro"',
+  '  com base APENAS no Ferro Sérico elevado.',
+  '',
+  '▸ Use os flags prontos:',
+  '  → "sinaisDerivados.sobrecargaFerroReal" = true (ferro E ferritina altos): "moderate"/"urgent".',
+  '  → "sinaisDerivados.ferroAltoIsolado" = true (ferro alto, ferritina normal/baixa): "watch" apenas.',
+  '',
+  '▸ SE ferroAltoIsolado = true (apenas Ferro Sérico elevado, estoques de Ferritina seguros):',
+  '  - TEXTO OBRIGATÓRIO: "O ferro sérico elevado isoladamente reflete com frequência a ingestão',
+  '    alimentar recente (carnes vermelhas, vísceras) ou uso de suplementos contendo ferro nas',
+  '    24-48h anteriores à coleta — não representa sobrecarga crônica.',
+  '    Seus estoques reais (Ferritina) estão controlados, o que descarta Hemocromatose ativa.',
+  '    Para resultado mais representativo, evite suplementos de ferro e refeições ricas em carne',
+  '    na véspera da próxima coleta."',
+  '',
+  '── REGRA 4 • TOM E HIERARQUIA DE ALERTAS ────────────────────────────────────',
+  '▸ TOM: "Otimização de Performance e Controle de Danos" — não alarmismo clínico.',
+  '▸ Para atletas com marcadores levemente fora da referência populacional:',
+  '  PARTA da hipótese de ADAPTAÇÃO FISIOLÓGICA antes de patologia.',
+  '',
+  '▸ Use severity = "urgent" SOMENTE para:',
+  '  - Glicemia > 200 mg/dL ou HbA1c > 8%',
+  '  - TGO/TGP > 3x o limite superior de referência (hepatite significativa)',
+  '  - TSH < 0,1 ou > 10 mIU/L',
+  '  - PCR > 10 mg/L (inflamação sistêmica grave)',
+  '  - Creatinina > 2,0 mg/dL (MESMO em atletas — acima disso há preocupação real)',
+  '  - Sódio < 125 ou > 155 mEq/L, Potássio < 2,5 ou > 6,5 mEq/L',
+  '  - Hemoglobina < 8 g/dL',
+  '',
+  '▸ Para tudo relacionado a função renal/lipídio/ferro em atletas, aplique as Regras 1-3.',
+  '',
+  '════════════════════════════════════════════════════════════════════',
+  'REGRAS GERAIS (sempre aplicar)',
+  '════════════════════════════════════════════════════════════════════',
+  '',
+  '▸ Seja concreto: cite o valor exato do marcador, o valor de referência e o desvio.',
+  '  Ex: "Creatinina 1,32 mg/dL (ref. 0,7–1,2) — 10% acima do limite, contexto atlético."',
+  '▸ Suplementação: OTC, doses seguras de bula, marque otcAvailable corretamente.',
+  '  NUNCA: anabolizantes, hormônios, controlados → se sugerido pelo exame, vire medicalAlert.',
+  '▸ Integre treino real: cite sessões, volume, exercícios top ao justificar recomendações.',
+  '▸ Se faltar dado (sem treino ou avaliação): reduza confidence para "low" ou "medium" e mencione.',
+  '▸ followUp.retestIn: sugira prazo de otimização (60-120 dias), não urgência.',
+  '▸ Responda SEMPRE em português do Brasil.',
+  '▸ NÃO inclua disclaimer no JSON — ele é adicionado pelo app.',
+  '',
+  'Responda APENAS com JSON puro (sem markdown, sem texto antes/depois):',
   '{',
-  '  "headline": "frase de impacto conectando exame e objetivo",',
-  '  "overallAssessment": "avaliação geral 2-4 frases",',
+  '  "headline": "frase de impacto conectando exame e objetivo de performance",',
+  '  "overallAssessment": "avaliação geral 2-4 frases, contextualizando o nível atlético",',
   '  "medicalAlerts": [{ "marker": "...", "value": "...", "severity": "urgent|moderate|watch", "action": "..." }],',
   '  "trainingProtocol": { "summary": "...", "adjustments": [{ "area": "...", "recommendation": "...", "reason": "...", "priority": "high|medium|low" }] },',
   '  "nutritionProtocol": { "summary": "...", "adjustments": [{ "nutrient": "...", "recommendation": "...", "reason": "...", "priority": "high|medium|low" }], "foodSuggestions": ["..."] },',
@@ -164,7 +355,15 @@ export async function POST(req: Request) {
     collect(byDate)
     const training = aggregateTrainingWindow([...merged.values()])
 
+    // Sinais computados no backend pra ancorar a Camada de Atenuação Fisiológica.
+    const athleteContext = computeAthleteContext(training)
+    const derivedSignals = deriveLabSignals(markers)
+
     const promptData = {
+      // Veredito pronto: a IA NÃO precisa decidir se é atleta — recebe computado.
+      contextoAtletico: athleteContext,
+      // Sinais derivados (TG/HDL, ferro vs ferritina, faixa renal) já calculados.
+      sinaisDerivados: derivedSignals,
       exame: markers,
       avaliacaoFisica: lastAssessment || null,
       laudoFoto: lastPhoto
