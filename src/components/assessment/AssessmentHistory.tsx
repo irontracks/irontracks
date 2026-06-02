@@ -25,6 +25,7 @@ import { AssessmentListItem, measurementFields, skinfoldFields } from '@/compone
 import { AssessmentPlanModal } from '@/components/assessment/AssessmentPlanModal';
 import { AssessmentHistoryModal } from './AssessmentHistoryModal';
 import { BodyPhotoCaptureModal } from '@/components/body-photo/BodyPhotoCaptureModal';
+import { LabExamsSection } from '@/components/lab-exams/LabExamsSection';
 import { useAssessmentHistoryData } from '@/hooks/useAssessmentHistoryData';
 import { ArrowLeft } from 'lucide-react';
 
@@ -162,6 +163,10 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
           <h2 className="text-xl font-black text-white mb-2">Nenhuma avaliação encontrada</h2>
           <p className="text-neutral-500 text-sm">Este aluno ainda não possui avaliações físicas registradas.</p>
         </div>
+
+        {/* Exames Laboratoriais — acessível mesmo sem avaliação física prévia */}
+        <LabExamsSection studentUserId={studentId ?? null} />
+
         <BodyPhotoCaptureModal
           open={photoModalOpen}
           onClose={() => setPhotoModalOpen(false)}
@@ -330,6 +335,9 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
             })}
           </div>
         </div>
+
+        {/* Exames Laboratoriais + protocolo integrado por IA (VIP) */}
+        <LabExamsSection studentUserId={studentId ?? null} />
 
         {/* AI Plan Modal */}
         {planModalOpen && planModalAssessment ? (
