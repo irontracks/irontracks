@@ -64,6 +64,8 @@ export const viewport = {
   themeColor: "#000000",
   width: "device-width",
   initialScale: 1,
+  maximumScale: 1,     // previne auto-zoom iOS em inputs < 16px
+  userScalable: false, // desabilita pinch-to-zoom no webview
   viewportFit: "cover",
 };
 

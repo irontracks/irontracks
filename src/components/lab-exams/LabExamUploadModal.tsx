@@ -169,12 +169,12 @@ export function LabExamUploadModal({ open, onClose, studentUserId, onSaved }: Pr
                 <div>
                   <label htmlFor="lab-exam-date" className="text-[11px] uppercase font-bold text-neutral-500">Data do exame</label>
                   <input id="lab-exam-date" type="date" aria-label="Data do exame" value={examDate} onChange={(e) => setExamDate(e.target.value)}
-                    className="w-full mt-1 bg-neutral-900 border border-neutral-800 rounded-xl px-3 py-2 text-sm text-white focus:border-yellow-500 focus:outline-none" />
+                    className="w-full mt-1 bg-neutral-900 border border-neutral-800 rounded-xl px-3 py-2 text-[16px] text-white focus:border-yellow-500 focus:outline-none" />
                 </div>
                 <div>
                   <label htmlFor="lab-exam-lab" className="text-[11px] uppercase font-bold text-neutral-500">Laboratório</label>
                   <input id="lab-exam-lab" type="text" aria-label="Laboratório" value={labName} onChange={(e) => setLabName(e.target.value)} placeholder="opcional"
-                    className="w-full mt-1 bg-neutral-900 border border-neutral-800 rounded-xl px-3 py-2 text-sm text-white focus:border-yellow-500 focus:outline-none" />
+                    className="w-full mt-1 bg-neutral-900 border border-neutral-800 rounded-xl px-3 py-2 text-[16px] text-white focus:border-yellow-500 focus:outline-none" />
                 </div>
               </div>
 

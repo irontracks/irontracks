@@ -71,75 +71,64 @@ export type LabExamExtracted = z.infer<typeof LabExamExtractedSchema>
 export const PRIORITY = ['high', 'medium', 'low'] as const
 export type Priority = (typeof PRIORITY)[number]
 
+// Limites generosos — o Gemini Pro gera respostas longas pra exames completos.
+// O objetivo do schema é garantir ESTRUTURA correta, não limitar conteúdo.
+const str = z.string()
+
 const MedicalAlertSchema = z.object({
-  marker: z.string().min(1).max(120),
-  value: z.string().max(60),
+  marker: str.min(1),
+  value: str,
   severity: z.enum(['urgent', 'moderate', 'watch']),
-  /** Ação recomendada, ex.: "Procure um endocrinologista". */
-  action: z.string().max(400),
+  action: str,
 })
 
 const TrainingAdjustmentSchema = z.object({
-  /** Área do treino, ex.: "Volume semanal", "Intensidade", "Recuperação". */
-  area: z.string().min(1).max(80),
-  recommendation: z.string().max(500),
-  /** Por que — ligado a um marcador específico. */
-  reason: z.string().max(400),
+  area: str.min(1),
+  recommendation: str,
+  reason: str,
   priority: z.enum(PRIORITY),
 })
 
 const NutritionAdjustmentSchema = z.object({
-  /** Nutriente/eixo, ex.: "Proteína", "Gorduras saturadas", "Fibras". */
-  nutrient: z.string().min(1).max(80),
-  recommendation: z.string().max(500),
-  reason: z.string().max(400),
+  nutrient: str.min(1),
+  recommendation: str,
+  reason: str,
   priority: z.enum(PRIORITY),
 })
 
 const SupplementSchema = z.object({
-  /** Nome, ex.: "Vitamina D3 (colecalciferol)". */
-  name: z.string().min(1).max(120),
-  /** Dose sugerida, ex.: "5.000 UI". */
-  dose: z.string().max(80),
-  /** Quando tomar, ex.: "com refeição contendo gordura". */
-  timing: z.string().max(120),
-  /** Por que — ligado a um marcador, ex.: "Vit. D = 18 ng/mL (ref. >30)". */
-  reason: z.string().max(400),
-  /** Duração sugerida antes de reavaliar, ex.: "3 meses e reexaminar". */
-  duration: z.string().max(120),
+  name: str.min(1),
+  dose: str,
+  timing: str,
+  reason: str,
+  duration: str,
   priority: z.enum(PRIORITY),
-  /** Disponível sem prescrição médica no Brasil. */
   otcAvailable: z.boolean(),
 })
 
 export const LabProtocolSchema = z.object({
-  /** Manchete de impacto, ex.: "Testosterona baixa + cortisol alto explicam sua fadiga". */
-  headline: z.string().min(1).max(200),
-  /** Avaliação geral em 2–4 frases. */
-  overallAssessment: z.string().max(1500),
+  headline: str.min(1),
+  overallAssessment: str,
 
-  /** Alertas que pedem atenção médica. Vazio quando nada relevante. */
-  medicalAlerts: z.array(MedicalAlertSchema).max(20),
+  medicalAlerts: z.array(MedicalAlertSchema).max(30),
 
   trainingProtocol: z.object({
-    summary: z.string().max(800),
-    adjustments: z.array(TrainingAdjustmentSchema).max(15),
+    summary: str,
+    adjustments: z.array(TrainingAdjustmentSchema).max(20),
   }),
 
   nutritionProtocol: z.object({
-    summary: z.string().max(800),
-    adjustments: z.array(NutritionAdjustmentSchema).max(15),
-    foodSuggestions: z.array(z.string().max(120)).max(30),
+    summary: str,
+    adjustments: z.array(NutritionAdjustmentSchema).max(20),
+    foodSuggestions: z.array(str).max(40),
   }),
 
-  /** Suplementação detalhada (doses, horário, duração). */
-  supplementation: z.array(SupplementSchema).max(20),
+  supplementation: z.array(SupplementSchema).max(30),
 
   followUp: z.object({
-    /** Quando reexaminar, ex.: "3 meses". */
-    retestIn: z.string().max(80),
-    markersToWatch: z.array(z.string().max(120)).max(30),
-    notes: z.string().max(800),
+    retestIn: str,
+    markersToWatch: z.array(str).max(40),
+    notes: str,
   }),
 
   confidence: z.enum(['high', 'medium', 'low']),
