@@ -23,7 +23,7 @@ import { parseJsonBody, parseJsonWithSchema } from '@/utils/zod'
 import { env } from '@/utils/env'
 import { safeGemini } from '@/utils/ai/handleGeminiError'
 import { logError } from '@/lib/logger'
-import { aggregateTrainingWindow } from '@/utils/bodyPhoto/trainingWindow'
+import { aggregateTrainingWindow, computeSessionStats } from '@/utils/bodyPhoto/trainingWindow'
 import { LabProtocolSchema } from '@/schemas/labExam'
 
 export const dynamic = 'force-dynamic'
@@ -132,6 +132,84 @@ function deriveLabSignals(rawMarkers: unknown) {
     egfr: egfr?.value ?? null,
     // Faixa renal G2 (60-89) = zona de atenuação pra atletas.
     egfrEmFaixaAtenuavel: typeof egfr?.value === 'number' ? egfr.value >= 60 && egfr.value <= 89 : null,
+  }
+}
+
+// ─── Classificador de grupo muscular (keywords PT-BR/EN, determinístico) ────────
+const MUSCLE_KEYWORDS: Array<{ group: string; re: RegExp }> = [
+  { group: 'Pernas', re: /agacha|leg ?press|cadeira|mesa flex|stiff|terra|afundo|avanço|panturril|gêmeos|gluteo|glúteo|hack|b[uú]lgaro|extensora|flexora|squat|lunge|hip thrust|elevação pélvica/i },
+  { group: 'Peito', re: /supino|crucifixo|crossover|peck|peitoral|chest|fly|flexão de braço|push.?up|paralelas/i },
+  { group: 'Costas', re: /remada|puxada|pulldown|barra fixa|pull.?up|pullover|levantamento terra|deadlift|row|encolhimento|trap[eé]zio/i },
+  { group: 'Ombros', re: /desenvolvimento|elevação lateral|elevação frontal|arnold|militar|shoulder|overhead press|crucifixo inverso|face pull/i },
+  { group: 'Bíceps', re: /rosca|biceps|bíceps|curl/i },
+  { group: 'Tríceps', re: /tr[ií]ceps|testa|coice|pulley|extensão de cotovelo|mergulho|dips/i },
+  { group: 'Abdômen/Core', re: /abdomin|prancha|plank|crunch|core|obl[ií]quo|elevação de perna|infra/i },
+]
+
+function classifyMuscleGroup(name: string): string {
+  for (const { group, re } of MUSCLE_KEYWORDS) if (re.test(name)) return group
+  return 'Outros'
+}
+
+interface DatedSession { notes?: unknown; date: string | null }
+
+/**
+ * Sinais temporais do treino relativos à data do exame:
+ *  - proximidade (dias entre o último treino e a coleta) → explica CK/creatinina/TGO altas
+ *  - tendência (última semana vs média) → detecta pico de carga ou deload
+ *  - volume por grupo muscular → contextualiza marcadores por padrão de treino
+ */
+function computeTrainingTemporalSignals(sessions: DatedSession[], examDateStr: string | null, anchorMs: number) {
+  const anchor = examDateStr ? new Date(`${String(examDateStr).slice(0, 10)}T12:00:00Z`).getTime() : anchorMs
+  const validAnchor = Number.isFinite(anchor) ? anchor : anchorMs
+  const DAY = 86400_000
+  const weekStart = validAnchor - 7 * DAY
+
+  let lastSessionMs: number | null = null
+  let lastWeekVolumeKg = 0
+  let totalVolumeKg = 0
+  let earliestMs: number | null = null
+  const byGroup = new Map<string, number>()
+
+  for (const s of sessions) {
+    if (!s.date) continue
+    const ms = new Date(`${String(s.date).slice(0, 10)}T12:00:00Z`).getTime()
+    if (!Number.isFinite(ms) || ms > validAnchor) continue // ignora treino DEPOIS da coleta
+    const stats = computeSessionStats(s.notes)
+    if (stats.totalSets === 0) continue
+    totalVolumeKg += stats.volumeKg
+    if (lastSessionMs === null || ms > lastSessionMs) lastSessionMs = ms
+    if (earliestMs === null || ms < earliestMs) earliestMs = ms
+    if (ms >= weekStart) lastWeekVolumeKg += stats.volumeKg
+    for (const [name, ev] of stats.byExercise) {
+      const g = classifyMuscleGroup(name)
+      byGroup.set(g, (byGroup.get(g) || 0) + ev.volumeKg)
+    }
+  }
+
+  const spanWeeks = earliestMs !== null ? Math.max(1, (validAnchor - earliestMs) / (7 * DAY)) : 1
+  const avgWeeklyVolumeKg = totalVolumeKg / spanWeeks
+  const daysSinceLastSession = lastSessionMs !== null ? Math.round((validAnchor - lastSessionMs) / DAY) : null
+
+  let volumeTrend: 'pico' | 'estavel' | 'deload' | 'sem_dados' = 'sem_dados'
+  if (lastSessionMs !== null && avgWeeklyVolumeKg > 0) {
+    const ratio = lastWeekVolumeKg / avgWeeklyVolumeKg
+    volumeTrend = ratio >= 1.3 ? 'pico' : ratio <= 0.6 ? 'deload' : 'estavel'
+  }
+
+  const volumeByMuscleGroup = Object.fromEntries(
+    [...byGroup.entries()].sort((a, b) => b[1] - a[1]).map(([g, v]) => [g, Math.round(v)]),
+  )
+
+  return {
+    examDateUsada: examDateStr ? String(examDateStr).slice(0, 10) : 'hoje (data do exame ausente)',
+    diasDesdeUltimoTreino: daysSinceLastSession,
+    // Janela crítica de 72h pós-treino: CK/creatinina/TGO podem estar elevadas.
+    treinoRecenteAfetaExame: daysSinceLastSession !== null && daysSinceLastSession <= 3,
+    volumeUltimaSemanaKg: Math.round(lastWeekVolumeKg),
+    volumeMedioSemanalKg: Math.round(avgWeeklyVolumeKg),
+    tendenciaVolume: volumeTrend, // pico = sobrecarga recente, deload = recuperação
+    volumePorGrupoMuscular: volumeByMuscleGroup,
   }
 }
 
@@ -247,6 +325,25 @@ const PROMPT_HEADER = [
   '',
   '▸ Para tudo relacionado a função renal/lipídio/ferro em atletas, aplique as Regras 1-3.',
   '',
+  '── REGRA 5 • TIMING DA COLETA (proximidade treino ↔ exame) ──────────────────',
+  'Use o campo "treinoTemporal" dos DADOS (já computado em relação à DATA DO EXAME):',
+  '',
+  '▸ SE "treinoTemporal.treinoRecenteAfetaExame" = true (último treino ≤ 3 dias antes da coleta):',
+  '  Marcadores de DANO MUSCULAR e turnover ficam transitoriamente elevados por 24-72h:',
+  '  CK (creatinoquinase), Creatinina, TGO/AST, LDH, Ácido Úrico, e até leucócitos.',
+  '  → Para ESSES marcadores, atenue fortemente e explique no texto, citando os dias:',
+  '    "Você treinou há [diasDesdeUltimoTreino] dia(s) antes da coleta. Marcadores de dano',
+  '     muscular (CK, AST, creatinina) sobem 24-72h após treino intenso e retornam ao basal',
+  '     com descanso. Para um retrato sem esse ruído, colha o sangue após 48-72h sem treino',
+  '     de força pesado."',
+  '',
+  '▸ SE "treinoTemporal.tendenciaVolume" = "pico": houve sobrecarga de volume na semana da coleta.',
+  '  Reforça a explicação acima e justifica marcadores inflamatórios (PCR) levemente altos.',
+  '▸ SE "tendenciaVolume" = "deload": recuperação — marcadores de dano tendem ao basal real.',
+  '',
+  '▸ Use "treinoTemporal.volumePorGrupoMuscular" pra conectar marcadores ao padrão de treino',
+  '  (ex.: alto volume de Pernas + creatinina alta = coerente com dano de grandes grupos).',
+  '',
   '════════════════════════════════════════════════════════════════════',
   'REGRAS GERAIS (sempre aplicar)',
   '════════════════════════════════════════════════════════════════════',
@@ -298,7 +395,7 @@ export async function POST(req: Request) {
 
     const { data: exam } = await admin
       .from('lab_exams')
-      .select('id, user_id, trainer_id, extracted_markers')
+      .select('id, user_id, trainer_id, extracted_markers, exam_date')
       .eq('id', examId)
       .maybeSingle()
     if (!exam) return NextResponse.json({ ok: false, error: 'not_found' }, { status: 404 })
@@ -332,38 +429,53 @@ export async function POST(req: Request) {
       .limit(1)
       .maybeSingle()
 
-    // ── Fonte 4: janela de treino dos últimos 90 dias ───────────────────────
-    const toDate = new Date()
+    // ── Fonte 4: janela de treino — ancorada na DATA DO EXAME ────────────────
+    // O treino que influencia os marcadores é o que ANTECEDE a coleta, não o de hoje.
+    const examDateStr = (exam as { exam_date?: string | null }).exam_date || null
+    const anchorMs = examDateStr
+      ? new Date(`${String(examDateStr).slice(0, 10)}T12:00:00Z`).getTime()
+      : Date.now()
+    const toDate = new Date(Number.isFinite(anchorMs) ? anchorMs : Date.now())
     const fromDate = new Date(toDate.getTime() - 90 * 86400_000)
-    const merged = new Map<string, { notes?: unknown }>()
-    const collect = (rows: unknown) => {
+
+    // Guarda notes + data efetiva (completed_at || date) por workout.
+    const merged = new Map<string, { notes?: unknown; date: string | null }>()
+    const collect = (rows: unknown, dateField: 'completed_at' | 'date') => {
       if (!Array.isArray(rows)) return
       for (const r of rows) {
-        const row = r as { id?: string; notes?: unknown }
-        if (row?.id) merged.set(String(row.id), { notes: row.notes })
+        const row = r as { id?: string; notes?: unknown; completed_at?: string | null; date?: string | null }
+        if (!row?.id) continue
+        const d = String(row[dateField] || '').slice(0, 10) || null
+        const existing = merged.get(String(row.id))
+        merged.set(String(row.id), { notes: row.notes, date: existing?.date || d })
       }
     }
     const { data: byCompleted } = await admin
       .from('workouts').select('id, notes, completed_at')
       .eq('user_id', assessedUserId).eq('is_template', false)
       .gte('completed_at', fromDate.toISOString()).lte('completed_at', toDate.toISOString())
-    collect(byCompleted)
+    collect(byCompleted, 'completed_at')
     const { data: byDate } = await admin
       .from('workouts').select('id, notes, date')
       .eq('user_id', assessedUserId).eq('is_template', false)
       .gte('date', dayStr(fromDate)).lte('date', dayStr(toDate))
-    collect(byDate)
-    const training = aggregateTrainingWindow([...merged.values()])
+    collect(byDate, 'date')
+
+    const sessionList = [...merged.values()]
+    const training = aggregateTrainingWindow(sessionList)
 
     // Sinais computados no backend pra ancorar a Camada de Atenuação Fisiológica.
     const athleteContext = computeAthleteContext(training)
     const derivedSignals = deriveLabSignals(markers)
+    const temporalSignals = computeTrainingTemporalSignals(sessionList, examDateStr, anchorMs)
 
     const promptData = {
       // Veredito pronto: a IA NÃO precisa decidir se é atleta — recebe computado.
       contextoAtletico: athleteContext,
       // Sinais derivados (TG/HDL, ferro vs ferritina, faixa renal) já calculados.
       sinaisDerivados: derivedSignals,
+      // Sinais temporais: proximidade treino↔coleta, tendência de carga, volume por grupo.
+      treinoTemporal: temporalSignals,
       exame: markers,
       avaliacaoFisica: lastAssessment || null,
       laudoFoto: lastPhoto
