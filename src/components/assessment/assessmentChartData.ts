@@ -75,7 +75,7 @@ function getAllValues(datasets: { data: (number | null)[] }[]): (number | null)[
 // ── Chart option builders ───────────────────────────────────────────────────
 
 const GRID_COLOR = 'rgba(255, 255, 255, 0.04)';
-const TICK_COLOR = 'rgba(255, 255, 255, 0.35)';
+const TICK_COLOR = 'rgba(255, 255, 255, 0.55)';
 const FONT_FAMILY = "'Inter', 'system-ui', sans-serif";
 
 function buildLineOptions(title: string, unit: string, datasets: { data: (number | null)[] }[]): Record<string, unknown> {
@@ -83,44 +83,47 @@ function buildLineOptions(title: string, unit: string, datasets: { data: (number
     return {
         responsive: true,
         maintainAspectRatio: false,
+        spanGaps: true,
         interaction: { mode: 'index' as const, intersect: false },
         plugins: {
             legend: {
                 position: 'bottom' as const,
                 labels: {
                     color: TICK_COLOR,
-                    font: { family: FONT_FAMILY, size: 11, weight: '600' as const },
+                    font: { family: FONT_FAMILY, size: 11, weight: '700' as const },
                     usePointStyle: true,
                     pointStyle: 'circle' as const,
-                    padding: 16,
+                    padding: 20,
+                    boxWidth: 8,
+                    boxHeight: 8,
                 },
             },
             title: { display: false },
             tooltip: {
-                backgroundColor: 'rgba(10, 10, 10, 0.95)',
-                titleColor: '#facc15',
-                titleFont: { family: FONT_FAMILY, size: 12, weight: '700' as const },
-                bodyColor: '#e5e5e5',
-                bodyFont: { family: FONT_FAMILY, size: 12 },
-                borderColor: 'rgba(255, 255, 255, 0.08)',
+                backgroundColor: 'rgba(8, 8, 8, 0.97)',
+                titleColor: '#fbbf24',
+                titleFont: { family: FONT_FAMILY, size: 12, weight: '800' as const },
+                bodyColor: 'rgba(255,255,255,0.8)',
+                bodyFont: { family: FONT_FAMILY, size: 12, weight: '500' as const },
+                borderColor: 'rgba(251,191,36,0.2)',
                 borderWidth: 1,
-                padding: { x: 12, y: 8 },
-                cornerRadius: 10,
+                padding: { x: 14, y: 10 },
+                cornerRadius: 12,
                 displayColors: true,
                 callbacks: {
                     label: (ctx: { dataset: { label?: string }; parsed: { y: number | null } }) => {
                         const label = ctx.dataset.label || '';
                         const value = ctx.parsed.y;
                         if (value == null) return `${label}: -`;
-                        return `${label}: ${value.toFixed(1)} ${unit}`;
+                        return `  ${label}: ${value.toFixed(1)} ${unit}`;
                     },
                 },
             },
         },
         scales: {
             x: {
-                grid: { color: GRID_COLOR, drawBorder: false },
-                ticks: { color: TICK_COLOR, font: { family: FONT_FAMILY, size: 11 } },
+                grid: { color: 'rgba(255,255,255,0.03)', drawBorder: false },
+                ticks: { color: TICK_COLOR, font: { family: FONT_FAMILY, size: 10, weight: '600' as const } },
             },
             y: {
                 suggestedMin: bounds.suggestedMin,
@@ -128,14 +131,14 @@ function buildLineOptions(title: string, unit: string, datasets: { data: (number
                 grid: { color: GRID_COLOR, drawBorder: false },
                 ticks: {
                     color: TICK_COLOR,
-                    font: { family: FONT_FAMILY, size: 11 },
+                    font: { family: FONT_FAMILY, size: 10, weight: '600' as const },
                     callback: (value: number) => `${value}${unit === '%' ? '%' : ''}`,
                 },
             },
         },
         elements: {
-            point: { radius: 5, hoverRadius: 7, borderWidth: 2, backgroundColor: '#0a0a0a' },
-            line: { borderWidth: 2.5 },
+            point: { radius: 5, hoverRadius: 9, borderWidth: 2.5, backgroundColor: '#060606', hoverBorderWidth: 3 },
+            line: { borderWidth: 3, borderCapStyle: 'round' as const, borderJoinStyle: 'round' as const },
         },
     };
 }
@@ -179,14 +182,14 @@ function buildBarOptions(title: string, datasets: { data: (number | null)[] }[])
             },
         },
         datasets: {
-            bar: { maxBarThickness: 20 },
+            bar: { maxBarThickness: 22, borderSkipped: false },
         },
         scales: {
             x: {
                 grid: { display: false },
                 ticks: {
                     color: TICK_COLOR,
-                    font: { family: FONT_FAMILY, size: 10 },
+                    font: { family: FONT_FAMILY, size: 10, weight: '600' as const },
                     maxRotation: 45,
                     minRotation: 45,
                 },
@@ -194,8 +197,8 @@ function buildBarOptions(title: string, datasets: { data: (number | null)[] }[])
             y: {
                 suggestedMin: bounds.suggestedMin,
                 suggestedMax: bounds.suggestedMax,
-                grid: { color: GRID_COLOR, drawBorder: false },
-                ticks: { color: TICK_COLOR, font: { family: FONT_FAMILY, size: 11 } },
+                grid: { color: 'rgba(255,255,255,0.03)', drawBorder: false },
+                ticks: { color: TICK_COLOR, font: { family: FONT_FAMILY, size: 10, weight: '600' as const } },
             },
         },
     };
@@ -238,18 +241,18 @@ export function buildAssessmentChartData(sortedAssessments: AssessmentRow[]): As
                 {
                     label: 'Peso (kg)',
                     data: sortedAssessments.map(getWeightKg),
-                    borderColor: '#facc15',
-                    backgroundColor: 'rgba(250, 204, 21, 0.08)',
+                    borderColor: '#fbbf24',
+                    backgroundColor: 'rgba(251,191,36,0.12)',
                     fill: true,
-                    tension: 0.35,
+                    tension: 0.4,
                 },
                 {
                     label: 'Massa Magra (kg)',
                     data: sortedAssessments.map(getLeanMassKg),
-                    borderColor: '#22c55e',
-                    backgroundColor: 'rgba(34, 197, 94, 0.06)',
+                    borderColor: '#4ade80',
+                    backgroundColor: 'rgba(74,222,128,0.1)',
                     fill: true,
-                    tension: 0.35,
+                    tension: 0.4,
                 },
             ],
         },
@@ -259,35 +262,35 @@ export function buildAssessmentChartData(sortedAssessments: AssessmentRow[]): As
                 {
                     label: '% Gordura',
                     data: sortedAssessments.map(getBodyFatPercent),
-                    borderColor: '#ef4444',
-                    backgroundColor: 'rgba(239, 68, 68, 0.08)',
+                    borderColor: '#f43f5e',
+                    backgroundColor: 'rgba(244,63,94,0.1)',
                     fill: true,
-                    tension: 0.35,
+                    tension: 0.4,
                 },
                 {
                     label: 'Massa Gorda (kg)',
                     data: sortedAssessments.map(getFatMassKg),
-                    borderColor: '#f97316',
-                    backgroundColor: 'rgba(249, 115, 22, 0.06)',
+                    borderColor: '#fb923c',
+                    backgroundColor: 'rgba(251,146,60,0.08)',
                     fill: false,
-                    tension: 0.35,
+                    tension: 0.4,
                 },
             ],
         },
         trunkMeasurements: {
             labels: barLabels,
             datasets: [
-                { label: 'Peito', data: barAssessments.map(a => getMeasurementCm(a, 'chest')), backgroundColor: 'rgba(59, 130, 246, 0.7)', borderColor: 'rgba(59, 130, 246, 1)', borderWidth: 1, borderRadius: 6 },
-                { label: 'Cintura', data: barAssessments.map(a => getMeasurementCm(a, 'waist')), backgroundColor: 'rgba(236, 72, 153, 0.7)', borderColor: 'rgba(236, 72, 153, 1)', borderWidth: 1, borderRadius: 6 },
-                { label: 'Quadril', data: barAssessments.map(a => getMeasurementCm(a, 'hip')), backgroundColor: 'rgba(14, 165, 233, 0.7)', borderColor: 'rgba(14, 165, 233, 1)', borderWidth: 1, borderRadius: 6 },
+                { label: 'Peito', data: barAssessments.map(a => getMeasurementCm(a, 'chest')), backgroundColor: 'rgba(96,165,250,0.85)', borderColor: 'rgba(96,165,250,1)', borderWidth: 1.5, borderRadius: 10 },
+                { label: 'Cintura', data: barAssessments.map(a => getMeasurementCm(a, 'waist')), backgroundColor: 'rgba(244,114,182,0.85)', borderColor: 'rgba(244,114,182,1)', borderWidth: 1.5, borderRadius: 10 },
+                { label: 'Quadril', data: barAssessments.map(a => getMeasurementCm(a, 'hip')), backgroundColor: 'rgba(56,189,248,0.85)', borderColor: 'rgba(56,189,248,1)', borderWidth: 1.5, borderRadius: 10 },
             ],
         },
         limbMeasurements: {
             labels: barLabels,
             datasets: [
-                { label: 'Braço', data: barAssessments.map(a => getMeasurementCm(a, 'arm')), backgroundColor: 'rgba(168, 85, 247, 0.7)', borderColor: 'rgba(168, 85, 247, 1)', borderWidth: 1, borderRadius: 6 },
-                { label: 'Coxa', data: barAssessments.map(a => getMeasurementCm(a, 'thigh')), backgroundColor: 'rgba(34, 197, 94, 0.7)', borderColor: 'rgba(34, 197, 94, 1)', borderWidth: 1, borderRadius: 6 },
-                { label: 'Panturrilha', data: barAssessments.map(a => getMeasurementCm(a, 'calf')), backgroundColor: 'rgba(251, 191, 36, 0.7)', borderColor: 'rgba(251, 191, 36, 1)', borderWidth: 1, borderRadius: 6 },
+                { label: 'Braço', data: barAssessments.map(a => getMeasurementCm(a, 'arm')), backgroundColor: 'rgba(192,132,252,0.85)', borderColor: 'rgba(192,132,252,1)', borderWidth: 1.5, borderRadius: 10 },
+                { label: 'Coxa', data: barAssessments.map(a => getMeasurementCm(a, 'thigh')), backgroundColor: 'rgba(52,211,153,0.85)', borderColor: 'rgba(52,211,153,1)', borderWidth: 1.5, borderRadius: 10 },
+                { label: 'Panturrilha', data: barAssessments.map(a => getMeasurementCm(a, 'calf')), backgroundColor: 'rgba(252,211,77,0.85)', borderColor: 'rgba(252,211,77,1)', borderWidth: 1.5, borderRadius: 10 },
             ],
         },
     };
