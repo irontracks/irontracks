@@ -178,10 +178,18 @@ function buildBarOptions(title: string, datasets: { data: (number | null)[] }[])
                 },
             },
         },
+        datasets: {
+            bar: { maxBarThickness: 20 },
+        },
         scales: {
             x: {
                 grid: { display: false },
-                ticks: { color: TICK_COLOR, font: { family: FONT_FAMILY, size: 11 } },
+                ticks: {
+                    color: TICK_COLOR,
+                    font: { family: FONT_FAMILY, size: 10 },
+                    maxRotation: 45,
+                    minRotation: 45,
+                },
             },
             y: {
                 suggestedMin: bounds.suggestedMin,
@@ -206,12 +214,22 @@ export interface AssessmentChartData {
     limbMeasurements: { labels: string[]; datasets: { label: string; data: (number | null)[]; backgroundColor: string; borderColor: string; borderWidth: number; borderRadius: number }[] };
 }
 
+// Número máximo de avaliações exibidas nos gráficos de barra — evita
+// superlotação do eixo X em mobile com muitos registros históricos.
+const CHART_BAR_LIMIT = 6;
+
 export function buildAssessmentChartData(sortedAssessments: AssessmentRow[]): AssessmentChartData {
-    const labels = sortedAssessments.map(assessment => {
+    const makeLabel = (assessment: AssessmentRow) => {
         const rawDate = assessment?.date ?? assessment?.assessment_date;
         const date = new Date(typeof rawDate === 'string' || typeof rawDate === 'number' || rawDate instanceof Date ? rawDate : String(rawDate ?? ''));
         return Number.isNaN(date.getTime()) ? '-' : date.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
-    });
+    };
+
+    const labels = sortedAssessments.map(makeLabel);
+
+    // Barras: apenas as N mais recentes para não sobrecarregar o eixo X
+    const barAssessments = sortedAssessments.slice(-CHART_BAR_LIMIT);
+    const barLabels = barAssessments.map(makeLabel);
 
     return {
         weightLeanMass: {
@@ -257,19 +275,19 @@ export function buildAssessmentChartData(sortedAssessments: AssessmentRow[]): As
             ],
         },
         trunkMeasurements: {
-            labels,
+            labels: barLabels,
             datasets: [
-                { label: 'Peito', data: sortedAssessments.map(a => getMeasurementCm(a, 'chest')), backgroundColor: 'rgba(59, 130, 246, 0.7)', borderColor: 'rgba(59, 130, 246, 1)', borderWidth: 1, borderRadius: 6 },
-                { label: 'Cintura', data: sortedAssessments.map(a => getMeasurementCm(a, 'waist')), backgroundColor: 'rgba(236, 72, 153, 0.7)', borderColor: 'rgba(236, 72, 153, 1)', borderWidth: 1, borderRadius: 6 },
-                { label: 'Quadril', data: sortedAssessments.map(a => getMeasurementCm(a, 'hip')), backgroundColor: 'rgba(14, 165, 233, 0.7)', borderColor: 'rgba(14, 165, 233, 1)', borderWidth: 1, borderRadius: 6 },
+                { label: 'Peito', data: barAssessments.map(a => getMeasurementCm(a, 'chest')), backgroundColor: 'rgba(59, 130, 246, 0.7)', borderColor: 'rgba(59, 130, 246, 1)', borderWidth: 1, borderRadius: 6 },
+                { label: 'Cintura', data: barAssessments.map(a => getMeasurementCm(a, 'waist')), backgroundColor: 'rgba(236, 72, 153, 0.7)', borderColor: 'rgba(236, 72, 153, 1)', borderWidth: 1, borderRadius: 6 },
+                { label: 'Quadril', data: barAssessments.map(a => getMeasurementCm(a, 'hip')), backgroundColor: 'rgba(14, 165, 233, 0.7)', borderColor: 'rgba(14, 165, 233, 1)', borderWidth: 1, borderRadius: 6 },
             ],
         },
         limbMeasurements: {
-            labels,
+            labels: barLabels,
             datasets: [
-                { label: 'Braço', data: sortedAssessments.map(a => getMeasurementCm(a, 'arm')), backgroundColor: 'rgba(168, 85, 247, 0.7)', borderColor: 'rgba(168, 85, 247, 1)', borderWidth: 1, borderRadius: 6 },
-                { label: 'Coxa', data: sortedAssessments.map(a => getMeasurementCm(a, 'thigh')), backgroundColor: 'rgba(34, 197, 94, 0.7)', borderColor: 'rgba(34, 197, 94, 1)', borderWidth: 1, borderRadius: 6 },
-                { label: 'Panturrilha', data: sortedAssessments.map(a => getMeasurementCm(a, 'calf')), backgroundColor: 'rgba(251, 191, 36, 0.7)', borderColor: 'rgba(251, 191, 36, 1)', borderWidth: 1, borderRadius: 6 },
+                { label: 'Braço', data: barAssessments.map(a => getMeasurementCm(a, 'arm')), backgroundColor: 'rgba(168, 85, 247, 0.7)', borderColor: 'rgba(168, 85, 247, 1)', borderWidth: 1, borderRadius: 6 },
+                { label: 'Coxa', data: barAssessments.map(a => getMeasurementCm(a, 'thigh')), backgroundColor: 'rgba(34, 197, 94, 0.7)', borderColor: 'rgba(34, 197, 94, 1)', borderWidth: 1, borderRadius: 6 },
+                { label: 'Panturrilha', data: barAssessments.map(a => getMeasurementCm(a, 'calf')), backgroundColor: 'rgba(251, 191, 36, 0.7)', borderColor: 'rgba(251, 191, 36, 1)', borderWidth: 1, borderRadius: 6 },
             ],
         },
     };
