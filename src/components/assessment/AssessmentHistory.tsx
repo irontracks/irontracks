@@ -211,7 +211,7 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
             }}
           >
             <h3 className="text-sm font-black uppercase tracking-widest text-yellow-500/80 mb-4">Peso × Massa Magra</h3>
-            <div className="h-64">
+            <div className="h-72">
               {chartHasData.weightLeanMass ? (
                 <Line data={chartData.weightLeanMass} options={chartOptions.weightLeanMass as never} />
               ) : (
@@ -231,7 +231,7 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
             }}
           >
             <h3 className="text-sm font-black uppercase tracking-widest text-yellow-500/80 mb-4">Gordura Corporal</h3>
-            <div className="h-64">
+            <div className="h-72">
               {chartHasData.bodyFatPercent ? (
                 <Line data={chartData.bodyFatPercent} options={chartOptions.bodyFatPercent as never} />
               ) : (
@@ -254,7 +254,7 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
             }}
           >
             <h3 className="text-sm font-black uppercase tracking-widest text-yellow-500/80 mb-4">Circunferências — Tronco</h3>
-            <div className="h-64">
+            <div className="h-72">
               {chartHasData.trunkMeasurements ? (
                 <Bar data={chartData.trunkMeasurements} options={chartOptions.trunkMeasurements as never} />
               ) : (
@@ -274,7 +274,7 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
             }}
           >
             <h3 className="text-sm font-black uppercase tracking-widest text-yellow-500/80 mb-4">Circunferências — Membros</h3>
-            <div className="h-64">
+            <div className="h-72">
               {chartHasData.limbMeasurements ? (
                 <Bar data={chartData.limbMeasurements} options={chartOptions.limbMeasurements as never} />
               ) : (
