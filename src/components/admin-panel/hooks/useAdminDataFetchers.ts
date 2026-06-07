@@ -524,6 +524,7 @@ export function useAdminDataFetchers(deps: AdminDataFetchersDeps) {
             const student = selectedStudentRef.current;
             if (!student) return;
             setLoading(true);
+            try {
             const expectedStudentId = student?.id || null;
             let targetUserId = student.user_id || '';
             if (!targetUserId && student.email) {
@@ -568,12 +569,13 @@ export function useAdminDataFetchers(deps: AdminDataFetchersDeps) {
             } catch { }
             if (targetUserId) {
                 let wData: UnknownRecord[] = [];
-                const { data } = await supabase
+                const { data, error: wErr } = await supabase
                     .from('workouts')
                     .select('*, exercises(*, sets(*))')
                     .eq('user_id', targetUserId)
                     .eq('is_template', true)
                     .order('name');
+                if (wErr) logError('useAdminDataFetchers.fetchWorkouts', wErr);
                 wData = data || [];
                 wData = (Array.isArray(wData) ? wData : []).filter((w: UnknownRecord) => w && typeof w === 'object' && w.is_template === true);
                 const studentDeduped = (wData || []).sort((a: UnknownRecord, b: UnknownRecord) => String(a.name || '').localeCompare(String(b.name || '')));
@@ -672,7 +674,11 @@ export function useAdminDataFetchers(deps: AdminDataFetchersDeps) {
                     setAssessments([]);
                 }
             }
-            setLoading(false);
+            } catch (e) {
+                logError('useAdminDataFetchers.fetchDetails', e);
+            } finally {
+                setLoading(false);
+            }
         };
         fetchDetails();
         // CRITICAL: deps use primitive keys (id/email) NOT the full selectedStudent object
