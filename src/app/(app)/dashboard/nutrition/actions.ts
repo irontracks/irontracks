@@ -219,6 +219,52 @@ export async function editMealAction(
   }
 }
 
+/**
+ * Applies one meal from an AI-generated diet plan as a single entry.
+ * Macros are already computed server-side by /api/ai/diet-generate; here we
+ * just validate, clamp and persist via the shared trackMeal flow so totals
+ * and daily logs stay consistent.
+ */
+export async function applyGeneratedMealAction(
+  meal: { name: string; calories: number; protein: number; carbs: number; fat: number },
+  dateKey?: string,
+) {
+  try {
+    const supabase = await createClient()
+    const { data, error } = await supabase.auth.getUser()
+    if (error) throw new Error(error.message || 'nutrition_auth_failed')
+    const userId = data?.user?.id
+    if (!userId) throw new Error('nutrition_unauthorized')
+
+    const resolvedDateKey = (() => {
+      const s = typeof dateKey === 'string' ? dateKey.trim() : ''
+      if (s && /^\d{4}-\d{2}-\d{2}$/.test(s)) return s
+      try {
+        const tz = 'America/Sao_Paulo'
+        return new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
+      } catch {
+        return new Date().toISOString().slice(0, 10)
+      }
+    })()
+
+    const mealLog = {
+      foodName: sanitizeFoodName(String(meal?.name ?? '')).slice(0, 120) || 'Refeição',
+      calories: Math.max(0, Math.round(Number(meal?.calories) || 0)),
+      protein: Math.max(0, Math.round(Number(meal?.protein) || 0)),
+      carbs: Math.max(0, Math.round(Number(meal?.carbs) || 0)),
+      fat: Math.max(0, Math.round(Number(meal?.fat) || 0)),
+    }
+    if (mealLog.calories <= 0 && mealLog.protein <= 0) return { ok: false, error: 'Refeição vazia.' }
+
+    const row = await trackMeal(userId, mealLog, resolvedDateKey)
+    revalidatePath('/dashboard/nutrition')
+    waitUntil(maybeNotifyDailyGoal(supabase, userId, resolvedDateKey))
+    return { ok: true, meal: mealLog, entry: row || null }
+  } catch (e: unknown) {
+    return { ok: false, error: String(getErrorMessage(e) || 'nutrition_apply_generated_meal_failed') }
+  }
+}
+
 export async function logBarcodeAction(ean: string, grams: number, dateKey?: string) {
   try {
     const cleanEan = String(ean ?? '').trim()

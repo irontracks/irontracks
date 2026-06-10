@@ -125,3 +125,4 @@ ios-native/build/
 ios-native/.build/
 .worktrees/
 scripts/taco-data.json
+knowledge-base/

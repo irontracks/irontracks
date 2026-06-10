@@ -16,6 +16,7 @@ const NutritionEntryCard = dynamic(() => import('./NutritionEntryCard'), { ssr: 
 const WaterTracker = dynamic(() => import('./WaterTracker'), { ssr: false })
 const FavoriteMeals = dynamic(() => import('./FavoriteMeals'), { ssr: false })
 const SmartSuggestions = dynamic(() => import('./SmartSuggestions'), { ssr: false })
+const DietGenerator = dynamic(() => import('./DietGenerator'), { ssr: false })
 const DateNavigator = dynamic(() => import('./DateNavigator'), { ssr: false })
 const CustomFoodScanner = dynamic(() => import('./CustomFoodScanner'), { ssr: false })
 const CustomFoodLibrary = dynamic(() => import('./CustomFoodLibrary'), { ssr: false })
@@ -591,6 +592,16 @@ export default function NutritionMixer({
       {/* ══ AI SUGGESTIONS ═══════════════════════════════════════════════ */}
       {safeGoals.calories > 0 && isToday && (
         <SmartSuggestions goals={safeGoals} consumed={totals} onSelect={handleFavoriteSelect} />
+      )}
+
+      {/* ══ DIET GENERATOR — memória nutricional ═════════════════════════ */}
+      {canViewMacros && safeGoals.calories > 0 && isToday && (
+        <DietGenerator
+          goals={safeGoals}
+          dateKey={currentDateKey}
+          hideVipCtas={hideVipCtas}
+          onApplied={() => setEntriesTick(v => v + 1)}
+        />
       )}
 
       {/* ══ MEAL INPUT ═══════════════════════════════════════════════════ */}
