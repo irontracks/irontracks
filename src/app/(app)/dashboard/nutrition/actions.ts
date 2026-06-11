@@ -60,7 +60,7 @@ async function maybeNotifyDailyGoal(
   }
 }
 
-export async function logMealAction(mealText: string, dateKey?: string) {
+export async function logMealAction(mealText: string, dateKey?: string, mealName?: string) {
   try {
     const normalizedText = String(mealText ?? '').trim()
     if (!normalizedText) return { ok: false, error: 'Texto vazio.' }
@@ -87,10 +87,14 @@ export async function logMealAction(mealText: string, dateKey?: string) {
     const resolved = await resolveFood(supabase, userId, normalizedText)
 
     if (resolved) {
-      const row = await trackMeal(userId, resolved.meal, resolvedDateKey)
+      const customName = String(mealName ?? '').trim()
+      const meal = customName
+        ? { ...resolved.meal, foodName: sanitizeFoodName(customName).slice(0, 120) || resolved.meal.foodName }
+        : resolved.meal
+      const row = await trackMeal(userId, meal, resolvedDateKey)
       revalidatePath('/dashboard/nutrition')
       waitUntil(maybeNotifyDailyGoal(supabase, userId, resolvedDateKey))
-      return { ok: true, meal: resolved.meal, entry: row || null }
+      return { ok: true, meal, entry: row || null }
     }
 
     // Nothing resolved → signal client to call AI
