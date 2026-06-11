@@ -7,6 +7,7 @@ import { parseJsonBody, parseJsonWithSchema } from '@/utils/zod'
 import { env } from '@/utils/env'
 import { getGeminiModel } from '@/utils/ai/gemini'
 import { safeGemini, handleGeminiError } from '@/utils/ai/handleGeminiError'
+import { buildUserContextBlock } from '@/utils/ai/userContext'
 
 export const dynamic = 'force-dynamic'
 
@@ -54,8 +55,12 @@ export async function POST(req: Request) {
     if (parsed.response) return parsed.response
     const body = parsed.data as z.infer<typeof ZodBody>
 
+    const userCtx = await buildUserContextBlock(auth.supabase, userId, ['profile', 'nutrition', 'labs'])
+
     const prompt = [
+      userCtx,
       'Você é um nutricionista esportivo especializado em musculação.',
+      'Personalize pelo CONTEXTO DO USUÁRIO acima (objetivo, exames, avaliação, treino).',
       `O atleta acabou de treinar: ${body.muscleGroups.join(', ') || 'treino geral'}.`,
       `Intensidade: ${body.intensity}.`,
       body.durationMinutes ? `Duração: ${body.durationMinutes} minutos.` : '',

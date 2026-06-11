@@ -10,6 +10,7 @@ import { env } from '@/utils/env'
 import { getGeminiModel } from '@/utils/ai/gemini'
 import { safeGemini, handleGeminiError } from '@/utils/ai/handleGeminiError'
 import { fetchRecentWorkoutHistory } from '@/utils/ai/recentWorkoutHistory'
+import { buildUserContextBlock } from '@/utils/ai/userContext'
 
 export const dynamic = 'force-dynamic'
 
@@ -73,6 +74,8 @@ export async function POST(req: Request) {
     // shows everything. (Reported by user testing 2026-05-03.)
     const recentHistory = await fetchRecentWorkoutHistory(supabase, userId, 5)
 
+    const userCtx = await buildUserContextBlock(supabase, userId, ['profile', 'assessment', 'training', 'nutrition', 'labs'])
+
     const apiKey = env.gemini.apiKey
     if (!apiKey) {
       return NextResponse.json(
@@ -86,7 +89,9 @@ export async function POST(req: Request) {
     }
 
     const prompt = [
+      ...(userCtx ? [userCtx, ''] : []),
       'Você é um coach de musculação do app IronTracks.',
+      'Personalize pelo CONTEXTO DO USUÁRIO acima (objetivo, avaliação, exames, treino, nutrição).',
       'Responda sempre em pt-BR, de forma objetiva e prática.',
       'Não invente números; use apenas o que o usuário forneceu.',
       'Quando o usuário pedir um treino, monte um treino completo com nome, exercícios, séries, repetições, descanso e método de cada exercício.',

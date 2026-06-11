@@ -8,6 +8,7 @@ import { parseJsonBody, parseJsonWithSchema } from '@/utils/zod'
 import { env } from '@/utils/env'
 import { safeGemini, handleGeminiError } from '@/utils/ai/handleGeminiError'
 import { getGeminiModel } from '@/utils/ai/gemini'
+import { buildUserContextBlock } from '@/utils/ai/userContext'
 
 export const dynamic = 'force-dynamic'
 
@@ -102,8 +103,12 @@ export async function POST(req: Request) {
     const apiKey = env.gemini.apiKey
     if (!apiKey) return NextResponse.json({ ok: false, error: 'ai_not_configured' }, { status: 500 })
 
+    const userCtx = await buildUserContextBlock(auth.supabase, userId, ['profile', 'nutrition', 'labs'])
+
     const prompt = [
+      userCtx,
       'Você é um nutricionista esportivo brasileiro.',
+      'Personalize pelo CONTEXTO DO USUÁRIO acima (objetivo, exames, avaliação, treino).',
       'Tarefa: sugerir 2-3 alimentos práticos para completar os macros restantes do dia.',
       'Regras:',
       '- Responda APENAS com JSON, sem texto extra.',
@@ -121,7 +126,7 @@ export async function POST(req: Request) {
       '',
       'Formato JSON:',
       '{ "suggestions": [{ "food": string, "portion": string, "calories": number, "protein": number, "carbs": number, "fat": number }], "tip": string }',
-    ].join('\n')
+    ].filter(Boolean).join('\n')
 
     const genAI = new GoogleGenerativeAI(apiKey)
     const model = getGeminiModel(genAI, MODEL)

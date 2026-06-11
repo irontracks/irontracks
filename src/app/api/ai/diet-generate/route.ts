@@ -8,6 +8,7 @@ import { parseJsonBody, parseJsonWithSchema } from '@/utils/zod'
 import { env } from '@/utils/env'
 import { safeGemini, handleGeminiError } from '@/utils/ai/handleGeminiError'
 import { buildFoodProfile, foodProfileToPromptList } from '@/lib/nutrition/food-profile'
+import { buildUserContextBlock } from '@/utils/ai/userContext'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60 // geração de cardápio no Gemini pode passar dos 30s padrão
@@ -106,9 +107,12 @@ export async function POST(req: Request) {
 
     const profile = await buildFoodProfile(supabase, userId)
     const preferred = foodProfileToPromptList(profile)
+    const userCtx = await buildUserContextBlock(supabase, userId, ['profile', 'assessment', 'training', 'nutrition', 'labs'])
 
     const prompt = [
+      userCtx,
       'Você é um nutricionista esportivo brasileiro.',
+      'Personalize ao máximo pelo CONTEXTO DO USUÁRIO acima: respeite o objetivo, e se houver exames alterados (ex.: colesterol/LDL alto) ajuste a dieta (mais fibras/ômega-3, menos gordura saturada).',
       `Monte um cardápio de 1 dia com ${body.meals} refeições que bata as metas:`,
       `- Calorias: ${Math.round(body.calories)} kcal`,
       `- Proteína: ${Math.round(body.protein)} g`,

@@ -7,6 +7,7 @@ import { parseJsonBody, parseJsonWithSchema } from '@/utils/zod'
 import { env } from '@/utils/env'
 import { getGeminiModel } from '@/utils/ai/gemini'
 import { safeGemini, handleGeminiError } from '@/utils/ai/handleGeminiError'
+import { buildUserContextBlock } from '@/utils/ai/userContext'
 
 export const dynamic = 'force-dynamic'
 
@@ -46,6 +47,7 @@ export async function POST(req: Request) {
     const auth = await requireUser()
     if (!auth.ok) return auth.response
     const userId = String(auth.user.id || '').trim()
+    const supabase = auth.supabase
 
     const ip = getRequestIp(req)
     const rl = await checkRateLimitAsync(`ai:exercise-swap:${userId}:${ip}`, 15, 60_000)
@@ -65,9 +67,13 @@ export async function POST(req: Request) {
     if (parsed.response) return parsed.response
     const body = parsed.data as z.infer<typeof ZodBody>
 
+    const userCtx = await buildUserContextBlock(supabase, userId, ['profile'])
+
     const prompt = [
+      userCtx,
       'Você é um especialista em musculação e biomecânica.',
       `O atleta quer uma alternativa para o exercício: "${body.exerciseName}".`,
+      'Personalize pelo CONTEXTO DO USUÁRIO acima (objetivo/restrições, avaliação, exames, números de treino).',
       body.muscleGroup ? `Grupo muscular alvo: ${body.muscleGroup}` : '',
       body.method ? `Método de treino: ${body.method}` : '',
       body.equipment ? `Equipamento disponível: ${body.equipment}` : '',

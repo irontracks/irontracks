@@ -8,6 +8,7 @@ import { parseJsonBody, parseJsonWithSchema } from '@/utils/zod'
 import { env } from '@/utils/env'
 import { getGeminiModel } from '@/utils/ai/gemini'
 import { safeGemini, handleGeminiError } from '@/utils/ai/handleGeminiError'
+import { buildUserContextBlock } from '@/utils/ai/userContext'
 
 export const dynamic = 'force-dynamic'
 
@@ -86,9 +87,13 @@ export async function POST(req: Request) {
       .order('date', { ascending: false })
       .limit(10)
 
+    const userCtx = await buildUserContextBlock(admin, body.studentId, ['profile', 'assessment', 'training', 'labs'])
+
     const prompt = [
+      userCtx,
       'Você é um personal trainer especializado em prescrição de treinos.',
       `Crie um plano de treino para o aluno abaixo.`,
+      'Personalize pelo CONTEXTO DO USUÁRIO acima (objetivo/restrições, avaliação, exames, números de treino).',
       '',
       `Foco: ${body.focus || 'hipertrofia'}`,
       `Dias/semana: ${body.daysPerWeek}`,
