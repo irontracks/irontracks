@@ -26,6 +26,7 @@ import { requireUser } from '@/utils/auth/route'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { parseJsonBody, parseJsonWithSchema } from '@/utils/zod'
 import { env } from '@/utils/env'
+import { getGeminiModel } from '@/utils/ai/gemini'
 import { safeGemini } from '@/utils/ai/handleGeminiError'
 import { logError } from '@/lib/logger'
 
@@ -243,7 +244,7 @@ export async function POST(req: Request) {
 
     const genAI = new GoogleGenerativeAI(apiKey)
     // Flash é suficiente pra OCR estruturado e custa muito menos que Pro.
-    const model = genAI.getGenerativeModel({ model: env.gemini.fastModelId })
+    const model = getGeminiModel(genAI, env.gemini.fastModelId)
 
     const geminiResult = await safeGemini('bia-extract', () =>
       model.generateContent([

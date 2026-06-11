@@ -11,6 +11,7 @@ import { resolveCanonicalExerciseName } from '@/utils/exerciseCanonical'
 import { MUSCLE_GROUPS } from '@/utils/muscleMapConfig'
 import { buildHeuristicExerciseMap } from '@/utils/exerciseMuscleHeuristics'
 import { env } from '@/utils/env'
+import { getGeminiModel } from '@/utils/ai/gemini'
 import { safeGemini, handleGeminiError } from '@/utils/ai/handleGeminiError'
 
 export const dynamic = 'force-dynamic'
@@ -201,7 +202,7 @@ export async function POST(req: Request) {
     ].join('\n')
 
     const genAI = new GoogleGenerativeAI(apiKey)
-    const model = genAI.getGenerativeModel({ model: MODEL })
+    const model = getGeminiModel(genAI, MODEL)
     const geminiResult = await safeGemini('exercise-muscle-map', () =>
       model.generateContent(prompt),
     )

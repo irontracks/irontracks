@@ -14,6 +14,7 @@ import { buildHeuristicExerciseMap } from '@/utils/exerciseMuscleHeuristics'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { env } from '@/utils/env'
 import { safeGemini, handleGeminiError } from '@/utils/ai/handleGeminiError'
+import { getGeminiModel } from '@/utils/ai/gemini'
 import {
   toStr,
   extractJsonFromModelText,
@@ -102,7 +103,7 @@ const classifyExercisesWithAi = async (apiKey: string, names: string[]) => {
   ].join('\n')
 
   const genAI = new GoogleGenerativeAI(apiKey)
-  const model = genAI.getGenerativeModel({ model: MODEL })
+  const model = getGeminiModel(genAI, MODEL)
   const geminiResult = await safeGemini('muscle-map-week:classify', () =>
     model.generateContent(prompt),
   )
@@ -180,7 +181,7 @@ const generateWeeklyInsightsWithAi = async (apiKey: string, input: unknown) => {
   ].join('\n')
 
   const genAI = new GoogleGenerativeAI(apiKey)
-  const model = genAI.getGenerativeModel({ model: MODEL })
+  const model = getGeminiModel(genAI, MODEL)
   const geminiResult = await safeGemini('muscle-map-week:insights', () =>
     model.generateContent(prompt),
   )

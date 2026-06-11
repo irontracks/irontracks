@@ -8,6 +8,7 @@ import { parseJsonBody } from '@/utils/zod'
 import { logInfo, logError } from '@/lib/logger'
 import { safePg } from '@/utils/safePgFilter'
 import { env } from '@/utils/env'
+import { getGeminiModel } from '@/utils/ai/gemini'
 import { safeGemini, handleGeminiError } from '@/utils/ai/handleGeminiError'
 
 export const dynamic = 'force-dynamic'
@@ -226,7 +227,7 @@ export async function POST(req: Request) {
     const prompt = [system, '', modeHint, '', '═══ DADOS DO USUÁRIO ═══', contextStr, '', '═══ MENSAGEM DO USUÁRIO ═══', message].join('\n')
 
     const genAI = new GoogleGenerativeAI(apiKey)
-    const model = genAI.getGenerativeModel({ model: MODEL })
+    const model = getGeminiModel(genAI, MODEL)
     const geminiResult = await safeGemini('vip-coach', () =>
       model.generateContent([{ text: prompt }] as Parameters<typeof model.generateContent>[0]),
     )

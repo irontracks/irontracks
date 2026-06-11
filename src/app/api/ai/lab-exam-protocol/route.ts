@@ -21,6 +21,7 @@ import { checkVipFeatureAccess } from '@/utils/vip/limits'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { parseJsonBody, parseJsonWithSchema } from '@/utils/zod'
 import { env } from '@/utils/env'
+import { getGeminiModel } from '@/utils/ai/gemini'
 import { safeGemini } from '@/utils/ai/handleGeminiError'
 import { logError } from '@/lib/logger'
 import { aggregateTrainingWindow, computeSessionStats } from '@/utils/bodyPhoto/trainingWindow'
@@ -500,7 +501,7 @@ export async function POST(req: Request) {
     const prompt = `${PROMPT_HEADER}\n\nDADOS:\n${JSON.stringify(promptData)}`
 
     const genAI = new GoogleGenerativeAI(apiKey)
-    const model = genAI.getGenerativeModel({ model: env.gemini.modelId })
+    const model = getGeminiModel(genAI, env.gemini.modelId)
     const geminiResult = await safeGemini('lab-exam-protocol', () => model.generateContent(prompt))
     if ('errorResponse' in geminiResult) {
       await admin.from('lab_exams').update({ status: 'failed', error_message: 'ai_error' }).eq('id', examId)

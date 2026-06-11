@@ -9,6 +9,7 @@ import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { parseJsonBody, parseJsonWithSchema } from '@/utils/zod'
 import { env } from '@/utils/env'
 import { safeGemini, handleGeminiError } from '@/utils/ai/handleGeminiError'
+import { getGeminiModel } from '@/utils/ai/gemini'
 
 export const dynamic = 'force-dynamic'
 
@@ -340,7 +341,7 @@ export async function POST(req: Request) {
     ].filter(s => s !== undefined).join('\n')
 
     const genAI = new GoogleGenerativeAI(apiKey)
-    const model = genAI.getGenerativeModel({ model: POST_WORKOUT_MODEL })
+    const model = getGeminiModel(genAI, POST_WORKOUT_MODEL)
     // Retry transient 503/504/timeout with exponential backoff. Never leaks
     // Google's raw error string — errors become canonical 'ai_*' codes that
     // the client translates to pt-BR.

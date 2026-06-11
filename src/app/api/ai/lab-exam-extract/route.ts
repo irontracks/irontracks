@@ -19,6 +19,7 @@ import { checkVipFeatureAccess } from '@/utils/vip/limits'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { parseJsonBody, parseJsonWithSchema } from '@/utils/zod'
 import { env } from '@/utils/env'
+import { getGeminiModel } from '@/utils/ai/gemini'
 import { safeGemini } from '@/utils/ai/handleGeminiError'
 import { logError } from '@/lib/logger'
 import { LabExamExtractedSchema, LAB_MARKER_CATEGORIES, LAB_MARKER_STATUSES } from '@/schemas/labExam'
@@ -157,7 +158,7 @@ export async function POST(req: Request) {
     }
 
     const genAI = new GoogleGenerativeAI(apiKey)
-    const model = genAI.getGenerativeModel({ model: env.gemini.fastModelId })
+    const model = getGeminiModel(genAI, env.gemini.fastModelId)
     const geminiResult = await safeGemini('lab-exam-extract', () => model.generateContent(parts))
     if ('errorResponse' in geminiResult) {
       await admin.from('lab_exams').update({ status: 'failed', error_message: 'ai_error' }).eq('id', examId)
