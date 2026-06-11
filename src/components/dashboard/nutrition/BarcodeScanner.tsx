@@ -1,6 +1,8 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
+import { BrowserMultiFormatReader } from '@zxing/browser'
+import { BarcodeFormat, DecodeHintType } from '@zxing/library'
 
 type Props = {
   onResult: (ean: string) => void
@@ -54,12 +56,22 @@ export default function BarcodeScanner({ onResult, onClose }: Props) {
         const videoEl = videoRef.current
         if (!videoEl) return
 
-        const { BrowserMultiFormatReader } = await import('@zxing/browser')
-        if (cancelled) return
+        // Hints: foca nos formatos de código de barras de produto (EAN/UPC) e
+        // liga "try harder" — sem isso o leitor varre todos os formatos e
+        // frequentemente não trava no código.
+        const hints = new Map<DecodeHintType, unknown>()
+        hints.set(DecodeHintType.POSSIBLE_FORMATS, [
+          BarcodeFormat.EAN_13,
+          BarcodeFormat.EAN_8,
+          BarcodeFormat.UPC_A,
+          BarcodeFormat.UPC_E,
+          BarcodeFormat.CODE_128,
+        ])
+        hints.set(DecodeHintType.TRY_HARDER, true)
 
-        const reader = new BrowserMultiFormatReader()
+        const reader = new BrowserMultiFormatReader(hints)
         const controls = await reader.decodeFromConstraints(
-          { video: { facingMode: { ideal: 'environment' } } },
+          { video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } } },
           videoEl,
           (result) => {
             if (!result || doneRef.current) return
