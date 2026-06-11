@@ -40,10 +40,11 @@ export default function DietGenerator({
   const [plan, setPlan] = useState<DietPlan | null>(null)
   const [appliedIdx, setAppliedIdx] = useState<Set<number>>(new Set())
   const [applyingIdx, setApplyingIdx] = useState<number | null>(null)
+  const [openMeal, setOpenMeal] = useState<number | null>(null)
 
   const generate = useCallback(async () => {
     if (busy) return
-    setBusy(true); setError(null); setUpgrade(false); setPlan(null); setAppliedIdx(new Set())
+    setBusy(true); setError(null); setUpgrade(false); setPlan(null); setAppliedIdx(new Set()); setOpenMeal(null)
     try {
       const res = await fetch('/api/ai/diet-generate', {
         method: 'POST',
@@ -139,36 +140,66 @@ export default function DietGenerator({
 
                 {plan.meals.map((meal, idx) => {
                   const applied = appliedIdx.has(idx)
+                  const isOpen = openMeal === idx
                   return (
-                    <div key={`${meal.name}-${idx}`} className="rounded-xl bg-white/[0.02] border border-white/[0.06] p-3">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-sm font-semibold text-white">
-                          {meal.name}{meal.time ? <span className="text-neutral-400 font-normal"> · {meal.time}</span> : null}
-                        </span>
-                        <span className="text-[10px] tabular-nums text-yellow-300/90 shrink-0">
-                          {Math.round(meal.totals.calories)} kcal · {Math.round(meal.totals.protein)}g P
-                        </span>
-                      </div>
-                      <ul className="mt-2 space-y-1">
-                        {meal.items.map((it, j) => (
-                          <li key={`${it.food}-${j}`} className="flex items-baseline justify-between gap-2 text-xs text-neutral-300">
-                            <span className="truncate">{it.food}</span>
-                            <span className="shrink-0 tabular-nums text-neutral-400">{Math.round(it.grams)}g</span>
-                          </li>
-                        ))}
-                      </ul>
+                    <div key={`${meal.name}-${idx}`} className="rounded-xl bg-white/[0.02] border border-white/[0.06] overflow-hidden">
                       <button
                         type="button"
-                        onClick={() => applyMeal(meal, idx)}
-                        disabled={applied || applyingIdx !== null}
-                        className={`mt-3 h-8 w-full rounded-lg text-xs font-bold transition active:scale-[0.98] ${
-                          applied
-                            ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
-                            : 'bg-white/[0.06] border border-white/[0.08] text-white hover:bg-white/[0.1] disabled:opacity-50'
-                        }`}
+                        onClick={() => setOpenMeal(isOpen ? null : idx)}
+                        aria-expanded={isOpen}
+                        className="flex w-full items-center justify-between gap-2 p-3 text-left transition active:bg-white/[0.03]"
                       >
-                        {applied ? '✓ Lançado' : applyingIdx === idx ? 'Lançando...' : '✚ Lançar refeição'}
+                        <span className="min-w-0">
+                          <span className="block text-sm font-semibold text-white truncate">{meal.name}</span>
+                          {meal.time ? <span className="text-[10px] text-neutral-400">{meal.time}</span> : null}
+                        </span>
+                        <span className="flex shrink-0 items-center gap-2">
+                          {applied && <span className="text-[10px] font-bold text-emerald-400">✓</span>}
+                          <span className="text-[10px] tabular-nums text-yellow-300/90">{Math.round(meal.totals.calories)} kcal · {Math.round(meal.totals.protein)}g P</span>
+                          <svg className={`size-3.5 text-neutral-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="m6 9 6 6 6-6" />
+                          </svg>
+                        </span>
                       </button>
+
+                      {isOpen && (
+                        <div className="px-3 pb-3">
+                          <div className="overflow-hidden rounded-lg bg-black/20 divide-y divide-white/[0.04]">
+                            {meal.items.map((it, j) => (
+                              <div key={`${it.food}-${j}`} className="px-2.5 py-2">
+                                <div className="flex items-baseline justify-between gap-2">
+                                  <span className="text-xs text-white truncate">{it.food}</span>
+                                  <span className="shrink-0 text-xs font-semibold tabular-nums text-neutral-200">{Math.round(it.grams)}g</span>
+                                </div>
+                                <div className="mt-1 flex gap-3 text-[10px] tabular-nums text-neutral-400">
+                                  <span>{Math.round(it.calories)} kcal</span>
+                                  <span className="text-blue-400/80">P {Math.round(it.protein)}g</span>
+                                  <span className="text-amber-400/80">C {Math.round(it.carbs)}g</span>
+                                  <span className="text-red-400/80">G {Math.round(it.fat)}g</span>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+
+                          <div className="mt-2 flex items-baseline justify-between gap-2 px-1 text-[11px] tabular-nums">
+                            <span className="font-semibold text-white">Total da refeição</span>
+                            <span className="text-neutral-300">{Math.round(meal.totals.calories)} kcal · P{Math.round(meal.totals.protein)} C{Math.round(meal.totals.carbs)} G{Math.round(meal.totals.fat)}</span>
+                          </div>
+
+                          <button
+                            type="button"
+                            onClick={() => applyMeal(meal, idx)}
+                            disabled={applied || applyingIdx !== null}
+                            className={`mt-3 h-8 w-full rounded-lg text-xs font-bold transition active:scale-[0.98] ${
+                              applied
+                                ? 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30'
+                                : 'bg-white/[0.06] border border-white/[0.08] text-white hover:bg-white/[0.1] disabled:opacity-50'
+                            }`}
+                          >
+                            {applied ? '✓ Lançado' : applyingIdx === idx ? 'Lançando...' : '✚ Lançar refeição'}
+                          </button>
+                        </div>
+                      )}
                     </div>
                   )
                 })}
