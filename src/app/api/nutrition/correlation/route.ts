@@ -28,13 +28,16 @@ export async function GET(req: Request) {
   const from = isoDate(thirtyDaysAgo)
   const today = isoDate(new Date())
 
-  // Workout days from workout_sessions
+  // Workout days from `workouts` (the legacy `workout_sessions` table does not
+  // exist — Postgrest returned 404, leaving the heatmap always at 0 workouts).
+  // Completed workouts are is_template=false rows with a `date`.
   const { data: sessions } = await admin
-    .from('workout_sessions')
-    .select('started_at, calories_estimate')
+    .from('workouts')
+    .select('date')
     .eq('user_id', auth.user.id)
-    .gte('started_at', thirtyDaysAgo.toISOString())
-    .order('started_at', { ascending: true })
+    .eq('is_template', false)
+    .gte('date', thirtyDaysAgo.toISOString())
+    .order('date', { ascending: true })
 
   // Nutrition days from daily_nutrition_logs
   const { data: nutLogs } = await admin
@@ -45,11 +48,14 @@ export async function GET(req: Request) {
     .lte('date', today)
 
   // Build lookup maps
+  // ~300 kcal estimate per logged workout (the workouts table has no
+  // duration/kcal field; the estimate is only used in the tooltip).
   const workoutByDay = new Map<string, number>()
   for (const s of Array.isArray(sessions) ? sessions : []) {
-    const day = isoDate(new Date(String(s.started_at)))
-    const cal = Number(s.calories_estimate) || 0
-    workoutByDay.set(day, (workoutByDay.get(day) || 0) + cal)
+    const ts = String((s as { date?: string }).date || '')
+    if (!ts) continue
+    const day = isoDate(new Date(ts))
+    workoutByDay.set(day, (workoutByDay.get(day) || 0) + 300)
   }
 
   const nutritionByDay = new Map<string, number>()

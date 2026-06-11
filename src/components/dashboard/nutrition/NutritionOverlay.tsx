@@ -103,7 +103,7 @@ export default function NutritionOverlay({ onClose: _onClose, canViewMacros }: N
           supabase.from('daily_nutrition_logs').select('calories,protein,carbs,fat').eq('user_id', uid).eq('date', dateKey).maybeSingle(),
           supabase.from('nutrition_goals').select('calories,protein,carbs,fat').eq('user_id', uid).order('updated_at', { ascending: false }).limit(1).maybeSingle(),
           supabase.from('user_settings').select('preferences').eq('user_id', uid).maybeSingle(),
-          supabase.from('workout_sessions').select('calories_estimate').eq('user_id', uid).gte('completed_at', `${dateKey}T00:00:00`).lte('completed_at', `${dateKey}T23:59:59`),
+          supabase.from('workouts').select('id').eq('user_id', uid).eq('is_template', false).gte('completed_at', `${dateKey}T00:00:00`).lte('completed_at', `${dateKey}T23:59:59`),
         ])
 
         if (cancelled) return
@@ -140,13 +140,8 @@ export default function NutritionOverlay({ onClose: _onClose, canViewMacros }: N
           }
         }
 
-        let workoutCalories = 0
-        if (Array.isArray(sessionsRes.data)) {
-          for (const s of sessionsRes.data) {
-            const kcal = Number((s as Record<string, unknown>)?.calories_estimate)
-            if (Number.isFinite(kcal) && kcal > 0) workoutCalories += kcal
-          }
-        }
+        // workouts table has no kcal field — estimate ~300 kcal per session
+        const workoutCalories = Array.isArray(sessionsRes.data) ? sessionsRes.data.length * 300 : 0
 
         if (!cancelled) setData({ dateKey, totals, goals, goalsSource, workoutCalories })
       } catch {
