@@ -269,6 +269,37 @@ export async function applyGeneratedMealAction(
   }
 }
 
+/** Persists the day's water intake (ml) in daily_nutrition_logs. */
+export async function updateWaterAction(ml: number, dateKey?: string) {
+  try {
+    const supabase = await createClient()
+    const { data, error } = await supabase.auth.getUser()
+    if (error) throw new Error(error.message || 'nutrition_auth_failed')
+    const userId = data?.user?.id
+    if (!userId) throw new Error('nutrition_unauthorized')
+
+    const resolvedDateKey = (() => {
+      const s = typeof dateKey === 'string' ? dateKey.trim() : ''
+      if (s && /^\d{4}-\d{2}-\d{2}$/.test(s)) return s
+      try {
+        const tz = 'America/Sao_Paulo'
+        return new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
+      } catch {
+        return new Date().toISOString().slice(0, 10)
+      }
+    })()
+
+    const safeMl = Math.max(0, Math.min(10000, Math.round(Number(ml) || 0)))
+    const { error: upsertError } = await supabase
+      .from('daily_nutrition_logs')
+      .upsert({ user_id: userId, date: resolvedDateKey, water_ml: safeMl, updated_at: new Date().toISOString() }, { onConflict: 'user_id,date' })
+    if (upsertError) throw upsertError
+    return { ok: true, water_ml: safeMl }
+  } catch (e: unknown) {
+    return { ok: false, error: String(getErrorMessage(e) || 'nutrition_water_failed') }
+  }
+}
+
 export async function logBarcodeAction(ean: string, grams: number, dateKey?: string) {
   try {
     const cleanEan = String(ean ?? '').trim()

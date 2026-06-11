@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState, useTransition, useCallback } from 'react'
-import { logMealAction, logBarcodeAction } from '@/app/(app)/dashboard/nutrition/actions'
+import { logMealAction, logBarcodeAction, updateWaterAction } from '@/app/(app)/dashboard/nutrition/actions'
 import type { MealLog } from '@/lib/nutrition/engine'
 import { useIsIosNative } from '@/hooks/useIsIosNative'
 import { createClient } from '@/utils/supabase/client'
@@ -9,8 +9,6 @@ import { getErrorMessage } from '@/utils/errorMessage'
 import dynamic from 'next/dynamic'
 
 // ── Lazy sub-components ────────────────────────────────────────────────────────
-const CalorieTimeline = dynamic(() => import('./CalorieTimeline'), { ssr: false })
-const MacroPieChart = dynamic(() => import('./MacroPieChart'), { ssr: false })
 const NutritionDayScore = dynamic(() => import('./NutritionDayScore'), { ssr: false })
 const NutritionEntryCard = dynamic(() => import('./NutritionEntryCard'), { ssr: false })
 const WaterTracker = dynamic(() => import('./WaterTracker'), { ssr: false })
@@ -202,6 +200,7 @@ export default function NutritionMixer({
   const [entryBusyId, setEntryBusyId] = useState('')
   const [aiBusy, setAiBusy] = useState(false)
   const [aiUpgrade, setAiUpgrade] = useState(false)
+  const [waterMl, setWaterMl] = useState(0)
 
   // Entry detail state
   const [expandedEntryId, setExpandedEntryId] = useState<string | null>(null)
@@ -295,6 +294,19 @@ export default function NutritionMixer({
         }
       } catch { if (!cancelled) setEntriesError('Falha ao carregar lançamentos.') }
       finally { if (!cancelled) setEntriesLoading(false) }
+    })()
+    return () => { cancelled = true }
+  }, [currentDateKey, entriesTick, schemaMissing, supabase])
+
+  // Water intake for the day
+  useEffect(() => {
+    if (schemaMissing) { setWaterMl(0); return }
+    let cancelled = false
+    ;(async () => {
+      try {
+        const { data } = await supabase.from('daily_nutrition_logs').select('water_ml').eq('date', currentDateKey).maybeSingle()
+        if (!cancelled) setWaterMl(safeNumber((data as Record<string, unknown> | null)?.water_ml))
+      } catch { /* ignore */ }
     })()
     return () => { cancelled = true }
   }, [currentDateKey, entriesTick, schemaMissing, supabase])
@@ -524,17 +536,9 @@ export default function NutritionMixer({
         </Card>
       )}
 
-      {/* ══ CHARTS ROW (Day Score + Pie) ═════════════════════════════════ */}
+      {/* ══ DAY SCORE ════════════════════════════════════════════════════ */}
       {canViewMacros && safeEntries.length > 0 && (
-        <div className="grid grid-cols-2 gap-3">
-          <Card className="p-3"><NutritionDayScore totals={totals} goals={safeGoals} /></Card>
-          <Card className="p-3"><MacroPieChart protein={totals.protein} carbs={totals.carbs} fat={totals.fat} /></Card>
-        </div>
-      )}
-
-      {/* ══ CALORIE TIMELINE ═════════════════════════════════════════════ */}
-      {safeEntries.length > 0 && (
-        <Card className="p-4"><CalorieTimeline entries={safeEntries} /></Card>
+        <Card className="p-3"><NutritionDayScore totals={totals} goals={safeGoals} /></Card>
       )}
 
       {/* ══ TREINO × NUTRIÇÃO CORRELATION ════════════════════════════════ */}
@@ -588,7 +592,11 @@ export default function NutritionMixer({
       {/* ── Water Panel ───────────────────────────────────────────────── */}
       {activePanel === 'water' && (
         <Card className="p-4">
-          <WaterTracker initialMl={0} onUpdate={() => {}} />
+          <WaterTracker
+            key={currentDateKey}
+            initialMl={waterMl}
+            onUpdate={(ml) => { setWaterMl(ml); void updateWaterAction(ml, currentDateKey) }}
+          />
         </Card>
       )}
 
@@ -759,21 +767,6 @@ export default function NutritionMixer({
         />
       )}
 
-      {/* ══ FLOATING CTA ═════════════════════════════════════════════════ */}
-      {isToday && (input.trim() || isPending) && (
-        <div className="fixed bottom-0 left-0 right-0 z-40 bg-neutral-950/90 backdrop-blur-lg border-t border-white/[0.06]">
-          <div className="mx-auto max-w-md px-4 py-3">
-            <button
-              type="button"
-              onClick={handleSubmit}
-              disabled={!!schemaMissing || !input.trim()}
-              className="w-full h-12 rounded-2xl bg-gradient-to-r from-yellow-400 to-amber-500 text-black font-bold shadow-[0_0_24px_rgba(250,204,21,0.2)] hover:from-yellow-300 hover:to-amber-400 active:scale-[0.98] transition disabled:opacity-40"
-            >
-              {isPending ? 'Processando...' : '✚ Lançar refeição'}
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
