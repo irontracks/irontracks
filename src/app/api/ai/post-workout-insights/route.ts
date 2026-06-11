@@ -10,6 +10,7 @@ import { parseJsonBody, parseJsonWithSchema } from '@/utils/zod'
 import { env } from '@/utils/env'
 import { safeGemini, handleGeminiError } from '@/utils/ai/handleGeminiError'
 import { getGeminiModel } from '@/utils/ai/gemini'
+import { buildUserContextBlock } from '@/utils/ai/userContext'
 
 export const dynamic = 'force-dynamic'
 
@@ -306,8 +307,11 @@ export async function POST(req: Request) {
     const painContext = extractPainContext(sessionObj)
     const hasPainData = painContext.trim().length > 0
 
+    const userCtx = await buildUserContextBlock(supabase, userId, ['profile', 'nutrition', 'labs'])
+
     const prompt = [
-      'Você é um coach de musculação e um analista de performance do app IronTracks.',
+      `${userCtx ? userCtx + '\n\n' : ''}Você é um coach de musculação e um analista de performance do app IronTracks.`,
+      'Personalize pelo CONTEXTO DO USUÁRIO acima (objetivo, avaliação, exames, treino, nutrição).',
       'Gere insights pós-treino com base na sessão atual (e na sessão anterior, se houver).',
       '',
       'Retorne APENAS um JSON válido (sem markdown, sem texto extra) com esta estrutura:',

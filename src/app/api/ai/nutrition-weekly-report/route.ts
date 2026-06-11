@@ -8,6 +8,7 @@ import { parseJsonBody, parseJsonWithSchema } from '@/utils/zod'
 import { env } from '@/utils/env'
 import { safeGemini, handleGeminiError } from '@/utils/ai/handleGeminiError'
 import { getGeminiModel } from '@/utils/ai/gemini'
+import { buildUserContextBlock } from '@/utils/ai/userContext'
 
 export const dynamic = 'force-dynamic'
 
@@ -85,8 +86,12 @@ export async function POST(req: Request) {
     const daysBelow = weeklyData.filter((d) => d.calories > 0 && d.calories < goals.calories * 0.8).length
     const daysEmpty = weeklyData.filter((d) => d.calories === 0).length
 
+    const userCtx = await buildUserContextBlock(auth.supabase, userId, ['profile', 'assessment', 'training', 'nutrition'])
+
     const prompt = [
+      userCtx,
       'Você é um nutricionista esportivo brasileiro analisando a semana alimentar de um atleta.',
+      'Personalize pelo CONTEXTO DO USUÁRIO acima (objetivo, exames, avaliação, treino).',
       'Seja direto, motivador e específico. Use linguagem informal mas profissional.',
       'Regras:',
       '- Responda APENAS com JSON, sem texto extra.',
@@ -104,7 +109,7 @@ export async function POST(req: Request) {
       '',
       'Formato JSON:',
       '{ "summary": string, "highlights": string[], "tip": string }',
-    ].join('\n')
+    ].filter(Boolean).join('\n')
 
     const genAI = new GoogleGenerativeAI(apiKey)
     const model = getGeminiModel(genAI, MODEL)

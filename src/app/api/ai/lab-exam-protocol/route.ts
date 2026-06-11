@@ -22,6 +22,7 @@ import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { parseJsonBody, parseJsonWithSchema } from '@/utils/zod'
 import { env } from '@/utils/env'
 import { getGeminiModel } from '@/utils/ai/gemini'
+import { buildUserContextBlock } from '@/utils/ai/userContext'
 import { safeGemini } from '@/utils/ai/handleGeminiError'
 import { logError } from '@/lib/logger'
 import { aggregateTrainingWindow, computeSessionStats } from '@/utils/bodyPhoto/trainingWindow'
@@ -498,7 +499,10 @@ export async function POST(req: Request) {
       },
     }
 
-    const prompt = `${PROMPT_HEADER}\n\nDADOS:\n${JSON.stringify(promptData)}`
+    // Complementa a lógica própria (treino/avaliação/exames) com os setores que
+    // faltavam no protocolo: nutrição real e objetivo/restrições do usuário.
+    const userCtx = await buildUserContextBlock(admin, assessedUserId, ['nutrition', 'profile'])
+    const prompt = `${PROMPT_HEADER}\n\n${userCtx ? userCtx + '\n\n' : ''}DADOS:\n${JSON.stringify(promptData)}`
 
     const genAI = new GoogleGenerativeAI(apiKey)
     const model = getGeminiModel(genAI, env.gemini.modelId)

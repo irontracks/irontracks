@@ -10,6 +10,7 @@ import { applyWizardConsistency, buildProgressionTargets } from '@/utils/workout
 import { env } from '@/utils/env'
 import { getGeminiModel } from '@/utils/ai/gemini'
 import { safeGemini, handleGeminiError } from '@/utils/ai/handleGeminiError'
+import { buildUserContextBlock } from '@/utils/ai/userContext'
 
 export const dynamic = 'force-dynamic'
 
@@ -315,14 +316,17 @@ export async function POST(req: Request) {
 
     const days = Math.max(2, Math.min(6, Number((answers as Record<string, unknown>)?.daysPerWeek || 3) || 3))
     const history = await buildWizardHistory(supabase, userId)
+    const userCtx = await buildUserContextBlock(supabase, userId, ['profile', 'assessment', 'training', 'labs'])
     const schema =
       mode === 'program'
         ? `{ \"drafts\": [{ \"title\": string, \"exercises\": [{\"name\": string, \"sets\": number, \"reps\": string, \"restTime\": number, \"notes\": string}] }] }`
         : `{ \"draft\": { \"title\": string, \"exercises\": [{\"name\": string, \"sets\": number, \"reps\": string, \"restTime\": number, \"notes\": string}] } }`
 
     const prompt = [
+      userCtx,
       'Você é um treinador de musculação e um criador de treinos do app IronTracks.',
       'Crie um treino de musculação com base nas respostas do usuário.',
+      'Personalize pelo CONTEXTO DO USUÁRIO acima (objetivo/restrições, avaliação, exames, números de treino).',
       'Escreva em pt-BR.',
       'Retorne APENAS um JSON válido (sem markdown, sem texto extra) seguindo este schema:',
       schema,
@@ -336,7 +340,7 @@ export async function POST(req: Request) {
       '',
       'Respostas do usuário:',
       JSON.stringify(answers),
-    ].join('\n')
+    ].filter(Boolean).join('\n')
 
     const genAI = new GoogleGenerativeAI(apiKey)
     const model = getGeminiModel(genAI, MODEL, {

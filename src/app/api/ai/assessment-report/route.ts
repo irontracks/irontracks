@@ -8,6 +8,7 @@ import { parseJsonBody, parseJsonWithSchema } from '@/utils/zod'
 import { env } from '@/utils/env'
 import { getGeminiModel } from '@/utils/ai/gemini'
 import { safeGemini, handleGeminiError } from '@/utils/ai/handleGeminiError'
+import { buildUserContextBlock } from '@/utils/ai/userContext'
 
 export const dynamic = 'force-dynamic'
 
@@ -76,9 +77,13 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: 'Nenhuma avaliação encontrada' }, { status: 404 })
     }
 
+    const userCtx = await buildUserContextBlock(admin, body.studentId, ['profile', 'training', 'nutrition', 'labs'])
+
     const prompt = [
+      userCtx,
       'Você é um educador físico especializado em avaliação física e prescrição de exercícios.',
       'Gere um relatório profissional da avaliação física do aluno.',
+      'Personalize pelo CONTEXTO DO USUÁRIO acima (objetivo/restrições, avaliação, exames, números de treino).',
       '',
       'Retorne APENAS JSON:',
       '{',
@@ -94,7 +99,7 @@ export async function POST(req: Request) {
       '',
       'Dados do aluno:',
       JSON.stringify({ profile, assessments }),
-    ].join('\n')
+    ].filter(Boolean).join('\n')
 
     const genAI = new GoogleGenerativeAI(apiKey)
     const model = getGeminiModel(genAI, MODEL_ID)

@@ -9,6 +9,7 @@ import { z } from 'zod'
 import { env } from '@/utils/env'
 import { getGeminiModel } from '@/utils/ai/gemini'
 import { safeGemini, handleGeminiError } from '@/utils/ai/handleGeminiError'
+import { buildUserContextBlock } from '@/utils/ai/userContext'
 
 export const dynamic = 'force-dynamic'
 
@@ -104,9 +105,13 @@ export async function POST(req: Request) {
       })
     }
 
+    const userCtx = await buildUserContextBlock(admin, userId, ['profile', 'assessment', 'training', 'nutrition'])
+
     const prompt = [
+      userCtx,
       'Você é um coach de musculação e analista de performance.',
       `Analise os ${sessionData.length} treinos da última semana deste atleta.`,
+      'Personalize pelo CONTEXTO DO USUÁRIO acima (objetivo/restrições, avaliação, exames, números de treino).',
       '',
       'Retorne APENAS JSON (sem markdown) com esta estrutura:',
       '{',
@@ -127,7 +132,7 @@ export async function POST(req: Request) {
       '',
       'Treinos da semana:',
       JSON.stringify(sessionData),
-    ].join('\n')
+    ].filter(Boolean).join('\n')
 
     const genAI = new GoogleGenerativeAI(apiKey)
     const model = getGeminiModel(genAI, MODEL_ID)

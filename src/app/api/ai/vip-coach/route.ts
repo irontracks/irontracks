@@ -10,6 +10,7 @@ import { safePg } from '@/utils/safePgFilter'
 import { env } from '@/utils/env'
 import { getGeminiModel } from '@/utils/ai/gemini'
 import { safeGemini, handleGeminiError } from '@/utils/ai/handleGeminiError'
+import { buildUserContextBlock } from '@/utils/ai/userContext'
 
 export const dynamic = 'force-dynamic'
 
@@ -224,7 +225,14 @@ export async function POST(req: Request) {
           ? 'O usuário está no modo DIAGNÓSTICO. Analise os dados com profundidade, identifique pontos fracos, padrões de volume crescente/decrescente, e sugira correções baseadas nos treinos reais.'
           : 'O usuário está no modo COACH GERAL. Ajude com treino, progressão, recuperação, dúvidas gerais. Personalize as respostas com base nos dados disponíveis.'
 
-    const prompt = [system, '', modeHint, '', '═══ DADOS DO USUÁRIO ═══', contextStr, '', '═══ MENSAGEM DO USUÁRIO ═══', message].join('\n')
+    const userCtx = await buildUserContextBlock(supabase, userId, ['profile', 'assessment', 'training', 'nutrition', 'labs'])
+
+    const prompt = [
+      ...(userCtx ? [userCtx, ''] : []),
+      system,
+      'Personalize pelo CONTEXTO DO USUÁRIO acima (objetivo, avaliação, exames, treino, nutrição).',
+      '', modeHint, '', '═══ DADOS DO USUÁRIO ═══', contextStr, '', '═══ MENSAGEM DO USUÁRIO ═══', message,
+    ].join('\n')
 
     const genAI = new GoogleGenerativeAI(apiKey)
     const model = getGeminiModel(genAI, MODEL)

@@ -23,6 +23,7 @@ import { safeGemini } from '@/utils/ai/handleGeminiError'
 import { logError } from '@/lib/logger'
 import { aggregateTrainingWindow } from '@/utils/bodyPhoto/trainingWindow'
 import { BodyPhotoCorrelationSchema, type TrainingWindowSummary } from '@/types/bodyPhotoAssessment'
+import { buildUserContextBlock } from '@/utils/ai/userContext'
 
 export const dynamic = 'force-dynamic'
 
@@ -162,8 +163,12 @@ export async function POST(req: Request) {
             },
         }
 
+        const userCtx = await buildUserContextBlock(admin, assessedUserId, ['profile', 'nutrition', 'labs'])
+
         const prompt = [
+            ...(userCtx ? [userCtx, ''] : []),
             'Você é um educador físico. Correlacione o LAUDO da avaliação por foto com o TREINO REAL executado na janela.',
+            'Personalize pelo CONTEXTO DO USUÁRIO acima (objetivo, avaliação, exames, treino, nutrição).',
             'Use seu conhecimento de quais músculos cada exercício trabalha (pelos nomes em topExercicios).',
             'Seja concreto e cite números do treino (volume, séries, sessões). Se houver avaliação anterior, comente a evolução dos scores.',
             'Se não houver treino registrado na janela, diga isso com clareza e baixe a confiança.',
