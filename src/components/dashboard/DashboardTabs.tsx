@@ -1,7 +1,7 @@
 'use client'
 
 import { memo, useCallback } from 'react'
-import Image from 'next/image'
+import { Apple, ClipboardList, Crown, Dumbbell, Users, type LucideIcon } from 'lucide-react'
 import { triggerHaptic } from '@/utils/native/irontracksNative'
 
 type DashboardTabsProps = {
@@ -17,8 +17,8 @@ type DashboardTabsProps = {
 }
 
 const tabs = [
-  { key: 'dashboard', label: 'Treinos', icon: '/icons/tab-treinos.png' },
-  { key: 'assessments', label: 'Avaliações', icon: '/icons/tab-avaliacoes.png' },
+  { key: 'dashboard', label: 'Treinos', Icon: Dumbbell },
+  { key: 'assessments', label: 'Avaliações', Icon: ClipboardList },
 ] as const
 
 export const DashboardTabs = memo(({
@@ -70,18 +70,15 @@ export const DashboardTabs = memo(({
       </>
     ) : null
 
-  const renderIcon = (src: string, active: boolean, alt: string) => (
-    <div className={`relative transition-transform duration-200 ${active ? 'scale-[1.15] rotate-[3deg]' : ''}`}>
-      <Image
-        src={src}
-        alt={alt}
-        width={22}
-        height={22}
-        className={`rounded-[4px] transition-all duration-300 ${
-          active ? 'brightness-110 drop-shadow-[0_0_6px_rgba(234,179,8,0.5)]' : 'brightness-75 grayscale-[30%]'
-        }`}
-      />
-    </div>
+  // Ícones monocromáticos (lucide) — herdam a cor de marca via currentColor do
+  // botão (amarelo ativo / neutro inativo). Substituem os PNGs 3D que tinham
+  // molduras e estilos díspares, dando o aspecto "amador".
+  const renderIcon = (Icon: LucideIcon, active: boolean) => (
+    <Icon
+      size={21}
+      strokeWidth={active ? 2.4 : 2}
+      className={`transition-transform duration-200 ${active ? 'scale-110 drop-shadow-[0_0_6px_rgba(234,179,8,0.45)]' : ''}`}
+    />
   )
 
   return (
@@ -105,7 +102,7 @@ export const DashboardTabs = memo(({
               Other tabs must dim out, otherwise the previously-selected tab
               stays lit alongside Nutrição (the bug from PR #88's follow-up).
             */}
-            {tabs.map(({ key, label, icon }) => {
+            {tabs.map(({ key, label, Icon }) => {
               const active = view === key && !nutritionActive
               return (
                 <button
@@ -116,7 +113,7 @@ export const DashboardTabs = memo(({
                   className={tabCls(active)}
                 >
                   {renderIndicator(active)}
-                  {renderIcon(icon, active, label)}
+                  {renderIcon(Icon, active)}
                   <span>{label}</span>
                 </button>
               )
@@ -132,7 +129,7 @@ export const DashboardTabs = memo(({
                   className={tabCls(active)}
                 >
                   {renderIndicator(active)}
-                  {renderIcon('/icons/tab-comunidade.png', active, 'Comunidade')}
+                  {renderIcon(Users, active)}
                   <span>Comunidade</span>
                 </button>
               )
@@ -147,7 +144,7 @@ export const DashboardTabs = memo(({
                 aria-label="Abrir Nutrição"
               >
                 {renderIndicator(!!nutritionActive)}
-                {renderIcon('/icons/tab-nutricao.png', !!nutritionActive, 'Nutrição')}
+                {renderIcon(Apple, !!nutritionActive)}
                 <span>Nutrição</span>
               </button>
             )}
@@ -162,7 +159,7 @@ export const DashboardTabs = memo(({
                   className={tabCls(active)}
                 >
                   {renderIndicator(active)}
-                  {renderIcon('/icons/tab-vip.png', active, 'VIP')}
+                  {renderIcon(Crown, active)}
                   <span>{vipLabel}{vipLocked ? ' 🔒' : ''}</span>
                 </button>
               )

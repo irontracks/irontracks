@@ -52,7 +52,7 @@ export default function DateNavigator({
         className={`
           min-w-[140px] h-9 rounded-xl px-4 text-sm font-semibold tracking-tight transition
           ${isToday
-            ? 'bg-yellow-500/12 border border-yellow-500/25 text-yellow-300'
+            ? 'bg-yellow-500/10 border border-yellow-500/25 text-yellow-400'
             : 'bg-neutral-900/60 border border-neutral-800/60 text-neutral-200 hover:bg-neutral-800/80'}
         `}
       >
