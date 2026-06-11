@@ -77,6 +77,9 @@
         },
         "src/app/api/ai/lab-exam-protocol/route.ts": {
             "maxDuration": 120
+        },
+        "src/app/api/ai/diet-generate/route.ts": {
+            "maxDuration": 60
         }
     },
     "rewrites": [

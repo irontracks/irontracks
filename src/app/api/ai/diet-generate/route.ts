@@ -10,6 +10,7 @@ import { safeGemini, handleGeminiError } from '@/utils/ai/handleGeminiError'
 import { buildFoodProfile, foodProfileToPromptList } from '@/lib/nutrition/food-profile'
 
 export const dynamic = 'force-dynamic'
+export const maxDuration = 60 // geração de cardápio no Gemini pode passar dos 30s padrão
 
 /* ──────────────────────────────────────────────────────────
  * POST /api/ai/diet-generate
@@ -139,7 +140,7 @@ export async function POST(req: Request) {
     const genAI = new GoogleGenerativeAI(apiKey)
     const model = genAI.getGenerativeModel({
       model: MODEL_ID,
-      generationConfig: { maxOutputTokens: 8192, temperature: 0.6, responseMimeType: 'application/json' },
+      generationConfig: { maxOutputTokens: 4096, temperature: 0.6, responseMimeType: 'application/json' },
     })
     const geminiResult = await safeGemini('diet-generate', () => model.generateContent(prompt))
     if ('errorResponse' in geminiResult) return geminiResult.errorResponse
