@@ -1,117 +1,150 @@
 'use client'
 
-import { useCallback, useState } from 'react'
-import { isNativePlatform } from '@/utils/platform'
-
-type BarcodeScanResult = {
-  rawValue: string
-}
-
-type BarcodePlugin = {
-  scan: () => Promise<{ barcodes: BarcodeScanResult[] }>
-  checkPermissions: () => Promise<{ camera: string }>
-  requestPermissions: () => Promise<{ camera: string }>
-}
-
-async function loadBarcodePlugin(): Promise<BarcodePlugin | null> {
-  try {
-    if (!isNativePlatform()) return null
-    const { BarcodeScanner } = await import('@capacitor-mlkit/barcode-scanning')
-    return BarcodeScanner as unknown as BarcodePlugin
-  } catch {
-    return null
-  }
-}
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 type Props = {
   onResult: (ean: string) => void
   onClose: () => void
 }
 
-type ScanState = 'idle' | 'scanning' | 'error'
+type ScanState = 'starting' | 'scanning' | 'error'
 
+type ScannerControls = { stop: () => void }
+
+/**
+ * Web-based barcode scanner (getUserMedia + @zxing/browser).
+ *
+ * Replaces the native @capacitor-mlkit plugin, which is CocoaPods-only and
+ * therefore incompatible with this app's SPM iOS build. Since the app loads
+ * from the production web (server.url), the camera runs inside the WebView via
+ * getUserMedia — no native plugin / rebuild required. NSCameraUsageDescription
+ * is already declared in the iOS Info.plist.
+ */
 export default function BarcodeScanner({ onResult, onClose }: Props) {
-  const [state, setState] = useState<ScanState>('idle')
+  const videoRef = useRef<HTMLVideoElement>(null)
+  const controlsRef = useRef<ScannerControls | null>(null)
+  const doneRef = useRef(false)
+  const [state, setState] = useState<ScanState>('starting')
   const [errorMsg, setErrorMsg] = useState('')
 
-  const startScan = useCallback(async () => {
-    setState('scanning')
-    setErrorMsg('')
-
-    const plugin = await loadBarcodePlugin()
-    if (!plugin) {
-      setState('error')
-      setErrorMsg('Scanner de código de barras não disponível neste dispositivo.')
-      return
+  const cleanup = useCallback(() => {
+    try { controlsRef.current?.stop() } catch { /* noop */ }
+    controlsRef.current = null
+    const video = videoRef.current
+    const stream = video?.srcObject as MediaStream | null
+    if (stream) {
+      for (const track of stream.getTracks()) {
+        try { track.stop() } catch { /* noop */ }
+      }
     }
+    if (video) video.srcObject = null
+  }, [])
 
-    try {
-      const { camera } = await plugin.checkPermissions()
-      if (camera !== 'granted') {
-        const { camera: granted } = await plugin.requestPermissions()
-        if (granted !== 'granted') {
+  useEffect(() => {
+    let cancelled = false
+
+    void (async () => {
+      try {
+        if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
           setState('error')
-          setErrorMsg('Permissão de câmera necessária para escanear.')
+          setErrorMsg('Câmera não disponível neste dispositivo.')
           return
         }
-      }
 
-      const { barcodes } = await plugin.scan()
-      const ean = barcodes[0]?.rawValue?.trim()
+        const videoEl = videoRef.current
+        if (!videoEl) return
 
-      if (!ean) {
+        const { BrowserMultiFormatReader } = await import('@zxing/browser')
+        if (cancelled) return
+
+        const reader = new BrowserMultiFormatReader()
+        const controls = await reader.decodeFromConstraints(
+          { video: { facingMode: { ideal: 'environment' } } },
+          videoEl,
+          (result) => {
+            if (!result || doneRef.current) return
+            const ean = result.getText().trim()
+            if (!ean) return
+            doneRef.current = true
+            cleanup()
+            onResult(ean)
+          },
+        )
+
+        if (cancelled) {
+          controls.stop()
+          return
+        }
+        controlsRef.current = controls
+        setState('scanning')
+      } catch (e: unknown) {
+        if (cancelled) return
+        const name = (e as { name?: string })?.name || ''
         setState('error')
-        setErrorMsg('Nenhum código detectado. Tente novamente.')
-        return
+        setErrorMsg(
+          name === 'NotAllowedError'
+            ? 'Permissão de câmera negada. Libere o acesso da câmera nas configurações do app.'
+            : name === 'NotFoundError'
+              ? 'Nenhuma câmera encontrada.'
+              : 'Não foi possível abrir a câmera. Tente novamente.',
+        )
       }
+    })()
 
-      setState('idle')
-      onResult(ean)
-    } catch {
-      setState('error')
-      setErrorMsg('Erro ao escanear. Tente novamente.')
+    return () => {
+      cancelled = true
+      cleanup()
     }
-  }, [onResult])
+  }, [cleanup, onResult])
+
+  const handleClose = useCallback(() => {
+    cleanup()
+    onClose()
+  }, [cleanup, onClose])
 
   return (
-    <div className="flex flex-col items-center gap-4 p-4">
-      {state === 'idle' && (
+    <div className="fixed inset-0 z-50 flex flex-col bg-black/95">
+      <div className="relative flex-1 overflow-hidden">
+        <video
+          ref={videoRef}
+          aria-label="Câmera do scanner de código de barras"
+          className="absolute inset-0 h-full w-full object-cover"
+          playsInline
+          muted
+          autoPlay
+        >
+          <track kind="captions" />
+        </video>
+
+        {/* Aiming frame */}
+        {state !== 'error' && (
+          <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+            <div className="h-32 w-72 rounded-2xl border-2 border-yellow-400/80 shadow-[0_0_0_9999px_rgba(0,0,0,0.45)]" />
+          </div>
+        )}
+
+        <div className="absolute left-0 right-0 top-8 px-6 text-center">
+          <p className="text-sm font-medium text-white/90">
+            {state === 'starting' ? 'Abrindo câmera…' : state === 'scanning' ? 'Aponte para o código de barras' : ''}
+          </p>
+        </div>
+
+        {state === 'error' && (
+          <div className="absolute inset-x-6 top-1/2 -translate-y-1/2 rounded-xl border border-red-500/30 bg-red-500/15 p-4 text-center">
+            <p className="text-sm text-red-200">{errorMsg}</p>
+          </div>
+        )}
+      </div>
+
+      <div className="flex items-center justify-center bg-black p-4 pb-8">
         <button
           type="button"
-          onClick={startScan}
-          className="flex items-center gap-2 rounded-xl bg-white/10 px-5 py-3 text-sm font-medium text-white active:scale-95"
+          onClick={handleClose}
+          className="h-11 rounded-xl bg-white/10 px-8 text-sm font-semibold text-white active:scale-95"
         >
-          <svg className="size-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M3 4h2v16H3V4zm4 0h1v16H7V4zm3 0h2v16h-2V4zm4 0h1v16h-1V4zm3 0h4v16h-4V4z" />
-          </svg>
-          Escanear código de barras
+          {state === 'error' ? 'Fechar' : 'Cancelar'}
         </button>
-      )}
-
-      {state === 'scanning' && (
-        <p className="text-sm text-white/60 animate-pulse">Apontando câmera…</p>
-      )}
-
-      {state === 'error' && (
-        <div className="flex flex-col items-center gap-2">
-          <p className="text-sm text-red-400">{errorMsg}</p>
-          <button
-            type="button"
-            onClick={() => setState('idle')}
-            className="text-xs text-white/50 underline"
-          >
-            Tentar novamente
-          </button>
-        </div>
-      )}
-
-      <button
-        type="button"
-        onClick={onClose}
-        className="text-xs text-white/40 underline"
-      >
-        Cancelar
-      </button>
+      </div>
     </div>
   )
 }
