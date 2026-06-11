@@ -33,6 +33,7 @@ const BodySchema = z
   .object({
     text: z.string().min(1).max(600),
     dateKey: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    mealName: z.string().max(60).optional(),
   })
   .strict()
 
@@ -64,7 +65,7 @@ export async function POST(req: Request) {
 
     const parsedBody = await parseJsonBody(req, BodySchema)
     if (parsedBody.response) return parsedBody.response
-    const { text, dateKey } = parsedBody.data!
+    const { text, dateKey, mealName } = parsedBody.data!
 
     const apiKey = env.gemini.apiKey
     if (!apiKey) return NextResponse.json({ ok: false, error: 'ai_not_configured' }, { status: 500 })
@@ -106,9 +107,11 @@ export async function POST(req: Request) {
     const carbs = Math.max(0, Math.min(800, Number(out.carbs) || 0))
     const fat = Math.max(0, Math.min(300, Number(out.fat) || 0))
 
-    // Use the fixed trackMeal function instead of broken RPC
+    // Use the fixed trackMeal function instead of broken RPC.
+    // A custom meal name (from the user) takes precedence over the AI-derived name.
+    const customName = String(mealName ?? '').trim()
     const row = await trackMeal(userId, {
-      foodName: sanitizeFoodName(out.foodName || 'Refeição').slice(0, 120),
+      foodName: sanitizeFoodName(customName || out.foodName || 'Refeição').slice(0, 120),
       calories,
       protein,
       carbs,

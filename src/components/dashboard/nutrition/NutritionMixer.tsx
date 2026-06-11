@@ -192,6 +192,7 @@ export default function NutritionMixer({
 
   const [entries, setEntries] = useState<MealEntry[]>([])
   const [input, setInput] = useState('')
+  const [mealName, setMealName] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [isPending, startTransition] = useTransition()
   const inputRef = useRef<HTMLTextAreaElement>(null)
@@ -305,7 +306,8 @@ export default function NutritionMixer({
     setError(null)
     startTransition(async () => {
       try {
-        const res = await logMealAction(text, currentDateKey)
+        const customName = mealName.trim()
+        const res = await logMealAction(text, currentDateKey, customName || undefined)
         if (!res?.ok) {
           if ((res as Record<string, unknown>)?.needsAi) { void estimateWithAi(); return }
           setError(String((res as Record<string, unknown>)?.error || 'Falha ao processar.')); return
@@ -321,7 +323,7 @@ export default function NutritionMixer({
         } else {
           setTotals(prev => ({ calories: safeNumber(prev?.calories) + safeNumber(meal.calories), protein: safeNumber(prev?.protein) + safeNumber(meal.protein), carbs: safeNumber(prev?.carbs) + safeNumber(meal.carbs), fat: safeNumber(prev?.fat) + safeNumber(meal.fat) }))
         }
-        setInput('')
+        setInput(''); setMealName('')
         try { queueMicrotask(() => inputRef.current?.focus()) } catch {}
       } catch (e: unknown) { setError(getErrorMessage(e) || 'Falha ao processar.') }
     })
@@ -347,7 +349,8 @@ export default function NutritionMixer({
     if (!text || schemaMissing || aiBusy) return
     setAiBusy(true); setAiUpgrade(false); setError(null)
     try {
-      const res = await fetch('/api/ai/nutrition-estimate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, dateKey: currentDateKey }) })
+      const customName = mealName.trim()
+      const res = await fetch('/api/ai/nutrition-estimate', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ text, dateKey: currentDateKey, mealName: customName || undefined }) })
       const json = await res.json().catch((): null => null)
       if (!json?.ok) {
         const up = !!json?.upgradeRequired || String(json?.error || '') === 'vip_required'
@@ -358,7 +361,7 @@ export default function NutritionMixer({
         setTotals({ calories: safeNumber(row?.totals_calories), protein: safeNumber(row?.totals_protein), carbs: safeNumber(row?.totals_carbs), fat: safeNumber(row?.totals_fat) })
         setEntries(prev => [{ id: String(row?.entry_id || row?.id || Date.now()), created_at: String(row?.created_at || new Date().toISOString()), food_name: String(row?.food_name || 'Refeição'), calories: safeNumber(row?.calories), protein: safeNumber(row?.protein), carbs: safeNumber(row?.carbs), fat: safeNumber(row?.fat) }, ...(Array.isArray(prev) ? prev : [])].slice(0, 30))
       }
-      setInput(''); try { inputRef.current?.focus() } catch {}
+      setInput(''); setMealName(''); try { inputRef.current?.focus() } catch {}
     } catch (e: unknown) { setError(getErrorMessage(e) || 'Falha ao estimar com IA.') }
     finally { setAiBusy(false) }
   }
@@ -609,6 +612,16 @@ export default function NutritionMixer({
         <Card glow="bg-[linear-gradient(180deg,rgba(250,204,21,0.04)_0%,transparent_50%)]" className="p-4">
           <div className="text-[10px] uppercase tracking-[0.2em] text-neutral-400 font-semibold">Adicionar refeição</div>
           <div className="mt-1 text-xs text-neutral-400">Ex.: 150g frango + arroz branco + salada</div>
+          <input
+            type="text"
+            aria-label="Nome da refeição (opcional)"
+            value={mealName}
+            onChange={e => setMealName(e.target.value)}
+            disabled={isPending || !!schemaMissing}
+            maxLength={60}
+            className="mt-3 w-full rounded-xl bg-white/[0.04] border border-white/[0.08] px-4 py-2.5 text-sm text-white placeholder:text-neutral-400 focus:outline-none focus:border-yellow-500/30 focus:ring-1 focus:ring-yellow-500/20 transition"
+            placeholder="Nome da refeição (opcional) — ex.: Almoço"
+          />
           <textarea
             ref={inputRef}
             aria-label="Adicionar refeição"
