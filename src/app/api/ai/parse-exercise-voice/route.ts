@@ -7,6 +7,7 @@ import { parseJsonBody, parseJsonWithSchema } from '@/utils/zod'
 import { sanitizeAiInput } from '@/lib/nutrition/security'
 import { env } from '@/utils/env'
 import { safeGemini, handleGeminiError } from '@/utils/ai/handleGeminiError'
+import { getGeminiModel } from '@/utils/ai/gemini'
 
 export const dynamic = 'force-dynamic'
 
@@ -96,7 +97,7 @@ export async function POST(req: Request) {
     ].join('\n')
 
     const genAI = new GoogleGenerativeAI(apiKey)
-    const model = genAI.getGenerativeModel({ model: MODEL })
+    const model = getGeminiModel(genAI, MODEL)
     const geminiResult = await safeGemini('parse-exercise-voice', () =>
       model.generateContent([{ text: prompt }]),
     )

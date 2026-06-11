@@ -18,6 +18,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { parseJsonBody, parseJsonWithSchema } from '@/utils/zod'
 import { env } from '@/utils/env'
+import { getGeminiModel } from '@/utils/ai/gemini'
 import { safeGemini } from '@/utils/ai/handleGeminiError'
 import { logError } from '@/lib/logger'
 import { aggregateTrainingWindow } from '@/utils/bodyPhoto/trainingWindow'
@@ -183,7 +184,7 @@ export async function POST(req: Request) {
         ].join('\n')
 
         const genAI = new GoogleGenerativeAI(apiKey)
-        const model = genAI.getGenerativeModel({ model: env.gemini.modelId })
+        const model = getGeminiModel(genAI, env.gemini.modelId)
         const geminiResult = await safeGemini('body-composition-correlation', () => model.generateContent(prompt))
         if ('errorResponse' in geminiResult) return geminiResult.errorResponse
 

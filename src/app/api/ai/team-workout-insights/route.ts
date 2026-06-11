@@ -5,6 +5,7 @@ import { requireUser } from '@/utils/auth/route'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { parseJsonBody } from '@/utils/zod'
 import { env } from '@/utils/env'
+import { getGeminiModel } from '@/utils/ai/gemini'
 import { safeGemini, handleGeminiError } from '@/utils/ai/handleGeminiError'
 
 export const dynamic = 'force-dynamic'
@@ -86,7 +87,7 @@ export async function POST(req: Request) {
         ].join('\n')
 
         const genAI = new GoogleGenerativeAI(apiKey)
-        const model = genAI.getGenerativeModel({ model: TEAM_AI_MODEL })
+        const model = getGeminiModel(genAI, TEAM_AI_MODEL)
         const geminiResult = await safeGemini('team-workout-insights', () =>
             model.generateContent(prompt),
         )

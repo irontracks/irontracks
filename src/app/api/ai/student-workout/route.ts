@@ -6,6 +6,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { parseJsonBody, parseJsonWithSchema } from '@/utils/zod'
 import { env } from '@/utils/env'
+import { getGeminiModel } from '@/utils/ai/gemini'
 import { safeGemini, handleGeminiError } from '@/utils/ai/handleGeminiError'
 
 export const dynamic = 'force-dynamic'
@@ -125,13 +126,10 @@ export async function POST(req: Request) {
     ].filter(Boolean).join('\n')
 
     const genAI = new GoogleGenerativeAI(apiKey)
-    const model = genAI.getGenerativeModel({
-      model: MODEL_ID,
-      generationConfig: {
-        maxOutputTokens: 8192,
-        temperature: 0.7,
-        responseMimeType: 'application/json',
-      },
+    const model = getGeminiModel(genAI, MODEL_ID, {
+      maxOutputTokens: 8192,
+      temperature: 0.7,
+      responseMimeType: 'application/json',
     })
     const geminiResult = await safeGemini('student-workout', () =>
       model.generateContent(prompt),

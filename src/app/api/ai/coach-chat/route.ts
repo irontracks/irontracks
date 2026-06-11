@@ -7,6 +7,7 @@ import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { parseJsonBody } from '@/utils/zod'
 import { logInfo, logError } from '@/lib/logger'
 import { env } from '@/utils/env'
+import { getGeminiModel } from '@/utils/ai/gemini'
 import { safeGemini, handleGeminiError } from '@/utils/ai/handleGeminiError'
 import { fetchRecentWorkoutHistory } from '@/utils/ai/recentWorkoutHistory'
 
@@ -108,7 +109,7 @@ export async function POST(req: Request) {
     ].join('\n')
 
     const genAI = new GoogleGenerativeAI(apiKey)
-    const model = genAI.getGenerativeModel({ model: MODEL })
+    const model = getGeminiModel(genAI, MODEL)
     const geminiResult = await safeGemini('coach-chat', () =>
       model.generateContent([{ text: prompt }] as Parameters<typeof model.generateContent>[0]),
     )

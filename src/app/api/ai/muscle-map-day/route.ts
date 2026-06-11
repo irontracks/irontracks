@@ -12,6 +12,7 @@ import { MUSCLE_GROUPS } from '@/utils/muscleMapConfig'
 import { buildHeuristicExerciseMap } from '@/utils/exerciseMuscleHeuristics'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { env } from '@/utils/env'
+import { getGeminiModel } from '@/utils/ai/gemini'
 import { safeGemini, handleGeminiError } from '@/utils/ai/handleGeminiError'
 
 export const dynamic = 'force-dynamic'
@@ -225,7 +226,7 @@ const classifyExercisesWithAi = async (apiKey: string, names: string[]) => {
   ].join('\n')
 
   const genAI = new GoogleGenerativeAI(apiKey)
-  const model = genAI.getGenerativeModel({ model: MODEL })
+  const model = getGeminiModel(genAI, MODEL)
   const geminiResult = await safeGemini('muscle-map-day:classify', () =>
     model.generateContent(prompt),
   )

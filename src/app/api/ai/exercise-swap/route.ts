@@ -5,6 +5,7 @@ import { requireUser } from '@/utils/auth/route'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { parseJsonBody, parseJsonWithSchema } from '@/utils/zod'
 import { env } from '@/utils/env'
+import { getGeminiModel } from '@/utils/ai/gemini'
 import { safeGemini, handleGeminiError } from '@/utils/ai/handleGeminiError'
 
 export const dynamic = 'force-dynamic'
@@ -92,7 +93,7 @@ export async function POST(req: Request) {
     ].filter(Boolean).join('\n')
 
     const genAI = new GoogleGenerativeAI(apiKey)
-    const model = genAI.getGenerativeModel({ model: MODEL_ID })
+    const model = getGeminiModel(genAI, MODEL_ID)
     const geminiResult = await safeGemini('exercise-swap', () =>
       model.generateContent(prompt),
     )
