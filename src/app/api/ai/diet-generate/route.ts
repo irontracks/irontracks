@@ -138,10 +138,17 @@ export async function POST(req: Request) {
     ].filter(Boolean).join('\n')
 
     const genAI = new GoogleGenerativeAI(apiKey)
-    const model = genAI.getGenerativeModel({
-      model: MODEL_ID,
-      generationConfig: { maxOutputTokens: 4096, temperature: 0.6, responseMimeType: 'application/json' },
-    })
+    // gemini-2.5-flash liga "thinking" por padrão, e os tokens de raciocínio
+    // consomem o orçamento de saída ANTES da resposta — truncando o JSON do
+    // cardápio (finishReason MAX_TOKENS). thinkingBudget: 0 desliga e libera
+    // todo o maxOutputTokens para a resposta.
+    const generationConfig = {
+      maxOutputTokens: 4096,
+      temperature: 0.6,
+      responseMimeType: 'application/json',
+      thinkingConfig: { thinkingBudget: 0 },
+    }
+    const model = genAI.getGenerativeModel({ model: MODEL_ID, generationConfig })
     const geminiResult = await safeGemini('diet-generate', () => model.generateContent(prompt))
     if ('errorResponse' in geminiResult) return geminiResult.errorResponse
 
