@@ -180,12 +180,12 @@ function NutritionEntryCard({
           ) : (
             <>
               {/* Calories row + Edit / Remove */}
-              <div className="mt-3 flex items-center justify-between">
-                <div className="text-xs text-neutral-400">
+              <div className="mt-3 flex items-center justify-between gap-2">
+                <div className="min-w-0 truncate text-xs text-neutral-400">
                   Total: <span className="text-white font-semibold">{Math.round(item.calories)} kcal</span>
                   {' · '}{formatClock(item.created_at)}
                 </div>
-                <div className="flex items-center gap-1.5">
+                <div className="flex items-center gap-1.5 shrink-0">
                   {confirmDeleteId === item.id ? (
                     <>
                       <button
