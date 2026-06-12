@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState, useTransition, useCallback } from 'react'
-import { logMealAction, logBarcodeAction, updateWaterAction } from '@/app/(app)/dashboard/nutrition/actions'
+import { logMealAction, logBarcodeAction, updateWaterAction, deleteMealAction, editMealAction } from '@/app/(app)/dashboard/nutrition/actions'
 import type { MealLog } from '@/lib/nutrition/engine'
 import { analyzeMeal } from '@/lib/nutrition/parser'
 import { useIsIosNative } from '@/hooks/useIsIosNative'
@@ -373,11 +373,13 @@ export default function NutritionMixer({
     if (!id || entryBusyId) return
     setEntryBusyId(id); setError(null)
     try {
-      const { data, error } = await supabase.rpc('nutrition_delete_meal_entry', { p_entry_id: id })
-      if (error) throw error
-      const row = Array.isArray(data) ? data[0] : null
-      if (row && typeof row === 'object') {
-        setTotals({ calories: safeNumber((row as Record<string, unknown>)?.totals_calories), protein: safeNumber((row as Record<string, unknown>)?.totals_protein), carbs: safeNumber((row as Record<string, unknown>)?.totals_carbs), fat: safeNumber((row as Record<string, unknown>)?.totals_fat) })
+      // Usa a server action (delete + recálculo via supabase-js). A antiga RPC
+      // nutrition_delete_meal_entry tem "column reference user_id is ambiguous".
+      const res = await deleteMealAction(id)
+      if (!res?.ok) throw new Error(String((res as Record<string, unknown>)?.error || 'Falha ao remover.'))
+      const totals = (res as Record<string, unknown>)?.totals as Record<string, unknown> | null
+      if (totals) {
+        setTotals({ calories: safeNumber(totals.calories), protein: safeNumber(totals.protein), carbs: safeNumber(totals.carbs), fat: safeNumber(totals.fat) })
       }
       setEntries(prev => prev.filter(x => x.id !== id))
     } catch (e: unknown) { setError(getErrorMessage(e) || 'Falha ao remover.') }
@@ -830,8 +832,10 @@ export default function NutritionMixer({
                   if (!editingEntryId || !editDraft) return
                   setEditBusy(true)
                   try {
-                    const { error } = await supabase.from('nutrition_meal_entries').update({ food_name: editDraft.food_name, calories: editDraft.calories, protein: editDraft.protein, carbs: editDraft.carbs, fat: editDraft.fat }).eq('id', editingEntryId)
-                    if (error) throw error
+                    const res = await editMealAction(editingEntryId, editDraft)
+                    if (!res?.ok) throw new Error(String((res as Record<string, unknown>)?.error || 'Falha ao editar.'))
+                    const totals = (res as Record<string, unknown>)?.totals as Record<string, unknown> | null
+                    if (totals) setTotals({ calories: safeNumber(totals.calories), protein: safeNumber(totals.protein), carbs: safeNumber(totals.carbs), fat: safeNumber(totals.fat) })
                     setEditingEntryId(null); setEditDraft(null); setEntriesTick(v => v + 1)
                   } catch (e: unknown) { setError(getErrorMessage(e) || 'Falha ao editar.') }
                   finally { setEditBusy(false) }
