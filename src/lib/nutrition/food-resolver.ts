@@ -1,22 +1,15 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { FoodItem } from './food-database'
 import type { MealLog } from './engine'
-import { parseInput } from './parser'
+import { analyzeMeal, type ParsedMealItem } from './parser'
 import { loadTacoFoods } from './sources/taco-source'
 import { searchOffByText } from './sources/off-source'
 import { loadLearnedFoods } from './learned-foods'
 
 type ResolveResult = {
   meal: MealLog
+  items: ParsedMealItem[]
   source: 'local' | 'taco_or_learned' | 'off'
-}
-
-const UNKNOWN_PREFIX = 'nutrition_parser_unknown_food:'
-
-function extractUnknownLines(errorMessage: string): string[] {
-  if (!errorMessage.startsWith(UNKNOWN_PREFIX)) return []
-  const raw = errorMessage.slice(UNKNOWN_PREFIX.length).trim()
-  return raw.split('|').map((s) => s.trim()).filter(Boolean)
 }
 
 /**
@@ -82,13 +75,10 @@ export async function resolveFood(
   userId: string,
   text: string,
 ): Promise<ResolveResult | null> {
-  // ── Phase 1a: try with hardcoded base only (zero latency) ───────────────────
-  try {
-    const meal = parseInput(text)
-    return { meal, source: 'local' }
-  } catch (e: unknown) {
-    const msg = String((e as Error)?.message || '')
-    if (!msg.startsWith(UNKNOWN_PREFIX)) return null
+  // ── Phase 1a: hardcoded base only (zero latency) ────────────────────────────
+  const a1 = analyzeMeal(text)
+  if (a1.unknownLines.length === 0 && a1.items.length > 0) {
+    return { meal: a1.meal, items: a1.items, source: 'local' }
   }
 
   // ── Phase 1b: augment with TACO + learned + custom foods (parallel) ─────────
@@ -99,30 +89,25 @@ export async function resolveFood(
   ])
   const phase1ExtraFoods = expandFoodKeys({ ...tacoFoods, ...learned, ...customFoods })
 
-  try {
-    const meal = parseInput(text, phase1ExtraFoods)
-    return { meal, source: 'taco_or_learned' }
-  } catch (e: unknown) {
-    const msg = String((e as Error)?.message || '')
-    const unknownLines = extractUnknownLines(msg)
-    if (unknownLines.length === 0) return null
-
-    // ── Phase 2: try Open Food Facts for each unknown line ────────────────────
-    const offResults = await Promise.all(
-      unknownLines.map((line) => searchOffByText(supabase, line)),
-    )
-    const offFoods: Record<string, { kcal: number; p: number; c: number; f: number }> = {}
-    for (const r of offResults) {
-      Object.assign(offFoods, r)
-    }
-
-    if (Object.keys(offFoods).length === 0) return null
-
-    try {
-      const meal = parseInput(text, expandFoodKeys({ ...phase1ExtraFoods, ...offFoods }))
-      return { meal, source: 'off' }
-    } catch {
-      return null
-    }
+  const a2 = analyzeMeal(text, phase1ExtraFoods)
+  if (a2.unknownLines.length === 0 && a2.items.length > 0) {
+    return { meal: a2.meal, items: a2.items, source: 'taco_or_learned' }
   }
+  if (a2.unknownLines.length === 0) return null // nada reconhecido nem desconhecido
+
+  // ── Phase 2: try Open Food Facts for each unknown line ────────────────────
+  const offResults = await Promise.all(
+    a2.unknownLines.map((line) => searchOffByText(supabase, line)),
+  )
+  const offFoods: Record<string, { kcal: number; p: number; c: number; f: number }> = {}
+  for (const r of offResults) {
+    Object.assign(offFoods, r)
+  }
+  if (Object.keys(offFoods).length === 0) return null
+
+  const a3 = analyzeMeal(text, expandFoodKeys({ ...phase1ExtraFoods, ...offFoods }))
+  if (a3.unknownLines.length === 0 && a3.items.length > 0) {
+    return { meal: a3.meal, items: a3.items, source: 'off' }
+  }
+  return null
 }
