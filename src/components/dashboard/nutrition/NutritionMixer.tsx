@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState, useTransition, useCallback } from 'react'
 import { logMealAction, logBarcodeAction, updateWaterAction } from '@/app/(app)/dashboard/nutrition/actions'
 import type { MealLog } from '@/lib/nutrition/engine'
+import { analyzeMeal } from '@/lib/nutrition/parser'
 import { useIsIosNative } from '@/hooks/useIsIosNative'
 import { createClient } from '@/utils/supabase/client'
 import { getErrorMessage } from '@/utils/errorMessage'
@@ -23,7 +24,7 @@ const BarcodeScanner = dynamic(() => import('./BarcodeScanner'), { ssr: false })
 
 // ── Hooks ──────────────────────────────────────────────────────────────────────
 import { useFavoriteMeals } from './useFavoriteMeals'
-import { useCustomFoods } from './useCustomFoods'
+import { useCustomFoods, customFoodsToExtraFoods } from './useCustomFoods'
 
 type Totals = { calories: number; protein: number; carbs: number; fat: number }
 
@@ -241,6 +242,33 @@ export default function NutritionMixer({
   const caloriePct = Math.round(clamp01(calorieRatio) * PERCENT_SCALE)
   const calorieOver = safeGoals.calories > 0 && calorieRatio > 1
   const remaining = Math.max(0, safeGoals.calories - safeNumber(totals?.calories))
+
+  // ── Simulação ao vivo — parser local (base + repertório do usuário), zero
+  // latência. Mostra os macros parciais da refeição ENQUANTO o usuário digita,
+  // sem precisar lançar, pra ele simular se cabe na meta antes de comer.
+  const mealPreview = useMemo(() => {
+    const text = input.trim()
+    if (!text) return null
+    try {
+      const extra = customFoodsToExtraFoods(Array.isArray(customFoods) ? customFoods : [])
+      const a = analyzeMeal(input, extra)
+      if (a.items.length === 0) return a.unknownLines.length > 0 ? a : null
+      return a
+    } catch {
+      return null
+    }
+  }, [input, customFoods])
+
+  // Impacto da simulação na meta de calorias do dia (consumido + preview).
+  const previewImpact = useMemo(() => {
+    if (!mealPreview || mealPreview.items.length === 0) return null
+    const consumed = safeNumber(totals?.calories)
+    const add = mealPreview.meal.calories
+    const goal = safeGoals.calories
+    const projected = consumed + add
+    const left = goal - projected
+    return { add, projected, goal, left, over: goal > 0 && projected > goal }
+  }, [mealPreview, totals?.calories, safeGoals.calories])
 
   // ── Effects ──────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -640,6 +668,52 @@ export default function NutritionMixer({
             className="mt-3 w-full rounded-xl bg-white/[0.04] border border-white/[0.08] px-4 py-3 text-sm text-white placeholder:text-neutral-400 focus:outline-none focus:border-yellow-500/30 focus:ring-1 focus:ring-yellow-500/20 resize-none transition"
             placeholder={schemaMissing ? 'Nutrição não configurada.' : 'O que você comeu?'}
           />
+
+          {/* ══ Simulação ao vivo — macros parciais enquanto digita ═══════════ */}
+          {mealPreview && (mealPreview.items.length > 0 || mealPreview.unknownLines.length > 0) && (
+            <div className="mt-3 rounded-xl border border-yellow-500/15 bg-yellow-500/[0.03] p-3">
+              <div className="flex items-center justify-between">
+                <span className="text-[10px] uppercase tracking-[0.18em] text-yellow-400/80 font-semibold">Simulação</span>
+                {mealPreview.items.length > 0 && (
+                  <span className="text-sm font-bold text-yellow-300">{mealPreview.meal.calories} kcal</span>
+                )}
+              </div>
+
+              {mealPreview.items.length > 0 && (
+                <>
+                  <ul className="mt-2 space-y-1">
+                    {mealPreview.items.map((it, i) => (
+                      <li key={`${it.label}-${i}`} className="flex items-baseline justify-between gap-2 text-xs">
+                        <span className="min-w-0 truncate text-neutral-200">{it.label}</span>
+                        <span className="shrink-0 whitespace-nowrap text-neutral-400">
+                          <span className="font-semibold text-neutral-100">{it.calories}</span> kcal
+                          <span className="ml-2 text-[10px] text-neutral-500">P{it.protein} C{it.carbs} G{it.fat}</span>
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+
+                  <div className="mt-2 border-t border-white/[0.06] pt-2 text-[11px] text-neutral-400">
+                    Total: P {mealPreview.meal.protein} · C {mealPreview.meal.carbs} · G {mealPreview.meal.fat} g
+                  </div>
+
+                  {previewImpact && previewImpact.goal > 0 && (
+                    <div className={`mt-1 text-xs font-medium ${previewImpact.over ? 'text-red-300' : 'text-emerald-300'}`}>
+                      {previewImpact.over
+                        ? `Passa a meta em ${Math.abs(previewImpact.left)} kcal (${previewImpact.projected}/${previewImpact.goal})`
+                        : `Sobram ${previewImpact.left} kcal na meta (${previewImpact.projected}/${previewImpact.goal})`}
+                    </div>
+                  )}
+                </>
+              )}
+
+              {mealPreview.unknownLines.length > 0 && (
+                <div className={`${mealPreview.items.length > 0 ? 'mt-2' : 'mt-1'} text-[11px] text-neutral-500`}>
+                  Não reconhecido localmente: <span className="text-neutral-400">{mealPreview.unknownLines.join(', ')}</span>. Toque em Lançar pra estimar com IA.
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Submit row */}
           <div className="mt-3 flex items-center gap-2">

@@ -34,19 +34,50 @@ function buildFoodEntries(extraFoods?: Record<string, FoodItem>) {
 
 type MacroTotals = { p: number; c: number; f: number; kcal: number }
 
-export function parseInput(text: string, extraFoods?: Record<string, FoodItem>): MealLog {
+/** A single recognized food line, with its resolved grams and macros. */
+export type ParsedMealItem = {
+  label: string
+  grams: number
+  calories: number
+  protein: number
+  carbs: number
+  fat: number
+}
+
+/** Full breakdown of a meal: totals, per-item detail and unrecognized lines. */
+export type MealAnalysis = {
+  meal: MealLog
+  items: ParsedMealItem[]
+  unknownLines: string[]
+}
+
+/**
+ * Like {@link parseInput}, but never throws: returns the recognized totals,
+ * the per-item breakdown and the list of lines we couldn't match. Used by the
+ * live "simulação" preview so the user sees partial macros while typing.
+ */
+export function analyzeMeal(text: string, extraFoods?: Record<string, FoodItem>): MealAnalysis {
   const rawText = typeof text === 'string' ? text : ''
-  if (!rawText.trim()) throw new Error('nutrition_parser_empty_input')
+  const empty: MealAnalysis = {
+    meal: { foodName: 'Refeição', calories: 0, protein: 0, carbs: 0, fat: 0 },
+    items: [],
+    unknownLines: [],
+  }
+  if (!rawText.trim()) return empty
 
   const lines = rawText
     .split('\n')
     .flatMap((l) => String(l || '').split(/\s*\+\s*/g))
     .flatMap((l) => String(l || '').split(/\s*;\s*/g))
+    // Comma followed by whitespace is an item separator ("arroz, frango"),
+    // but a comma between digits is a decimal ("1,5 colher") — keep that intact.
+    .flatMap((l) => String(l || '').split(/,\s+/g))
     .map((l) => String(l || '').trim())
     .filter(Boolean)
   let mealName = 'Refeição'
   const totals: MacroTotals = { p: 0, c: 0, f: 0, kcal: 0 }
   const unknownLines: string[] = []
+  const items: ParsedMealItem[] = []
 
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index]
@@ -162,21 +193,44 @@ export function parseInput(text: string, extraFoods?: Record<string, FoodItem>):
     const f = Math.round(Number(matchedItem.f) * multiplier)
     const kcal = Math.round(Number(matchedItem.kcal) * multiplier)
 
-    totals.p += Number.isFinite(p) ? p : 0
-    totals.c += Number.isFinite(c) ? c : 0
-    totals.f += Number.isFinite(f) ? f : 0
-    totals.kcal += Number.isFinite(kcal) ? kcal : 0
-  }
-
-  if (unknownLines.length > 0) {
-    throw new Error(`nutrition_parser_unknown_food:${unknownLines.join('|')}`)
+    const sp = Number.isFinite(p) ? p : 0
+    const sc = Number.isFinite(c) ? c : 0
+    const sf = Number.isFinite(f) ? f : 0
+    const skcal = Number.isFinite(kcal) ? kcal : 0
+    totals.p += sp
+    totals.c += sc
+    totals.f += sf
+    totals.kcal += skcal
+    items.push({
+      label: rawLine,
+      grams: Math.max(0, Math.round(Number.isFinite(grams) ? grams : 0)),
+      calories: Math.max(0, skcal),
+      protein: Math.max(0, sp),
+      carbs: Math.max(0, sc),
+      fat: Math.max(0, sf),
+    })
   }
 
   return {
-    foodName: mealName,
-    calories: Math.max(0, Math.round(totals.kcal)),
-    protein: Math.max(0, Math.round(totals.p)),
-    carbs: Math.max(0, Math.round(totals.c)),
-    fat: Math.max(0, Math.round(totals.f)),
+    meal: {
+      foodName: mealName,
+      calories: Math.max(0, Math.round(totals.kcal)),
+      protein: Math.max(0, Math.round(totals.p)),
+      carbs: Math.max(0, Math.round(totals.c)),
+      fat: Math.max(0, Math.round(totals.f)),
+    },
+    items,
+    unknownLines,
   }
+}
+
+export function parseInput(text: string, extraFoods?: Record<string, FoodItem>): MealLog {
+  const rawText = typeof text === 'string' ? text : ''
+  if (!rawText.trim()) throw new Error('nutrition_parser_empty_input')
+
+  const analysis = analyzeMeal(rawText, extraFoods)
+  if (analysis.unknownLines.length > 0) {
+    throw new Error(`nutrition_parser_unknown_food:${analysis.unknownLines.join('|')}`)
+  }
+  return analysis.meal
 }
