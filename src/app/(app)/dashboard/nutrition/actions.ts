@@ -341,6 +341,39 @@ async function saveScannedProductToLibrary(
   }
 }
 
+/**
+ * Resolve um código de barras SEM lançar — usado pelo scanner da biblioteca pra
+ * pré-preencher o formulário a partir do produto (biblioteca do usuário ou OFF).
+ */
+export async function lookupBarcodeAction(ean: string) {
+  try {
+    const cleanEan = String(ean ?? '').trim()
+    if (!cleanEan) return { ok: false, error: 'Código inválido.' }
+
+    const supabase = await createClient()
+    const { data, error } = await supabase.auth.getUser()
+    if (error) throw new Error(error.message || 'nutrition_auth_failed')
+    const userId = data?.user?.id
+    if (!userId) throw new Error('nutrition_unauthorized')
+
+    const resolved = await resolveBarcode(supabase, cleanEan, userId)
+    if (!resolved) return { ok: true, found: false, ean: cleanEan }
+
+    return {
+      ok: true,
+      found: true,
+      ean: cleanEan,
+      name: resolved.name,
+      kcal: Math.max(0, Math.round(resolved.item.kcal)),
+      protein: Math.max(0, Math.round(resolved.item.p)),
+      carbs: Math.max(0, Math.round(resolved.item.c)),
+      fat: Math.max(0, Math.round(resolved.item.f)),
+    }
+  } catch (e: unknown) {
+    return { ok: false, error: String(getErrorMessage(e) || 'nutrition_lookup_barcode_failed') }
+  }
+}
+
 export async function logBarcodeAction(ean: string, grams: number, dateKey?: string) {
   try {
     const cleanEan = String(ean ?? '').trim()
