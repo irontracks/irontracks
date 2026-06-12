@@ -40,10 +40,10 @@ const BodySchema = z
 const OutputSchema = z
   .object({
     foodName: z.string().min(1).max(120),
-    calories: z.number().nonnegative(),
-    protein: z.number().nonnegative(),
-    carbs: z.number().nonnegative(),
-    fat: z.number().nonnegative(),
+    calories: z.coerce.number().nonnegative(),
+    protein: z.coerce.number().nonnegative(),
+    carbs: z.coerce.number().nonnegative(),
+    fat: z.coerce.number().nonnegative(),
   })
   .strict()
 

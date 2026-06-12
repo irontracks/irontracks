@@ -23,7 +23,7 @@ const ExerciseSchema = z.object({
   name: z.string().min(1).max(120),
   sets: z.number().int().min(1).max(20).nullable(),
   reps: z.number().int().min(1).max(200).nullable(),
-  weightKg: z.number().nonnegative().nullable(),
+  weightKg: z.coerce.number().nonnegative().nullable(),
   cadence: z.string().max(20).nullable(),   // ex: "2020", "3010"
   restSeconds: z.number().int().nonnegative().nullable(),
   rpe: z.number().min(1).max(10).nullable(),

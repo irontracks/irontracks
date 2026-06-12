@@ -27,20 +27,20 @@ const MODEL_ID = env.gemini.fastModelId
 
 const ZodBody = z.object({
   calories: z.number().positive().max(10_000),
-  protein: z.number().nonnegative().max(1_000),
-  carbs: z.number().nonnegative().max(2_000),
-  fat: z.number().nonnegative().max(1_000),
+  protein: z.coerce.number().nonnegative().max(1_000),
+  carbs: z.coerce.number().nonnegative().max(2_000),
+  fat: z.coerce.number().nonnegative().max(1_000),
   meals: z.number().int().min(3).max(7).optional().default(5),
   notes: z.string().max(300).optional(),
 }).strip()
 
 const ItemSchema = z.object({
   food: z.string().min(1).max(100),
-  grams: z.number().nonnegative().max(2_000),
-  calories: z.number().nonnegative().max(3_000),
-  protein: z.number().nonnegative().max(300),
-  carbs: z.number().nonnegative().max(500),
-  fat: z.number().nonnegative().max(300),
+  grams: z.coerce.number().nonnegative().max(2_000),
+  calories: z.coerce.number().nonnegative().max(3_000),
+  protein: z.coerce.number().nonnegative().max(300),
+  carbs: z.coerce.number().nonnegative().max(500),
+  fat: z.coerce.number().nonnegative().max(300),
 })
 
 const MealSchema = z.object({
