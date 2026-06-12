@@ -34,3 +34,18 @@ export function safePgLike(value: unknown): string {
   const clean = safePg(value)
   return clean ? `%${clean}%` : ''
 }
+
+/**
+ * Escape a value for an EXACT, case-insensitive `.ilike(column, value)` match —
+ * e.g. looking a user up by their email.
+ *
+ * Unlike {@link safePgLike}, this does NOT strip dots/operators (that mangled
+ * "user@gmail.com" into "user@gmailcom", so the lookup never matched) and does
+ * NOT add `%` wildcards. It only escapes the three LIKE metacharacters (`\`, `%`,
+ * `_`), all of which are legal in email local-parts, so the match stays exact.
+ * Safe because `.ilike(col, value)` is parameterized by PostgREST — there is no
+ * operator-injection surface the way there is inside an interpolated `.or()`.
+ */
+export function safeEmailLike(value: unknown): string {
+  return String(value ?? '').trim().replace(/([\\%_])/g, '\\$1')
+}

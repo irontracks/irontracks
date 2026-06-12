@@ -6,7 +6,7 @@ import { parseJsonBody } from '@/utils/zod'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { logWarn } from '@/lib/logger'
 import { cacheDelete } from '@/utils/cache'
-import { safePgLike } from '@/utils/safePgFilter'
+import { safeEmailLike } from '@/utils/safePgFilter'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 
 const GrantSchema = z
@@ -53,7 +53,10 @@ export async function POST(req: Request) {
         const email = String(g.email || '').trim().toLowerCase()
         let userId = String(g.user_id || '').trim()
         if (!userId && email) {
-          const { data: profile } = await admin.from('profiles').select('id, email').ilike('email', safePgLike(email)).maybeSingle()
+          // Exact, case-insensitive email match. safeEmailLike escapes only LIKE
+          // wildcards — NOT safePgLike, which strips dots and turned
+          // "user@gmail.com" into "%user@gmailcom%" so the lookup never matched.
+          const { data: profile } = await admin.from('profiles').select('id, email').ilike('email', safeEmailLike(email)).maybeSingle()
           userId = String(profile?.id || '').trim()
         }
         if (!userId) {

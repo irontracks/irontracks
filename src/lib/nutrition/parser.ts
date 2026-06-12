@@ -72,6 +72,9 @@ export function analyzeMeal(text: string, extraFoods?: Record<string, FoodItem>)
     // Comma followed by whitespace is an item separator ("arroz, frango"),
     // but a comma between digits is a decimal ("1,5 colher") — keep that intact.
     .flatMap((l) => String(l || '').split(/,\s+/g))
+    // " e " between items is also a separator ("banana e iogurte"). No food in
+    // the database contains a standalone " e ", so this is safe.
+    .flatMap((l) => String(l || '').split(/\s+e\s+/gi))
     .map((l) => String(l || '').trim())
     .filter(Boolean)
   let mealName = 'Refeição'
@@ -97,8 +100,11 @@ export function analyzeMeal(text: string, extraFoods?: Record<string, FoodItem>)
     let unitUsed = 'g'
     let wasApprox = false
 
+    // "ovo(s)" is deliberately NOT a unit here: it's an actual food in the
+    // database, and treating it as a unit ate the food name ("2 ovos cozidos"
+    // → unit "ovos" + name "cozidos" → no match). Let count-parsing handle it.
     const approxRegex =
-      /(\d+(?:[.,]\d+)?)\s*(colheres?|conchas?|bifes?|fatias?|pedacos?|latas?|scoops?|doses?|unidades?|ovos?|xicaras?|copos?|pratos?|rodelas?|espigas?|postas?|medalhoes?|espetinhos?|un|unid)\b/i
+      /(\d+(?:[.,]\d+)?)\s*(colheres?|conchas?|bifes?|fatias?|pedacos?|latas?|scoops?|doses?|unidades?|xicaras?|copos?|pratos?|rodelas?|espigas?|postas?|medalhoes?|espetinhos?|un|unid)\b/i
     const gramRegex = /(\d+(?:[.,]\d+)?)\s*(g|gr|ml)\b/i
     const countRegex = /^(\d+(?:[.,]\d+)?)\s+(.+)$/i
 
@@ -118,7 +124,6 @@ export function analyzeMeal(text: string, extraFoods?: Record<string, FoodItem>)
       else if (unitRaw.startsWith('pedaco')) unitUsed = 'pedaco'
       else if (unitRaw.startsWith('lata')) unitUsed = 'lata'
       else if (unitRaw.startsWith('scoop') || unitRaw.startsWith('dose')) unitUsed = 'scoop'
-      else if (unitRaw.startsWith('ovo')) unitUsed = 'unidade'
       else if (unitRaw.startsWith('xicara')) unitUsed = 'xicara'
       else if (unitRaw.startsWith('copo')) unitUsed = 'copo'
       else if (unitRaw.startsWith('prato')) unitUsed = 'prato'
@@ -130,6 +135,9 @@ export function analyzeMeal(text: string, extraFoods?: Record<string, FoodItem>)
       else unitUsed = 'unidade'
 
       foodName = normalizedLine.replace(approxMatch[0] || '', '').replace(' de ', ' ').trim().toLowerCase()
+      // When the unit IS the food ("2 ovos" → unit "ovos", empty name), fall back
+      // to the unit word as the food name so it still matches the database.
+      if (!foodName) foodName = (approxMatch[2] || '').trim().toLowerCase()
       wasApprox = true
     } else if (gramMatch) {
       qtd = parseQtd(gramMatch[1] || '0')
