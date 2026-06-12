@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { safePg, safePgLike } from '@/utils/safePgFilter'
+import { safePg, safePgLike, safeEmailLike } from '@/utils/safePgFilter'
 
 describe('safePg', () => {
   it('returns empty string for null/undefined', () => {
@@ -94,5 +94,25 @@ describe('safePgLike', () => {
 
   it('handles email addresses', () => {
     expect(safePgLike('john@example.com')).toBe('%john@examplecom%')
+  })
+})
+
+describe('safeEmailLike', () => {
+  it('keeps the dot so the email still matches (regression: grant VIP)', () => {
+    expect(safeEmailLike('frankokott@gmail.com')).toBe('frankokott@gmail.com')
+  })
+
+  it('does not add % wildcards (exact match, not contains)', () => {
+    expect(safeEmailLike('john@example.com')).toBe('john@example.com')
+  })
+
+  it('escapes LIKE metacharacters that are legal in emails', () => {
+    expect(safeEmailLike('john_doe@example.com')).toBe('john\\_doe@example.com')
+    expect(safeEmailLike('a%b@example.com')).toBe('a\\%b@example.com')
+  })
+
+  it('returns empty string for null/undefined', () => {
+    expect(safeEmailLike(null)).toBe('')
+    expect(safeEmailLike(undefined)).toBe('')
   })
 })

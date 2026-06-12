@@ -159,6 +159,33 @@ describe('parseInput', () => {
     expect(combined.protein).toBe(arroz.protein + frango.protein)
   })
 
+  it('splits items joined by " e " ("banana e iogurte")', () => {
+    const combined = parseInput('70g banana e 100g iogurte natural')
+    const banana = parseInput('70g banana')
+    const iogurte = parseInput('100g iogurte natural')
+    expect(combined.calories).toBe(banana.calories + iogurte.calories)
+  })
+
+  it('parses "N ovos" and qualified eggs as the food ovo, not as a unit', () => {
+    // Regression: "ovos" used to be treated as a measurement unit, which ate the
+    // food name and left "2 ovos cozidos" unrecognized.
+    const dois = parseInput('2 ovos')
+    expect(dois.calories).toBeGreaterThan(100) // ~2 eggs ≈ 155 kcal
+    expect(dois.protein).toBeGreaterThan(10)
+    const cozidos = parseInput('2 ovos cozidos')
+    expect(cozidos.calories).toBeGreaterThan(100)
+    const fritos = analyzeMeal('2 ovos fritos sem óleo')
+    expect(fritos.unknownLines).toHaveLength(0)
+    expect(fritos.items[0]!.calories).toBeGreaterThan(100)
+  })
+
+  it("Fran's full meal recognizes every item (eggs included)", () => {
+    const a = analyzeMeal('2 ovos fritos sem óleo, 70g de banana e 100g iogurte natural caseiro')
+    expect(a.unknownLines).toHaveLength(0)
+    expect(a.items).toHaveLength(3)
+    expect(a.meal.calories).toBeGreaterThan(250)
+  })
+
   it('does not split a decimal written with a comma (e.g. "1,5 colher")', () => {
     // A comma NOT followed by a space (the decimal in "1,5") must not break the
     // line into two items — it stays a single recognized food entry.
