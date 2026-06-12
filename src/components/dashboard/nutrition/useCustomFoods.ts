@@ -33,6 +33,7 @@ export interface CustomFoodDraft {
   fat_per100g: number
   fiber_per100g: number
   label_image_url: string | null
+  barcode?: string | null
 }
 
 /** Convert custom foods to the extraFoods format consumed by parseInput */
@@ -100,6 +101,7 @@ export function useCustomFoods(userId: string | null | undefined) {
         .insert({
           user_id: userId,
           name: draft.name.trim(),
+          barcode: draft.barcode ? String(draft.barcode).trim() || null : null,
           aliases: draft.aliases.map(a => a.trim()).filter(Boolean),
           serving_size_g: draft.serving_size_g,
           kcal_per100g: draft.kcal_per100g,

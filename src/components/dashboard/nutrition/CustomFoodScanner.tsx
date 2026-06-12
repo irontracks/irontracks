@@ -23,6 +23,8 @@ interface Props {
   saving: boolean
   onSave: (draft: CustomFoodDraft) => Promise<{ ok: boolean; error?: string }>
   onClose: () => void
+  /** EAN a associar (quando aberto após um código de barras não encontrado). */
+  initialBarcode?: string | null
 }
 
 const CONFIDENCE_LABEL: Record<string, string> = {
@@ -50,7 +52,7 @@ function NumInput({ label, value, onChange }: { label: string; value: number; on
   )
 }
 
-const CustomFoodScanner = memo(function CustomFoodScanner({ saving, onSave, onClose }: Props) {
+const CustomFoodScanner = memo(function CustomFoodScanner({ saving, onSave, onClose, initialBarcode }: Props) {
   const fileRef = useRef<HTMLInputElement>(null)
   const [scanning, setScanning] = useState(false)
   const [scanError, setScanError] = useState<string | null>(null)
@@ -120,13 +122,14 @@ const CustomFoodScanner = memo(function CustomFoodScanner({ saving, onSave, onCl
       fat_per100g: label.fatPer100g,
       fiber_per100g: label.fiberPer100g,
       label_image_url: null, // future: upload to Supabase Storage
+      barcode: initialBarcode ?? null,
     })
     if (result.ok) {
       onClose()
     } else {
       setSaveError(result.error || 'Erro ao salvar')
     }
-  }, [label, name, aliases, onSave, onClose])
+  }, [label, name, aliases, onSave, onClose, initialBarcode])
 
   const setField = useCallback((field: keyof ScannedLabel, val: number) => {
     setLabel(prev => prev ? { ...prev, [field]: val } : null)
@@ -141,6 +144,12 @@ const CustomFoodScanner = memo(function CustomFoodScanner({ saving, onSave, onCl
         </div>
         <button type="button" onClick={onClose} className="text-neutral-500 hover:text-white text-xl transition">✕</button>
       </div>
+
+      {initialBarcode && (
+        <div className="rounded-xl border border-yellow-500/20 bg-yellow-500/[0.06] px-3 py-2 text-xs text-yellow-200">
+          Código <span className="font-mono font-semibold">{initialBarcode}</span> não está na base. Fotografe a tabela nutricional — vou salvar o produto vinculado a esse código pra reconhecer da próxima vez.
+        </div>
+      )}
 
       {/* Upload trigger */}
       {!label && !scanning && (
