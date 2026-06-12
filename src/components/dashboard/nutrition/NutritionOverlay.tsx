@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import NutritionMixer from './NutritionMixer'
 import { SkeletonList } from '@/components/ui/Skeleton'
+import { estimateSessionKcal } from '@/utils/calories/sessionKcal'
 
 type Totals = { calories: number; protein: number; carbs: number; fat: number }
 type Gender = 'MALE' | 'FEMALE'
@@ -103,7 +104,7 @@ export default function NutritionOverlay({ onClose: _onClose, canViewMacros }: N
           supabase.from('daily_nutrition_logs').select('calories,protein,carbs,fat').eq('user_id', uid).eq('date', dateKey).maybeSingle(),
           supabase.from('nutrition_goals').select('calories,protein,carbs,fat').eq('user_id', uid).order('updated_at', { ascending: false }).limit(1).maybeSingle(),
           supabase.from('user_settings').select('preferences').eq('user_id', uid).maybeSingle(),
-          supabase.from('workouts').select('id').eq('user_id', uid).eq('is_template', false).gte('completed_at', `${dateKey}T00:00:00`).lte('completed_at', `${dateKey}T23:59:59`),
+          supabase.from('workouts').select('id, notes').eq('user_id', uid).eq('is_template', false).gte('completed_at', `${dateKey}T00:00:00`).lte('completed_at', `${dateKey}T23:59:59`),
         ])
 
         if (cancelled) return
@@ -140,8 +141,22 @@ export default function NutritionOverlay({ onClose: _onClose, canViewMacros }: N
           }
         }
 
-        // workouts table has no kcal field — estimate ~300 kcal per session
-        const workoutCalories = Array.isArray(sessionsRes.data) ? sessionsRes.data.length * 300 : 0
+        // Real per-session kcal from the saved session JSON (`notes`), using the
+        // SAME MET model as the workout report — so this matches the "~X kcal" the
+        // report shows, instead of a flat 300/session estimate.
+        const kcalPrefs = settingsRes.data?.preferences as Record<string, unknown> | null
+        const kcalBodyWeight = Number(kcalPrefs?.bodyWeightKg)
+        const kcalSex = typeof kcalPrefs?.biologicalSex === 'string' ? (kcalPrefs.biologicalSex as string) : null
+        let workoutCalories = 0
+        for (const w of Array.isArray(sessionsRes.data) ? sessionsRes.data : []) {
+          try {
+            const notes = JSON.parse(String((w as { notes?: unknown }).notes ?? ''))
+            workoutCalories += estimateSessionKcal(notes, {
+              bodyWeightKg: Number.isFinite(kcalBodyWeight) ? kcalBodyWeight : null,
+              biologicalSex: kcalSex,
+            })
+          } catch { /* sem JSON de sessão → ignora este treino */ }
+        }
 
         if (!cancelled) setData({ dateKey, totals, goals, goalsSource, workoutCalories })
       } catch {
