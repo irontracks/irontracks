@@ -23,12 +23,12 @@ const MAX_IMAGE_BYTES = 5 * 1024 * 1024 // 5 MB
 
 const LabelSchema = z.object({
   productName: z.string().min(1).max(120).default('Produto'),
-  servingSizeG: z.number().nonnegative().default(100),
-  kcalPer100g: z.number().nonnegative(),
-  proteinPer100g: z.number().nonnegative(),
-  carbsPer100g: z.number().nonnegative(),
-  fatPer100g: z.number().nonnegative(),
-  fiberPer100g: z.number().nonnegative().default(0),
+  servingSizeG: z.coerce.number().nonnegative().default(100),
+  kcalPer100g: z.coerce.number().nonnegative(),
+  proteinPer100g: z.coerce.number().nonnegative(),
+  carbsPer100g: z.coerce.number().nonnegative(),
+  fatPer100g: z.coerce.number().nonnegative(),
+  fiberPer100g: z.coerce.number().nonnegative().default(0),
   confidence: z.enum(['high', 'medium', 'low']).default('medium'),
 })
 

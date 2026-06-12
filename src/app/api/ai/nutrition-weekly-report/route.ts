@@ -16,16 +16,16 @@ const MODEL = env.gemini.modelId
 
 const WeekDaySchema = z.object({
   date: z.string(),
-  calories: z.number().nonnegative(),
+  calories: z.coerce.number().nonnegative(),
 })
 
 const BodySchema = z.object({
   weeklyData: z.array(WeekDaySchema).min(1).max(7),
   goals: z.object({
-    calories: z.number().nonnegative(),
-    protein: z.number().nonnegative(),
-    carbs: z.number().nonnegative(),
-    fat: z.number().nonnegative(),
+    calories: z.coerce.number().nonnegative(),
+    protein: z.coerce.number().nonnegative(),
+    carbs: z.coerce.number().nonnegative(),
+    fat: z.coerce.number().nonnegative(),
   }),
 })
 
