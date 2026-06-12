@@ -13,7 +13,6 @@ import dynamic from 'next/dynamic'
 const NutritionDayScore = dynamic(() => import('./NutritionDayScore'), { ssr: false })
 const NutritionEntryCard = dynamic(() => import('./NutritionEntryCard'), { ssr: false })
 const WaterTracker = dynamic(() => import('./WaterTracker'), { ssr: false })
-const FavoriteMeals = dynamic(() => import('./FavoriteMeals'), { ssr: false })
 const SmartSuggestions = dynamic(() => import('./SmartSuggestions'), { ssr: false })
 const DietGenerator = dynamic(() => import('./DietGenerator'), { ssr: false })
 const DateNavigator = dynamic(() => import('./DateNavigator'), { ssr: false })
@@ -23,7 +22,6 @@ const NutritionWorkoutCorrelation = dynamic(() => import('./NutritionWorkoutCorr
 const BarcodeScanner = dynamic(() => import('./BarcodeScanner'), { ssr: false })
 
 // ── Hooks ──────────────────────────────────────────────────────────────────────
-import { useFavoriteMeals } from './useFavoriteMeals'
 import { useCustomFoods, customFoodsToExtraFoods } from './useCustomFoods'
 
 type Totals = { calories: number; protein: number; carbs: number; fat: number }
@@ -247,7 +245,7 @@ export default function NutritionMixer({
   const isToday = currentDateKey === todayDate
 
   // ── Panel toggles ────────────────────────────────────────────────────────
-  const [activePanel, setActivePanel] = useState<'none' | 'scanner' | 'library' | 'favorites' | 'water'>('none')
+  const [activePanel, setActivePanel] = useState<'none' | 'scanner' | 'library' | 'water'>('none')
   const togglePanel = useCallback((p: typeof activePanel) => setActivePanel(prev => prev === p ? 'none' : p), [])
   const [showBarcodeScanner, setShowBarcodeScanner] = useState(false)
   // EAN lido cujo produto não foi encontrado — abre o scanner de tabela
@@ -255,7 +253,6 @@ export default function NutritionMixer({
   const [pendingBarcode, setPendingBarcode] = useState<string | null>(null)
 
   // ── Hooks ────────────────────────────────────────────────────────────────
-  const { favorites, loading: favoritesLoading, deleteFavorite, saveFavorite } = useFavoriteMeals(userId)
   const { foods: customFoods, loading: customFoodsLoading, saving: scannerSaving, saveFood: scannerSaveFood, updateFood: updateCustomFood, deleteFood: deleteCustomFood } = useCustomFoods(userId)
 
   // ── Derived ──────────────────────────────────────────────────────────────
@@ -610,7 +607,6 @@ export default function NutritionMixer({
       <div className="flex items-center gap-2 overflow-x-auto pb-1 scrollbar-none -mx-1 px-1">
         <QuickAction icon="📷" label="Scanner" onClick={() => togglePanel('scanner')} active={activePanel === 'scanner'} />
         <QuickAction icon="📚" label="Biblioteca" onClick={() => togglePanel('library')} active={activePanel === 'library'} />
-        <QuickAction icon="⭐" label="Favoritos" onClick={() => togglePanel('favorites')} active={activePanel === 'favorites'} />
         <QuickAction icon="💧" label="Água" onClick={() => togglePanel('water')} active={activePanel === 'water'} />
       </div>
 
@@ -638,19 +634,6 @@ export default function NutritionMixer({
         </Card>
       )}
 
-      {/* ── Favorites Panel ───────────────────────────────────────────── */}
-      {activePanel === 'favorites' && (
-        <Card className="p-4">
-          <FavoriteMeals
-            favorites={favorites}
-            loading={favoritesLoading}
-            onSelect={handleFavoriteSelect}
-            onDelete={deleteFavorite}
-            onSave={saveFavorite}
-            currentInput={input}
-          />
-        </Card>
-      )}
 
       {/* ── Water Panel ───────────────────────────────────────────────── */}
       {activePanel === 'water' && (
