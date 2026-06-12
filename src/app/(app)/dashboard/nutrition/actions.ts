@@ -300,6 +300,47 @@ export async function updateWaterAction(ml: number, dateKey?: string) {
   }
 }
 
+/**
+ * Copia um produto resolvido pelo Open Food Facts para a biblioteca do usuário,
+ * associado ao EAN. Assim a próxima leitura do mesmo código é instantânea (vem
+ * da biblioteca) e o produto passa a ser reconhecido na simulação por nome.
+ * Não-fatal: qualquer erro (limite de 50, etc.) não impede o lançamento.
+ */
+async function saveScannedProductToLibrary(
+  supabase: SupabaseClient,
+  userId: string,
+  ean: string,
+  name: string,
+  item: { kcal: number; p: number; c: number; f: number },
+): Promise<void> {
+  try {
+    const { data: existing } = await supabase
+      .from('nutrition_custom_foods')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('barcode', ean)
+      .limit(1)
+      .maybeSingle()
+    if (existing) return
+
+    await supabase.from('nutrition_custom_foods').insert({
+      user_id: userId,
+      name: sanitizeFoodName(name).slice(0, 120) || 'Produto',
+      aliases: [],
+      barcode: ean,
+      serving_size_g: 100,
+      kcal_per100g: Math.max(0, Math.round(item.kcal)),
+      protein_per100g: Math.max(0, Math.round(item.p)),
+      carbs_per100g: Math.max(0, Math.round(item.c)),
+      fat_per100g: Math.max(0, Math.round(item.f)),
+      fiber_per100g: 0,
+      updated_at: new Date().toISOString(),
+    })
+  } catch {
+    /* non-fatal */
+  }
+}
+
 export async function logBarcodeAction(ean: string, grams: number, dateKey?: string) {
   try {
     const cleanEan = String(ean ?? '').trim()
@@ -327,9 +368,15 @@ export async function logBarcodeAction(ean: string, grams: number, dateKey?: str
       }
     })()
 
-    const resolved = await resolveBarcode(supabase, cleanEan)
+    const resolved = await resolveBarcode(supabase, cleanEan, userId)
     if (!resolved) {
-      return { ok: false, error: 'Produto não encontrado. Tente digitar o nome manualmente.' }
+      // Sinaliza ao cliente pra abrir o scanner da tabela nutricional já com o EAN.
+      return { ok: false, error: 'Produto não encontrado.', notFound: true, ean: cleanEan }
+    }
+
+    // Achou via OFF → copia pra biblioteca com o EAN (próxima leitura é instantânea).
+    if (resolved.source === 'off') {
+      await saveScannedProductToLibrary(supabase, userId, cleanEan, resolved.name, resolved.item)
     }
 
     const multiplier = safeGrams / 100

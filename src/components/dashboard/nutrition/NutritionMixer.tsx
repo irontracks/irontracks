@@ -250,6 +250,9 @@ export default function NutritionMixer({
   const [activePanel, setActivePanel] = useState<'none' | 'scanner' | 'library' | 'favorites' | 'water'>('none')
   const togglePanel = useCallback((p: typeof activePanel) => setActivePanel(prev => prev === p ? 'none' : p), [])
   const [showBarcodeScanner, setShowBarcodeScanner] = useState(false)
+  // EAN lido cujo produto não foi encontrado — abre o scanner de tabela
+  // nutricional pra cadastrar o produto já associado a esse código.
+  const [pendingBarcode, setPendingBarcode] = useState<string | null>(null)
 
   // ── Hooks ────────────────────────────────────────────────────────────────
   const { favorites, loading: favoritesLoading, deleteFavorite, saveFavorite } = useFavoriteMeals(userId)
@@ -469,6 +472,11 @@ export default function NutritionMixer({
           setTotals(prev => ({ calories: safeNumber(prev?.calories) + safeNumber(meal.calories), protein: safeNumber(prev?.protein) + safeNumber(meal.protein), carbs: safeNumber(prev?.carbs) + safeNumber(meal.carbs), fat: safeNumber(prev?.fat) + safeNumber(meal.fat) }))
           setEntriesTick(v => v + 1)
         }
+      } else if ((result as Record<string, unknown>)?.notFound) {
+        // Produto fora do OFF → abre o scanner da tabela nutricional já vinculado
+        // ao código. Ao salvar, o produto entra na biblioteca com o EAN.
+        setPendingBarcode(String((result as Record<string, unknown>)?.ean || ean))
+        setActivePanel('scanner')
       } else {
         setError(result.error ?? 'Produto não encontrado.')
       }
@@ -611,7 +619,8 @@ export default function NutritionMixer({
         <CustomFoodScanner
           saving={scannerSaving}
           onSave={scannerSaveFood}
-          onClose={() => setActivePanel('none')}
+          onClose={() => { setActivePanel('none'); setPendingBarcode(null) }}
+          initialBarcode={pendingBarcode}
         />
       )}
 
