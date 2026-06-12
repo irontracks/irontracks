@@ -713,9 +713,20 @@ export default function NutritionMixer({
 
               {mealPreview.unknownLines.length > 0 && (
                 <div className={`${mealPreview.items.length > 0 ? 'mt-2' : 'mt-1'} text-[11px] text-neutral-500`}>
-                  Não reconhecido localmente: <span className="text-neutral-400">{mealPreview.unknownLines.join(', ')}</span>. Toque em Lançar pra estimar com IA.
+                  Fora da base local: <span className="text-neutral-400">{mealPreview.unknownLines.join(', ')}</span>. Ao tocar em Lançar, a IA calcula os macros e salva pra próxima vez.
                 </div>
               )}
+            </div>
+          )}
+
+          {/* IA calculando — feedback claro pro fallback de IA (item fora da base) */}
+          {aiBusy && (
+            <div className="mt-3 flex items-center gap-2 rounded-xl border border-yellow-500/20 bg-yellow-500/[0.06] px-3 py-2.5">
+              <svg className="size-4 animate-spin text-yellow-400" viewBox="0 0 24 24" fill="none">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-90" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.4 0 0 5.4 0 12h4z" />
+              </svg>
+              <span className="text-xs text-yellow-200">Calculando com IA e salvando na sua base…</span>
             </div>
           )}
 
@@ -724,10 +735,10 @@ export default function NutritionMixer({
             <button
               type="button"
               onClick={handleSubmit}
-              disabled={!input.trim() || isPending || !!schemaMissing}
+              disabled={!input.trim() || isPending || aiBusy || !!schemaMissing}
               className="flex-1 h-10 rounded-xl bg-gradient-to-r from-yellow-400 to-amber-500 text-black font-bold text-sm shadow-lg shadow-yellow-500/20 hover:from-yellow-300 hover:to-amber-400 active:scale-[0.98] transition disabled:opacity-40 disabled:shadow-none"
             >
-              {isPending ? 'Processando...' : '✚ Lançar'}
+              {aiBusy ? '🤖 Calculando…' : isPending ? 'Processando…' : '✚ Lançar'}
             </button>
             {isNative && (
               <button
