@@ -31,11 +31,11 @@ const ZodBody = z.object({
   carbs: z.coerce.number().nonnegative().max(2_000),
   fat: z.coerce.number().nonnegative().max(1_000),
   meals: z.number().int().min(3).max(7).optional().default(5),
-  notes: z.string().max(300).optional(),
+  notes: z.string().transform((s) => s.slice(0, 300)).optional(),
 }).strip()
 
 const ItemSchema = z.object({
-  food: z.string().min(1).max(100),
+  food: z.string().min(1).transform((s) => s.slice(0, 100)),
   grams: z.coerce.number().nonnegative().max(2_000),
   calories: z.coerce.number().nonnegative().max(3_000),
   protein: z.coerce.number().nonnegative().max(300),
@@ -44,13 +44,13 @@ const ItemSchema = z.object({
 })
 
 const MealSchema = z.object({
-  name: z.string().min(1).max(60),
-  time: z.string().max(20).optional().default(''),
+  name: z.string().min(1).transform((s) => s.slice(0, 60)),
+  time: z.string().transform((s) => s.slice(0, 20)).optional().default(''),
   items: z.array(ItemSchema).min(1).max(8),
 })
 
 const PlanSchema = z.object({
-  planName: z.string().max(80).optional().default('Dieta gerada'),
+  planName: z.string().transform((s) => s.slice(0, 80)).optional().default('Dieta gerada'),
   meals: z.array(MealSchema).min(3).max(7),
 })
 

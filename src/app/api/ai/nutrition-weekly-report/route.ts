@@ -30,9 +30,9 @@ const BodySchema = z.object({
 })
 
 const OutputSchema = z.object({
-  summary: z.string().min(1).max(400),
-  highlights: z.array(z.string().min(1).max(200)).min(1).max(5),
-  tip: z.string().max(200).optional(),
+  summary: z.string().min(1).transform((s) => s.slice(0, 400)),
+  highlights: z.array(z.string().min(1).transform((s) => s.slice(0, 200))).min(1).max(5),
+  tip: z.string().transform((s) => s.slice(0, 200)).optional(),
 })
 
 const safeJsonParse = (raw: unknown) => parseJsonWithSchema(raw, z.unknown())

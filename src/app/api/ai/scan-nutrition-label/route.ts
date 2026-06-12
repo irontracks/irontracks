@@ -22,7 +22,7 @@ const MODEL = env.gemini.modelId
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024 // 5 MB
 
 const LabelSchema = z.object({
-  productName: z.string().min(1).max(120).default('Produto'),
+  productName: z.string().min(1).transform((s) => s.slice(0, 120)).default('Produto'),
   servingSizeG: z.coerce.number().nonnegative().default(100),
   kcalPer100g: z.coerce.number().nonnegative(),
   proteinPer100g: z.coerce.number().nonnegative(),

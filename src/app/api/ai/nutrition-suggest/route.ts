@@ -31,20 +31,22 @@ const BodySchema = z
   })
   .strict()
 
-// coerce: alguns modelos (ex.: gemini-3.5-flash) devolvem os macros como string
-// ("protein": "75"). z.coerce.number() converte "75" → 75 e evita invalid_ai_output.
+// Tolerante ao output do LLM:
+// - coerce: gemini-3.5-flash devolve macros como string ("protein": "75").
+// - transform/slice: trunca strings longas (ex.: o 3.5 gera `tip` > 200 chars)
+//   em vez de REJEITAR — antes isso virava invalid_ai_output.
 const SuggestionSchema = z.object({
   suggestions: z.array(
     z.object({
-      food: z.string().min(1).max(100),
-      portion: z.string().min(1).max(200),
+      food: z.string().min(1).transform((s) => s.slice(0, 100)),
+      portion: z.string().min(1).transform((s) => s.slice(0, 200)),
       calories: z.coerce.number().nonnegative(),
       protein: z.coerce.number().nonnegative(),
       carbs: z.coerce.number().nonnegative(),
       fat: z.coerce.number().nonnegative(),
     }),
   ).min(1).max(4),
-  tip: z.string().max(200).optional(),
+  tip: z.string().transform((s) => s.slice(0, 200)).optional(),
 })
 
 const safeJsonParse = (raw: unknown) => parseJsonWithSchema(raw, z.unknown())

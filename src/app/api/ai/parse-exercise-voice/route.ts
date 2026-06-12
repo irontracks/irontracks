@@ -14,21 +14,21 @@ export const dynamic = 'force-dynamic'
 const MODEL = env.gemini.modelId
 
 const BodySchema = z.object({
-  text: z.string().min(1).max(800),
+  text: z.string().min(1).transform((s) => s.slice(0, 800)),
   // Exercícios já existentes no treino — usados para fuzzy match
   existingExercises: z.array(z.string()).max(80).optional(),
 }).strict()
 
 const ExerciseSchema = z.object({
-  name: z.string().min(1).max(120),
+  name: z.string().min(1).transform((s) => s.slice(0, 120)),
   sets: z.number().int().min(1).max(20).nullable(),
   reps: z.number().int().min(1).max(200).nullable(),
   weightKg: z.coerce.number().nonnegative().nullable(),
-  cadence: z.string().max(20).nullable(),   // ex: "2020", "3010"
+  cadence: z.string().transform((s) => s.slice(0, 20)).nullable(),   // ex: "2020", "3010"
   restSeconds: z.number().int().nonnegative().nullable(),
   rpe: z.number().min(1).max(10).nullable(),
   method: z.enum(['normal', 'drop_set', 'rest_pause', 'super_set', 'cluster']).nullable(),
-  notes: z.string().max(200).nullable(),
+  notes: z.string().transform((s) => s.slice(0, 200)).nullable(),
 })
 
 const OutputSchema = z.object({
