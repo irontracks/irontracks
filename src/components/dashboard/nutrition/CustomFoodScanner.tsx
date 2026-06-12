@@ -8,6 +8,7 @@
 import { useState, useRef, useCallback, memo } from 'react'
 import dynamic from 'next/dynamic'
 import type { CustomFoodDraft } from './useCustomFoods'
+import { lookupBarcodeAction } from '@/app/(app)/dashboard/nutrition/actions'
 
 const BarcodeScanner = dynamic(() => import('./BarcodeScanner'), { ssr: false })
 
@@ -69,6 +70,43 @@ const CustomFoodScanner = memo(function CustomFoodScanner({ saving, onSave, onCl
   const [aliases, setAliases] = useState<string[]>([])
   const [barcode, setBarcode] = useState(initialBarcode ?? '')
   const [barcodeScannerOpen, setBarcodeScannerOpen] = useState(false)
+  const [lookingUp, setLookingUp] = useState(false)
+
+  // Resolve o código lido: se achar o produto (biblioteca/OFF), pré-preenche o
+  // formulário; senão mantém o código e pede a foto da tabela nutricional.
+  const handleBarcodeLookup = useCallback(async (ean: string) => {
+    const clean = String(ean || '').replace(/[^0-9]/g, '')
+    setBarcodeScannerOpen(false)
+    setBarcode(clean)
+    if (!clean) return
+    // Já editando um rótulo: o "Ler código" só vincula o EAN, sem re-resolver
+    // nem sobrescrever os valores que o usuário já revisou.
+    if (label) return
+    setLookingUp(true)
+    setScanError(null)
+    try {
+      const res = await lookupBarcodeAction(clean)
+      if (res.ok && res.found) {
+        setLabel({
+          productName: res.name ?? '',
+          kcalPer100g: res.kcal ?? 0,
+          proteinPer100g: res.protein ?? 0,
+          carbsPer100g: res.carbs ?? 0,
+          fatPer100g: res.fat ?? 0,
+          fiberPer100g: 0,
+          servingSizeG: 100,
+          confidence: 'high',
+        })
+        if (res.name) setName(res.name)
+      } else {
+        setScanError(`Código ${clean} lido, mas o produto não está na base. Fotografe a tabela nutricional pra cadastrar com este código.`)
+      }
+    } catch {
+      setScanError('Falha ao buscar o código.')
+    } finally {
+      setLookingUp(false)
+    }
+  }, [label])
 
   const handleFile = useCallback(async (file: File) => {
     setScanning(true)
@@ -156,17 +194,35 @@ const CustomFoodScanner = memo(function CustomFoodScanner({ saving, onSave, onCl
         </div>
       )}
 
-      {/* Upload trigger */}
-      {!label && !scanning && (
-        <button
-          type="button"
-          onClick={() => fileRef.current?.click()}
-          className="w-full rounded-2xl border-2 border-dashed border-neutral-700 hover:border-yellow-500/50 bg-neutral-900/50 hover:bg-neutral-900 transition py-8 flex flex-col items-center gap-2"
-        >
-          <span className="text-3xl">📸</span>
-          <span className="text-sm font-semibold text-white">Fotografar tabela nutricional</span>
-          <span className="text-xs text-neutral-400">Ou selecione da galeria</span>
-        </button>
+      {/* Método de cadastro: tabela nutricional (foto) ou código de barras */}
+      {!label && !scanning && !lookingUp && (
+        <div className="grid grid-cols-2 gap-3">
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            className="rounded-2xl border-2 border-dashed border-neutral-700 hover:border-yellow-500/50 bg-neutral-900/50 hover:bg-neutral-900 transition py-7 flex flex-col items-center gap-1.5"
+          >
+            <span className="text-3xl">📸</span>
+            <span className="text-sm font-semibold text-white">Tabela nutricional</span>
+            <span className="text-[10px] text-neutral-400">Fotografar rótulo</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setBarcodeScannerOpen(true)}
+            className="rounded-2xl border-2 border-dashed border-neutral-700 hover:border-yellow-500/50 bg-neutral-900/50 hover:bg-neutral-900 transition py-7 flex flex-col items-center gap-1.5"
+          >
+            <span className="text-3xl">📦</span>
+            <span className="text-sm font-semibold text-white">Código de barras</span>
+            <span className="text-[10px] text-neutral-400">Ler código</span>
+          </button>
+        </div>
+      )}
+
+      {lookingUp && (
+        <div className="flex items-center gap-3 rounded-2xl bg-yellow-500/10 border border-yellow-500/20 px-4 py-3">
+          <span className="animate-spin text-lg">⏳</span>
+          <span className="text-sm text-yellow-200">Buscando produto pelo código…</span>
+        </div>
       )}
       <input
         ref={fileRef}
@@ -313,7 +369,7 @@ const CustomFoodScanner = memo(function CustomFoodScanner({ saving, onSave, onCl
 
       {barcodeScannerOpen && (
         <BarcodeScanner
-          onResult={(ean) => { setBarcode(String(ean || '').replace(/[^0-9]/g, '')); setBarcodeScannerOpen(false) }}
+          onResult={handleBarcodeLookup}
           onClose={() => setBarcodeScannerOpen(false)}
         />
       )}
