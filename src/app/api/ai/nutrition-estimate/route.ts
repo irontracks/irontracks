@@ -31,15 +31,15 @@ const extractJsonFromModelText = (text: string) => {
 
 const BodySchema = z
   .object({
-    text: z.string().min(1).max(600),
+    text: z.string().min(1).transform((s) => s.slice(0, 600)),
     dateKey: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
-    mealName: z.string().max(60).optional(),
+    mealName: z.string().transform((s) => s.slice(0, 60)).optional(),
   })
   .strict()
 
 const OutputSchema = z
   .object({
-    foodName: z.string().min(1).max(120),
+    foodName: z.string().min(1).transform((s) => s.slice(0, 120)),
     calories: z.coerce.number().nonnegative(),
     protein: z.coerce.number().nonnegative(),
     carbs: z.coerce.number().nonnegative(),
