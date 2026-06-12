@@ -91,7 +91,7 @@ export async function logMealAction(mealText: string, dateKey?: string, mealName
       const meal = customName
         ? { ...resolved.meal, foodName: sanitizeFoodName(customName).slice(0, 120) || resolved.meal.foodName }
         : resolved.meal
-      const row = await trackMeal(userId, meal, resolvedDateKey)
+      const row = await trackMeal(userId, meal, resolvedDateKey, resolved.items)
       revalidatePath('/dashboard/nutrition')
       waitUntil(maybeNotifyDailyGoal(supabase, userId, resolvedDateKey))
       return { ok: true, meal, entry: row || null }
@@ -341,7 +341,11 @@ export async function logBarcodeAction(ean: string, grams: number, dateKey?: str
       fat: Math.round(resolved.item.f * multiplier),
     }
 
-    const row = await trackMeal(userId, meal, resolvedDateKey)
+    const row = await trackMeal(userId, meal, resolvedDateKey, [{
+      label: `${Math.round(safeGrams)}g ${meal.foodName}`,
+      grams: Math.round(safeGrams),
+      calories: meal.calories, protein: meal.protein, carbs: meal.carbs, fat: meal.fat,
+    }])
     revalidatePath('/dashboard/nutrition')
     waitUntil(maybeNotifyDailyGoal(supabase, userId, resolvedDateKey))
     return { ok: true, meal, entry: row || null }

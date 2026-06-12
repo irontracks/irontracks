@@ -110,13 +110,14 @@ export async function POST(req: Request) {
     // Use the fixed trackMeal function instead of broken RPC.
     // A custom meal name (from the user) takes precedence over the AI-derived name.
     const customName = String(mealName ?? '').trim()
+    const itemLabel = sanitizeFoodName(out.foodName || customName || 'Refeição').slice(0, 120)
     const row = await trackMeal(userId, {
       foodName: sanitizeFoodName(customName || out.foodName || 'Refeição').slice(0, 120),
       calories,
       protein,
       carbs,
       fat,
-    }, dateKey)
+    }, dateKey, [{ label: itemLabel, grams: 0, calories, protein, carbs, fat }])
 
     // Auto-learn: save the AI-estimated food so the local parser
     // recognizes it next time without needing the AI again.

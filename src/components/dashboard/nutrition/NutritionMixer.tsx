@@ -28,6 +28,8 @@ import { useCustomFoods, customFoodsToExtraFoods } from './useCustomFoods'
 
 type Totals = { calories: number; protein: number; carbs: number; fat: number }
 
+type MealItemView = { label: string; grams: number; calories: number; protein: number; carbs: number; fat: number }
+
 type MealEntry = {
   id: string
   created_at: string
@@ -36,6 +38,23 @@ type MealEntry = {
   protein: number
   carbs: number
   fat: number
+  items?: MealItemView[] | null
+}
+
+function parseItems(raw: unknown): MealItemView[] | null {
+  if (!Array.isArray(raw) || raw.length === 0) return null
+  const items = raw
+    .filter((it): it is Record<string, unknown> => !!it && typeof it === 'object')
+    .map((it) => ({
+      label: String(it.label ?? ''),
+      grams: Number(it.grams) || 0,
+      calories: Number(it.calories) || 0,
+      protein: Number(it.protein) || 0,
+      carbs: Number(it.carbs) || 0,
+      fat: Number(it.fat) || 0,
+    }))
+    .filter((it) => it.label)
+  return items.length > 0 ? items : null
 }
 
 const PERCENT_SCALE = 100
@@ -302,7 +321,7 @@ export default function NutritionMixer({
         setEntriesLoading(true); setEntriesError('')
         const { data, error } = await supabase
           .from('nutrition_meal_entries')
-          .select('id, created_at, food_name, calories, protein, carbs, fat')
+          .select('id, created_at, food_name, calories, protein, carbs, fat, items')
           .eq('date', currentDateKey)
           .order('created_at', { ascending: false })
           .limit(30)
@@ -314,6 +333,7 @@ export default function NutritionMixer({
             food_name: String(r?.food_name || ''),
             calories: safeNumber(r?.calories), protein: safeNumber(r?.protein),
             carbs: safeNumber(r?.carbs), fat: safeNumber(r?.fat),
+            items: parseItems(r?.items),
           }))
           .filter((r: MealEntry) => Boolean(r.id))
         setEntries(mapped)
@@ -359,7 +379,7 @@ export default function NutritionMixer({
           const e = entry as Record<string, unknown>
           const nt = { calories: safeNumber(e?.totals_calories), protein: safeNumber(e?.totals_protein), carbs: safeNumber(e?.totals_carbs), fat: safeNumber(e?.totals_fat) }
           if (nt.calories || nt.protein || nt.carbs || nt.fat) setTotals(nt)
-          setEntries(prev => [{ id: String(e?.entry_id || e?.id || Date.now()), created_at: String(e?.created_at || new Date().toISOString()), food_name: String(e?.food_name || meal.foodName || 'Refeição'), calories: safeNumber(e?.calories ?? meal.calories), protein: safeNumber(e?.protein ?? meal.protein), carbs: safeNumber(e?.carbs ?? meal.carbs), fat: safeNumber(e?.fat ?? meal.fat) }, ...(Array.isArray(prev) ? prev : [])].slice(0, 30))
+          setEntries(prev => [{ id: String(e?.entry_id || e?.id || Date.now()), created_at: String(e?.created_at || new Date().toISOString()), food_name: String(e?.food_name || meal.foodName || 'Refeição'), calories: safeNumber(e?.calories ?? meal.calories), protein: safeNumber(e?.protein ?? meal.protein), carbs: safeNumber(e?.carbs ?? meal.carbs), fat: safeNumber(e?.fat ?? meal.fat), items: parseItems(e?.items) }, ...(Array.isArray(prev) ? prev : [])].slice(0, 30))
         } else {
           setTotals(prev => ({ calories: safeNumber(prev?.calories) + safeNumber(meal.calories), protein: safeNumber(prev?.protein) + safeNumber(meal.protein), carbs: safeNumber(prev?.carbs) + safeNumber(meal.carbs), fat: safeNumber(prev?.fat) + safeNumber(meal.fat) }))
         }
@@ -401,7 +421,7 @@ export default function NutritionMixer({
       const row = json?.row
       if (row && typeof row === 'object') {
         setTotals({ calories: safeNumber(row?.totals_calories), protein: safeNumber(row?.totals_protein), carbs: safeNumber(row?.totals_carbs), fat: safeNumber(row?.totals_fat) })
-        setEntries(prev => [{ id: String(row?.entry_id || row?.id || Date.now()), created_at: String(row?.created_at || new Date().toISOString()), food_name: String(row?.food_name || 'Refeição'), calories: safeNumber(row?.calories), protein: safeNumber(row?.protein), carbs: safeNumber(row?.carbs), fat: safeNumber(row?.fat) }, ...(Array.isArray(prev) ? prev : [])].slice(0, 30))
+        setEntries(prev => [{ id: String(row?.entry_id || row?.id || Date.now()), created_at: String(row?.created_at || new Date().toISOString()), food_name: String(row?.food_name || 'Refeição'), calories: safeNumber(row?.calories), protein: safeNumber(row?.protein), carbs: safeNumber(row?.carbs), fat: safeNumber(row?.fat), items: parseItems(row?.items) }, ...(Array.isArray(prev) ? prev : [])].slice(0, 30))
       }
       setInput(''); setMealName(''); try { inputRef.current?.focus() } catch {}
     } catch (e: unknown) { setError(getErrorMessage(e) || 'Falha ao estimar com IA.') }
@@ -444,7 +464,7 @@ export default function NutritionMixer({
           const e = entry as Record<string, unknown>
           const nt = { calories: safeNumber(e?.totals_calories), protein: safeNumber(e?.totals_protein), carbs: safeNumber(e?.totals_carbs), fat: safeNumber(e?.totals_fat) }
           if (nt.calories || nt.protein || nt.carbs || nt.fat) setTotals(nt)
-          setEntries(prev => [{ id: String(e?.entry_id || e?.id || Date.now()), created_at: String(e?.created_at || new Date().toISOString()), food_name: String(e?.food_name || meal.foodName || 'Produto'), calories: safeNumber(e?.calories ?? meal.calories), protein: safeNumber(e?.protein ?? meal.protein), carbs: safeNumber(e?.carbs ?? meal.carbs), fat: safeNumber(e?.fat ?? meal.fat) }, ...(Array.isArray(prev) ? prev : [])].slice(0, 30))
+          setEntries(prev => [{ id: String(e?.entry_id || e?.id || Date.now()), created_at: String(e?.created_at || new Date().toISOString()), food_name: String(e?.food_name || meal.foodName || 'Produto'), calories: safeNumber(e?.calories ?? meal.calories), protein: safeNumber(e?.protein ?? meal.protein), carbs: safeNumber(e?.carbs ?? meal.carbs), fat: safeNumber(e?.fat ?? meal.fat), items: parseItems(e?.items) }, ...(Array.isArray(prev) ? prev : [])].slice(0, 30))
         } else {
           setTotals(prev => ({ calories: safeNumber(prev?.calories) + safeNumber(meal.calories), protein: safeNumber(prev?.protein) + safeNumber(meal.protein), carbs: safeNumber(prev?.carbs) + safeNumber(meal.carbs), fat: safeNumber(prev?.fat) + safeNumber(meal.fat) }))
           setEntriesTick(v => v + 1)

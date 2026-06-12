@@ -118,7 +118,16 @@ export interface MealLog {
   fat: number
 }
 
-export async function trackMeal(userId: string, meal: MealLog, dateKey?: string): Promise<Record<string, unknown> | null> {
+export type MealItem = {
+  label: string
+  grams: number
+  calories: number
+  protein: number
+  carbs: number
+  fat: number
+}
+
+export async function trackMeal(userId: string, meal: MealLog, dateKey?: string, items?: MealItem[] | null): Promise<Record<string, unknown> | null> {
   try {
     const safeUserId = typeof userId === 'string' ? userId.trim() : ''
     if (!safeUserId) throw new Error('nutrition_invalid_user_id')
@@ -145,6 +154,19 @@ export async function trackMeal(userId: string, meal: MealLog, dateKey?: string)
     const { createClient } = await import('../../utils/supabase/server')
     const supabase = await createClient()
 
+    // Breakdown por item (nome + gramas + macros), salvo em `items` (jsonb) para
+    // o card expandido mostrar os alimentos. Null quando não há detalhamento.
+    const safeItems = Array.isArray(items) && items.length > 0
+      ? items.map((it) => ({
+          label: String(it?.label ?? '').slice(0, 120),
+          grams: Math.max(0, Math.round(Number(it?.grams) || 0)),
+          calories: Math.max(0, Math.round(Number(it?.calories) || 0)),
+          protein: Math.max(0, Math.round(Number(it?.protein) || 0)),
+          carbs: Math.max(0, Math.round(Number(it?.carbs) || 0)),
+          fat: Math.max(0, Math.round(Number(it?.fat) || 0)),
+        }))
+      : null
+
     // 1. Insert the meal entry directly (bypassing broken RPC)
     const { data: insertedEntry, error: insertError } = await supabase
       .from('nutrition_meal_entries')
@@ -156,8 +178,9 @@ export async function trackMeal(userId: string, meal: MealLog, dateKey?: string)
         protein,
         carbs,
         fat,
+        items: safeItems,
       })
-      .select('id, created_at, food_name, calories, protein, carbs, fat')
+      .select('id, created_at, food_name, calories, protein, carbs, fat, items')
       .single()
 
     if (insertError) throw new Error(insertError.message || 'nutrition_insert_entry_failed')
@@ -208,6 +231,7 @@ export async function trackMeal(userId: string, meal: MealLog, dateKey?: string)
       protein,
       carbs,
       fat,
+      items: insertedEntry?.items ?? safeItems,
       totals_calories: Math.round(totalCalories),
       totals_protein: Math.round(totalProtein),
       totals_carbs: Math.round(totalCarbs),

@@ -2,6 +2,8 @@
 
 import { memo } from 'react'
 
+type MealItemView = { label: string; grams: number; calories: number; protein: number; carbs: number; fat: number }
+
 type MealEntry = {
   id: string
   created_at: string
@@ -10,6 +12,7 @@ type MealEntry = {
   protein: number
   carbs: number
   fat: number
+  items?: MealItemView[] | null
 }
 
 type EditDraft = {
@@ -126,6 +129,24 @@ function NutritionEntryCard({
               <div className="text-[10px] text-neutral-400">{fatPct}%</div>
             </div>
           </div>
+
+          {/* Alimentos da refeição (breakdown por item) */}
+          {Array.isArray(item.items) && item.items.length > 0 && (
+            <div className="mt-3">
+              <div className="text-[10px] uppercase tracking-[0.18em] text-neutral-400 font-semibold mb-1.5">Alimentos</div>
+              <ul className="space-y-1">
+                {item.items.map((food, i) => (
+                  <li key={`${food.label}-${i}`} className="flex items-baseline justify-between gap-2 text-xs">
+                    <span className="min-w-0 truncate text-neutral-200">{food.label}</span>
+                    <span className="shrink-0 whitespace-nowrap text-neutral-400">
+                      <span className="font-semibold text-neutral-100">{Math.round(food.calories)}</span> kcal
+                      <span className="ml-2 text-[10px] text-neutral-500">P{Math.round(food.protein)} C{Math.round(food.carbs)} G{Math.round(food.fat)}</span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           {/* Inline edit form */}
           {editingId === item.id ? (
