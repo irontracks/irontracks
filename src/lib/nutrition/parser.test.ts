@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseInput } from './parser'
+import { parseInput, analyzeMeal } from './parser'
 
 describe('parseInput', () => {
   // ── Basic parsing ────────────────────────────────────────────
@@ -148,5 +148,44 @@ describe('parseInput', () => {
     const result = parseInput('100g ovo cozido; 100g frango')
     expect(result.calories).toBeGreaterThan(0)
     expect(result.protein).toBeGreaterThan(30) // ovo + frango both high protein
+  })
+
+  // ── Comma separator (comma + space splits; decimal comma stays) ──────────
+  it('splits items on "comma + space"', () => {
+    const combined = parseInput('200g arroz cozido, 200g frango')
+    const arroz = parseInput('200g arroz cozido')
+    const frango = parseInput('200g frango')
+    expect(combined.calories).toBe(arroz.calories + frango.calories)
+    expect(combined.protein).toBe(arroz.protein + frango.protein)
+  })
+
+  it('does not split a decimal written with a comma (e.g. "1,5 colher")', () => {
+    // A comma NOT followed by a space (the decimal in "1,5") must not break the
+    // line into two items — it stays a single recognized food entry.
+    const a = analyzeMeal('1,5 colher arroz cozido')
+    expect(a.items).toHaveLength(1)
+    expect(a.unknownLines).toHaveLength(0)
+  })
+})
+
+describe('analyzeMeal', () => {
+  it('returns per-item breakdown plus totals without throwing', () => {
+    const a = analyzeMeal('200g arroz cozido, 200g frango')
+    expect(a.items).toHaveLength(2)
+    expect(a.unknownLines).toHaveLength(0)
+    expect(a.meal.calories).toBe(a.items[0]!.calories + a.items[1]!.calories)
+  })
+
+  it('reports unknown lines instead of throwing, keeping known partial totals', () => {
+    const a = analyzeMeal('200g arroz cozido, 100g zorgblatt')
+    expect(a.items).toHaveLength(1)
+    expect(a.items[0]!.calories).toBeGreaterThan(0)
+    expect(a.unknownLines).toContain('100g zorgblatt')
+  })
+
+  it('returns an empty analysis for blank input', () => {
+    const a = analyzeMeal('   ')
+    expect(a.items).toHaveLength(0)
+    expect(a.meal.calories).toBe(0)
   })
 })
