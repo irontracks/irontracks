@@ -494,11 +494,15 @@ export default function NutritionMixer({
               </div>
             )}
 
-            {/* Workout burn */}
+            {/* Gasto do treino — informativo apenas. NÃO entra na meta de propósito:
+                "comer de volta" um gasto estimado sabota o déficit do cutting. */}
             {safeNumber(workoutCaloriesToday) > 0 && (
-              <div className="flex items-center gap-3 mt-1">
-                <span className="text-[10px] text-orange-400">🔥 -{Math.round(safeNumber(workoutCaloriesToday))} kcal treino</span>
-                <span className="text-[10px] text-blue-400">⚖ {Math.round(safeNumber(totals?.calories) - safeNumber(workoutCaloriesToday))} líquido</span>
+              <div className="mt-1.5 inline-flex items-center gap-1.5 rounded-lg border border-orange-500/15 bg-orange-500/[0.06] px-2 py-1">
+                <span className="text-[11px] leading-none">🔥</span>
+                <span className="text-[10px] leading-tight text-orange-300">
+                  Treino hoje: <span className="font-semibold">~{Math.round(safeNumber(workoutCaloriesToday))} kcal</span>
+                  <span className="text-neutral-500"> · estimativa, não muda a meta</span>
+                </span>
               </div>
             )}
           </div>
