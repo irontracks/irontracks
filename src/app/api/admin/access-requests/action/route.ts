@@ -5,7 +5,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { requireRoleOrBearer } from '@/utils/auth/route'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { logError, logWarn } from '@/lib/logger'
-import { safePgLike } from '@/utils/safePgFilter'
+import { safeEmailLike } from '@/utils/safePgFilter'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { cacheDeletePattern } from '@/utils/cache'
 import { env } from '@/utils/env'
@@ -154,7 +154,7 @@ export async function POST(req: Request) {
       const { data: profile } = await admin
         .from('profiles')
         .select('id, role, is_approved')
-        .ilike('email', safePgLike(email))
+        .ilike('email', safeEmailLike(email))
         .maybeSingle()
 
       if (profile?.id && profile.is_approved !== true) {
@@ -172,7 +172,7 @@ export async function POST(req: Request) {
           })
           await admin.from('profiles').delete().eq('id', profile.id)
           await admin.auth.admin.deleteUser(profile.id)
-          await admin.from('students').update({ user_id: null }).ilike('email', safePgLike(email))
+          await admin.from('students').update({ user_id: null }).ilike('email', safeEmailLike(email))
         }
       }
 

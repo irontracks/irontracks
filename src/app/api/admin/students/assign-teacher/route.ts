@@ -4,7 +4,7 @@ import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { requireRoleOrBearer } from '@/utils/auth/route'
 import { getErrorMessage } from '@/utils/errorMessage'
-import { safePgLike } from '@/utils/safePgFilter'
+import { safeEmailLike } from '@/utils/safePgFilter'
 import { resolveStudentRow } from '@/utils/admin/resolveStudent'
 
 export const dynamic = 'force-dynamic'
@@ -38,7 +38,7 @@ export async function POST(req: Request) {
 
     // Resolve teacher_user_id from teacher_email via profiles (auth uid)
     if (!teacher_user_id && teacher_email) {
-      const { data: tProfile } = await admin.from('profiles').select('id').ilike('email', safePgLike(teacher_email)).maybeSingle()
+      const { data: tProfile } = await admin.from('profiles').select('id').ilike('email', safeEmailLike(teacher_email)).maybeSingle()
       teacher_user_id = tProfile?.id || null
     }
     if (!teacher_user_id && String(teacher_email || '').trim()) {
@@ -51,7 +51,7 @@ export async function POST(req: Request) {
       // Best-effort: ensure a row exists in teachers by email if available (do not fail if missing)
       const { data: p } = await admin.from('profiles').select('display_name, email').eq('id', teacher_user_id).maybeSingle()
       if (p?.email) {
-        const { data: existing } = await admin.from('teachers').select('id').ilike('email', safePgLike(p.email)).maybeSingle()
+        const { data: existing } = await admin.from('teachers').select('id').ilike('email', safeEmailLike(p.email)).maybeSingle()
         if (!existing) {
           await admin.from('teachers').insert({ email: p.email, name: p.display_name || null, status: 'active' })
         }

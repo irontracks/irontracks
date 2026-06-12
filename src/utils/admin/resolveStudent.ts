@@ -35,7 +35,7 @@
  * - Returns `null` only if every avenue is exhausted (truly invalid input).
  */
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { safePgLike } from '@/utils/safePgFilter'
+import { safeEmailLike } from '@/utils/safePgFilter'
 
 export interface ResolvedStudent {
     id: string
@@ -109,7 +109,7 @@ export async function resolveStudentRow(
 
     const fetchByEmail = async (value: string) => {
         if (!value) return null
-        const { data } = await admin.from('students').select(SELECT_COLS).ilike('email', safePgLike(value)).maybeSingle()
+        const { data } = await admin.from('students').select(SELECT_COLS).ilike('email', safeEmailLike(value)).maybeSingle()
         return (data as Record<string, unknown> | null) ?? null
     }
 
@@ -151,7 +151,7 @@ export async function resolveStudentRow(
         const { data } = await admin
             .from('profiles')
             .select('id, email, display_name')
-            .ilike('email', safePgLike(email))
+            .ilike('email', safeEmailLike(email))
             .maybeSingle()
         profile = (data as ProfileRow | null) ?? null
     }

@@ -33,7 +33,7 @@ import {
 import { tryAutoPair } from '@/utils/calculations/assessmentPairing';
 import { getErrorMessage } from '@/utils/errorMessage';
 import { logError } from '@/lib/logger'
-import { safePg, safePgLike } from '@/utils/safePgFilter'
+import { safePg, safeEmailLike } from '@/utils/safePgFilter'
 
 interface UseAssessmentReturn {
   // Estado
@@ -177,7 +177,7 @@ export const useAssessment = (): UseAssessmentReturn => {
           const { data: profileByEmail, error: profileByEmailError } = await supabase
             .from('profiles')
             .select('id')
-            .ilike('email', safePgLike(studentById.email))
+            .ilike('email', safeEmailLike(studentById.email))
             .maybeSingle();
 
           if (profileByEmailError) {
