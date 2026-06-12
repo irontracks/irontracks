@@ -1,7 +1,6 @@
 import { SupabaseClient } from '@supabase/supabase-js'
 import { logError, logWarn } from '@/lib/logger'
 import { getWeeklyResetStart } from './weekReset'
-import { safePg } from '@/utils/safePgFilter'
 
 export type VipTierLimits = {
   chat_daily: number
@@ -179,7 +178,11 @@ export async function getVipPlanLimits(supabase: SupabaseClient, userId: string)
     .eq('user_id', userId)
     .in('status', ['active', 'trialing', 'past_due'])
     .lte('valid_from', nowIso)
-    .or(`valid_until.is.null,valid_until.gte.${safePg(nowIso)}`)
+    // nowIso vem de new Date().toISOString() (valor do servidor, não input do
+    // usuário) — NÃO passar por safePg: ele remove o ponto dos milissegundos
+    // ("…20.616Z" → "…20616Z"), o que estoura "date/time out of range" no
+    // PostgREST, a query falha e o usuário cai no fallback legacy (plano errado).
+    .or(`valid_until.is.null,valid_until.gte.${nowIso}`)
     .order('valid_until', { ascending: false, nullsFirst: true })
     .order('created_at', { ascending: false })
     .limit(1)
