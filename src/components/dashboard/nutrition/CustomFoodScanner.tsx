@@ -6,7 +6,10 @@
  * values, add a name and aliases, then save to their custom food library.
  */
 import { useState, useRef, useCallback, memo } from 'react'
+import dynamic from 'next/dynamic'
 import type { CustomFoodDraft } from './useCustomFoods'
+
+const BarcodeScanner = dynamic(() => import('./BarcodeScanner'), { ssr: false })
 
 interface ScannedLabel {
   productName: string
@@ -64,6 +67,8 @@ const CustomFoodScanner = memo(function CustomFoodScanner({ saving, onSave, onCl
   const [name, setName] = useState('')
   const [aliasInput, setAliasInput] = useState('')
   const [aliases, setAliases] = useState<string[]>([])
+  const [barcode, setBarcode] = useState(initialBarcode ?? '')
+  const [barcodeScannerOpen, setBarcodeScannerOpen] = useState(false)
 
   const handleFile = useCallback(async (file: File) => {
     setScanning(true)
@@ -122,14 +127,14 @@ const CustomFoodScanner = memo(function CustomFoodScanner({ saving, onSave, onCl
       fat_per100g: label.fatPer100g,
       fiber_per100g: label.fiberPer100g,
       label_image_url: null, // future: upload to Supabase Storage
-      barcode: initialBarcode ?? null,
+      barcode: barcode.trim() || null,
     })
     if (result.ok) {
       onClose()
     } else {
       setSaveError(result.error || 'Erro ao salvar')
     }
-  }, [label, name, aliases, onSave, onClose, initialBarcode])
+  }, [label, name, aliases, onSave, onClose, barcode])
 
   const setField = useCallback((field: keyof ScannedLabel, val: number) => {
     setLabel(prev => prev ? { ...prev, [field]: val } : null)
@@ -220,6 +225,26 @@ const CustomFoodScanner = memo(function CustomFoodScanner({ saving, onSave, onCl
             />
           </div>
 
+          {/* Código de barras (opcional) */}
+          <div className="flex flex-col gap-1">
+            <label htmlFor="custom-food-barcode" className="text-[10px] uppercase tracking-widest text-neutral-400">Código de barras (opcional)</label>
+            <div className="flex gap-2">
+              <input
+                id="custom-food-barcode"
+                aria-label="Código de barras"
+                inputMode="numeric"
+                value={barcode}
+                onChange={e => setBarcode(e.target.value.replace(/[^0-9]/g, ''))}
+                placeholder="Escaneie ou digite o código"
+                className="flex-1 rounded-xl bg-neutral-900 border border-neutral-700 px-3 py-2 text-sm text-white placeholder-neutral-600 font-mono tracking-wider focus:outline-none focus:border-yellow-500/60"
+              />
+              <button type="button" onClick={() => setBarcodeScannerOpen(true)} className="rounded-xl bg-neutral-800 border border-neutral-700 px-3 py-2 text-xs font-semibold text-neutral-200 hover:bg-neutral-700 transition whitespace-nowrap">
+                📷 Ler código
+              </button>
+            </div>
+            <span className="text-[10px] text-neutral-500">Vincula o produto ao código pra reconhecer na próxima leitura.</span>
+          </div>
+
           {/* Aliases */}
           <div className="flex flex-col gap-2">
             <label htmlFor="custom-food-alias" className="text-[10px] uppercase tracking-widest text-neutral-400">Apelidos (para reconhecimento rápido)</label>
@@ -284,6 +309,13 @@ const CustomFoodScanner = memo(function CustomFoodScanner({ saving, onSave, onCl
             {saving ? 'Salvando...' : '✅ Salvar na minha biblioteca'}
           </button>
         </div>
+      )}
+
+      {barcodeScannerOpen && (
+        <BarcodeScanner
+          onResult={(ean) => { setBarcode(String(ean || '').replace(/[^0-9]/g, '')); setBarcodeScannerOpen(false) }}
+          onClose={() => setBarcodeScannerOpen(false)}
+        />
       )}
     </div>
   )
