@@ -8,7 +8,7 @@ import { useAdminPanel } from './AdminPanelContext';
 import { useDialog } from '@/contexts/DialogContext';
 import type { UnknownRecord } from '@/types/app';
 import { apiAdmin } from '@/lib/api';
-import { safePgLike } from '@/utils/safePgFilter';
+import { safeEmailLike } from '@/utils/safePgFilter';
 
 const WorkoutWizardModal = dynamic(
     () => import('@/components/dashboard/WorkoutWizardModal'),
@@ -228,7 +228,7 @@ export const StudentWorkoutsTab: React.FC = () => {
                             const payloadEmail = String(selectedStudent.email || '').trim();
                             if (!payloadId && payloadEmail) {
                                 try {
-                                    const { data: profile } = await supabase.from('profiles').select('id').ilike('email', safePgLike(payloadEmail)).maybeSingle();
+                                    const { data: profile } = await supabase.from('profiles').select('id').ilike('email', safeEmailLike(payloadEmail)).maybeSingle();
                                     if (profile?.id) payloadId = String(profile.id);
                                 } catch { }
                             }

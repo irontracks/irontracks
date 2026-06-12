@@ -5,7 +5,7 @@ import type { AdminUser, AdminTeacher, AdminWorkoutTemplate } from '@/types/admi
 import type { UnknownRecord } from '@/types/app'
 import type { WorkoutExercise } from '@/types/workout'
 import { adminFetchJson } from '@/utils/admin/adminFetch'
-import { safePg, safePgLike } from '@/utils/safePgFilter'
+import { safePg, safeEmailLike } from '@/utils/safePgFilter'
 import { workoutTitleKey, normalizeWorkoutTitle } from '@/utils/workoutTitle'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { apiAdmin, apiWorkouts } from '@/lib/api'
@@ -531,7 +531,7 @@ export function useAdminDataFetchers(deps: AdminDataFetchersDeps) {
                 const { data: profile } = await supabase
                     .from('profiles')
                     .select('id')
-                    .ilike('email', safePgLike(String(student.email)))
+                    .ilike('email', safeEmailLike(String(student.email)))
                     .maybeSingle();
                 targetUserId = profile?.id || targetUserId;
             }
