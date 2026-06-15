@@ -37,22 +37,55 @@
     }
   };
 
-  // Limpa caches do Service Worker e o desregistra. É exatamente o que
-  // "deletar e reinstalar o app" faz — remove o app-shell / chunks STALE que
-  // um SW antigo serve e que causam ChunkLoadError em loop após um deploy.
-  const purge = async () => {
+  // Limpa SÓ o cache de runtime do app — é onde o SW guarda o app-shell
+  // (navegações) e os bundles JS/CSS, ou seja, exatamente o conteúdo STALE que
+  // causa o ChunkLoadError em loop após um deploy. O cache "static" (página
+  // /offline, manifest, ícone) é PRESERVADO de propósito: sem ele o offline
+  // ficaria sem fallback. Caches de terceiros também são preservados.
+  const clearRuntimeCaches = async () => {
     try {
       if (window.caches && caches.keys) {
         const keys = await caches.keys();
-        await Promise.all(keys.map((k) => caches.delete(k).catch(() => {})));
+        await Promise.all(
+          keys.map((k) => {
+            const name = String(k || "");
+            if (name.startsWith("irontracks") && name.includes("-runtime-")) {
+              return caches.delete(k).catch(() => {});
+            }
+            return Promise.resolve();
+          }),
+        );
       }
     } catch {}
+  };
+
+  // Atualiza o SW NO LUGAR em vez de desregistrar: r.update() re-busca o
+  // /sw.js (servido no-store) e, se o script mudou, instala o novo SW
+  // (network-first) e assume o controle (skipWaiting + clients.claim). Assim um
+  // SW antigo cache-first — a real causa do loop — é trocado pelo correto SEM o
+  // offline jamais ficar sem Service Worker. Só desregistra como último recurso,
+  // quando o update falha (registro realmente quebrado, sem serventia).
+  const refreshServiceWorker = async () => {
     try {
-      if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
-        const regs = await navigator.serviceWorker.getRegistrations();
-        await Promise.all(regs.map((r) => r.unregister().catch(() => {})));
-      }
+      if (!navigator.serviceWorker || !navigator.serviceWorker.getRegistrations) return;
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(
+        regs.map(async (r) => {
+          try {
+            if (r.update) await r.update();
+          } catch {
+            try { await r.unregister(); } catch {}
+          }
+        }),
+      );
     } catch {}
+  };
+
+  // Recuperação não-destrutiva pro offline: descarta o shell/bundles stale e
+  // renova o SW, mantendo a página /offline e o registro do SW vivos.
+  const purge = async () => {
+    await clearRuntimeCaches();
+    await refreshServiceWorker();
   };
 
   // Recuperação de chunk error: PURGA antes de recarregar para o reload buscar
