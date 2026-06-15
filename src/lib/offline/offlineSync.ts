@@ -172,6 +172,16 @@ export const flushOfflineQueue = async ({ max: _max = 50, force = false } = {}) 
         await processUpdateWorkout(j);
       } else if (jobType === 'delete_workout') {
         await processDeleteWorkout(j);
+      } else if (jobType === 'nutrition_log_local') {
+        await processNutritionLogLocal(j);
+      } else if (jobType === 'nutrition_log_ai') {
+        await processNutritionLogAi(j);
+      } else if (jobType === 'nutrition_delete') {
+        await processNutritionDelete(j);
+      } else if (jobType === 'nutrition_edit') {
+        await processNutritionEdit(j);
+      } else if (jobType === 'nutrition_water') {
+        await processNutritionWater(j);
       } else {
         // Unknown job type — do NOT delete. Log and skip.
         logWarn('offlineSync: unknown job type, skipping:', j.type, j.id);
@@ -343,6 +353,135 @@ export const queueDeleteWorkout = async (payload: Record<string, unknown>) => {
     createdAt: new Date().toISOString(),
     payload,
     details: (payload.title as string) || 'Excluir Treino',
+    status: 'pending',
+    attempts: 0,
+    maxAttempts: 5,
+    nextAttemptAt: 0,
+  }
+  await queuePut(job)
+  return id
+}
+
+// ─── Nutrition Job Processors ─────────────────────────────────────────────────
+
+/**
+ * POST helper para os jobs de nutrição: 4xx vira erro terminal (a fila marca
+ * `failed` sem retry); 5xx/erro de rede sobe pra retry com backoff.
+ */
+async function postNutritionJob(url: string, payload: unknown) {
+  const response = await fetch(url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload ?? {}),
+  })
+  if (!response.ok) {
+    const text = await response.text()
+    if (response.status >= 400 && response.status < 500) {
+      throw new Error(`Validation error (4xx): ${text}`)
+    }
+    throw new Error(`API error: ${response.status} - ${text}`)
+  }
+}
+
+async function processNutritionLogLocal(job: OfflineJob) {
+  await postNutritionJob('/api/nutrition/log-entry', job.payload)
+}
+
+async function processNutritionLogAi(job: OfflineJob) {
+  // Alimento fora da base local: a estimativa por IA roda no servidor (online),
+  // que resolve os macros, persiste e aprende o alimento pra próxima vez.
+  await postNutritionJob('/api/ai/nutrition-estimate', job.payload)
+}
+
+async function processNutritionDelete(job: OfflineJob) {
+  await postNutritionJob('/api/nutrition/delete-entry', job.payload)
+}
+
+async function processNutritionEdit(job: OfflineJob) {
+  await postNutritionJob('/api/nutrition/edit-entry', job.payload)
+}
+
+async function processNutritionWater(job: OfflineJob) {
+  await postNutritionJob('/api/nutrition/water', job.payload)
+}
+
+// ─── Nutrition Queue Helpers ──────────────────────────────────────────────────
+
+/**
+ * Enfileira um lançamento de refeição feito offline. Usa o `clientId` (uuid
+ * otimista da UI) COMO id do job — assim cancelar um lançamento ainda-pendente
+ * é só `queueDelete(clientId)`. `needsAi=true` quando o parser local não
+ * reconheceu o alimento e os macros só serão calculados na sincronização.
+ */
+export const queueNutritionLog = async (
+  clientId: string,
+  payload: Record<string, unknown>,
+  needsAi: boolean,
+) => {
+  const id = String(clientId || '').trim()
+  if (!id) return ''
+  const job: OfflineJob = {
+    id,
+    type: needsAi ? 'nutrition_log_ai' : 'nutrition_log_local',
+    createdAt: new Date().toISOString(),
+    payload,
+    details: String(payload.foodName || payload.text || 'Refeição'),
+    status: 'pending',
+    attempts: 0,
+    maxAttempts: 5,
+    nextAttemptAt: 0,
+  }
+  await queuePut(job)
+  return id
+}
+
+export const queueNutritionDelete = async (payload: Record<string, unknown>) => {
+  const id = `ndel_${String(payload.entryId || '')}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+  const job: OfflineJob = {
+    id,
+    type: 'nutrition_delete',
+    createdAt: new Date().toISOString(),
+    payload,
+    details: 'Excluir refeição',
+    status: 'pending',
+    attempts: 0,
+    maxAttempts: 5,
+    nextAttemptAt: 0,
+  }
+  await queuePut(job)
+  return id
+}
+
+export const queueNutritionEdit = async (payload: Record<string, unknown>) => {
+  const id = `nedit_${String(payload.entryId || '')}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
+  const job: OfflineJob = {
+    id,
+    type: 'nutrition_edit',
+    createdAt: new Date().toISOString(),
+    payload,
+    details: 'Editar refeição',
+    status: 'pending',
+    attempts: 0,
+    maxAttempts: 5,
+    nextAttemptAt: 0,
+  }
+  await queuePut(job)
+  return id
+}
+
+/**
+ * Água usa id estável por data (`nwater_<dateKey>`) — várias mudanças offline no
+ * mesmo dia colapsam num único job (last-write-wins), sem inflar a fila.
+ */
+export const queueNutritionWater = async (payload: Record<string, unknown>) => {
+  const dateKey = String(payload.dateKey || 'today')
+  const id = `nwater_${dateKey}`
+  const job: OfflineJob = {
+    id,
+    type: 'nutrition_water',
+    createdAt: new Date().toISOString(),
+    payload,
+    details: 'Atualizar água',
     status: 'pending',
     attempts: 0,
     maxAttempts: 5,

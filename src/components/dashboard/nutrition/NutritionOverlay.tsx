@@ -5,6 +5,7 @@ import { createClient } from '@/utils/supabase/client'
 import NutritionMixer from './NutritionMixer'
 import { SkeletonList } from '@/components/ui/Skeleton'
 import { estimateSessionKcal } from '@/utils/calories/sessionKcal'
+import { getNutritionOverlayCache, setNutritionOverlayCache } from '@/lib/offline/nutritionCache'
 
 type Totals = { calories: number; protein: number; carbs: number; fat: number }
 type Gender = 'MALE' | 'FEMALE'
@@ -94,12 +95,45 @@ export default function NutritionOverlay({ onClose: _onClose, canViewMacros }: N
   useEffect(() => {
     let cancelled = false
 
-    const load = async () => {
+    // uid offline-safe: getUser() valida no servidor (falha sem rede); cai pra
+    // getSession() que lê a sessão local. Pro cache offline precisamos do id.
+    const getUid = async (): Promise<string> => {
       try {
-        const { data: auth } = await supabase.auth.getUser()
-        const uid = auth?.user?.id
-        if (!uid || cancelled) return
+        const { data } = await supabase.auth.getUser()
+        if (data?.user?.id) return String(data.user.id)
+      } catch { /* offline → tenta a sessão local */ }
+      try {
+        const { data } = await supabase.auth.getSession()
+        if (data?.session?.user?.id) return String(data.session.user.id)
+      } catch { /* sem sessão legível */ }
+      return ''
+    }
 
+    const serveFromCache = async (uid: string): Promise<boolean> => {
+      const c = await getNutritionOverlayCache(uid, dateKey)
+      if (c && !cancelled) {
+        setData({
+          dateKey,
+          totals: c.totals,
+          goals: c.goals,
+          goalsSource: (c.goalsSource as 'saved' | 'profile' | 'default') || 'default',
+          workoutCalories: safeNumber(c.workoutCalories),
+        })
+        return true
+      }
+      return false
+    }
+
+    const load = async () => {
+      const uid = await getUid()
+      if (!uid || cancelled) return
+
+      // Offline: serve do cache na hora, sem travar nas 4 queries de rede.
+      if (typeof navigator !== 'undefined' && navigator.onLine === false) {
+        if (await serveFromCache(uid)) return
+      }
+
+      try {
         const [totalsRes, goalsRes, settingsRes, sessionsRes] = await Promise.all([
           supabase.from('daily_nutrition_logs').select('calories,protein,carbs,fat').eq('user_id', uid).eq('date', dateKey).maybeSingle(),
           supabase.from('nutrition_goals').select('calories,protein,carbs,fat').eq('user_id', uid).order('updated_at', { ascending: false }).limit(1).maybeSingle(),
@@ -158,8 +192,13 @@ export default function NutritionOverlay({ onClose: _onClose, canViewMacros }: N
           } catch { /* sem JSON de sessão → ignora este treino */ }
         }
 
-        if (!cancelled) setData({ dateKey, totals, goals, goalsSource, workoutCalories })
+        if (!cancelled) {
+          setData({ dateKey, totals, goals, goalsSource, workoutCalories })
+          void setNutritionOverlayCache(uid, dateKey, { totals, goals, goalsSource, workoutCalories })
+        }
       } catch {
+        // Falha (rede/transitória): tenta o cache antes de cair pro estado vazio.
+        if (await serveFromCache(uid)) return
         if (!cancelled) setData({ dateKey, totals: { calories: 0, protein: 0, carbs: 0, fat: 0 }, goals: DEFAULT_GOALS, goalsSource: 'default', workoutCalories: 0 })
       }
     }
