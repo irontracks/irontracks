@@ -8,6 +8,14 @@ import { useIsIosNative } from '@/hooks/useIsIosNative'
 import { createClient } from '@/utils/supabase/client'
 import { getErrorMessage } from '@/utils/errorMessage'
 import dynamic from 'next/dynamic'
+import { queueGetAll, queueDelete as cancelQueuedJob } from '@/lib/offline/idb'
+import { queueNutritionLog, queueNutritionDelete, queueNutritionEdit, queueNutritionWater } from '@/lib/offline/offlineSync'
+import {
+  getNutritionMealsCache,
+  setNutritionMealsCache,
+  setCustomFoodsCache,
+  getCustomFoodsCache,
+} from '@/lib/offline/nutritionCache'
 
 // ── Lazy sub-components ────────────────────────────────────────────────────────
 const NutritionDayScore = dynamic(() => import('./NutritionDayScore'), { ssr: false })
@@ -22,7 +30,7 @@ const NutritionWorkoutCorrelation = dynamic(() => import('./NutritionWorkoutCorr
 const BarcodeScanner = dynamic(() => import('./BarcodeScanner'), { ssr: false })
 
 // ── Hooks ──────────────────────────────────────────────────────────────────────
-import { useCustomFoods, customFoodsToExtraFoods } from './useCustomFoods'
+import { useCustomFoods, customFoodsToExtraFoods, type CustomFood } from './useCustomFoods'
 
 type Totals = { calories: number; protein: number; carbs: number; fat: number }
 
@@ -37,7 +45,15 @@ type MealEntry = {
   carbs: number
   fat: number
   items?: MealItemView[] | null
+  /** Lançado offline e ainda não sincronizado (id = clientId do job na fila). */
+  pending?: boolean
 }
+
+/** Verdadeiro só quando o navegador reporta explicitamente que está offline. */
+const isOffline = () => typeof navigator !== 'undefined' && navigator.onLine === false
+
+/** id otimista de uma entry lançada offline; vira o id do job na fila. */
+const newClientId = () => `co_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 9)}`
 
 function parseItems(raw: unknown): MealItemView[] | null {
   if (!Array.isArray(raw) || raw.length === 0) return null
@@ -60,6 +76,19 @@ const PERCENT_SCALE = 100
 function safeNumber(value: unknown): number {
   const n = Number(value)
   return Number.isFinite(n) ? n : 0
+}
+
+/** Soma os macros de uma lista de entries (usado pro estado otimista offline). */
+function sumTotals(list: MealEntry[]): Totals {
+  return (Array.isArray(list) ? list : []).reduce(
+    (a, e) => ({
+      calories: a.calories + safeNumber(e?.calories),
+      protein: a.protein + safeNumber(e?.protein),
+      carbs: a.carbs + safeNumber(e?.carbs),
+      fat: a.fat + safeNumber(e?.fat),
+    }),
+    { calories: 0, protein: 0, carbs: 0, fat: 0 },
+  )
 }
 
 function clamp01(n: number) {
@@ -181,9 +210,19 @@ export default function NutritionMixer({
   // ── Auth ──────────────────────────────────────────────────────────────────
   const [userId, setUserId] = useState<string | undefined>()
   useEffect(() => {
-    supabase.auth.getUser().then(({ data }) => {
-      if (data?.user?.id) setUserId(data.user.id)
-    }).catch(() => {})
+    let cancelled = false
+    ;(async () => {
+      // getUser() valida no servidor (falha offline) → cai pra getSession() local.
+      try {
+        const { data } = await supabase.auth.getUser()
+        if (data?.user?.id) { if (!cancelled) setUserId(data.user.id); return }
+      } catch { /* offline → sessão local */ }
+      try {
+        const { data } = await supabase.auth.getSession()
+        if (data?.session?.user?.id && !cancelled) setUserId(data.session.user.id)
+      } catch { /* sem sessão legível */ }
+    })()
+    return () => { cancelled = true }
   }, [supabase])
 
   // ── Core state ────────────────────────────────────────────────────────────
@@ -207,6 +246,8 @@ export default function NutritionMixer({
   }), [goalsState?.calories, goalsState?.protein, goalsState?.carbs, goalsState?.fat])
 
   const [entries, setEntries] = useState<MealEntry[]>([])
+  const entriesRef = useRef<MealEntry[]>([])
+  useEffect(() => { entriesRef.current = entries }, [entries])
   const [input, setInput] = useState('')
   const [mealName, setMealName] = useState('')
   const [error, setError] = useState<string | null>(null)
@@ -219,6 +260,9 @@ export default function NutritionMixer({
   const [aiBusy, setAiBusy] = useState(false)
   const [aiUpgrade, setAiUpgrade] = useState(false)
   const [waterMl, setWaterMl] = useState(0)
+  // Biblioteca (custom foods) vinda do cache, pro parser reconhecer alimentos
+  // salvos quando offline (o hook useCustomFoods busca do Supabase e falha sem rede).
+  const [cachedCustomFoods, setCachedCustomFoods] = useState<CustomFood[]>([])
 
   // Entry detail state
   const [expandedEntryId, setExpandedEntryId] = useState<string | null>(null)
@@ -255,6 +299,41 @@ export default function NutritionMixer({
   // ── Hooks ────────────────────────────────────────────────────────────────
   const { foods: customFoods, loading: customFoodsLoading, saving: scannerSaving, saveFood: scannerSaveFood, updateFood: updateCustomFood, deleteFood: deleteCustomFood } = useCustomFoods(userId)
 
+  // Espelha a biblioteca no cache quando ela carrega (online); quando vier vazia
+  // (offline), restaura do cache pro parser reconhecer os alimentos salvos.
+  useEffect(() => {
+    const uid = userId ? String(userId) : ''
+    if (!uid) return
+    if (Array.isArray(customFoods) && customFoods.length > 0) {
+      void setCustomFoodsCache(uid, customFoods)
+    } else {
+      let cancelled = false
+      getCustomFoodsCache(uid).then((f) => { if (!cancelled && f.length) setCachedCustomFoods(f as unknown as CustomFood[]) })
+      return () => { cancelled = true }
+    }
+  }, [userId, customFoods])
+
+  // Base efetiva do parser: a biblioteca online quando disponível, senão o cache.
+  const effectiveCustomFoods = useMemo(
+    () => (Array.isArray(customFoods) && customFoods.length > 0 ? customFoods : cachedCustomFoods),
+    [customFoods, cachedCustomFoods],
+  )
+
+  // Escreve o cache de leitura (entries + água) do dia visível. Chamado SÓ em
+  // pontos com dado autoritativo (fetch ok / mutação otimista) — nunca no estado
+  // vazio transitório de troca de data, pra não clobberar o cache.
+  const cacheDay = useCallback(
+    (nextEntries: MealEntry[], waterOverride?: number) => {
+      const uid = userId ? String(userId) : ''
+      if (!uid || schemaMissing) return
+      void setNutritionMealsCache(uid, currentDateKey, {
+        entries: Array.isArray(nextEntries) ? nextEntries : [],
+        water_ml: waterOverride !== undefined ? safeNumber(waterOverride) : safeNumber(waterMl),
+      })
+    },
+    [userId, schemaMissing, currentDateKey, waterMl],
+  )
+
   // ── Derived ──────────────────────────────────────────────────────────────
   const safeEntries = Array.isArray(entries) ? entries : []
   const calorieRatio = safeGoals.calories > 0 ? safeNumber(totals?.calories) / safeGoals.calories : 0
@@ -269,14 +348,14 @@ export default function NutritionMixer({
     const text = input.trim()
     if (!text) return null
     try {
-      const extra = customFoodsToExtraFoods(Array.isArray(customFoods) ? customFoods : [])
+      const extra = customFoodsToExtraFoods(Array.isArray(effectiveCustomFoods) ? effectiveCustomFoods : [])
       const a = analyzeMeal(input, extra)
       if (a.items.length === 0) return a.unknownLines.length > 0 ? a : null
       return a
     } catch {
       return null
     }
-  }, [input, customFoods])
+  }, [input, effectiveCustomFoods])
 
   // Impacto da simulação na meta de calorias do dia (consumido + preview).
   const previewImpact = useMemo(() => {
@@ -316,7 +395,26 @@ export default function NutritionMixer({
   useEffect(() => {
     if (schemaMissing) { setEntries([]); return }
     let cancelled = false
+    const uid = userId ? String(userId) : ''
+
+    const serveFromCache = async (): Promise<boolean> => {
+      if (!uid) return false
+      const c = await getNutritionMealsCache(uid, currentDateKey)
+      if (!c || cancelled) return false
+      const cached = Array.isArray(c.entries) ? (c.entries as MealEntry[]) : []
+      setEntries(cached)
+      setTotals(sumTotals(cached))
+      return true
+    }
+
     ;(async () => {
+      // Offline → serve do cache na hora (inclui os lançamentos pendentes).
+      if (isOffline()) {
+        setEntriesLoading(true); setEntriesError('')
+        await serveFromCache()
+        if (!cancelled) setEntriesLoading(false)
+        return
+      }
       try {
         setEntriesLoading(true); setEntriesError('')
         const { data, error } = await supabase
@@ -336,34 +434,117 @@ export default function NutritionMixer({
             items: parseItems(r?.items),
           }))
           .filter((r: MealEntry) => Boolean(r.id))
-        setEntries(mapped)
-        if (mapped.length > 0) {
-          setTotals(mapped.reduce((a, e) => ({ calories: a.calories + e.calories, protein: a.protein + e.protein, carbs: a.carbs + e.carbs, fat: a.fat + e.fat }), { calories: 0, protein: 0, carbs: 0, fat: 0 }))
-        }
-      } catch { if (!cancelled) setEntriesError('Falha ao carregar lançamentos.') }
+
+        // Reconciliação: preserva os lançamentos pendentes cujo job AINDA está na
+        // fila (não sincronizou). Quando o job some (sincronizou), o item real já
+        // veio em `mapped` e o pendente é descartado. ids de clientId nunca
+        // colidem com os do servidor.
+        let queuedIds = new Set<string>()
+        try {
+          const all = await queueGetAll()
+          queuedIds = new Set((Array.isArray(all) ? all : []).map((j) => String((j as Record<string, unknown>)?.id || '')))
+        } catch { /* sem fila acessível */ }
+        if (cancelled) return
+
+        const stillPending = entriesRef.current.filter((e) => e.pending && queuedIds.has(e.id))
+        const merged = [...stillPending, ...mapped].slice(0, 30)
+        setEntries(merged)
+        setTotals(sumTotals(merged))
+        cacheDay(merged)
+      } catch {
+        // Falha de rede: tenta o cache antes de mostrar erro.
+        if (await serveFromCache()) { if (!cancelled) setEntriesLoading(false); return }
+        if (!cancelled) setEntriesError('Falha ao carregar lançamentos.')
+      }
       finally { if (!cancelled) setEntriesLoading(false) }
     })()
     return () => { cancelled = true }
-  }, [currentDateKey, entriesTick, schemaMissing, supabase])
+  }, [currentDateKey, entriesTick, schemaMissing, supabase, userId, cacheDay])
 
   // Water intake for the day
   useEffect(() => {
     if (schemaMissing) { setWaterMl(0); return }
     let cancelled = false
+    const uid = userId ? String(userId) : ''
     ;(async () => {
+      if (isOffline()) {
+        if (!uid) return
+        const c = await getNutritionMealsCache(uid, currentDateKey)
+        if (!cancelled && c) setWaterMl(safeNumber(c.water_ml))
+        return
+      }
       try {
         const { data } = await supabase.from('daily_nutrition_logs').select('water_ml').eq('date', currentDateKey).maybeSingle()
-        if (!cancelled) setWaterMl(safeNumber((data as Record<string, unknown> | null)?.water_ml))
+        if (cancelled) return
+        const ml = safeNumber((data as Record<string, unknown> | null)?.water_ml)
+        setWaterMl(ml)
+        cacheDay(entriesRef.current, ml)
       } catch { /* ignore */ }
     })()
     return () => { cancelled = true }
-  }, [currentDateKey, entriesTick, schemaMissing, supabase])
+  }, [currentDateKey, entriesTick, schemaMissing, supabase, userId, cacheDay])
+
+  // ── Reconciliação online ──────────────────────────────────────────────────
+  // A fila global (useOfflineSync) sincroniza os jobs ao voltar a rede; aqui só
+  // forçamos refetch do dia visível pra trocar os pendentes pelas entries reais.
+  const hasPending = (Array.isArray(entries) ? entries : []).some((e) => e.pending)
+  useEffect(() => {
+    const onOnline = () => { window.setTimeout(() => setEntriesTick((v) => v + 1), 4000) }
+    window.addEventListener('online', onOnline)
+    return () => window.removeEventListener('online', onOnline)
+  }, [])
+  useEffect(() => {
+    if (!hasPending) return
+    const iv = setInterval(() => { if (!isOffline()) setEntriesTick((v) => v + 1) }, 8000)
+    return () => clearInterval(iv)
+  }, [hasPending])
 
   // ── Actions ──────────────────────────────────────────────────────────────
+  const handleSubmitOffline = (text: string) => {
+    try {
+      const extra = customFoodsToExtraFoods(Array.isArray(effectiveCustomFoods) ? effectiveCustomFoods : [])
+      const a = analyzeMeal(text, extra)
+      const customName = mealName.trim()
+      const cid = newClientId()
+      const resolved = a.items.length > 0 && a.unknownLines.length === 0
+
+      if (resolved) {
+        const foodName = (customName || a.items.map((i) => i.label).join(', ') || 'Refeição').slice(0, 120)
+        const items = a.items.map((it) => ({ label: it.label, grams: it.grams, calories: it.calories, protein: it.protein, carbs: it.carbs, fat: it.fat }))
+        const newEntry: MealEntry = {
+          id: cid, created_at: new Date().toISOString(), food_name: foodName,
+          calories: a.meal.calories, protein: a.meal.protein, carbs: a.meal.carbs, fat: a.meal.fat,
+          items, pending: true,
+        }
+        const next = [newEntry, ...(Array.isArray(entries) ? entries : [])].slice(0, 30)
+        setEntries(next); setTotals(sumTotals(next)); cacheDay(next)
+        void queueNutritionLog(cid, { foodName, calories: a.meal.calories, protein: a.meal.protein, carbs: a.meal.carbs, fat: a.meal.fat, items, dateKey: currentDateKey }, false)
+        setInput(''); setMealName('')
+      } else {
+        // Fora da base local: fica pendente sem macros; a IA calcula no sync.
+        const label = (customName || text).slice(0, 120)
+        const newEntry: MealEntry = {
+          id: cid, created_at: new Date().toISOString(), food_name: label,
+          calories: 0, protein: 0, carbs: 0, fat: 0, items: null, pending: true,
+        }
+        const next = [newEntry, ...(Array.isArray(entries) ? entries : [])].slice(0, 30)
+        setEntries(next); cacheDay(next)
+        void queueNutritionLog(cid, { text, dateKey: currentDateKey, mealName: customName || undefined }, true)
+        setInput(''); setMealName('')
+        setError('Sem internet: vou calcular os macros e salvar quando a conexão voltar.')
+      }
+    } catch (e: unknown) {
+      setError(getErrorMessage(e) || 'Falha ao lançar offline.')
+    }
+  }
+
   const handleSubmit = () => {
     const text = input.trim()
     if (!text) return
     setError(null)
+    // Sem internet: resolve local (ou enfileira pra IA) e otimista. NUNCA chama a
+    // Server Action offline (é RPC de rede).
+    if (isOffline()) { handleSubmitOffline(text); return }
     startTransition(async () => {
       try {
         const customName = mealName.trim()
@@ -379,7 +560,9 @@ export default function NutritionMixer({
           const e = entry as Record<string, unknown>
           const nt = { calories: safeNumber(e?.totals_calories), protein: safeNumber(e?.totals_protein), carbs: safeNumber(e?.totals_carbs), fat: safeNumber(e?.totals_fat) }
           if (nt.calories || nt.protein || nt.carbs || nt.fat) setTotals(nt)
-          setEntries(prev => [{ id: String(e?.entry_id || e?.id || Date.now()), created_at: String(e?.created_at || new Date().toISOString()), food_name: String(e?.food_name || meal.foodName || 'Refeição'), calories: safeNumber(e?.calories ?? meal.calories), protein: safeNumber(e?.protein ?? meal.protein), carbs: safeNumber(e?.carbs ?? meal.carbs), fat: safeNumber(e?.fat ?? meal.fat), items: parseItems(e?.items) }, ...(Array.isArray(prev) ? prev : [])].slice(0, 30))
+          const newEntry: MealEntry = { id: String(e?.entry_id || e?.id || Date.now()), created_at: String(e?.created_at || new Date().toISOString()), food_name: String(e?.food_name || meal.foodName || 'Refeição'), calories: safeNumber(e?.calories ?? meal.calories), protein: safeNumber(e?.protein ?? meal.protein), carbs: safeNumber(e?.carbs ?? meal.carbs), fat: safeNumber(e?.fat ?? meal.fat), items: parseItems(e?.items) }
+          const next = [newEntry, ...(Array.isArray(entries) ? entries : [])].slice(0, 30)
+          setEntries(next); cacheDay(next)
         } else {
           setTotals(prev => ({ calories: safeNumber(prev?.calories) + safeNumber(meal.calories), protein: safeNumber(prev?.protein) + safeNumber(meal.protein), carbs: safeNumber(prev?.carbs) + safeNumber(meal.carbs), fat: safeNumber(prev?.fat) + safeNumber(meal.fat) }))
         }
@@ -391,7 +574,20 @@ export default function NutritionMixer({
 
   const deleteEntry = async (id: string) => {
     if (!id || entryBusyId) return
-    setEntryBusyId(id); setError(null)
+    setError(null)
+
+    if (isOffline()) {
+      const list = Array.isArray(entries) ? entries : []
+      const target = list.find(x => x.id === id)
+      const next = list.filter(x => x.id !== id)
+      setEntries(next); setTotals(sumTotals(next)); cacheDay(next)
+      // Pendente (ainda na fila) → cancela o job de criação; senão enfileira a exclusão.
+      if (target?.pending) void cancelQueuedJob(id)
+      else void queueNutritionDelete({ entryId: id })
+      return
+    }
+
+    setEntryBusyId(id)
     try {
       // Usa a server action (delete + recálculo via supabase-js). A antiga RPC
       // nutrition_delete_meal_entry tem "column reference user_id is ambiguous".
@@ -401,7 +597,8 @@ export default function NutritionMixer({
       if (totals) {
         setTotals({ calories: safeNumber(totals.calories), protein: safeNumber(totals.protein), carbs: safeNumber(totals.carbs), fat: safeNumber(totals.fat) })
       }
-      setEntries(prev => prev.filter(x => x.id !== id))
+      const next = (Array.isArray(entries) ? entries : []).filter(x => x.id !== id)
+      setEntries(next); cacheDay(next)
     } catch (e: unknown) { setError(getErrorMessage(e) || 'Falha ao remover.') }
     finally { setEntryBusyId('') }
   }
@@ -641,7 +838,12 @@ export default function NutritionMixer({
           <WaterTracker
             key={currentDateKey}
             initialMl={waterMl}
-            onUpdate={(ml) => { setWaterMl(ml); void updateWaterAction(ml, currentDateKey) }}
+            onUpdate={(ml) => {
+              setWaterMl(ml)
+              cacheDay(entriesRef.current, ml)
+              if (isOffline()) void queueNutritionWater({ ml, dateKey: currentDateKey })
+              else void updateWaterAction(ml, currentDateKey)
+            }}
           />
         </Card>
       )}
@@ -830,10 +1032,15 @@ export default function NutritionMixer({
             </div>
           ) : (
             safeEntries.map(item => (
-              <NutritionEntryCard
-                key={item.id}
-                item={item}
-                isExpanded={expandedEntryId === item.id}
+              <div key={item.id} className="relative">
+                {item.pending && (
+                  <span className="pointer-events-none absolute right-2 top-2 z-10 rounded-full border border-yellow-500/30 bg-yellow-500/15 px-2 py-0.5 text-[9px] font-semibold uppercase tracking-wider text-yellow-300">
+                    ⏳ pendente
+                  </span>
+                )}
+                <NutritionEntryCard
+                  item={item}
+                  isExpanded={expandedEntryId === item.id}
                 onToggleExpand={(id: string) => setExpandedEntryId(id || null)}
                 editingId={editingEntryId || ''}
                 editDraft={editDraft || { food_name: '', calories: 0, protein: 0, carbs: 0, fat: 0 }}
@@ -842,6 +1049,24 @@ export default function NutritionMixer({
                 onCancelEdit={() => { setEditingEntryId(null); setEditDraft(null) }}
                 onSaveEdit={async () => {
                   if (!editingEntryId || !editDraft) return
+                  if (isOffline()) {
+                    const id = editingEntryId
+                    const draft = editDraft
+                    const list = Array.isArray(entries) ? entries : []
+                    const target = list.find(x => x.id === id)
+                    const next = list.map(x => x.id === id
+                      ? { ...x, food_name: draft.food_name, calories: safeNumber(draft.calories), protein: safeNumber(draft.protein), carbs: safeNumber(draft.carbs), fat: safeNumber(draft.fat) }
+                      : x)
+                    setEntries(next); setTotals(sumTotals(next)); cacheDay(next)
+                    // Pendente → reescreve o job de lançamento (mesmo id); senão enfileira a edição.
+                    if (target?.pending) {
+                      void queueNutritionLog(id, { foodName: draft.food_name, calories: safeNumber(draft.calories), protein: safeNumber(draft.protein), carbs: safeNumber(draft.carbs), fat: safeNumber(draft.fat), items: target?.items ?? null, dateKey: currentDateKey }, false)
+                    } else {
+                      void queueNutritionEdit({ entryId: id, draft })
+                    }
+                    setEditingEntryId(null); setEditDraft(null)
+                    return
+                  }
                   setEditBusy(true)
                   try {
                     const res = await editMealAction(editingEntryId, editDraft)
@@ -858,7 +1083,8 @@ export default function NutritionMixer({
                 onConfirmDelete={(id: string) => setConfirmDeleteId(id)}
                 onCancelDelete={() => setConfirmDeleteId(null)}
                 onDelete={(id: string) => { setConfirmDeleteId(null); deleteEntry(id) }}
-              />
+                />
+              </div>
             ))
           )}
         </div>

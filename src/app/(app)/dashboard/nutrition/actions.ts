@@ -7,6 +7,7 @@ import { resolveFood } from '@/lib/nutrition/food-resolver'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { resolveBarcode } from '@/lib/nutrition/barcode-resolver'
 import { sanitizeFoodName } from '@/lib/nutrition/security'
+import { deleteEntryCore, editEntryCore, setWaterCore, resolveDateKey } from '@/lib/nutrition/mutations'
 import { insertNotifications, shouldThrottleBySenderType } from '@/lib/social/notifyFollowers'
 import { logError } from '@/lib/logger'
 import { waitUntil } from '@vercel/functions'
@@ -72,16 +73,7 @@ export async function logMealAction(mealText: string, dateKey?: string, mealName
     const userId = data?.user?.id
     if (!userId) throw new Error('nutrition_unauthorized')
 
-    const resolvedDateKey = (() => {
-      const s = typeof dateKey === 'string' ? dateKey.trim() : ''
-      if (s && /^\d{4}-\d{2}-\d{2}$/.test(s)) return s
-      try {
-        const tz = 'America/Sao_Paulo'
-        return new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
-      } catch {
-        return new Date().toISOString().slice(0, 10)
-      }
-    })()
+    const resolvedDateKey = resolveDateKey(dateKey)
 
     // Try food-resolver first (local → TACO → learned → OFF)
     const resolved = await resolveFood(supabase, userId, normalizedText)
@@ -127,39 +119,7 @@ export async function deleteMealAction(entryId: string) {
     const userId = authData?.user?.id
     if (!userId) throw new Error('nutrition_unauthorized')
 
-    // Fetch entry to know the date before deleting
-    const { data: entry } = await supabase
-      .from('nutrition_meal_entries')
-      .select('date')
-      .eq('id', id)
-      .eq('user_id', userId)
-      .maybeSingle()
-
-    const { error } = await supabase
-      .from('nutrition_meal_entries')
-      .delete()
-      .eq('id', id)
-      .eq('user_id', userId)
-
-    if (error) throw error
-
-    // Recalculate totals for the date
-    let totals = null
-    if (entry?.date) {
-      const { data: remaining } = await supabase
-        .from('nutrition_meal_entries')
-        .select('calories, protein, carbs, fat')
-        .eq('user_id', userId)
-        .eq('date', entry.date)
-
-      const rows = Array.isArray(remaining) ? remaining : []
-      totals = {
-        calories: rows.reduce((s, r) => s + (Number(r?.calories) || 0), 0),
-        protein: rows.reduce((s, r) => s + (Number(r?.protein) || 0), 0),
-        carbs: rows.reduce((s, r) => s + (Number(r?.carbs) || 0), 0),
-        fat: rows.reduce((s, r) => s + (Number(r?.fat) || 0), 0),
-      }
-    }
+    const { totals } = await deleteEntryCore(supabase, userId, id)
 
     revalidatePath('/dashboard/nutrition')
     return { ok: true, totals }
@@ -182,39 +142,7 @@ export async function editMealAction(
     const userId = authData?.user?.id
     if (!userId) throw new Error('nutrition_unauthorized')
 
-    const { data: updated, error } = await supabase
-      .from('nutrition_meal_entries')
-      .update({
-        food_name: String(draft.food_name ?? '').trim() || 'Refeição',
-        calories: Math.max(0, Number(draft.calories) || 0),
-        protein: Math.max(0, Number(draft.protein) || 0),
-        carbs: Math.max(0, Number(draft.carbs) || 0),
-        fat: Math.max(0, Number(draft.fat) || 0),
-      })
-      .eq('id', id)
-      .eq('user_id', userId)
-      .select('date')
-      .maybeSingle()
-
-    if (error) throw error
-
-    // Recalculate totals for the date
-    let totals = null
-    if (updated?.date) {
-      const { data: all } = await supabase
-        .from('nutrition_meal_entries')
-        .select('calories, protein, carbs, fat')
-        .eq('user_id', userId)
-        .eq('date', updated.date)
-
-      const rows = Array.isArray(all) ? all : []
-      totals = {
-        calories: rows.reduce((s, r) => s + (Number(r?.calories) || 0), 0),
-        protein: rows.reduce((s, r) => s + (Number(r?.protein) || 0), 0),
-        carbs: rows.reduce((s, r) => s + (Number(r?.carbs) || 0), 0),
-        fat: rows.reduce((s, r) => s + (Number(r?.fat) || 0), 0),
-      }
-    }
+    const { totals } = await editEntryCore(supabase, userId, id, draft)
 
     revalidatePath('/dashboard/nutrition')
     return { ok: true, totals }
@@ -240,16 +168,7 @@ export async function applyGeneratedMealAction(
     const userId = data?.user?.id
     if (!userId) throw new Error('nutrition_unauthorized')
 
-    const resolvedDateKey = (() => {
-      const s = typeof dateKey === 'string' ? dateKey.trim() : ''
-      if (s && /^\d{4}-\d{2}-\d{2}$/.test(s)) return s
-      try {
-        const tz = 'America/Sao_Paulo'
-        return new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
-      } catch {
-        return new Date().toISOString().slice(0, 10)
-      }
-    })()
+    const resolvedDateKey = resolveDateKey(dateKey)
 
     const mealLog = {
       foodName: sanitizeFoodName(String(meal?.name ?? '')).slice(0, 120) || 'Refeição',
@@ -278,23 +197,10 @@ export async function updateWaterAction(ml: number, dateKey?: string) {
     const userId = data?.user?.id
     if (!userId) throw new Error('nutrition_unauthorized')
 
-    const resolvedDateKey = (() => {
-      const s = typeof dateKey === 'string' ? dateKey.trim() : ''
-      if (s && /^\d{4}-\d{2}-\d{2}$/.test(s)) return s
-      try {
-        const tz = 'America/Sao_Paulo'
-        return new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
-      } catch {
-        return new Date().toISOString().slice(0, 10)
-      }
-    })()
+    const resolvedDateKey = resolveDateKey(dateKey)
 
-    const safeMl = Math.max(0, Math.min(10000, Math.round(Number(ml) || 0)))
-    const { error: upsertError } = await supabase
-      .from('daily_nutrition_logs')
-      .upsert({ user_id: userId, date: resolvedDateKey, water_ml: safeMl, updated_at: new Date().toISOString() }, { onConflict: 'user_id,date' })
-    if (upsertError) throw upsertError
-    return { ok: true, water_ml: safeMl }
+    const { water_ml } = await setWaterCore(supabase, userId, ml, resolvedDateKey)
+    return { ok: true, water_ml }
   } catch (e: unknown) {
     return { ok: false, error: String(getErrorMessage(e) || 'nutrition_water_failed') }
   }
@@ -390,16 +296,7 @@ export async function logBarcodeAction(ean: string, grams: number, dateKey?: str
     const userId = data?.user?.id
     if (!userId) throw new Error('nutrition_unauthorized')
 
-    const resolvedDateKey = (() => {
-      const s = typeof dateKey === 'string' ? dateKey.trim() : ''
-      if (s && /^\d{4}-\d{2}-\d{2}$/.test(s)) return s
-      try {
-        const tz = 'America/Sao_Paulo'
-        return new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date())
-      } catch {
-        return new Date().toISOString().slice(0, 10)
-      }
-    })()
+    const resolvedDateKey = resolveDateKey(dateKey)
 
     const resolved = await resolveBarcode(supabase, cleanEan, userId)
     if (!resolved) {

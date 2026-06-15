@@ -151,8 +151,8 @@ export function useNutritionEntries({
             : e,
         ),
       )
-      if ((res as { totals?: Record<string, unknown> })?.totals) {
-        const t = (res as { totals: Record<string, unknown> }).totals
+      if ((res as { totals?: Record<string, unknown> | null })?.totals) {
+        const t = (res as unknown as { totals: Record<string, unknown> }).totals
         onTotalsChange({
           calories: Number(t.calories) || 0,
           protein: Number(t.protein) || 0,
