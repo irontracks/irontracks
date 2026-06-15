@@ -14,6 +14,10 @@
       return null;
     }
   };
+  // Contador anti-loop: sessionStorage preferido; cai pra localStorage quando o
+  // WKWebView (iOS) bloqueia sessionStorage — assim o limite SEMPRE existe e o
+  // app nunca recarrega infinitamente.
+  const store = () => ss() || ls();
   const host = () => String(location.hostname || "");
   const isLocal = () => {
     const h = host();
@@ -32,12 +36,50 @@
       } catch {}
     }
   };
+
+  // Limpa caches do Service Worker e o desregistra. É exatamente o que
+  // "deletar e reinstalar o app" faz — remove o app-shell / chunks STALE que
+  // um SW antigo serve e que causam ChunkLoadError em loop após um deploy.
+  const purge = async () => {
+    try {
+      if (window.caches && caches.keys) {
+        const keys = await caches.keys();
+        await Promise.all(keys.map((k) => caches.delete(k).catch(() => {})));
+      }
+    } catch {}
+    try {
+      if (navigator.serviceWorker && navigator.serviceWorker.getRegistrations) {
+        const regs = await navigator.serviceWorker.getRegistrations();
+        await Promise.all(regs.map((r) => r.unregister().catch(() => {})));
+      }
+    } catch {}
+  };
+
+  // Recuperação de chunk error: PURGA antes de recarregar para o reload buscar
+  // tudo fresh, quebrando o loop. O timeout garante que o reload aconteça mesmo
+  // se a limpeza travar.
+  const recover = (t) => {
+    let done = false;
+    const go = () => {
+      if (done) return;
+      done = true;
+      safeReload(t);
+    };
+    try {
+      Promise.race([purge(), new Promise((r) => setTimeout(r, 1500))]).then(go, go);
+    } catch {
+      go();
+    }
+  };
+
   const bust = (reason) => {
     try {
-      const s = ss();
+      const s = store();
       const t = now();
       if (!s) {
-        safeReload(t);
+        // Sem storage nenhum: purga e recarrega UMA vez (purge quebra o loop de
+        // shell stale; sem contador, mas o purge evita repetir o erro).
+        recover(t);
         return;
       }
       const k = "it.recover.v1";
@@ -56,10 +98,12 @@
         st.c = 1;
       }
       st.t = t;
-      s.setItem(k, String(st.t || 0) + "|" + String(st.c || 0));
+      try {
+        s.setItem(k, String(st.t || 0) + "|" + String(st.c || 0));
+      } catch {}
       if (isLocal()) {
         if (st.c > 2) return;
-        safeReload(t);
+        recover(t);
         return;
       }
       if (st.c > 2) {
@@ -92,27 +136,29 @@
         d.appendChild(box);
         document.body.appendChild(d);
         btn.addEventListener("click", () => {
-          safeReload(t);
+          recover(now());
         });
         return;
       }
-      safeReload(t);
+      recover(t);
     } catch {
       try {
-        location.reload();
+        recover(now());
       } catch {}
     }
   };
   const isChunkErr = (msg) => {
     const m = String(msg || "");
     const l = m.toLowerCase();
+    // Apenas erros de carregamento de CHUNK/MÓDULO (sinais de assets stale após
+    // deploy). NÃO inclui "failed to fetch" genérico — esse captura qualquer
+    // falha de rede transitória (API/imagem) e fazia o app recarregar à toa.
     return (
       l.includes("chunkloaderror") ||
       l.includes("loading chunk") ||
       l.includes("failed to fetch dynamically imported module") ||
       l.includes("importing a module script failed") ||
-      l.includes("unexpected token <") ||
-      l.includes("failed to fetch")
+      l.includes("unexpected token <")
     );
   };
   const handleOAuthHashError = () => {
@@ -168,19 +214,21 @@
             if (!cur) return;
             const prev = String(l.getItem(key) || "");
             if (prev && prev !== cur) {
-              const s = ss();
+              const s = store();
               const guard = "it.ver.reload.v1";
               const t = now();
               if (s) {
                 const last = Number(s.getItem(guard) || 0) || 0;
                 if (t - last < reloadGuardMs) return;
-                s.setItem(guard, String(t));
+                try { s.setItem(guard, String(t)); } catch {}
               }
-              l.setItem(key, cur);
+              try { l.setItem(key, cur); } catch {}
               safeReload(t);
               return;
             }
-            if (!prev) l.setItem(key, cur);
+            if (!prev) {
+              try { l.setItem(key, cur); } catch {}
+            }
           } catch {}
         })
         .catch(() => {});
