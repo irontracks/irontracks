@@ -22,40 +22,55 @@ const toDbRow = (v: unknown): DbRow =>
 const isRecord = (v: unknown): v is Record<string, unknown> =>
   v !== null && typeof v === 'object' && !Array.isArray(v)
 
-const hydrateWorkouts = async (supabase: SupabaseClient, rows: unknown[]) => {
+/**
+ * Roda uma query Supabase com retry. Distingue FALHA (erro/exceção) de
+ * RESULTADO VAZIO legítimo: `ok=false` só quando a query realmente falhou, para
+ * o chamador NÃO cachear nem exibir um estado parcial como se fosse o real.
+ */
+const fetchRows = async (
+  run: () => PromiseLike<{ data: unknown; error: unknown }>,
+  attempts = 2,
+): Promise<{ rows: DbRow[]; ok: boolean }> => {
+  for (let i = 0; i < attempts; i++) {
+    try {
+      const { data, error } = await run()
+      if (!error && Array.isArray(data)) return { rows: data as DbRow[], ok: true }
+    } catch { /* transitório → tenta de novo */ }
+    if (i < attempts - 1) await new Promise((r) => setTimeout(r, 150))
+  }
+  return { rows: [], ok: false }
+}
+
+const hydrateWorkouts = async (
+  supabase: SupabaseClient,
+  rows: unknown[],
+): Promise<{ rows: Array<Record<string, unknown>>; ok: boolean }> => {
   const base = Array.isArray(rows) ? rows.filter((x) => x && typeof x === 'object') : []
   const workoutIds = base.map((w) => toDbRow(w).id).filter(Boolean) as string[]
-  if (!workoutIds.length) return base.map((w) => ({ ...toDbRow(w), exercises: [] }))
+  if (!workoutIds.length) return { rows: base.map((w) => ({ ...toDbRow(w), exercises: [] })), ok: true }
 
-  // Fetch exercises and sets in parallel instead of serial
-  const [exercisesResult, setsResult] = await Promise.all([
-    (async () => {
-      try {
-        const { data } = await supabase
-          .from('exercises')
-          .select('id, workout_id, name, notes, video_url, rest_time, cadence, method, "order", is_unilateral, side_rest_time, transition_time')
-          .in('workout_id', workoutIds)
-          .order('order', { ascending: true })
-          .limit(5000)
-        return Array.isArray(data) ? (data as DbRow[]) : []
-      } catch { return [] as DbRow[] }
-    })(),
-    (async () => {
-      try {
-        // Fetch sets for all exercises in these workouts directly via workout_id join
-        const { data } = await supabase
-          .from('sets')
-          .select('id, exercise_id, set_number, reps, rpe, weight, is_warmup, advanced_config, exercises!inner(workout_id)')
-          .in('exercises.workout_id', workoutIds)
-          .order('set_number', { ascending: true })
-          .limit(20000)
-        return Array.isArray(data) ? (data as DbRow[]) : []
-      } catch { return [] as DbRow[] }
-    })(),
+  // Exercícios e séries em paralelo, cada um com retry e flag de sucesso.
+  const [exRes, setsRes] = await Promise.all([
+    fetchRows(() =>
+      supabase
+        .from('exercises')
+        .select('id, workout_id, name, notes, video_url, rest_time, cadence, method, "order", is_unilateral, side_rest_time, transition_time')
+        .in('workout_id', workoutIds)
+        .order('order', { ascending: true })
+        .limit(5000),
+    ),
+    fetchRows(() =>
+      supabase
+        .from('sets')
+        .select('id, exercise_id, set_number, reps, rpe, weight, is_warmup, advanced_config, exercises!inner(workout_id)')
+        .in('exercises.workout_id', workoutIds)
+        .order('set_number', { ascending: true })
+        .limit(20000),
+    ),
   ])
 
-  const exercises = exercisesResult
-  const sets = setsResult
+  const exercises = exRes.rows
+  const sets = setsRes.rows
 
   const setsByExercise = new Map<string, DbRow[]>()
   for (const s of sets) {
@@ -76,10 +91,15 @@ const hydrateWorkouts = async (supabase: SupabaseClient, rows: unknown[]) => {
     exByWorkout.set(wid, list)
   }
 
-  return base.map((w) => {
+  const hydrated = base.map((w) => {
     const row = toDbRow(w)
     return { ...row, exercises: exByWorkout.get(row.id ?? '') ?? [] }
   })
+
+  // ok só quando exercícios E séries carregaram. Se algum falhou, o chamador
+  // não deve cachear — senão um hiccup deixaria os exercícios "sem séries"
+  // gravados por 5 min (foi o bug reportado).
+  return { rows: hydrated, ok: exRes.ok && setsRes.ok }
 }
 
 /**
@@ -172,13 +192,22 @@ export async function GET() {
       }
     }
 
-    const hydrated = await hydrateWorkouts(supabase, workouts)
+    const { rows: hydrated, ok: hydrateOk } = await hydrateWorkouts(supabase, workouts)
 
     const payload = {
       ok: true,
       user: { id: user.id, email: user.email ?? null },
       profile: profile || null,
       workouts: hydrated,
+    }
+
+    // Só cacheia (Redis + browser) quando exercícios e séries carregaram por
+    // completo. Se houve falha parcial, devolve o melhor-esforço SEM persistir
+    // e com no-store — a próxima request refaz e autocorrige, sem precisar
+    // reiniciar o app (era a causa do "exercícios sem séries" da Fran).
+    if (!hydrateOk) {
+      logWarn('bootstrap', 'hidratação parcial — não cacheando', `user=${user.id}`)
+      return NextResponse.json(payload, { headers: { 'cache-control': 'no-store' } })
     }
 
     await cacheSet(cacheKey, payload, 300)
