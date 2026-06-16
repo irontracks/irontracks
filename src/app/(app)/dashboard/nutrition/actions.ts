@@ -7,8 +7,11 @@ import { resolveFood } from '@/lib/nutrition/food-resolver'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { resolveBarcode } from '@/lib/nutrition/barcode-resolver'
 import { sanitizeFoodName } from '@/lib/nutrition/security'
-import { deleteEntryCore, editEntryCore, setWaterCore, resolveDateKey } from '@/lib/nutrition/mutations'
+import { deleteEntryCore, editEntryCore, setWaterCore, resolveDateKey, type MealDraft } from '@/lib/nutrition/mutations'
 import { insertNotifications, shouldThrottleBySenderType } from '@/lib/social/notifyFollowers'
+import { checkVipFeatureAccess } from '@/utils/vip/limits'
+import { saveLearnedFood } from '@/lib/nutrition/learned-foods'
+import { estimateMacrosFromText } from '@/lib/nutrition/aiEstimate'
 import { logError } from '@/lib/logger'
 import { waitUntil } from '@vercel/functions'
 import type { SupabaseClient } from '@supabase/supabase-js'
@@ -130,7 +133,7 @@ export async function deleteMealAction(entryId: string) {
 
 export async function editMealAction(
   entryId: string,
-  draft: { food_name: string; calories: number; protein: number; carbs: number; fat: number },
+  draft: MealDraft,
 ) {
   try {
     const id = String(entryId ?? '').trim()
@@ -148,6 +151,83 @@ export async function editMealAction(
     return { ok: true, totals }
   } catch (e: unknown) {
     return { ok: false, error: String(getErrorMessage(e) || 'nutrition_edit_meal_failed') }
+  }
+}
+
+/**
+ * Resolve UM alimento (texto → item(s)) SEM persistir, pra adicionar dentro do
+ * editor de uma refeição. Usa o mesmo pipeline do lançamento (local→TACO→
+ * learned→custom→OFF). Se nada resolver, sinaliza needsAi pro cliente estimar.
+ */
+export async function resolveFoodItemsAction(text: string) {
+  try {
+    const normalized = String(text ?? '').trim()
+    if (!normalized) return { ok: false, error: 'Texto vazio.' }
+    if (normalized.length > 200) return { ok: false, error: 'Texto muito longo.' }
+
+    const supabase = await createClient()
+    const { data, error } = await supabase.auth.getUser()
+    if (error) throw new Error(error.message || 'nutrition_auth_failed')
+    const userId = data?.user?.id
+    if (!userId) throw new Error('nutrition_unauthorized')
+
+    const resolved = await resolveFood(supabase, userId, normalized)
+    if (resolved && Array.isArray(resolved.items) && resolved.items.length > 0) {
+      const items = resolved.items.map((it) => ({
+        label: String(it?.label ?? '').slice(0, 120),
+        grams: Math.max(0, Math.round(Number(it?.grams) || 0)),
+        calories: Math.max(0, Math.round(Number(it?.calories) || 0)),
+        protein: Math.max(0, Math.round(Number(it?.protein) || 0)),
+        carbs: Math.max(0, Math.round(Number(it?.carbs) || 0)),
+        fat: Math.max(0, Math.round(Number(it?.fat) || 0)),
+      }))
+      return { ok: true, items }
+    }
+    return { ok: false, needsAi: true }
+  } catch (e: unknown) {
+    return { ok: false, error: String(getErrorMessage(e) || 'nutrition_resolve_food_failed') }
+  }
+}
+
+/**
+ * Estima macros de UM alimento com IA (VIP), SEM persistir — usado quando o
+ * parser/base não reconhece o alimento no editor. Retorna 1 item (grams=0,
+ * label = o texto digitado) e aprende o alimento pra próxima.
+ */
+export async function estimateFoodAction(text: string) {
+  try {
+    const normalized = String(text ?? '').trim()
+    if (!normalized) return { ok: false, error: 'Texto vazio.' }
+    if (normalized.length > 200) return { ok: false, error: 'Texto muito longo.' }
+
+    const supabase = await createClient()
+    const { data, error } = await supabase.auth.getUser()
+    if (error) throw new Error(error.message || 'nutrition_auth_failed')
+    const userId = data?.user?.id
+    if (!userId) throw new Error('nutrition_unauthorized')
+
+    const access = await checkVipFeatureAccess(supabase, userId, 'nutrition_macros')
+    if (!access.allowed) return { ok: false, error: 'vip_required', upgradeRequired: true }
+
+    const out = await estimateMacrosFromText(normalized)
+    if (!out) return { ok: false, error: 'invalid_ai_output' }
+
+    // Auto-learn: próxima vez o parser local reconhece sem IA.
+    try {
+      await saveLearnedFood(supabase, userId, normalized, out.foodName, out.calories, out.protein, out.carbs, out.fat)
+    } catch { /* não-fatal */ }
+
+    const item = {
+      label: normalized.slice(0, 120),
+      grams: 0,
+      calories: Math.round(out.calories),
+      protein: Math.round(out.protein),
+      carbs: Math.round(out.carbs),
+      fat: Math.round(out.fat),
+    }
+    return { ok: true, item }
+  } catch (e: unknown) {
+    return { ok: false, error: String(getErrorMessage(e) || 'nutrition_estimate_food_failed') }
   }
 }
 

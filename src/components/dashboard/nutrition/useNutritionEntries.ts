@@ -3,7 +3,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { deleteMealAction, editMealAction } from '@/app/(app)/dashboard/nutrition/actions'
 import { createClient } from '@/utils/supabase/client'
-import type { MealEntry, EditDraft } from './NutritionEntryCard'
+import type { MealEntry } from './NutritionEntryCard'
+
+// Tipo local (macros) — este hook é legado/sem uso; o EditDraft do
+// NutritionEntryCard passou a ser por itens.
+type EditDraft = { food_name: string; calories: number; protein: number; carbs: number; fat: number }
 
 function safeNumber(value: unknown): number {
   const n = Number(value)
