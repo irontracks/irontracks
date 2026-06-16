@@ -106,6 +106,9 @@ export const UserSettingsSchema = z
     favoriteGymName: z.string().default(''),
     favoriteGymLat: z.number().nullable().default(null),
     favoriteGymLng: z.number().nullable().default(null),
+    // ── Story (Instagram) ─────────────────────────────────────────────────────
+    /** Último template de estilo escolhido no composer de Story. */
+    storyTemplate: z.string().default('classic'),
   })
   .passthrough()
 
