@@ -107,8 +107,10 @@ export const UserSettingsSchema = z
     favoriteGymLat: z.number().nullable().default(null),
     favoriteGymLng: z.number().nullable().default(null),
     // ── Story (Instagram) ─────────────────────────────────────────────────────
-    /** Último template de estilo escolhido no composer de Story. */
+    /** Último template de estilo escolhido no composer de Story (treino). */
     storyTemplate: z.string().default('classic'),
+    /** Último template escolhido no composer de Story de nutrição. */
+    nutritionStoryTemplate: z.string().default('fresh'),
   })
   .passthrough()
 
