@@ -1,14 +1,18 @@
 'use client'
 
 import React from 'react'
-import { Layout, Move, RotateCcw, Crown, Download, Loader2, CheckCircle2, AlertCircle } from 'lucide-react'
+import { Layout, Move, RotateCcw, Crown, Download, Loader2, CheckCircle2, AlertCircle, Palette } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import VideoTrimmer from '@/components/stories/VideoTrimmer'
 import { STORY_LAYOUTS, LivePositions } from '../storyComposerUtils'
+import type { StoryTemplate } from './storyTemplates'
 
 interface StoryControlPanelProps {
     layout: string
     onSelectLayout: (l: string) => void
+    templates: StoryTemplate[]
+    templateId: string
+    onSelectTemplate: (id: string) => void
     livePositions: LivePositions
     onResetPositions: () => void
     showTrimmer: boolean
@@ -31,6 +35,7 @@ interface StoryControlPanelProps {
 
 export function StoryControlPanel({
     layout, onSelectLayout, onResetPositions,
+    templates, templateId, onSelectTemplate,
     showTrimmer, isVideo, videoDuration, trimRange, setTrimRange,
     previewTime, videoRef, busy, busyAction, busySubAction, uploadProgress,
     error, info, onPost, onShare,
@@ -69,6 +74,36 @@ export function StoryControlPanel({
                     </motion.div>
                 )}
             </AnimatePresence>
+
+            {/* Template (Estilo) Selector */}
+            <div className="space-y-3">
+                <div className="flex items-center gap-2 text-[10px] font-bold uppercase tracking-wider text-yellow-500/80 mb-2">
+                    <Palette size={14} />
+                    ESCOLHA O ESTILO
+                </div>
+                <div className="grid grid-cols-5 gap-2">
+                    {templates.map((t) => (
+                        <button
+                            key={t.id} type="button"
+                            onClick={() => onSelectTemplate(t.id)}
+                            disabled={busy}
+                            aria-pressed={templateId === t.id}
+                            title={t.name}
+                            className={['flex flex-col items-center gap-1.5 rounded-xl border p-2 transition-all active:scale-[0.97]',
+                                templateId === t.id ? 'border-white bg-white/10 shadow-lg scale-[1.03]' : 'border-neutral-800 bg-neutral-900 hover:border-neutral-700 hover:bg-neutral-800',
+                            ].join(' ')}
+                        >
+                            <span
+                                className="block h-7 w-7 rounded-full ring-1 ring-white/20"
+                                style={{ background: `linear-gradient(135deg, ${t.swatch[0]} 0%, ${t.swatch[1]} 100%)` }}
+                            />
+                            <span className={['text-[8px] font-bold uppercase tracking-wide truncate w-full text-center',
+                                templateId === t.id ? 'text-white' : 'text-neutral-400',
+                            ].join(' ')}>{t.name}</span>
+                        </button>
+                    ))}
+                </div>
+            </div>
 
             {/* Layout Selector */}
             <div className="space-y-3">
