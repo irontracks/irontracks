@@ -9,15 +9,27 @@ export const dynamic = 'force-dynamic'
 
 /** Edita uma entry. Usada pela fila offline (`nutrition_edit`). */
 
+const ItemSchema = z.object({
+  label: z.string().transform((s) => s.slice(0, 120)),
+  grams: z.coerce.number().nonnegative(),
+  calories: z.coerce.number().nonnegative(),
+  protein: z.coerce.number().nonnegative(),
+  carbs: z.coerce.number().nonnegative(),
+  fat: z.coerce.number().nonnegative(),
+})
+
+// macros opcionais: a edição por ITENS manda só { food_name, items }; jobs
+// offline antigos (macro-only) seguem válidos.
 const BodySchema = z
   .object({
     entryId: z.string().min(1),
     draft: z.object({
       food_name: z.string().transform((s) => s.slice(0, 120)),
-      calories: z.coerce.number().nonnegative(),
-      protein: z.coerce.number().nonnegative(),
-      carbs: z.coerce.number().nonnegative(),
-      fat: z.coerce.number().nonnegative(),
+      calories: z.coerce.number().nonnegative().optional(),
+      protein: z.coerce.number().nonnegative().optional(),
+      carbs: z.coerce.number().nonnegative().optional(),
+      fat: z.coerce.number().nonnegative().optional(),
+      items: z.array(ItemSchema).optional(),
     }),
   })
   .strip()

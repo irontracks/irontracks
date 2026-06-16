@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState, useTransition, useCallback } from 'react'
-import { logMealAction, logBarcodeAction, updateWaterAction, deleteMealAction, editMealAction } from '@/app/(app)/dashboard/nutrition/actions'
+import { logMealAction, logBarcodeAction, updateWaterAction, deleteMealAction, editMealAction, resolveFoodItemsAction, estimateFoodAction } from '@/app/(app)/dashboard/nutrition/actions'
 import type { MealLog } from '@/lib/nutrition/engine'
 import { analyzeMeal } from '@/lib/nutrition/parser'
 import { useIsIosNative } from '@/hooks/useIsIosNative'
@@ -271,7 +271,7 @@ export default function NutritionMixer({
   // Entry detail state
   const [expandedEntryId, setExpandedEntryId] = useState<string | null>(null)
   const [editingEntryId, setEditingEntryId] = useState<string | null>(null)
-  const [editDraft, setEditDraft] = useState<{ food_name: string; calories: number; protein: number; carbs: number; fat: number } | null>(null)
+  const [editDraft, setEditDraft] = useState<{ food_name: string; items: MealItemView[] } | null>(null)
   const [editBusy, setEditBusy] = useState(false)
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null)
 
@@ -337,6 +337,51 @@ export default function NutritionMixer({
     },
     [userId, schemaMissing, currentDateKey, waterMl],
   )
+
+  // Resolve um texto de alimento → item(s) pro editor de refeição:
+  // parser local (base + biblioteca) → resolveFood (TACO/OFF) → IA (VIP).
+  // Offline usa só o parser local.
+  const resolveFoodForEditor = useCallback(async (
+    text: string,
+  ): Promise<{ ok: true; items: MealItemView[] } | { ok: false; error?: string; needsAi?: boolean }> => {
+    const t = String(text || '').trim()
+    if (!t) return { ok: false, error: 'Digite um alimento.' }
+
+    // 1. parser local (instantâneo)
+    try {
+      const extra = customFoodsToExtraFoods(Array.isArray(effectiveCustomFoods) ? effectiveCustomFoods : [])
+      const a = analyzeMeal(t, extra)
+      if (a.items.length > 0 && a.unknownLines.length === 0) {
+        return { ok: true, items: a.items.map((it) => ({ label: it.label, grams: it.grams, calories: it.calories, protein: it.protein, carbs: it.carbs, fat: it.fat })) }
+      }
+    } catch { /* cai pro servidor */ }
+
+    if (isOffline()) return { ok: false, error: 'Sem internet pra reconhecer esse alimento.' }
+
+    // 2. servidor: resolveFood (base/TACO/learned/custom/OFF)
+    try {
+      const res = await resolveFoodItemsAction(t)
+      if (res?.ok && Array.isArray(res.items) && res.items.length > 0) {
+        return { ok: true, items: res.items as MealItemView[] }
+      }
+      if (!(res as Record<string, unknown>)?.needsAi) {
+        return { ok: false, error: String((res as Record<string, unknown>)?.error || 'Não reconheci esse alimento.') }
+      }
+    } catch { /* tenta IA */ }
+
+    // 3. IA (VIP)
+    try {
+      const ai = await estimateFoodAction(t)
+      const aiObj = ai as Record<string, unknown>
+      if (ai?.ok && aiObj?.item) {
+        return { ok: true, items: [aiObj.item as MealItemView] }
+      }
+      const upgrade = Boolean(aiObj?.upgradeRequired) || String(aiObj?.error || '') === 'vip_required'
+      return { ok: false, error: upgrade ? 'Estimativa por IA é do plano VIP.' : 'Não reconheci esse alimento.' }
+    } catch {
+      return { ok: false, error: 'Falha ao adicionar.' }
+    }
+  }, [effectiveCustomFoods])
 
   // ── Derived ──────────────────────────────────────────────────────────────
   const safeEntries = Array.isArray(entries) ? entries : []
@@ -1060,33 +1105,51 @@ export default function NutritionMixer({
                 onStory={(entry) => setStory({ mode: 'meal', content: mealToContent(entry) })}
                 onToggleExpand={(id: string) => setExpandedEntryId(id || null)}
                 editingId={editingEntryId || ''}
-                editDraft={editDraft || { food_name: '', calories: 0, protein: 0, carbs: 0, fat: 0 }}
+                editDraft={editDraft || { food_name: '', items: [] }}
                 editBusy={editBusy}
-                onStartEdit={(entry) => { setEditingEntryId(entry.id); setEditDraft({ food_name: entry.food_name, calories: entry.calories, protein: entry.protein, carbs: entry.carbs, fat: entry.fat }) }}
+                onAddFood={resolveFoodForEditor}
+                onStartEdit={(entry) => {
+                  setEditingEntryId(entry.id)
+                  const existing = Array.isArray(entry.items) ? entry.items : []
+                  // Refeições antigas sem detalhamento: semeia 1 item com os macros atuais.
+                  const seeded: MealItemView[] = existing.length > 0
+                    ? existing.map(it => ({ label: String(it.label || ''), grams: safeNumber(it.grams), calories: safeNumber(it.calories), protein: safeNumber(it.protein), carbs: safeNumber(it.carbs), fat: safeNumber(it.fat) }))
+                    : [{ label: entry.food_name || 'Refeição', grams: 0, calories: safeNumber(entry.calories), protein: safeNumber(entry.protein), carbs: safeNumber(entry.carbs), fat: safeNumber(entry.fat) }]
+                  setEditDraft({ food_name: entry.food_name, items: seeded })
+                }}
                 onCancelEdit={() => { setEditingEntryId(null); setEditDraft(null) }}
                 onSaveEdit={async () => {
                   if (!editingEntryId || !editDraft) return
+                  const id = editingEntryId
+                  const draft = editDraft
+                  const items = Array.isArray(draft.items) ? draft.items : []
+                  if (items.length === 0) return
+                  const macros = items.reduce((a, it) => ({
+                    calories: a.calories + safeNumber(it.calories),
+                    protein: a.protein + safeNumber(it.protein),
+                    carbs: a.carbs + safeNumber(it.carbs),
+                    fat: a.fat + safeNumber(it.fat),
+                  }), { calories: 0, protein: 0, carbs: 0, fat: 0 })
+
                   if (isOffline()) {
-                    const id = editingEntryId
-                    const draft = editDraft
                     const list = Array.isArray(entries) ? entries : []
                     const target = list.find(x => x.id === id)
                     const next = list.map(x => x.id === id
-                      ? { ...x, food_name: draft.food_name, calories: safeNumber(draft.calories), protein: safeNumber(draft.protein), carbs: safeNumber(draft.carbs), fat: safeNumber(draft.fat) }
+                      ? { ...x, food_name: draft.food_name, calories: macros.calories, protein: macros.protein, carbs: macros.carbs, fat: macros.fat, items }
                       : x)
                     setEntries(next); setTotals(sumTotals(next)); cacheDay(next)
                     // Pendente → reescreve o job de lançamento (mesmo id); senão enfileira a edição.
                     if (target?.pending) {
-                      void queueNutritionLog(id, { foodName: draft.food_name, calories: safeNumber(draft.calories), protein: safeNumber(draft.protein), carbs: safeNumber(draft.carbs), fat: safeNumber(draft.fat), items: target?.items ?? null, dateKey: currentDateKey }, false)
+                      void queueNutritionLog(id, { foodName: draft.food_name, calories: macros.calories, protein: macros.protein, carbs: macros.carbs, fat: macros.fat, items, dateKey: currentDateKey }, false)
                     } else {
-                      void queueNutritionEdit({ entryId: id, draft })
+                      void queueNutritionEdit({ entryId: id, draft: { food_name: draft.food_name, items } })
                     }
                     setEditingEntryId(null); setEditDraft(null)
                     return
                   }
                   setEditBusy(true)
                   try {
-                    const res = await editMealAction(editingEntryId, editDraft)
+                    const res = await editMealAction(id, { food_name: draft.food_name, items })
                     if (!res?.ok) throw new Error(String((res as Record<string, unknown>)?.error || 'Falha ao editar.'))
                     const totals = (res as Record<string, unknown>)?.totals as Record<string, unknown> | null
                     if (totals) setTotals({ calories: safeNumber(totals.calories), protein: safeNumber(totals.protein), carbs: safeNumber(totals.carbs), fat: safeNumber(totals.fat) })
