@@ -38,6 +38,17 @@ import {
     getTemplateById,
 } from './storyTemplates'
 
+/** Renderer injetável — quando ausente, usa o drawStory de treino. */
+export type StoryRenderer = (args: {
+    ctx: CanvasRenderingContext2D
+    canvasW: number
+    canvasH: number
+    backgroundImage: HTMLImageElement | null
+    transparentBg?: boolean
+    skipClear?: boolean
+    template: StoryTemplate
+}) => void
+
 interface UseStoryComposerOptions {
     open: boolean
     session: SessionLite
@@ -48,9 +59,27 @@ interface UseStoryComposerOptions {
     initialTemplateId?: string | null
     /** Persiste o template escolhido (chamado em setTemplate). */
     onTemplatePersist?: (id: string) => void
+    /** Renderer alternativo (ex.: nutrição). Default = drawStory de treino. */
+    draw?: StoryRenderer
+    /** meta/caption do POST interno. Quando ausentes, usa o metaBase de treino. */
+    metaOverride?: Record<string, unknown>
+    captionOverride?: string
+    /** Resolve o id do template contra a registry certa (treino vs nutrição). */
+    resolveTemplate?: (id?: string | null) => StoryTemplate
 }
 
-export function useStoryComposer({ open, session, onClose, caloriesOverride, initialTemplateId, onTemplatePersist }: UseStoryComposerOptions) {
+export function useStoryComposer({
+    open,
+    session,
+    onClose,
+    caloriesOverride,
+    initialTemplateId,
+    onTemplatePersist,
+    draw,
+    metaOverride,
+    captionOverride,
+    resolveTemplate = getTemplateById,
+}: UseStoryComposerOptions) {
     const inputRef = useRef<HTMLInputElement>(null)
     const videoRef = useRef<HTMLVideoElement>(null)
     const compositorRef = useRef<VideoCompositor | null>(null)
@@ -80,7 +109,7 @@ export function useStoryComposer({ open, session, onClose, caloriesOverride, ini
     const [info, setInfo] = useState('')
     const [showSafeGuide, setShowSafeGuide] = useState(true)
     const [layout, setLayout] = useState('bottom-row')
-    const [template, setTemplateState] = useState<StoryTemplate>(() => getTemplateById(initialTemplateId))
+    const [template, setTemplateState] = useState<StoryTemplate>(() => resolveTemplate(initialTemplateId))
     const userTouchedTemplateRef = useRef(false)
     const [livePositions, setLivePositions] = useState<LivePositions>(DEFAULT_LIVE_POSITIONS)
     const [draggingKey, setDraggingKey] = useState<string | null>(null)
@@ -98,8 +127,8 @@ export function useStoryComposer({ open, session, onClose, caloriesOverride, ini
     // sobrescrever uma escolha que o usuário já fez nesta sessão.
     useEffect(() => {
         if (userTouchedTemplateRef.current || !initialTemplateId) return
-        setTemplateState(getTemplateById(initialTemplateId))
-    }, [initialTemplateId])
+        setTemplateState(resolveTemplate(initialTemplateId))
+    }, [initialTemplateId, resolveTemplate])
 
     const setTemplate = useCallback((t: StoryTemplate) => {
         userTouchedTemplateRef.current = true
@@ -438,6 +467,19 @@ export function useStoryComposer({ open, session, onClose, caloriesOverride, ini
     }, [livePositions])
 
     // Canvas helpers
+    // Desenha o overlay no ctx: renderer injetado (ex.: nutrição) ou o drawStory
+    // de treino (default). Centraliza o branch dos 3 call-sites de render.
+    const renderComposite = (
+        ctx: CanvasRenderingContext2D,
+        opts: { backgroundImage: HTMLImageElement | null; transparentBg?: boolean; skipClear?: boolean },
+    ) => {
+        if (draw) {
+            draw({ ctx, canvasW: CANVAS_W, canvasH: CANVAS_H, backgroundImage: opts.backgroundImage, transparentBg: opts.transparentBg, skipClear: opts.skipClear, template })
+        } else {
+            drawStory({ ctx, canvasW: CANVAS_W, canvasH: CANVAS_H, backgroundImage: opts.backgroundImage, metrics, layout, livePositions, transparentBg: opts.transparentBg, skipClear: opts.skipClear, template })
+        }
+    }
+
     const renderVideoFrameAsJpeg = async (vid: HTMLVideoElement): Promise<{ blob: Blob; filename: string; mime: string }> => {
         const canvas = document.createElement('canvas')
         canvas.width = CANVAS_W; canvas.height = CANVAS_H
@@ -446,7 +488,7 @@ export function useStoryComposer({ open, session, onClose, caloriesOverride, ini
         const vw = vid.videoWidth || CANVAS_W; const vh = vid.videoHeight || CANVAS_H
         const scale = Math.max(CANVAS_W / vw, CANVAS_H / vh)
         ctx.drawImage(vid, (CANVAS_W - vw * scale) / 2, (CANVAS_H - vh * scale) / 2, vw * scale, vh * scale)
-        drawStory({ ctx, canvasW: CANVAS_W, canvasH: CANVAS_H, backgroundImage: null, metrics, layout, livePositions, transparentBg: true, skipClear: true, template })
+        renderComposite(ctx, { backgroundImage: null, transparentBg: true, skipClear: true })
         return new Promise<{ blob: Blob; filename: string; mime: string }>((resolve, reject) =>
             canvas.toBlob(b => b ? resolve({ blob: b, filename: `irontracks-story-${Date.now()}.jpg`, mime: 'image/jpeg' }) : reject(new Error('blob_failed')), 'image/jpeg', 0.92)
         )
@@ -466,18 +508,7 @@ export function useStoryComposer({ open, session, onClose, caloriesOverride, ini
             overlayCanvas.height = CANVAS_H
             const overlayCtx = overlayCanvas.getContext('2d') // alpha: true (default) — transparent bg
             if (overlayCtx) {
-                drawStory({
-                    ctx: overlayCtx,
-                    canvasW: CANVAS_W,
-                    canvasH: CANVAS_H,
-                    backgroundImage: null,
-                    metrics,
-                    layout,
-                    livePositions,
-                    transparentBg: true,
-                    skipClear: false,
-                    template,
-                })
+                renderComposite(overlayCtx, { backgroundImage: null, transparentBg: true, skipClear: false })
             }
 
             // ── iOS native fast path (AVFoundation + VideoToolbox hardware H.264) ──
@@ -559,7 +590,7 @@ export function useStoryComposer({ open, session, onClose, caloriesOverride, ini
         canvas.width = CANVAS_W; canvas.height = CANVAS_H
         const ctx = canvas.getContext('2d')
         if (!ctx) throw new Error('canvas_error')
-        drawStory({ ctx, canvasW: CANVAS_W, canvasH: CANVAS_H, backgroundImage: mediaKind === 'image' ? backgroundImage : null, metrics, layout, livePositions, template })
+        renderComposite(ctx, { backgroundImage: mediaKind === 'image' ? backgroundImage : null })
         const mime = type === 'png' ? 'image/png' : 'image/jpeg'
         const ext = type === 'png' ? 'png' : 'jpg'
         return new Promise((resolve, reject) =>
@@ -626,7 +657,7 @@ export function useStoryComposer({ open, session, onClose, caloriesOverride, ini
             if (name === 'AbortError') return
             setError(String(getErrorMessage(e) || '').trim() || 'Não foi possível compartilhar.')
         } finally { setBusy(false); setBusyAction(null); setBusySubAction(null) }
-    }, [mediaKind, metrics, layout, livePositions, backgroundImage, template]) // eslint-disable-line
+    }, [mediaKind, metrics, layout, livePositions, backgroundImage, template, draw]) // eslint-disable-line
 
     const postToIronTracks = useCallback(async () => {
         setBusy(true); setBusyAction('post'); setBusySubAction('processing'); setError(''); setInfo('')
@@ -639,6 +670,8 @@ export function useStoryComposer({ open, session, onClose, caloriesOverride, ini
             let path = ''
             let meta: Record<string, unknown> = {}
             const metaBase = { title: String(metrics?.title || ''), dateText: String(metrics?.date || ''), durationSeconds: Number(metrics?.totalTime || 0), totalVolumeKg: Number(metrics?.volume || 0), kcal: Number(metrics?.kcal || 0), layout: String(layout || '') }
+            // metaOverride (ex.: nutrição) substitui o metaBase de treino quando presente.
+            const baseMeta: Record<string, unknown> = metaOverride ?? metaBase
             if (mediaKind === 'video') {
                 if (!selectedFile) throw new Error('Selecione um vídeo primeiro.')
                 if (Number(selectedFile.size) > maxBytes) throw new Error('Vídeo muito grande (máx 200MB).')
@@ -651,20 +684,20 @@ export function useStoryComposer({ open, session, onClose, caloriesOverride, ini
                 setBusySubAction('uploading'); setUploadProgress(0)
                 path = await uploadStoryMedia(blob, uid, mime, (uploaded: number, total: number) => { if (total > 0) setUploadProgress(Math.round((uploaded / total) * 100)) })
                 setUploadProgress(100)
-                meta = { ...metaBase, mediaKind: 'video' }
+                meta = { ...baseMeta, mediaKind: 'video' }
             } else {
                 const result = await createImageBlob({ type: 'jpg', quality: 0.92 })
                 setBusySubAction('uploading'); setUploadProgress(0)
                 path = await uploadStoryMedia(result.blob, uid, result.mime, (uploaded: number, total: number) => { if (total > 0) setUploadProgress(Math.round((uploaded / total) * 100)) })
                 setUploadProgress(100)
-                meta = { ...metaBase, mediaKind: 'image' }
+                meta = { ...baseMeta, mediaKind: 'image' }
             }
             const createUrl = isIosNative() ? `/api/social/stories/create?media_path=${encodeURIComponent(path)}` : '/api/social/stories/create'
             const fetchController = new AbortController()
             const fetchTimeout = setTimeout(() => fetchController.abort(), 30_000)
             let createResp: Response
             try {
-                createResp = await fetch(createUrl, { method: 'POST', signal: fetchController.signal, headers: { 'content-type': 'application/json' }, body: JSON.stringify({ mediaPath: path, media_path: path, caption: String(metrics?.title || ''), meta }) })
+                createResp = await fetch(createUrl, { method: 'POST', signal: fetchController.signal, headers: { 'content-type': 'application/json' }, body: JSON.stringify({ mediaPath: path, media_path: path, caption: captionOverride ?? String(metrics?.title || ''), meta }) })
             } finally { clearTimeout(fetchTimeout) }
             const createJson = await createResp.json().catch((): null => null)
             if (!createResp.ok || !createJson?.ok) throw new Error(String(createJson?.error || 'Falha ao publicar'))
@@ -675,7 +708,7 @@ export function useStoryComposer({ open, session, onClose, caloriesOverride, ini
             logError('error', err)
             setError(String(getErrorMessage(err) || '').trim() || 'Falha ao publicar story.')
         } finally { setBusy(false); setBusyAction(null); setBusySubAction(null); setUploadProgress(0) }
-    }, [mediaKind, selectedFile, metrics, layout, livePositions, backgroundImage, onClose, template]) // eslint-disable-line
+    }, [mediaKind, selectedFile, metrics, layout, livePositions, backgroundImage, onClose, template, draw, metaOverride, captionOverride]) // eslint-disable-line
 
     return {
         // refs
