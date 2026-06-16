@@ -16,6 +16,7 @@ import {
   setCustomFoodsCache,
   getCustomFoodsCache,
 } from '@/lib/offline/nutritionCache'
+import { mealToContent, dayToContent, type NutritionStoryContent } from '@/components/stories/nutritionStory'
 
 // ── Lazy sub-components ────────────────────────────────────────────────────────
 const NutritionDayScore = dynamic(() => import('./NutritionDayScore'), { ssr: false })
@@ -28,6 +29,7 @@ const CustomFoodScanner = dynamic(() => import('./CustomFoodScanner'), { ssr: fa
 const CustomFoodLibrary = dynamic(() => import('./CustomFoodLibrary'), { ssr: false })
 const NutritionWorkoutCorrelation = dynamic(() => import('./NutritionWorkoutCorrelation'), { ssr: false })
 const BarcodeScanner = dynamic(() => import('./BarcodeScanner'), { ssr: false })
+const NutritionStoryComposer = dynamic(() => import('@/components/NutritionStoryComposer'), { ssr: false })
 
 // ── Hooks ──────────────────────────────────────────────────────────────────────
 import { useCustomFoods, customFoodsToExtraFoods, type CustomFood } from './useCustomFoods'
@@ -263,6 +265,8 @@ export default function NutritionMixer({
   // Biblioteca (custom foods) vinda do cache, pro parser reconhecer alimentos
   // salvos quando offline (o hook useCustomFoods busca do Supabase e falha sem rede).
   const [cachedCustomFoods, setCachedCustomFoods] = useState<CustomFood[]>([])
+  // Composer de Story de nutrição (refeição ou resumo do dia)
+  const [story, setStory] = useState<{ mode: 'meal' | 'day'; content: NutritionStoryContent } | null>(null)
 
   // Entry detail state
   const [expandedEntryId, setExpandedEntryId] = useState<string | null>(null)
@@ -735,6 +739,18 @@ export default function NutritionMixer({
         {goalsSource === 'profile' && (
           <div className="mt-3 text-[10px] text-neutral-400 text-center">Meta via TDEE do perfil • <button type="button" onClick={() => setGoalsOpen(true)} className="text-yellow-500 hover:text-yellow-400">Ajustar</button></div>
         )}
+
+        {safeEntries.length > 0 && (
+          <div className="mt-4 pt-3 border-t border-white/[0.06] flex justify-center">
+            <button
+              type="button"
+              onClick={() => setStory({ mode: 'day', content: dayToContent(totals, safeGoals, currentDateKey) })}
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-yellow-500/15 border border-yellow-500/30 text-yellow-200 text-xs font-bold uppercase tracking-wider hover:bg-yellow-500/25 active:scale-[0.98] transition"
+            >
+              🎬 Compartilhar dia
+            </button>
+          </div>
+        )}
       </Card>
 
       {/* ══ MACROS ═══════════════════════════════════════════════════════ */}
@@ -1041,6 +1057,7 @@ export default function NutritionMixer({
                 <NutritionEntryCard
                   item={item}
                   isExpanded={expandedEntryId === item.id}
+                onStory={(entry) => setStory({ mode: 'meal', content: mealToContent(entry) })}
                 onToggleExpand={(id: string) => setExpandedEntryId(id || null)}
                 editingId={editingEntryId || ''}
                 editDraft={editDraft || { food_name: '', calories: 0, protein: 0, carbs: 0, fat: 0 }}
@@ -1095,6 +1112,16 @@ export default function NutritionMixer({
         <BarcodeScanner
           onResult={handleBarcodeResult}
           onClose={() => setShowBarcodeScanner(false)}
+        />
+      )}
+
+      {/* ── Story de nutrição (refeição / dia) ──────────────────────────── */}
+      {story && (
+        <NutritionStoryComposer
+          open={!!story}
+          mode={story.mode}
+          content={story.content}
+          onClose={() => setStory(null)}
         />
       )}
 

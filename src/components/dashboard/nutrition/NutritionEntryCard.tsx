@@ -41,6 +41,8 @@ type NutritionEntryCardProps = {
   onConfirmDelete: (id: string) => void
   onCancelDelete: () => void
   onDelete: (id: string) => void
+  // Story
+  onStory?: (item: MealEntry) => void
 }
 
 function formatClock(iso: string) {
@@ -69,6 +71,7 @@ function NutritionEntryCard({
   onConfirmDelete,
   onCancelDelete,
   onDelete,
+  onStory,
 }: NutritionEntryCardProps) {
   const totalMacroG = item.protein + item.carbs + item.fat
   const proteinPct = totalMacroG > 0 ? Math.round((item.protein / totalMacroG) * 100) : 0
@@ -227,6 +230,16 @@ function NutritionEntryCard({
                     </>
                   ) : (
                     <>
+                      {onStory && (
+                        <button
+                          type="button"
+                          onClick={(e) => { e.stopPropagation(); onStory(item) }}
+                          aria-label="Compartilhar refeição (Story)"
+                          className="h-8 px-3 rounded-xl bg-neutral-900/90 border border-neutral-800 text-xs font-semibold text-yellow-400 hover:bg-yellow-500/10 hover:border-yellow-500/20 transition"
+                        >
+                          Story
+                        </button>
+                      )}
                       <button
                         type="button"
                         onClick={(e) => { e.stopPropagation(); onStartEdit(item) }}
