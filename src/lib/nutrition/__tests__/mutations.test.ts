@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { resolveDateKey, recalcDayTotals, setWaterCore } from '../mutations'
+import { resolveDateKey, recalcDayTotals, setWaterCore, editEntryCore } from '../mutations'
 
 describe('resolveDateKey', () => {
   it('passa adiante uma data já no formato YYYY-MM-DD', () => {
@@ -66,5 +66,72 @@ describe('setWaterCore', () => {
       from: () => ({ upsert: () => Promise.resolve({ error: new Error('boom') }) }),
     } as unknown as SupabaseClient
     await expect(setWaterCore(supa, 'u', 100, '2026-06-15')).rejects.toThrow('boom')
+  })
+})
+
+describe('editEntryCore (edição por itens)', () => {
+  it('grava os macros como SOMA dos itens + a coluna items, e recalcula o dia', async () => {
+    let updatePayload: Record<string, unknown> = {}
+    const supa = {
+      from: () => ({
+        update: (payload: Record<string, unknown>) => {
+          updatePayload = payload
+          return { eq: () => ({ eq: () => ({ select: () => ({ maybeSingle: () => Promise.resolve({ data: { date: '2026-06-16' } }) }) }) }) }
+        },
+        // usado pelo recalcDayTotals
+        select: () => ({ eq: () => ({ eq: () => Promise.resolve({ data: [{ calories: 500, protein: 64, carbs: 44, fat: 6 }] }) }) }),
+      }),
+    } as unknown as SupabaseClient
+
+    const { totals } = await editEntryCore(supa, 'u', 'e1', {
+      food_name: 'Almoço',
+      items: [
+        { label: '200g arroz', grams: 200, calories: 200, protein: 4, carbs: 44, fat: 0 },
+        { label: '200g frango', grams: 200, calories: 300, protein: 60, carbs: 0, fat: 6 },
+      ],
+    })
+
+    expect(updatePayload.food_name).toBe('Almoço')
+    expect(updatePayload.calories).toBe(500)
+    expect(updatePayload.protein).toBe(64)
+    expect(updatePayload.carbs).toBe(44)
+    expect(updatePayload.fat).toBe(6)
+    expect(Array.isArray(updatePayload.items)).toBe(true)
+    expect((updatePayload.items as unknown[]).length).toBe(2)
+    expect(totals).toEqual({ calories: 500, protein: 64, carbs: 44, fat: 6 })
+  })
+
+  it('lista vazia → items null e macros zerados', async () => {
+    let updatePayload: Record<string, unknown> = {}
+    const supa = {
+      from: () => ({
+        update: (payload: Record<string, unknown>) => {
+          updatePayload = payload
+          return { eq: () => ({ eq: () => ({ select: () => ({ maybeSingle: () => Promise.resolve({ data: { date: '2026-06-16' } }) }) }) }) }
+        },
+        select: () => ({ eq: () => ({ eq: () => Promise.resolve({ data: [] }) }) }),
+      }),
+    } as unknown as SupabaseClient
+
+    await editEntryCore(supa, 'u', 'e1', { food_name: 'X', items: [] })
+    expect(updatePayload.items).toBeNull()
+    expect(updatePayload.calories).toBe(0)
+  })
+
+  it('sem items (edição legada) → usa os macros do draft', async () => {
+    let updatePayload: Record<string, unknown> = {}
+    const supa = {
+      from: () => ({
+        update: (payload: Record<string, unknown>) => {
+          updatePayload = payload
+          return { eq: () => ({ eq: () => ({ select: () => ({ maybeSingle: () => Promise.resolve({ data: { date: '2026-06-16' } }) }) }) }) }
+        },
+        select: () => ({ eq: () => ({ eq: () => Promise.resolve({ data: [] }) }) }),
+      }),
+    } as unknown as SupabaseClient
+
+    await editEntryCore(supa, 'u', 'e1', { food_name: 'X', calories: 123, protein: 10, carbs: 20, fat: 5 })
+    expect(updatePayload.calories).toBe(123)
+    expect('items' in updatePayload).toBe(false)
   })
 })

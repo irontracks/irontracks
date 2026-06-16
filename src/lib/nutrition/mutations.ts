@@ -1,4 +1,5 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import type { MealItem } from './engine'
 
 /**
  * Núcleo compartilhado das mutações de nutrição (delete / edit / água) e do
@@ -20,10 +21,25 @@ export interface DayTotals {
 
 export interface MealDraft {
   food_name: string
-  calories: number
-  protein: number
-  carbs: number
-  fat: number
+  /** Macros explícitos (edição legada). Ignorados quando `items` está presente. */
+  calories?: number
+  protein?: number
+  carbs?: number
+  fat?: number
+  /** Quando presente, os totais da entry e os macros viram a SOMA dos itens. */
+  items?: MealItem[]
+}
+
+/** Sanitiza/arredonda um item (mesma forma do trackMeal). */
+function sanitizeItems(items: MealItem[]): MealItem[] {
+  return (Array.isArray(items) ? items : []).map((it) => ({
+    label: String(it?.label ?? '').slice(0, 120),
+    grams: Math.max(0, Math.round(Number(it?.grams) || 0)),
+    calories: Math.max(0, Math.round(Number(it?.calories) || 0)),
+    protein: Math.max(0, Math.round(Number(it?.protein) || 0)),
+    carbs: Math.max(0, Math.round(Number(it?.carbs) || 0)),
+    fat: Math.max(0, Math.round(Number(it?.fat) || 0)),
+  }))
 }
 
 /** Resolve a data (YYYY-MM-DD) no fuso de São Paulo quando não vier explícita. */
@@ -92,7 +108,12 @@ export async function deleteEntryCore(
   return { totals }
 }
 
-/** Edita os macros/nome de uma entry e devolve os totais recalculados do dia. */
+/**
+ * Edita uma entry e devolve os totais recalculados do dia.
+ * - Com `draft.items`: os macros/calorias da entry viram a SOMA dos itens (fonte
+ *   única) e a coluna `items` é regravada.
+ * - Sem `items` (edição legada / jobs offline antigos): grava os macros do draft.
+ */
 export async function editEntryCore(
   supabase: SupabaseClient,
   userId: string,
@@ -102,15 +123,27 @@ export async function editEntryCore(
   const id = String(entryId ?? '').trim()
   if (!id) throw new Error('ID inválido.')
 
+  const update: Record<string, unknown> = {
+    food_name: String(draft.food_name ?? '').trim() || 'Refeição',
+  }
+
+  if (Array.isArray(draft.items)) {
+    const items = sanitizeItems(draft.items)
+    update.items = items.length > 0 ? items : null
+    update.calories = items.reduce((s, it) => s + it.calories, 0)
+    update.protein = items.reduce((s, it) => s + it.protein, 0)
+    update.carbs = items.reduce((s, it) => s + it.carbs, 0)
+    update.fat = items.reduce((s, it) => s + it.fat, 0)
+  } else {
+    update.calories = Math.max(0, Number(draft.calories) || 0)
+    update.protein = Math.max(0, Number(draft.protein) || 0)
+    update.carbs = Math.max(0, Number(draft.carbs) || 0)
+    update.fat = Math.max(0, Number(draft.fat) || 0)
+  }
+
   const { data: updated, error } = await supabase
     .from('nutrition_meal_entries')
-    .update({
-      food_name: String(draft.food_name ?? '').trim() || 'Refeição',
-      calories: Math.max(0, Number(draft.calories) || 0),
-      protein: Math.max(0, Number(draft.protein) || 0),
-      carbs: Math.max(0, Number(draft.carbs) || 0),
-      fat: Math.max(0, Number(draft.fat) || 0),
-    })
+    .update(update)
     .eq('id', id)
     .eq('user_id', userId)
     .select('date')
