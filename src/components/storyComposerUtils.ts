@@ -350,7 +350,9 @@ export const computeLiveSizes = ({
         const titleFont = storyFont(F.family, F.titleWeight, 34);
         const left = SAFE_SIDE;
         const right = CANVAS_W - SAFE_SIDE;
-        const title = safeString(metrics?.title).toUpperCase();
+        const title = template.titleUppercase
+            ? safeString(metrics?.title).toUpperCase()
+            : safeString(metrics?.title);
         const words = title.split(/\s+/).filter(Boolean);
         const lines: string[] = [];
         let line = '';
@@ -636,11 +638,12 @@ export const drawStory = ({
     ctx.fillStyle = C.brandPrimary;
     ctx.fillText('IRON', left, brandY);
     const ironW = ctx.measureText('IRON').width;
-    // separator dot
+    // separator (varia por template — pode ser '', ' · ', ' — ', ' / ')
+    const divider = template.brandDivider;
     ctx.fillStyle = C.brandDot;
     ctx.font = f(F.brandWeight, Math.round(brandFontSize * 0.55), F.brandStyle);
-    const dotW = ctx.measureText(' · ').width;
-    ctx.fillText(' · ', left + ironW, brandY + brandFontSize * 0.22);
+    const dotW = divider ? ctx.measureText(divider).width : 0;
+    if (divider) ctx.fillText(divider, left + ironW, brandY + brandFontSize * 0.22);
     ctx.font = f(F.brandWeight, brandFontSize, F.brandStyle);
     ctx.fillStyle = C.brandAccent;
     ctx.fillText('TRACKS', left + ironW + dotW, brandY);
@@ -649,7 +652,9 @@ export const drawStory = ({
     // ── Workout title — wrapping text ─────────────────────────────────────────
     const titleFontSize = 36;
     const titleLineH = titleFontSize + 8;
-    const title = safeString(metrics?.title).toUpperCase();
+    const title = template.titleUppercase
+        ? safeString(metrics?.title).toUpperCase()
+        : safeString(metrics?.title);
     ctx.font = f(F.titleWeight, titleFontSize);
     const lines: string[] = [];
     const words = title.split(/\s+/).filter(Boolean);

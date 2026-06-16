@@ -62,9 +62,19 @@ export interface StoryTemplate {
   fonts: StoryTemplateFonts
   overlay: StoryTemplateOverlay
   card: StoryTemplateCard
+  /** Título em CAIXA ALTA (true) ou como digitado (false). */
+  titleUppercase: boolean
+  /** Separador entre IRON e TRACKS nos layouts standard (ex.: ' · ', ' — ', ''). */
+  brandDivider: string
 }
 
+// Fontes JÁ instaladas no iOS/macOS (renderizam no canvas sem carregar nada).
+// No Android/web caem num fallback parecido da própria stack.
 const SYSTEM_STACK = 'ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial'
+const SERIF_STACK = 'Georgia, "Times New Roman", "Noto Serif", serif'
+const ROUNDED_STACK = '"Avenir Next", "Avenir", "Trebuchet MS", "Segoe UI", sans-serif'
+const GEOMETRIC_STACK = '"Futura", "Century Gothic", "Trebuchet MS", system-ui, sans-serif'
+const HEAVY_STACK = '"Impact", "Haettenschweiler", "Arial Narrow Bold", "Anton", sans-serif'
 
 /** Monta a string de `ctx.font` a partir do template. */
 export const storyFont = (
@@ -116,9 +126,11 @@ const CLASSIC_TEMPLATE: StoryTemplate = {
     gradientEnd: 'rgba(0,0,0,0.78)',
   },
   card: { radius: 28, accentHeight: 3, showAccentLine: true },
+  titleUppercase: true,
+  brandDivider: ' · ',
 }
 
-// ── 2. Noir (monocromático, editorial, sem linha de acento) ──────────────────
+// ── 2. Noir (serifada, editorial, sem linha de acento) ───────────────────────
 const NOIR_TEMPLATE: StoryTemplate = {
   id: 'noir',
   name: 'Noir',
@@ -145,12 +157,12 @@ const NOIR_TEMPLATE: StoryTemplate = {
     timeText: '#ffffff',
   },
   fonts: {
-    family: SYSTEM_STACK,
-    brandWeight: '800',
+    family: SERIF_STACK,
+    brandWeight: '700',
     brandStyle: 'normal',
     titleWeight: '700',
-    subtitleWeight: '600',
-    valueWeight: '800',
+    subtitleWeight: '400',
+    valueWeight: '700',
     labelWeight: '700',
     labelLetterSpacing: '4px',
   },
@@ -160,6 +172,8 @@ const NOIR_TEMPLATE: StoryTemplate = {
     gradientEnd: 'rgba(0,0,0,0.82)',
   },
   card: { radius: 20, accentHeight: 2, showAccentLine: false },
+  titleUppercase: false,
+  brandDivider: '',
 }
 
 // ── 3. Sunset (quente, coral/laranja) ────────────────────────────────────────
@@ -189,13 +203,13 @@ const SUNSET_TEMPLATE: StoryTemplate = {
     timeText: '#fdba74',
   },
   fonts: {
-    family: SYSTEM_STACK,
-    brandWeight: '900',
+    family: ROUNDED_STACK,
+    brandWeight: '800',
     brandStyle: 'italic',
-    titleWeight: '800',
-    subtitleWeight: '700',
-    valueWeight: '900',
-    labelWeight: '800',
+    titleWeight: '700',
+    subtitleWeight: '600',
+    valueWeight: '800',
+    labelWeight: '700',
     labelLetterSpacing: '2px',
   },
   overlay: {
@@ -204,6 +218,8 @@ const SUNSET_TEMPLATE: StoryTemplate = {
     gradientEnd: 'rgba(20,6,10,0.80)',
   },
   card: { radius: 28, accentHeight: 3, showAccentLine: true },
+  titleUppercase: true,
+  brandDivider: ' · ',
 }
 
 // ── 4. Ocean (ciano/azul) ────────────────────────────────────────────────────
@@ -233,14 +249,14 @@ const OCEAN_TEMPLATE: StoryTemplate = {
     timeText: '#7dd3fc',
   },
   fonts: {
-    family: SYSTEM_STACK,
-    brandWeight: '900',
-    brandStyle: 'italic',
-    titleWeight: '800',
-    subtitleWeight: '700',
-    valueWeight: '900',
-    labelWeight: '800',
-    labelLetterSpacing: '2px',
+    family: GEOMETRIC_STACK,
+    brandWeight: '700',
+    brandStyle: 'normal',
+    titleWeight: '600',
+    subtitleWeight: '500',
+    valueWeight: '700',
+    labelWeight: '700',
+    labelLetterSpacing: '3px',
   },
   overlay: {
     fallbackBg: ['#06121f', '#0c2238'],
@@ -248,6 +264,8 @@ const OCEAN_TEMPLATE: StoryTemplate = {
     gradientEnd: 'rgba(2,8,18,0.80)',
   },
   card: { radius: 24, accentHeight: 3, showAccentLine: true },
+  titleUppercase: true,
+  brandDivider: ' / ',
 }
 
 // ── 5. Lime (alto contraste, verde-limão, bold) ──────────────────────────────
@@ -277,14 +295,14 @@ const LIME_TEMPLATE: StoryTemplate = {
     timeText: '#a3e635',
   },
   fonts: {
-    family: SYSTEM_STACK,
-    brandWeight: '900',
+    family: HEAVY_STACK,
+    brandWeight: '400',
     brandStyle: 'normal',
-    titleWeight: '900',
-    subtitleWeight: '800',
-    valueWeight: '900',
-    labelWeight: '900',
-    labelLetterSpacing: '3px',
+    titleWeight: '400',
+    subtitleWeight: '400',
+    valueWeight: '400',
+    labelWeight: '400',
+    labelLetterSpacing: '2px',
   },
   overlay: {
     fallbackBg: ['#0a0a0a', '#14160d'],
@@ -292,6 +310,8 @@ const LIME_TEMPLATE: StoryTemplate = {
     gradientEnd: 'rgba(0,0,0,0.82)',
   },
   card: { radius: 16, accentHeight: 4, showAccentLine: true },
+  titleUppercase: true,
+  brandDivider: '',
 }
 
 export const STORY_TEMPLATES: StoryTemplate[] = [
