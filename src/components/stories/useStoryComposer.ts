@@ -32,6 +32,11 @@ import {
     computeLiveSizes,
     drawStory,
 } from '../storyComposerUtils'
+import {
+    type StoryTemplate,
+    STORY_TEMPLATES,
+    getTemplateById,
+} from './storyTemplates'
 
 interface UseStoryComposerOptions {
     open: boolean
@@ -39,9 +44,13 @@ interface UseStoryComposerOptions {
     onClose: () => void
     /** Pre-calculated calories from the report — overrides internal estimation when provided */
     caloriesOverride?: number | null
+    /** Template salvo do usuário (de user_settings.preferences.storyTemplate). */
+    initialTemplateId?: string | null
+    /** Persiste o template escolhido (chamado em setTemplate). */
+    onTemplatePersist?: (id: string) => void
 }
 
-export function useStoryComposer({ open, session, onClose, caloriesOverride }: UseStoryComposerOptions) {
+export function useStoryComposer({ open, session, onClose, caloriesOverride, initialTemplateId, onTemplatePersist }: UseStoryComposerOptions) {
     const inputRef = useRef<HTMLInputElement>(null)
     const videoRef = useRef<HTMLVideoElement>(null)
     const compositorRef = useRef<VideoCompositor | null>(null)
@@ -71,6 +80,8 @@ export function useStoryComposer({ open, session, onClose, caloriesOverride }: U
     const [info, setInfo] = useState('')
     const [showSafeGuide, setShowSafeGuide] = useState(true)
     const [layout, setLayout] = useState('bottom-row')
+    const [template, setTemplateState] = useState<StoryTemplate>(() => getTemplateById(initialTemplateId))
+    const userTouchedTemplateRef = useRef(false)
     const [livePositions, setLivePositions] = useState<LivePositions>(DEFAULT_LIVE_POSITIONS)
     const [draggingKey, setDraggingKey] = useState<string | null>(null)
     const [saveImageUrl, setSaveImageUrl] = useState<string | null>(null)
@@ -82,6 +93,19 @@ export function useStoryComposer({ open, session, onClose, caloriesOverride }: U
     const kcalApiCalledRef = useRef(false)
 
     useEffect(() => { backgroundUrlRef.current = backgroundUrl }, [backgroundUrl])
+
+    // Aplica a preferência salva quando ela chega (settings carregam async), sem
+    // sobrescrever uma escolha que o usuário já fez nesta sessão.
+    useEffect(() => {
+        if (userTouchedTemplateRef.current || !initialTemplateId) return
+        setTemplateState(getTemplateById(initialTemplateId))
+    }, [initialTemplateId])
+
+    const setTemplate = useCallback((t: StoryTemplate) => {
+        userTouchedTemplateRef.current = true
+        setTemplateState(t)
+        try { onTemplatePersist?.(t.id) } catch { /* persistência best-effort */ }
+    }, [onTemplatePersist])
 
     const metrics: Metrics = useMemo(() => {
         // Remove o "(TERÇA)" / "(DIA 3)" do título — usuário pode estar postando
@@ -422,7 +446,7 @@ export function useStoryComposer({ open, session, onClose, caloriesOverride }: U
         const vw = vid.videoWidth || CANVAS_W; const vh = vid.videoHeight || CANVAS_H
         const scale = Math.max(CANVAS_W / vw, CANVAS_H / vh)
         ctx.drawImage(vid, (CANVAS_W - vw * scale) / 2, (CANVAS_H - vh * scale) / 2, vw * scale, vh * scale)
-        drawStory({ ctx, canvasW: CANVAS_W, canvasH: CANVAS_H, backgroundImage: null, metrics, layout, livePositions, transparentBg: true, skipClear: true })
+        drawStory({ ctx, canvasW: CANVAS_W, canvasH: CANVAS_H, backgroundImage: null, metrics, layout, livePositions, transparentBg: true, skipClear: true, template })
         return new Promise<{ blob: Blob; filename: string; mime: string }>((resolve, reject) =>
             canvas.toBlob(b => b ? resolve({ blob: b, filename: `irontracks-story-${Date.now()}.jpg`, mime: 'image/jpeg' }) : reject(new Error('blob_failed')), 'image/jpeg', 0.92)
         )
@@ -452,6 +476,7 @@ export function useStoryComposer({ open, session, onClose, caloriesOverride }: U
                     livePositions,
                     transparentBg: true,
                     skipClear: false,
+                    template,
                 })
             }
 
@@ -534,7 +559,7 @@ export function useStoryComposer({ open, session, onClose, caloriesOverride }: U
         canvas.width = CANVAS_W; canvas.height = CANVAS_H
         const ctx = canvas.getContext('2d')
         if (!ctx) throw new Error('canvas_error')
-        drawStory({ ctx, canvasW: CANVAS_W, canvasH: CANVAS_H, backgroundImage: mediaKind === 'image' ? backgroundImage : null, metrics, layout, livePositions })
+        drawStory({ ctx, canvasW: CANVAS_W, canvasH: CANVAS_H, backgroundImage: mediaKind === 'image' ? backgroundImage : null, metrics, layout, livePositions, template })
         const mime = type === 'png' ? 'image/png' : 'image/jpeg'
         const ext = type === 'png' ? 'png' : 'jpg'
         return new Promise((resolve, reject) =>
@@ -601,7 +626,7 @@ export function useStoryComposer({ open, session, onClose, caloriesOverride }: U
             if (name === 'AbortError') return
             setError(String(getErrorMessage(e) || '').trim() || 'Não foi possível compartilhar.')
         } finally { setBusy(false); setBusyAction(null); setBusySubAction(null) }
-    }, [mediaKind, metrics, layout, livePositions, backgroundImage]) // eslint-disable-line
+    }, [mediaKind, metrics, layout, livePositions, backgroundImage, template]) // eslint-disable-line
 
     const postToIronTracks = useCallback(async () => {
         setBusy(true); setBusyAction('post'); setBusySubAction('processing'); setError(''); setInfo('')
@@ -650,7 +675,7 @@ export function useStoryComposer({ open, session, onClose, caloriesOverride }: U
             logError('error', err)
             setError(String(getErrorMessage(err) || '').trim() || 'Falha ao publicar story.')
         } finally { setBusy(false); setBusyAction(null); setBusySubAction(null); setUploadProgress(0) }
-    }, [mediaKind, selectedFile, metrics, layout, livePositions, backgroundImage, onClose]) // eslint-disable-line
+    }, [mediaKind, selectedFile, metrics, layout, livePositions, backgroundImage, onClose, template]) // eslint-disable-line
 
     return {
         // refs
@@ -660,6 +685,7 @@ export function useStoryComposer({ open, session, onClose, caloriesOverride }: U
         busy, busyAction, busySubAction, uploadProgress, isExporting,
         error, info, showSafeGuide, setShowSafeGuide,
         layout, livePositions, setLivePositions,
+        template, setTemplate, templates: STORY_TEMPLATES,
         draggingKey, saveImageUrl, setSaveImageUrl,
         showTrimmer, setShowTrimmer, videoDuration, trimRange, setTrimRange, previewTime, setPreviewTime,
         metrics,

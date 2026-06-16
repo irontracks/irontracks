@@ -1,12 +1,15 @@
 'use client'
 
-import React, { useRef, useState, useCallback } from 'react'
+import React, { useRef, useState, useCallback, useEffect } from 'react'
 import NextImage from 'next/image'
 import { ArrowLeft, Upload, Scissors } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useStoryComposer } from '@/components/stories/useStoryComposer'
 import { StoryControlPanel } from '@/components/stories/StoryControlPanel'
 import { StoryComposerIosSavePanel } from './StoryComposerIosSavePanel'
+import { getTemplateById } from '@/components/stories/storyTemplates'
+import { useUserSettings } from '@/hooks/useUserSettings'
+import { createClient } from '@/utils/supabase/client'
 import {
   SessionLite,
   CANVAS_W,
@@ -36,12 +39,25 @@ export default function StoryComposer({ open, session, onClose, calories }: Stor
   const previewRef = useRef<HTMLDivElement>(null)
   const previewCanvasRef = useRef<HTMLCanvasElement>(null)
 
+  // Template salvo do usuário (user_settings.preferences.storyTemplate).
+  const [userId, setUserId] = useState<string | undefined>()
+  useEffect(() => {
+    if (!open) return
+    let cancelled = false
+    createClient().auth.getUser().then(({ data }) => {
+      if (!cancelled && data?.user?.id) setUserId(data.user.id)
+    }).catch(() => {})
+    return () => { cancelled = true }
+  }, [open])
+  const { settings, updateSetting, save } = useUserSettings(userId)
+
   const {
     inputRef, videoRef,
     mediaKind, backgroundUrl, backgroundImage,
     busy, busyAction, busySubAction, uploadProgress, isExporting,
     error, info, showSafeGuide, setShowSafeGuide,
     layout, livePositions, setLivePositions,
+    template, setTemplate, templates,
     draggingKey, saveImageUrl, setSaveImageUrl,
     showTrimmer, setShowTrimmer, videoDuration, trimRange, setTrimRange, previewTime,
     metrics: rawMetrics,
@@ -49,7 +65,14 @@ export default function StoryComposer({ open, session, onClose, calories }: Stor
     onPiecePointerDown, onPiecePointerMove, onPiecePointerUp,
     onGroupPointerDown, onGroupPointerMove, onGroupPointerUp,
     shareImage, postToIronTracks,
-  } = useStoryComposer({ open, session, onClose, caloriesOverride: calories })
+  } = useStoryComposer({
+    open,
+    session,
+    onClose,
+    caloriesOverride: calories,
+    initialTemplateId: settings.storyTemplate,
+    onTemplatePersist: (id) => { updateSetting('storyTemplate', id); void save({ storyTemplate: id }) },
+  })
 
   // metrics.kcal already reflects caloriesOverride (applied inside the hook so the canvas is correct)
   const metrics = rawMetrics
@@ -164,11 +187,11 @@ export default function StoryComposer({ open, session, onClose, calories }: Stor
     const ctx = canvas.getContext('2d')
     if (!ctx) return
     let raf = 0
-    const draw = () => drawStory({ ctx, canvasW: CANVAS_W, canvasH: CANVAS_H, backgroundImage, metrics, layout, livePositions, transparentBg: mediaKind === 'video' })
+    const draw = () => drawStory({ ctx, canvasW: CANVAS_W, canvasH: CANVAS_H, backgroundImage, metrics, layout, livePositions, transparentBg: mediaKind === 'video', template })
     if (isExporting) { draw(); return }
     if (layout === 'live' && draggingKey) { raf = requestAnimationFrame(draw) } else { draw() }
     return () => cancelAnimationFrame(raf)
-  }, [open, backgroundImage, layout, livePositions, mediaKind, metrics, draggingKey, isExporting])
+  }, [open, backgroundImage, layout, livePositions, mediaKind, metrics, draggingKey, isExporting, template])
 
   const livePieces = React.useMemo(() => [
     { key: 'brand', label: 'IRONTRACKS' },
@@ -403,6 +426,9 @@ export default function StoryComposer({ open, session, onClose, calories }: Stor
                 <StoryControlPanel
                   layout={layout}
                   onSelectLayout={onSelectLayout}
+                  templates={templates}
+                  templateId={template.id}
+                  onSelectTemplate={(id) => setTemplate(getTemplateById(id))}
                   livePositions={livePositions}
                   onResetPositions={() => setLivePositions(DEFAULT_LIVE_POSITIONS)}
                   showTrimmer={showTrimmer}

@@ -7,6 +7,7 @@
 
 import { safeString } from '@/utils/guards'
 import { estimateCaloriesMet, MET_LIGHT, DEFAULT_BODY_WEIGHT_KG } from '@/utils/calories/metEstimate'
+import { type StoryTemplate, DEFAULT_STORY_TEMPLATE, storyFont } from '@/components/stories/storyTemplates'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -328,9 +329,11 @@ export const drawRoundedRect = (
 export const computeLiveSizes = ({
     ctx,
     metrics,
+    template = DEFAULT_STORY_TEMPLATE,
 }: {
     ctx: CanvasRenderingContext2D | null;
     metrics: Metrics;
+    template?: StoryTemplate;
 }) => {
     try {
         if (!ctx) {
@@ -343,6 +346,8 @@ export const computeLiveSizes = ({
             };
         }
 
+        const F = template.fonts;
+        const titleFont = storyFont(F.family, F.titleWeight, 34);
         const left = SAFE_SIDE;
         const right = CANVAS_W - SAFE_SIDE;
         const title = safeString(metrics?.title).toUpperCase();
@@ -350,7 +355,7 @@ export const computeLiveSizes = ({
         const lines: string[] = [];
         let line = '';
 
-        ctx.font = '800 34px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial';
+        ctx.font = titleFont;
         for (const w of words) {
             const candidate = line ? `${line} ${w}` : w;
             if (ctx.measureText(candidate).width <= right - left) line = candidate;
@@ -363,7 +368,7 @@ export const computeLiveSizes = ({
         if (line && lines.length < 2) lines.push(line);
 
         const brandW = (() => {
-            ctx.font = 'italic 900 56px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial';
+            ctx.font = storyFont(F.family, F.brandWeight, 56, F.brandStyle);
             const ironW = ctx.measureText('IRON').width;
             const tracksW = ctx.measureText('TRACKS').width;
             return ironW + tracksW;
@@ -371,13 +376,13 @@ export const computeLiveSizes = ({
         const brandH = 56;
 
         const titleW = (() => {
-            ctx.font = '800 34px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial';
+            ctx.font = titleFont;
             return Math.max(...lines.map((l) => ctx.measureText(l).width), 0);
         })();
         const titleH = lines.length * 40;
 
         const subtitleW = (() => {
-            ctx.font = '800 34px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial';
+            ctx.font = titleFont;
             const dateText = metrics?.date ? `• ${metrics.date}` : '';
             return ctx.measureText(`RELATÓRIO DO TREINO ${dateText}`.trim()).width;
         })();
@@ -414,6 +419,7 @@ export const drawStory = ({
     livePositions,
     transparentBg = false,
     skipClear = false,
+    template = DEFAULT_STORY_TEMPLATE,
 }: {
     ctx: CanvasRenderingContext2D;
     canvasW: number;
@@ -424,7 +430,15 @@ export const drawStory = ({
     livePositions: LivePositions;
     transparentBg?: boolean;
     skipClear?: boolean;
+    template?: StoryTemplate;
 }) => {
+    // Atalhos do template (cores/fontes/card). A GEOMETRIA segue literal abaixo —
+    // o template só troca cor/peso/itálico/acento, nunca posições/tamanhos.
+    const C = template.colors;
+    const F = template.fonts;
+    const f = (weight: string, size: number, style: 'italic' | 'normal' = 'normal') =>
+        storyFont(F.family, weight, size, style);
+
     if (!skipClear) ctx.clearRect(0, 0, canvasW, canvasH);
 
     // Background
@@ -443,8 +457,8 @@ export const drawStory = ({
             ctx.drawImage(backgroundImage, cx, cy, dw, dh);
         } else {
             const g = ctx.createLinearGradient(0, 0, canvasW, canvasH);
-            g.addColorStop(0, '#0a0a0a');
-            g.addColorStop(1, '#111827');
+            g.addColorStop(0, template.overlay.fallbackBg[0]);
+            g.addColorStop(1, template.overlay.fallbackBg[1]);
             ctx.fillStyle = g;
             ctx.fillRect(0, 0, canvasW, canvasH);
         }
@@ -452,8 +466,8 @@ export const drawStory = ({
 
     // Gradient Overlay
     const baseOverlay = ctx.createLinearGradient(0, canvasH * 0.35, 0, canvasH);
-    baseOverlay.addColorStop(0, 'rgba(0,0,0,0)');
-    baseOverlay.addColorStop(1, 'rgba(0,0,0,0.78)');
+    baseOverlay.addColorStop(0, template.overlay.gradientStart);
+    baseOverlay.addColorStop(1, template.overlay.gradientEnd);
     ctx.fillStyle = baseOverlay;
     ctx.fillRect(0, 0, canvasW, canvasH);
 
@@ -467,7 +481,7 @@ export const drawStory = ({
         const label = `EQUIPE • ${teamCount}`;
         ctx.save();
         ctx.textBaseline = 'top';
-        ctx.font = '900 24px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial';
+        ctx.font = f('900', 24);
         const padX = 18;
         const padY = 12;
         const textW = ctx.measureText(label).width;
@@ -476,12 +490,12 @@ export const drawStory = ({
         const x = Math.max(left, right - w);
         const y = SAFE_TOP;
         drawRoundedRect(ctx, x, y, w, h, 18);
-        ctx.fillStyle = 'rgba(250,204,21,0.16)';
+        ctx.fillStyle = C.badgeFill;
         ctx.fill();
         ctx.lineWidth = 2;
-        ctx.strokeStyle = 'rgba(250,204,21,0.28)';
+        ctx.strokeStyle = C.badgeBorder;
         ctx.stroke();
-        ctx.fillStyle = '#facc15';
+        ctx.fillStyle = C.badgeText;
         ctx.fillText(label, x + padX, y + padY);
         ctx.restore();
     }
@@ -494,44 +508,46 @@ export const drawStory = ({
         box: { x: number; y: number; w: number; h: number },
         card: { label: string; value: string },
     ) => {
-        const r = 28;
+        const r = template.card.radius;
 
         // 1. Dark glass fill
         drawRoundedRect(ctx, box.x, box.y, box.w, box.h, r);
-        ctx.fillStyle = 'rgba(0,0,0,0.72)';
+        ctx.fillStyle = C.cardFill;
         ctx.fill();
 
         // 2. Subtle border
         ctx.lineWidth = 1.5;
-        ctx.strokeStyle = 'rgba(255,255,255,0.10)';
+        ctx.strokeStyle = C.cardBorder;
         ctx.stroke();
 
-        // 3. Gold bottom accent line
-        const accentH = 3;
-        const accentY = box.y + box.h - accentH;
-        const accentInset = 14;
-        drawRoundedRect(ctx, box.x + accentInset, accentY, box.w - accentInset * 2, accentH, accentH / 2);
-        ctx.fillStyle = 'rgba(250,204,21,0.70)';
-        ctx.fill();
+        // 3. Accent bottom line (opcional por template)
+        const accentH = template.card.accentHeight;
+        if (template.card.showAccentLine) {
+            const accentY = box.y + box.h - accentH;
+            const accentInset = 14;
+            drawRoundedRect(ctx, box.x + accentInset, accentY, box.w - accentInset * 2, accentH, accentH / 2);
+            ctx.fillStyle = C.cardAccent;
+            ctx.fill();
+        }
 
-        // 4. Gold label
+        // 4. Label (acento)
         ctx.textBaseline = 'top';
-        ctx.font = '800 20px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial';
-        ctx.fillStyle = 'rgba(250,204,21,0.85)';
-        ctx.letterSpacing = '2px';
+        ctx.font = f(F.labelWeight, 20);
+        ctx.fillStyle = C.cardLabel;
+        ctx.letterSpacing = F.labelLetterSpacing;
         const labelW = ctx.measureText(card.label).width;
         const labelX = box.x + (box.w - labelW) / 2;
         ctx.fillText(card.label, labelX, box.y + 20);
         ctx.letterSpacing = '0px';
 
-        // 5. White value — auto-shrink to fit
-        ctx.fillStyle = '#ffffff';
+        // 5. Value — auto-shrink to fit
+        ctx.fillStyle = C.value;
         let valFont = 52;
-        ctx.font = `900 ${valFont}px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial`;
+        ctx.font = f(F.valueWeight, valFont);
         let valW = ctx.measureText(card.value).width;
         while (valW > box.w - 24 && valFont > 26) {
             valFont -= 2;
-            ctx.font = `900 ${valFont}px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial`;
+            ctx.font = f(F.valueWeight, valFont);
             valW = ctx.measureText(card.value).width;
         }
         const valX = box.x + (box.w - valW) / 2;
@@ -545,7 +561,7 @@ export const drawStory = ({
     if (layoutId === 'live' || layoutId === 'group') {
         const safe =
             livePositions && typeof livePositions === 'object' ? livePositions : DEFAULT_LIVE_POSITIONS;
-        const sizes = computeLiveSizes({ ctx, metrics });
+        const sizes = computeLiveSizes({ ctx, metrics, template });
 
         const brandPos = clampPctWithSize({ pos: safe.brand, size: sizes.brand });
         const titlePos = clampPctWithSize({ pos: safe.title, size: sizes.title });
@@ -558,25 +574,25 @@ export const drawStory = ({
         const brandY = brandPos.y * CANVAS_H;
 
         ctx.textBaseline = 'top';
-        ctx.font = 'italic 900 56px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial';
-        ctx.fillStyle = '#ffffff';
+        ctx.font = f(F.brandWeight, 56, F.brandStyle);
+        ctx.fillStyle = C.brandPrimary;
         ctx.fillText('IRON', brandX, brandY);
         const ironW = ctx.measureText('IRON').width;
-        ctx.fillStyle = '#facc15';
+        ctx.fillStyle = C.brandAccent;
         ctx.fillText('TRACKS', brandX + ironW, brandY);
 
         const titleX = titlePos.x * CANVAS_W;
         const titleY = titlePos.y * CANVAS_H;
-        ctx.fillStyle = '#ffffff';
-        ctx.font = '800 34px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial';
+        ctx.fillStyle = C.title;
+        ctx.font = f(F.titleWeight, 34);
         ; (sizes.titleLines ?? []).forEach((l, idx) => {
             ctx.fillText(l, titleX, titleY + idx * 40);
         });
 
         const subtitleX = subtitlePos.x * CANVAS_W;
         const subtitleY = subtitlePos.y * CANVAS_H;
-        ctx.fillStyle = 'rgba(255,255,255,0.85)';
-        ctx.font = '800 34px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial';
+        ctx.fillStyle = C.subtitle;
+        ctx.font = f(F.titleWeight, 34);
         const dateText = metrics?.date ? `• ${metrics.date}` : '';
         ctx.fillText(`RELATÓRIO DO TREINO ${dateText}`.trim(), subtitleX, subtitleY);
 
@@ -610,23 +626,23 @@ export const drawStory = ({
     // ── Brand logo (IRON·TRACKS) — strictly below SAFE_TOP ───────────────────
     const brandY = SAFE_TOP + 18;
     const brandFontSize = 54;
-    ctx.font = `italic 900 ${brandFontSize}px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial`;
+    ctx.font = f(F.brandWeight, brandFontSize, F.brandStyle);
     ctx.textBaseline = 'top';
 
     // Shadow for legibility on any background
     ctx.save();
     ctx.shadowColor = 'rgba(0,0,0,0.6)';
     ctx.shadowBlur = 12;
-    ctx.fillStyle = '#ffffff';
+    ctx.fillStyle = C.brandPrimary;
     ctx.fillText('IRON', left, brandY);
     const ironW = ctx.measureText('IRON').width;
     // separator dot
-    ctx.fillStyle = 'rgba(250,204,21,0.55)';
-    ctx.font = `italic 900 ${Math.round(brandFontSize * 0.55)}px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial`;
+    ctx.fillStyle = C.brandDot;
+    ctx.font = f(F.brandWeight, Math.round(brandFontSize * 0.55), F.brandStyle);
     const dotW = ctx.measureText(' · ').width;
     ctx.fillText(' · ', left + ironW, brandY + brandFontSize * 0.22);
-    ctx.font = `italic 900 ${brandFontSize}px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial`;
-    ctx.fillStyle = '#facc15';
+    ctx.font = f(F.brandWeight, brandFontSize, F.brandStyle);
+    ctx.fillStyle = C.brandAccent;
     ctx.fillText('TRACKS', left + ironW + dotW, brandY);
     ctx.restore();
 
@@ -634,7 +650,7 @@ export const drawStory = ({
     const titleFontSize = 36;
     const titleLineH = titleFontSize + 8;
     const title = safeString(metrics?.title).toUpperCase();
-    ctx.font = `800 ${titleFontSize}px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial`;
+    ctx.font = f(F.titleWeight, titleFontSize);
     const lines: string[] = [];
     const words = title.split(/\s+/).filter(Boolean);
     let line = '';
@@ -660,18 +676,18 @@ export const drawStory = ({
     const drawSubtitlePill = (x: number, y: number) => {
         const dateText = metrics?.date ? ` · ${metrics.date}` : '';
         const subText = `RELATÓRIO${dateText}`;
-        ctx.font = '700 24px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial';
+        ctx.font = f(F.subtitleWeight, 24);
         const tw = ctx.measureText(subText).width;
         const padX = 18; const padY = 10;
         const pillW = tw + padX * 2;
         const pillH = 24 + padY * 2;
         drawRoundedRect(ctx, x, y, pillW, pillH, pillH / 2);
-        ctx.fillStyle = 'rgba(0,0,0,0.52)';
+        ctx.fillStyle = C.pillFill;
         ctx.fill();
         ctx.lineWidth = 1;
-        ctx.strokeStyle = 'rgba(250,204,21,0.30)';
+        ctx.strokeStyle = C.pillBorder;
         ctx.stroke();
-        ctx.fillStyle = 'rgba(255,255,255,0.80)';
+        ctx.fillStyle = C.pillText;
         ctx.fillText(subText, x + padX, y + padY);
     };
 
@@ -731,8 +747,8 @@ export const drawStory = ({
     ctx.save();
     ctx.shadowColor = 'rgba(0,0,0,0.55)';
     ctx.shadowBlur = 10;
-    ctx.fillStyle = '#ffffff';
-    ctx.font = `800 ${titleFontSize}px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial`;
+    ctx.fillStyle = C.title;
+    ctx.font = f(F.titleWeight, titleFontSize);
     ctx.textBaseline = 'top';
     lines.forEach((l, idx) => {
         ctx.fillText(l, left, titleY + idx * titleLineH);
@@ -754,7 +770,7 @@ export const drawStory = ({
 
         ctx.save();
         const fontSize = 32;
-        ctx.font = `900 ${fontSize}px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial`;
+        ctx.font = f('900', fontSize);
         const timeW = ctx.measureText(timeStr).width;
 
         const padX = 18;
@@ -767,16 +783,16 @@ export const drawStory = ({
 
         // Glass background
         drawRoundedRect(ctx, pillX, pillY, pillW, pillH, 14);
-        ctx.fillStyle = 'rgba(0,0,0,0.55)';
+        ctx.fillStyle = C.timeFill;
         ctx.fill();
         ctx.lineWidth = 1.5;
-        ctx.strokeStyle = 'rgba(250,204,21,0.5)';
+        ctx.strokeStyle = C.timeBorder;
         ctx.stroke();
 
-        // Time text (gold)
-        ctx.font = `900 ${fontSize}px ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Arial`;
+        // Time text
+        ctx.font = f('900', fontSize);
         ctx.textBaseline = 'top';
-        ctx.fillStyle = '#facc15';
+        ctx.fillStyle = C.timeText;
         ctx.shadowColor = 'rgba(0,0,0,0.7)';
         ctx.shadowBlur = 6;
         ctx.fillText(timeStr, pillX + padX, pillY + padY);
