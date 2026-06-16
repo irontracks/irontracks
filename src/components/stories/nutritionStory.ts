@@ -15,6 +15,8 @@ import {
 } from '../storyComposerUtils'
 import { type StoryTemplate, storyFont } from './storyTemplates'
 
+export type NutritionStoryItem = { label: string; grams: number }
+
 export type NutritionStoryContent =
   | {
       kind: 'meal'
@@ -23,6 +25,7 @@ export type NutritionStoryContent =
       protein: number
       carbs: number
       fat: number
+      items?: NutritionStoryItem[]
     }
   | {
       kind: 'day'
@@ -211,6 +214,45 @@ export const drawNutritionStory = ({
   // ── CALORIAS hero ──────────────────────────────────────────────────────────
   const cardTopY = safeBottomY - 16 - cardH
   const heroLabelY = cardTopY - 188
+
+  // ── Lista de alimentos (modo refeição) ─────────────────────────────────────
+  // Cada linha é o que o usuário digitou (ex.: "200g arroz branco"). Cabe entre
+  // o subtítulo e o hero; se não couber tudo, mostra "+N mais".
+  if (content.kind === 'meal' && Array.isArray(content.items) && content.items.length > 0) {
+    const listX = left
+    const listTop = subY + 48 + 22 // abaixo do pill (~48px)
+    const lineH = 36
+    const maxLines = Math.max(1, Math.floor((heroLabelY - 24 - listTop) / lineH))
+    const all = content.items
+    const fitsAll = all.length <= maxLines
+    const visible = fitsAll ? all : all.slice(0, Math.max(1, maxLines - 1))
+    ctx.save()
+    ctx.shadowColor = 'rgba(0,0,0,0.65)'
+    ctx.shadowBlur = 8
+    ctx.textBaseline = 'top'
+    visible.forEach((it, i) => {
+      const y = listTop + i * lineH
+      ctx.fillStyle = C.cardAccent
+      ctx.font = f(F.valueWeight, 22)
+      ctx.fillText('•', listX, y + 3)
+      const bulletW = 22
+      ctx.fillStyle = C.title
+      ctx.font = f(F.subtitleWeight, 28)
+      let label = String(it.label || '')
+      const maxW = right - listX - bulletW
+      if (ctx.measureText(label).width > maxW) {
+        while (label.length > 1 && ctx.measureText(label + '…').width > maxW) label = label.slice(0, -1)
+        label = label + '…'
+      }
+      ctx.fillText(label, listX + bulletW, y)
+    })
+    if (!fitsAll) {
+      ctx.fillStyle = C.subtitle
+      ctx.font = f(F.subtitleWeight, 24)
+      ctx.fillText(`+${all.length - visible.length} mais`, listX, listTop + visible.length * lineH)
+    }
+    ctx.restore()
+  }
   ctx.save()
   ctx.shadowColor = 'rgba(0,0,0,0.5)'
   ctx.shadowBlur = 10
@@ -294,6 +336,7 @@ export const mealToContent = (item: {
   protein?: number
   carbs?: number
   fat?: number
+  items?: Array<{ label?: unknown; grams?: unknown }> | null
 }): NutritionStoryContent => ({
   kind: 'meal',
   mealName: String(item?.food_name || 'Refeição'),
@@ -301,6 +344,11 @@ export const mealToContent = (item: {
   protein: Number(item?.protein) || 0,
   carbs: Number(item?.carbs) || 0,
   fat: Number(item?.fat) || 0,
+  items: Array.isArray(item?.items)
+    ? item.items
+        .map((it) => ({ label: String(it?.label ?? '').trim(), grams: Number(it?.grams) || 0 }))
+        .filter((it) => it.label)
+    : undefined,
 })
 
 export const dayToContent = (
