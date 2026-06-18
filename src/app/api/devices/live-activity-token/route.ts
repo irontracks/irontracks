@@ -64,8 +64,19 @@ export async function POST(request: Request) {
 
     if (error) {
       // Table may not exist yet (migration not applied) — fail soft so the
-      // client doesn't loop on every token rotation.
-      if (String(error.code || '').toLowerCase() === '42p01' || /does not exist/i.test(error.message)) {
+      // client doesn't loop on every token rotation. We may see either the
+      // direct Postgres error (42P01 / "does not exist") or, since supabase-js
+      // goes through PostgREST, the schema-cache error (PGRST205 / "could not
+      // find the table ... in the schema cache").
+      const code = String(error.code || '').toLowerCase()
+      const errMsg = String(error.message || '')
+      const tableMissing =
+        code === '42p01' ||
+        code === 'pgrst205' ||
+        /does not exist/i.test(errMsg) ||
+        /schema cache/i.test(errMsg) ||
+        /could not find the table/i.test(errMsg)
+      if (tableMissing) {
         return NextResponse.json({ ok: true, deferred: true })
       }
       return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
