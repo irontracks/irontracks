@@ -83,7 +83,7 @@ export async function POST(req: Request) {
 
     const { data: inserted, error: insertErr } = await admin
       .from('exercise_videos')
-      .upsert(rows as unknown, { onConflict: 'exercise_library_id,provider,provider_video_id' })
+      .upsert(rows, { onConflict: 'exercise_library_id,provider,provider_video_id' })
       .select('id')
 
     if (insertErr) return NextResponse.json({ ok: false, error: insertErr.message }, { status: 400 })
