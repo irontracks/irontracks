@@ -29,8 +29,23 @@ Sentry.init({
   replaysSessionSampleRate: 0.1,
   replaysOnErrorSampleRate: 1.0,
 
-  // false = não envia IP/user-agent por padrão (LGPD)
-  sendDefaultPii: false,
+  // Equivalente exato ao antigo `sendDefaultPii: false` (deprecated em 10.57+,
+  // removido na v11). Não envia PII por padrão: IP/user-agent/headers/cookies/
+  // query params filtrados, sem corpos de request/response, sem user info,
+  // sem I/O de IA. (LGPD)
+  dataCollection: {
+    userInfo: false,
+    cookies: { deny: ["forwarded", "-ip", "remote-", "via", "-user"] },
+    httpHeaders: {
+      request: { deny: ["forwarded", "-ip", "remote-", "via", "-user"] },
+      response: { deny: ["forwarded", "-ip", "remote-", "via", "-user"] },
+    },
+    httpBodies: [],
+    queryParams: { deny: ["forwarded", "-ip", "remote-", "via", "-user"] },
+    genAI: { inputs: false, outputs: false },
+    stackFrameVariables: true,
+    frameContextLines: 7,
+  },
 
   integrations: [],
 
