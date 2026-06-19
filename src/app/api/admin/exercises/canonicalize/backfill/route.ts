@@ -6,7 +6,7 @@ import { z } from 'zod'
 import { requireRoleOrBearer } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { normalizeExerciseName } from '@/utils/normalizeExerciseName'
-import { GoogleGenerativeAI } from '@google/generative-ai'
+import { getGeminiModel } from '@/utils/ai/gemini'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { env } from '@/utils/env'
 
@@ -47,8 +47,7 @@ async function resolveWithGemini(items: Array<{ normalized: string; alias: strin
   const apiKey = String(env.gemini.apiKey || '').trim()
   if (!apiKey) throw new Error('missing_gemini_key')
 
-  const genAI = new GoogleGenerativeAI(apiKey)
-  const model = genAI.getGenerativeModel({ model: MODEL_ID })
+  const model = getGeminiModel(apiKey, MODEL_ID)
 
   const prompt =
     'Você é um assistente para PADRONIZAR nomes de exercícios de musculação para relatórios de evolução.' +

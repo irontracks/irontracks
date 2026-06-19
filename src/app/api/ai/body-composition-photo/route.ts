@@ -12,7 +12,7 @@
  * Rate limit: 5 req/min (chamada de IA cara).
  */
 import { NextResponse } from 'next/server'
-import { GoogleGenerativeAI, type Part } from '@google/generative-ai'
+import type { Part } from '@google/genai'
 import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
@@ -150,8 +150,7 @@ export async function POST(req: Request) {
             return NextResponse.json({ ok: false, error: 'photos_unreadable' }, { status: 400 })
         }
 
-        const genAI = new GoogleGenerativeAI(apiKey)
-        const model = getGeminiModel(genAI, env.gemini.modelId)
+        const model = getGeminiModel(apiKey, env.gemini.modelId)
         const geminiResult = await safeGemini('body-composition-photo', () => model.generateContent(parts))
         if ('errorResponse' in geminiResult) {
             await admin.from('body_photo_assessments').update({ status: 'failed' }).eq('id', assessmentId)

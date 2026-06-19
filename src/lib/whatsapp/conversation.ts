@@ -6,7 +6,7 @@
  * whatsapp_conversations.context. Gemini receives the full history on every
  * reply so context is preserved across messages.
  */
-import { GoogleGenerativeAI } from '@google/generative-ai'
+import { GoogleGenAI } from '@google/genai'
 import { env } from '@/utils/env'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { logError } from '@/lib/logger'
@@ -124,7 +124,7 @@ export async function generateReply(
   history: ConversationTurn[],
   userCtx: UserWorkoutContext,
 ): Promise<GenerateReplyResult> {
-  const genAI = new GoogleGenerativeAI(env.gemini.apiKey)
+  const ai = new GoogleGenAI({ apiKey: env.gemini.apiKey })
 
   const contextBlock = [
     `Contexto do usuário:`,
@@ -133,26 +133,23 @@ export async function generateReply(
     `- Total de treinos registrados no app: ${userCtx.totalWorkouts}`,
   ].join('\n')
 
-  const model = genAI.getGenerativeModel({
-    model: env.gemini.fastModelId,
-    systemInstruction: `${SYSTEM_PROMPT}\n\n${contextBlock}`,
-  })
-
   // Gemini requires history to start with a 'user' turn — strip any
   // leading 'model' turns (e.g. when the cron sends the initial message
   // before the user replies for the first time).
   const firstUserIdx = history.findIndex((t) => t.role === 'user')
   const geminiHistory = firstUserIdx >= 0 ? history.slice(firstUserIdx) : []
 
-  const chat = model.startChat({
+  const chat = ai.chats.create({
+    model: env.gemini.fastModelId,
+    config: { systemInstruction: `${SYSTEM_PROMPT}\n\n${contextBlock}` },
     history: geminiHistory.map((turn) => ({
       role: turn.role,
       parts: [{ text: turn.text }],
     })),
   })
 
-  const result = await chat.sendMessage(userMessage)
-  const rawText = result.response.text().trim()
+  const result = await chat.sendMessage({ message: userMessage })
+  const rawText = (result.text ?? '').trim()
 
   const shouldClose = rawText.includes('ENCERRAR_CONVERSA')
   const message = rawText.replace('ENCERRAR_CONVERSA', '').trim()

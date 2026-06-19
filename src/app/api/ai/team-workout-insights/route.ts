@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server'
-import { GoogleGenerativeAI } from '@google/generative-ai'
 import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
@@ -86,8 +85,7 @@ export async function POST(req: Request) {
             'Regras: pt-BR, objetivo, positivo mas honesto, 1-2 frases por campo. Não invente números.',
         ].join('\n')
 
-        const genAI = new GoogleGenerativeAI(apiKey)
-        const model = getGeminiModel(genAI, TEAM_AI_MODEL)
+        const model = getGeminiModel(apiKey, TEAM_AI_MODEL)
         const geminiResult = await safeGemini('team-workout-insights', () =>
             model.generateContent(prompt),
         )

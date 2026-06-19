@@ -13,7 +13,6 @@
  * Feature VIP (pro+). Rate limit: 5 req/min por usuário (Gemini Pro é caro).
  */
 import { NextResponse } from 'next/server'
-import { GoogleGenerativeAI } from '@google/generative-ai'
 import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
@@ -504,8 +503,7 @@ export async function POST(req: Request) {
     const userCtx = await buildUserContextBlock(admin, assessedUserId, ['nutrition', 'profile'])
     const prompt = `${PROMPT_HEADER}\n\n${userCtx ? userCtx + '\n\n' : ''}DADOS:\n${JSON.stringify(promptData)}`
 
-    const genAI = new GoogleGenerativeAI(apiKey)
-    const model = getGeminiModel(genAI, env.gemini.modelId)
+    const model = getGeminiModel(apiKey, env.gemini.modelId)
     const geminiResult = await safeGemini('lab-exam-protocol', () => model.generateContent(prompt))
     if ('errorResponse' in geminiResult) {
       await admin.from('lab_exams').update({ status: 'failed', error_message: 'ai_error' }).eq('id', examId)

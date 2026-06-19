@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server'
-import { GoogleGenerativeAI } from '@google/generative-ai'
 import { requireUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { checkVipFeatureAccess, incrementVipUsage } from '@/utils/vip/limits'
@@ -134,8 +133,7 @@ export async function POST(req: Request) {
       JSON.stringify(sessionData),
     ].filter(Boolean).join('\n')
 
-    const genAI = new GoogleGenerativeAI(apiKey)
-    const model = getGeminiModel(genAI, MODEL_ID)
+    const model = getGeminiModel(apiKey, MODEL_ID)
     const geminiResult = await safeGemini('weekly-report', () =>
       model.generateContent(prompt),
     )

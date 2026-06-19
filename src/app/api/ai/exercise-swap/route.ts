@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { GoogleGenerativeAI } from '@google/generative-ai'
 import { requireUser } from '@/utils/auth/route'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { parseJsonBody, parseJsonWithSchema } from '@/utils/zod'
@@ -98,8 +97,7 @@ export async function POST(req: Request) {
       '- Sem markdown, sem texto extra, APENAS o JSON array.',
     ].filter(Boolean).join('\n')
 
-    const genAI = new GoogleGenerativeAI(apiKey)
-    const model = getGeminiModel(genAI, MODEL_ID)
+    const model = getGeminiModel(apiKey, MODEL_ID)
     const geminiResult = await safeGemini('exercise-swap', () =>
       model.generateContent(prompt),
     )

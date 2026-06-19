@@ -11,7 +11,6 @@
  * Feature VIP (pro+). Rate limit: 5 req/min por usuário (IA é cara).
  */
 import { NextResponse } from 'next/server'
-import { GoogleGenerativeAI } from '@google/generative-ai'
 import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
@@ -157,8 +156,7 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: 'download_failed' }, { status: 400 })
     }
 
-    const genAI = new GoogleGenerativeAI(apiKey)
-    const model = getGeminiModel(genAI, env.gemini.fastModelId)
+    const model = getGeminiModel(apiKey, env.gemini.fastModelId)
     const geminiResult = await safeGemini('lab-exam-extract', () => model.generateContent(parts))
     if ('errorResponse' in geminiResult) {
       await admin.from('lab_exams').update({ status: 'failed', error_message: 'ai_error' }).eq('id', examId)

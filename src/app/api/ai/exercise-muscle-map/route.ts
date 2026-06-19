@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
 import { parseJsonBody, parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
-import { GoogleGenerativeAI } from '@google/generative-ai'
 import { requireUser } from '@/utils/auth/route'
 import { checkVipFeatureAccess } from '@/utils/vip/limits'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
@@ -201,8 +200,7 @@ export async function POST(req: Request) {
       JSON.stringify(remaining),
     ].join('\n')
 
-    const genAI = new GoogleGenerativeAI(apiKey)
-    const model = getGeminiModel(genAI, MODEL)
+    const model = getGeminiModel(apiKey, MODEL)
     const geminiResult = await safeGemini('exercise-muscle-map', () =>
       model.generateContent(prompt),
     )

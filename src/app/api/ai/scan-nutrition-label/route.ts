@@ -8,7 +8,7 @@
  * Rate limit: 10 req/hour per user.
  */
 import { NextResponse } from 'next/server'
-import { GoogleGenerativeAI } from '@google/generative-ai'
+import { getGeminiModel } from '@/utils/ai/gemini'
 import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
@@ -123,7 +123,6 @@ export async function POST(req: Request) {
       '}',
     ].join('\n')
 
-    const genAI = new GoogleGenerativeAI(apiKey)
     // gemini-2.5-flash liga "thinking" por padrão; com visão de imagem ele
     // raciocina demais e consome o orçamento de saída, truncando/atrapalhando
     // o JSON do rótulo. Desligar o thinking + forçar JSON puro resolve.
@@ -132,7 +131,7 @@ export async function POST(req: Request) {
       responseMimeType: 'application/json',
       thinkingConfig: { thinkingBudget: 0 },
     }
-    const model = genAI.getGenerativeModel({ model: MODEL, generationConfig })
+    const model = getGeminiModel(apiKey, MODEL, generationConfig)
     const geminiResult = await safeGemini('scan-nutrition-label', () =>
       model.generateContent([
         { text: prompt },

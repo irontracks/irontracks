@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server'
-import { GoogleGenerativeAI } from '@google/generative-ai'
 import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
 import { checkVipFeatureAccess, incrementVipUsage } from '@/utils/vip/limits'
@@ -342,8 +341,7 @@ export async function POST(req: Request) {
       JSON.stringify(answers),
     ].filter(Boolean).join('\n')
 
-    const genAI = new GoogleGenerativeAI(apiKey)
-    const model = getGeminiModel(genAI, MODEL, {
+    const model = getGeminiModel(apiKey, MODEL, {
       // Cap output so a stuck / runaway generation returns instead of timing out
       maxOutputTokens: 8192,
       temperature: 0.7,

@@ -11,7 +11,6 @@
  * Rate limit: 5 req/min.
  */
 import { NextResponse } from 'next/server'
-import { GoogleGenerativeAI } from '@google/generative-ai'
 import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
@@ -188,8 +187,7 @@ export async function POST(req: Request) {
             JSON.stringify(promptData),
         ].join('\n')
 
-        const genAI = new GoogleGenerativeAI(apiKey)
-        const model = getGeminiModel(genAI, env.gemini.modelId)
+        const model = getGeminiModel(apiKey, env.gemini.modelId)
         const geminiResult = await safeGemini('body-composition-correlation', () => model.generateContent(prompt))
         if ('errorResponse' in geminiResult) return geminiResult.errorResponse
 
