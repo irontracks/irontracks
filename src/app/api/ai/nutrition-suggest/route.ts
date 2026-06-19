@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server'
-import { GoogleGenerativeAI } from '@google/generative-ai'
 import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
 import { checkVipFeatureAccess } from '@/utils/vip/limits'
@@ -132,8 +131,7 @@ export async function POST(req: Request) {
       '{ "suggestions": [{ "food": string, "portion": string, "calories": number, "protein": number, "carbs": number, "fat": number }], "tip": string }',
     ].filter(Boolean).join('\n')
 
-    const genAI = new GoogleGenerativeAI(apiKey)
-    const model = getGeminiModel(genAI, MODEL)
+    const model = getGeminiModel(apiKey, MODEL)
     const geminiResult = await safeGemini('nutrition-suggest', () =>
       model.generateContent([{ text: prompt }]),
     )

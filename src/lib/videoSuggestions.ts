@@ -1,4 +1,4 @@
-import { GoogleGenerativeAI } from '@google/generative-ai'
+import { getGeminiModel } from '@/utils/ai/gemini'
 import { parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
 import { env } from '@/utils/env'
@@ -32,8 +32,7 @@ export async function getVideoQueriesFromGemini(exerciseName: string) {
   const name = String(exerciseName || '').trim()
   if (!name) return []
 
-  const genAI = new GoogleGenerativeAI(apiKey)
-  const model = genAI.getGenerativeModel({ model: VIDEO_AI_MODEL_ID })
+  const model = getGeminiModel(apiKey, VIDEO_AI_MODEL_ID)
 
   const prompt =
     'Você é um assistente para padronizar nomes de exercícios e gerar termos de busca para vídeos de execução.' +

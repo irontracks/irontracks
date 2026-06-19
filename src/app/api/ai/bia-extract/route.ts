@@ -20,7 +20,6 @@
  * Rate limit: 5 req/min por usuário (chamada de IA é cara).
  */
 import { NextResponse } from 'next/server'
-import { GoogleGenerativeAI } from '@google/generative-ai'
 import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
@@ -242,9 +241,8 @@ export async function POST(req: Request) {
 
     const base64Data = dl.data.toString('base64')
 
-    const genAI = new GoogleGenerativeAI(apiKey)
     // Flash é suficiente pra OCR estruturado e custa muito menos que Pro.
-    const model = getGeminiModel(genAI, env.gemini.fastModelId)
+    const model = getGeminiModel(apiKey, env.gemini.fastModelId)
 
     const geminiResult = await safeGemini('bia-extract', () =>
       model.generateContent([

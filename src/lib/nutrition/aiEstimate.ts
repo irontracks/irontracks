@@ -7,7 +7,6 @@
  * server action `estimateFoodAction` (que só ESTIMA, sem persistir).
  */
 import { z } from 'zod'
-import { GoogleGenerativeAI } from '@google/generative-ai'
 import { env } from '@/utils/env'
 import { getGeminiModel } from '@/utils/ai/gemini'
 import { parseJsonWithSchema } from '@/utils/zod'
@@ -90,8 +89,7 @@ export async function estimateMacrosFromText(text: string): Promise<EstimatedMac
   if (!prompt) return null
   const apiKey = env.gemini.apiKey
   if (!apiKey) throw new Error('ai_not_configured')
-  const genAI = new GoogleGenerativeAI(apiKey)
-  const model = getGeminiModel(genAI, env.gemini.modelId)
+  const model = getGeminiModel(apiKey, env.gemini.modelId)
   const result = await model.generateContent([{ text: prompt }])
   const rawText = result?.response?.text?.() || ''
   return parseEstimateOutput(rawText)

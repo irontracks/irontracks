@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
 import { logWarn } from '@/lib/logger'
-import { GoogleGenerativeAI } from '@google/generative-ai'
 import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
@@ -344,8 +343,7 @@ export async function POST(req: Request) {
       hasPainData ? '\nObservações de dor/desconforto reportadas:\n' + painContext : '',
     ].filter(s => s !== undefined).join('\n')
 
-    const genAI = new GoogleGenerativeAI(apiKey)
-    const model = getGeminiModel(genAI, POST_WORKOUT_MODEL)
+    const model = getGeminiModel(apiKey, POST_WORKOUT_MODEL)
     // Retry transient 503/504/timeout with exponential backoff. Never leaks
     // Google's raw error string — errors become canonical 'ai_*' codes that
     // the client translates to pt-BR.

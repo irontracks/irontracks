@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server'
-import { GoogleGenerativeAI } from '@google/generative-ai'
 import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
 import { checkVipFeatureAccess, incrementVipUsage } from '@/utils/vip/limits'
@@ -234,8 +233,7 @@ export async function POST(req: Request) {
       '', modeHint, '', '═══ DADOS DO USUÁRIO ═══', contextStr, '', '═══ MENSAGEM DO USUÁRIO ═══', message,
     ].join('\n')
 
-    const genAI = new GoogleGenerativeAI(apiKey)
-    const model = getGeminiModel(genAI, MODEL)
+    const model = getGeminiModel(apiKey, MODEL)
     const geminiResult = await safeGemini('vip-coach', () =>
       model.generateContent([{ text: prompt }] as Parameters<typeof model.generateContent>[0]),
     )

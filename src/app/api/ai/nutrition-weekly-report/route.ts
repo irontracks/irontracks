@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server'
-import { GoogleGenerativeAI } from '@google/generative-ai'
 import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
 import { checkVipFeatureAccess } from '@/utils/vip/limits'
@@ -111,8 +110,7 @@ export async function POST(req: Request) {
       '{ "summary": string, "highlights": string[], "tip": string }',
     ].filter(Boolean).join('\n')
 
-    const genAI = new GoogleGenerativeAI(apiKey)
-    const model = getGeminiModel(genAI, MODEL)
+    const model = getGeminiModel(apiKey, MODEL)
     const geminiResult = await safeGemini('nutrition-weekly-report', () =>
       model.generateContent([{ text: prompt }]),
     )

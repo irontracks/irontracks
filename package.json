@@ -67,7 +67,7 @@
     "@capacitor/geolocation": "^8.2.0",
     "@capacitor/ios": "^8.4.1",
     "@capacitor/push-notifications": "^8.1.1",
-    "@google/generative-ai": "^0.24.1",
+    "@google/genai": "^2.9.0",
     "@revenuecat/purchases-capacitor": "^12.1.2",
     "@sentry/nextjs": "^10.59.0",
     "@supabase/auth-js": "^2.89.0",
