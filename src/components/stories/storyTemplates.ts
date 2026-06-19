@@ -314,12 +314,59 @@ const LIME_TEMPLATE: StoryTemplate = {
   brandDivider: '',
 }
 
+// ── 6. Brasil (verde/amarelo/azul — clima de Copa, bandeirinha 🇧🇷 no divisor) ─
+const BRASIL_TEMPLATE: StoryTemplate = {
+  id: 'brasil',
+  name: 'Brasil',
+  swatch: ['#00401f', '#ffdf00'],
+  colors: {
+    brandPrimary: '#ffffff',
+    brandAccent: '#ffdf00',
+    brandDot: 'rgba(255,223,0,0.55)',
+    title: '#00d95f', // verde bandeira (vivo p/ legibilidade no fundo escuro)
+    subtitle: 'rgba(220,252,231,0.88)',
+    value: '#ffdf00',
+    cardLabel: 'rgba(255,223,0,0.95)',
+    cardFill: 'rgba(0,32,16,0.70)',
+    cardBorder: 'rgba(0,156,59,0.30)',
+    cardAccent: 'rgba(255,223,0,0.85)',
+    badgeFill: 'rgba(255,223,0,0.16)',
+    badgeBorder: 'rgba(255,223,0,0.32)',
+    badgeText: '#ffdf00',
+    pillFill: 'rgba(0,20,46,0.55)', // azul bandeira
+    pillBorder: 'rgba(0,39,118,0.55)',
+    pillText: 'rgba(220,252,231,0.92)',
+    timeFill: 'rgba(0,32,16,0.60)',
+    timeBorder: 'rgba(0,156,59,0.55)', // verde bandeira
+    timeText: '#ffdf00',
+  },
+  fonts: {
+    family: SYSTEM_STACK,
+    brandWeight: '900',
+    brandStyle: 'italic',
+    titleWeight: '800',
+    subtitleWeight: '700',
+    valueWeight: '900',
+    labelWeight: '800',
+    labelLetterSpacing: '2px',
+  },
+  overlay: {
+    fallbackBg: ['#00130a', '#00401f'], // verde escuro
+    gradientStart: 'rgba(0,12,6,0)',
+    gradientEnd: 'rgba(0,12,6,0.82)',
+  },
+  card: { radius: 28, accentHeight: 3, showAccentLine: true },
+  titleUppercase: true,
+  brandDivider: ' 🇧🇷 ',
+}
+
 export const STORY_TEMPLATES: StoryTemplate[] = [
   CLASSIC_TEMPLATE,
   NOIR_TEMPLATE,
   SUNSET_TEMPLATE,
   OCEAN_TEMPLATE,
   LIME_TEMPLATE,
+  BRASIL_TEMPLATE,
 ]
 
 export const DEFAULT_STORY_TEMPLATE = STORY_TEMPLATES[0]
