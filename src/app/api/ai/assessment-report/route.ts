@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { GoogleGenerativeAI } from '@google/generative-ai'
 import { requireUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
@@ -101,8 +100,7 @@ export async function POST(req: Request) {
       JSON.stringify({ profile, assessments }),
     ].filter(Boolean).join('\n')
 
-    const genAI = new GoogleGenerativeAI(apiKey)
-    const model = getGeminiModel(genAI, MODEL_ID)
+    const model = getGeminiModel(apiKey, MODEL_ID)
     const geminiResult = await safeGemini('assessment-report', () =>
       model.generateContent(prompt),
     )

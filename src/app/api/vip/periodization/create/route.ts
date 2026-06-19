@@ -9,7 +9,7 @@ import { checkRateLimitAsync } from '@/utils/rateLimit'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { checkVipFeatureAccess } from '@/utils/vip/limits'
 import { normalizeExerciseName } from '@/utils/normalizeExerciseName'
-import { GoogleGenerativeAI } from '@google/generative-ai'
+import { getGeminiModel } from '@/utils/ai/gemini'
 import { errorResponse } from '@/utils/api'
 
 import {
@@ -148,8 +148,7 @@ const ensureExerciseLibrarySeeded = async (admin: ReturnType<typeof createAdminC
 const generateProgramOverviewWithGemini = async (q: VipPeriodizationQuestionnaire, split: string) => {
   const apiKey = env.gemini.apiKey
   if (!apiKey) return null
-  const genAI = new GoogleGenerativeAI(apiKey)
-  const model = genAI.getGenerativeModel({ model: MODEL_ID })
+  const model = getGeminiModel(apiKey, MODEL_ID)
   const prompt = [
     'Você é um coach de musculação do IronTracks (VIP).',
     'Crie um resumo curto e prático (pt-BR) para um programa de periodização.',

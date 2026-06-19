@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server'
-import { GoogleGenerativeAI } from '@google/generative-ai'
 import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
 import { checkVipFeatureAccess } from '@/utils/vip/limits'
@@ -51,8 +50,7 @@ export async function POST(req: Request) {
     const prompt = buildEstimatePrompt(text)
     if (!prompt) return NextResponse.json({ ok: false, error: 'input_too_short' }, { status: 400 })
 
-    const genAI = new GoogleGenerativeAI(apiKey)
-    const model = getGeminiModel(genAI, MODEL)
+    const model = getGeminiModel(apiKey, MODEL)
     const geminiResult = await safeGemini('nutrition-estimate', () =>
       model.generateContent([{ text: prompt }]),
     )

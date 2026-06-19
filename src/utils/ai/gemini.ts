@@ -1,17 +1,24 @@
-import { GoogleGenerativeAI, type GenerationConfig, type GenerativeModel } from '@google/generative-ai'
+import { GoogleGenAI, type GenerateContentParameters } from '@google/genai'
 import { logWarn } from '@/lib/logger'
 
 /**
- * Modelo de fallback — estável e rápido. Quando o modelo primário (ex.:
- * gemini-3.5-flash) está indisponível (503) ou lento demais (enfileira e
- * estoura o timeout da função), caímos para este automaticamente.
+ * Wrapper único sobre o SDK oficial @google/genai (substituiu o deprecado
+ * @google/generative-ai). É o ÚNICO ponto do app que importa o SDK — todo o
+ * resto chama `getGeminiModel(apiKey, model, config)` e recebe um shim que
+ * preserva o contrato antigo `result.response.text()`, então os call-sites não
+ * precisaram mudar de forma.
+ *
+ * Mantém os dois comportamentos do wrapper anterior:
+ *  - thinking desligado por padrão (`thinkingBudget: 0`) para modelos que
+ *    suportam (flash / flash-lite) — economiza tokens e evita truncar JSON;
+ *  - fallback automático para {@link FALLBACK_MODEL} quando o modelo primário
+ *    falha ou demora mais que {@link PRIMARY_TIMEOUT_MS}.
  */
+
+/** Modelo de fallback — estável e rápido. */
 const FALLBACK_MODEL = 'gemini-2.5-flash'
 
-/**
- * Se o modelo primário não responder neste tempo, abortamos a espera e usamos
- * o fallback. Mantém a função bem abaixo do limite de 30s da Vercel.
- */
+/** Se o primário não responder neste tempo, usamos o fallback. */
 const PRIMARY_TIMEOUT_MS = 12_000
 
 function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
@@ -21,46 +28,68 @@ function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T> {
   ])
 }
 
+/** Config de geração (campos do antigo GenerationConfig: maxOutputTokens, temperature, responseMimeType, etc.). */
+export type GeminiGenerationConfig = Record<string, unknown>
+
+/** Mesmos shapes que os call-sites já passavam: string | Part | Part[]. */
+export type GeminiContents = GenerateContentParameters['contents']
+
+/** Shim que reproduz o contrato antigo `result.response.text()`. */
+export interface GeminiResult {
+  response: { text: () => string }
+}
+
+export interface GeminiModelShim {
+  generateContent: (contents: GeminiContents) => Promise<GeminiResult>
+}
+
 /**
- * Creates a Gemini model with "thinking" disabled by default and automatic
- * fallback to a stable model.
- *
- * `gemini-2.5-flash` enables thinking by default; the reasoning tokens consume
- * the output budget BEFORE the visible response, truncating structured JSON
- * (finishReason MAX_TOKENS). `thinkingBudget: 0` disables it.
- *
- * Além disso, se o modelo primário falhar ou demorar mais que
- * {@link PRIMARY_TIMEOUT_MS}, `generateContent` cai automaticamente para o
- * {@link FALLBACK_MODEL} — sem o chamador precisar saber. Isso evita o 504
- * quando o modelo configurado (ex.: gemini-3.5-flash) está instável no Google.
+ * `gemini-2.5-flash` (e flash-lite) habilita "thinking" por padrão; os tokens
+ * de raciocínio consomem o budget de saída ANTES da resposta visível,
+ * truncando JSON estruturado (finishReason MAX_TOKENS). `thinkingBudget: 0`
+ * desliga. O 2.5 Pro NÃO permite desligar — por isso só aplicamos em flash.
+ */
+function buildConfig(model: string, generationConfig: GeminiGenerationConfig): Record<string, unknown> {
+  const cfg: Record<string, unknown> = { ...generationConfig }
+  if (/flash/i.test(model) && cfg.thinkingConfig === undefined) {
+    cfg.thinkingConfig = { thinkingBudget: 0 }
+  }
+  return cfg
+}
+
+/**
+ * Cria um "modelo" Gemini (shim) com thinking desligado por padrão e fallback
+ * automático para um modelo estável.
  */
 export function getGeminiModel(
-  genAI: GoogleGenerativeAI,
+  apiKey: string,
   model: string,
-  generationConfig: GenerationConfig = {},
-): GenerativeModel {
-  const cfg: GenerationConfig & { thinkingConfig?: { thinkingBudget: number } } = {
-    thinkingConfig: { thinkingBudget: 0 },
-    ...generationConfig,
+  generationConfig: GeminiGenerationConfig = {},
+): GeminiModelShim {
+  const ai = new GoogleGenAI({ apiKey })
+
+  const callOnce = async (m: string, contents: GeminiContents): Promise<GeminiResult> => {
+    const resp = await ai.models.generateContent({
+      model: m,
+      contents,
+      config: buildConfig(m, generationConfig),
+    })
+    const text = typeof resp?.text === 'string' ? resp.text : ''
+    return { response: { text: () => text } }
   }
-  const primary = genAI.getGenerativeModel({ model, generationConfig: cfg })
 
-  // Já é o fallback → sem wrapper (evita recursão / dupla chamada).
-  if (model === FALLBACK_MODEL) return primary
-
-  const fallback = genAI.getGenerativeModel({ model: FALLBACK_MODEL, generationConfig: cfg })
-  const primaryGenerate = primary.generateContent.bind(primary)
-
-  primary.generateContent = (async (...args: Parameters<GenerativeModel['generateContent']>) => {
-    try {
-      return await withTimeout(primaryGenerate(...args), PRIMARY_TIMEOUT_MS)
-    } catch (e) {
+  return {
+    async generateContent(contents: GeminiContents): Promise<GeminiResult> {
+      // Já é o fallback → sem race/segunda tentativa.
+      if (model === FALLBACK_MODEL) return callOnce(model, contents)
       try {
-        logWarn('ai:gemini', `Modelo ${model} falhou/lento (${(e as Error)?.message || e}); usando ${FALLBACK_MODEL}`)
-      } catch { /* logger nunca quebra o fallback */ }
-      return await fallback.generateContent(...args)
-    }
-  }) as GenerativeModel['generateContent']
-
-  return primary
+        return await withTimeout(callOnce(model, contents), PRIMARY_TIMEOUT_MS)
+      } catch (e) {
+        try {
+          logWarn('ai:gemini', `Modelo ${model} falhou/lento (${(e as Error)?.message || e}); usando ${FALLBACK_MODEL}`)
+        } catch { /* logger nunca quebra o fallback */ }
+        return callOnce(FALLBACK_MODEL, contents)
+      }
+    },
+  }
 }

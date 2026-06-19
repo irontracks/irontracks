@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { GoogleGenerativeAI } from '@google/generative-ai'
 import { requireUser } from '@/utils/auth/route'
 import { checkVipFeatureAccess, incrementVipUsage } from '@/utils/vip/limits'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
@@ -108,8 +107,7 @@ export async function POST(req: Request) {
       '- Sem markdown, sem texto extra.',
     ].filter(Boolean).join('\n')
 
-    const genAI = new GoogleGenerativeAI(apiKey)
-    const model = getGeminiModel(genAI, MODEL_ID, {
+    const model = getGeminiModel(apiKey, MODEL_ID, {
       maxOutputTokens: 8192,
       temperature: 0.7,
       responseMimeType: 'application/json',

@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server'
-import { GoogleGenerativeAI } from '@google/generative-ai'
 import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
@@ -96,8 +95,7 @@ export async function POST(req: Request) {
       `Entrada: "${sanitized}"`,
     ].join('\n')
 
-    const genAI = new GoogleGenerativeAI(apiKey)
-    const model = getGeminiModel(genAI, MODEL)
+    const model = getGeminiModel(apiKey, MODEL)
     const geminiResult = await safeGemini('parse-exercise-voice', () =>
       model.generateContent([{ text: prompt }]),
     )

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { GoogleGenerativeAI } from '@google/generative-ai'
+import { getGeminiModel } from '@/utils/ai/gemini'
 import { requireUser } from '@/utils/auth/route'
 import { checkVipFeatureAccess, incrementVipUsage } from '@/utils/vip/limits'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
@@ -141,7 +141,6 @@ export async function POST(req: Request) {
       '- A soma do dia deve ficar próxima das metas (tolerância ~5%).',
     ].filter(Boolean).join('\n')
 
-    const genAI = new GoogleGenerativeAI(apiKey)
     // gemini-2.5-flash liga "thinking" por padrão, e os tokens de raciocínio
     // consomem o orçamento de saída ANTES da resposta — truncando o JSON do
     // cardápio (finishReason MAX_TOKENS). thinkingBudget: 0 desliga e libera
@@ -152,7 +151,7 @@ export async function POST(req: Request) {
       responseMimeType: 'application/json',
       thinkingConfig: { thinkingBudget: 0 },
     }
-    const model = genAI.getGenerativeModel({ model: MODEL_ID, generationConfig })
+    const model = getGeminiModel(apiKey, MODEL_ID, generationConfig)
     const geminiResult = await safeGemini('diet-generate', () => model.generateContent(prompt))
     if ('errorResponse' in geminiResult) return geminiResult.errorResponse
 
