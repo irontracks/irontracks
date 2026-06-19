@@ -29,7 +29,7 @@ export async function POST(req: Request) {
         if (!r?.id || !next || next === current) return null
         return { id: r.id, name: next }
       })
-      .filter(Boolean)
+      .filter((u): u is NonNullable<typeof u> => u !== null)
 
     if (!updates.length) return NextResponse.json({ ok: true, updated: 0 })
 
