@@ -58,7 +58,7 @@ async function processJob(job: StoryJobPayload): Promise<'ok' | 'skip' | 'error'
         .from('social-stories')
         .list(folderPath, { search: fileName, limit: 1 })
 
-    const fileMeta = fileList?.[0]?.metadata ?? {}
+    const fileMeta = (fileList?.[0]?.metadata ?? {}) as Record<string, unknown>
     const fileSize = Number(fileMeta.size ?? 0)
     const mimeType = String(fileMeta.mimetype ?? '').toLowerCase()
 

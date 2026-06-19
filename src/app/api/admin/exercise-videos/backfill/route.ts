@@ -149,7 +149,7 @@ export async function POST(req: Request) {
 
       const { data: inserted } = await admin
         .from('exercise_videos')
-        .upsert(rows as unknown, { onConflict: 'exercise_library_id,provider,provider_video_id' })
+        .upsert(rows, { onConflict: 'exercise_library_id,provider,provider_video_id' })
         .select('id')
 
       created += Array.isArray(inserted) ? inserted.length : 0
