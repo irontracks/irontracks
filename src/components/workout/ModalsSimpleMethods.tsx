@@ -5,6 +5,7 @@ import { Save, X } from 'lucide-react';
 import { parseTrainingNumber } from '@/utils/trainingNumber';
 import { useWorkoutContext } from './WorkoutContext';
 import { UnknownRecord } from './types';
+import { getSuggestion, watermarkPlaceholder } from './utils';
 
 /**
  * ModalsSimpleMethods
@@ -24,7 +25,17 @@ export function ModalsSimpleMethods() {
         partialRepsModal, setPartialRepsModal, savePartialRepsModal,
         sistema21Modal, setSistema21Modal, saveSistema21Modal,
         groupMethodModal, setGroupMethodModal, saveGroupMethodModal,
+        deloadSuggestions,
     } = useWorkoutContext();
+
+    // Sugestões do último treino (peso/reps/RPE) por modal — viram placeholder.
+    const hdSug = getSuggestion(deloadSuggestions, String((heavyDutyModal as UnknownRecord | null)?.key ?? ''));
+    const pzSug = getSuggestion(deloadSuggestions, String((pontoZeroModal as UnknownRecord | null)?.key ?? ''));
+    const frSug = getSuggestion(deloadSuggestions, String((forcedRepsModal as UnknownRecord | null)?.key ?? ''));
+    const nrSug = getSuggestion(deloadSuggestions, String((negativeRepsModal as UnknownRecord | null)?.key ?? ''));
+    const prSug = getSuggestion(deloadSuggestions, String((partialRepsModal as UnknownRecord | null)?.key ?? ''));
+    const s21Sug = getSuggestion(deloadSuggestions, String((sistema21Modal as UnknownRecord | null)?.key ?? ''));
+    const gmSug = getSuggestion(deloadSuggestions, String((groupMethodModal as UnknownRecord | null)?.key ?? ''));
 
     return (
         <>
@@ -45,11 +56,11 @@ export function ModalsSimpleMethods() {
                             <div className="grid grid-cols-2 gap-3">
                                 <div className="space-y-1">
                                     <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Peso (kg)</div>
-                                    <input aria-label="Peso (kg)" inputMode="decimal" value={String(heavyDutyModal.weight ?? '')} onChange={(e) => setHeavyDutyModal((prev) => prev && typeof prev === 'object' ? { ...prev, weight: e?.target?.value ?? '', error: '' } : prev)} placeholder="Ex: 80" className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500" />
+                                    <input aria-label="Peso (kg)" inputMode="decimal" value={String(heavyDutyModal.weight ?? '')} onChange={(e) => setHeavyDutyModal((prev) => prev && typeof prev === 'object' ? { ...prev, weight: e?.target?.value ?? '', error: '' } : prev)} placeholder={watermarkPlaceholder(hdSug, 'weight', 'Ex: 80')} className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500" />
                                 </div>
                                 <div className="space-y-1">
                                     <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Reps até falha</div>
-                                    <input aria-label="Reps até falha" inputMode="numeric" value={String(heavyDutyModal.reps_failure ?? '')} onChange={(e) => setHeavyDutyModal((prev) => prev && typeof prev === 'object' ? { ...prev, reps_failure: e?.target?.value ?? '', error: '' } : prev)} placeholder="Ex: 8" className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500" />
+                                    <input aria-label="Reps até falha" inputMode="numeric" value={String(heavyDutyModal.reps_failure ?? '')} onChange={(e) => setHeavyDutyModal((prev) => prev && typeof prev === 'object' ? { ...prev, reps_failure: e?.target?.value ?? '', error: '' } : prev)} placeholder={watermarkPlaceholder(hdSug, 'reps', 'Ex: 8')} className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500" />
                                 </div>
                             </div>
                             <div className="rounded-xl bg-neutral-800/40 border border-neutral-700/50 p-3 space-y-3">
@@ -69,7 +80,7 @@ export function ModalsSimpleMethods() {
                                     </div>
                                     <div className="space-y-1">
                                         <div className="text-xs text-neutral-400">RPE</div>
-                                        <input aria-label="RPE" inputMode="decimal" value={String(heavyDutyModal.rpe ?? '')} onChange={(e) => setHeavyDutyModal((prev) => prev && typeof prev === 'object' ? { ...prev, rpe: e?.target?.value ?? '' } : prev)} placeholder="1–10" className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500" />
+                                        <input aria-label="RPE" inputMode="decimal" value={String(heavyDutyModal.rpe ?? '')} onChange={(e) => setHeavyDutyModal((prev) => prev && typeof prev === 'object' ? { ...prev, rpe: e?.target?.value ?? '' } : prev)} placeholder={watermarkPlaceholder(hdSug, 'rpe', '1–10')} className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500" />
                                     </div>
                                 </div>
                             </div>
@@ -99,11 +110,11 @@ export function ModalsSimpleMethods() {
                             <div className="grid grid-cols-2 gap-3">
                                 <div className="space-y-1">
                                     <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Peso (kg)</div>
-                                    <input aria-label="Peso (kg)" inputMode="decimal" value={String(pontoZeroModal.weight ?? '')} onChange={(e) => setPontoZeroModal((prev) => prev && typeof prev === 'object' ? { ...prev, weight: e?.target?.value ?? '', error: '' } : prev)} placeholder="Ex: 60" className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500" />
+                                    <input aria-label="Peso (kg)" inputMode="decimal" value={String(pontoZeroModal.weight ?? '')} onChange={(e) => setPontoZeroModal((prev) => prev && typeof prev === 'object' ? { ...prev, weight: e?.target?.value ?? '', error: '' } : prev)} placeholder={watermarkPlaceholder(pzSug, 'weight', 'Ex: 60')} className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500" />
                                 </div>
                                 <div className="space-y-1">
                                     <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Reps</div>
-                                    <input aria-label="Reps" inputMode="numeric" value={String(pontoZeroModal.reps ?? '')} onChange={(e) => setPontoZeroModal((prev) => prev && typeof prev === 'object' ? { ...prev, reps: e?.target?.value ?? '', error: '' } : prev)} placeholder="Ex: 10" className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500" />
+                                    <input aria-label="Reps" inputMode="numeric" value={String(pontoZeroModal.reps ?? '')} onChange={(e) => setPontoZeroModal((prev) => prev && typeof prev === 'object' ? { ...prev, reps: e?.target?.value ?? '', error: '' } : prev)} placeholder={watermarkPlaceholder(pzSug, 'reps', 'Ex: 10')} className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500" />
                                 </div>
                             </div>
                             <div className="space-y-2">
@@ -119,7 +130,7 @@ export function ModalsSimpleMethods() {
                             </div>
                             <div className="space-y-1">
                                 <div className="text-xs font-black uppercase tracking-widest text-neutral-400">RPE (opcional)</div>
-                                <input aria-label="RPE (opcional)" inputMode="decimal" value={String(pontoZeroModal.rpe ?? '')} onChange={(e) => setPontoZeroModal((prev) => prev && typeof prev === 'object' ? { ...prev, rpe: e?.target?.value ?? '' } : prev)} placeholder="1–10" className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500" />
+                                <input aria-label="RPE (opcional)" inputMode="decimal" value={String(pontoZeroModal.rpe ?? '')} onChange={(e) => setPontoZeroModal((prev) => prev && typeof prev === 'object' ? { ...prev, rpe: e?.target?.value ?? '' } : prev)} placeholder={watermarkPlaceholder(pzSug, 'rpe', '1–10')} className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500" />
                             </div>
                         </div>
                         <div className="p-4 border-t border-neutral-800 flex items-center justify-between gap-2">
@@ -147,11 +158,11 @@ export function ModalsSimpleMethods() {
                             <div className="grid grid-cols-2 gap-3">
                                 <div className="space-y-1">
                                     <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Peso (kg)</div>
-                                    <input aria-label="Peso (kg)" inputMode="decimal" value={String(forcedRepsModal.weight ?? '')} onChange={(e) => setForcedRepsModal((prev) => prev && typeof prev === 'object' ? { ...prev, weight: e?.target?.value ?? '', error: '' } : prev)} placeholder="Ex: 80" className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500" />
+                                    <input aria-label="Peso (kg)" inputMode="decimal" value={String(forcedRepsModal.weight ?? '')} onChange={(e) => setForcedRepsModal((prev) => prev && typeof prev === 'object' ? { ...prev, weight: e?.target?.value ?? '', error: '' } : prev)} placeholder={watermarkPlaceholder(frSug, 'weight', 'Ex: 80')} className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500" />
                                 </div>
                                 <div className="space-y-1">
                                     <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Reps até falha</div>
-                                    <input aria-label="Reps até falha" inputMode="numeric" value={String(forcedRepsModal.reps_failure ?? '')} onChange={(e) => setForcedRepsModal((prev) => prev && typeof prev === 'object' ? { ...prev, reps_failure: e?.target?.value ?? '', error: '' } : prev)} placeholder="Ex: 8" className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500" />
+                                    <input aria-label="Reps até falha" inputMode="numeric" value={String(forcedRepsModal.reps_failure ?? '')} onChange={(e) => setForcedRepsModal((prev) => prev && typeof prev === 'object' ? { ...prev, reps_failure: e?.target?.value ?? '', error: '' } : prev)} placeholder={watermarkPlaceholder(frSug, 'reps', 'Ex: 8')} className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500" />
                                 </div>
                                 <div className="space-y-1">
                                     <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Reps Forçadas</div>
@@ -159,7 +170,7 @@ export function ModalsSimpleMethods() {
                                 </div>
                                 <div className="space-y-1">
                                     <div className="text-xs font-black uppercase tracking-widest text-neutral-400">RPE (opcional)</div>
-                                    <input aria-label="RPE (opcional)" inputMode="decimal" value={String(forcedRepsModal.rpe ?? '')} onChange={(e) => setForcedRepsModal((prev) => prev && typeof prev === 'object' ? { ...prev, rpe: e?.target?.value ?? '' } : prev)} placeholder="1–10" className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500" />
+                                    <input aria-label="RPE (opcional)" inputMode="decimal" value={String(forcedRepsModal.rpe ?? '')} onChange={(e) => setForcedRepsModal((prev) => prev && typeof prev === 'object' ? { ...prev, rpe: e?.target?.value ?? '' } : prev)} placeholder={watermarkPlaceholder(frSug, 'rpe', '1–10')} className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500" />
                                 </div>
                             </div>
                         </div>
@@ -188,11 +199,11 @@ export function ModalsSimpleMethods() {
                             <div className="grid grid-cols-2 gap-3">
                                 <div className="space-y-1">
                                     <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Peso (kg)</div>
-                                    <input aria-label="Peso (kg)" inputMode="decimal" value={String(negativeRepsModal.weight ?? '')} onChange={(e) => setNegativeRepsModal((prev) => prev && typeof prev === 'object' ? { ...prev, weight: e?.target?.value ?? '', error: '' } : prev)} placeholder="Ex: 100" className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500" />
+                                    <input aria-label="Peso (kg)" inputMode="decimal" value={String(negativeRepsModal.weight ?? '')} onChange={(e) => setNegativeRepsModal((prev) => prev && typeof prev === 'object' ? { ...prev, weight: e?.target?.value ?? '', error: '' } : prev)} placeholder={watermarkPlaceholder(nrSug, 'weight', 'Ex: 100')} className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500" />
                                 </div>
                                 <div className="space-y-1">
                                     <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Reps</div>
-                                    <input aria-label="Reps" inputMode="numeric" value={String(negativeRepsModal.reps ?? '')} onChange={(e) => setNegativeRepsModal((prev) => prev && typeof prev === 'object' ? { ...prev, reps: e?.target?.value ?? '', error: '' } : prev)} placeholder="Ex: 5" className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500" />
+                                    <input aria-label="Reps" inputMode="numeric" value={String(negativeRepsModal.reps ?? '')} onChange={(e) => setNegativeRepsModal((prev) => prev && typeof prev === 'object' ? { ...prev, reps: e?.target?.value ?? '', error: '' } : prev)} placeholder={watermarkPlaceholder(nrSug, 'reps', 'Ex: 5')} className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500" />
                                 </div>
                                 <div className="space-y-1">
                                     <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Excêntrico (seg/rep)</div>
@@ -200,7 +211,7 @@ export function ModalsSimpleMethods() {
                                 </div>
                                 <div className="space-y-1">
                                     <div className="text-xs font-black uppercase tracking-widest text-neutral-400">RPE (opcional)</div>
-                                    <input aria-label="RPE (opcional)" inputMode="decimal" value={String(negativeRepsModal.rpe ?? '')} onChange={(e) => setNegativeRepsModal((prev) => prev && typeof prev === 'object' ? { ...prev, rpe: e?.target?.value ?? '' } : prev)} placeholder="1–10" className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500" />
+                                    <input aria-label="RPE (opcional)" inputMode="decimal" value={String(negativeRepsModal.rpe ?? '')} onChange={(e) => setNegativeRepsModal((prev) => prev && typeof prev === 'object' ? { ...prev, rpe: e?.target?.value ?? '' } : prev)} placeholder={watermarkPlaceholder(nrSug, 'rpe', '1–10')} className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500" />
                                 </div>
                             </div>
                         </div>
@@ -229,11 +240,11 @@ export function ModalsSimpleMethods() {
                             <div className="grid grid-cols-2 gap-3">
                                 <div className="space-y-1">
                                     <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Peso (kg)</div>
-                                    <input aria-label="Peso (kg)" inputMode="decimal" value={String(partialRepsModal.weight ?? '')} onChange={(e) => setPartialRepsModal((prev) => prev && typeof prev === 'object' ? { ...prev, weight: e?.target?.value ?? '', error: '' } : prev)} placeholder="Ex: 60" className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500" />
+                                    <input aria-label="Peso (kg)" inputMode="decimal" value={String(partialRepsModal.weight ?? '')} onChange={(e) => setPartialRepsModal((prev) => prev && typeof prev === 'object' ? { ...prev, weight: e?.target?.value ?? '', error: '' } : prev)} placeholder={watermarkPlaceholder(prSug, 'weight', 'Ex: 60')} className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500" />
                                 </div>
                                 <div className="space-y-1">
                                     <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Reps Completas</div>
-                                    <input aria-label="Reps Completas" inputMode="numeric" value={String(partialRepsModal.full_reps ?? '')} onChange={(e) => setPartialRepsModal((prev) => prev && typeof prev === 'object' ? { ...prev, full_reps: e?.target?.value ?? '', error: '' } : prev)} placeholder="Ex: 8" className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500" />
+                                    <input aria-label="Reps Completas" inputMode="numeric" value={String(partialRepsModal.full_reps ?? '')} onChange={(e) => setPartialRepsModal((prev) => prev && typeof prev === 'object' ? { ...prev, full_reps: e?.target?.value ?? '', error: '' } : prev)} placeholder={watermarkPlaceholder(prSug, 'reps', 'Ex: 8')} className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500" />
                                 </div>
                                 <div className="space-y-1">
                                     <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Reps Parciais</div>
@@ -241,7 +252,7 @@ export function ModalsSimpleMethods() {
                                 </div>
                                 <div className="space-y-1">
                                     <div className="text-xs font-black uppercase tracking-widest text-neutral-400">RPE (opcional)</div>
-                                    <input aria-label="RPE (opcional)" inputMode="decimal" value={String(partialRepsModal.rpe ?? '')} onChange={(e) => setPartialRepsModal((prev) => prev && typeof prev === 'object' ? { ...prev, rpe: e?.target?.value ?? '' } : prev)} placeholder="1–10" className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500" />
+                                    <input aria-label="RPE (opcional)" inputMode="decimal" value={String(partialRepsModal.rpe ?? '')} onChange={(e) => setPartialRepsModal((prev) => prev && typeof prev === 'object' ? { ...prev, rpe: e?.target?.value ?? '' } : prev)} placeholder={watermarkPlaceholder(prSug, 'rpe', '1–10')} className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500" />
                                 </div>
                             </div>
                         </div>
@@ -269,7 +280,7 @@ export function ModalsSimpleMethods() {
                             {sistema21Modal.error ? <div className="rounded-xl border border-yellow-500/20 bg-yellow-500/10 p-3 text-sm text-neutral-200">{String(sistema21Modal.error)}</div> : null}
                             <div className="space-y-1">
                                 <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Peso (kg)</div>
-                                <input aria-label="Peso (kg)" inputMode="decimal" value={String(sistema21Modal.weight ?? '')} onChange={(e) => setSistema21Modal((prev) => prev && typeof prev === 'object' ? { ...prev, weight: e?.target?.value ?? '', error: '' } : prev)} placeholder="Ex: 30" className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500" />
+                                <input aria-label="Peso (kg)" inputMode="decimal" value={String(sistema21Modal.weight ?? '')} onChange={(e) => setSistema21Modal((prev) => prev && typeof prev === 'object' ? { ...prev, weight: e?.target?.value ?? '', error: '' } : prev)} placeholder={watermarkPlaceholder(s21Sug, 'weight', 'Ex: 30')} className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500" />
                             </div>
                             {[{ key: 'phase1', label: 'Fase 1 — ½ inferior (início → meio)' }, { key: 'phase2', label: 'Fase 2 — ½ superior (meio → topo)' }, { key: 'phase3', label: 'Fase 3 — Amplitude completa' }].map(({ key: phaseKey, label }) => (
                                 <div key={phaseKey} className="rounded-xl bg-neutral-800/60 border border-neutral-700 p-3 space-y-2">
@@ -279,7 +290,7 @@ export function ModalsSimpleMethods() {
                             ))}
                             <div className="space-y-1">
                                 <div className="text-xs font-black uppercase tracking-widest text-neutral-400">RPE (opcional)</div>
-                                <input aria-label="RPE (opcional)" inputMode="decimal" value={String(sistema21Modal.rpe ?? '')} onChange={(e) => setSistema21Modal((prev) => prev && typeof prev === 'object' ? { ...prev, rpe: e?.target?.value ?? '' } : prev)} placeholder="1–10" className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500" />
+                                <input aria-label="RPE (opcional)" inputMode="decimal" value={String(sistema21Modal.rpe ?? '')} onChange={(e) => setSistema21Modal((prev) => prev && typeof prev === 'object' ? { ...prev, rpe: e?.target?.value ?? '' } : prev)} placeholder={watermarkPlaceholder(s21Sug, 'rpe', '1–10')} className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500" />
                             </div>
                         </div>
                         <div className="p-4 border-t border-neutral-800 flex items-center justify-between gap-2">
@@ -319,15 +330,15 @@ export function ModalsSimpleMethods() {
                                 <div className="grid grid-cols-3 gap-3">
                                     <div className="space-y-1">
                                         <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Peso (kg)</div>
-                                        <input aria-label="Peso (kg)" inputMode="decimal" value={String(groupMethodModal.weight ?? '')} onChange={(e) => setGroupMethodModal((prev) => prev && typeof prev === 'object' ? { ...prev, weight: e?.target?.value ?? '', error: '' } : prev)} placeholder="Ex: 60" className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500" />
+                                        <input aria-label="Peso (kg)" inputMode="decimal" value={String(groupMethodModal.weight ?? '')} onChange={(e) => setGroupMethodModal((prev) => prev && typeof prev === 'object' ? { ...prev, weight: e?.target?.value ?? '', error: '' } : prev)} placeholder={watermarkPlaceholder(gmSug, 'weight', 'Ex: 60')} className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500" />
                                     </div>
                                     <div className="space-y-1">
                                         <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Reps</div>
-                                        <input aria-label="Reps" inputMode="numeric" value={String(groupMethodModal.reps ?? '')} onChange={(e) => setGroupMethodModal((prev) => prev && typeof prev === 'object' ? { ...prev, reps: e?.target?.value ?? '', error: '' } : prev)} placeholder="Ex: 12" className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500" />
+                                        <input aria-label="Reps" inputMode="numeric" value={String(groupMethodModal.reps ?? '')} onChange={(e) => setGroupMethodModal((prev) => prev && typeof prev === 'object' ? { ...prev, reps: e?.target?.value ?? '', error: '' } : prev)} placeholder={watermarkPlaceholder(gmSug, 'reps', 'Ex: 12')} className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500" />
                                     </div>
                                     <div className="space-y-1">
                                         <div className="text-xs font-black uppercase tracking-widest text-neutral-400">RPE</div>
-                                        <input aria-label="RPE" inputMode="decimal" value={String(groupMethodModal.rpe ?? '')} onChange={(e) => setGroupMethodModal((prev) => prev && typeof prev === 'object' ? { ...prev, rpe: e?.target?.value ?? '' } : prev)} placeholder="1–10" className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500" />
+                                        <input aria-label="RPE" inputMode="decimal" value={String(groupMethodModal.rpe ?? '')} onChange={(e) => setGroupMethodModal((prev) => prev && typeof prev === 'object' ? { ...prev, rpe: e?.target?.value ?? '' } : prev)} placeholder={watermarkPlaceholder(gmSug, 'rpe', '1–10')} className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500" />
                                     </div>
                                 </div>
                             </div>
