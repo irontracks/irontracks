@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { shouldOpenFinishPrompt } from '../utils'
+import { shouldOpenFinishPrompt, getSuggestion, watermarkPlaceholder } from '../utils'
 
 // ─── Lógica pura extraída de useActiveWorkoutController ─────────────────────
 // Esses testes cobrem as funções mais críticas sem precisar renderizar o hook.
@@ -232,5 +232,31 @@ describe('shouldOpenFinishPrompt', () => {
 
     it('NÃO dispara enquanto já está finalizando', () => {
         expect(shouldOpenFinishPrompt({ ...base, allComplete: true, prevAllComplete: false, finishing: true })).toBe(false)
+    })
+})
+
+// ---------------------------------------------------------------------------
+// Watermark do "último treino" (peso/reps/RPE) — usado inline e nos modais
+// ---------------------------------------------------------------------------
+describe('getSuggestion / watermarkPlaceholder', () => {
+    it('getSuggestion lê a sugestão da série pelo key', () => {
+        const map = { '0-0': { weight: 80, reps: 10, rpe: 8 } }
+        expect(getSuggestion(map, '0-0')).toEqual({ weight: 80, reps: 10, rpe: 8 })
+        expect(getSuggestion(map, '9-9')).toBeNull()
+        expect(getSuggestion(null, '0-0')).toBeNull()
+        expect(getSuggestion(map, '')).toBeNull()
+    })
+
+    it('watermarkPlaceholder usa a sugestão (kg no peso, valor cru em reps/rpe)', () => {
+        const s = { weight: 80, reps: 10, rpe: 8 }
+        expect(watermarkPlaceholder(s, 'weight', 'Peso')).toBe('80 kg')
+        expect(watermarkPlaceholder(s, 'reps', 'Reps')).toBe('10')
+        expect(watermarkPlaceholder(s, 'rpe', 'RPE')).toBe('8')
+    })
+
+    it('cai no fallback quando não há sugestão para o campo', () => {
+        expect(watermarkPlaceholder(null, 'weight', 'Ex: 80')).toBe('Ex: 80')
+        expect(watermarkPlaceholder({ weight: null }, 'weight', 'kg')).toBe('kg')
+        expect(watermarkPlaceholder({ weight: 80 }, 'rpe', '1–10')).toBe('1–10')
     })
 })
