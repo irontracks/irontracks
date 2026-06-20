@@ -6,7 +6,7 @@ import { Check, Clock, Save, X } from 'lucide-react';
 import { parseTrainingNumber } from '@/utils/trainingNumber';
 import { useWorkoutContext } from './WorkoutContext';
 import { useWorkoutTimer } from './WorkoutTimerContext';
-import { isObject, buildBlocksByCount, normalizeExerciseKey } from './utils';
+import { isObject, buildBlocksByCount, normalizeExerciseKey, getSuggestion, watermarkPlaceholder } from './utils';
 import { UnknownRecord, WorkoutExercise } from './types';
 
 /**
@@ -32,6 +32,11 @@ export function ModalsComplexMethods() {
         exercises,
         reportHistory,
     } = useWorkoutContext();
+
+    // Sugestões do último treino (peso/reps/RPE) por modal — viram placeholder.
+    const restPauseSug = getSuggestion(deloadSuggestions, String((restPauseModal as UnknownRecord | null)?.key ?? ''));
+    const waveSug = getSuggestion(deloadSuggestions, String((waveModal as UnknownRecord | null)?.key ?? ''));
+    const clusterSug = getSuggestion(deloadSuggestions, String((clusterModal as UnknownRecord | null)?.key ?? ''));
 
     // Ticker drives the 1-second check that turns rest buttons green when done
     const { ticker } = useWorkoutTimer();
@@ -109,7 +114,7 @@ export function ModalsComplexMethods() {
                                             const v = e?.target?.value ?? '';
                                             setRestPauseModal((prev) => (prev && typeof prev === 'object' ? { ...prev, weight: v, error: '' } : prev));
                                         }}
-                                        placeholder="kg"
+                                        placeholder={watermarkPlaceholder(restPauseSug, 'weight', 'kg')}
                                         className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500"
                                     />
                                 </div>
@@ -217,7 +222,7 @@ export function ModalsComplexMethods() {
                                         const v = e?.target?.value ?? '';
                                         setRestPauseModal((prev) => (prev && typeof prev === 'object' ? { ...prev, rpe: v, error: '' } : prev));
                                     }}
-                                    placeholder="RPE (0-10)"
+                                    placeholder={watermarkPlaceholder(restPauseSug, 'rpe', 'RPE (0-10)')}
                                     className="mt-2 w-full bg-black/30 border border-yellow-500/30 rounded-xl px-3 py-2 text-[16px] text-yellow-500 font-bold outline-none focus:ring-1 ring-yellow-500"
                                 />
                             </div>
@@ -404,7 +409,7 @@ export function ModalsComplexMethods() {
                                             const v = e?.target?.value ?? '';
                                             setDropSetModal((prev) => (prev && typeof prev === 'object' ? { ...prev, rpe: v } : prev));
                                         }}
-                                        placeholder="RPE (0-10)"
+                                        placeholder={watermarkPlaceholder(suggestion, 'rpe', 'RPE (0-10)')}
                                         className="mt-2 w-full bg-black/30 border border-yellow-500/30 rounded-xl px-3 py-2 text-[16px] text-yellow-500 font-bold outline-none focus:ring-1 ring-yellow-500"
                                     />
                                 </div>
@@ -543,7 +548,7 @@ export function ModalsComplexMethods() {
                                 <div className="grid grid-cols-2 gap-3">
                                     <div className="space-y-1">
                                         <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Peso base (kg)</div>
-                                        <input inputMode="decimal" value={String(waveModal.weight ?? '')} onChange={(e) => setWaveModal((prev) => prev && typeof prev === 'object' ? { ...prev, weight: e?.target?.value ?? '', error: '' } : prev)} placeholder="Ex: 80" className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500" />
+                                        <input inputMode="decimal" value={String(waveModal.weight ?? '')} onChange={(e) => setWaveModal((prev) => prev && typeof prev === 'object' ? { ...prev, weight: e?.target?.value ?? '', error: '' } : prev)} placeholder={watermarkPlaceholder(waveSug, 'weight', 'Ex: 80')} className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500" />
                                     </div>
                                     <div className="space-y-1">
                                         <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Nº de ondas</div>
@@ -575,7 +580,7 @@ export function ModalsComplexMethods() {
                                 ))}
                                 <div className="space-y-1">
                                     <div className="text-xs font-black uppercase tracking-widest text-neutral-400">RPE (opcional)</div>
-                                    <input inputMode="decimal" value={String(waveModal.rpe ?? '')} onChange={(e) => setWaveModal((prev) => prev && typeof prev === 'object' ? { ...prev, rpe: e?.target?.value ?? '' } : prev)} placeholder="1–10" className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500" />
+                                    <input inputMode="decimal" value={String(waveModal.rpe ?? '')} onChange={(e) => setWaveModal((prev) => prev && typeof prev === 'object' ? { ...prev, rpe: e?.target?.value ?? '' } : prev)} placeholder={watermarkPlaceholder(waveSug, 'rpe', '1–10')} className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500" />
                                 </div>
                             </div>
                             <div className="p-4 border-t border-neutral-800 flex items-center justify-between gap-2">
@@ -830,7 +835,7 @@ export function ModalsComplexMethods() {
                                         const v = e?.target?.value ?? '';
                                         setClusterModal((prev) => (prev && typeof prev === 'object' ? { ...prev, rpe: v, error: '' } : prev));
                                     }}
-                                    placeholder="RPE (0-10)"
+                                    placeholder={watermarkPlaceholder(clusterSug, 'rpe', 'RPE (0-10)')}
                                     className="mt-2 w-full bg-black/30 border border-yellow-500/30 rounded-lg px-3 py-2 text-[16px] text-yellow-500 font-bold outline-none focus:ring-1 ring-yellow-500"
                                 />
                             </div>

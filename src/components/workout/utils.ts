@@ -284,3 +284,34 @@ export const shouldOpenFinishPrompt = (params: {
   const justCompleted = allComplete && !prevAllComplete;
   return justCompleted && !alreadyPrompted && !finishing;
 };
+
+// ── Watermark do "último treino" (peso/reps/RPE) ────────────────────────────
+// `deloadSuggestions[key]` carrega o peso/reps/rpe da última sessão. Estes
+// helpers padronizam a exibição como placeholder (watermark) em TODOS os
+// inputs — inline (set-renderers) e dentro dos modais dos métodos.
+export type DeloadSuggestion = { weight?: number | null; reps?: number | null; rpe?: number | null };
+
+/** Lê a sugestão (último treino) do mapa deloadSuggestions para uma série. */
+export const getSuggestion = (
+  map: Record<string, unknown> | null | undefined,
+  key: string,
+): DeloadSuggestion | null => {
+  if (!key || !map) return null;
+  const v = map[key];
+  return isObject(v) ? (v as DeloadSuggestion) : null;
+};
+
+/**
+ * Monta o placeholder de um input a partir da sugestão. Peso recebe sufixo
+ * " kg". Sem sugestão (ou modo desligado) cai no `fallback` original do input.
+ */
+export const watermarkPlaceholder = (
+  suggestion: DeloadSuggestion | null | undefined,
+  field: 'weight' | 'reps' | 'rpe',
+  fallback: string,
+): string => {
+  if (DELOAD_SUGGEST_MODE !== 'watermark') return fallback;
+  const v = suggestion?.[field];
+  if (v == null) return fallback;
+  return field === 'weight' ? `${v} kg` : String(v);
+};
