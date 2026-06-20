@@ -211,7 +211,7 @@ const NormalSetInner = ({
   // Compact variant for reps/RPE (narrow 2fr columns) — reduced padding so
   // 5-char placeholders like "10-12" fit without truncation.
   const inputCompact =
-    'w-full bg-black/40 border border-neutral-700/80 rounded-xl px-1.5 py-2 text-[16px] text-white text-center ' +
+    'w-full bg-black/40 border border-neutral-700/80 rounded-xl px-1 py-2 text-[16px] text-white text-center ' +
     'outline-none focus:ring-1 ring-yellow-500 focus:border-yellow-500/50 transition-all duration-200 ' +
     'placeholder:text-neutral-400 placeholder:text-xs focus:placeholder:opacity-0';
 
@@ -406,7 +406,7 @@ const NormalSetInner = ({
           )}
         </div>
         {/* 4-column grid — no notes slot here; notes lives below both rows */}
-        <div className="grid items-center gap-1.5 min-w-0" style={{ gridTemplateColumns: 'minmax(0,3fr) minmax(0,2.3fr) minmax(0,1.7fr) 76px' }}>
+        <div className="grid items-center gap-1.5 min-w-0" style={{ gridTemplateColumns: 'minmax(0,3fr) minmax(0,2.5fr) minmax(0,1.5fr) 76px' }}>
           {/* Weight */}
           <input
             inputMode="decimal"
@@ -462,7 +462,7 @@ const NormalSetInner = ({
   const renderUnilateralHeader = () => (
     <div
       className="grid items-center gap-1.5 px-2.5 text-[9px] uppercase tracking-widest text-neutral-400 font-bold min-w-0"
-      style={{ gridTemplateColumns: 'minmax(0,3fr) minmax(0,2.3fr) minmax(0,1.7fr) 76px' }}
+      style={{ gridTemplateColumns: 'minmax(0,3fr) minmax(0,2.5fr) minmax(0,1.5fr) 76px' }}
     >
       <span>Peso (kg)</span>
       <span className="text-center">Reps</span>
@@ -473,7 +473,7 @@ const NormalSetInner = ({
   const renderBilateralHeader = () => (
     <div
       className="grid items-center gap-1.5 px-2.5 text-[9px] uppercase tracking-widest text-neutral-400 font-bold min-w-0"
-      style={{ gridTemplateColumns: '32px 28px minmax(0,3fr) minmax(0,2.3fr) minmax(0,1.7fr) 76px' }}
+      style={{ gridTemplateColumns: '32px 28px minmax(0,3fr) minmax(0,2.5fr) minmax(0,1.5fr) 76px' }}
     >
       <span className="text-center">Set</span>
       <span />
@@ -527,7 +527,7 @@ const NormalSetInner = ({
               warmup or feeler (popover) — taps do nothing to avoid accidents
               during sweaty workouts. */}
           <div className="grid items-center gap-1.5"
-            style={{ gridTemplateColumns: '32px 28px minmax(0,3fr) minmax(0,2.3fr) minmax(0,1.7fr) 76px' }}>
+            style={{ gridTemplateColumns: '32px 28px minmax(0,3fr) minmax(0,2.5fr) minmax(0,1.5fr) 76px' }}>
 
             {/* Set-number badge with long-press → SetTypePopover */}
             <button
