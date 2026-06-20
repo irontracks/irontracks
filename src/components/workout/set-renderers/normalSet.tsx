@@ -167,7 +167,9 @@ const NormalSetInner = ({
   const useWatermark      = DELOAD_SUGGEST_MODE === 'watermark';
   const weightPlaceholder = useWatermark && suggestion?.weight != null ? `${suggestion.weight} kg` : 'Peso';
   const repsPlaceholder   = useWatermark && suggestion?.reps   != null ? String(suggestion.reps)   : 'Reps';
-  const rpePlaceholder    = useWatermark && suggestion?.rpe    != null ? String(suggestion.rpe)    : 'RPE';
+  // RPE: prioriza o último treino (watermark), igual ao peso. Sem RPE no
+  // histórico, cai no planejado e por fim em 'RPE'.
+  const rpeWatermark      = useWatermark && suggestion?.rpe    != null ? String(suggestion.rpe)    : (plannedRpe || 'RPE');
 
   const notesId     = `notes-${key}`;
   const hasNotes    = extNotes.trim().length > 0;
@@ -404,7 +406,7 @@ const NormalSetInner = ({
           )}
         </div>
         {/* 4-column grid — no notes slot here; notes lives below both rows */}
-        <div className="grid items-center gap-1.5 min-w-0" style={{ gridTemplateColumns: 'minmax(0,3fr) minmax(0,2fr) minmax(0,2fr) 76px' }}>
+        <div className="grid items-center gap-1.5 min-w-0" style={{ gridTemplateColumns: 'minmax(0,3fr) minmax(0,2.3fr) minmax(0,1.7fr) 76px' }}>
           {/* Weight */}
           <input
             inputMode="decimal"
@@ -437,7 +439,7 @@ const NormalSetInner = ({
             onChange={rpeFld.handleChange}
             onFocus={rpeFld.handleFocus}
             onBlur={rpeFld.handleBlur}
-            placeholder={plannedRpe || rpePlaceholder}
+            placeholder={rpeWatermark}
             className={`${inputCompact} text-yellow-400 border-yellow-500/25 placeholder:text-yellow-600/60`}
           />
 
@@ -460,7 +462,7 @@ const NormalSetInner = ({
   const renderUnilateralHeader = () => (
     <div
       className="grid items-center gap-1.5 px-2.5 text-[9px] uppercase tracking-widest text-neutral-400 font-bold min-w-0"
-      style={{ gridTemplateColumns: 'minmax(0,3fr) minmax(0,2fr) minmax(0,2fr) 76px' }}
+      style={{ gridTemplateColumns: 'minmax(0,3fr) minmax(0,2.3fr) minmax(0,1.7fr) 76px' }}
     >
       <span>Peso (kg)</span>
       <span className="text-center">Reps</span>
@@ -471,7 +473,7 @@ const NormalSetInner = ({
   const renderBilateralHeader = () => (
     <div
       className="grid items-center gap-1.5 px-2.5 text-[9px] uppercase tracking-widest text-neutral-400 font-bold min-w-0"
-      style={{ gridTemplateColumns: '32px 28px minmax(0,3fr) minmax(0,2fr) minmax(0,2fr) 76px' }}
+      style={{ gridTemplateColumns: '32px 28px minmax(0,3fr) minmax(0,2.3fr) minmax(0,1.7fr) 76px' }}
     >
       <span className="text-center">Set</span>
       <span />
@@ -525,7 +527,7 @@ const NormalSetInner = ({
               warmup or feeler (popover) — taps do nothing to avoid accidents
               during sweaty workouts. */}
           <div className="grid items-center gap-1.5"
-            style={{ gridTemplateColumns: '32px 28px minmax(0,3fr) minmax(0,2fr) minmax(0,2fr) 76px' }}>
+            style={{ gridTemplateColumns: '32px 28px minmax(0,3fr) minmax(0,2.3fr) minmax(0,1.7fr) 76px' }}>
 
             {/* Set-number badge with long-press → SetTypePopover */}
             <button
@@ -588,7 +590,7 @@ const NormalSetInner = ({
               onChange={rpeField.handleChange}
               onFocus={rpeField.handleFocus}
               onBlur={rpeField.handleBlur}
-              placeholder={plannedRpe || rpePlaceholder}
+              placeholder={rpeWatermark}
               className={`${inputCompact} text-yellow-400 border-yellow-500/25 placeholder:text-yellow-600/60`}
             />
 
