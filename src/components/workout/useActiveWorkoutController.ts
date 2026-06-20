@@ -16,7 +16,7 @@ import {
   WorkoutDraft,
   WorkoutExercise,
 } from './types';
-import { isObject } from './utils';
+import { isObject, shouldOpenFinishPrompt } from './utils';
 import {
   getPlanConfig,
   getPlannedSet,
@@ -487,6 +487,34 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     const pct = total > 0 ? Math.round((done / total) * 100) : 0;
     return { completedSets: done, totalSets: total, progressPct: pct, remainingSets: total - done };
   }, [exercises, logs]);
+
+  // ── Prompt automático ao concluir TODOS os exercícios ───────────────────
+  // Quando o usuário marca a última série pendente, abre um confirm
+  // perguntando se quer finalizar o treino. Dispara só na TRANSIÇÃO
+  // (não-completo → completo), nunca no mount/resume, e só uma vez por sessão
+  // — sem "nag" se o usuário recusar (segue podendo finalizar pelo footer).
+  const allExercisesComplete = totalSets > 0 && completedSets >= totalSets;
+  const finishPromptedRef = useRef(false);
+  const prevAllCompleteRef = useRef(allExercisesComplete);
+  useEffect(() => {
+    const open = shouldOpenFinishPrompt({
+      allComplete: allExercisesComplete,
+      prevAllComplete: prevAllCompleteRef.current,
+      alreadyPrompted: finishPromptedRef.current,
+      finishing,
+    });
+    prevAllCompleteRef.current = allExercisesComplete;
+    if (!open) return;
+    finishPromptedRef.current = true;
+    void (async () => {
+      const ok = await confirm(
+        'Você concluiu todos os exercícios! Deseja finalizar o treino agora?',
+        'Treino concluído 💪',
+        { confirmText: 'Finalizar' },
+      );
+      if (ok) await finishWorkout();
+    })();
+  }, [allExercisesComplete, finishing, confirm, finishWorkout]);
 
   // Memoiza o contexto inteiro pra não recriar o `value` do WorkoutProvider a
   // cada render do controller. Sem isso, qualquer mudança no controller (ticker
