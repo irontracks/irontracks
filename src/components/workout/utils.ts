@@ -267,3 +267,20 @@ export const estimate1Rm = (weight: unknown, reps: unknown): number | null => {
   if (!Number.isFinite(w) || !Number.isFinite(r) || w <= 0 || r <= 0) return null;
   return w * (1 + r / 30);
 };
+
+/**
+ * Decide se deve abrir o prompt automático de "finalizar treino".
+ * Dispara só na TRANSIÇÃO de não-completo → completo (nunca no mount/resume,
+ * onde prevAllComplete já é true), uma única vez por sessão (alreadyPrompted)
+ * e nunca enquanto já está finalizando.
+ */
+export const shouldOpenFinishPrompt = (params: {
+  allComplete: boolean;
+  prevAllComplete: boolean;
+  alreadyPrompted: boolean;
+  finishing: boolean;
+}): boolean => {
+  const { allComplete, prevAllComplete, alreadyPrompted, finishing } = params;
+  const justCompleted = allComplete && !prevAllComplete;
+  return justCompleted && !alreadyPrompted && !finishing;
+};

@@ -1,4 +1,5 @@
 import { describe, it, expect } from 'vitest'
+import { shouldOpenFinishPrompt } from '../utils'
 
 // ─── Lógica pura extraída de useActiveWorkoutController ─────────────────────
 // Esses testes cobrem as funções mais críticas sem precisar renderizar o hook.
@@ -204,5 +205,32 @@ describe('useActiveWorkoutController — getSetsCount', () => {
 
     it('retorna 0 para exercício sem configuração', () => {
         expect(getSetsCount({})).toBe(0)
+    })
+})
+
+// ---------------------------------------------------------------------------
+// shouldOpenFinishPrompt — prompt automático ao concluir todos os exercícios
+// ---------------------------------------------------------------------------
+describe('shouldOpenFinishPrompt', () => {
+    const base = { allComplete: false, prevAllComplete: false, alreadyPrompted: false, finishing: false }
+
+    it('dispara na transição não-completo → completo', () => {
+        expect(shouldOpenFinishPrompt({ ...base, allComplete: true, prevAllComplete: false })).toBe(true)
+    })
+
+    it('NÃO dispara no mount/resume (já estava completo)', () => {
+        expect(shouldOpenFinishPrompt({ ...base, allComplete: true, prevAllComplete: true })).toBe(false)
+    })
+
+    it('NÃO dispara se ainda não está tudo completo', () => {
+        expect(shouldOpenFinishPrompt({ ...base, allComplete: false, prevAllComplete: false })).toBe(false)
+    })
+
+    it('NÃO repete depois de já ter perguntado uma vez', () => {
+        expect(shouldOpenFinishPrompt({ ...base, allComplete: true, prevAllComplete: false, alreadyPrompted: true })).toBe(false)
+    })
+
+    it('NÃO dispara enquanto já está finalizando', () => {
+        expect(shouldOpenFinishPrompt({ ...base, allComplete: true, prevAllComplete: false, finishing: true })).toBe(false)
     })
 })
