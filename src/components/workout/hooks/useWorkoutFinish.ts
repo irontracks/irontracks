@@ -21,6 +21,7 @@ import { buildFinishWorkoutPayload } from '@/lib/finishWorkoutPayload'
 import { saveFinishBackup, clearFinishBackup } from '@/lib/workoutSafetyNet'
 import { logWarn } from '@/lib/logger'
 import { endAllRestLiveActivities, triggerHaptic, requestNativeReview } from '@/utils/native/irontracksNative'
+import { apiAi } from '@/lib/api/ai'
 
 interface UseWorkoutFinishProps {
   session: WorkoutSession | null
@@ -183,6 +184,13 @@ export function useWorkoutFinish(props: UseWorkoutFinishProps) {
           // ── SAFETY NET: clear backup only after confirmed save ──
           if (safeUserId && (onlineSuccess || offlineQueued)) {
             clearFinishBackup(safeUserId)
+          }
+
+          // Auto-atualiza o Mapa Muscular em background (recalcula + recacheia,
+          // sem IA) pra refletir o treino recém-concluído — dispensa o botão
+          // "Atualizar". Fire-and-forget: nunca bloqueia/quebra a finalização.
+          if (onlineSuccess) {
+            void apiAi.muscleMapWeek({ refreshCache: true, refreshAi: false }).catch(() => { })
           }
 
         } catch (e: unknown) {
