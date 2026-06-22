@@ -522,6 +522,41 @@ interface SettingsNotificationsSectionProps extends SettingsSectionProps {
 }
 export function SettingsNotificationsSection({ draft, setValue, iosNotifStatus, iosNotifBusy, iosTimeSensitiveStatus, onRequestIosNotifPermission, onOpenAppSettings, isIosNative }: SettingsNotificationsSectionProps) {
     const inAppToasts = Boolean(draft?.inAppToasts ?? true)
+    // Diagnóstico admin: com um descanso ativo, dispara um push de teste da
+    // Live Activity pro próprio device — valida o pipeline APNs→Dynamic Island
+    // antes de construir o agendamento de fim de descanso. Só aparece p/ admin.
+    const [laDiag, setLaDiag] = useState<string>('')
+    const [laAdmin, setLaAdmin] = useState(false)
+    useEffect(() => {
+        if (!isIosNative) return
+        let alive = true
+        void (async () => {
+            try {
+                const sb = createClient()
+                const { data: { user } } = await sb.auth.getUser()
+                if (!user?.id) return
+                const { data } = await sb.from('profiles').select('role').eq('id', user.id).maybeSingle()
+                if (alive && data?.role === 'admin') setLaAdmin(true)
+            } catch { /* noop */ }
+        })()
+        return () => { alive = false }
+    }, [isIosNative])
+    const runLaTest = async () => {
+        setLaDiag('enviando…')
+        try {
+            const res = await fetch('/api/push/live-activity-test', {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({ kind: 'rest', event: 'update' }),
+            })
+            const json = await res.json().catch(() => ({}))
+            const n = Array.isArray(json?.results) ? json.results.length : 0
+            const okCount = Array.isArray(json?.results) ? json.results.filter((r: { ok?: boolean }) => r?.ok).length : 0
+            setLaDiag(res.ok && json?.ok ? `enviado p/ ${okCount}/${n} token(s)` : `erro: ${json?.error || res.status}`)
+        } catch (e) {
+            setLaDiag(`falha: ${e instanceof Error ? e.message : String(e)}`)
+        }
+    }
     const notificationPermissionPrompt = Boolean(draft?.notificationPermissionPrompt ?? true)
     const allowSocialFollows = Boolean(draft?.allowSocialFollows ?? true)
     // Master switch: disables ALL push (lock-screen) notifications.
@@ -916,6 +951,18 @@ export function SettingsNotificationsSection({ draft, setValue, iosNotifStatus, 
                                 <button type="button" disabled={iosNotifBusy} onClick={onRequestIosNotifPermission} className="px-3 py-2 rounded-xl bg-yellow-500 text-black font-black disabled:opacity-60">Solicitar</button>
                                 <button type="button" disabled={iosNotifBusy} onClick={onOpenAppSettings} className="px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black disabled:opacity-60">Abrir Ajustes</button>
                             </div>
+                        </div>
+                    </div>
+                )}
+
+                {isIosNative && laAdmin && (
+                    <div className="mt-2 rounded-xl bg-neutral-900 border border-yellow-500/30 p-3">
+                        <div className="flex items-center justify-between gap-3">
+                            <div className="min-w-0">
+                                <div className="text-sm font-black text-white">🧪 Testar Live Activity (admin)</div>
+                                <div className="text-xs text-neutral-400">Com um descanso ATIVO, envia um push de teste pra Dynamic Island.{laDiag ? ` — ${laDiag}` : ''}</div>
+                            </div>
+                            <button type="button" onClick={runLaTest} className="px-3 py-2 rounded-xl bg-yellow-500 text-black font-black shrink-0">Enviar</button>
                         </div>
                     </div>
                 )}
