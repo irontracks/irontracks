@@ -6,12 +6,12 @@ import { unlockAudio } from '@/lib/sounds'
 import { logError } from '@/lib/logger'
 import type { ActiveWorkoutSession, DirectChatState } from '@/types/app'
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { isRecord } from '@/utils/guards'
 
 // ────────────────────────────────────────────────────────────────
-// Exported helpers (used by sibling hooks)
+// Exported helpers (used by sibling hooks) — fonte única em utils/guards
 // ────────────────────────────────────────────────────────────────
-export const isRecord = (v: unknown): v is Record<string, unknown> =>
-  v !== null && typeof v === 'object' && !Array.isArray(v)
+export { isRecord }
 
 export const parseStartedAtMs = (raw: unknown): number => {
   const direct = typeof raw === 'number' ? raw : Number(String(raw ?? '').trim())

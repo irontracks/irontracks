@@ -1,9 +1,9 @@
+import { isRecord } from '@/utils/guards'
+
 const DEFAULT_SECONDS_PER_REP = 4;
 const DEFAULT_CARDIO_MINUTES = 5;
 const DEFAULT_REST_SECONDS = 60;
 const SET_OVERHEAD_SECONDS = 5;
-
-const isRecord = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v)
 
 export function isCardioExercise(ex: Record<string, unknown> | null): boolean {
   const e = isRecord(ex) ? ex : {}

@@ -6,6 +6,7 @@
 
 import { z } from 'zod';
 import { ExerciseRowSchema, SetRowSchema, WorkoutRowSchema } from '@/schemas/database';
+import { isRecord } from '@/utils/guards';
 import { PeriodStats } from '@/types/workout';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -169,8 +170,7 @@ export const SetLiteSchema = z
 
 // ─── Utilities ─────────────────────────────────────────────────────────────────
 
-export const isRecord = (v: unknown): v is Record<string, unknown> =>
-    v !== null && typeof v === 'object' && !Array.isArray(v);
+export { isRecord }; // fonte única em utils/guards
 
 export const parseRawSession = (value: unknown): z.infer<typeof RawSessionObjectSchema> | null => {
     if (typeof value === 'string') {

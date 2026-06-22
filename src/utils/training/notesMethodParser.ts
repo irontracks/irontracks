@@ -1,20 +1,12 @@
 import { parseTrainingNumber } from '../trainingNumber'
-
-const safeString = (v: unknown): string => {
-  try {
-    return String(v ?? '').trim()
-  } catch {
-    return ''
-  }
-}
+import { safeString } from '@/utils/guards'
+import { stripDiacritics } from '@/utils/normalizeExerciseName'
 
 const normalize = (v: unknown): string => {
   const s = safeString(v)
   if (!s) return ''
   try {
-    return s
-      .normalize('NFD')
-      .replace(/[\u0300-\u036f]/g, '')
+    return stripDiacritics(s)
       .toLowerCase()
       .replace(/[()]/g, ' ')
       .replace(/[–—]/g, '-')
