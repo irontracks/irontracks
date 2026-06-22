@@ -4,3 +4,6 @@ export const safeRecord = (v: unknown): Record<string, unknown> =>
 export const safeArray = <T,>(v: unknown): T[] => (Array.isArray(v) ? (v as T[]) : [])
 
 export const safeString = (v: unknown): string => String(v ?? '').trim()
+
+export const isRecord = (v: unknown): v is Record<string, unknown> =>
+  v !== null && typeof v === 'object' && !Array.isArray(v)
