@@ -100,6 +100,7 @@
         { "path": "/api/cron/teacher-plan-expiring", "schedule": "0 13 * * *" },
         { "path": "/api/cron/teacher-plan-suspend", "schedule": "0 6 * * *" },
         { "path": "/api/cron/whatsapp-reactivation", "schedule": "0 14 * * *" },
-        { "path": "/api/cron/admin-vip-expiring", "schedule": "30 12 * * *" }
+        { "path": "/api/cron/admin-vip-expiring", "schedule": "30 12 * * *" },
+        { "path": "/api/cron/muscle-weekly-insights", "schedule": "0 22 * * 0" }
     ]
 }
