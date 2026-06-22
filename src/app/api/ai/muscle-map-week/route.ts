@@ -27,9 +27,9 @@ import {
   plannedSetsCount,
   colorForRatio,
   normalizeAiExerciseMap,
-  normalizeAiInsights,
   DEFAULT_MUSCLE_ID_SET,
 } from '@/utils/ai/muscleMapWeekHelpers'
+import { generateWeeklyMuscleInsights } from '@/lib/ai/weeklyMuscleInsights'
 
 export const dynamic = 'force-dynamic'
 
@@ -145,51 +145,6 @@ const classifyExercisesWithAi = async (apiKey: string, names: string[]) => {
   }
   const exercises = aiData.exercises
   return normalizeAiExerciseMap({ exercises })
-}
-
-const generateWeeklyInsightsWithAi = async (apiKey: string, input: unknown) => {
-  const schema = [
-    '{',
-    '  "summary": string[] (3-6),',
-    '  "imbalanceAlerts": [',
-    '    { "type": string, "severity": "info"|"warn"|"critical", "muscles": string[], "evidence": string, "suggestion": string }',
-    '  ],',
-    '  "recommendations": [',
-    '    { "title": string, "actions": string[] }',
-    '  ]',
-    '}',
-  ].join('\n')
-
-  const prompt = [
-    'Você é um coach de musculação do app IronTracks.',
-    'Gere insights semanais a partir de volumes por músculo já calculados.',
-    '',
-    'REGRAS ABSOLUTAS:',
-    '- Retorne APENAS um JSON válido (sem markdown, sem texto extra).',
-    '- Escreva em pt-BR.',
-    '- Não invente números; use apenas os dados fornecidos.',
-    '- Se não der para afirmar algo, omita.',
-    '- Seja prático e direto.',
-    '',
-    'Formato (JSON):',
-    schema,
-    '',
-    'Dados (JSON):',
-    JSON.stringify(input),
-  ].join('\n')
-
-  const model = getGeminiModel(apiKey, MODEL)
-  const geminiResult = await safeGemini('muscle-map-week:insights', () =>
-    model.generateContent(prompt),
-  )
-  if ('errorResponse' in geminiResult) {
-    throw new Error('ai_upstream_error')
-  }
-  const result = geminiResult.value
-  const text = (await result?.response?.text()) || ''
-  const parsed = extractJsonFromModelText(text)
-  if (!parsed) return null
-  return normalizeAiInsights(parsed)
 }
 
 export async function POST(req: Request) {
@@ -510,7 +465,7 @@ export async function POST(req: Request) {
     let aiError = ''
     if (isVip && refreshAi && apiKey) {
       try {
-        insightsFromAi = await generateWeeklyInsightsWithAi(apiKey, insightInput)
+        insightsFromAi = await generateWeeklyMuscleInsights(apiKey, insightInput)
       } catch (e: unknown) {
         aiError = getErrorMessage(e)
       }
