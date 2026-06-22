@@ -59,6 +59,22 @@ export function buildHeuristicExerciseMap(canonicalName: string): HeuristicExerc
     || matchAll(['elevação', 'pernas'])
   if (isAbs) return make(key, raw, [{ muscleId: 'abs', weight: 1, role: 'primary' }], false, 0.82, 'heuristic: abs')
 
+  // ── DELTOIDE POSTERIOR: crucifixo invertido / reverse fly ──────────
+  // PRECEDE o bloco FLY de propósito: "crucifixo INVERTIDO" / "peck deck
+  // invertido" / "reverse fly" são exercícios de deltoide posterior. Sem
+  // isto cairiam na regra de fly e seriam contados como peitoral — o que
+  // inflava o peito e zerava o posterior na análise de equilíbrio.
+  const isRearDeltFly =
+    (match(['crucifixo', 'fly', 'flye', 'peck deck', 'pec deck', 'voador']) && match(['invertid', 'invers', 'reverse']))
+    || match(['posterior de ombro', 'deltoide posterior', 'reverse pec', 'reverse fly'])
+  if (isRearDeltFly) {
+    return make(key, raw, [
+      { muscleId: 'delts_rear', weight: 0.75, role: 'primary' },
+      { muscleId: 'upper_back', weight: 0.15, role: 'secondary' },
+      { muscleId: 'biceps', weight: 0.10, role: 'stabilizer' },
+    ], false, 0.84, 'heuristic: delts_rear_fly')
+  }
+
   // ── PEITORAL: FLY / CRUCIFIXO ───────────────────────────────────────
   const isFly = match(['fly', 'flye', 'crucifixo', 'peck deck', 'pec deck', 'crossover', 'cross over', 'voador'])
   if (isFly) {
@@ -148,6 +164,16 @@ export function buildHeuristicExerciseMap(canonicalName: string): HeuristicExerc
     ], false, 0.83, 'heuristic: upper_back')
   }
 
+  // ── PULLOVER (dorsais) ──────────────────────────────────────────────
+  const isPullover = match(['pullover', 'pull over'])
+  if (isPullover) {
+    return make(key, raw, [
+      { muscleId: 'lats', weight: 0.65, role: 'primary' },
+      { muscleId: 'chest', weight: 0.20, role: 'secondary' },
+      { muscleId: 'triceps', weight: 0.15, role: 'secondary' },
+    ], false, 0.80, 'heuristic: lats_pullover')
+  }
+
   // ── COSTAS: PUXADA / PULLDOWN ─────────────────────────────────────
   const isPulldown = match(['puxada', 'pulldown', 'pull down', 'pull up', 'pullup', 'barra fixa', 'chin up', 'chinup'])
   if (isPulldown) {
@@ -213,7 +239,7 @@ export function buildHeuristicExerciseMap(canonicalName: string): HeuristicExerc
 
   // ── QUADRÍCEPS ───────────────────────────────────────────────────
   const isQuads =
-    match(['agachamento', 'squat', 'extensora', 'hack', 'sissy'])
+    match(['agachamento', 'squat', 'extensora', 'hack', 'sissy', 'bulgaro', 'bulgaria'])
     || (match(['leg press']) && !match(['panturr', 'calf']))
     || match(['cadeira extensora'])
   if (isQuads) {
@@ -246,7 +272,7 @@ export function buildHeuristicExerciseMap(canonicalName: string): HeuristicExerc
 
   // ── GLÚTEOS ──────────────────────────────────────────────────────
   const isGlutes =
-    match(['hip thrust', 'hipthrust', 'gluteo', 'glúteo', 'passada', 'avanco', 'avanço', 'lunge', 'abducao', 'abdução', 'kickback gluteo'])
+    match(['hip thrust', 'hipthrust', 'gluteo', 'glúteo', 'passada', 'avanco', 'avanço', 'lunge', 'abducao', 'abdução', 'abdutora', 'abdutor', 'kickback gluteo'])
     || matchAll(['extensao', 'quadril'])
     || matchAll(['extensão', 'quadril'])
   if (isGlutes) {
