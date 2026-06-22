@@ -132,7 +132,10 @@ export const env = {
   // ── Segurança ─────────────────────────────────────────────
   security: {
     get cronSecret() { return requireEnv('CRON_SECRET') },
-    get internalSecret() { return requireEnv('IRONTRACKS_INTERNAL_SECRET') },
+    // Opcional de propósito: hasValidInternalSecret() já trata ausência com
+    // `if (!secret) return false`. Como requireEnv, uma chamada sem auth a
+    // qualquer rota interna/cron estourava 500 em vez de 403 limpo.
+    get internalSecret() { return optionalEnv('IRONTRACKS_INTERNAL_SECRET') },
     get adminEmail() { return optionalEnv('IRONTRACKS_ADMIN_EMAIL', optionalEnv('ADMIN_EMAIL')) },
     get trustedProxyDepth() { return parseInt(optionalEnv('TRUSTED_PROXY_DEPTH', '1'), 10) },
   },
