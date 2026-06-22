@@ -59,6 +59,28 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
     // Without this, the overlay stays visible for 1-2 frames after tap, during which
     // re-renders can interfere with the button's click handling on iOS WKWebView.
     const [dismissed, setDismissed] = useState(false);
+    // Teclado: a barra fixa `bottom-0` ficava ATRÁS do teclado de forma
+    // inconsistente no iOS (ex.: editando reps num modal de método com o
+    // descanso rolando). Medimos quanto o teclado ocupa via VisualViewport e
+    // levantamos a barra exatamente essa altura — funciona tanto se o WebView
+    // redimensiona quanto se não (inset 0 vs >0, auto-corrige). Padroniza:
+    // a barra fica SEMPRE acima do teclado.
+    const [kbInset, setKbInset] = useState(0);
+    useEffect(() => {
+        const vv = typeof window !== 'undefined' ? window.visualViewport : null;
+        if (!vv) return;
+        const update = () => {
+            const inset = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+            setKbInset(inset > 1 ? inset : 0);
+        };
+        update();
+        vv.addEventListener('resize', update);
+        vv.addEventListener('scroll', update);
+        return () => {
+            vv.removeEventListener('resize', update);
+            vv.removeEventListener('scroll', update);
+        };
+    }, []);
     // Flash dismiss: tapping the green "BORA!" flash hides ONLY the flash,
     // keeping the bottom bar (timer + START + AUTO) visible. Lets the user
     // peek at the upcoming sets in the workout list below WITHOUT pressing
@@ -559,7 +581,7 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
                 </div>
             )}
 
-            <div className="fixed bottom-0 left-0 right-0 bg-neutral-950/97 backdrop-blur-xl border-t border-neutral-800/80 py-2 px-4 shadow-2xl z-[2100] animate-slide-up pb-safe overflow-x-hidden">
+            <div style={{ bottom: kbInset || undefined }} className="fixed bottom-0 left-0 right-0 bg-neutral-950/97 backdrop-blur-xl border-t border-neutral-800/80 py-2 px-4 shadow-2xl z-[2100] animate-slide-up pb-safe overflow-x-hidden transition-[bottom] duration-150">
                 <div className="flex items-center gap-3 max-w-md mx-auto min-w-0">
                     {/* Circular SVG ring — compact size matching bar height */}
                     <div className="relative flex-shrink-0" style={{ width: 68, height: 68 }}>
