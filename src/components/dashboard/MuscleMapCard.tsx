@@ -1,10 +1,10 @@
 'use client'
 
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ChevronDown, Crown, Loader2, RefreshCcw, Sparkles, Wand2 } from 'lucide-react'
+import { ChevronDown, Crown, Loader2, Sparkles, Wand2 } from 'lucide-react'
 import BodyMapSvg from '@/components/muscle-map/BodyMapSvg'
 import { MUSCLE_BY_ID, MUSCLE_GROUPS, type MuscleId } from '@/utils/muscleMapConfig'
-import { backfillExerciseMuscleMaps, getMuscleMapDay, getMuscleMapWeek } from '@/actions/workout-actions'
+import { getMuscleMapDay, getMuscleMapWeek } from '@/actions/workout-actions'
 import { translateAiError } from '@/utils/ai/clientErrors'
 import { motion, AnimatePresence } from 'framer-motion'
 import { parseJsonWithSchema } from '@/utils/zod'
@@ -138,7 +138,6 @@ const MuscleMapCard = memo(function MuscleMapCard(props: Props) {
   const [view, setView] = useState<'front' | 'back'>('front')
   const [selected, setSelected] = useState<MuscleId | null>(null)
   const [expanded, setExpanded] = useState(false)
-  const [backfill, setBackfill] = useState<{ status: 'idle' | 'loading' | 'error'; error: string }>({ status: 'idle', error: '' })
   const [state, setState] = useState<{ status: 'idle' | 'loading' | 'ready' | 'error'; data: ApiPayload | null; error: string }>({
     status: 'idle',
     data: null,
@@ -316,29 +315,6 @@ const MuscleMapCard = memo(function MuscleMapCard(props: Props) {
     props.onOpenWizard?.()
   }
 
-  const runBackfill = useCallback(async () => {
-    if (backfill.status === 'loading') return
-    setBackfill({ status: 'loading', error: '' })
-    const res = await backfillExerciseMuscleMaps({ days: 365, maxAi: 240 })
-    if (!res?.ok) {
-      const msg = translateAiError(res?.error)
-      setBackfill({ status: 'error', error: msg })
-      try { window.alert(msg) } catch { }
-      return
-    }
-    setBackfill({ status: 'idle', error: '' })
-    try {
-      window.alert(
-        `Reprocessamento concluído.\n` +
-        `Exercícios únicos: ${Number(res?.uniqueExercises || 0).toLocaleString('pt-BR')}\n` +
-        `Mapeados (heurística): ${Number(res?.heuristicMapped || 0).toLocaleString('pt-BR')}\n` +
-        `Mapeados (IA): ${Number(res?.aiMapped || 0).toLocaleString('pt-BR')}\n` +
-        `Ainda sem mapa: ${Number((Array.isArray(res?.remainingUnmapped) ? res.remainingUnmapped.length : 0) || 0).toLocaleString('pt-BR')}`
-      )
-    } catch { }
-    await load({ refreshCache: true, refreshAi: false, source: 'manual' })
-  }, [backfill.status, load])
-
   return (
     <div className="bg-neutral-900/70 border border-neutral-800 rounded-2xl shadow-lg shadow-black/30 overflow-hidden">
       <div
@@ -494,18 +470,6 @@ const MuscleMapCard = memo(function MuscleMapCard(props: Props) {
               </div>
 
               <div className="flex flex-col sm:flex-row gap-2">
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    load({ refreshCache: true, refreshAi: false, source: 'manual' })
-                  }}
-                  disabled={state.status === 'loading'}
-                  className="min-h-[40px] px-3 rounded-xl bg-black border border-neutral-800 text-neutral-200 font-black text-xs uppercase tracking-widest hover:bg-neutral-950 disabled:opacity-60 inline-flex items-center gap-2"
-                >
-                  {state.status === 'loading' ? <Loader2 size={16} className="animate-spin" /> : <RefreshCcw size={16} />}
-                  Atualizar
-                </button>
                 {(() => {
                   const isVip = Boolean((state.data as Record<string, unknown>)?.isVip)
                   if (!isVip) return (
@@ -537,18 +501,6 @@ const MuscleMapCard = memo(function MuscleMapCard(props: Props) {
                     </button>
                   )
                 })()}
-                <button
-                  type="button"
-                  onClick={(e) => {
-                    e.stopPropagation()
-                    runBackfill()
-                  }}
-                  disabled={state.status === 'loading' || backfill.status === 'loading'}
-                  className="min-h-[40px] px-3 rounded-xl bg-neutral-900 border border-neutral-800 text-neutral-200 font-black text-xs uppercase tracking-widest hover:bg-neutral-800 disabled:opacity-60 inline-flex items-center gap-2"
-                >
-                  {backfill.status === 'loading' ? <Loader2 size={16} className="animate-spin" /> : <RefreshCcw size={16} />}
-                  Histórico
-                </button>
                 <button
                   type="button"
                   onClick={(e) => {
