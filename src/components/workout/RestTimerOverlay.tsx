@@ -5,6 +5,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { playTimerFinishSound, playTick } from '@/lib/sounds';
 import { isNativePlatform } from '@/utils/platform';
 import { addWidgetStartSetListener, cancelRestNotification, checkPendingWidgetAction, endRestLiveActivity, requestNativeNotifications, scheduleRestNotification, startRestLiveActivity, stopAlarmSound, triggerHaptic, updateRestLiveActivity } from '@/utils/native/irontracksNative';
+import { scheduleRestEndPush as scheduleRestEndPushApi, cancelRestEndPush as cancelRestEndPushApi } from '@/lib/workout/restEndPush';
 
 interface RestTimerContext {
     kind?: string;
@@ -117,9 +118,55 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
     const alarmActiveRef = useRef(false);
     const wakeLockRef = useRef<{ release: () => Promise<void> } | null>(null);
     const hasNotifiedRef = useRef(false);
+    // Backend rest-end push (QStash): só agendamos quando o app vai pro
+    // background COM um descanso ativo; cancelamos ao voltar/terminar/pular.
+    const restInfoRef = useRef<{ id: string; endMs: number; title: string; body: string } | null>(null);
+    const restPushScheduleIdRef = useRef<string | null>(null);
+    const isFinishedRef = useRef(false);
     // Capture total rest seconds on mount so the ring can compute % remaining
     const totalSecondsRef = useRef<number>(0);
     const safeSettings = settings && typeof settings === 'object' ? settings : null;
+
+    // Espelha isFinished num ref e, ao finalizar com o app aberto, cancela o
+    // push de fim de descanso agendado (o cliente já finaliza a LA aqui).
+    useEffect(() => {
+        isFinishedRef.current = isFinished;
+        if (isFinished && restPushScheduleIdRef.current) {
+            const sid = restPushScheduleIdRef.current;
+            restPushScheduleIdRef.current = null;
+            void cancelRestEndPushApi(sid);
+        }
+    }, [isFinished]);
+
+    // Backend rest-end push: quando o app vai pro background COM um descanso
+    // ativo (não finalizado), agenda no QStash o push que acorda + finaliza a
+    // LA no fim. Ao voltar ao foreground, cancela (o cliente reassume). Só em
+    // app nativo (web não tem Live Activity / push desse tipo).
+    useEffect(() => {
+        if (!isNativePlatform() || typeof document === 'undefined') return;
+        const onVis = () => {
+            if (document.hidden) {
+                const info = restInfoRef.current;
+                if (info && !isFinishedRef.current && !restPushScheduleIdRef.current && info.endMs > Date.now() + 2500) {
+                    void scheduleRestEndPushApi(info.id, info.endMs, info.title, info.body).then((sid) => {
+                        if (!sid) return;
+                        // Se nesse meio tempo o app voltou ao foreground, cancela.
+                        if (!document.hidden) { void cancelRestEndPushApi(sid); return; }
+                        restPushScheduleIdRef.current = sid;
+                    });
+                }
+            } else {
+                const sid = restPushScheduleIdRef.current;
+                if (sid) { restPushScheduleIdRef.current = null; void cancelRestEndPushApi(sid); }
+            }
+        };
+        document.addEventListener('visibilitychange', onVis);
+        return () => {
+            document.removeEventListener('visibilitychange', onVis);
+            const sid = restPushScheduleIdRef.current;
+            if (sid) { restPushScheduleIdRef.current = null; void cancelRestEndPushApi(sid); }
+        };
+    }, []);
     const soundsEnabled = safeSettings ? safeSettings.enableSounds !== false : true;
     const soundVolume = (() => {
         const raw = Number(safeSettings?.soundVolume ?? 100);
@@ -279,6 +326,12 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
             if (notifyIdRef.current) {
                 cancelRestNotification(notifyIdRef.current);
             }
+            restInfoRef.current = null;
+            if (restPushScheduleIdRef.current) {
+                const sid = restPushScheduleIdRef.current;
+                restPushScheduleIdRef.current = null;
+                void cancelRestEndPushApi(sid);
+            }
             return;
         }
         hasNotifiedRef.current = false;
@@ -310,6 +363,14 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
                 }).catch(() => { });
             }
             startRestLiveActivity(id, seconds, liveTitle, workoutStartMs);
+            // Guarda os dados deste descanso p/ um eventual agendamento no
+            // background. Cancela qualquer agendamento de um descanso anterior.
+            if (restPushScheduleIdRef.current) {
+                const prev = restPushScheduleIdRef.current;
+                restPushScheduleIdRef.current = null;
+                void cancelRestEndPushApi(prev);
+            }
+            restInfoRef.current = { id, endMs: targetTime, title: notifyTitle, body: notifyBody };
         } catch { }
 
         // Capture total duration on first tick
