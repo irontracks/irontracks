@@ -1,25 +1,28 @@
 /**
  * GET /api/analysis/muscle-balance
  *
- * Analyzes workout sessions from the last 28 days and returns
- * volume per muscle group + antagonist imbalances.
+ * Analisa os treinos completos dos últimos 28 dias e retorna volume por grupo
+ * muscular + desequilíbrios entre antagonistas.
+ *
+ * Fonte de músculos = `exercise_library` (catálogo GLOBAL curado) via resolver
+ * anti-falhas: library → alias → heurística (fallback) → buraco logado. Nunca
+ * "some" um exercício silenciosamente.
  */
 import { NextResponse } from 'next/server'
 import { requireUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
-import { buildHeuristicExerciseMap } from '@/utils/exerciseMuscleHeuristics'
-import { normalizeExerciseName } from '@/utils/normalizeExerciseName'
-import type { MuscleId } from '@/utils/muscleMapConfig'
+import { buildLibraryIndex, resolveExerciseMuscles, type LibRow } from '@/utils/exerciseMuscleResolver'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
+import { logWarn } from '@/lib/logger'
 
 export const dynamic = 'force-dynamic'
 
+// Pares antagonistas na taxonomia do exercise_library (pt-BR).
 const ANTAGONIST_PAIRS = [
-  { a: 'chest', b: 'lats', labelA: 'Peitoral', labelB: 'Dorsais' },
-  { a: 'chest', b: 'upper_back', labelA: 'Peitoral', labelB: 'Costas sup.' },
+  { a: 'peito', b: 'costas', labelA: 'Peito', labelB: 'Costas' },
+  { a: 'ombros', b: 'ombros_posteriores', labelA: 'Ombro ant/lat', labelB: 'Ombro post.' },
   { a: 'biceps', b: 'triceps', labelA: 'Bíceps', labelB: 'Tríceps' },
-  { a: 'quads', b: 'hamstrings', labelA: 'Quadríceps', labelB: 'Posteriores' },
-  { a: 'delts_front', b: 'delts_rear', labelA: 'Deltoide frontal', labelB: 'Deltoide posterior' },
+  { a: 'quadriceps', b: 'posterior_de_coxa', labelA: 'Quadríceps', labelB: 'Posterior' },
 ] as const
 
 export async function GET(req: Request) {
@@ -32,10 +35,13 @@ export async function GET(req: Request) {
   const admin = createAdminClient()
   const since = new Date(Date.now() - 28 * 24 * 60 * 60 * 1000).toISOString()
 
-  // Get completed workouts from last 28 days.
-  // A tabela legada `workout_sessions` não existe — Postgrest retorna 404.
-  // Treinos completos vivem em `workouts` com is_template=false e notes
-  // JSON contendo `exercises[]` e `logs{}` exatamente no formato esperado.
+  // Catálogo global de músculos (fonte da verdade) + índice de resolução.
+  const { data: libRows } = await admin
+    .from('exercise_library')
+    .select('normalized_name, aliases, primary_muscle, secondary_muscles')
+  const index = buildLibraryIndex((libRows || []) as LibRow[])
+
+  // Treinos completos dos últimos 28 dias (notes JSON com exercises[] + logs{}).
   const { data: sessions } = await admin
     .from('workouts')
     .select('notes, completed_at')
@@ -45,8 +51,9 @@ export async function GET(req: Request) {
     .gte('completed_at', since)
     .limit(60)
 
-  const setsPerMuscle = new Map<MuscleId, number>()
+  const setsPerMuscle = new Map<string, number>()
   const sessionDates: string[] = []
+  const gaps = new Set<string>()
 
   for (const session of Array.isArray(sessions) ? sessions : []) {
     try {
@@ -62,7 +69,7 @@ export async function GET(req: Request) {
         const name = String(exObj?.name || '').trim()
         if (!name) return
 
-        // Count completed sets
+        // Conta séries concluídas
         const setsCount = Number(exObj?.sets) || 0
         let doneSets = 0
         for (let s = 0; s < setsCount; s++) {
@@ -71,26 +78,28 @@ export async function GET(req: Request) {
         }
         if (doneSets === 0) return
 
-        // Map exercise to muscle groups
-        const normalized = normalizeExerciseName(name)
-        const heuristic = buildHeuristicExerciseMap(normalized)
-        if (!heuristic) return
+        // Resolve músculos pelo catálogo (heurística como fallback).
+        const resolved = resolveExerciseMuscles(name, index, (n) => gaps.add(n))
+        if (!resolved) return
 
-        for (const c of heuristic.mapping.contributions) {
-          if (c.role === 'primary') {
-            setsPerMuscle.set(c.muscleId, (setsPerMuscle.get(c.muscleId) || 0) + doneSets)
-          } else if (c.role === 'secondary') {
-            setsPerMuscle.set(c.muscleId, (setsPerMuscle.get(c.muscleId) || 0) + doneSets * 0.5)
-          }
+        setsPerMuscle.set(resolved.primary, (setsPerMuscle.get(resolved.primary) || 0) + doneSets)
+        for (const sec of resolved.secondary) {
+          setsPerMuscle.set(sec, (setsPerMuscle.get(sec) || 0) + doneSets * 0.5)
         }
       })
     } catch { /* skip bad session */ }
   }
 
-  // Compute antagonist ratios
+  // Auto-cura: registra os exercícios que caíram no fallback/sem-resolução
+  // pra backfill posterior no exercise_library.
+  if (gaps.size > 0) {
+    logWarn('muscle-balance:gaps', `${gaps.size} exercício(s) sem match curado: ${[...gaps].slice(0, 30).join(' | ')}`)
+  }
+
+  // Desequilíbrios entre antagonistas (séries: primário 1x, secundário 0.5x).
   const imbalances = ANTAGONIST_PAIRS.map(pair => {
-    const setsA = setsPerMuscle.get(pair.a as MuscleId) || 0
-    const setsB = setsPerMuscle.get(pair.b as MuscleId) || 0
+    const setsA = setsPerMuscle.get(pair.a) || 0
+    const setsB = setsPerMuscle.get(pair.b) || 0
     const total = setsA + setsB
     const ratio = total > 0 ? setsA / total : 0.5
     const deviation = Math.abs(ratio - 0.5)
@@ -103,11 +112,10 @@ export async function GET(req: Request) {
       setsB: Math.round(setsB),
       ratio: Math.round(ratio * 100),
       deviation: Math.round(deviation * 100),
-      balanced: deviation < 0.15, // within 15% is considered balanced
+      balanced: deviation < 0.15, // dentro de 15% = equilibrado
     }
   })
 
-  // Top muscles by volume
   const muscleVolume = Array.from(setsPerMuscle.entries())
     .map(([id, sets]) => ({ id, sets: Math.round(sets) }))
     .sort((a, b) => b.sets - a.sets)

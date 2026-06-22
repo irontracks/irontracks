@@ -33,11 +33,13 @@ interface AnalysisData {
 }
 
 const MUSCLE_LABELS: Record<string, string> = {
-  chest: 'Peitoral', lats: 'Dorsais', upper_back: 'Costas sup.',
-  biceps: 'Bíceps', triceps: 'Tríceps', quads: 'Quadríceps',
-  hamstrings: 'Posteriores', glutes: 'Glúteos', delts_front: 'Ombro frontal',
-  delts_side: 'Ombro lateral', delts_rear: 'Ombro posterior',
-  abs: 'Abdômen', calves: 'Panturrilhas', forearms: 'Antebraço',
+  peito: 'Peito', costas: 'Costas', ombros: 'Ombros',
+  ombros_posteriores: 'Ombro post.', trapezio: 'Trapézio',
+  biceps: 'Bíceps', triceps: 'Tríceps', antebraco: 'Antebraço',
+  quadriceps: 'Quadríceps', posterior_de_coxa: 'Posterior', gluteos: 'Glúteos',
+  adutores: 'Adutores', abdutores: 'Abdutores', panturrilhas: 'Panturrilha',
+  abdomen: 'Abdômen', core: 'Core', lombar: 'Lombar',
+  flexores_do_quadril: 'Flexores quadril',
 }
 
 export default function MuscleBalanceCard() {
