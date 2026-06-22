@@ -1,14 +1,14 @@
 import { NextResponse } from 'next/server'
 import { logWarn } from '@/lib/logger'
 
-import { parseJsonBody, parseJsonWithSchema } from '@/utils/zod'
+import { parseJsonBody } from '@/utils/zod'
 import { z } from 'zod'
 import { requireRoleOrBearer } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { normalizeExerciseName } from '@/utils/normalizeExerciseName'
-import { getGeminiModel } from '@/utils/ai/gemini'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { env } from '@/utils/env'
+import { resolveCanonicalItems } from '@/utils/ai/exerciseCanonicalizeShared'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -21,34 +21,7 @@ const ZodBodySchema = z
 
 const MODEL_ID = env.gemini.modelId
 
-const JsonSchema = z.object({ items: z.array(z.record(z.unknown())).optional() }).passthrough()
-
-const extractJson = (raw: string) => {
-  const text = String(raw || '').trim()
-  if (!text) return null
-  let candidate = text
-  if (candidate.startsWith('```')) {
-    const firstBreak = candidate.indexOf('\n')
-    const lastFence = candidate.lastIndexOf('```')
-    if (firstBreak !== -1 && lastFence !== -1) {
-      candidate = candidate.substring(firstBreak + 1, lastFence).trim()
-    }
-  }
-  const direct = parseJsonWithSchema(candidate, JsonSchema)
-  if (direct) return direct
-  const start = candidate.indexOf('{')
-  const end = candidate.lastIndexOf('}')
-  if (start === -1 || end === -1 || end <= start) return null
-  const slice = candidate.substring(start, end + 1)
-  return parseJsonWithSchema(slice, JsonSchema)
-}
-
 async function resolveWithGemini(items: Array<{ normalized: string; alias: string; candidates: string[] }>) {
-  const apiKey = String(env.gemini.apiKey || '').trim()
-  if (!apiKey) throw new Error('missing_gemini_key')
-
-  const model = getGeminiModel(apiKey, MODEL_ID)
-
   const prompt =
     'Você é um assistente para PADRONIZAR nomes de exercícios de musculação para relatórios de evolução.' +
     ' Retorne APENAS JSON válido no formato {"items":[{"normalized":string,"canonical":string,"confidence":number}]}.' +
@@ -58,11 +31,7 @@ async function resolveWithGemini(items: Array<{ normalized: string; alias: strin
     ' 4) Não inclua markdown nem texto extra.' +
     ` Itens: ${JSON.stringify(items)}`
 
-  const result = await model.generateContent(prompt)
-  const text = (await result?.response?.text()) || ''
-  const parsed = extractJson(text)
-  const out = parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>).items : null
-  return Array.isArray(out) ? out : []
+  return resolveCanonicalItems(env.gemini.apiKey, MODEL_ID, prompt)
 }
 
 export async function POST(req: Request) {
