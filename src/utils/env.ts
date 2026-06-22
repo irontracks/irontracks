@@ -122,6 +122,13 @@ export const env = {
     get restToken() { return optionalEnv('UPSTASH_REDIS_REST_TOKEN') },
   },
 
+  // ── QStash (agendamento de push com atraso — fim do descanso) ─────
+  qstash: {
+    get token() { return optionalEnv('QSTASH_TOKEN') },
+    get currentSigningKey() { return optionalEnv('QSTASH_CURRENT_SIGNING_KEY') },
+    get nextSigningKey() { return optionalEnv('QSTASH_NEXT_SIGNING_KEY') },
+  },
+
   // ── Segurança ─────────────────────────────────────────────
   security: {
     get cronSecret() { return requireEnv('CRON_SECRET') },
