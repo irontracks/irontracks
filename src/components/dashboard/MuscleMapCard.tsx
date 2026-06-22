@@ -486,20 +486,9 @@ const MuscleMapCard = memo(function MuscleMapCard(props: Props) {
                       )}
                     </div>
                   )
-                  return (
-                    <button
-                      type="button"
-                      onClick={(e) => {
-                        e.stopPropagation()
-                        load({ refreshCache: true, refreshAi: true, source: 'manual' })
-                      }}
-                      disabled={state.status === 'loading'}
-                      className="min-h-[40px] px-3 rounded-xl bg-yellow-500 text-black font-black text-xs uppercase tracking-widest hover:bg-yellow-400 disabled:opacity-60 inline-flex items-center gap-2"
-                    >
-                      {state.status === 'loading' ? <Loader2 size={16} className="animate-spin" /> : <Sparkles size={16} />}
-                      Gerar com IA
-                    </button>
-                  )
+                  // Insights gerados automaticamente todo domingo (cron
+                  // muscle-weekly-insights) — sem botão manual pra VIP.
+                  return null
                 })()}
                 <button
                   type="button"
