@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { parseJsonBody, parseJsonWithSchema } from '@/utils/zod'
+import { parseJsonBody } from '@/utils/zod'
 import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
 import { checkVipFeatureAccess } from '@/utils/vip/limits'
@@ -12,6 +12,8 @@ import { buildHeuristicExerciseMap } from '@/utils/exerciseMuscleHeuristics'
 import { env } from '@/utils/env'
 import { getGeminiModel } from '@/utils/ai/gemini'
 import { safeGemini, handleGeminiError } from '@/utils/ai/handleGeminiError'
+import { isRecord } from '@/utils/guards'
+import { extractJsonFromModelText, normalizeAiMuscleItems, MUSCLE_MAP_JSON_SCHEMA } from '@/utils/ai/exerciseMuscleMapShared'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,88 +24,6 @@ const ZodBodySchema = z
   .strip()
 
 const MODEL = env.gemini.modelId
-
-const safeJsonParse = (raw: string) => parseJsonWithSchema(raw, z.unknown())
-
-const extractJsonFromModelText = (text: string) => {
-  const cleaned = String(text || '').trim()
-  if (!cleaned) return null
-  const direct = safeJsonParse(cleaned)
-  if (direct) return direct
-  const start = cleaned.indexOf('{')
-  const end = cleaned.lastIndexOf('}')
-  if (start === -1 || end === -1 || end <= start) return null
-  return safeJsonParse(cleaned.slice(start, end + 1))
-}
-
-const isRecord = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v)
-
-const toStr = (v: unknown) => String(v || '').trim()
-
-const toBool = (v: unknown) => Boolean(v)
-
-const normalizeResult = (obj: unknown): { items: Array<Record<string, unknown>> } => {
-  const base = obj && typeof obj === 'object' ? (obj as Record<string, unknown>) : {}
-  const itemsRaw = Array.isArray(base.items) ? (base.items as unknown[]) : []
-  const muscleIds = new Set<string>(MUSCLE_GROUPS.map((m) => m.id))
-
-  const normalized = itemsRaw
-    .map((it: unknown) => {
-      const item = it && typeof it === 'object' ? (it as Record<string, unknown>) : {}
-      const name = toStr(item?.name)
-      const canonical =
-        toStr(item?.canonical_name || item?.canonicalName || item?.canonical) || (name ? resolveCanonicalExerciseName(name)?.canonical : '')
-      const key = normalizeExerciseName(canonical || name)
-      if (!key) return null
-
-      const contribRaw = Array.isArray(item?.contributions)
-        ? (item.contributions as unknown[])
-        : Array.isArray(item?.muscles)
-          ? (item.muscles as unknown[])
-          : []
-      const contributions = contribRaw
-        .map((c: unknown) => {
-          const cc = c && typeof c === 'object' ? (c as Record<string, unknown>) : {}
-          const muscleId = toStr(cc?.muscleId || cc?.id)
-          if (!muscleId || typeof muscleId !== 'string' || !muscleIds.has(muscleId)) return null
-          const weight = Number(cc?.weight)
-          if (!Number.isFinite(weight) || weight <= 0) return null
-          const role = toStr(cc?.role || cc?.type || 'primary') || 'primary'
-          return { muscleId, weight, role }
-        })
-        .filter(Boolean)
-
-      const weightSum = contributions.reduce(
-        (acc: number, c: unknown) => acc + (Number((c as Record<string, unknown>)?.weight) || 0),
-        0,
-      )
-      const normalizedContrib =
-        weightSum > 0
-          ? contributions.map((c: unknown) => {
-            const cc = c as Record<string, unknown>
-            return { ...cc, weight: (Number(cc.weight) || 0) / weightSum }
-          })
-          : []
-
-      const confidenceRaw = Number(item?.confidence)
-      const confidence = Number.isFinite(confidenceRaw) ? Math.max(0, Math.min(1, confidenceRaw)) : 0.6
-
-      return {
-        exercise_key: key,
-        canonical_name: canonical || name,
-        mapping: {
-          contributions: normalizedContrib,
-          unilateral: toBool(item?.unilateral),
-          confidence,
-          notes: toStr(item?.notes).slice(0, 240),
-        },
-        confidence,
-      }
-    })
-    .filter(Boolean)
-
-  return { items: (normalized.filter(isRecord) as Array<Record<string, unknown>>) }
-}
 
 export async function POST(req: Request) {
   try {
@@ -163,21 +83,6 @@ export async function POST(req: Request) {
     if (!remaining.length) return NextResponse.json({ ok: true, items: heuristicItems })
     const muscleList = MUSCLE_GROUPS.map((m) => `${m.id}: ${m.label}`).join(', ')
 
-    const schema = [
-      '{',
-      '  "items": [',
-      '    {',
-      '      "name": string,',
-      '      "canonical_name": string,',
-      '      "contributions": [ { "muscleId": string, "weight": number, "role": "primary"|"secondary"|"stabilizer" } ],',
-      '      "unilateral": boolean,',
-      '      "confidence": number (0..1),',
-      '      "notes": string',
-      '    }',
-      '  ]',
-      '}',
-    ].join('\n')
-
     const prompt = [
       'Você é um coach de musculação do app IronTracks.',
       'Objetivo: mapear exercícios para músculos alvo, para calcular volume semanal por músculo.',
@@ -194,7 +99,7 @@ export async function POST(req: Request) {
       muscleList,
       '',
       'Formato (JSON):',
-      schema,
+      MUSCLE_MAP_JSON_SCHEMA,
       '',
       'Exercícios para mapear (array):',
       JSON.stringify(remaining),
@@ -210,9 +115,9 @@ export async function POST(req: Request) {
     const parsed = extractJsonFromModelText(text)
     if (!parsed) return NextResponse.json({ ok: false, error: 'invalid_ai_response' }, { status: 400 })
 
-    const normalized = normalizeResult(parsed)
+    const normalizedItems = normalizeAiMuscleItems(parsed)
 
-    const upsertRows = normalized.items.map((it: unknown) => {
+    const upsertRows = normalizedItems.map((it: unknown) => {
       const row = it && typeof it === 'object' ? (it as Record<string, unknown>) : {}
       return ({
         user_id: userId,
