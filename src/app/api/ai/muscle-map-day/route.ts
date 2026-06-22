@@ -346,6 +346,17 @@ export async function POST(req: Request) {
       mapByKey.set(k, row?.mapping && typeof row.mapping === 'object' ? row.mapping : null)
     }
 
+    // Fonte única (Fase 2): catálogo GLOBAL curado (exercise_library) tem
+    // prioridade sobre o exercise_muscle_maps per-usuário onde tiver contribuições.
+    const { data: libRows } = exerciseKeys.length
+      ? await admin.from('exercise_library').select('normalized_name, contributions').in('normalized_name', exerciseKeys)
+      : { data: [] as Array<Record<string, unknown>> }
+    for (const row of (Array.isArray(libRows) ? libRows : []) as Array<Record<string, unknown>>) {
+      const k = toStr(row?.normalized_name)
+      const contributions = row?.contributions
+      if (k && Array.isArray(contributions) && contributions.length) mapByKey.set(k, { contributions })
+    }
+
     const missingPairs: { key: string; canonical: string }[] = []
     for (const [key, canonical] of Array.from(exerciseKeyToCanonical.entries())) {
       if (!mapByKey.get(key)) missingPairs.push({ key, canonical })
