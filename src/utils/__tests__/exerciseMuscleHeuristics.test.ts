@@ -51,6 +51,41 @@ describe('buildHeuristicExerciseMap', () => {
     expect(result?.canonical_name).toBe('Panturrilha no Smith')
   })
 
+  it('mapeia "Crucifixo invertido" como deltoide posterior (não peitoral)', () => {
+    const result = buildHeuristicExerciseMap('Crucifixo invertido na máquina')
+    expect(result?.mapping.contributions[0].muscleId).toBe('delts_rear')
+    expect(result?.mapping.contributions[0].role).toBe('primary')
+  })
+
+  it('mantém "Crucifixo" (peck deck) normal como peitoral', () => {
+    const result = buildHeuristicExerciseMap('Crucifixo na máquina (peck deck)')
+    expect(result?.mapping.contributions[0].muscleId).toBe('chest')
+  })
+
+  it('reconhece "reverse fly" como deltoide posterior', () => {
+    expect(buildHeuristicExerciseMap('Reverse Fly')?.mapping.contributions[0].muscleId).toBe('delts_rear')
+  })
+
+  it('não confunde "rosca inversa" (antebraço) com deltoide posterior', () => {
+    const result = buildHeuristicExerciseMap('Rosca inversa')
+    expect(result?.mapping.contributions[0].muscleId).toBe('forearms')
+  })
+
+  it('mapeia "Pullover no cabo" como dorsais', () => {
+    const result = buildHeuristicExerciseMap('Pullover no cabo')
+    expect(result?.mapping.contributions[0].muscleId).toBe('lats')
+  })
+
+  it('mapeia "Cadeira abdutora" como glúteos', () => {
+    const result = buildHeuristicExerciseMap('Cadeira abdutora')
+    expect(result?.mapping.contributions[0].muscleId).toBe('glutes')
+  })
+
+  it('mapeia "Búlgaro com halteres" como quadríceps', () => {
+    const result = buildHeuristicExerciseMap('Búlgaro com halteres')
+    expect(result?.mapping.contributions[0].muscleId).toBe('quads')
+  })
+
   it('populates all required fields', () => {
     const result = buildHeuristicExerciseMap('Calf Press')
     expect(result).toMatchObject({
