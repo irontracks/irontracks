@@ -2,11 +2,11 @@
  * Shared formatting & utility functions for the report system.
  * Single source of truth — used by both WorkoutReport.tsx (React) and buildHtml.ts (PDF).
  */
+import { stripDiacritics } from '@/utils/normalizeExerciseName'
+import { isRecord } from '@/utils/guards'
 
-// ─── Type guard ──────────────────────────────────────────────────────────────
-
-export const isRecord = (v: unknown): v is Record<string, unknown> =>
-    v !== null && typeof v === 'object' && !Array.isArray(v)
+// ─── Type guard (re-export da fonte única em utils/guards) ────────────────────
+export { isRecord }
 
 // ─── Date formatting ─────────────────────────────────────────────────────────
 
@@ -65,11 +65,7 @@ export const normalizeExerciseKey = (v: unknown): string => {
         // Must match the server-side normalization in workout-report-actions.ts:
         // NFD decomposition + diacritic removal so accented chars match
         // (e.g. "MÁQUINA" → "maquina", "TRÍCEPS" → "triceps").
-        return String(v || '')
-            .trim()
-            .toLowerCase()
-            .normalize('NFD')
-            .replace(/[̀-ͯ]/g, '')
+        return stripDiacritics(String(v || '').trim().toLowerCase())
             .replace(/\s+/g, ' ')
     } catch {
         return ''
