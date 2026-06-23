@@ -100,7 +100,7 @@ class NotificationService: UNNotificationServiceExtension {
         "inactivity",
         "meal_reminder", "missed_meal",
         "mentioned_in_chat", "mentioned_in_comment",
-        "morning_briefing",
+        "morning_briefing", "muscle_weekly_insights",
         "story_comment", "story_like", "story_posted",
         "team_chat", "team_invite",
         "trial_ending", "vip_welcome",
