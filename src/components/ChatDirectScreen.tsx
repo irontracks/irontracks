@@ -202,7 +202,7 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
         try {
             let query = supabase
                 .from('direct_messages')
-                .select('id, channel_id, sender_id, content, created_at, media_url, media_type, reply_to')
+                .select('id, channel_id, sender_id, content, created_at')
                 .eq('channel_id', channelId)
                 .order('created_at', { ascending: true })
                 .limit(50);
@@ -361,7 +361,7 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
             const { data: inserted, error: insertError } = await supabase
                 .from('direct_messages')
                 .insert({ channel_id: channelId, sender_id: safeUserId, content: message })
-                .select('id, channel_id, sender_id, content, created_at, media_url, media_type, reply_to')
+                .select('id, channel_id, sender_id, content, created_at')
                 .single();
 
             if (insertError) throw insertError;
