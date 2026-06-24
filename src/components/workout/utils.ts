@@ -313,6 +313,10 @@ export const buildWorkoutSummary = (
     let done = 0;
     let vol = 0;
     let missing = false;
+    const weights = new Set<number>();
+    const repsSet = new Set<number>();
+    let lastWeight = 0;
+    let lastReps = 0;
 
     for (const [key, val] of Object.entries(logMap)) {
       if (!key.startsWith(`${i}-`)) continue; // séries do exercício i (chave "i-s")
@@ -321,23 +325,39 @@ export const buildWorkoutSummary = (
       done += 1;
       const w = num(log.weight);
       const r = num(log.reps);
-      if (w > 0 && r > 0) vol += w * r;
-      else missing = true;
+      if (w > 0 && r > 0) {
+        vol += w * r;
+        weights.add(w);
+        repsSet.add(r);
+        lastWeight = w;
+        lastReps = r;
+      } else {
+        missing = true;
+      }
     }
 
     if (done === 0) return;
     totalSets += done;
     totalVolume += vol;
 
-    let line = `• ${name} — ${done} série${done !== 1 ? 's' : ''}`;
-    if (vol > 0) line += ` · ${Math.round(vol).toLocaleString('pt-BR')} kg`;
+    // Uniforme (mesmo peso e reps em todas as séries) → "4×10 · 100 kg".
+    // Variando → volume total. Sem peso/reps → só a contagem (+ flag abaixo).
+    let detail: string;
+    if (!missing && weights.size === 1 && repsSet.size === 1) {
+      detail = `${done}×${lastReps} · ${lastWeight.toLocaleString('pt-BR')} kg`;
+    } else if (vol > 0) {
+      detail = `${done} série${done !== 1 ? 's' : ''} · ${Math.round(vol).toLocaleString('pt-BR')} kg`;
+    } else {
+      detail = `${done} série${done !== 1 ? 's' : ''}`;
+    }
+    let line = `• ${name} — ${detail}`;
     if (missing) line += ' ⚠️ sem carga';
     lines.push(line);
   });
 
   const totalLine =
     `${lines.length} exercício${lines.length !== 1 ? 's' : ''} · ${totalSets} série${totalSets !== 1 ? 's' : ''}` +
-    (totalVolume > 0 ? ` · ${Math.round(totalVolume).toLocaleString('pt-BR')} kg movimentados` : '');
+    (totalVolume > 0 ? ` · ${Math.round(totalVolume).toLocaleString('pt-BR')} kg` : '');
   const text = lines.length ? `${lines.join('\n')}\n\n${totalLine}` : '';
 
   return { text, exercises: lines.length, sets: totalSets, volume: totalVolume };

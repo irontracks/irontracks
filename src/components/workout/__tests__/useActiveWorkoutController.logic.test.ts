@@ -265,19 +265,28 @@ describe('getSuggestion / watermarkPlaceholder', () => {
 describe('buildWorkoutSummary', () => {
     const exs = [{ name: 'Supino reto' }, { name: 'Crucifixo' }]
 
-    it('resume séries feitas + volume por exercício e totais', () => {
+    it('séries uniformes → reps×peso; totais corretos', () => {
         const logs = {
             '0-0': { done: true, weight: '100', reps: '10' },
-            '0-1': { done: true, weight: '100', reps: '8' },
+            '0-1': { done: true, weight: '100', reps: '10' },
             '1-0': { done: true, weight: '20', reps: '12' },
         }
         const r = buildWorkoutSummary(exs, logs)
         expect(r.exercises).toBe(2)
         expect(r.sets).toBe(3)
-        expect(r.volume).toBe(100 * 10 + 100 * 8 + 20 * 12) // 2040
-        expect(r.text).toContain('Supino reto — 2 séries')
-        expect(r.text).toContain('Crucifixo — 1 série')
+        expect(r.volume).toBe(100 * 10 + 100 * 10 + 20 * 12) // 2240
+        expect(r.text).toContain('Supino reto — 2×10 · 100 kg')
+        expect(r.text).toContain('Crucifixo — 1×12 · 20 kg')
         expect(r.text).toContain('2 exercícios · 3 séries')
+    })
+
+    it('séries que variam (reps/peso) → cai pro volume total', () => {
+        const logs = {
+            '0-0': { done: true, weight: '100', reps: '10' },
+            '0-1': { done: true, weight: '100', reps: '8' },
+        }
+        const r = buildWorkoutSummary(exs, logs)
+        expect(r.text).toContain('Supino reto — 2 séries · 1.800 kg')
     })
 
     it('ignora exercício sem nenhuma série feita', () => {
@@ -290,21 +299,23 @@ describe('buildWorkoutSummary', () => {
     it('flag "sem carga" quando série feita sem peso/reps', () => {
         const logs = { '0-0': { done: true, weight: '', reps: '' } }
         const r = buildWorkoutSummary(exs, logs)
-        expect(r.text).toContain('⚠️ sem carga')
+        expect(r.text).toContain('Supino reto — 1 série ⚠️ sem carga')
         expect(r.volume).toBe(0)
     })
 
     it('parseia peso com vírgula decimal', () => {
         const logs = { '0-0': { done: true, weight: '28,5', reps: '10' } }
-        expect(buildWorkoutSummary(exs, logs).volume).toBe(285)
+        const r = buildWorkoutSummary(exs, logs)
+        expect(r.volume).toBe(285)
+        expect(r.text).toContain('Supino reto — 1×10 · 28,5 kg')
     })
 
     it('não confunde exercício 1 com 10 (prefixo ancorado no traço)', () => {
         const many = Array.from({ length: 11 }, (_, i) => ({ name: `Ex${i}` }))
         const logs = { '1-0': { done: true, weight: '10', reps: '10' }, '10-0': { done: true, weight: '5', reps: '5' } }
         const r = buildWorkoutSummary(many, logs)
-        expect(r.text).toContain('Ex1 — 1 série · 100 kg')
-        expect(r.text).toContain('Ex10 — 1 série · 25 kg')
+        expect(r.text).toContain('Ex1 — 1×10 · 10 kg')
+        expect(r.text).toContain('Ex10 — 1×5 · 5 kg')
     })
 
     it('texto vazio quando nada foi feito', () => {
