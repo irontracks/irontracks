@@ -71,15 +71,21 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
         const vv = typeof window !== 'undefined' ? window.visualViewport : null;
         if (!vv) return;
         const update = () => {
-            const inset = Math.max(0, window.innerHeight - vv.height - vv.offsetTop);
+            // Altura do teclado = layout viewport − viewport visível. NÃO subtrair
+            // vv.offsetTop: quando o iOS rola pra revelar o input, offsetTop fica
+            // > 0 e zerava o inset (barra colava atrás do teclado). offsetTop é o
+            // scroll do visual viewport, não a altura do teclado.
+            const inset = Math.max(0, window.innerHeight - vv.height);
             setKbInset(inset > 1 ? inset : 0);
         };
         update();
         vv.addEventListener('resize', update);
         vv.addEventListener('scroll', update);
+        window.addEventListener('resize', update);
         return () => {
             vv.removeEventListener('resize', update);
             vv.removeEventListener('scroll', update);
+            window.removeEventListener('resize', update);
         };
     }, []);
     // Flash dismiss: tapping the green "BORA!" flash hides ONLY the flash,
