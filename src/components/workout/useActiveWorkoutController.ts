@@ -16,7 +16,7 @@ import {
   WorkoutDraft,
   WorkoutExercise,
 } from './types';
-import { isObject, shouldOpenFinishPrompt } from './utils';
+import { isObject, shouldOpenFinishPrompt, buildWorkoutSummary } from './utils';
 import {
   getPlanConfig,
   getPlannedSet,
@@ -507,14 +507,14 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     if (!open) return;
     finishPromptedRef.current = true;
     void (async () => {
-      const ok = await confirm(
-        'Você concluiu todos os exercícios! Deseja finalizar o treino agora?',
-        'Treino concluído 💪',
-        { confirmText: 'Finalizar' },
-      );
+      const summary = buildWorkoutSummary(exercises, logs);
+      const message = summary.text
+        ? `Você concluiu todos os exercícios! Confira antes de finalizar:\n\n${summary.text}`
+        : 'Você concluiu todos os exercícios! Deseja finalizar o treino agora?';
+      const ok = await confirm(message, 'Treino concluído 💪', { confirmText: 'Finalizar' });
       if (ok) await finishWorkout();
     })();
-  }, [allExercisesComplete, finishing, confirm, finishWorkout]);
+  }, [allExercisesComplete, finishing, confirm, finishWorkout, exercises, logs]);
 
   // Memoiza o contexto inteiro pra não recriar o `value` do WorkoutProvider a
   // cada render do controller. Sem isso, qualquer mudança no controller (ticker
