@@ -217,6 +217,35 @@ if (dryRun) {
     console.log('  ✅ Release notes updated')
 }
 
+// ─── 4b. Garante o link dos Termos de Uso (EULA) na descrição ───────────────
+// Apple Guideline 3.1.2: apps com assinatura auto-renovável precisam de um link
+// FUNCIONAL pros Termos de Uso (EULA) na metadata, senão a review é rejeitada.
+// O app não tem EULA próprio → usamos o EULA padrão da Apple (que a própria
+// mensagem de rejeição indica como válido). Aplicado em TODAS as localizações.
+const EULA_URL = 'https://www.apple.com/legal/internet-services/itunes/dev/stdeula/'
+const hasEulaLink = (s) => /stdeula|termos de uso|terms of use|\beula\b/i.test(String(s || ''))
+console.log('→ Garantindo link dos Termos de Uso (EULA) na descrição...')
+for (const loc of (localizationsRes.data || [])) {
+    const desc = String(loc.attributes.description || '')
+    if (hasEulaLink(desc)) {
+        console.log(`  ${loc.attributes.locale}: já tem link de Termos — ok`)
+        continue
+    }
+    const newDesc = `${desc.trimEnd()}\n\nTermos de Uso (EULA): ${EULA_URL}`
+    if (newDesc.length > 4000) {
+        console.log(`  ⚠️ ${loc.attributes.locale}: descrição ficaria > 4000 chars — pulando (ajuste manual)`)
+        continue
+    }
+    if (dryRun) {
+        console.log(`  [DRY-RUN] ${loc.attributes.locale}: anexaria link do EULA`)
+    } else {
+        await api('PATCH', `/v1/appStoreVersionLocalizations/${loc.id}`, {
+            data: { type: 'appStoreVersionLocalizations', id: loc.id, attributes: { description: newDesc } },
+        })
+        console.log(`  ✅ ${loc.attributes.locale}: link do EULA adicionado`)
+    }
+}
+
 // ─── 5. Attach the build ───────────────────────────────────────────────────
 console.log('→ Attaching build to version...')
 if (dryRun) {
