@@ -2,6 +2,7 @@
 import { UnknownRecord, ReportHistory, ReportHistoryItem } from './types';
 import { parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
+import { parseTrainingNumber } from '@/utils/trainingNumber'
 
 export const DELOAD_HISTORY_KEY = 'irontracks.deload.history.v1';
 export const DELOAD_AUDIT_KEY = 'irontracks.deload.audit.v1';
@@ -283,6 +284,63 @@ export const shouldOpenFinishPrompt = (params: {
   const { allComplete, prevAllComplete, alreadyPrompted, finishing } = params;
   const justCompleted = allComplete && !prevAllComplete;
   return justCompleted && !alreadyPrompted && !finishing;
+};
+
+/**
+ * Resumo textual do treino pro prompt de finalização — por exercício: séries
+ * concluídas + volume (peso×reps), com flag "sem carga" quando uma série foi
+ * marcada feita sem peso/reps registrados. Puro/testável. Exercícios sem
+ * nenhuma série feita não entram.
+ */
+export const buildWorkoutSummary = (
+  exercises: unknown,
+  logs: unknown,
+): { text: string; exercises: number; sets: number; volume: number } => {
+  const exArr = Array.isArray(exercises) ? exercises : [];
+  const logMap = isObject(logs) ? logs : {};
+  const num = (v: unknown): number => {
+    const n = parseTrainingNumber(typeof v === 'number' ? v : String(v ?? ''));
+    return typeof n === 'number' && Number.isFinite(n) ? n : 0;
+  };
+
+  let totalSets = 0;
+  let totalVolume = 0;
+  const lines: string[] = [];
+
+  exArr.forEach((exRaw, i) => {
+    const ex = isObject(exRaw) ? exRaw : {};
+    const name = String(ex.name ?? '').trim() || `Exercício ${i + 1}`;
+    let done = 0;
+    let vol = 0;
+    let missing = false;
+
+    for (const [key, val] of Object.entries(logMap)) {
+      if (!key.startsWith(`${i}-`)) continue; // séries do exercício i (chave "i-s")
+      const log = isObject(val) ? val : {};
+      if (!log.done) continue;
+      done += 1;
+      const w = num(log.weight);
+      const r = num(log.reps);
+      if (w > 0 && r > 0) vol += w * r;
+      else missing = true;
+    }
+
+    if (done === 0) return;
+    totalSets += done;
+    totalVolume += vol;
+
+    let line = `• ${name} — ${done} série${done !== 1 ? 's' : ''}`;
+    if (vol > 0) line += ` · ${Math.round(vol).toLocaleString('pt-BR')} kg`;
+    if (missing) line += ' ⚠️ sem carga';
+    lines.push(line);
+  });
+
+  const totalLine =
+    `${lines.length} exercício${lines.length !== 1 ? 's' : ''} · ${totalSets} série${totalSets !== 1 ? 's' : ''}` +
+    (totalVolume > 0 ? ` · ${Math.round(totalVolume).toLocaleString('pt-BR')} kg movimentados` : '');
+  const text = lines.length ? `${lines.join('\n')}\n\n${totalLine}` : '';
+
+  return { text, exercises: lines.length, sets: totalSets, volume: totalVolume };
 };
 
 // ── Watermark do "último treino" (peso/reps/RPE) ────────────────────────────
