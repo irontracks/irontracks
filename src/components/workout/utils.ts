@@ -2,7 +2,8 @@
 import { UnknownRecord, ReportHistory, ReportHistoryItem } from './types';
 import { parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
-import { parseTrainingNumber } from '@/utils/trainingNumber'
+import { setVolume, setTopWeightReps } from '@/utils/report/setVolume'
+import { isSetCompleted } from '@/utils/report/setCompletion'
 
 export const DELOAD_HISTORY_KEY = 'irontracks.deload.history.v1';
 export const DELOAD_AUDIT_KEY = 'irontracks.deload.audit.v1';
@@ -298,10 +299,6 @@ export const buildWorkoutSummary = (
 ): { text: string; exercises: number; sets: number; volume: number } => {
   const exArr = Array.isArray(exercises) ? exercises : [];
   const logMap = isObject(logs) ? logs : {};
-  const num = (v: unknown): number => {
-    const n = parseTrainingNumber(typeof v === 'number' ? v : String(v ?? ''));
-    return typeof n === 'number' && Number.isFinite(n) ? n : 0;
-  };
 
   let totalSets = 0;
   let totalVolume = 0;
@@ -321,12 +318,12 @@ export const buildWorkoutSummary = (
     for (const [key, val] of Object.entries(logMap)) {
       if (!key.startsWith(`${i}-`)) continue; // séries do exercício i (chave "i-s")
       const log = isObject(val) ? val : {};
-      if (!log.done) continue;
+      if (!isSetCompleted(log)) continue;
       done += 1;
-      const w = num(log.weight);
-      const r = num(log.reps);
-      if (w > 0 && r > 0) {
-        vol += w * r;
+      const v = setVolume(log); // trata cluster + unilateral (L+R) + normal
+      const { weight: w, reps: r } = setTopWeightReps(log);
+      if (v > 0 && w > 0 && r > 0) {
+        vol += v;
         weights.add(w);
         repsSet.add(r);
         lastWeight = w;
