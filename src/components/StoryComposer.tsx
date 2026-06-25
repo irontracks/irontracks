@@ -1,7 +1,6 @@
 'use client'
 
-import React, { useRef, useState, useCallback, useEffect } from 'react'
-import NextImage from 'next/image'
+import React, { useRef, useState, useEffect } from 'react'
 import { ArrowLeft, Upload, Scissors } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useStoryComposer } from '@/components/stories/useStoryComposer'
@@ -29,11 +28,6 @@ interface StoryComposerProps {
   /** Pre-calculated calories from the report (avoids re-computation divergence) */
   calories?: number
 }
-
-const STICKERS = [
-  { id: 'fire', src: '/sticker-fire.png', label: '🔥 Fogo', alt: 'Sticker fogo' },
-  { id: 'lightning', src: '/sticker-lightning.png', label: '⚡ Raio', alt: 'Sticker raio' },
-]
 
 export default function StoryComposer({ open, session, onClose, calories }: StoryComposerProps) {
   const previewRef = useRef<HTMLDivElement>(null)
@@ -76,108 +70,6 @@ export default function StoryComposer({ open, session, onClose, calories }: Stor
 
   // metrics.kcal already reflects caloriesOverride (applied inside the hook so the canvas is correct)
   const metrics = rawMetrics
-
-  // ── Sticker state ───────────────────────────────────────────────────
-  const [selectedSticker, setSelectedSticker] = useState<string | null>(null)
-  const [stickerPos, setStickerPos] = useState({ x: 0.5, y: 0.5 })
-  const [stickerScale, setStickerScale] = useState(1.0)
-  // Refs to avoid stale closures in pointer handlers
-  const stickerScaleRef = useRef(1.0)
-  const stickerPosRef = useRef({ x: 0.5, y: 0.5 })
-  React.useEffect(() => { stickerScaleRef.current = stickerScale }, [stickerScale])
-  React.useEffect(() => { stickerPosRef.current = stickerPos }, [stickerPos])
-
-  // Multi-pointer tracking: supports simultaneous drag (1 finger) and pinch (2 fingers)
-  const stickerPointersRef = useRef<Map<number, { x: number; y: number }>>(new Map())
-  // Delta-based pinch: tracks the distance from the previous frame so that
-  // the same physical finger movement always produces the same scale change,
-  // regardless of the sticker's current size (unlike ratio-based which gets
-  // harder to control when the sticker is small).
-  const pinchRef = useRef<{ lastDistance: number; settled: boolean } | null>(null)
-  const stickerDragRef = useRef<{ startX: number; startY: number; startPosX: number; startPosY: number } | null>(null)
-
-  // How many scale units to add/remove per pixel of finger spread/pinch.
-  // 0.007 feels natural: ~140 px of movement → 1.0 scale unit.
-  const PINCH_SENSITIVITY = 0.007
-  // Smoothing: how fast the rendered scale catches up to the target (0–1).
-  // 0.45 = responsive without snapping; lower = smoother but laggier.
-  const PINCH_SMOOTH = 0.45
-  const targetScaleRef = useRef(1.0)
-
-  const onStickerPointerDown = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    e.preventDefault()
-    e.currentTarget.setPointerCapture(e.pointerId)
-    stickerPointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
-    const pts = Array.from(stickerPointersRef.current.values())
-    if (pts.length >= 2) {
-      // Two fingers → pinch mode.
-      // We mark settled=false so the FIRST pointermove just establishes the
-      // baseline distance without changing scale (prevents the initial jump
-      // that happens when the second finger lands at an arbitrary position).
-      const dist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y)
-      pinchRef.current = { lastDistance: Math.max(dist, 10), settled: false }
-      targetScaleRef.current = stickerScaleRef.current
-      stickerDragRef.current = null
-    } else {
-      // One finger → drag mode
-      pinchRef.current = null
-      stickerDragRef.current = {
-        startX: e.clientX, startY: e.clientY,
-        startPosX: stickerPosRef.current.x, startPosY: stickerPosRef.current.y,
-      }
-    }
-  }, [])
-
-  const onStickerPointerMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    stickerPointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY })
-    const pts = Array.from(stickerPointersRef.current.values())
-    if (pts.length >= 2 && pinchRef.current) {
-      const dist = Math.hypot(pts[1].x - pts[0].x, pts[1].y - pts[0].y)
-      if (!pinchRef.current.settled) {
-        // First move after 2nd finger landed: just set the baseline, don't scale yet
-        pinchRef.current.lastDistance = dist
-        pinchRef.current.settled = true
-        return
-      }
-      // Delta-based: how many pixels did the spread change this frame?
-      const delta = dist - pinchRef.current.lastDistance
-      pinchRef.current.lastDistance = dist // update for next frame
-      // Add delta × sensitivity to the target scale
-      const rawTarget = Math.max(0.3, Math.min(5.0, targetScaleRef.current + delta * PINCH_SENSITIVITY))
-      targetScaleRef.current = rawTarget
-      // Smooth the rendered scale towards the target
-      const smoothed = stickerScaleRef.current + (rawTarget - stickerScaleRef.current) * PINCH_SMOOTH
-      stickerScaleRef.current = smoothed // keep ref in sync immediately
-      setStickerScale(smoothed)
-    } else if (pts.length === 1 && stickerDragRef.current) {
-      // Drag: move sticker position
-      const rect = previewRef.current?.getBoundingClientRect()
-      if (!rect) return
-      const dx = (e.clientX - stickerDragRef.current.startX) / rect.width
-      const dy = (e.clientY - stickerDragRef.current.startY) / rect.height
-      setStickerPos({
-        x: Math.max(0.05, Math.min(0.95, stickerDragRef.current.startPosX + dx)),
-        y: Math.max(0.05, Math.min(0.95, stickerDragRef.current.startPosY + dy)),
-      })
-    }
-  }, [PINCH_SENSITIVITY, PINCH_SMOOTH])
-
-  const onStickerPointerUp = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
-    e.currentTarget.releasePointerCapture(e.pointerId)
-    stickerPointersRef.current.delete(e.pointerId)
-    if (stickerPointersRef.current.size < 2) pinchRef.current = null
-    if (stickerPointersRef.current.size === 0) stickerDragRef.current = null
-  }, [])
-
-  const toggleSticker = (id: string) => {
-    if (selectedSticker === id) {
-      setSelectedSticker(null)
-    } else {
-      setSelectedSticker(id)
-      setStickerPos({ x: 0.5, y: 0.35 })
-      setStickerScale(1.0) // reset size when switching sticker
-    }
-  }
 
   // Draw loop
   React.useEffect(() => {
@@ -324,72 +216,6 @@ export default function StoryComposer({ open, session, onClose, calories }: Stor
                       </div>
                     )}
 
-                            {selectedSticker && (() => {
-                          const stk = STICKERS.find(s => s.id === selectedSticker)
-                          if (!stk) return null
-                          const BASE_SIZE = 96 // px — base sticker size
-                          return (
-                            <div
-                              onPointerDown={onStickerPointerDown}
-                              onPointerMove={onStickerPointerMove}
-                              onPointerUp={onStickerPointerUp}
-                              onPointerCancel={onStickerPointerUp}
-                              className="absolute z-30 select-none touch-none cursor-grab active:cursor-grabbing"
-                              style={{
-                                left: `${stickerPos.x * 100}%`,
-                                top: `${stickerPos.y * 100}%`,
-                                width: `${BASE_SIZE}px`,
-                                height: `${BASE_SIZE}px`,
-                                transform: `translate(-50%, -50%) scale(${stickerScale})`,
-                                transformOrigin: 'center center',
-                              }}
-                            >
-                              <NextImage
-                                src={stk.src}
-                                alt={stk.alt}
-                                width={BASE_SIZE}
-                                height={BASE_SIZE}
-                                draggable={false}
-                                className="w-full h-full object-contain drop-shadow-2xl pointer-events-none"
-                              />
-                            </div>
-                          )
-                        })()}
-                  </div>
-
-                  {/* Sticker Picker */}
-                  <div className="w-full max-w-[300px] sm:max-w-[340px]">
-                    <p className="text-[9px] font-black uppercase tracking-[0.2em] text-neutral-500 mb-2">Stickers</p>
-                    <div className="flex items-center gap-2">
-                      {STICKERS.map(stk => (
-                        <button
-                          key={stk.id}
-                          type="button"
-                          onClick={() => toggleSticker(stk.id)}
-                          className={[
-                            'relative w-16 h-16 rounded-2xl border-2 transition-all active:scale-95 overflow-hidden flex items-center justify-center',
-                            selectedSticker === stk.id
-                              ? 'border-yellow-400 bg-yellow-500/15 shadow-lg shadow-yellow-900/30'
-                              : 'border-neutral-700/60 bg-neutral-900/60 hover:border-neutral-600'
-                          ].join(' ')}
-                        >
-                          <NextImage src={stk.src} alt={stk.alt} width={52} height={52} className="object-contain" />
-                          {selectedSticker === stk.id && (
-                            <div className="absolute inset-0 rounded-xl ring-2 ring-yellow-400/60 ring-inset" />
-                          )}
-                        </button>
-                      ))}
-                      {selectedSticker && (
-                        <button
-                          type="button"
-                          onClick={() => setSelectedSticker(null)}
-                          className="w-10 h-10 rounded-xl bg-neutral-900 border border-neutral-700/60 text-neutral-400 hover:text-red-400 text-xs font-black transition-colors flex items-center justify-center"
-                          aria-label="Remover sticker"
-                        >
-                          ✕
-                        </button>
-                      )}
-                    </div>
                   </div>
 
                   {/* Media Controls */}
