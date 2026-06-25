@@ -22,9 +22,10 @@ const nextConfig: NextConfig = {
     optimizePackageImports: ['lucide-react', 'chart.js', 'react-chartjs-2', '@tanstack/react-virtual', '@tanstack/react-query', 'framer-motion'],
   },
 
-  // tsc roda localmente via `npm run deploy` antes de cada push.
-  // Desabilitar no build do Vercel evita checagem duplicada (~40-60s por deploy).
-  typescript: { ignoreBuildErrors: true },
+  // TypeScript bloqueia o build remoto também (rede de segurança caso um commit
+  // chegue ao Vercel sem ter passado pelo tsc local/CI). O código já compila
+  // limpo sob strict (tsconfig strict: true).
+  typescript: { ignoreBuildErrors: false },
 
   images: {
     // localPatterns restricts which /public-served paths next/image can load.
@@ -192,8 +193,14 @@ export default withSentryConfig(nextConfig, {
     treeshake: { removeDebugLogging: true },
     automaticVercelMonitors: false,
   },
-  // Desabilita geração de source maps no build do Vercel (~30-50s economizados).
-  // Sentry ainda captura erros em produção; stack traces mostram código minificado.
-  sourcemaps: { disable: true },
+  // Sourcemaps só são gerados/enviados quando há SENTRY_AUTH_TOKEN (ex.: no
+  // Vercel). Sem token, ficam desabilitados — zero custo de build e nenhum risco
+  // de vazar o código-fonte. Defina SENTRY_AUTH_TOKEN no ambiente do Vercel pra
+  // ativar stack traces legíveis em produção.
+  sourcemaps: {
+    disable: !process.env.SENTRY_AUTH_TOKEN,
+    // Apaga os .map do output após o upload pro Sentry — nunca servidos publicamente.
+    deleteSourcemapsAfterUpload: true,
+  },
 })
 
