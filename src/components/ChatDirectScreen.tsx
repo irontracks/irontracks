@@ -81,8 +81,8 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
     const { alert, prompt, confirm } = useDialog();
     const supabase = useMemo(() => createClient(), []);
     const rootRef = useRef<HTMLDivElement | null>(null);
-    const messagesEndRef = useRef<HTMLDivElement | null>(null);
     const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+    const prependingRef = useRef(false);
     const _typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const [showEmoji, setShowEmoji] = useState(false);
@@ -332,9 +332,27 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
         return () => { if (unsubscribe) unsubscribe(); };
     }, [loadOtherUser, getOrCreateChannel, loadMessages, setupRealtime]);
 
+    const scrollToBottom = useCallback(() => {
+        // Dois requestAnimationFrame: garante que o layout (flex justify-end,
+        // imagens, ajuste do teclado) já assentou antes de medir scrollHeight,
+        // senão o scroll para num ponto desatualizado.
+        requestAnimationFrame(() => {
+            requestAnimationFrame(() => {
+                const node = scrollContainerRef.current;
+                if (node) node.scrollTop = node.scrollHeight;
+            });
+        });
+    }, []);
+
+    // Mantém a conversa sempre no rodapé ("atualizada"): ao abrir (depois que
+    // carrega), a cada nova mensagem recebida/enviada e quando o teclado abre.
     useEffect(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [messages]);
+        if (loading) return;
+        // Paginação (carregar mensagens antigas) faz prepend — não rola pro fim,
+        // senão o usuário é jogado de volta ao ler o histórico.
+        if (prependingRef.current) { prependingRef.current = false; return; }
+        scrollToBottom();
+    }, [messages, loading, kbOpen, scrollToBottom]);
 
     // Cola o container do chat na viewport VISÍVEL (visualViewport) para a barra
     // de input grudar no topo do teclado — elimina o espaço morto preto entre o
@@ -374,6 +392,7 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
         if (!el) return;
         const onScroll = async () => {
             if (el.scrollTop <= 10 && hasMore && !loadingMore && oldestCreatedAt && channelId) {
+                prependingRef.current = true; // a próxima mudança em messages é paginação (prepend)
                 setLoadingMore(true);
                 await loadMessages(channelId, oldestCreatedAt);
                 setLoadingMore(false);
@@ -766,7 +785,6 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
                                 </div>
                             );
                         })}
-                        <div ref={messagesEndRef} />
                         {loadingMore && (
                             <div className="text-center text-xs text-neutral-500 py-2">Carregando mensagens...</div>
                         )}
