@@ -89,8 +89,8 @@ export default function TermsOfUse() {
         <div className="space-y-4 text-neutral-400 leading-relaxed group">
           <p>
             Dúvidas sobre estes Termos ou sobre sua assinatura? Fale com a gente em{' '}
-            <a href="mailto:suporte@irontracks.com.br" className="underline font-semibold text-yellow-500 hover:text-yellow-400">
-              suporte@irontracks.com.br
+            <a href="mailto:irontrackscompany@gmail.com" className="underline font-semibold text-yellow-500 hover:text-yellow-400">
+              irontrackscompany@gmail.com
             </a>
             .
           </p>
