@@ -7,6 +7,7 @@ import { translateAiError } from '@/utils/ai/clientErrors';
 import { PeriodStats } from '@/types/workout';
 import { PeriodReport, PeriodAiState, PeriodPdfState, WorkoutSummary, isRecord, RawSessionObjectSchema } from '@/components/historyListTypes';
 import { toDateMs, calculateTotalVolumeFromLogs } from './useHistoryData';
+import { setVolume, setTopWeightReps } from '@/utils/report/setVolume';
 
 const REPORT_DAYS_WEEK = 7;
 const REPORT_DAYS_MONTH = 30;
@@ -66,16 +67,16 @@ export function useHistoryPeriodReport({ historyItems, user, alert }: UseHistory
                 sessionSummaries.push({ date: dateValue, minutes: sessionMinutes, volumeKg: Math.max(0, Math.round(safeVolume || 0)) });
                 Object.entries(logs || {}).forEach(([key, log]) => {
                     if (!isRecord(log)) return;
-                    const w = Number(String(log.weight ?? '').replace(',', '.'));
-                    const r = Number(String(log.reps ?? '').replace(',', '.'));
-                    if (!Number.isFinite(w) || !Number.isFinite(r)) return;
+                    // setTopWeightReps/setVolume tratam unilateral (L_/R_).
+                    const { weight: w, reps: r } = setTopWeightReps(log);
                     if (w <= 0 || r <= 0) return;
+                    const vol = setVolume(log);
                     totalSets += 1; totalReps += r;
                     const exIdx = Number.parseInt(String(key || '').split('-')[0] || '', 10);
                     const ex = Number.isFinite(exIdx) ? exercises?.[exIdx] : null;
                     const name = String(isRecord(ex) ? (ex.name ?? '') : '').trim() || 'Exercício';
                     const current = exerciseMap.get(name) || { name, sets: 0, reps: 0, volumeKg: 0, sessions: new Set<string>() };
-                    current.sets += 1; current.reps += r; current.volumeKg += w * r;
+                    current.sets += 1; current.reps += r; current.volumeKg += vol;
                     if (dayKey) current.sessions.add(dayKey);
                     exerciseMap.set(name, current);
                 });

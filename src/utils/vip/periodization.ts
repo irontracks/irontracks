@@ -1,5 +1,6 @@
 import { normalizeExerciseName } from '@/utils/normalizeExerciseName'
 import { parseTrainingNumber } from '@/utils/trainingNumber'
+import { setVolume, setTopWeightReps } from '@/utils/report/setVolume'
 import { vipPeriodizationExerciseSeed, VipExerciseSeed } from '@/data/vipPeriodizationExercises'
 import { parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
@@ -374,11 +375,12 @@ export const computeWeeklyStatsFromSessions = (sessions: Array<{ created_at: str
         if (!log) continue
         const doneRaw = log.done ?? log.isDone ?? log.completed ?? null
         const done = doneRaw == null ? true : doneRaw === true || String(doneRaw || '').toLowerCase() === 'true'
-        const weight = safeNumber(log.weight)
-        const reps = safeNumber(log.reps)
-        if (!done && (weight == null || reps == null)) continue
-        if (weight != null && reps != null && weight > 0 && reps > 0) {
-          cur.volume += weight * reps
+        // setTopWeightReps/setVolume tratam unilateral (L_/R_) além do normal.
+        const { weight, reps } = setTopWeightReps(log)
+        if (!done && weight <= 0 && reps <= 0) continue
+        const vol = setVolume(log)
+        if (vol > 0) cur.volume += vol
+        if (weight > 0 && reps > 0) {
           const est = estimate1Rm(weight, reps)
           if (est != null && est > cur.best1rm) cur.best1rm = est
         }

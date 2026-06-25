@@ -322,4 +322,17 @@ describe('buildWorkoutSummary', () => {
         expect(buildWorkoutSummary(exs, {}).text).toBe('')
         expect(buildWorkoutSummary(null, null).text).toBe('')
     })
+
+    it('unilateral: lê peso por lado (L_/R_), volume soma os dois lados', () => {
+        const uniExs = [{ name: 'Rosca unilateral', isUnilateral: true }]
+        const logs = {
+            '0-0': { done: true, L_done: true, R_done: true, L_weight: '20', L_reps: '12', R_weight: '20', R_reps: '12' },
+            '0-1': { done: true, L_done: true, R_done: true, L_weight: '20', L_reps: '12', R_weight: '20', R_reps: '12' },
+        }
+        const r = buildWorkoutSummary(uniExs, logs)
+        expect(r.sets).toBe(2)
+        expect(r.volume).toBe(960) // 2 × (20×12 + 20×12)
+        expect(r.text).toContain('Rosca unilateral — 2×12 · 20 kg') // exibe por lado
+        expect(r.text).not.toContain('sem carga')
+    })
 })
