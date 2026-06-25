@@ -6,6 +6,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { sendPushToAllPlatforms as sendPushToUsers } from '@/lib/push/sender'
 import { logError } from '@/lib/logger'
 import { waitUntil } from '@vercel/functions'
+import { cacheGet } from '@/utils/cache'
 
 export const dynamic = 'force-dynamic'
 
@@ -65,6 +66,13 @@ export async function POST(req: Request) {
 
     if (shares !== true) {
       return NextResponse.json({ ok: false, error: 'forbidden' }, { status: 403 })
+    }
+
+    // Se o destinatário está com ESTA conversa aberta em foreground, não envia
+    // push/banner nem cria notificação — ele já recebe a mensagem em tempo real.
+    const viewing = await cacheGet<string>(`dm:viewing:${receiverId}:${user.id}`, (v) => String(v ?? ''))
+    if (viewing) {
+      return NextResponse.json({ ok: true, skipped: 'viewing' })
     }
 
     const { data: prefRow } = await admin

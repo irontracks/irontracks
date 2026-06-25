@@ -383,6 +383,34 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
         return () => el.removeEventListener('scroll', onScroll);
     }, [hasMore, loadingMore, oldestCreatedAt, channelId, loadMessages]);
 
+    // Presença "estou vendo esta conversa": enquanto o chat está aberto E em
+    // foreground, avisa o servidor pra NÃO enviar push/banner de mensagens deste
+    // contato (você já as recebe em tempo real). Renova a cada 20s; limpa ao
+    // sair da tela ou quando o app vai pra segundo plano.
+    useEffect(() => {
+        if (!resolvedOtherUserId || !safeUserId) return;
+        let alive = true;
+        const ping = (active: boolean) => {
+            void fetch('/api/chat/presence', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ otherUserId: resolvedOtherUserId, active }),
+                keepalive: !active,
+            }).catch(() => { });
+        };
+        const refresh = () => { if (alive && document.visibilityState === 'visible') ping(true); };
+        const onVisibility = () => (document.visibilityState === 'visible' ? ping(true) : ping(false));
+        refresh();
+        document.addEventListener('visibilitychange', onVisibility);
+        const interval = setInterval(refresh, 20000);
+        return () => {
+            alive = false;
+            clearInterval(interval);
+            document.removeEventListener('visibilitychange', onVisibility);
+            ping(false);
+        };
+    }, [resolvedOtherUserId, safeUserId]);
+
     // Dispara push pro destinatário (fire-and-forget). A rota já valida canal
     // compartilhado, preferência notifyDirectMessages e dedupe — uma falha aqui
     // nunca bloqueia nem reverte o envio da mensagem.
