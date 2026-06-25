@@ -1,5 +1,6 @@
 import { createClient } from '@/utils/supabase/client'
 import { logWarn } from '@/lib/logger'
+import { setVolume, setTopWeightReps } from '@/utils/report/setVolume'
 import type { ActionResult } from '@/types/actions'
 import { parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
@@ -44,12 +45,10 @@ const extractLogsStatsByExercise = (session: unknown) => {
             if (!exName) return
             const key = normalizeExerciseKey(exName)
             if (!key) return
-            const wRaw = Number(String(log?.weight ?? '').replace(',', '.'))
-            const rRaw = Number(String(log?.reps ?? '').replace(',', '.'))
-            const w = Number.isFinite(wRaw) && wRaw > 0 ? wRaw : 0
-            const r = Number.isFinite(rRaw) && rRaw > 0 ? rRaw : 0
+            // setTopWeightReps/setVolume tratam unilateral (L_/R_) além do normal.
+            const { weight: w, reps: r } = setTopWeightReps(log)
             if (!w && !r) return
-            const volume = w && r ? w * r : 0
+            const volume = setVolume(log)
             const cur = byKey.get(key) || { exercise: exName, weight: 0, reps: 0, volume: 0 }
             cur.exercise = exName
             cur.weight = Math.max(cur.weight, w)
