@@ -383,6 +383,22 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
         return () => el.removeEventListener('scroll', onScroll);
     }, [hasMore, loadingMore, oldestCreatedAt, channelId, loadMessages]);
 
+    // Dispara push pro destinatário (fire-and-forget). A rota já valida canal
+    // compartilhado, preferência notifyDirectMessages e dedupe — uma falha aqui
+    // nunca bloqueia nem reverte o envio da mensagem.
+    const notifyRecipientPush = (preview: string) => {
+        const safePreview = String(preview || '').trim().slice(0, 240);
+        if (!safePreview || !resolvedOtherUserId) return;
+        const senderName = String(
+            userObj?.displayName ?? userObj?.display_name ?? userObj?.name ?? ''
+        ).trim() || 'Nova mensagem';
+        void fetch('/api/notifications/direct-message', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ receiverId: resolvedOtherUserId, senderName, preview: safePreview }),
+        }).catch(() => { });
+    };
+
     const handleSendMessage = async (e: React.FormEvent<HTMLFormElement>) => {
         e.preventDefault();
         if (!newMessage.trim() || !channelId || !safeUserId) {
@@ -417,6 +433,8 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
                 .from('direct_channels')
                 .update({ last_message_at: new Date().toISOString() })
                 .eq('id', channelId);
+
+            notifyRecipientPush(message);
 
         } catch (error) {
             logError('error', 'Erro ao enviar mensagem:', error);
@@ -475,6 +493,7 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
                         sender_id: safeUserId,
                         content: JSON.stringify(payload)
                     });
+                    notifyRecipientPush(payload.type === 'video' ? '🎥 Vídeo' : '📷 Imagem');
                 }
             }
         } catch (err) {
@@ -517,6 +536,7 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
                 sender_id: safeUserId,
                 content: JSON.stringify(payload)
             });
+            notifyRecipientPush('🎬 GIF');
         } finally {
             setSendingGif(false);
         }
