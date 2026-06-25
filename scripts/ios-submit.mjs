@@ -271,38 +271,50 @@ try {
     }
 } catch (e) { console.log('  ⚠️ privacy URL falhou:', e?.message || e) }
 
-// ─── 4d. Notas de revisão (App Review Information) ──────────────────────────
-// Explica o modelo invite-only + Sign in with Apple (Guideline 2.1a) e aponta
-// a conta demo (já configurada). NÃO mexe na senha demo.
-const REVIEW_NOTES = `ACCESS / GUIDELINE 2.1(a) — Sign in with Apple:
-IronTracks is an invite-only platform: an account must be pre-registered (invited by a coach) before it can sign in. Please review the app using the demo account already provided in the Sign-In Information fields below (email: apple-test@irontracks.com.br).
-
-Sign in with Apple authenticates correctly, but for an Apple ID that has NOT yet been invited the app intentionally shows an "account not found" message (invite-only model). Using the demo email/password account gives full access to the app. For an already-registered user, Sign in with Apple signs them in normally.
+// ─── 4d. App Review Information: conta demo + notas ─────────────────────────
+// A conta demo (com assinatura expirada) é gravada NOS CAMPOS ESTRUTURADOS
+// (demoAccountName/Password/Required) E nas notas. As credenciais vêm do ambiente
+// (ASC_DEMO_EMAIL / ASC_DEMO_PASSWORD) pra NÃO ficarem hardcoded/commitadas.
+const DEMO_EMAIL = (process.env.ASC_DEMO_EMAIL || '').trim()
+const DEMO_PASSWORD = (process.env.ASC_DEMO_PASSWORD || '').trim()
+const hasDemo = Boolean(DEMO_EMAIL && DEMO_PASSWORD)
+const demoBlock = hasDemo
+    ? `\n\nGUIDELINE 2.1 — Demo account (expired subscription):\nEmail: ${DEMO_EMAIL}\nPassword: ${DEMO_PASSWORD}\nThis account has an expired subscription so you can review the entire purchase flow.`
+    : ''
+const REVIEW_NOTES = `GUIDELINE 2.1(a) — Sign in with Apple:
+Sign in with Apple now works for both first-time and returning users. A prior account-provisioning bug that could show an error on a repeat authorization has been fixed. The app loads its web layer from our servers, so the fix is already live for this build — no new binary is required.${demoBlock}
 
 GUIDELINE 3.1.2(c) — Auto-renewable subscriptions:
-The subscription checkout now displays functional links to the Terms of Use (EULA) and the Privacy Policy, alongside the subscription title, length and price. The Privacy Policy URL is set in App Store Connect and the Terms of Use (EULA) link is included in the app description.`
-console.log('→ Atualizando notas de revisão (App Review Information)...')
+The subscription screen shows the subscription title, length and price, with functional links to the Terms of Use (EULA) and the Privacy Policy. The Privacy Policy URL is set in App Store Connect and the Terms of Use (EULA) link is included in the app description.`
+
+const reviewAttrs = { notes: REVIEW_NOTES }
+if (hasDemo) {
+    reviewAttrs.demoAccountName = DEMO_EMAIL
+    reviewAttrs.demoAccountPassword = DEMO_PASSWORD
+    reviewAttrs.demoAccountRequired = true
+}
+console.log(`→ Atualizando App Review Information (conta demo=${DEMO_EMAIL || 'none'} + notas)...`)
 try {
     const ardRes = await api('GET', `/v1/appStoreVersions/${version.id}/appStoreReviewDetail`)
     const ardId = ardRes?.data?.id
     if (dryRun) {
-        console.log(`  [DRY-RUN] ${ardId ? 'PATCH' : 'POST'} notas de revisão (${REVIEW_NOTES.length} chars)`)
+        console.log(`  [DRY-RUN] ${ardId ? 'PATCH' : 'POST'} review detail (notas ${REVIEW_NOTES.length} chars, demo=${DEMO_EMAIL || 'none'})`)
     } else if (ardId) {
         await api('PATCH', `/v1/appStoreReviewDetails/${ardId}`, {
-            data: { type: 'appStoreReviewDetails', id: ardId, attributes: { notes: REVIEW_NOTES } },
+            data: { type: 'appStoreReviewDetails', id: ardId, attributes: reviewAttrs },
         })
-        console.log('  ✅ notas de revisão atualizadas (PATCH)')
+        console.log('  ✅ App Review Information atualizada (PATCH)')
     } else {
         await api('POST', `/v1/appStoreReviewDetails`, {
             data: {
                 type: 'appStoreReviewDetails',
-                attributes: { notes: REVIEW_NOTES },
+                attributes: reviewAttrs,
                 relationships: { appStoreVersion: { data: { type: 'appStoreVersions', id: version.id } } },
             },
         })
-        console.log('  ✅ notas de revisão criadas (POST)')
+        console.log('  ✅ App Review Information criada (POST)')
     }
-} catch (e) { console.log('  ⚠️ notas de revisão falharam:', e?.message || e) }
+} catch (e) { console.log('  ⚠️ App Review Information falhou:', e?.message || e) }
 
 // ─── 5. Attach the build ───────────────────────────────────────────────────
 console.log('→ Attaching build to version...')
