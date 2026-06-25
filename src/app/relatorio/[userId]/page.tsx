@@ -58,7 +58,7 @@ const CSS = `
 .hn{font-size:28px;font-weight:500;line-height:1}
 .hm{font-size:11px;color:rgba(255,255,255,0.4);margin-top:4px}
 .s3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
-.sc{background:#111114;border:1px solid rgba(255,255,255,0.07);border-radius:14px;padding:1.1rem .9rem;text-align:center;transition:border-color .2s,transform .15s;cursor:default}
+.sc{background:#111114;border:1px solid rgba(255,255,255,0.07);border-radius:14px;padding:1.1rem .9rem;text-align:center;transition:border-color .2s,transform .15s;cursor:pointer;text-decoration:none;display:block}
 .sc:hover{border-color:rgba(250,204,21,0.45);transform:translateY(-2px)}
 .sv{font-size:26px;font-weight:500;color:#facc15;line-height:1}
 .sl{font-size:9px;text-transform:uppercase;letter-spacing:.07em;color:rgba(255,255,255,0.4);margin-top:5px}
@@ -107,8 +107,8 @@ const CSS = `
 .pb-v{font-size:10px;font-weight:500;flex:0 0 40px;text-align:right}
 .pl{display:inline-block;font-size:10px;padding:2px 8px;border-radius:20px;margin:2px;background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.6);border:1px solid rgba(255,255,255,0.09)}
 .pl.dp{background:rgba(239,68,68,0.09);color:#fca5a5;border-color:rgba(239,68,68,0.2)}
-.pl.rp{background:rgba(34,197,94,0.09);color:#86efac;border-color:rgba(34,197,94,0.18)}
-.dc{background:#111114;border:1px solid rgba(255,255,255,0.07);border-radius:11px;padding:.9rem 1rem;cursor:default;transition:all .2s}
+.pl.rst{background:rgba(34,197,94,0.09);color:#86efac;border-color:rgba(34,197,94,0.18)}
+.dc{background:#111114;border:1px solid rgba(255,255,255,0.07);border-radius:11px;padding:.9rem 1rem;cursor:pointer;transition:all .2s;text-decoration:none;display:block}
 .dc:hover{border-color:rgba(250,204,21,0.35);transform:translateY(-2px)}
 .dcd{font-size:9px;font-weight:500;color:#facc15;letter-spacing:.08em;text-transform:uppercase;margin-bottom:3px}
 .dcn{font-size:11px;font-weight:500;margin-bottom:.45rem;line-height:1.3}
@@ -282,19 +282,19 @@ export default async function RelatorioPage({ params }: PageProps) {
               </div>
             </div>
             <div className="s3">
-              <div className="sc">
+              <a className="sc" href="https://irontracks.com.br/assessments" target="_blank" rel="noopener">
                 <div className="sv">{num(latest?.lean_mass, 1)} kg</div>
                 <div style={{ fontSize: 9, color: '#facc15', marginTop: 2, fontWeight: 500 }}>massa magra</div>
                 <div className="sl">Composição</div>
                 <div className="ss">{leanDelta > 0 ? `+${num(leanDelta)} kg` : '—'} em {assessments.length > 1 ? `${assessments.length - 1} aval.` : 'avaliações'}</div>
-              </div>
-              <div className="sc">
+              </a>
+              <a className="sc" href="https://irontracks.com.br/assessments" target="_blank" rel="noopener">
                 <div className="sv">{num(latest?.body_fat_percentage)}%</div>
                 <div style={{ fontSize: 9, color: '#22c55e', marginTop: 2, fontWeight: 500 }}>gordura corporal</div>
                 <div className="sl">% gordura</div>
                 <div className="ss">{bfDelta > 0 ? `-${num(bfDelta)} pp` : '—'} desde início</div>
-              </div>
-              <div className="sc">
+              </a>
+              <a className="sc" href="https://irontracks.com.br" target="_blank" rel="noopener">
                 <div className="sv">{totalWorkouts}</div>
                 <div style={{ fontSize: 9, color: '#facc15', marginTop: 2, fontWeight: 500 }}>treinos em {new Date().getFullYear()}</div>
                 <div className="sl">Frequência</div>
@@ -303,7 +303,7 @@ export default async function RelatorioPage({ params }: PageProps) {
                     ? `~${(workoutsByMonth.reduce((s, w) => s + w.treinos, 0) / workoutsByMonth.length).toFixed(1).replace('.', ',')}× por mês`
                     : '—'}
                 </div>
-              </div>
+              </a>
             </div>
           </div>
 
@@ -530,27 +530,27 @@ export default async function RelatorioPage({ params }: PageProps) {
               {templates.length > 0 && (
                 <div style={{ marginTop: '1rem', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 9 }}>
                   {templates.map((t) => (
-                    <div key={t.id} className="dc">
+                    <a key={t.id} className="dc" href="https://irontracks.com.br" target="_blank" rel="noopener">
                       <div className="dcd">{t.name.split('·')[0].trim()}</div>
                       <div className="dcn">{t.name.includes('·') ? t.name.split('·').slice(1).join('·').trim() : t.name}</div>
                       <div>
                         {(t.exercises ?? []).map((e, i) => (
                           <span
                             key={i}
-                            className={`pl${e.method === 'Drop-Set' ? ' dp' : e.method === 'Rest-Pause' ? ' rp' : ''}`}
+                            className={`pl${e.method === 'Drop-Set' ? ' dp' : e.method === 'Rest-Pause' ? ' rst' : ''}`}
                           >
                             {e.name}
                           </span>
                         ))}
                       </div>
-                    </div>
+                    </a>
                   ))}
                 </div>
               )}
               {templates.length > 0 && (
                 <div style={{ display: 'flex', gap: 8, marginTop: '.75rem', alignItems: 'center', flexWrap: 'wrap' }}>
                   <span className="pl dp">Drop-set</span>
-                  <span className="pl rp">Rest-pause</span>
+                  <span className="pl rst">Rest-pause</span>
                   <span className="pl">Normal</span>
                   <span style={{ fontSize: 9, color: 'rgba(255,255,255,0.25)', marginLeft: 4 }}>métodos de intensidade</span>
                 </div>
