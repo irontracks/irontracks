@@ -8,7 +8,8 @@ import {
     Image as ImageIcon,
     Smile,
     Link2,
-    Trash2
+    Trash2,
+    Plus
 } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 import { useDialog } from '@/contexts/DialogContext';
@@ -86,6 +87,7 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
 
     const [showEmoji, setShowEmoji] = useState(false);
     const [kbOpen, setKbOpen] = useState(false);
+    const [showActions, setShowActions] = useState(false);
     const [uploading, setUploading] = useState(false);
     const fileInputRef = useRef<HTMLInputElement | null>(null);
     const [debugChat, setDebugChat] = useState(false);
@@ -345,6 +347,10 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
             const h = vv.height;
             // Guarda contra valores improváveis que colapsariam o container.
             if (!Number.isFinite(h) || h < 200) return;
+            // iOS rola a página ao focar o input, deslocando elementos `fixed` e
+            // criando o espaço morto entre a barra e o teclado. Cancelamos esse
+            // scroll e fixamos o container exatamente na viewport visível.
+            if (window.scrollX !== 0 || window.scrollY !== 0) window.scrollTo(0, 0);
             el.style.top = `${vv.offsetTop}px`;
             el.style.height = `${h}px`;
             el.style.bottom = 'auto';
@@ -722,31 +728,65 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
             </div>
 
             <form onSubmit={handleSendMessage} className={`shrink-0 z-30 px-4 pt-3 ${kbOpen ? 'pb-2' : 'pb-[max(env(safe-area-inset-bottom),12px)]'} shadow-[0_-14px_40px_rgba(0,0,0,0.55)]`} style={{ background: 'rgba(9,9,9,0.99)', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
-                <div className="flex items-center gap-2 rounded-2xl px-2 py-2" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
-                    <button type="button" onClick={() => setShowEmoji(v => !v)} className="w-11 h-11 rounded-xl bg-neutral-800 text-neutral-200 hover:text-white hover:bg-neutral-700 active:scale-95 transition-transform inline-flex items-center justify-center" aria-label="Emojis"><Smile size={18} /></button>
-                    <button type="button" onClick={handleAttachClick} className="w-11 h-11 rounded-xl bg-neutral-800 text-neutral-200 hover:text-white hover:bg-neutral-700 active:scale-95 transition-transform inline-flex items-center justify-center" aria-label="Anexar mídia"><ImageIcon size={18} /></button>
-                    <button type="button" onClick={handleAddGif} disabled={sendingGif} className="w-11 h-11 rounded-xl bg-neutral-800 text-neutral-200 hover:text-white hover:bg-neutral-700 active:scale-95 transition-transform inline-flex items-center justify-center disabled:opacity-60" aria-label="Enviar GIF"><Link2 size={18} /></button>
+                <div className="flex items-center gap-2.5">
+                    {/* Ações em cascata (emoji / imagem / GIF) atrás de um botão "+" */}
+                    <div className="relative shrink-0">
+                        {showActions && (
+                            <div className="absolute bottom-full left-0 mb-3 flex flex-col gap-2">
+                                {[
+                                    { key: 'emoji', label: 'Emojis', icon: <Smile size={20} />, onClick: () => { setShowActions(false); setShowEmoji(v => !v); } },
+                                    { key: 'image', label: 'Anexar mídia', icon: <ImageIcon size={20} />, onClick: () => { setShowActions(false); handleAttachClick(); } },
+                                    { key: 'gif', label: 'Enviar GIF', icon: <Link2 size={20} />, onClick: () => { setShowActions(false); handleAddGif(); } },
+                                ].map((a, i) => (
+                                    <button
+                                        key={a.key}
+                                        type="button"
+                                        onClick={a.onClick}
+                                        disabled={a.key === 'gif' && sendingGif}
+                                        aria-label={a.label}
+                                        className="w-12 h-12 rounded-2xl bg-neutral-800 border border-white/10 text-neutral-100 hover:text-white hover:bg-neutral-700 active:scale-95 transition-transform inline-flex items-center justify-center shadow-lg disabled:opacity-60 animate-in fade-in slide-in-from-bottom-2"
+                                        style={{ animationDelay: `${(2 - i) * 45}ms`, animationFillMode: 'both' }}
+                                    >
+                                        {a.icon}
+                                    </button>
+                                ))}
+                            </div>
+                        )}
+                        <button
+                            type="button"
+                            onClick={() => setShowActions(v => !v)}
+                            aria-label={showActions ? 'Fechar opções' : 'Mais opções'}
+                            aria-expanded={showActions}
+                            className={`w-12 h-12 rounded-2xl border border-white/10 active:scale-95 transition-all inline-flex items-center justify-center ${showActions ? 'rotate-45 bg-neutral-700 text-white' : 'bg-neutral-800 text-neutral-200 hover:text-white hover:bg-neutral-700'}`}
+                        >
+                            <Plus size={22} />
+                        </button>
+                    </div>
+
                     <input ref={fileInputRef} type="file" accept="image/*,video/*" multiple className="hidden" onChange={handleFileSelected} aria-label="Selecionar arquivos" />
+
                     <input
                         type="text"
                         value={newMessage}
                         onChange={(e) => setNewMessage(e.target.value)}
+                        onFocus={() => setShowActions(false)}
                         placeholder="Digite uma mensagem…"
-                        className="flex-1 min-w-0 bg-transparent text-white outline-none placeholder:text-neutral-500 text-[15px] leading-6 px-2"
+                        className="flex-1 min-w-0 rounded-2xl bg-white/[0.06] border border-white/10 text-white outline-none placeholder:text-neutral-500 text-base leading-6 px-4 py-3.5 focus:border-yellow-500/40 focus:bg-white/[0.08] transition-colors"
                         aria-label="Mensagem"
                     />
+
                     <button
                         type="submit"
                         disabled={!newMessage.trim()}
-                        className="shrink-0 w-11 h-11 rounded-xl bg-yellow-500 text-black flex items-center justify-center shadow-lg shadow-yellow-500/20 hover:bg-yellow-400 disabled:opacity-50 disabled:cursor-not-allowed active:scale-95 transition-transform"
+                        className="shrink-0 w-12 h-12 rounded-2xl bg-yellow-500 text-black flex items-center justify-center shadow-lg shadow-yellow-500/20 hover:bg-yellow-400 disabled:opacity-40 disabled:cursor-not-allowed active:scale-95 transition-transform"
                         aria-label="Enviar mensagem"
                     >
-                        <Send size={18} />
+                        <Send size={20} />
                     </button>
                 </div>
                 {uploading ? <div className="mt-2 text-[11px] text-neutral-400">Enviando…</div> : null}
                 {showEmoji && (
-                    <div className="absolute right-4 bottom-[calc(84px+env(safe-area-inset-bottom))] bg-neutral-950 border border-neutral-800 rounded-2xl p-2 grid grid-cols-8 gap-1 shadow-2xl z-50">
+                    <div className="absolute left-4 right-4 bottom-[calc(96px+env(safe-area-inset-bottom))] bg-neutral-950 border border-neutral-800 rounded-2xl p-2 grid grid-cols-8 gap-1 shadow-2xl z-50">
                         {['😀', '😁', '😂', '😉', '😊', '😍', '👍', '💪', '🔥', '🙏', '🥳', '🤝', '🤩', '🤔', '👏', '🙌'].map(e => (
                             <button type="button" key={e} className="text-xl w-9 h-9 rounded-xl hover:bg-neutral-900 active:scale-95 transition-transform" onClick={() => insertEmoji(e)}>{e}</button>
                         ))}
