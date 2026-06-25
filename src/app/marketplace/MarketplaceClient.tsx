@@ -618,6 +618,14 @@ export default function MarketplaceClient() {
                 </div>
               </div>
 
+              {/* Apple 3.1.2(c): links funcionais de Termos (EULA) + Privacidade no fluxo de assinatura */}
+              <p className="text-center text-[11px] leading-relaxed text-neutral-400 px-2">
+                Assinatura com renovação automática, cobrada na sua conta. Ao assinar você concorda com os{' '}
+                <a href="/terms" className="underline font-semibold text-neutral-200 hover:text-white">Termos de Uso (EULA)</a>
+                {' '}e a{' '}
+                <a href="/privacy" className="underline font-semibold text-neutral-200 hover:text-white">Política de Privacidade</a>.
+              </p>
+
               {isIosNative ? (
                 <div className="space-y-3">
                   <div className="rounded-xl border border-yellow-500/20 bg-yellow-500/10 p-3 text-sm text-yellow-100 flex items-start gap-2">
