@@ -48,12 +48,14 @@ if (!KEY_ID || !ISSUER_ID) {
 // ─── Parse CLI args ────────────────────────────────────────────────────────
 const args = process.argv.slice(2)
 let dryRun = false
+let noSubmit = false
 let targetBuildNumber = null
 let releaseNotes = null
 
 for (let i = 0; i < args.length; i++) {
     const a = args[i]
     if (a === '--dry-run') dryRun = true
+    else if (a === '--no-submit') noSubmit = true // aplica metadata/notas, NÃO submete
     else if (a === '--build') targetBuildNumber = args[++i]
     else if (!releaseNotes) releaseNotes = a
 }
@@ -246,6 +248,62 @@ for (const loc of (localizationsRes.data || [])) {
     }
 }
 
+// ─── 4c. Privacy Policy URL na metadata (appInfoLocalizations) ──────────────
+// Apple 3.1.2(c): o campo Privacy Policy URL precisa de link funcional.
+const PRIVACY_URL = 'https://irontracks.com.br/privacy'
+console.log('→ Garantindo Privacy Policy URL na metadata...')
+try {
+    const appInfosRes = await api('GET', `/v1/apps/${app.id}/appInfos`)
+    const appInfo = (appInfosRes.data || [])[0]
+    if (appInfo) {
+        const ailRes = await api('GET', `/v1/appInfos/${appInfo.id}/appInfoLocalizations`)
+        for (const loc of (ailRes.data || [])) {
+            const cur = String(loc.attributes.privacyPolicyUrl || '')
+            if (cur) { console.log(`  ${loc.attributes.locale}: já tem privacy URL — ok`); continue }
+            if (dryRun) { console.log(`  [DRY-RUN] ${loc.attributes.locale}: setaria ${PRIVACY_URL}`); continue }
+            await api('PATCH', `/v1/appInfoLocalizations/${loc.id}`, {
+                data: { type: 'appInfoLocalizations', id: loc.id, attributes: { privacyPolicyUrl: PRIVACY_URL } },
+            })
+            console.log(`  ✅ ${loc.attributes.locale}: privacy URL setado`)
+        }
+    } else {
+        console.log('  ⚠️ appInfo não encontrado — verifique manualmente')
+    }
+} catch (e) { console.log('  ⚠️ privacy URL falhou:', e?.message || e) }
+
+// ─── 4d. Notas de revisão (App Review Information) ──────────────────────────
+// Explica o modelo invite-only + Sign in with Apple (Guideline 2.1a) e aponta
+// a conta demo (já configurada). NÃO mexe na senha demo.
+const REVIEW_NOTES = `ACCESS / GUIDELINE 2.1(a) — Sign in with Apple:
+IronTracks is an invite-only platform: an account must be pre-registered (invited by a coach) before it can sign in. Please review the app using the demo account already provided in the Sign-In Information fields below (email: apple-test@irontracks.com.br).
+
+Sign in with Apple authenticates correctly, but for an Apple ID that has NOT yet been invited the app intentionally shows an "account not found" message (invite-only model). Using the demo email/password account gives full access to the app. For an already-registered user, Sign in with Apple signs them in normally.
+
+GUIDELINE 3.1.2(c) — Auto-renewable subscriptions:
+The subscription checkout now displays functional links to the Terms of Use (EULA) and the Privacy Policy, alongside the subscription title, length and price. The Privacy Policy URL is set in App Store Connect and the Terms of Use (EULA) link is included in the app description.`
+console.log('→ Atualizando notas de revisão (App Review Information)...')
+try {
+    const ardRes = await api('GET', `/v1/appStoreVersions/${version.id}/appStoreReviewDetail`)
+    const ardId = ardRes?.data?.id
+    if (dryRun) {
+        console.log(`  [DRY-RUN] ${ardId ? 'PATCH' : 'POST'} notas de revisão (${REVIEW_NOTES.length} chars)`)
+    } else if (ardId) {
+        await api('PATCH', `/v1/appStoreReviewDetails/${ardId}`, {
+            data: { type: 'appStoreReviewDetails', id: ardId, attributes: { notes: REVIEW_NOTES } },
+        })
+        console.log('  ✅ notas de revisão atualizadas (PATCH)')
+    } else {
+        await api('POST', `/v1/appStoreReviewDetails`, {
+            data: {
+                type: 'appStoreReviewDetails',
+                attributes: { notes: REVIEW_NOTES },
+                relationships: { appStoreVersion: { data: { type: 'appStoreVersions', id: version.id } } },
+            },
+        })
+        console.log('  ✅ notas de revisão criadas (POST)')
+    }
+} catch (e) { console.log('  ⚠️ notas de revisão falharam:', e?.message || e) }
+
 // ─── 5. Attach the build ───────────────────────────────────────────────────
 console.log('→ Attaching build to version...')
 if (dryRun) {
@@ -259,9 +317,11 @@ if (dryRun) {
 
 // ─── 6. Submit for review ──────────────────────────────────────────────────
 console.log('→ Submitting for App Store review...')
-if (dryRun) {
-    console.log('  [DRY-RUN] would submit version', version.id, 'for review')
-    console.log('\n✅ Dry-run complete. Re-run without --dry-run to actually submit.')
+if (dryRun || noSubmit) {
+    console.log(dryRun
+        ? `  [DRY-RUN] would submit version ${version.id} for review`
+        : `  [--no-submit] metadata/notas aplicados; submissão PULADA`)
+    console.log(`\n✅ ${dryRun ? 'Dry-run' : 'No-submit'} completo. Rode sem a flag pra submeter de verdade.`)
     process.exit(0)
 }
 
