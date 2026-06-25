@@ -21,6 +21,14 @@ export interface SessionLite {
     [key: string]: unknown;
 }
 
+/** Linha por exercício pro layout "Treino do Dia" (tabela). */
+export interface WorkoutRow {
+    name: string;
+    reps: string;
+    weight: string;
+    rpe: string;
+}
+
 export interface Metrics {
     title: string;
     date: string;
@@ -28,6 +36,8 @@ export interface Metrics {
     totalTime: number;
     kcal: number;
     teamCount: number;
+    /** Linhas da tabela (layout 'workout'). Top set por exercício. */
+    exercises?: WorkoutRow[];
 }
 
 export interface LivePosition {
@@ -59,6 +69,7 @@ export const STORY_LAYOUTS: LayoutOption[] = [
     { id: 'right-stack', label: 'Direita' },
     { id: 'left-stack', label: 'Esquerda' },
     { id: 'top-row', label: 'Topo' },
+    { id: 'workout', label: 'Treino' },
     { id: 'live', label: 'LIVE' },
     { id: 'group', label: 'Grupo' },
 ];
@@ -615,6 +626,136 @@ export const drawStory = ({
         ];
 
         cards.forEach((c, idx) => drawCard(cardsBoxes[idx], c));
+        return;
+    }
+
+    // ── Layout "Treino do Dia" — tabela de exercícios (Exercício/Reps/Peso/RPE) ─
+    if (layoutId === 'workout') {
+        const rows = Array.isArray(metrics?.exercises) ? metrics.exercises : [];
+
+        // Brand
+        ctx.textBaseline = 'top';
+        const bY = SAFE_TOP + 14;
+        const bSize = 48;
+        ctx.save();
+        ctx.shadowColor = 'rgba(0,0,0,0.6)';
+        ctx.shadowBlur = 12;
+        ctx.font = f(F.brandWeight, bSize, F.brandStyle);
+        ctx.fillStyle = C.brandPrimary;
+        ctx.fillText('IRON', left, bY);
+        const ironWidth = ctx.measureText('IRON').width;
+        ctx.fillStyle = C.brandAccent;
+        ctx.fillText('TRACKS', left + ironWidth, bY);
+        ctx.restore();
+
+        // Título (1 linha, trunca pra largura)
+        const tY = bY + bSize + 14;
+        ctx.font = f(F.titleWeight, 40);
+        ctx.fillStyle = C.title;
+        let tStr = (template.titleUppercase ? safeString(metrics?.title).toUpperCase() : safeString(metrics?.title)) || 'TREINO';
+        while (ctx.measureText(tStr).width > right - left && tStr.length > 4) tStr = tStr.slice(0, -2);
+        ctx.save();
+        ctx.shadowColor = 'rgba(0,0,0,0.5)';
+        ctx.shadowBlur = 10;
+        ctx.fillText(tStr, left, tY);
+        ctx.restore();
+
+        // Data / subtítulo
+        const dY = tY + 50;
+        ctx.font = f(F.subtitleWeight, 24);
+        ctx.fillStyle = C.subtitle;
+        ctx.letterSpacing = F.labelLetterSpacing;
+        ctx.fillText(metrics?.date ? `TREINO DO DIA · ${metrics.date}` : 'TREINO DO DIA', left, dY);
+        ctx.letterSpacing = '0px';
+
+        // Footer cards (CALORIAS + VOLUME TOTAL) ancorados no rodapé seguro
+        const footerH = cardH;
+        const footerY = safeBottomY - footerH;
+        const fW = Math.floor((right - left - gap) / 2);
+        drawCard({ x: left, y: footerY, w: fW, h: footerH }, { label: 'CALORIAS', value: `${Math.round(Number(metrics?.kcal) || 0)} kcal` });
+        drawCard({ x: left + fW + gap, y: footerY, w: fW, h: footerH }, { label: 'VOLUME TOTAL', value: `${Math.round(Number(metrics?.volume) || 0).toLocaleString('pt-BR')} kg` });
+
+        // Cartão da tabela
+        const tableTop = dY + 44;
+        const tableBottom = footerY - 22;
+        drawRoundedRect(ctx, left, tableTop, right - left, tableBottom - tableTop, template.card.radius);
+        ctx.fillStyle = C.cardFill;
+        ctx.fill();
+        ctx.lineWidth = 1.5;
+        ctx.strokeStyle = C.cardBorder;
+        ctx.stroke();
+
+        // Colunas (nome à esquerda; reps/peso/rpe alinhados à direita)
+        const padX = 24;
+        const nameX = left + padX;
+        const rpeR = right - padX;
+        const pesoR = rpeR - 92;
+        const repsR = pesoR - 104;
+        const nameMaxW = repsR - 72 - nameX;
+
+        // Cabeçalho
+        const headY = tableTop + 22;
+        ctx.font = f(F.labelWeight, 19);
+        ctx.fillStyle = C.cardLabel;
+        ctx.letterSpacing = F.labelLetterSpacing;
+        ctx.textAlign = 'left';
+        ctx.fillText('EXERCÍCIO', nameX, headY);
+        ctx.textAlign = 'right';
+        ctx.fillText('REPS', repsR, headY);
+        ctx.fillText('PESO', pesoR, headY);
+        ctx.fillText('RPE', rpeR, headY);
+        ctx.letterSpacing = '0px';
+
+        // Divisória
+        const headBottom = headY + 30;
+        ctx.beginPath();
+        ctx.moveTo(nameX, headBottom);
+        ctx.lineTo(rpeR, headBottom);
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = C.cardBorder;
+        ctx.stroke();
+
+        // Linhas
+        const rowsTop = headBottom + 16;
+        const rowH = 46;
+        const maxRows = Math.max(0, Math.floor((tableBottom - rowsTop - 8) / rowH));
+        const overflow = rows.length > maxRows;
+        const visible = overflow ? rows.slice(0, Math.max(0, maxRows - 1)) : rows;
+        visible.forEach((row, i) => {
+            const ry = rowsTop + i * rowH;
+            ctx.textAlign = 'left';
+            ctx.font = f('700', 26);
+            ctx.fillStyle = C.value;
+            const full = String(row?.name || '');
+            let nm = full;
+            if (ctx.measureText(nm).width > nameMaxW) {
+                while (nm.length > 2 && ctx.measureText(`${nm}…`).width > nameMaxW) nm = nm.slice(0, -1);
+                nm = `${nm}…`;
+            }
+            ctx.fillText(nm, nameX, ry);
+            ctx.textAlign = 'right';
+            ctx.font = f(F.valueWeight, 26);
+            ctx.fillStyle = C.value;
+            ctx.fillText(String(row?.reps ?? '—'), repsR, ry);
+            ctx.fillText(String(row?.weight ?? '—'), pesoR, ry);
+            ctx.fillStyle = C.cardAccent;
+            ctx.fillText(String(row?.rpe ?? '—'), rpeR, ry);
+        });
+        if (overflow && rows.length > visible.length) {
+            ctx.textAlign = 'left';
+            ctx.font = f('700', 22);
+            ctx.fillStyle = C.subtitle;
+            ctx.fillText(`+ ${rows.length - visible.length} exercícios`, nameX, rowsTop + visible.length * rowH + 4);
+        }
+        if (rows.length === 0) {
+            ctx.textAlign = 'left';
+            ctx.font = f('700', 24);
+            ctx.fillStyle = C.subtitle;
+            ctx.fillText('Sem séries registradas', nameX, rowsTop + 4);
+        }
+
+        ctx.textAlign = 'left';
+        ctx.letterSpacing = '0px';
         return;
     }
 
