@@ -56,7 +56,6 @@ const nextConfig: NextConfig = {
       { pathname: '/screenshot/**' },
       { pathname: '/rank-**' },
       { pathname: '/report-**' },
-      { pathname: '/sticker-**' },
       { pathname: '/seasonal/**' },
     ],
     remotePatterns: [
