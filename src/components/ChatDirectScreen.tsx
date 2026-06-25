@@ -342,10 +342,13 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
         const el = rootRef.current;
         if (!vv || !el) return;
         const apply = () => {
+            const h = vv.height;
+            // Guarda contra valores improváveis que colapsariam o container.
+            if (!Number.isFinite(h) || h < 200) return;
             el.style.top = `${vv.offsetTop}px`;
-            el.style.height = `${vv.height}px`;
+            el.style.height = `${h}px`;
             el.style.bottom = 'auto';
-            const open = window.innerHeight - vv.height > 120;
+            const open = window.innerHeight - h > 120;
             setKbOpen((prev) => (prev === open ? prev : open));
         };
         apply();
