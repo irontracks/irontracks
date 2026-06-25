@@ -5,6 +5,7 @@ import { z } from 'zod';
 import { createClient } from '@/utils/supabase/client';
 import { adminFetchJson } from '@/utils/admin/adminFetch';
 import { logError } from '@/lib/logger';
+import { setVolume } from '@/utils/report/setVolume';
 import {
     WorkoutLog, WorkoutSummary, WorkoutTemplate, ManualExercise,
     NewWorkoutState, HistoryListProps,
@@ -53,11 +54,8 @@ export function calculateTotalVolumeFromLogs(logs: unknown): number {
         let volume = 0;
         Object.values(safeLogs).forEach((log) => {
             if (!isRecord(log)) return;
-            const w = Number(String(log.weight ?? '').replace(',', '.'));
-            const r = Number(String(log.reps ?? '').replace(',', '.'));
-            if (!Number.isFinite(w) || !Number.isFinite(r)) return;
-            if (w <= 0 || r <= 0) return;
-            volume += w * r;
+            // setVolume trata cluster + unilateral (L+R) + série normal.
+            volume += setVolume(log);
         });
         return volume;
     } catch {

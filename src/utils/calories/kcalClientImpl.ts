@@ -1,6 +1,7 @@
 
 import type { UnknownRecord } from '@/types/app'
 import { estimateCaloriesMet } from '@/utils/calories/metEstimate'
+import { setVolume } from '@/utils/report/setVolume'
 
 type WorkoutLogEntry = {
   weight?: unknown
@@ -9,64 +10,14 @@ type WorkoutLogEntry = {
 
 type LogsMap = Record<string, WorkoutLogEntry>
 
-const safeString = (v: unknown) => {
-  try {
-    return String(v ?? '').trim()
-  } catch {
-    return ''
-  }
-}
-
-const parseRepsValue = (raw: unknown): number => {
-  const s = safeString(raw).replace(',', '.')
-  if (!s) return 0
-  if (s.includes('/')) {
-    const first = s.split('/')[0].trim()
-    const n = Number(first)
-    return Number.isFinite(n) && n > 0 ? n : 0
-  }
-  const n = Number(s)
-  return Number.isFinite(n) && n > 0 ? n : 0
-}
-
-const parseWeightValue = (raw: unknown): number => {
-  const n = Number(safeString(raw).replace(',', '.'))
-  return Number.isFinite(n) && n > 0 ? n : 0
-}
-
-const isRecord = (v: unknown): v is Record<string, unknown> =>
-  v !== null && typeof v === 'object' && !Array.isArray(v)
-
-const calculateClusterBlocksVolume = (cluster: unknown): number => {
-  if (!isRecord(cluster)) return 0
-  const source = Array.isArray(cluster.blocksDetailed) ? cluster.blocksDetailed
-    : Array.isArray(cluster.blocks) ? cluster.blocks : null
-  if (!source || source.length === 0) return 0
-  let vol = 0
-  for (const block of source) {
-    if (!block || typeof block !== 'object') continue
-    const b = block as Record<string, unknown>
-    const w = parseWeightValue(b.weight)
-    const r = parseRepsValue(b.reps)
-    if (w > 0 && r > 0) vol += w * r
-  }
-  return vol
-}
-
 export const calculateTotalVolume = (logs: unknown) => {
   try {
     const safeLogs = logs && typeof logs === 'object' ? (logs as LogsMap) : {}
     let volume = 0
     Object.values(safeLogs).forEach((log) => {
       if (!log || typeof log !== 'object') return
-      const logObj = log as Record<string, unknown>
-      // Cluster: each block may have different weight
-      const clusterVol = calculateClusterBlocksVolume(logObj.cluster)
-      if (clusterVol > 0) { volume += clusterVol; return }
-      // Standard set
-      const w = parseWeightValue((log as WorkoutLogEntry).weight)
-      const r = parseRepsValue((log as WorkoutLogEntry).reps)
-      if (w > 0 && r > 0) volume += w * r
+      // setVolume trata cluster + unilateral (L+R) + série normal.
+      volume += setVolume(log)
     })
     return volume
   } catch {

@@ -1,4 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
+import { setVolume, setTopWeightReps } from '@/utils/report/setVolume'
+import { isSetCompleted } from '@/utils/report/setCompletion'
 
 /**
  * Builds a compact, AI-friendly summary of the user's last few completed
@@ -38,11 +40,6 @@ const safeJsonParse = (raw: string): unknown => {
     }
 }
 
-const parseNum = (v: unknown): number => {
-    const n = Number(String(v ?? '').replace(',', '.'))
-    return Number.isFinite(n) ? n : 0
-}
-
 const isObj = (v: unknown): v is Record<string, unknown> =>
     !!v && typeof v === 'object' && !Array.isArray(v)
 
@@ -69,13 +66,13 @@ const compactFromSession = (session: Record<string, unknown>, workoutName: strin
             if (!isObj(log)) return
             const parts = String(k).split('-')
             if (Number(parts[0]) !== exIdx) return
-            const w = parseNum(log.weight)
-            const r = parseNum(log.reps)
-            const done = Boolean(log.done) || (w > 0 && r > 0)
+            const { weight: w, reps: r } = setTopWeightReps(log) // trata unilateral (L_/R_)
+            const done = isSetCompleted(log)
             if (!done) return
             setsDone += 1
+            const vol = setVolume(log)
+            if (vol > 0) volumeKg += vol
             if (w > 0 && r > 0) {
-                volumeKg += w * r
                 if (!topSet || w > topSet.weight || (w === topSet.weight && r > topSet.reps)) {
                     topSet = { weight: w, reps: r }
                 }

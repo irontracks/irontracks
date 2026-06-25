@@ -9,6 +9,7 @@ import { checkRateLimitAsync } from '@/utils/rateLimit'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { checkVipFeatureAccess } from '@/utils/vip/limits'
 import { normalizeExerciseName } from '@/utils/normalizeExerciseName'
+import { setTopWeightReps } from '@/utils/report/setVolume'
 import { getGeminiModel } from '@/utils/ai/gemini'
 import { errorResponse } from '@/utils/api'
 
@@ -60,11 +61,6 @@ interface SessionData {
   logs?: Record<string, LogEntry>
 }
 
-const safeNumber = (v: unknown): number | null => {
-  const n = typeof v === 'number' ? v : Number(String(v ?? '').replace(',', '.'))
-  return Number.isFinite(n) ? Number(n) : null
-}
-
 const parseSession = (notes: unknown): SessionData | null => {
   const obj = parseJsonWithSchema(notes, z.record(z.unknown()))
   if (obj && typeof obj === 'object' && !Array.isArray(obj)) return obj as SessionData
@@ -103,11 +99,11 @@ const buildUser1rmMapFromHistory = (history: Array<{ created_at: string; notes: 
       
       const doneRaw = log.done ?? log.isDone ?? log.completed ?? null
       const done = doneRaw == null ? true : doneRaw === true || String(doneRaw).toLowerCase() === 'true'
-      const weight = safeNumber(log.weight)
-      const reps = safeNumber(log.reps)
+      // setTopWeightReps trata unilateral (L_/R_) além do peso/reps normal.
+      const { weight, reps } = setTopWeightReps(log)
 
-      if (!done && (weight == null || reps == null)) continue
-      if (weight != null && reps != null && weight > 0 && reps > 0) {
+      if (!done && weight <= 0 && reps <= 0) continue
+      if (weight > 0 && reps > 0) {
         const est = weight * (1 + reps / 30)
         const cur = byEx.get(exNameNorm) || 0
         if (est > cur) byEx.set(exNameNorm, est)

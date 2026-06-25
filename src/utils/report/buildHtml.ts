@@ -8,6 +8,7 @@ import {
   normalizeExerciseKey,
   calculateTotalVolume,
 } from '@/utils/report/formatters'
+import { setTopWeightReps } from '@/utils/report/setVolume'
 import { estimateCaloriesMet } from '@/utils/calories/metEstimate'
 
 
@@ -195,14 +196,14 @@ export function buildReportData(
       const key = `${exIdx}-${sIdx}`
       const log = sessionLogs[key]
       if (!isRecord(log)) continue
-      if (!log.weight && !log.reps) continue
 
       const prevLog = prevLogs[sIdx]
 
-      const cw = Number(String(log.weight ?? '').replace(',', '.'))
-      const cr = Number(String(log.reps ?? '').replace(',', '.'))
-      const pw = isRecord(prevLog) ? Number(String(prevLog.weight ?? '').replace(',', '.')) : NaN
-      const pr = isRecord(prevLog) ? Number(String(prevLog.reps ?? '').replace(',', '.')) : NaN
+      // setTopWeightReps trata unilateral (L_/R_) além do peso/reps normal —
+      // sem isto a série unilateral era pulada e sumia do report.
+      const { weight: cw, reps: cr } = setTopWeightReps(log)
+      const { weight: pw, reps: pr } = setTopWeightReps(prevLog)
+      if (cw <= 0 && cr <= 0) continue
 
       const canWeight = Number.isFinite(cw) && cw > 0 && Number.isFinite(pw) && pw > 0
       const canReps = Number.isFinite(cr) && cr > 0 && Number.isFinite(pr) && pr > 0
@@ -240,8 +241,8 @@ export function buildReportData(
       const tag = getSetTag(log)
       sets.push({
         index: sIdx + 1,
-        weight: log.weight ?? null,
-        reps: log.reps ?? null,
+        weight: log.weight ?? (cw > 0 ? cw : null),
+        reps: log.reps ?? (cr > 0 ? cr : null),
         cadence: exObj?.cadence ?? null,
         tag,
         note,
@@ -272,12 +273,11 @@ export function buildReportData(
       Object.keys(sessionLogs).forEach((k) => {
         const log = sessionLogs[k]
         if (!isRecord(log)) return
-        const w = Number(String(log.weight ?? '').replace(',', '.'))
-        const r = Number(String(log.reps ?? '').replace(',', '.'))
-        if ((!Number.isFinite(w) || w <= 0) && (!Number.isFinite(r) || r <= 0)) return
+        const { weight: w, reps: r } = setTopWeightReps(log) // trata unilateral
+        if (w <= 0 && r <= 0) return
         setsLoggedCount += 1
-        if (Number.isFinite(r) && r > 0) repsTotal += r
-        if (Number.isFinite(w) && w > topWeight) topWeight = w
+        if (r > 0) repsTotal += r
+        if (w > topWeight) topWeight = w
         const parts = String(k || '').split('-')
         const eIdx = parseInt(parts[0] || '0', 10)
         if (Number.isFinite(eIdx) && eIdx >= 0) exercisesWithLogs.add(eIdx)
