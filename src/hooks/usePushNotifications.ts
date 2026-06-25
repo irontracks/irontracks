@@ -119,6 +119,8 @@ export function usePushNotifications(userId?: string | null) {
                 ? (notification.data as Record<string, unknown>) : null
               const link = data ? String(data.link || '').trim() : ''
               const type = data ? String(data.type || '').trim() : ''
+              const senderId = data ? String(data.sender_id || '').trim() : ''
+              const senderName = data ? String(data.sender_name || '').trim() : ''
               if (link || type) {
                 // Dedupe: iOS WKWebView pode re-entregar o mesmo action durante
                 // cold-launch + warm-launch. Se o mesmo action ID chegou nos
@@ -135,7 +137,7 @@ export function usePushNotifications(userId?: string | null) {
                 ) {
                   return
                 }
-                window.dispatchEvent(new CustomEvent('irontracks:push:navigate', { detail: { link, type } }))
+                window.dispatchEvent(new CustomEvent('irontracks:push:navigate', { detail: { link, type, senderId, senderName } }))
                 if (actionId) {
                   lastActionRef.current = { id: actionId, at: now }
                 }

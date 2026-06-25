@@ -737,6 +737,29 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         }
     }, [setCurrentWorkout, setView, setExpressWorkoutOpen])
 
+    // Deep-link de push de mensagem: ao tocar na notificação, abre a conversa.
+    // A push carrega sender_id/sender_name; o ChatDirectScreen resolve o canal
+    // a partir do userId, então não precisamos do channelId aqui.
+    useEffect(() => {
+        const onPushNavigate = (e: Event) => {
+            const detail = (e as CustomEvent<{ type?: string; senderId?: string; senderName?: string }>).detail;
+            if (detail?.type !== 'message') return;
+            const senderId = String(detail?.senderId || '').trim();
+            if (!senderId) return;
+            const senderName = String(detail?.senderName || '').trim();
+            setDirectChat({
+                channelId: '',
+                userId: senderId,
+                displayName: senderName || undefined,
+                other_user_id: senderId,
+                other_user_name: senderName || undefined,
+            });
+            setView('directChat');
+        };
+        window.addEventListener('irontracks:push:navigate', onPushNavigate);
+        return () => window.removeEventListener('irontracks:push:navigate', onPushNavigate);
+    }, [setView]);
+
     useEffect(() => {
         if (!hideVipOnIos) return;
         if (view === 'vip') setView('dashboard');
