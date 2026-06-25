@@ -79,11 +79,13 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
 
     const { alert, prompt, confirm } = useDialog();
     const supabase = useMemo(() => createClient(), []);
+    const rootRef = useRef<HTMLDivElement | null>(null);
     const messagesEndRef = useRef<HTMLDivElement | null>(null);
     const scrollContainerRef = useRef<HTMLDivElement | null>(null);
     const _typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
     const [showEmoji, setShowEmoji] = useState(false);
+    const [kbOpen, setKbOpen] = useState(false);
     const [uploading, setUploading] = useState(false);
     const fileInputRef = useRef<HTMLInputElement | null>(null);
     const [debugChat, setDebugChat] = useState(false);
@@ -332,6 +334,32 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages]);
 
+    // Cola o container do chat na viewport VISÍVEL (visualViewport) para a barra
+    // de input grudar no topo do teclado — elimina o espaço morto preto entre o
+    // input e o teclado no iOS/WKWebView (onde a layout viewport não encolhe).
+    useEffect(() => {
+        const vv = typeof window !== 'undefined' ? window.visualViewport : null;
+        const el = rootRef.current;
+        if (!vv || !el) return;
+        const apply = () => {
+            el.style.top = `${vv.offsetTop}px`;
+            el.style.height = `${vv.height}px`;
+            el.style.bottom = 'auto';
+            const open = window.innerHeight - vv.height > 120;
+            setKbOpen((prev) => (prev === open ? prev : open));
+        };
+        apply();
+        vv.addEventListener('resize', apply);
+        vv.addEventListener('scroll', apply);
+        return () => {
+            vv.removeEventListener('resize', apply);
+            vv.removeEventListener('scroll', apply);
+            el.style.top = '';
+            el.style.height = '';
+            el.style.bottom = '';
+        };
+    }, [loading]);
+
     useEffect(() => {
         const el = scrollContainerRef.current;
         if (!el) return;
@@ -522,7 +550,7 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
     }
 
     return (
-        <div className="fixed inset-0 z-50 flex flex-col h-full overflow-hidden text-white" style={{ background: '#090909' }}>
+        <div ref={rootRef} className="fixed inset-0 z-50 flex flex-col h-full overflow-hidden text-white" style={{ background: '#090909' }}>
             <div className="px-4 pt-[max(env(safe-area-inset-top),12px)] pb-3 sticky top-0 z-20 justify-center relative flex" style={{ background: 'rgba(9,9,9,0.98)', borderBottom: '1px solid rgba(255,255,255,0.06)', backdropFilter: 'blur(12px)' }}>
                 <div className="h-px absolute bottom-0 left-0 right-0" style={{ background: 'linear-gradient(90deg, transparent, rgba(234,179,8,0.3), transparent)' }} />
                 <button onClick={onClose} className="absolute left-4 w-10 h-10 flex items-center justify-center text-neutral-400 hover:text-white rounded-xl active:scale-95 transition-all" style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }} aria-label="Voltar">
@@ -571,7 +599,8 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
                 </div>
             )}
 
-            <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-4 py-4 space-y-4 pb-[calc(env(safe-area-inset-bottom)+120px)]" style={{ background: '#090909' }}>
+            <div ref={scrollContainerRef} className="flex-1 overflow-y-auto" style={{ background: '#090909' }}>
+                <div className="min-h-full flex flex-col justify-end px-4 py-4 space-y-4">
                 {messages.length === 0 ? (
                     <div className="text-center py-10 text-neutral-500">
                         <div className="text-lg mb-2">💬</div>
@@ -686,9 +715,10 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
                         )}
                     </>
                 )}
+                </div>
             </div>
 
-            <form onSubmit={handleSendMessage} className="sticky bottom-0 z-30 px-4 pt-3 pb-[max(env(safe-area-inset-bottom),12px)] shadow-[0_-14px_40px_rgba(0,0,0,0.55)]" style={{ background: 'rgba(9,9,9,0.99)', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
+            <form onSubmit={handleSendMessage} className={`shrink-0 z-30 px-4 pt-3 ${kbOpen ? 'pb-2' : 'pb-[max(env(safe-area-inset-bottom),12px)]'} shadow-[0_-14px_40px_rgba(0,0,0,0.55)]`} style={{ background: 'rgba(9,9,9,0.99)', borderTop: '1px solid rgba(255,255,255,0.06)' }}>
                 <div className="flex items-center gap-2 rounded-2xl px-2 py-2" style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)' }}>
                     <button type="button" onClick={() => setShowEmoji(v => !v)} className="w-11 h-11 rounded-xl bg-neutral-800 text-neutral-200 hover:text-white hover:bg-neutral-700 active:scale-95 transition-transform inline-flex items-center justify-center" aria-label="Emojis"><Smile size={18} /></button>
                     <button type="button" onClick={handleAttachClick} className="w-11 h-11 rounded-xl bg-neutral-800 text-neutral-200 hover:text-white hover:bg-neutral-700 active:scale-95 transition-transform inline-flex items-center justify-center" aria-label="Anexar mídia"><ImageIcon size={18} /></button>
