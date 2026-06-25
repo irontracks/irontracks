@@ -126,7 +126,11 @@ export async function POST() {
           user_id: user.id,
           plan_id: resolvedPlanId,
           status: 'active',
-          provider: 'revenuecat',
+          // provider='apple': RevenueCat é intermediário do Apple IAP e o CHECK
+          // constraint de app_subscriptions.provider NÃO aceita 'revenuecat'
+          // (rejeitava o INSERT com 400). Igual ao webhook. O rótulo 'revenuecat'
+          // fica preservado em metadata.provider (acima).
+          provider: 'apple',
           current_period_start: new Date().toISOString(),
           current_period_end: expiresDate,
           cancel_at_period_end: false,
