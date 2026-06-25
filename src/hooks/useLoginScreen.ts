@@ -7,6 +7,7 @@ import { isIosNative } from '@/utils/platform'
 import { logError } from '@/lib/logger'
 import { apiAuth } from '@/lib/api'
 import { writeSessionBackup, readSessionBackup, clearSessionBackup } from '@/utils/auth/sessionBackup'
+import { decodeAppleEmailFromToken } from '@/utils/auth/appleToken'
 
 // ─── Capacitor optional imports ───────────────────────────────────────────────
 let Capacitor: { getPlatform: () => string } = { getPlatform: () => 'web' }
@@ -217,7 +218,10 @@ export function useLoginScreen() {
                 setIsLoading(true)
                 const token = result?.response?.identityToken
                 if (!token) throw new Error('Falha ao obter token da Apple.')
-                const email = String(result?.response?.email || '').trim()
+                // Apple só manda email no objeto da 1ª autorização; em re-login vem vazio.
+                // Caímos para o claim "email" do próprio JWT, que está sempre presente —
+                // assim o pré-cadastro/whitelist abaixo funciona em TODA autorização.
+                const email = String(result?.response?.email || '').trim() || decodeAppleEmailFromToken(token)
                 const givenName = String(result?.response?.givenName || '').trim()
                 const familyName = String(result?.response?.familyName || '').trim()
                 const fullName = `${givenName} ${familyName}`.trim()
@@ -229,7 +233,7 @@ export function useLoginScreen() {
                 const { data, error } = await supabase.auth.signInWithIdToken({ provider: 'apple', token })
                 if (error) throw error
                 const userId = data?.user?.id
-                const userEmail = data?.user?.email?.trim().toLowerCase() || ''
+                const userEmail = data?.user?.email?.trim().toLowerCase() || email
                 if (userId) {
                     const { data: profile } = await supabase.from('profiles').select('id').eq('id', userId).maybeSingle()
                     if (!profile?.id) {

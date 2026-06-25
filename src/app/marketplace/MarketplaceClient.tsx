@@ -618,13 +618,22 @@ export default function MarketplaceClient() {
                 </div>
               </div>
 
-              {/* Apple 3.1.2(c): links funcionais de Termos (EULA) + Privacidade no fluxo de assinatura */}
-              <p className="text-center text-[11px] leading-relaxed text-neutral-400 px-2">
-                Assinatura com renovação automática, cobrada na sua conta. Ao assinar você concorda com os{' '}
-                <a href="/terms" className="underline font-semibold text-neutral-200 hover:text-white">Termos de Uso (EULA)</a>
-                {' '}e a{' '}
-                <a href="/privacy" className="underline font-semibold text-neutral-200 hover:text-white">Política de Privacidade</a>.
-              </p>
+              {/* Apple 3.1.2(c): info obrigatória da assinatura + links FUNCIONAIS e
+                  VISÍVEIS de Termos (EULA) e Política de Privacidade no fluxo de compra. */}
+              <div className="rounded-2xl border border-neutral-700 bg-neutral-950 p-4 space-y-2.5">
+                <p className="text-[13px] leading-relaxed text-neutral-300">
+                  Assinatura <span className="font-bold text-white">{selectedPlan.name}</span> de renovação
+                  automática ({selectedPlan.interval === 'year' ? 'anual' : 'mensal'}) —{' '}
+                  <span className="font-bold text-white">{formatMoney(selectedPlan.price_cents)}</span> cobrados
+                  na sua conta a cada período, com renovação automática até o cancelamento.
+                </p>
+                <p className="text-[13px] leading-relaxed text-neutral-300">
+                  Ao assinar você concorda com os{' '}
+                  <a href="/terms" className="underline font-bold text-yellow-400 hover:text-yellow-300">Termos de Uso (EULA)</a>
+                  {' '}e a{' '}
+                  <a href="/privacy" className="underline font-bold text-yellow-400 hover:text-yellow-300">Política de Privacidade</a>.
+                </p>
+              </div>
 
               {isIosNative ? (
                 <div className="space-y-3">
