@@ -39,7 +39,9 @@ function useSafeTeamWorkout() {
   }
 }
 
-function ExerciseCardInner({ ex, exIdx }: { ex: WorkoutExercise; exIdx: number }) {
+type GroupPos = 'first' | 'middle' | 'last';
+
+function ExerciseCardInner({ ex, exIdx, groupPos }: { ex: WorkoutExercise; exIdx: number; groupPos?: GroupPos }) {
   const {
     workout,
     logs,
@@ -296,6 +298,8 @@ function ExerciseCardInner({ ex, exIdx }: { ex: WorkoutExercise; exIdx: number }
       allSetsDone
         ? 'border-emerald-500/40 shadow-[0_0_20px_-4px_rgba(52,211,153,0.18)]'
         : 'border-neutral-800/80',
+      // Borda esquerda dourada sinaliza que o card faz parte de um grupo (Bi-Set, etc.)
+      groupPos && !allSetsDone ? 'border-l-2 border-l-yellow-500/60' : '',
       justCompleted ? 'scale-[1.01] shadow-[0_0_30px_-4px_rgba(52,211,153,0.35)]' : '',
     ].join(' ')}>
       {/* Outer wrapper — plain div, no interactive role */}
