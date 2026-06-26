@@ -42,6 +42,8 @@ interface ExerciseCrudDeps {
   setOrganizeOpen: (v: boolean) => void;
   organizeDirty: boolean;
   organizeBaseKeysRef: React.MutableRefObject<string>;
+  deleteConfirmIdx: number | null;
+  setDeleteConfirmIdx: (v: number | null) => void;
   onUpdateSession: ((update: Record<string, unknown>) => void) | undefined;
   alert: (msg: string, title?: string) => Promise<void>;
   confirm: (msg: string, title?: string, opts?: Record<string, unknown>) => Promise<boolean>;
@@ -66,6 +68,7 @@ export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
     setOrganizeError,
     setOrganizeOpen,
     organizeDirty, organizeBaseKeysRef,
+    deleteConfirmIdx, setDeleteConfirmIdx,
     onUpdateSession,
     alert, confirm,
   } = deps;
@@ -378,6 +381,64 @@ export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
   };
 
 
+  const openDeleteConfirm = (exIdx: number) => setDeleteConfirmIdx(exIdx);
+  const closeDeleteConfirm = () => setDeleteConfirmIdx(null);
+
+  const removeExerciseFromWorkout = async (fromPlan: boolean) => {
+    if (!workout || typeof onUpdateSession !== 'function') return;
+    const idx = deleteConfirmIdx;
+    if (idx === null || idx < 0 || idx >= exercises.length) return;
+
+    const nextExercises = exercises.filter((_, i) => i !== idx);
+
+    // Drop logs for removed exercise, re-index subsequent exercise indices
+    const nextLogs: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(logs as Record<string, unknown>)) {
+      const dash = key.indexOf('-');
+      if (dash === -1) { nextLogs[key] = value; continue; }
+      const exI = parseInt(key.slice(0, dash), 10);
+      if (isNaN(exI)) { nextLogs[key] = value; continue; }
+      if (exI === idx) continue;
+      nextLogs[exI > idx ? `${exI - 1}${key.slice(dash)}` : key] = value;
+    }
+
+    setCollapsed((prev) => {
+      const next = new Set<number>();
+      for (const i of prev) { if (i !== idx) next.add(i > idx ? i - 1 : i); }
+      return next;
+    });
+    setLinkedWeightExercises((prev) => {
+      const next = new Set<number>();
+      for (const i of prev) { if (i !== idx) next.add(i > idx ? i - 1 : i); }
+      return next;
+    });
+
+    setDeleteConfirmIdx(null);
+    onUpdateSession({ workout: { ...workout, exercises: nextExercises }, logs: nextLogs });
+
+    if (fromPlan) {
+      const workoutId = String(workout?.id ?? (workout as Record<string, unknown>)?.workout_id ?? '').trim();
+      if (!workoutId) {
+        try { await alert('Não foi possível salvar: treino sem ID.'); } catch { }
+        return;
+      }
+      try {
+        const response = await fetch('/api/workouts/update', {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ id: workoutId, workout: { ...workout, exercises: nextExercises } }),
+        }).catch((): null => null);
+        const result = response ? await response.json().catch((): null => null) : null;
+        if (!response?.ok || !(result as Record<string, unknown>)?.ok) {
+          try { await alert(String((result as Record<string, unknown>)?.error || 'Falha ao salvar no plano.')); } catch { }
+        }
+      } catch (e: unknown) {
+        const msg = isObject(e) && typeof e.message === 'string' ? e.message : 'Falha ao salvar no plano.';
+        try { await alert(msg); } catch { }
+      }
+    }
+  };
+
   /** Directly rename an exercise by index — used by AI swap. */
   const swapExerciseName = (exIdx: number, newName: string) => {
     if (!workout || typeof onUpdateSession !== 'function') return;
@@ -404,5 +465,8 @@ export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
     openOrganizeModal,
     requestCloseOrganize,
     saveOrganize,
+    openDeleteConfirm,
+    closeDeleteConfirm,
+    removeExerciseFromWorkout,
   };
 }

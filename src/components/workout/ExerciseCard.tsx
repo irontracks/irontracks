@@ -59,6 +59,10 @@ function ExerciseCardInner({ ex, exIdx }: { ex: WorkoutExercise; exIdx: number }
     removeExtraSetFromExercise,
     linkedWeightExercises,
     toggleLinkWeights,
+    deleteConfirmIdx,
+    openDeleteConfirm,
+    closeDeleteConfirm,
+    removeExerciseFromWorkout,
   } = useWorkoutContext();
 
   const teamCtx = useSafeTeamWorkout();
@@ -485,6 +489,27 @@ function ExerciseCardInner({ ex, exIdx }: { ex: WorkoutExercise; exIdx: number }
           >
             <Pencil size={14} />
           </button>
+          <button
+            type="button"
+            onClick={(e) => {
+              try { e.preventDefault(); e.stopPropagation(); } catch { }
+              if (deleteConfirmIdx === exIdx) {
+                closeDeleteConfirm();
+              } else {
+                openDeleteConfirm(exIdx);
+              }
+            }}
+            className={[
+              'h-9 w-9 inline-flex items-center justify-center rounded-xl border transition-colors active:scale-95 flex-shrink-0',
+              deleteConfirmIdx === exIdx
+                ? 'bg-red-500/15 border-red-500/40 text-red-400'
+                : 'bg-neutral-900 border-red-500/20 text-red-400/50 hover:text-red-400 hover:border-red-500/40 hover:bg-red-500/10',
+            ].join(' ')}
+            title="Remover exercício"
+            aria-label="Remover exercício do treino"
+          >
+            <Trash2 size={14} />
+          </button>
           {/* Share with partner — only when team session is active */}
           {teamCtx?.teamSession && (
             <button
@@ -515,6 +540,44 @@ function ExerciseCardInner({ ex, exIdx }: { ex: WorkoutExercise; exIdx: number }
           )}
         </div>
       </div>
+
+      {deleteConfirmIdx === exIdx && (
+        <div className="mt-3 rounded-xl border border-red-500/25 p-4" style={{ background: 'rgba(239,68,68,0.07)' }}>
+          <div className="flex items-start gap-3 mb-3">
+            <div className="flex-shrink-0 w-8 h-8 rounded-full flex items-center justify-center" style={{ background: 'rgba(239,68,68,0.15)' }}>
+              <Trash2 size={15} className="text-red-400" />
+            </div>
+            <div>
+              <div className="text-sm font-semibold text-white leading-snug">Remover &quot;{name}&quot;?</div>
+              <div className="text-xs text-neutral-400 mt-0.5 leading-snug">Escolha como deseja remover este exercício.</div>
+            </div>
+          </div>
+          <div className="flex flex-col gap-2">
+            <button
+              type="button"
+              onClick={(e) => { try { e.stopPropagation(); } catch { } void removeExerciseFromWorkout(false); }}
+              className="w-full min-h-[44px] rounded-xl bg-neutral-800 border border-neutral-700 text-sm text-white font-medium hover:bg-neutral-700 active:scale-95 transition-all"
+            >
+              Só desta vez
+            </button>
+            <button
+              type="button"
+              onClick={(e) => { try { e.stopPropagation(); } catch { } void removeExerciseFromWorkout(true); }}
+              className="w-full min-h-[44px] rounded-xl border border-red-500/30 text-sm text-red-400 font-medium hover:bg-red-500/15 active:scale-95 transition-all"
+              style={{ background: 'rgba(239,68,68,0.08)' }}
+            >
+              Remover do plano de treino
+            </button>
+            <button
+              type="button"
+              onClick={(e) => { try { e.stopPropagation(); } catch { } closeDeleteConfirm(); }}
+              className="w-full min-h-[44px] rounded-xl text-sm text-neutral-500 hover:text-neutral-300 active:scale-95 transition-all"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
 
       {!collapsedNow && (
         <div className="mt-4 space-y-2">
