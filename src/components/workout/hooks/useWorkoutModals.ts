@@ -82,6 +82,9 @@ export function useWorkoutModals(collapsedKey: string | null) {
         );
     }, [editExerciseDraft, editExerciseOriginal]);
 
+    // ---- Delete exercise confirmation ----
+    const [deleteConfirmIdx, setDeleteConfirmIdx] = useState<number | null>(null);
+
     // ---- Organize ----
     const [organizeOpen, setOrganizeOpen] = useState<boolean>(false);
     const [organizeDraft, setOrganizeDraft] = useState<UnknownRecord[]>([]);
@@ -152,6 +155,8 @@ export function useWorkoutModals(collapsedKey: string | null) {
     const clusterRefs = useRef<InputRefMap>({});
 
     return {
+        // Delete exercise confirmation
+        deleteConfirmIdx, setDeleteConfirmIdx,
         // Collapsed
         collapsed, setCollapsed,
         // Notes & UI flags

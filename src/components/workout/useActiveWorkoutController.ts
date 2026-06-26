@@ -101,6 +101,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     finishing, setFinishing,
     addExerciseOpen, setAddExerciseOpen,
     addExerciseDraft, setAddExerciseDraft,
+    deleteConfirmIdx, setDeleteConfirmIdx,
     editExerciseOpen, setEditExerciseOpen,
     editExerciseIdx, setEditExerciseIdx,
     editExerciseDraft, setEditExerciseDraft,
@@ -368,6 +369,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     organizeError, setOrganizeError,
     organizeOpen, setOrganizeOpen,
     organizeDirty, organizeBaseKeysRef: organizeBaseKeysRef as unknown as React.MutableRefObject<string>,
+    deleteConfirmIdx, setDeleteConfirmIdx,
     onUpdateSession: (updatedWorkout: UnknownRecord) => {
       props.onUpdateSession?.(updatedWorkout);
       if (teamSession?.id && typeof broadcastWorkoutEdit === 'function') {
@@ -393,6 +395,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     openEditExercise, saveEditExercise,
     addExtraExerciseToWorkout, swapExerciseName,
     openOrganizeModal, requestCloseOrganize, saveOrganize,
+    openDeleteConfirm, closeDeleteConfirm, removeExerciseFromWorkout,
   } = exerciseCrud;
 
   // ── Method savers (cluster, rest-pause, drop-set, etc) ──────────────────
@@ -584,6 +587,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     deloadSuggestions,
     currentExerciseIdx,
     setCurrentExerciseIdx,
+    deleteConfirmIdx,
     editExerciseOpen,
     setEditExerciseOpen,
     editExerciseIdx,
@@ -625,6 +629,9 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     openOrganizeModal,
     requestCloseOrganize,
     saveOrganize,
+    openDeleteConfirm,
+    closeDeleteConfirm,
+    removeExerciseFromWorkout,
     finishWorkout,
     openDeloadModal,
     startTimer,
@@ -699,6 +706,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     toggleCollapse, addExtraSetToExercise, removeExtraSetFromExercise,
     openEditExercise, saveEditExercise, swapExerciseName, addExtraExerciseToWorkout,
     openOrganizeModal, requestCloseOrganize, saveOrganize,
+    openDeleteConfirm, closeDeleteConfirm, removeExerciseFromWorkout, deleteConfirmIdx,
     finishWorkout, openDeloadModal, startTimer, handleTimerFinish,
     saveClusterModal, saveRestPauseModal, saveDropSetModal, saveStrippingModal,
     saveFst7Modal, saveHeavyDutyModal, savePontoZeroModal,
