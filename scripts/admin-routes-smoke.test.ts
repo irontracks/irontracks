@@ -44,6 +44,22 @@ for (const rel of [
   assert.ok(/status:\s*403/.test(text), `${rel.join('/')} must return 403 when access is denied`)
 }
 
+// ── Relatório público → privado guard (auditoria 2026-06-27) ───────────────
+// /relatorio/[userId] expunha email + composição corporal + nutrição +
+// marcadores de exame a QUALQUER anônimo por enumeração de UUID. Agora exige
+// login + ownership (dono/professor/admin) ANTES de qualquer fetch de dados.
+const relatorioPage = path.join(repoRoot, 'src', 'app', 'relatorio', '[userId]', 'page.tsx')
+assert.ok(fs.existsSync(relatorioPage), 'relatorio page missing')
+const relatorioText = fs.readFileSync(relatorioPage, 'utf8')
+assert.ok(relatorioText.includes('auth.getUser()'), 'relatorio page must authenticate the viewer')
+assert.ok(relatorioText.includes('canCoachStudent'), 'relatorio page must authorize the viewer via ownership (canCoachStudent)')
+// O gate de authz (canCoachStudent) deve rodar ANTES do fetch em massa (Promise.all).
+const gateIdx = relatorioText.indexOf('canCoachStudent')
+const fetchIdx = relatorioText.indexOf('Promise.all')
+assert.ok(gateIdx > -1 && fetchIdx > -1 && gateIdx < fetchIdx, 'relatorio auth gate must run BEFORE the bulk data fetch')
+// generateMetadata não pode vazar identidade via OG/unfurl (bot anônimo ignora o gate).
+assert.ok(!/title:\s*`Relatório — \$\{name\}/.test(relatorioText), 'relatorio generateMetadata must not leak the user name in the title')
+
 // ── Recurring "students" bug guard ─────────────────────────────────────────
 // Two errors kept regressing because every admin route reinvented student
 // lookup:
