@@ -51,6 +51,13 @@ export async function POST(req: Request) {
         if (!rl.allowed) {
             return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429, headers: { 'Retry-After': String(rl.retryAfterSeconds) } })
         }
+        // Teto DIÁRIO por usuário: o burst de 5/min ainda permitia ~7200/dia de
+        // chamadas caras ao Gemini. Cap de 30/dia fecha o abuso de custo sem
+        // bloquear o uso legítimo (auditoria 2026-06-27, L2).
+        const rlDay = await checkRateLimitAsync(`ai:team-insights:daily:${userId}`, 30, 86_400_000)
+        if (!rlDay.allowed) {
+            return NextResponse.json({ ok: false, error: 'daily_limit_reached' }, { status: 429, headers: { 'Retry-After': String(rlDay.retryAfterSeconds) } })
+        }
 
         const apiKey = env.gemini.apiKey
         if (!apiKey) {

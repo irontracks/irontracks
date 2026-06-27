@@ -4,6 +4,7 @@ import { requireUser } from '@/utils/auth/route'
 import { getVipPlanLimits } from '@/utils/vip/limits'
 import { parseJsonBody } from '@/utils/zod'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { respondDbError } from '@/utils/api/dbError'
 import { cacheGet, cacheSet } from '@/utils/cache'
 
 export const dynamic = 'force-dynamic'
@@ -36,7 +37,7 @@ export async function GET() {
       .select('user_id, goal, equipment, constraints, preferences, updated_at')
       .eq('user_id', user.id)
       .maybeSingle()
-    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+    if (error) return respondDbError('vip:profile:get', error)
     const payload = { ok: true, profile: data || null }
     await cacheSet(cacheKey, payload, 60)
     return NextResponse.json(payload)
@@ -78,7 +79,7 @@ export async function PUT(req: Request) {
       .select('user_id, goal, equipment, constraints, preferences, updated_at')
       .single()
 
-    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+    if (error) return respondDbError('vip:profile:put', error)
     const payload = { ok: true, profile: data }
     await cacheSet(`vip:profile:${user.id}`, payload, 60)
     return NextResponse.json(payload)
