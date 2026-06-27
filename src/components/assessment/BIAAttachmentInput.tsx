@@ -17,6 +17,8 @@ import { Upload, FileText, ImageIcon, X, Loader2, CheckCircle, AlertCircle, Spar
 import { createClient } from '@/utils/supabase/client'
 import {
   uploadBiaAttachment,
+  getBiaSignedUrl,
+  biaFileNameFromPath,
   ALLOWED_BIA_MIME,
   BIA_FILE_LIMIT_LABEL,
 } from '@/utils/storage/biaAttachmentUpload'
@@ -46,18 +48,8 @@ interface BIAAttachmentInputProps {
 
 const ACCEPT_ATTR = ALLOWED_BIA_MIME.join(',')
 
-const isImage = (url: string) => /\.(jpe?g|png|webp|heic|heif)(\?|$)/i.test(url)
-const isPdf = (url: string) => /\.pdf(\?|$)/i.test(url)
-
-const fileNameFromUrl = (url: string): string => {
-  try {
-    const u = new URL(url)
-    const last = u.pathname.split('/').pop() || 'arquivo'
-    return decodeURIComponent(last).replace(/^\d+_/, '')
-  } catch {
-    return 'arquivo'
-  }
-}
+const isImage = (p: string) => /\.(jpe?g|png|webp|heic|heif)(\?|$)/i.test(p)
+const isPdf = (p: string) => /\.pdf(\?|$)/i.test(p)
 
 export default function BIAAttachmentInput({
   value,
@@ -75,7 +67,21 @@ export default function BIAAttachmentInput({
   >({ kind: 'idle' })
   const [error, setError] = useState<string | null>(null)
   const [dragOver, setDragOver] = useState(false)
+  const [opening, setOpening] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
+
+  // Anexo agora vive em bucket PRIVADO — abrir = mintar uma signed URL curta.
+  const openAttachment = async (p: string) => {
+    if (!p || opening) return
+    setOpening(true)
+    try {
+      const url = await getBiaSignedUrl(p)
+      if (url) window.open(url, '_blank', 'noopener,noreferrer')
+      else setError('Não consegui abrir o anexo agora. Tenta de novo.')
+    } finally {
+      setOpening(false)
+    }
+  }
 
   const handleFiles = async (files: FileList | null) => {
     if (!files || files.length === 0 || disabled) return
@@ -103,7 +109,7 @@ export default function BIAAttachmentInput({
         setError(res.error)
         return
       }
-      onChange(res.publicUrl)
+      onChange(res.path)
 
       // Pós-upload: dispara extração automática se o parent quiser usar.
       // Falha aqui não invalida o anexo — usuário pode preencher manual.
@@ -111,7 +117,7 @@ export default function BIAAttachmentInput({
         setExtracting(true)
         setExtractionStatus({ kind: 'idle' })
         try {
-          const extraction = await extractBiaFromAttachment(res.publicUrl)
+          const extraction = await extractBiaFromAttachment(res.path)
           if (extraction.ok) {
             onExtracted(extraction.data)
             setExtractionStatus({ kind: 'success', confidence: extraction.data.confidence })
@@ -175,7 +181,7 @@ export default function BIAAttachmentInput({
   // Estado preenchido: mostra preview do anexo com botão remover
   // ──────────────────────────────────────────────────────────
   if (value) {
-    const fileName = fileNameFromUrl(value)
+    const fileName = biaFileNameFromPath(value)
     return (
       <div className="space-y-2">
         <div
@@ -198,15 +204,15 @@ export default function BIAAttachmentInput({
             )}
           </div>
           <div className="flex-1 min-w-0">
-            <a
-              href={value}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-sm font-bold text-white truncate block hover:underline"
+            <button
+              type="button"
+              onClick={() => openAttachment(value)}
+              disabled={opening}
+              className="text-sm font-bold text-white truncate block hover:underline text-left disabled:opacity-60"
               title={fileName}
             >
-              {fileName}
-            </a>
+              {opening ? 'Abrindo…' : fileName}
+            </button>
             <p className="text-[10px] text-emerald-300 font-bold uppercase tracking-wide mt-0.5">
               Anexo enviado · clique para abrir
             </p>
