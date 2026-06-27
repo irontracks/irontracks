@@ -59,7 +59,7 @@ const ChatListScreen = ({ user, onClose, onSelectChannel }: ChatListScreenProps)
             }
 
             const { data, error } = await supabase
-                .from('profiles')
+                .from('profiles_public')
                 .select('id, display_name, photo_url, last_seen')
                 .neq('id', safeUserId)
                 .order('last_seen', { ascending: false })

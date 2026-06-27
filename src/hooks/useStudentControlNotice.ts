@@ -50,7 +50,7 @@ export function useStudentControlNotice(
     if (!supabase) return 'Professor'
     try {
       const { data } = await supabase
-        .from('profiles')
+        .from('profiles_public')
         .select('display_name')
         .eq('id', teacherId)
         .maybeSingle()
