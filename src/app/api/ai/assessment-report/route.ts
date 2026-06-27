@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
+import { canCoachStudent } from '@/utils/auth/studentAccess'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { parseJsonBody, parseJsonWithSchema } from '@/utils/zod'
@@ -55,12 +56,20 @@ export async function POST(req: Request) {
     if (parsed.response) return parsed.response
     const body = parsed.data as z.infer<typeof ZodBody>
 
+    // Authz: só o próprio aluno, o professor vinculado ou admin podem gerar o
+    // relatório (perfil/avaliações/exames) deste studentId. Sem isto, qualquer
+    // usuário autenticado exfiltrava PII + dados de saúde de terceiros (IDOR).
+    if (!(await canCoachStudent({ id: userId, email: auth.user.email }, body.studentId))) {
+      return NextResponse.json({ ok: false, error: 'forbidden' }, { status: 403 })
+    }
+
     const admin = createAdminClient()
 
-    // Fetch student profile
+    // Fetch student profile. `email` é PII e não é usado no relatório — fora do
+    // select para não vazar ao LLM (Gemini) nem à resposta.
     const { data: profile } = await admin
       .from('profiles')
-      .select('id, name, email, gender, birth_date')
+      .select('id, name, gender, birth_date')
       .eq('id', body.studentId)
       .maybeSingle()
 

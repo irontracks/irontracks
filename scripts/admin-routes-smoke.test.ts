@@ -15,6 +15,35 @@ assert.ok(fs.existsSync(deleteTeacherRoute), 'teachers/delete route missing')
 const deleteTeacherText = fs.readFileSync(deleteTeacherRoute, 'utf8')
 assert.ok(deleteTeacherText.includes('requireRoleOrBearer'), 'teachers/delete should support bearer fallback')
 
+// ── IDOR destrutivo guard (auditoria 2026-06-27) ───────────────────────────
+// teachers/delete apaga profile + auth.users + dados em cascata via RPC.
+// Aceitar role 'teacher' permitia que QUALQUER professor deletasse QUALQUER
+// outro professor passando um `id` arbitrário no body. Deve ser admin-only.
+assert.ok(
+  /requireRoleOrBearer\(\s*req\s*,\s*\[\s*'admin'\s*\]\s*\)/.test(deleteTeacherText),
+  'teachers/delete must restrict to ["admin"] only',
+)
+assert.ok(
+  !/\[\s*'admin'\s*,\s*'teacher'\s*\]/.test(deleteTeacherText),
+  'teachers/delete must NOT allow role "teacher" — reintroduz IDOR destrutivo',
+)
+
+// ── Coach AI IDOR guard (auditoria 2026-06-27) ─────────────────────────────
+// Rotas de IA que recebem `studentId` e leem perfil/avaliações/EXAMES via
+// service-role precisam autorizar o vínculo (self/professor/admin) com
+// canCoachStudent. Sem isso, qualquer usuário autenticado exfiltrava dados de
+// saúde de terceiros (IDOR).
+for (const rel of [
+  ['src', 'app', 'api', 'ai', 'student-workout', 'route.ts'],
+  ['src', 'app', 'api', 'ai', 'assessment-report', 'route.ts'],
+]) {
+  const routePath = path.join(repoRoot, ...rel)
+  assert.ok(fs.existsSync(routePath), `${rel.join('/')} missing`)
+  const text = fs.readFileSync(routePath, 'utf8')
+  assert.ok(text.includes('canCoachStudent'), `${rel.join('/')} must authorize studentId via canCoachStudent`)
+  assert.ok(/status:\s*403/.test(text), `${rel.join('/')} must return 403 when access is denied`)
+}
+
 // ── Recurring "students" bug guard ─────────────────────────────────────────
 // Two errors kept regressing because every admin route reinvented student
 // lookup:
