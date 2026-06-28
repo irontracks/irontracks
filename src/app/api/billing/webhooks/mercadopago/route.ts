@@ -54,6 +54,36 @@ const addInterval = (start: Date, interval: string) => {
   return d
 }
 
+/**
+ * Defense-in-depth (auditoria 2026-06-28): confere o valor pago vs o preço do plano
+ * antes de conceder acesso. NÃO é externamente explorável (valor é fixado no checkout
+ * server-side + webhook tem HMAC + dados vêm da API do MP), mas protege contra bug de
+ * checkout ou fluxo futuro. Política CONSERVADORA pra nunca barrar receita legítima:
+ *   - sem preço de referência no banco  -> não bloqueia (fail-open);
+ *   - mismatch leve (preço mudou, arredondamento) -> só sinaliza (alerta), concede;
+ *   - mismatch GRAVE (pago < 50% do esperado, ou moeda divergente) -> bloqueia o grant.
+ * Como não há cupom/desconto e o valor é server-fixed, < 50% só pode ser bug/fraude.
+ */
+function assessPaymentAmount(
+  paidCents: number,
+  expectedCents: number | null | undefined,
+  paidCurrency: string,
+  expectedCurrency: string | null | undefined,
+): { block: boolean; mismatch: boolean; detail: string } {
+  const expected = Number(expectedCents || 0)
+  if (!Number.isFinite(expected) || expected <= 0) {
+    return { block: false, mismatch: false, detail: 'no_reference_price' }
+  }
+  const paid = Number.isFinite(paidCents) ? paidCents : 0
+  const curExpected = String(expectedCurrency || '').trim().toUpperCase()
+  const currencyOk = !curExpected || String(paidCurrency || '').toUpperCase() === curExpected
+  const ratio = expected > 0 ? paid / expected : 1
+  const block = !currencyOk || ratio < 0.5
+  const mismatch = !currencyOk || Math.abs(paid - expected) > 2
+  const detail = `paid=${paid} expected=${expected} paidCur=${paidCurrency} expCur=${curExpected || 'n/a'} ratio=${ratio.toFixed(3)}`
+  return { block, mismatch, detail }
+}
+
 const BodySchema = z
   .object({
     type: z.string().optional(),
@@ -250,17 +280,23 @@ export async function POST(req: Request) {
         if (status.toLowerCase() === 'approved' && subscriptionId) {
           const now = new Date()
 
-          // Load subscription to get duration
+          // Load subscription to get duration + price (price p/ a validação de valor)
           const { data: sub } = await admin
             .from('student_subscriptions')
-            .select('id, plan_id, student_service_plans(duration_days)')
+            .select('id, plan_id, student_service_plans(duration_days, price_cents)')
             .eq('id', subscriptionId)
             .maybeSingle()
 
           const planData = sub?.student_service_plans
-          const durationDays = Number(
-            (Array.isArray(planData) ? planData[0] : planData)?.duration_days ?? 30
-          )
+          const planRow = (Array.isArray(planData) ? planData[0] : planData) as { duration_days?: number; price_cents?: number } | null | undefined
+          const durationDays = Number(planRow?.duration_days ?? 30)
+
+          const amt = assessPaymentAmount(amountCents, planRow?.price_cents, currency, undefined)
+          if (amt.mismatch) logWarn('billing:webhooks:mp', `student_plan amount mismatch — ${amt.detail}`, { userId, subscriptionId, dataId })
+          if (amt.block) {
+            logError('billing:webhooks:mp', new Error(`student_plan grant BLOQUEADO por valor — ${amt.detail} sub=${subscriptionId} dataId=${dataId}`))
+            return NextResponse.json({ ok: true, skipped: 'amount_mismatch' })
+          }
           const expires = new Date(now)
           expires.setDate(expires.getDate() + durationDays)
 
@@ -302,6 +338,13 @@ export async function POST(req: Request) {
       if (scope === 'teacher_plan' && userId) {
         const now = new Date()
         if (status.toLowerCase() === 'approved') {
+          const { data: tier } = await admin.from('teacher_tiers').select('price_cents, currency').eq('tier_key', planId).maybeSingle()
+          const amt = assessPaymentAmount(amountCents, tier?.price_cents as number | undefined, currency, tier?.currency as string | undefined)
+          if (amt.mismatch) logWarn('billing:webhooks:mp', `teacher_plan amount mismatch — ${amt.detail}`, { userId, planId, dataId })
+          if (amt.block) {
+            logError('billing:webhooks:mp', new Error(`teacher_plan grant BLOQUEADO por valor — ${amt.detail} userId=${userId} planId=${planId} dataId=${dataId}`))
+            return NextResponse.json({ ok: true, skipped: 'amount_mismatch' })
+          }
           const end = new Date(now)
           end.setMonth(end.getMonth() + 1) // monthly billing
 
@@ -353,7 +396,7 @@ export async function POST(req: Request) {
 
       if (scope === 'vip' && userId) {
         const now = new Date()
-        const { data: plan } = planId ? await admin.from('app_plans').select('id, interval').eq('id', planId).maybeSingle() : { data: null }
+        const { data: plan } = planId ? await admin.from('app_plans').select('id, interval, price_cents, currency').eq('id', planId).maybeSingle() : { data: null }
         const end = plan?.interval ? addInterval(now, String(plan.interval)) : null
 
         const { data: activeSub } = await admin
@@ -384,6 +427,12 @@ export async function POST(req: Request) {
           )
 
         if (status.toLowerCase() === 'approved') {
+          const amt = assessPaymentAmount(amountCents, plan?.price_cents as number | undefined, currency, plan?.currency as string | undefined)
+          if (amt.mismatch) logWarn('billing:webhooks:mp', `vip amount mismatch — ${amt.detail}`, { userId, planId, dataId })
+          if (amt.block) {
+            logError('billing:webhooks:mp', new Error(`vip grant BLOQUEADO por valor — ${amt.detail} userId=${userId} planId=${planId} dataId=${dataId}`))
+            return NextResponse.json({ ok: true, skipped: 'amount_mismatch' })
+          }
           const entSubId = activeSub?.id ? String(activeSub.id) : ''
           await admin
             .from('app_subscriptions')
