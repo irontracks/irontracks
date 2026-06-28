@@ -71,6 +71,12 @@ export async function POST(req: Request) {
 
     // R3#5: Teachers can only reassign students they own (or unassigned students)
     if (auth.role === 'teacher') {
+      // Um professor só pode atribuir alunos a SI MESMO (ou desvincular = null).
+      // Antes, teacher_user_id vinha do body sem checagem → professor atribuía
+      // aluno a um terceiro arbitrário (auditoria 2026-06-27, L1).
+      if (teacher_user_id && teacher_user_id !== auth.user.id) {
+        return NextResponse.json({ ok: false, error: 'Professor só pode atribuir alunos a si mesmo.' }, { status: 403 })
+      }
       const currentTeacher = srow.teacher_id || ''
       if (currentTeacher && currentTeacher !== auth.user.id) {
         return NextResponse.json({ ok: false, error: 'Aluno já pertence a outro professor.' }, { status: 403 })
