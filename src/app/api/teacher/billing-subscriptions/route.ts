@@ -4,6 +4,7 @@ import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { parseJsonBody } from '@/utils/zod'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { respondDbError } from '@/utils/api/dbError'
 
 export const dynamic = 'force-dynamic'
 
@@ -25,7 +26,7 @@ export async function GET() {
       .eq('teacher_user_id', user.id)
       .order('created_at', { ascending: false })
 
-    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+    if (error) return respondDbError('teacher:billing_subscriptions:list', error)
 
     // Enrich with profile names
     const studentIds = [...new Set((data ?? []).map(s => String(s.student_user_id)))]

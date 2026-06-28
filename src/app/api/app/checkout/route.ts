@@ -6,6 +6,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { mercadopagoRequest } from '@/lib/mercadopago'
 import { parseJsonBody } from '@/utils/zod'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { respondDbError } from '@/utils/api/dbError'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { logError, logWarn } from '@/lib/logger'
 import { env } from '@/utils/env'
@@ -69,7 +70,7 @@ export async function POST(req: Request) {
       .select('id, name, description, price_cents, currency, interval, status, features')
       .eq('id', planId)
       .maybeSingle()
-    if (planErr) return NextResponse.json({ ok: false, error: planErr.message }, { status: 400 })
+    if (planErr) return respondDbError('checkout:plan-lookup', planErr)
     if (!plan || plan.status !== 'active') return NextResponse.json({ ok: false, error: 'plan_not_found' }, { status: 404 })
 
     const { data: existing } = await admin

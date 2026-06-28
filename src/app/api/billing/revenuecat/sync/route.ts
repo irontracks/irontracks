@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { respondDbError } from '@/utils/api/dbError'
 import { cacheDelete } from '@/utils/cache'
 import { env } from '@/utils/env'
 
@@ -118,7 +119,7 @@ export async function POST() {
           updated_at: new Date().toISOString(),
         })
         .eq('id', existing.id)
-      if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+      if (error) return respondDbError('revenuecat:sync:subscription-update', error)
     } else {
       const { error } = await admin
         .from('app_subscriptions')
@@ -136,7 +137,7 @@ export async function POST() {
           cancel_at_period_end: false,
           metadata: meta,
         })
-      if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+      if (error) return respondDbError('revenuecat:sync:subscription-insert', error)
     }
 
     // Sync to user_entitlements (primary VIP resolution table)

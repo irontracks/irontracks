@@ -5,6 +5,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { mercadopagoRequest } from '@/lib/mercadopago'
 import { parseJsonBody } from '@/utils/zod'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { respondDbError } from '@/utils/api/dbError'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { logError } from '@/lib/logger'
 import { env } from '@/utils/env'
@@ -140,7 +141,7 @@ export async function POST(req: Request) {
       .select('id, status, amount_cents, pix_qr_code, pix_payload, invoice_url, due_date')
       .single()
 
-    if (chargeErr) return NextResponse.json({ ok: false, error: chargeErr.message }, { status: 400 })
+    if (chargeErr) return respondDbError('student:charge:insert', chargeErr)
     return NextResponse.json({ ok: true, charge })
   } catch (e: unknown) {
     return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })

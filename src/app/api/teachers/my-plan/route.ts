@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { respondDbError } from '@/utils/api/dbError'
 
 export const dynamic = 'force-dynamic'
 
@@ -49,7 +50,7 @@ export async function GET() {
       .eq('user_id', user.id)
       .maybeSingle()
 
-    if (tErr) return NextResponse.json({ ok: false, error: tErr.message }, { status: 400 })
+    if (tErr) return respondDbError('teacher:my_plan', tErr)
 
     const tierKey: string = (teacher?.plan_tier_key as string | null) ?? 'free'
     const planStatus: string = (teacher?.plan_status as string | null) ?? 'active'
