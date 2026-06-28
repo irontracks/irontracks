@@ -54,15 +54,15 @@ const GlobalDialog = () => {
 				};
 			case 'prompt':
 				return {
-					bg: 'bg-purple-500/15 border border-purple-500/30',
-					icon: <MessageSquare className="text-purple-400" size={32} />,
-					confirmCls: 'bg-purple-500 hover:bg-purple-400 shadow-lg shadow-purple-900/30 text-white',
+					bg: 'bg-amber-500/15 border border-amber-500/30',
+					icon: <MessageSquare className="text-amber-400" size={32} />,
+					confirmCls: 'bg-amber-500 hover:bg-amber-400 shadow-lg shadow-amber-900/30 text-black',
 				};
 			case 'loading':
 				return {
-					bg: 'bg-blue-500/15 border border-blue-500/30',
-					icon: <AlertCircle className="text-blue-400 animate-pulse" size={32} />,
-					confirmCls: 'bg-blue-500 hover:bg-blue-400 shadow-lg shadow-blue-900/30 text-white',
+					bg: 'bg-amber-500/15 border border-amber-500/30',
+					icon: <AlertCircle className="text-amber-400 animate-pulse" size={32} />,
+					confirmCls: 'bg-amber-500 hover:bg-amber-400 shadow-lg shadow-amber-900/30 text-black',
 				};
 			default:
 				return {
@@ -76,7 +76,7 @@ const GlobalDialog = () => {
 	return (
 		<div
 			aria-hidden="false"
-			className="fixed inset-0 z-[5000] flex items-center justify-center p-4 pt-safe pb-safe animate-fade-in"
+			className="fixed inset-0 z-[10000] flex items-center justify-center p-4 pt-safe pb-safe animate-fade-in"
 			style={{ background: 'rgba(0,0,0,0.92)', backdropFilter: 'blur(20px)' }}
 		>
 			{/* aria-live region so screen readers announce the dialog immediately */}
@@ -125,7 +125,7 @@ const GlobalDialog = () => {
 							aria-label={dialog.title || 'Campo de entrada'}
 							defaultValue={dialog.defaultValue ?? ''}
 							onKeyDown={(e) => e.key === 'Enter' && handleConfirm()}
-							className="w-full bg-neutral-950 border border-neutral-800 rounded-xl p-3 text-white text-center font-bold outline-none focus:border-purple-500 transition-colors mt-2"
+							className="w-full bg-neutral-950 border border-neutral-800 rounded-xl p-3 text-white text-center font-bold outline-none focus:border-amber-500 transition-colors mt-2"
 							placeholder="Digite aqui..."
 						/>
 					</div>

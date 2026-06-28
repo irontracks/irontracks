@@ -390,14 +390,13 @@ export const TeachersTab: React.FC = () => {
                     <div className="relative grid grid-cols-4 gap-2 mt-5 pt-5 border-t border-neutral-800/60">
                         {[
                             { label: 'Alunos', value: teacherStudents.length, icon: Users, color: 'yellow' },
-                            { label: 'Treinos', value: teacherTemplatesRows.length, icon: Dumbbell, color: 'blue' },
-                            { label: 'Histórico', value: teacherHistoryRows.length, icon: BookOpen, color: 'violet' },
+                            { label: 'Treinos', value: teacherTemplatesRows.length, icon: Dumbbell, color: 'yellow' },
+                            { label: 'Histórico', value: teacherHistoryRows.length, icon: BookOpen, color: 'neutral' },
                             { label: 'Alertas', value: teacherInboxItems.length, icon: AlertCircle, color: 'red' },
                         ].map(({ label, value, color }) => (
                             <div key={label} className="text-center">
                                 <div className={`text-xl font-black ${color === 'yellow' ? 'text-yellow-400'
-                                    : color === 'blue' ? 'text-blue-400'
-                                        : color === 'violet' ? 'text-violet-400'
+                                    : color === 'neutral' ? 'text-neutral-300'
                                             : 'text-red-400'
                                     }`}>{value}</div>
                                 <div className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider">{label}</div>

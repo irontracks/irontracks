@@ -286,8 +286,8 @@ const IronRankCard = memo(function IronRankCard({
                                     </motion.div>
                                 </div>
                                 <div className="flex justify-between mt-1">
-                                    <span className="text-[9px] text-neutral-700">Toque para ver o ranking</span>
-                                    <span className="text-[9px] text-neutral-700">próx. {nextVol.toLocaleString('pt-BR')}kg</span>
+                                    <span className="text-[9px] text-neutral-400">Toque para ver o ranking</span>
+                                    <span className="text-[9px] text-neutral-400">próx. {nextVol.toLocaleString('pt-BR')}kg</span>
                                 </div>
                             </div>
                         </button>
@@ -331,7 +331,7 @@ const IronRankCard = memo(function IronRankCard({
                                         ? <div className="text-[9px] text-neutral-400 mt-0.5 truncate">
                                             <span style={{ color: 'rgba(234,179,8,0.65)' }}>{prsTitle}</span>
                                         </div>
-                                        : <div className="text-[9px] text-neutral-700 mt-0.5">Faça um treino para ver seus recordes.</div>
+                                        : <div className="text-[9px] text-neutral-500 mt-0.5">Faça um treino para ver seus recordes.</div>
                                     }
                                 </div>
 
@@ -535,7 +535,7 @@ const IronRankCard = memo(function IronRankCard({
                                                 </span>
                                             </div>
                                             <div className="text-right shrink-0">
-                                                <div className="text-[9px] text-neutral-700 font-bold uppercase">Volume</div>
+                                                <div className="text-[9px] text-neutral-500 font-bold uppercase">Volume</div>
                                                 <div className="text-sm font-black text-yellow-400 tabular-nums">
                                                     {Math.round(row.totalVolumeKg).toLocaleString('pt-BR')}kg
                                                 </div>
@@ -558,7 +558,7 @@ const IronRankCard = memo(function IronRankCard({
 function MetricBadge({ label, value, highlight }: { label: string; value: string; highlight: boolean }) {
     return (
         <div className="flex flex-col items-center">
-            <span className="text-[9px] uppercase font-bold text-neutral-700">{label}</span>
+            <span className="text-[9px] uppercase font-bold text-neutral-500">{label}</span>
             <span className={`text-[10px] font-black tabular-nums ${highlight ? 'text-yellow-400' : 'text-neutral-400'}`}>{value}</span>
         </div>
     )
@@ -567,7 +567,7 @@ function MetricBadge({ label, value, highlight }: { label: string; value: string
 function roleLabel(roleRaw: string | null) {
     const r = String(roleRaw || '').toLowerCase()
     if (r === 'admin') return { label: 'Admin', cls: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/30' }
-    if (r === 'teacher') return { label: 'Coach', cls: 'bg-purple-500/10 text-purple-300 border-purple-500/30' }
+    if (r === 'teacher') return { label: 'Coach', cls: 'bg-amber-600/10 text-amber-300 border-amber-600/30' }
     return { label: 'Aluno', cls: 'bg-neutral-800 text-neutral-400 border-neutral-700' }
 }
 

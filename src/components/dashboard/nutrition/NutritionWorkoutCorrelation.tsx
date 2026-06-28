@@ -5,7 +5,7 @@
  * Shows the last 30 days as a heatmap:
  * - Green: trained + logged nutrition
  * - Yellow: trained, no nutrition
- * - Blue: nutrition only, no training
+ * - Amber: nutrition only, no training
  * - Gray: neither
  */
 import React, { useEffect, useState } from 'react'
@@ -33,7 +33,7 @@ const DAY_LABELS = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S']
 const getDayColor = (d: DayData): string => {
   if (d.had_workout && d.had_nutrition) return '#22c55e' // green - both
   if (d.had_workout && !d.had_nutrition) return '#f59e0b' // amber - workout only
-  if (!d.had_workout && d.had_nutrition) return '#3b82f6' // blue - nutrition only
+  if (!d.had_workout && d.had_nutrition) return '#fbbf24' // amber - nutrition only
   return 'rgba(255,255,255,0.06)' // gray - neither
 }
 
@@ -132,7 +132,7 @@ export default function NutritionWorkoutCorrelation() {
       <div className="flex flex-wrap gap-3 text-xs text-white/40">
         <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: '#22c55e' }} />Ambos</span>
         <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: '#f59e0b' }} />Só treino</span>
-        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: '#3b82f6' }} />Só nutrição</span>
+        <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm inline-block" style={{ background: '#fbbf24' }} />Só nutrição</span>
       </div>
 
       {/* Stats */}

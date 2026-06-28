@@ -241,15 +241,15 @@ function NutritionEntryCard({
             <>
               {/* Macro stacked bar */}
               <div className="mt-3 h-2.5 rounded-full overflow-hidden flex bg-neutral-800">
-                {proteinPct > 0 && <div className="h-full" style={{ width: `${proteinPct}%`, backgroundColor: '#3b82f6' }} />}
+                {proteinPct > 0 && <div className="h-full" style={{ width: `${proteinPct}%`, backgroundColor: '#f59e0b' }} />}
                 {carbsPct > 0 && <div className="h-full" style={{ width: `${carbsPct}%`, backgroundColor: '#facc15' }} />}
                 {fatPct > 0 && <div className="h-full" style={{ width: `${fatPct}%`, backgroundColor: '#ef4444' }} />}
               </div>
 
               {/* Macro details */}
               <div className="mt-3 grid grid-cols-3 gap-3">
-                <div className="rounded-xl bg-blue-500/8 border border-blue-500/15 p-3">
-                  <div className="text-[10px] uppercase tracking-wider text-blue-400/70 font-bold">Proteína</div>
+                <div className="rounded-xl bg-amber-500/8 border border-amber-500/15 p-3">
+                  <div className="text-[10px] uppercase tracking-wider text-amber-400/70 font-bold">Proteína</div>
                   <div className="mt-1 text-base font-bold text-white">{Math.round(item.protein)}g</div>
                   <div className="text-[10px] text-neutral-400">{proteinPct}%</div>
                 </div>

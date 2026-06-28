@@ -58,7 +58,7 @@ export const CardioFields: React.FC<CardioFieldsProps> = ({
                         aria-label="Tempo em minutos do exercício de cardio"
                         value={exercise.reps ? String(exercise.reps) : ''}
                         onChange={(e) => onUpdateExercise('reps', e.target.value)}
-                        className="w-full bg-neutral-900 rounded-xl p-4 text-center text-xl font-bold text-white outline-none focus:ring-1 ring-blue-500 border border-neutral-700"
+                        className="w-full bg-neutral-900 rounded-xl p-4 text-center text-xl font-bold text-white outline-none focus:ring-1 ring-yellow-500 border border-neutral-700"
                         placeholder={isBikeOutdoor ? 'Livre' : '30'}
                     />
                 </div>

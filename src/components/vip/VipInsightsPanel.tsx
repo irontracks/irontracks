@@ -158,11 +158,11 @@ export default function VipInsightsPanel(props: { onOpenReport?: (session: unkno
   }
 
   return (
-    <div className="rounded-2xl p-[1px]" style={{ background: 'linear-gradient(135deg, rgba(139,92,246,0.2) 0%, rgba(255,255,255,0.03) 50%, rgba(139,92,246,0.08) 100%)' }}>
+    <div className="rounded-2xl p-[1px]" style={{ background: 'linear-gradient(135deg, rgba(245,158,11,0.2) 0%, rgba(255,255,255,0.03) 50%, rgba(245,158,11,0.08) 100%)' }}>
       <div className="rounded-[15px] p-4" style={{ background: 'rgba(12,12,12,0.99)' }}>
       <div className="flex items-center justify-between gap-3">
         <div className="min-w-0">
-          <div className="text-[10px] font-black uppercase tracking-widest" style={{ color: '#a78bfa' }}>Insights</div>
+          <div className="text-[10px] font-black uppercase tracking-widest" style={{ color: '#fbbf24' }}>Insights</div>
           <div className="text-white font-black text-sm">Pós-treino e progressão</div>
         </div>
         <div className="flex items-center gap-2">
@@ -220,14 +220,14 @@ export default function VipInsightsPanel(props: { onOpenReport?: (session: unkno
               key={r.id}
               className="rounded-xl px-3 py-3 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 transition-all"
               style={r.hasAi
-                ? { background: 'rgba(139,92,246,0.04)', border: '1px solid rgba(139,92,246,0.15)' }
+                ? { background: 'rgba(245,158,11,0.04)', border: '1px solid rgba(245,158,11,0.15)' }
                 : { background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }
               }
             >
               <div className="min-w-0 flex items-center gap-2">
                 {r.hasAi && (
-                  <div className="shrink-0 w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: 'rgba(139,92,246,0.15)', border: '1px solid rgba(139,92,246,0.25)' }}>
-                    <Sparkles size={12} className="text-purple-400" />
+                  <div className="shrink-0 w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: 'rgba(245,158,11,0.15)', border: '1px solid rgba(245,158,11,0.25)' }}>
+                    <Sparkles size={12} className="text-amber-400" />
                   </div>
                 )}
                 <div className="min-w-0">
@@ -240,8 +240,8 @@ export default function VipInsightsPanel(props: { onOpenReport?: (session: unkno
                   <button
                     type="button"
                     onClick={() => openReport(r.id)}
-                    className="inline-flex items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-xs font-black text-purple-300 hover:text-purple-200 transition-all active:scale-95"
-                    style={{ background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.2)' }}
+                    className="inline-flex items-center justify-center gap-1.5 rounded-xl px-3 py-2 text-xs font-black text-amber-300 hover:text-amber-200 transition-all active:scale-95"
+                    style={{ background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)' }}
                   >
                     <FileText size={14} />
                     Ver relatório

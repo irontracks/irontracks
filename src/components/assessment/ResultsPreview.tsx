@@ -120,18 +120,18 @@ export default function ResultsPreview({ formData, onBack: _onBack, studentName 
     switch (classification.toLowerCase()) {
       case 'baixo':
       case 'underweight':
-        return 'text-blue-600';
+        return 'text-amber-400';
       case 'normal':
       case 'ideal':
-        return 'text-green-600';
+        return 'text-emerald-400';
       case 'sobrepeso':
       case 'overweight':
-        return 'text-yellow-600';
+        return 'text-amber-400';
       case 'obesidade':
       case 'obesity':
-        return 'text-red-600';
+        return 'text-red-400';
       default:
-        return 'text-gray-600';
+        return 'text-neutral-300';
     }
   };
 
