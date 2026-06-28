@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { createClient } from '@/utils/supabase/server'
+import { requireRole } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { parseJsonBody } from '@/utils/zod'
 import { getErrorMessage } from '@/utils/errorMessage'
@@ -25,9 +25,9 @@ const PatchSchema = z.object({
 
 export async function PUT(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
+    const auth = await requireRole(['teacher', 'admin'])
+    if (!auth.ok) return auth.response
+    const user = auth.user
 
     const { id } = await params
     const parsed = await parseJsonBody(req, PatchSchema)
@@ -53,9 +53,9 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
 export async function DELETE(req: Request, { params }: { params: Promise<{ id: string }> }) {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
+    const auth = await requireRole(['teacher', 'admin'])
+    if (!auth.ok) return auth.response
+    const user = auth.user
 
     const { id } = await params
     const admin = createAdminClient()

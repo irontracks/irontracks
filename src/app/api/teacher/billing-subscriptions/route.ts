@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { createClient } from '@/utils/supabase/server'
+import { requireRole } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { parseJsonBody } from '@/utils/zod'
 import { getErrorMessage } from '@/utils/errorMessage'
@@ -11,9 +11,9 @@ export const dynamic = 'force-dynamic'
 // GET — list all student subscriptions for the teacher
 export async function GET() {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
+    const auth = await requireRole(['teacher', 'admin'])
+    if (!auth.ok) return auth.response
+    const user = auth.user
 
     const admin = createAdminClient()
     const { data, error } = await admin
@@ -60,9 +60,9 @@ const AssignSchema = z.object({
 
 export async function POST(req: Request) {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
+    const auth = await requireRole(['teacher', 'admin'])
+    if (!auth.ok) return auth.response
+    const user = auth.user
 
     const parsed = await parseJsonBody(req, AssignSchema)
     if (parsed.response) return parsed.response
@@ -79,6 +79,17 @@ export async function POST(req: Request) {
       .eq('is_active', true)
       .maybeSingle()
     if (!plan) return NextResponse.json({ ok: false, error: 'plano_nao_encontrado' }, { status: 404 })
+
+    // Valida vínculo: o aluno alvo precisa ser realmente aluno deste professor.
+    // Sem isto, um professor poderia criar assinatura/cobrança 'pending' pra QUALQUER
+    // usuário do sistema (spam de cobrança). Auditoria 2026-06-28 (R2).
+    const { data: link } = await admin
+      .from('students')
+      .select('id')
+      .eq('user_id', student_user_id)
+      .eq('teacher_id', user.id)
+      .maybeSingle()
+    if (!link) return NextResponse.json({ ok: false, error: 'aluno_nao_vinculado' }, { status: 403 })
 
     // Upsert subscription (replace any existing pending one)
     const now = new Date()

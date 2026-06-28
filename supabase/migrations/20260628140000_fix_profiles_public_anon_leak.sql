@@ -1,0 +1,24 @@
+-- 2ª auditoria de segurança (2026-06-28), M-2 — vazamento de PII a anônimos.
+--
+-- A migration 20260627150000 criou a view SECURITY DEFINER public.profiles_public
+-- e fez `REVOKE ALL ... FROM PUBLIC` + `GRANT SELECT TO authenticated`. Porém o
+-- schema public tem um DEFAULT PRIVILEGE (pg_default_acl) que auto-concede tudo ao
+-- role `anon` em QUALQUER objeto novo — e `REVOKE FROM PUBLIC` NÃO revoga de um role
+-- nomeado (anon ≠ PUBLIC). Resultado: `anon` (não autenticado) conseguia ler a base
+-- inteira de perfis via anon key pública, incluindo `role=admin` dos admins —
+-- enumeração total + alvo de admins pra phishing.
+--
+-- Como a view é SECURITY DEFINER ela NÃO tem RLS própria; o GRANT table-level é a
+-- decisão de acesso inteira. Correção: revogar explicitamente de `anon`. O app só lê
+-- profiles_public pós-login (role authenticated), então anon não precisa de acesso.
+--
+-- Verificado no banco vivo (enbueukmvgodngydkpzm): antes -> anon via 46 perfis (2 admins);
+-- depois -> has_table_privilege('anon', ...,'SELECT') = false; authenticated mantém SELECT.
+--
+-- Convenção a seguir daqui pra frente: TODA view nova em public deve fazer
+-- `REVOKE ALL ON <view> FROM anon` (o default privilege do schema concede a anon
+-- automaticamente, e views não têm RLS pra conter isso).
+--
+-- Rollback (reabre o vazamento — NÃO recomendado): GRANT SELECT ON public.profiles_public TO anon;
+
+REVOKE ALL ON public.profiles_public FROM anon;

@@ -15,6 +15,7 @@ import { generateReply, fetchUserContext } from '@/lib/whatsapp/conversation'
 import type { ConversationTurn } from '@/lib/whatsapp/conversation'
 import { env } from '@/utils/env'
 import { parseJsonBody } from '@/utils/zod'
+import { cacheSetNx } from '@/utils/cache'
 
 export const dynamic = 'force-dynamic'
 
@@ -89,6 +90,16 @@ export async function POST(req: Request) {
 
     const phoneOptions = brPhoneCandidates(String(body.phone ?? ''))
     if (phoneOptions.length === 0 || !text) return NextResponse.json({ ok: true })
+
+    // Replay/idempotência: Z-API pode reentregar a mesma mensagem (retries de webhook).
+    // Sem dedupe, cada reentrega gera uma nova resposta de IA — custo Gemini duplicado
+    // e mensagem repetida pro usuário. Janela curta por messageId. Se o id não vier,
+    // segue (fail-open, pra não engolir mensagem legítima). Auditoria 2026-06-28 (R2).
+    const messageId = String(body.messageId ?? body.id ?? '').trim()
+    if (messageId) {
+      const isNew = await cacheSetNx(`webhook:whatsapp:msg:${messageId}`, '1', 600)
+      if (!isNew) return NextResponse.json({ ok: true, deduped: true })
+    }
 
     const phone = phoneOptions[0] // canonical phone for sending the reply
 
