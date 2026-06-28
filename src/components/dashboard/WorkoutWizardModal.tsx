@@ -407,18 +407,18 @@ export default function WorkoutWizardModal(props: Props) {
                 onClick={() => setShowVoice(true)}
                 className="group w-full text-left rounded-xl p-4 border transition-all active:scale-[0.97]"
                 style={{
-                  background: 'linear-gradient(135deg, rgba(59,130,246,0.08) 0%, rgba(59,130,246,0.02) 100%)',
-                  border: '1px solid rgba(59,130,246,0.3)',
-                  boxShadow: '0 0 20px rgba(59,130,246,0.06)',
+                  background: 'linear-gradient(135deg, rgba(245,158,11,0.08) 0%, rgba(245,158,11,0.02) 100%)',
+                  border: '1px solid rgba(245,158,11,0.3)',
+                  boxShadow: '0 0 20px rgba(245,158,11,0.06)',
                 }}
               >
                 <div className="flex items-center gap-3">
-                  <span className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(59,130,246,0.15)' }}>
-                    <Mic size={20} className="text-blue-400" />
+                  <span className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(245,158,11,0.15)' }}>
+                    <Mic size={20} className="text-amber-400" />
                   </span>
                   <div>
-                    <div className="font-black text-sm text-blue-400">Por Voz</div>
-                    <div className="text-[11px] text-blue-600/80 mt-0.5">Dite os exercícios e a IA transcreve e estrutura automaticamente.</div>
+                    <div className="font-black text-sm text-amber-400">Por Voz</div>
+                    <div className="text-[11px] text-neutral-400 mt-0.5">Dite os exercícios e a IA transcreve e estrutura automaticamente.</div>
                   </div>
                 </div>
               </button>

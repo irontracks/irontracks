@@ -499,7 +499,7 @@ export default function ProgressPhotos({ onClose }: ProgressPhotosProps) {
                   className={[
                     'relative aspect-[3/4] rounded-2xl overflow-hidden bg-neutral-900 transition-all cursor-pointer text-left',
                     isSelectedA ? 'ring-2 ring-yellow-500 scale-[0.97]' : '',
-                    isSelectedB ? 'ring-2 ring-blue-400 scale-[0.97]' : '',
+                    isSelectedB ? 'ring-2 ring-amber-400 scale-[0.97]' : '',
                     compareMode && !isSelected ? 'opacity-70' : '',
                   ].join(' ')}
                   onClick={() => {
@@ -529,7 +529,7 @@ export default function ProgressPhotos({ onClose }: ProgressPhotosProps) {
                   {isSelected && (
                     <div className={[
                       'absolute top-2 left-2 w-6 h-6 rounded-full flex items-center justify-center text-[10px] font-black',
-                      isSelectedA ? 'bg-yellow-500 text-black' : 'bg-blue-500 text-white',
+                      isSelectedA ? 'bg-yellow-500 text-black' : 'bg-amber-400 text-black',
                     ].join(' ')}>
                       {isSelectedA ? 'A' : 'B'}
                     </div>

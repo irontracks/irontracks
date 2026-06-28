@@ -49,7 +49,7 @@ export default function WaterTracker({
           </div>
         </div>
         <div className="text-right">
-          <div className={`text-sm font-bold tabular-nums ${pct >= 100 ? 'text-blue-400' : 'text-neutral-400'}`}>
+          <div className={`text-sm font-bold tabular-nums ${pct >= 100 ? 'text-amber-400' : 'text-neutral-400'}`}>
             {pct}%
           </div>
           <div className="text-[10px] text-neutral-600">{glasses} copos</div>
@@ -62,7 +62,7 @@ export default function WaterTracker({
           className="h-full rounded-full transition-all duration-500 ease-out"
           style={{
             width: `${pct}%`,
-            backgroundColor: pct >= 100 ? '#3b82f6' : pct >= 50 ? '#60a5fa' : '#93c5fd',
+            backgroundColor: pct >= 100 ? '#f59e0b' : pct >= 50 ? '#fbbf24' : '#fcd34d',
           }}
         />
       </div>
@@ -75,7 +75,7 @@ export default function WaterTracker({
             type="button"
             onClick={() => addWater(ml)}
             disabled={busy}
-            className="flex-1 h-9 rounded-xl bg-blue-500/10 border border-blue-500/20 text-xs font-semibold text-blue-300 hover:bg-blue-500/20 active:scale-95 transition disabled:opacity-50"
+            className="flex-1 h-9 rounded-xl bg-amber-500/10 border border-amber-500/20 text-xs font-semibold text-amber-300 hover:bg-amber-500/20 active:scale-95 transition disabled:opacity-50"
           >
             +{ml}ml
           </button>

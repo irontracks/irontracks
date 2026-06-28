@@ -111,10 +111,10 @@ export default function VipWeeklySummaryCard() {
             </div>
 
             {/* PRs */}
-            <div className="rounded-xl p-3" style={{ background: prsCount > 0 ? 'rgba(139,92,246,0.08)' : 'rgba(255,255,255,0.03)', border: `1px solid ${prsCount > 0 ? 'rgba(139,92,246,0.2)' : 'rgba(255,255,255,0.06)'}` }}>
+            <div className="rounded-xl p-3" style={{ background: prsCount > 0 ? 'rgba(245,158,11,0.08)' : 'rgba(255,255,255,0.03)', border: `1px solid ${prsCount > 0 ? 'rgba(245,158,11,0.2)' : 'rgba(255,255,255,0.06)'}` }}>
               <div className="flex items-center gap-1.5 mb-1">
-                <Trophy size={14} className={prsCount > 0 ? 'text-purple-400' : 'text-neutral-600'} />
-                <span className="text-[9px] font-black uppercase tracking-widest text-purple-500">Recordes</span>
+                <Trophy size={14} className={prsCount > 0 ? 'text-amber-400' : 'text-neutral-600'} />
+                <span className="text-[9px] font-black uppercase tracking-widest text-amber-500">Recordes</span>
               </div>
               <div className="text-xl font-black text-white">{prsCount}</div>
               <div className="text-[10px] text-neutral-500">PR{prsCount !== 1 ? 's' : ''} esta semana</div>
@@ -134,10 +134,10 @@ export default function VipWeeklySummaryCard() {
 
             {/* Sono */}
             {checkins?.sleep != null && (
-              <div className="rounded-xl p-3" style={{ background: 'rgba(99,102,241,0.06)', border: '1px solid rgba(99,102,241,0.12)' }}>
+              <div className="rounded-xl p-3" style={{ background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.12)' }}>
                 <div className="flex items-center gap-1.5 mb-1">
-                  <Moon size={14} className="text-indigo-400" />
-                  <span className="text-[9px] font-black uppercase tracking-widest text-indigo-500">Sono</span>
+                  <Moon size={14} className="text-amber-400" />
+                  <span className="text-[9px] font-black uppercase tracking-widest text-amber-500">Sono</span>
                 </div>
                 <div className="text-xl font-black text-white">{Math.round(checkins.sleep * 10) / 10}</div>
                 <div className="text-[10px] text-neutral-500">média</div>

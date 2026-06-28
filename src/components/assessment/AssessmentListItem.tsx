@@ -209,7 +209,7 @@ export function AssessmentListItem({
             </div>
             <div className="shrink-0 flex items-center gap-2 flex-wrap justify-end">
               {isBiaOnly && (
-                <span className="px-2.5 py-1 bg-blue-500/15 text-blue-300 text-xs rounded-full border border-blue-500/30 font-bold">
+                <span className="px-2.5 py-1 bg-amber-500/15 text-amber-300 text-xs rounded-full border border-amber-500/30 font-bold">
                   Bioimpedância
                 </span>
               )}

@@ -135,7 +135,7 @@ export default function MotivationalPushCard({
       ? 'from-yellow-950/40 to-amber-950/30 border-yellow-500/20'
       : msg.type === 'streak'
         ? 'from-orange-950/40 to-amber-950/30 border-orange-500/20'
-        : 'from-violet-950/40 to-blue-950/30 border-violet-500/20'
+        : 'from-amber-950/40 to-amber-900/30 border-amber-500/20'
 
   return (
     <div
