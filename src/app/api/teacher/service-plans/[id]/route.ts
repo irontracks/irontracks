@@ -4,6 +4,7 @@ import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { parseJsonBody } from '@/utils/zod'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { respondDbError } from '@/utils/api/dbError'
 
 export const dynamic = 'force-dynamic'
 
@@ -42,7 +43,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
       .select()
       .single()
 
-    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+    if (error) return respondDbError('teacher:service_plan:update', error)
     if (!data) return NextResponse.json({ ok: false, error: 'not_found' }, { status: 404 })
     return NextResponse.json({ ok: true, plan: data })
   } catch (e: unknown) {
@@ -66,7 +67,7 @@ export async function DELETE(req: Request, { params }: { params: Promise<{ id: s
       .eq('id', id)
       .eq('teacher_user_id', user.id)
 
-    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+    if (error) return respondDbError('teacher:service_plan:delete', error)
     return NextResponse.json({ ok: true })
   } catch (e: unknown) {
     return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })

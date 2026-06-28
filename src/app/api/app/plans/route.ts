@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { respondDbError } from '@/utils/api/dbError'
 import { cacheGet, cacheSet } from '@/utils/cache'
 
 export const dynamic = 'force-dynamic'
@@ -18,7 +19,7 @@ export async function GET() {
       .eq('status', 'active')
       .order('sort_order', { ascending: true })
 
-    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+    if (error) return respondDbError('app:plans:list', error)
     const payload = { ok: true, plans: data || [] }
     await cacheSet(cacheKey, payload, 120)
     return NextResponse.json(payload)
