@@ -18,6 +18,7 @@ import type { AiPlanEntry } from '@/hooks/useAssessmentHistoryData'
 import { combinedBodyFat } from '@/utils/calculations/bodyComposition'
 import { resolveBodyFatFromPair } from '@/utils/calculations/assessmentPairing'
 import { FileText, ImageIcon } from 'lucide-react'
+import { getBiaSignedUrl } from '@/utils/storage/biaAttachmentUpload'
 
 const AssessmentPDFGenerator = dynamic(() => import('@/components/assessment/AssessmentPDFGenerator'), { ssr: false })
 const BodyMeasurementMap = dynamic(() => import('@/components/assessment/BodyMeasurementMap'), { ssr: false })
@@ -168,6 +169,18 @@ export function AssessmentListItem({
   setPlanAnchorRef,
 }: AssessmentListItemProps) {
   const assessmentId = String(assessment?.id ?? idx)
+  // Anexo BIA vive em bucket PRIVADO — abrir = mintar signed URL curta.
+  const [biaOpening, setBiaOpening] = React.useState(false)
+  const openBiaAttachment = async (p: string) => {
+    if (!p || biaOpening) return
+    setBiaOpening(true)
+    try {
+      const url = await getBiaSignedUrl(p)
+      if (url) window.open(url, '_blank', 'noopener,noreferrer')
+    } finally {
+      setBiaOpening(false)
+    }
+  }
   const photos = Array.isArray(assessment?.photos) ? assessment.photos : []
   const ageLabel = String(assessment?.age ?? '-')
   // Discriminação BIA-only vs full + sinal de pareamento. O hook
@@ -429,11 +442,11 @@ export function AssessmentListItem({
             return (
               <div className="mb-4">
                 <h4 className="font-bold text-white mb-2 text-sm">Comprovante da Bioimpedância</h4>
-                <a
-                  href={attachment}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="flex items-center gap-3 rounded-xl p-3 border transition-all hover:border-emerald-500/40"
+                <button
+                  type="button"
+                  onClick={() => openBiaAttachment(attachment)}
+                  disabled={biaOpening}
+                  className="w-full text-left flex items-center gap-3 rounded-xl p-3 border transition-all hover:border-emerald-500/40 disabled:opacity-60"
                   style={{
                     background: 'rgba(34,197,94,0.06)',
                     borderColor: 'rgba(34,197,94,0.25)',
@@ -453,14 +466,14 @@ export function AssessmentListItem({
                   </div>
                   <div className="flex-1 min-w-0">
                     <p className="text-sm font-bold text-white">
-                      {isPdf ? 'Abrir PDF' : isImage ? 'Abrir foto' : 'Abrir arquivo'}
+                      {biaOpening ? 'Abrindo…' : isPdf ? 'Abrir PDF' : isImage ? 'Abrir foto' : 'Abrir arquivo'}
                     </p>
                     <p className="text-[11px] text-emerald-300 mt-0.5">
                       {fromPair ? 'do registro de bioimpedância linkado' : 'do registro atual'}
                     </p>
                   </div>
                   <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wide">↗</span>
-                </a>
+                </button>
               </div>
             );
           })()}

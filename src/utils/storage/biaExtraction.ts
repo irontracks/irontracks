@@ -46,15 +46,15 @@ export type BiaExtractionResponse = BiaExtractionResult | BiaExtractionFailure
  * input vazio para o usuário preencher".
  */
 export async function extractBiaFromAttachment(
-  attachmentUrl: string,
+  attachmentPath: string,
 ): Promise<BiaExtractionResponse> {
-  if (!attachmentUrl) return { ok: false, error: 'no_url' }
+  if (!attachmentPath) return { ok: false, error: 'no_path' }
 
   try {
     const res = await fetch('/api/ai/bia-extract', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url: attachmentUrl }),
+      body: JSON.stringify({ path: attachmentPath }),
     })
 
     const json = await res.json().catch(() => null) as
