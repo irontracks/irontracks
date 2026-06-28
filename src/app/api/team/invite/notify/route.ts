@@ -52,6 +52,22 @@ export async function POST(req: Request) {
 
     const admin = createAdminClient()
 
+    // Validação prometida no docstring (#2): só dispara o push se existir um
+    // convite PENDENTE real deste sender para o targetUserId. Antes, qualquer
+    // autenticado disparava "Convite de treino" (com o próprio nome real) para
+    // qualquer user_id — spam/phishing direcionado (auditoria 2026-06-27).
+    let inviteQuery = admin
+      .from('invites')
+      .select('id')
+      .eq('from_uid', senderId)
+      .eq('to_uid', targetUserId)
+      .eq('status', 'pending')
+    if (sessionId) inviteQuery = inviteQuery.eq('team_session_id', sessionId)
+    const { data: invite } = await inviteQuery.maybeSingle()
+    if (!invite?.id) {
+      return NextResponse.json({ ok: false, error: 'invite_not_found' }, { status: 404 })
+    }
+
     // Fetch the sender's display name for the push body
     const { data: me } = await admin
       .from('profiles')
