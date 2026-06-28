@@ -98,7 +98,7 @@ export async function GET() {
   const supabase = auth.supabase
   const user = auth.user
 
-  const access = await checkVipFeatureAccess(supabase, user.id, 'analytics')
+  const access = await checkVipFeatureAccess(supabase, user.id, 'analytics', { meter: true })
   if (!access.allowed) {
     return NextResponse.json({ ok: false, error: 'vip_required', upgradeRequired: true }, { status: 403 })
   }
