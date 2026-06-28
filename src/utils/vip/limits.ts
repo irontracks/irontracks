@@ -294,12 +294,23 @@ async function fetchPlanLimits(supabase: SupabaseClient, planId: string): Promis
 }
 
 
+// Teto diário ANTI-ABUSO (não é product tier) para features booleanas que disparam
+// Gemini. Generoso o bastante pra nunca afetar VIP legítimo; barra custo descontrolado
+// (sem isto, dava pra estourar chamadas pagas dentro da janela de rate-limit). Admin/
+// teacher (source='role') são isentos. Auditoria 2026-06-28 (R2 — VIP boolean metering).
+const BOOLEAN_DAILY_CEILING: Partial<Record<keyof VipTierLimits, number>> = {
+  lab_exams: 50,
+  nutrition_macros: 200,
+  analytics: 150,
+}
+
 export async function checkVipFeatureAccess(
-  supabase: SupabaseClient, 
-  userId: string, 
-  feature: keyof VipTierLimits
+  supabase: SupabaseClient,
+  userId: string,
+  feature: keyof VipTierLimits,
+  opts?: { meter?: boolean }
 ): Promise<{ allowed: boolean, currentUsage: number, limit: number | null, tier: string }> {
-  const { tier, limits } = await getVipPlanLimits(supabase, userId)
+  const { tier, limits, source } = await getVipPlanLimits(supabase, userId)
   const normalizedTier = normalizePlanId(tier)
 
   // Fix #7: Check limits object first (respects limits_override from admin)
@@ -308,7 +319,32 @@ export async function checkVipFeatureAccess(
 
   // Boolean features — respect the limits object (includes overrides)
   if (typeof limit === 'boolean') {
-    return { allowed: limit, currentUsage: 0, limit: limit ? 1 : 0, tier }
+    if (!limit) return { allowed: false, currentUsage: 0, limit: 0, tier }
+
+    // Teto anti-abuso só pra features que custam Gemini; admin/teacher (source='role')
+    // são isentos (unlimited de verdade). Sem teto (ex.: offline) → acesso direto.
+    const ceiling = source === 'role' ? undefined : BOOLEAN_DAILY_CEILING[feature]
+    if (!ceiling) return { allowed: true, currentUsage: 0, limit: 1, tier }
+
+    const today = new Date().toISOString().split('T')[0]
+    if (opts?.meter) {
+      // Consumo real: incrementa atômico (mesmo RPC do M-1) e bloqueia se passar do teto.
+      const { data: newCount } = await supabase.rpc('increment_vip_usage_daily', {
+        p_user_id: userId, p_feature_key: feature, p_day: today,
+      })
+      const c = Number(newCount || 0)
+      return { allowed: c <= ceiling, currentUsage: c, limit: ceiling, tier }
+    }
+    // Checagem de display (não consome): só lê a contagem do dia.
+    const { data: usage } = await supabase
+      .from('vip_usage_daily')
+      .select('usage_count')
+      .eq('user_id', userId)
+      .eq('feature_key', feature)
+      .eq('day', today)
+      .maybeSingle()
+    const c = usage?.usage_count || 0
+    return { allowed: c < ceiling, currentUsage: c, limit: ceiling, tier }
   }
 
   // Null means unlimited

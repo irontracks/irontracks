@@ -43,7 +43,7 @@ export async function POST(request: Request) {
     if (!rl.allowed) return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 })
 
     // Gate VIP: feature pro+ (admin/teacher têm acesso ilimitado via role).
-    const access = await checkVipFeatureAccess(auth.supabase, userId, 'lab_exams')
+    const access = await checkVipFeatureAccess(auth.supabase, userId, 'lab_exams', { meter: true })
     if (!access.allowed) {
       return NextResponse.json(
         { ok: false, error: 'vip_required', message: 'A análise de exames é exclusiva para assinantes VIP. Se você já assina, tente sair e entrar novamente.' },
