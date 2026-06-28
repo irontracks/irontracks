@@ -26,6 +26,10 @@ CREATE OR REPLACE FUNCTION public.current_user_teaches(student_uid uuid) RETURNS
 
 GRANT EXECUTE ON FUNCTION public.current_user_is_admin() TO authenticated;
 GRANT EXECUTE ON FUNCTION public.current_user_teaches(uuid) TO authenticated;
+-- Só authenticated avalia as policies (TO authenticated); anon não precisa chamar
+-- estes helpers SECURITY DEFINER (advisor: *_security_definer_function_executable).
+REVOKE EXECUTE ON FUNCTION public.current_user_is_admin() FROM anon, public;
+REVOKE EXECUTE ON FUNCTION public.current_user_teaches(uuid) FROM anon, public;
 
 ALTER POLICY profiles_admin_all ON public.profiles
   USING (public.current_user_is_admin()) WITH CHECK (public.current_user_is_admin());
