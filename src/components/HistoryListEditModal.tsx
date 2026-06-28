@@ -96,9 +96,10 @@ export function HistoryListEditModal({
                             <input
                                 aria-label="Duração (min)"
                                 type="number"
+                                inputMode="numeric"
                                 value={editDuration}
                                 onChange={(e) => setEditDuration(e.target.value)}
-                                className="w-full rounded-xl p-3 text-white outline-none border focus:border-yellow-500/40 transition-all"
+                                className="w-full rounded-xl p-3 text-base text-white outline-none border focus:border-yellow-500/40 transition-all"
                                 style={{ background: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.08)' }}
                             />
                         </div>
@@ -139,18 +140,20 @@ export function HistoryListEditModal({
                                         <input
                                             aria-label="Sets"
                                             type="number"
+                                            inputMode="numeric"
                                             value={ex.sets}
                                             onChange={(e) => updateEditExercise(idx, 'sets', e.target.value)}
-                                            className="w-full bg-neutral-900 rounded p-2 text-center text-sm"
+                                            className="w-full bg-neutral-900 rounded p-2 text-center text-base"
                                         />
                                     </div>
                                     <div>
                                         <div className="text-[10px] text-neutral-400">Reps</div>
                                         <input
                                             aria-label="Reps"
+                                            inputMode="numeric"
                                             value={ex.reps || ''}
                                             onChange={(e) => updateEditExercise(idx, 'reps', e.target.value)}
-                                            className="w-full bg-neutral-900 rounded p-2 text-center text-sm"
+                                            className="w-full bg-neutral-900 rounded p-2 text-center text-base"
                                         />
                                     </div>
                                     <div>
@@ -167,9 +170,10 @@ export function HistoryListEditModal({
                                         <input
                                             aria-label="Descanso (s)"
                                             type="number"
+                                            inputMode="numeric"
                                             value={ex.restTime || 0}
                                             onChange={(e) => updateEditExercise(idx, 'restTime', e.target.value)}
-                                            className="w-full bg-neutral-900 rounded p-2 text-center text-sm"
+                                            className="w-full bg-neutral-900 rounded p-2 text-center text-base"
                                         />
                                     </div>
                                 </div>
@@ -180,9 +184,10 @@ export function HistoryListEditModal({
                                             <input
                                                 key={sIdx}
                                                 aria-label={`Peso série ${sIdx + 1}`}
+                                                inputMode="decimal"
                                                 value={String(ex.weights?.[sIdx] ?? '')}
                                                 onChange={(e) => updateEditExercise(idx, 'weight', [sIdx, e.target.value])}
-                                                className="w-full bg-neutral-900 rounded p-2 text-center text-sm"
+                                                className="w-full bg-neutral-900 rounded p-2 text-center text-base"
                                                 placeholder={`#${sIdx + 1}`}
                                             />
                                         ))}
@@ -195,9 +200,10 @@ export function HistoryListEditModal({
                                             <input
                                                 key={sIdx}
                                                 aria-label={`Reps série ${sIdx + 1}`}
+                                                inputMode="numeric"
                                                 value={String(ex.repsPerSet?.[sIdx] ?? '')}
                                                 onChange={(e) => updateEditExercise(idx, 'rep', [sIdx, e.target.value])}
-                                                className="w-full bg-neutral-900 rounded p-2 text-center text-sm"
+                                                className="w-full bg-neutral-900 rounded p-2 text-center text-base"
                                                 placeholder={`#${sIdx + 1}`}
                                             />
                                         ))}

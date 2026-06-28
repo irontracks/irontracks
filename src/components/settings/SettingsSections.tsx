@@ -115,7 +115,7 @@ export function SettingsProfileSection({ draft, setValue, userId, userPhotoURL, 
     ]
     return (
         <SectionCard>
-            <SectionHeader icon={User} label="Perfil" color="#3b82f6" />
+            <SectionHeader icon={User} label="Perfil" color="#f59e0b" />
             <div className="space-y-3">
                 {/* Avatar */}
                 <div className="flex items-center gap-4 pb-3 border-b border-neutral-700/60">
@@ -187,7 +187,7 @@ export function SettingsAppearanceSection({ draft, setValue }: SettingsSectionPr
     const density = String(draft?.dashboardDensity || 'comfortable')
     return (
         <SectionCard>
-            <SectionHeader icon={Palette} label="Aparência" color="#8b5cf6" />
+            <SectionHeader icon={Palette} label="Aparência" color="#fbbf24" />
             <div className="space-y-3">
                 <div className="flex items-center justify-between gap-3">
                     <div>
@@ -242,7 +242,7 @@ export function SettingsAppModeSection({ draft, setValue, setModulesModalOpen }:
     const promptPostWorkoutCheckin = Boolean(draft?.promptPostWorkoutCheckin ?? true)
     return (
         <SectionCard>
-            <SectionHeader icon={Layers} label="Modo do App" color="#06b6d4" />
+            <SectionHeader icon={Layers} label="Modo do App" color="#f59e0b" />
             <div className="space-y-3">
                 <div className="flex items-center justify-between gap-3">
                     <div>
@@ -446,7 +446,7 @@ export function SettingsTimerSection({ draft, setValue }: SettingsSectionProps) 
     const restTimerAutoStart = Boolean(draft?.restTimerAutoStart ?? false)
     return (
         <SectionCard>
-            <SectionHeader icon={Timer} label="Timer" color="#6366f1" />
+            <SectionHeader icon={Timer} label="Timer" color="#fbbf24" />
             <div className="space-y-3">
                 <div className="flex items-center justify-between gap-3">
                     <div><div className="text-sm font-bold text-white">START automático</div><div className="text-xs text-neutral-400">Inicia a próxima série ao terminar o descanso.</div></div>

@@ -145,7 +145,7 @@ const GroupMethodSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx
               <button
                 type="button"
                 onClick={() => toggleNotes(key)} aria-label="Observações"
-                className={isNotesOpen || hasAnyNote ? 'shrink-0 inline-flex items-center justify-center rounded-lg p-1.5 text-yellow-500 bg-yellow-500/10 border border-yellow-500/40' : 'shrink-0 inline-flex items-center justify-center rounded-lg p-1.5 text-neutral-400 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'}
+                className={isNotesOpen || hasAnyNote ? 'shrink-0 h-9 w-9 inline-flex items-center justify-center rounded-lg text-yellow-500 bg-yellow-500/10 border border-yellow-500/40' : 'shrink-0 h-9 w-9 inline-flex items-center justify-center rounded-lg text-neutral-400 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'}
               >
                 <MessageSquare size={12} />
               </button>
@@ -153,7 +153,7 @@ const GroupMethodSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx
                 type="button"
                 title={GROUP_METHOD_INFO[effectiveMethod] ?? effectiveMethod}
                 onClick={() => setGroupMethodModal({ key, method: effectiveMethod, weight: weightValue, reps: repsValue, rpe: rpeValue, info: GROUP_METHOD_INFO[effectiveMethod] ?? '', error: '' })}
-                className="shrink-0 inline-flex items-center justify-center rounded-lg p-1.5 text-neutral-400 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200"
+                className="shrink-0 h-9 w-9 inline-flex items-center justify-center rounded-lg text-neutral-400 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200"
               >
                 <Pencil size={12} />
               </button>

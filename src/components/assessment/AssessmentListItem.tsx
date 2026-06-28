@@ -223,7 +223,7 @@ export function AssessmentListItem({
               )}
               {hasAttachment && (
                 <span
-                  className="px-2.5 py-1 bg-cyan-500/15 text-cyan-300 text-xs rounded-full border border-cyan-500/30 font-bold inline-flex items-center gap-1"
+                  className="px-2.5 py-1 bg-neutral-700/40 text-neutral-300 text-xs rounded-full border border-neutral-600/40 font-bold inline-flex items-center gap-1"
                   title="Tem anexo (PDF ou foto) da bioimpedância"
                 >
                   📎 Comprovante
