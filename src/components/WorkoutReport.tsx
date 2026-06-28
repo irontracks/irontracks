@@ -9,6 +9,7 @@ import { fetchMuscleMapAssets } from '@/utils/report/fetchMuscleMapAssets';
 import { workoutPlanHtml } from '@/utils/report/templates';
 import { generatePostWorkoutInsights, applyProgressionToNextTemplate } from '@/actions/workout-actions';
 import { useVipCredits } from '@/hooks/useVipCredits';
+import { useBackHandler } from '@/hooks/useBackHandler';
 import { FEATURE_KEYS, isFeatureEnabled } from '@/utils/featureFlags';
 import { logError } from '@/lib/logger'
 import { getErrorMessage } from '@/utils/errorMessage'
@@ -144,6 +145,9 @@ const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose,
     const getCurrentDate = () => new Date().toLocaleDateString('pt-BR', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
     const _prevSessionLogs: Record<string, unknown> = effectivePreviousSession?.logs && typeof effectivePreviousSession.logs === 'object' ? (effectivePreviousSession.logs as Record<string, unknown>) : {};
+
+    // Android: botão Voltar fecha o relatório (overlay full-screen) em vez de minimizar o app.
+    useBackHandler(true, onClose);
 
     if (!session) return null;
 

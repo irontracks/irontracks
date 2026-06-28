@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { compressImage } from '@/utils/chat/media'
 import { useFocusTrap } from '@/hooks/useFocusTrap'
+import { useBackHandler } from '@/hooks/useBackHandler'
 import { Camera, Loader2, Check, X } from 'lucide-react'
 import Image from 'next/image'
 
@@ -39,6 +40,7 @@ export default function AvatarUploadModal({ isOpen, onClose, currentPhotoURL, us
     onClose()
   }, [uploading, previewUrl, onClose])
   const focusTrapRef = useFocusTrap(isOpen, handleEscape)
+  useBackHandler(isOpen, handleEscape)
 
   if (!isOpen) return null
 

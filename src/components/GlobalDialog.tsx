@@ -3,6 +3,7 @@
 import React, { useEffect, useRef, useCallback } from 'react';
 import { useDialog } from '@/contexts/DialogContext';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
+import { useBackHandler } from '@/hooks/useBackHandler';
 import { AlertCircle, HelpCircle, X, MessageSquare, CheckCircle2 } from 'lucide-react';
 
 const GlobalDialog = () => {
@@ -25,6 +26,8 @@ const GlobalDialog = () => {
 	}, [dialog?.type, handleClose]);
 
 	const focusTrapRef = useFocusTrap(isOpen, onEscape);
+	// Botão Voltar nativo do Android = cancelar (exceto 'loading', bloqueante). M11.
+	useBackHandler(isOpen && dialog?.type !== 'loading', onEscape);
 
 	useEffect(() => {
 		if (dialog?.type === 'prompt') {

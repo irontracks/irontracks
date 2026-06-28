@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
+import { useBackHandler } from '@/hooks/useBackHandler';
 
 export interface ManualExercise {
     name: string;
@@ -53,6 +54,7 @@ export function HistoryListEditModal({
 }: EditModalProps) {
     // WCAG 2.4.3 Focus Order + 2.1.2 No Keyboard Trap
     const focusTrapRef = useFocusTrap(true, onClose);
+    useBackHandler(true, onClose);
     return (
         <div
             role="button"

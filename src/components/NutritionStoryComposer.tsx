@@ -11,6 +11,7 @@ import { drawNutritionStory, type NutritionStoryContent } from '@/components/sto
 import { NUTRITION_STORY_TEMPLATES, getNutritionTemplateById } from '@/components/stories/nutritionStoryTemplates'
 import { useUserSettings } from '@/hooks/useUserSettings'
 import { createClient } from '@/utils/supabase/client'
+import { useBackHandler } from '@/hooks/useBackHandler'
 
 interface NutritionStoryComposerProps {
   open: boolean
@@ -22,6 +23,8 @@ interface NutritionStoryComposerProps {
 export default function NutritionStoryComposer({ open, mode, content, onClose }: NutritionStoryComposerProps) {
   const previewRef = useRef<HTMLDivElement>(null)
   const previewCanvasRef = useRef<HTMLCanvasElement>(null)
+
+  useBackHandler(open, onClose)
 
   // Template salvo (user_settings.preferences.nutritionStoryTemplate)
   const [userId, setUserId] = useState<string | undefined>()

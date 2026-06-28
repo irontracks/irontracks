@@ -14,6 +14,7 @@ import { getErrorMessage } from '@/utils/errorMessage'
 import { isIosNative } from '@/utils/platform'
 import { useIsIosNative } from '@/hooks/useIsIosNative'
 import { useFocusTrap } from '@/hooks/useFocusTrap'
+import { useBackHandler } from '@/hooks/useBackHandler'
 import {
   checkBiometricsAvailable,
   checkNativeNotificationPermission,
@@ -94,6 +95,7 @@ export default function SettingsModal(props: SettingsModalProps) {
   const canSeeExperimental = userRole === 'admin' || userRole === 'teacher'
   const canSave = isOpen && !saving
   const focusTrapRef = useFocusTrap(isOpen, props?.onClose)
+  useBackHandler(isOpen, () => props?.onClose?.())
 
   // ── Keyboard ESC ────────────────────────────────────────────────────────
   useEffect(() => {

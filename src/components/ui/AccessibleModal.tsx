@@ -2,6 +2,7 @@
 
 import React from 'react'
 import { useFocusTrap } from '@/hooks/useFocusTrap'
+import { useBackHandler } from '@/hooks/useBackHandler'
 
 /**
  * Accessible modal wrapper that provides:
@@ -45,6 +46,8 @@ export function AccessibleModal({
     preventBackdropClose = false,
 }: AccessibleModalProps) {
     const focusTrapRef = useFocusTrap(isOpen, onClose)
+    // Botão Voltar nativo do Android fecha o modal (consistente com o Escape acima). M11.
+    useBackHandler(isOpen, onClose)
 
     if (!isOpen) return null
 

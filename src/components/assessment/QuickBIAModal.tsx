@@ -15,6 +15,7 @@ import React, { useState } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { ArrowLeft, Activity, Save, Loader2, AlertCircle } from 'lucide-react'
 import { useAssessment } from '@/hooks/useAssessment'
+import { useBackHandler } from '@/hooks/useBackHandler'
 import { useDialog } from '@/contexts/DialogContext'
 import { logError } from '@/lib/logger'
 import BIAAttachmentInput from './BIAAttachmentInput'
@@ -84,6 +85,8 @@ export default function QuickBIAModal({
   }>({ weight_kg: null, height_cm: null, age_years: null, bmr_kcal: null })
   const { createBiaAssessment } = useAssessment()
   const { alert } = useDialog()
+
+  useBackHandler(isOpen, onClose)
 
   const handleNumberInput = (field: keyof FormState, value: string) => {
     const cleaned = value.replace(/[^0-9.,]/g, '').replace(',', '.')

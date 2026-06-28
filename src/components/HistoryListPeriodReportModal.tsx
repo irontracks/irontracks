@@ -4,6 +4,7 @@ import React from 'react';
 import { Download, Loader2 } from 'lucide-react';
 import { PeriodStats } from '@/types/workout';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
+import { useBackHandler } from '@/hooks/useBackHandler';
 
 export interface PeriodReport {
     type: 'week' | 'month';
@@ -76,6 +77,7 @@ export function HistoryListPeriodReportModal({
 }: PeriodReportModalProps) {
     // WCAG 2.4.3 Focus Order + 2.1.2 No Keyboard Trap
     const focusTrapRef = useFocusTrap(true, onClose);
+    useBackHandler(true, onClose);
     const { type, stats } = periodReport;
     const typeLabel = type === 'week' ? 'Resumo semanal' : type === 'month' ? 'Resumo mensal' : 'Resumo';
     const totalVolumeKg = Number(stats?.totalVolumeKg || 0);
