@@ -377,11 +377,11 @@ const NormalSetInner = ({
     const rowColor = done
       ? 'bg-emerald-950/30 border-emerald-500/30'
       : sideDone
-        ? 'bg-blue-950/20 border-blue-500/30'
+        ? 'bg-amber-950/20 border-amber-500/30'
         : 'bg-neutral-900/50 border-neutral-800/80';
 
     const badgeColor = side === 'L'
-      ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+      ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
       : 'bg-orange-500/20 text-orange-400 border border-orange-500/30';
 
     const btnColor = done
@@ -389,7 +389,7 @@ const NormalSetInner = ({
       : sideDone
         ? 'bg-emerald-600 text-white border border-emerald-500/50'
         : side === 'R' && lDone
-          ? 'bg-blue-600 text-white border border-blue-500/50 shadow-sm shadow-blue-900/30'
+          ? 'bg-amber-500 text-black border border-amber-500/50 shadow-sm shadow-amber-900/30'
           : 'bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700';
 
     return (
@@ -402,7 +402,7 @@ const NormalSetInner = ({
             LADO {side}
           </span>
           {sideDone && !done && (
-            <span className="text-[9px] text-blue-400/70 font-bold">✓</span>
+            <span className="text-[9px] text-amber-400/70 font-bold">✓</span>
           )}
         </div>
         {/* 4-column grid — no notes slot here; notes lives below both rows */}

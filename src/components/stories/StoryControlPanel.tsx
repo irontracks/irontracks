@@ -127,13 +127,13 @@ export function StoryControlPanel({
                     ))}
                 </div>
                 {layout === 'live' && (
-                    <div className="p-3 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-start gap-3 mt-2">
-                        <Move size={16} className="text-blue-400 mt-0.5" />
+                    <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-start gap-3 mt-2">
+                        <Move size={16} className="text-amber-400 mt-0.5" />
                         <div className="flex-1">
-                            <p className="text-xs text-blue-200 font-medium">Modo LIVE ativado</p>
-                            <p className="text-[10px] text-blue-300/70 mt-1">Arraste os elementos na pré-visualização para personalizar.</p>
+                            <p className="text-xs text-amber-200 font-medium">Modo LIVE ativado</p>
+                            <p className="text-[10px] text-amber-300/70 mt-1">Arraste os elementos na pré-visualização para personalizar.</p>
                         </div>
-                        <button onClick={onResetPositions} className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg hover:bg-blue-500/20 text-blue-300" title="Resetar posições">
+                        <button onClick={onResetPositions} className="min-h-[44px] min-w-[44px] flex items-center justify-center rounded-lg hover:bg-amber-500/20 text-amber-300" title="Resetar posições">
                             <RotateCcw size={14} />
                         </button>
                     </div>

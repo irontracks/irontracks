@@ -130,7 +130,7 @@ export default function UserProfileModal({
               {[
                 { icon: <Dumbbell size={16} className="text-yellow-500" />, value: s?.totalWorkouts || 0, label: 'Treinos' },
                 { icon: <Flame size={16} className="text-red-400" />, value: s?.streak || 0, label: 'Streak' },
-                { icon: <Calendar size={16} className="text-blue-400" />, value: s?.weeklyWorkouts || 0, label: 'Esta semana' },
+                { icon: <Calendar size={16} className="text-amber-400" />, value: s?.weeklyWorkouts || 0, label: 'Esta semana' },
               ].map((stat) => (
                 <div
                   key={stat.label}

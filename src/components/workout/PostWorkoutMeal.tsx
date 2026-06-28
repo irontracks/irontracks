@@ -125,9 +125,9 @@ export default function PostWorkoutMeal({
             <Flame size={10} className="text-red-400" />
             <span className="text-[10px] font-bold text-red-300">{meal.calories}kcal</span>
           </div>
-          <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-blue-500/10 border border-blue-500/20">
-            <Droplets size={10} className="text-blue-400" />
-            <span className="text-[10px] font-bold text-blue-300">{meal.protein}g P</span>
+          <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-amber-500/10 border border-amber-500/20">
+            <Droplets size={10} className="text-amber-400" />
+            <span className="text-[10px] font-bold text-amber-300">{meal.protein}g P</span>
           </div>
           <div className="flex items-center gap-1 px-2 py-1 rounded-lg bg-amber-500/10 border border-amber-500/20">
             <Wheat size={10} className="text-amber-400" />

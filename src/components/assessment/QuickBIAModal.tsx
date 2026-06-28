@@ -218,10 +218,10 @@ export default function QuickBIAModal({
           <div className="p-5 space-y-4">
             <div
               className="rounded-xl p-3 flex gap-2 text-xs leading-relaxed"
-              style={{ background: 'rgba(59,130,246,0.06)', border: '1px solid rgba(59,130,246,0.18)' }}
+              style={{ background: 'rgba(245,158,11,0.06)', border: '1px solid rgba(245,158,11,0.18)' }}
             >
-              <AlertCircle className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
-              <p className="text-blue-200">
+              <AlertCircle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+              <p className="text-amber-200">
                 Use a data que está no PDF do aparelho. O app cruza com a avaliação por dobras mais próxima (±14 dias) automaticamente.
               </p>
             </div>
