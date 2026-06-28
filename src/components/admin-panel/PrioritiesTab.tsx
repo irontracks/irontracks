@@ -55,9 +55,9 @@ const KIND_CONFIG: Record<string, {
     checkins_alert: {
         label: 'Alerta Check-in',
         Icon: AlertCircle,
-        bg: 'bg-blue-500/10',
-        text: 'text-blue-400',
-        border: 'border-blue-500/20',
+        bg: 'bg-amber-500/10',
+        text: 'text-amber-400',
+        border: 'border-amber-500/20',
     },
 };
 
