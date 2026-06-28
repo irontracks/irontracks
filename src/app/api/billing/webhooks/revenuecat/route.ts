@@ -14,6 +14,46 @@ import { insertNotifications } from '@/lib/social/notifyFollowers'
 import { waitUntil } from '@vercel/functions'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { logWarn } from '@/lib/logger'
+import { respondDbError } from '@/utils/api/dbError'
+
+/**
+ * Comparação constant-time (auditoria 2026-06-27, I3). `a === b` faz short-circuit
+ * no 1º byte diferente — dá pra recuperar o secret medindo latência. XOR em O(n).
+ */
+function safeEqual(a: string, b: string): boolean {
+  if (a.length !== b.length) return false
+  let mismatch = 0
+  for (let i = 0; i < a.length; i++) mismatch |= a.charCodeAt(i) ^ b.charCodeAt(i)
+  return mismatch === 0
+}
+
+/**
+ * L4: confirma direto na API da RevenueCat que o app_user_id REALMENTE tem o
+ * entitlement ativo — defesa contra forja de evento de ativação se o
+ * WEBHOOK_AUTH_KEY vazar. Retorna true (confirmado), false (API respondeu e NÃO
+ * tem) ou null (sem secret key / API indisponível → caller segue, fail-open, pra
+ * não bloquear grant legítimo num outage da RevenueCat).
+ */
+async function revenuecatHasActiveEntitlement(appUserId: string): Promise<boolean | null> {
+  const key = String(env.revenuecat.secretKey || '').trim()
+  const uid = String(appUserId || '').trim()
+  if (!key || !uid) return null
+  try {
+    const res = await fetch(`https://api.revenuecat.com/v1/subscribers/${encodeURIComponent(uid)}`, {
+      headers: { Authorization: `Bearer ${key}` },
+      redirect: 'manual',
+    })
+    if (!res.ok) return null
+    const data = (await res.json()) as { subscriber?: { entitlements?: Record<string, { expires_date?: string | null }> } }
+    const entId = String(env.revenuecat.entitlementId || 'vip')
+    const ent = data?.subscriber?.entitlements?.[entId]
+    if (!ent) return false
+    const exp = ent.expires_date ? new Date(ent.expires_date).getTime() : Infinity
+    return Number.isFinite(exp) ? exp > Date.now() : true
+  } catch {
+    return null
+  }
+}
 
 /**
  * Maps Apple/RevenueCat product identifiers to app_plans.id values.
@@ -94,7 +134,7 @@ export async function POST(request: NextRequest) {
     }
     const authHeader = request.headers.get('authorization') || ''
     const token = authHeader.replace(/^Bearer\s+/i, '').trim()
-    if (token !== WEBHOOK_AUTH_KEY) {
+    if (!safeEqual(token, WEBHOOK_AUTH_KEY)) {
       return NextResponse.json(
         { ok: false, error: 'unauthorized' },
         { status: 401 },
@@ -154,6 +194,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ ok: true, skipped: true })
     }
 
+    // L4: para eventos de ATIVAÇÃO, confirma o entitlement direto na API da
+    // RevenueCat antes de conceder VIP. Defesa em profundidade: se o
+    // WEBHOOK_AUTH_KEY vazar, um atacante não consegue forjar um INITIAL_PURCHASE
+    // pra app_user_id arbitrário (a API não confirmaria). null (sem secret key /
+    // API fora) → segue, pra não bloquear grant legítimo num outage.
+    if (targetStatus === 'active') {
+      const verified = await revenuecatHasActiveEntitlement(userId)
+      if (verified === false) {
+        logWarn('webhook:revenuecat', 'Ativação NÃO confirmada pela API RevenueCat — grant negado', { userId, eventId, type: eventType })
+        return NextResponse.json({ ok: true, skipped: 'not_verified' })
+      }
+    }
+
     const admin = createAdminClient()
 
     // The app_subscriptions.provider CHECK constraint allows a fixed set of
@@ -201,10 +254,7 @@ export async function POST(request: NextRequest) {
         })
         .eq('id', existing.id)
       if (error) {
-        return NextResponse.json(
-          { ok: false, error: error.message },
-          { status: 500 },
-        )
+        return respondDbError('revenuecat:webhook:subscription-update', error, 500)
       }
     } else if (targetStatus === 'active') {
       // Only create new subscription record for activation events
@@ -221,10 +271,7 @@ export async function POST(request: NextRequest) {
           metadata: meta,
         })
       if (error) {
-        return NextResponse.json(
-          { ok: false, error: error.message },
-          { status: 500 },
-        )
+        return respondDbError('revenuecat:webhook:subscription-insert', error, 500)
       }
     }
 
