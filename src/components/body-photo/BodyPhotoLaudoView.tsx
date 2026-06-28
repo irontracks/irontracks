@@ -37,7 +37,7 @@ const ScoreRing = ({ label, value }: { label: string; value: number }) => {
                     <span className="text-sm font-black text-white">{Math.round(pct)}</span>
                 </div>
             </div>
-            <span className="text-[10px] uppercase tracking-widest font-bold text-neutral-400">{label}</span>
+            <span className="text-[10px] uppercase tracking-wide font-bold text-neutral-400">{label}</span>
         </div>
     )
 }
@@ -108,7 +108,7 @@ export const BodyPhotoLaudoView: React.FC<{ laudo: BodyPhotoLaudo }> = ({ laudo 
             </div>
 
             {/* Scores */}
-            <div className="grid grid-cols-4 gap-2 rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4">
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 rounded-2xl border border-neutral-800 bg-neutral-900/40 p-4">
                 <ScoreRing label="Composição" value={laudo.scores.composition} />
                 <ScoreRing label="Simetria" value={laudo.scores.symmetry} />
                 <ScoreRing label="Postura" value={laudo.scores.posture} />

@@ -114,6 +114,26 @@ export default function LeaderboardPanel({ userId }: { userId: string }) {
         })}
       </div>
 
+      {/* Stale-data banner (reload failed but previous data is shown) */}
+      {error && (
+        <div
+          className="mx-4 mb-2 px-3 py-2 rounded-lg flex items-center gap-2"
+          style={{ background: 'rgba(234,179,8,0.06)', border: '1px solid rgba(234,179,8,0.18)' }}
+        >
+          <div className="flex-1 min-w-0 text-[11px] text-yellow-500/90">
+            Não foi possível atualizar — mostrando dados anteriores.
+          </div>
+          <button
+            type="button"
+            onClick={() => load()}
+            aria-label="Tentar atualizar novamente"
+            className="flex-shrink-0 flex items-center justify-center w-9 h-9 -my-2 -mr-1 rounded-lg text-yellow-500 transition-colors"
+          >
+            <RotateCw size={14} />
+          </button>
+        </div>
+      )}
+
       {/* Ranking List */}
       {currentEntries.length === 0 ? (
         <div className="p-6 text-center">
