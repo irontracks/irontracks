@@ -13,6 +13,7 @@ import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { mercadopagoRequest } from '@/lib/mercadopago'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { respondDbError } from '@/utils/api/dbError'
 import { logWarn } from '@/lib/logger'
 
 export const dynamic = 'force-dynamic'
@@ -33,7 +34,7 @@ export async function POST() {
       .filter('metadata->>scope', 'eq', 'teacher_plan_recurring')
       .in('status', ['pending', 'active', 'past_due'])
 
-    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+    if (error) return respondDbError('teacher:cancel_recurring', error)
     if (!subs || subs.length === 0) {
       return NextResponse.json({ ok: true, cancelled: 0 })
     }

@@ -5,6 +5,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { asaasRequest } from '@/lib/asaas'
 import { requireRoleOrBearer } from '@/utils/auth/route'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { respondDbError } from '@/utils/api/dbError'
 import { safeEmailLike } from '@/utils/safePgFilter'
 
 export const dynamic = 'force-dynamic'
@@ -243,7 +244,7 @@ export async function POST(req: Request) {
         .eq('id', teacherRow.id)
         .select('id, email, user_id, asaas_wallet_id, asaas_account_id, asaas_account_status')
         .single()
-      if (updateErr) return NextResponse.json({ ok: false, error: updateErr.message }, { status: 400 })
+      if (updateErr) return respondDbError('admin:teachers-asaas:update-subaccount', updateErr)
 
       return NextResponse.json({ ok: true, teacher: updated })
     }
@@ -262,7 +263,7 @@ export async function POST(req: Request) {
       .eq('id', teacherRow.id)
       .select('id, email, user_id, asaas_wallet_id, asaas_account_id, asaas_account_status')
       .single()
-    if (updateErr) return NextResponse.json({ ok: false, error: updateErr.message }, { status: 400 })
+    if (updateErr) return respondDbError('admin:teachers-asaas:update-wallet', updateErr)
 
     return NextResponse.json({ ok: true, teacher: updated })
   } catch (e: unknown) {

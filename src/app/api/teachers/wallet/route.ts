@@ -3,6 +3,7 @@ import { parseJsonBody } from '@/utils/zod'
 import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { requireRole } from '@/utils/auth/route'
+import { respondDbError } from '@/utils/api/dbError'
 
 export const dynamic = 'force-dynamic'
 
@@ -150,7 +151,7 @@ export async function POST(req: Request) {
         asaas_wallet_id: walletId,
       }
       const { data: inserted, error: insertErr } = await admin.from('teachers').insert(payload).select(selectFull).single()
-      if (insertErr) return NextResponse.json({ ok: false, error: insertErr.message }, { status: 400 })
+      if (insertErr) return respondDbError('teacher:wallet:insert', insertErr)
       return NextResponse.json({ ok: true, teacher: inserted })
     }
 
@@ -166,7 +167,7 @@ export async function POST(req: Request) {
       .eq('id', String(teacherRow.id))
       .select(selectFull)
       .single()
-    if (updateErr) return NextResponse.json({ ok: false, error: updateErr.message }, { status: 400 })
+    if (updateErr) return respondDbError('teacher:wallet:update', updateErr)
 
     return NextResponse.json({ ok: true, teacher: updated })
   } catch (e: unknown) {

@@ -5,6 +5,7 @@ import { requireRoleOrBearer } from '@/utils/auth/route'
 import { parseJsonBody } from '@/utils/zod'
 import { logWarn } from '@/lib/logger'
 import { cacheDelete } from '@/utils/cache'
+import { respondDbError } from '@/utils/api/dbError'
 
 export const dynamic = 'force-dynamic'
 
@@ -41,7 +42,7 @@ export async function POST(req: Request) {
             .eq('id', entitlement_id)
 
         if (error) {
-            return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
+            return respondDbError('admin:vip:revoke', error, 500)
         }
 
         // Audit

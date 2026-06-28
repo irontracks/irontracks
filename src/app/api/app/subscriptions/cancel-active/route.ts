@@ -8,6 +8,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { asaasRequest } from '@/lib/asaas'
 import { mercadopagoRequest } from '@/lib/mercadopago'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { respondDbError } from '@/utils/api/dbError'
 import { logError } from '@/lib/logger'
 
 export const dynamic = 'force-dynamic'
@@ -45,7 +46,7 @@ export async function POST(req: Request) {
     if (planId) q = q.eq('plan_id', planId)
 
     const { data: sub, error } = await q.maybeSingle()
-    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+    if (error) return respondDbError('subscriptions:cancel-active:lookup', error)
     if (!sub?.id) return NextResponse.json({ ok: true, cancelled: false })
 
     const provider = String(sub?.provider || '').trim()

@@ -16,6 +16,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { respondDbError } from '@/utils/api/dbError'
 
 export const dynamic = 'force-dynamic'
 
@@ -49,7 +50,7 @@ export async function GET() {
       .limit(PAGE_SIZE)
 
     if (error) {
-      return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+      return respondDbError('teacher:my_invoices', error)
     }
 
     const invoices = (data ?? []).map((row) => {

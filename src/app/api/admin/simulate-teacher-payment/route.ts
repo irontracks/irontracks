@@ -29,6 +29,7 @@ import { requireRole } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { parseJsonBody } from '@/utils/zod'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { respondDbError } from '@/utils/api/dbError'
 import { insertNotifications } from '@/lib/social/notifyFollowers'
 import { logInfo, logWarn } from '@/lib/logger'
 
@@ -98,7 +99,7 @@ export async function POST(req: Request) {
       })
       .eq('user_id', teacherUserId)
     if (tErr) {
-      return NextResponse.json({ ok: false, error: tErr.message }, { status: 400 })
+      return respondDbError('admin:simulate:teachers-update', tErr)
     }
 
     // 2. Record approved invoice in app_payments (marked simulated)

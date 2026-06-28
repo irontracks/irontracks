@@ -4,6 +4,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { requireRoleOrBearer } from '@/utils/auth/route'
 import { parseSearchParams } from '@/utils/zod'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { respondDbError } from '@/utils/api/dbError'
 
 const QuerySchema = z
   .object({
@@ -28,7 +29,7 @@ export async function GET(req: Request) {
       .order('created_at', { ascending: false })
       .limit(limit)
 
-    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+    if (error) return respondDbError('admin:vip:grant-history', error)
     return NextResponse.json({ ok: true, rows: data || [] })
   } catch (e: unknown) {
     return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
