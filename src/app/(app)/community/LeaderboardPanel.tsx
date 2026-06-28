@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useState } from 'react'
 import Image from 'next/image'
-import { Trophy, Dumbbell, Flame, Loader2 } from 'lucide-react'
+import { Trophy, Dumbbell, Flame, Loader2, RotateCw } from 'lucide-react'
 
 type RankingCategory = 'workouts' | 'volume' | 'streak'
 
@@ -34,15 +34,18 @@ const medalColors = ['#FFD700', '#C0C0C0', '#CD7F32'] // gold, silver, bronze
 export default function LeaderboardPanel({ userId }: { userId: string }) {
   const [rankings, setRankings] = useState<Rankings | null>(null)
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(false)
   const [category, setCategory] = useState<RankingCategory>('workouts')
 
   const load = useCallback(async () => {
     setLoading(true)
+    setError(false)
     try {
       const res = await fetch('/api/social/leaderboard')
       const data = await res.json().catch(() => null)
       if (data?.ok) setRankings(data.rankings)
-    } catch { }
+      else setError(true)
+    } catch { setError(true) }
     finally { setLoading(false) }
   }, [])
 
@@ -53,6 +56,24 @@ export default function LeaderboardPanel({ userId }: { userId: string }) {
       <div className="p-8 flex flex-col items-center gap-3">
         <Loader2 size={28} className="text-yellow-500 animate-spin" />
         <div className="text-sm text-neutral-400">Calculando ranking…</div>
+      </div>
+    )
+  }
+
+  if (error && !rankings) {
+    return (
+      <div className="p-8 flex flex-col items-center gap-3 text-center">
+        <Trophy size={28} className="text-neutral-400" />
+        <div className="text-sm text-neutral-400">Não foi possível carregar o ranking.</div>
+        <button
+          type="button"
+          onClick={() => load()}
+          className="mt-1 flex items-center gap-1.5 px-4 py-2 rounded-lg text-xs font-black uppercase tracking-wider text-yellow-500 transition-colors"
+          style={{ background: 'rgba(234,179,8,0.08)', border: '1px solid rgba(234,179,8,0.2)' }}
+        >
+          <RotateCw size={13} />
+          Tentar novamente
+        </button>
       </div>
     )
   }

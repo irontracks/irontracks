@@ -9,10 +9,12 @@ import {
     Smile,
     Link2,
     Trash2,
-    Plus
+    Plus,
+    RotateCw
 } from 'lucide-react';
 import { createClient } from '@/utils/supabase/client';
 import { useDialog } from '@/contexts/DialogContext';
+import { useToast } from '@/contexts/ToastContext';
 import { compressImage, generateImageThumbnail } from '@/utils/chat/media';
 import { logError } from '@/lib/logger'
 import { parseJsonWithSchema } from '@/utils/zod'
@@ -34,6 +36,10 @@ interface MessageRow {
     content?: string | null
     created_at: string
     attachments?: unknown[]
+    // Estado de envio otimista. Indefinido = mensagem já confirmada no servidor
+    // (caminho normal carregado/realtime). 'sending' = bolha local temporária
+    // aguardando confirmação do insert. 'failed' = insert falhou, oferece Reenviar.
+    _sendStatus?: 'sending' | 'failed'
     [key: string]: unknown
 }
 
@@ -79,6 +85,7 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
     const [loadingMore, setLoadingMore] = useState(false);
 
     const { alert, prompt, confirm } = useDialog();
+    const { toast } = useToast();
     const supabase = useMemo(() => createClient(), []);
     const rootRef = useRef<HTMLDivElement | null>(null);
     const scrollContainerRef = useRef<HTMLDivElement | null>(null);
@@ -433,47 +440,79 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
     // Dispara push pro destinatário (fire-and-forget). A rota já valida canal
     // compartilhado, preferência notifyDirectMessages e dedupe — uma falha aqui
     // nunca bloqueia nem reverte o envio da mensagem.
-    const notifyRecipientPush = (preview: string) => {
+    const notifyRecipientPush = useCallback((preview: string) => {
         const safePreview = String(preview || '').trim().slice(0, 240);
         if (!safePreview || !resolvedOtherUserId) return;
+        const u = isRecord(user) ? user : {};
         const senderName = String(
-            userObj?.displayName ?? userObj?.display_name ?? userObj?.name ?? ''
+            u?.displayName ?? u?.display_name ?? u?.name ?? ''
         ).trim() || 'Nova mensagem';
         void fetch('/api/notifications/direct-message', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ receiverId: resolvedOtherUserId, senderName, preview: safePreview }),
         }).catch(() => { });
-    };
+    }, [resolvedOtherUserId, user]);
 
-    const handleSendMessage = async (e: React.FormEvent<HTMLFormElement>) => {
-        e.preventDefault();
-        if (!newMessage.trim() || !channelId || !safeUserId) {
+    // Núcleo de envio de texto com otimismo. `tempId` permite que o Reenviar
+    // reaproveite a mesma bolha temporária (marca como 'sending' de novo) em vez
+    // de criar uma nova. Caminho feliz é 100% preservado; a única diferença é que
+    // a bolha aparece ANTES do await (estado 'sending') e é reconciliada depois.
+    const sendTextMessage = useCallback(async (message: string, tempId?: string) => {
+        const text = message.trim();
+        if (!text || !channelId || !safeUserId) {
             if (!safeUserId) await alert('Sessão inválida. Faça login novamente.');
             return;
         }
 
-        let message = '';
-        try {
-            message = newMessage.trim();
-            setNewMessage('');
+        const u = isRecord(user) ? user : {};
+        const senderProfile = { display_name: u?.displayName || null, photo_url: u?.photoURL || null };
+        const localId = tempId ?? `tmp-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+        const optimisticRow: MessageRow = toMessageRow({
+            id: localId,
+            channel_id: channelId,
+            sender_id: safeUserId,
+            content: text,
+            created_at: new Date().toISOString(),
+            sender: senderProfile,
+            _sendStatus: 'sending',
+        });
 
+        // Insere/atualiza a bolha 'sending' ANTES do await — em rede ruim a
+        // mensagem aparece na hora em vez de "sumir" até o insert retornar.
+        setMessages(prev => {
+            const safePrev = Array.isArray(prev) ? prev : [];
+            if (safePrev.some(m => m.id === localId)) {
+                return safePrev.map(m => (m.id === localId ? optimisticRow : m));
+            }
+            return [...safePrev, optimisticRow];
+        });
+
+        try {
             const { data: inserted, error: insertError } = await supabase
                 .from('direct_messages')
-                .insert({ channel_id: channelId, sender_id: safeUserId, content: message })
+                .insert({ channel_id: channelId, sender_id: safeUserId, content: text })
                 .select('id, channel_id, sender_id, content, created_at')
                 .single();
 
             if (insertError) throw insertError;
 
-            const optimistic = {
-                ...inserted,
-                sender: { display_name: userObj?.displayName || null, photo_url: userObj?.photoURL || null }
-            };
+            const realRow: MessageRow = toMessageRow({
+                ...(isRecord(inserted) ? inserted : {}),
+                sender: senderProfile,
+            });
+
+            // Reconciliação: troca a bolha temp pela real. Se o realtime já trouxe
+            // a real (mesmo id), remove o temp e mantém uma única cópia — evita
+            // duplicata sem depender da ordem de chegada (insert vs realtime).
             setMessages(prev => {
-                if (prev.find(m => m.id === optimistic.id)) return prev;
-                const row = isRecord(optimistic) ? optimistic : {}
-                return [...prev, toMessageRow(row)];
+                const safePrev = Array.isArray(prev) ? prev : [];
+                const realId = realRow.id;
+                const alreadyHasReal = realId && safePrev.some(m => m.id === realId);
+                if (alreadyHasReal) {
+                    return safePrev.filter(m => m.id !== localId);
+                }
+                return safePrev.map(m => (m.id === localId ? realRow : m));
             });
 
             await supabase
@@ -481,15 +520,38 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
                 .update({ last_message_at: new Date().toISOString() })
                 .eq('id', channelId);
 
-            notifyRecipientPush(message);
-
+            notifyRecipientPush(text);
         } catch (error) {
             logError('error', 'Erro ao enviar mensagem:', error);
+            // Marca a bolha como 'failed' (mantém o texto) para oferecer Reenviar,
+            // em vez de remover e perder o conteúdo digitado.
+            setMessages(prev => {
+                const safePrev = Array.isArray(prev) ? prev : [];
+                return safePrev.map(m => (m.id === localId ? { ...m, _sendStatus: 'failed' as const } : m));
+            });
             const msg = String((error as Record<string, unknown>)?.message ?? error ?? '');
-            await alert('Erro ao enviar mensagem: ' + msg);
-            setNewMessage(message);
+            toast('Erro ao enviar mensagem: ' + msg, 'error');
         }
+    }, [alert, channelId, notifyRecipientPush, safeUserId, supabase, toast, user]);
+
+    const handleSendMessage = async (e: React.FormEvent<HTMLFormElement>) => {
+        e.preventDefault();
+        if (!newMessage.trim() || !channelId || !safeUserId) {
+            if (!safeUserId) await alert('Sessão inválida. Faça login novamente.');
+            return;
+        }
+        const message = newMessage.trim();
+        setNewMessage('');
+        await sendTextMessage(message);
     };
+
+    // Reenvia uma bolha que falhou: reaproveita o mesmo tempId (volta pra
+    // 'sending') e tenta o insert de novo.
+    const handleRetryMessage = useCallback((message: MessageRow) => {
+        const text = typeof message.content === 'string' ? message.content : '';
+        if (!text) return;
+        void sendTextMessage(text, message.id);
+    }, [sendTextMessage]);
 
     const handleAttachClick = () => { fileInputRef.current?.click() }
 
@@ -712,10 +774,10 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
                                         )
                                     )}
 
-                                    <div className={`max-w-[78%] rounded-2xl px-4 py-3 shadow-sm break-words ${isMyMessage
+                                    <div className={`max-w-[78%] rounded-2xl px-4 py-3 shadow-sm break-words transition-opacity ${isMyMessage
                                             ? 'bg-yellow-500 text-black rounded-br-none shadow-yellow-500/15'
                                             : 'bg-neutral-900/80 text-white rounded-bl-none border border-neutral-800'
-                                        }`}>
+                                        } ${message._sendStatus === 'sending' ? 'opacity-70' : ''} ${message._sendStatus === 'failed' ? 'ring-1 ring-red-500/50' : ''}`}>
                                         {!isMyMessage && (
                                             <p className="text-[10px] font-bold text-neutral-400 mb-1">
                                                 {String(senderObj?.display_name ?? 'Usuário')}
@@ -764,7 +826,7 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
                                             return <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{String(payload?.text ?? message.content ?? '')}</p>;
                                         })()}
                                         <div className="flex items-center justify-between gap-2 mt-1">
-                                            {isMyMessage ? (
+                                            {isMyMessage && message._sendStatus !== 'sending' && message._sendStatus !== 'failed' ? (
                                                 <button
                                                     type="button"
                                                     onClick={() => handleDeleteMessage(message)}
@@ -776,10 +838,22 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
                                             ) : (
                                                 <span />
                                             )}
-                                            <p className={`text-[10px] text-right tabular-nums ${isMyMessage ? 'text-black/60' : 'text-neutral-500'
-                                                }`}>
-                                                {formatTime(message.created_at)}
-                                            </p>
+                                            {message._sendStatus === 'failed' ? (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => handleRetryMessage(message)}
+                                                    className="text-[10px] font-bold inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md text-red-700 hover:text-red-800 bg-black/10 active:scale-95 transition-transform"
+                                                    aria-label="Reenviar mensagem"
+                                                >
+                                                    <RotateCw size={11} />
+                                                    Reenviar
+                                                </button>
+                                            ) : (
+                                                <p className={`text-[10px] text-right tabular-nums ${isMyMessage ? 'text-black/60' : 'text-neutral-500'
+                                                    }`}>
+                                                    {message._sendStatus === 'sending' ? 'Enviando…' : formatTime(message.created_at)}
+                                                </p>
+                                            )}
                                         </div>
                                     </div>
                                 </div>
