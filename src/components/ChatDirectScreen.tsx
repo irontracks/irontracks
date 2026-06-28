@@ -135,7 +135,7 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
     const loadOtherUser = useCallback(async () => {
         try {
             const { data, error } = await supabase
-                .from('profiles')
+                .from('profiles_public')
                 .select('id, display_name, photo_url, last_seen')
                 .eq('id', resolvedOtherUserId)
                 .single();
@@ -224,7 +224,7 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
             const profilesMap: Record<string, Record<string, unknown>> = {};
             if (senderIds.length > 0) {
                 const { data: profiles } = await supabase
-                    .from('profiles')
+                    .from('profiles_public')
                     .select('id, display_name, photo_url')
                     .in('id', senderIds);
                 (Array.isArray(profiles) ? profiles.filter(isRecord) : []).forEach((p: Record<string, unknown>) => {
@@ -281,7 +281,7 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
                         let senderData = null
                         if (senderId) {
                             const { data } = await supabase
-                                .from('profiles')
+                                .from('profiles_public')
                                 .select('display_name, photo_url')
                                 .eq('id', senderId)
                                 .maybeSingle()

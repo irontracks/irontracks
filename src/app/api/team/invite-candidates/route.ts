@@ -51,7 +51,7 @@ export async function GET(req: Request) {
     if (studentsList.length > 0) {
       const ids = studentsList.map((s) => s.user_id)
       const { data: spData } = await supabase
-        .from('profiles')
+        .from('profiles_public')
         .select('id, last_seen, photo_url')
         .in('id', ids)
 
@@ -82,7 +82,7 @@ export async function GET(req: Request) {
     }
 
     let profilesQuery = supabase
-      .from('profiles')
+      .from('profiles_public')
       .select('id, display_name, photo_url, last_seen')
       .order('last_seen', { ascending: false })
       .limit(limit)

@@ -111,7 +111,7 @@ export function useTeamInvites({
                         if (newInvite.status !== 'pending') return;
 
                         const { data: profile } = await supabase
-                            .from('profiles')
+                            .from('profiles_public')
                             .select('display_name, photo_url')
                             .eq('id', newInvite.from_uid)
                             .single();
@@ -342,7 +342,7 @@ export function useTeamInvites({
                 let profile = null;
                 if (toUid) {
                     const { data } = await supabase
-                        .from('profiles')
+                        .from('profiles_public')
                         .select('display_name, photo_url')
                         .eq('id', toUid)
                         .maybeSingle();

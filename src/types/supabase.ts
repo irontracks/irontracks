@@ -3882,7 +3882,17 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      profiles_public: {
+        Row: {
+          display_name: string | null
+          handle: string | null
+          id: string
+          last_seen: string | null
+          photo_url: string | null
+          role: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       accept_team_invite: { Args: { invite_id: string }; Returns: Json }
