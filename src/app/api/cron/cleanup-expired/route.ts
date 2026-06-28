@@ -1,21 +1,12 @@
 import { NextResponse } from 'next/server'
 import { logWarn } from '@/lib/logger'
 import { createAdminClient } from '@/utils/supabase/admin'
-import { hasValidInternalSecret } from '@/utils/auth/route'
+import { isCronAuthorized } from '@/utils/cron/auth'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
-import { env } from '@/utils/env'
 
 export const dynamic = 'force-dynamic'
-
-const isAuthorized = (req: Request) => {
-  const authHeader = req.headers.get('authorization')
-  if (authHeader === `Bearer ${env.security.cronSecret}`) return true
-  if (hasValidInternalSecret(req)) return true
-  // Query param ?secret= removed — secrets in URLs leak to access logs and Referer headers
-  return false
-}
 
 const chunk = <T,>(arr: T[], size: number) => {
   const out: T[][] = []
@@ -54,7 +45,7 @@ const ContentSchema = z
 
 export async function GET(req: Request) {
   try {
-  if (!isAuthorized(req)) return NextResponse.json({ ok: false, error: 'forbidden' }, { status: 403 })
+  if (!isCronAuthorized(req)) return NextResponse.json({ ok: false, error: 'forbidden' }, { status: 403 })
 
   const admin = createAdminClient()
   const nowIso = new Date().toISOString()
