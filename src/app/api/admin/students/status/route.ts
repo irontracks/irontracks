@@ -12,7 +12,10 @@ import { waitUntil } from '@vercel/functions'
 const ZodBodySchema = z
   .object({
     id: z.string().min(1),
-    status: z.string().min(1),
+    // Allowlist de status conhecidos (auditoria 2026-06-28, R2): antes era string
+    // livre, deixando um teacher gravar qualquer valor em students.status. Cobre os
+    // valores em uso no banco (pago/ativo) + os que disparam push (pendente/atrasado/cancelar).
+    status: z.enum(['pago', 'ativo', 'pendente', 'atrasado', 'cancelar']),
     // Optional fallback identifier. When the admin panel's AdminUser was
     // built from the profiles fallback (no `students` row yet), `id` is a
     // profile UUID and won't match `students.id`. If the client forwards

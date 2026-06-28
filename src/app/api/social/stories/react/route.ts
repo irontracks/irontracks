@@ -49,19 +49,19 @@ export async function POST(req: Request) {
 
     const admin = createAdminClient()
 
-    // Get the story to find the author
+    // Get the story to find the author (coluna real é author_id, não user_id)
     const { data: story } = await admin
       .from('social_stories')
-      .select('user_id')
+      .select('author_id')
       .eq('id', storyId)
       .maybeSingle()
 
-    if (!story?.user_id) {
+    if (!story?.author_id) {
       return NextResponse.json({ ok: false, error: 'story_not_found' }, { status: 404 })
     }
 
     // Don't notify yourself
-    if (story.user_id !== auth.user.id) {
+    if (story.author_id !== auth.user.id) {
       const { data: me } = await admin
         .from('profiles')
         .select('display_name')
@@ -70,8 +70,8 @@ export async function POST(req: Request) {
       const name = String(me?.display_name || '').trim() || 'Alguém'
 
       await insertNotifications([{
-        user_id: story.user_id,
-        recipient_id: story.user_id,
+        user_id: story.author_id,
+        recipient_id: story.author_id,
         sender_id: auth.user.id,
         type: 'story_reaction',
         title: 'Nova reação',

@@ -14,7 +14,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { dequeueStoryJobs, getQueueDepth, type StoryJobPayload } from '@/lib/queue/storyQueue'
 import { logError, logInfo, logWarn } from '@/lib/logger'
 import { getErrorMessage } from '@/utils/errorMessage'
-import { env } from '@/utils/env'
+import { isCronAuthorized } from '@/utils/cron/auth'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -22,14 +22,6 @@ export const runtime = 'nodejs'
 export const maxDuration = 30
 
 const JOBS_PER_BATCH = 5
-
-/** Verify the request comes from Vercel Cron or an authorised internal caller. */
-function isAuthorised(req: Request): boolean {
-    const secret = env.security.cronSecret
-    if (!secret) return false
-    const auth = req.headers.get('authorization') ?? ''
-    return auth === `Bearer ${secret}`
-}
 
 async function processJob(job: StoryJobPayload): Promise<'ok' | 'skip' | 'error'> {
     const admin = createAdminClient()
@@ -88,7 +80,7 @@ async function processJob(job: StoryJobPayload): Promise<'ok' | 'skip' | 'error'
 }
 
 export async function POST(req: Request) {
-    if (!isAuthorised(req)) {
+    if (!isCronAuthorized(req)) {
         return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
     }
 
@@ -118,7 +110,7 @@ export async function POST(req: Request) {
 
 // Also allow GET for health-check / queue depth inspection
 export async function GET(req: Request) {
-    if (!isAuthorised(req)) {
+    if (!isCronAuthorized(req)) {
         return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
     }
     const depth = await getQueueDepth()

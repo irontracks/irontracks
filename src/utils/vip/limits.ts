@@ -366,49 +366,18 @@ export async function incrementVipUsage(
   feature: 'chat' | 'wizard' | 'insights'
 ) {
   const today = new Date().toISOString().split('T')[0]
-  const now = new Date().toISOString()
 
-  // R2#5: Atomic increment — first try insert (new row), then update with increment on conflict.
-  // This avoids the read-then-write race condition where two concurrent requests
-  // read the same count and both write count+1, losing one increment.
-  const { error: insertError } = await supabase
-    .from('vip_usage_daily')
-    .insert({
-      user_id: userId,
-      feature_key: feature,
-      day: today,
-      usage_count: 1,
-      last_used_at: now,
-      updated_at: now,
-    })
+  // R2#M1: increment ATÔMICO via RPC (UPSERT com usage_count = usage_count + 1 no
+  // próprio banco). Substitui o read-then-write anterior, onde o UPDATE com optimistic
+  // lock tratava 0-row como sucesso silencioso sob concorrência — dois requests
+  // paralelos liam a mesma contagem e perdiam um increment, furando a cota de IA paga
+  // (custo Gemini real). A função increment_vip_usage_daily faz INSERT ... ON CONFLICT
+  // DO UPDATE, fechando a janela TOCTOU. Auditoria 2026-06-28 (M-1).
+  const { error } = await supabase.rpc('increment_vip_usage_daily', {
+    p_user_id: userId,
+    p_feature_key: feature,
+    p_day: today,
+  })
 
-  if (insertError) {
-    // Row already exists (unique constraint violation) — do atomic increment via raw SQL
-    // Supabase JS doesn't support SET col = col + 1, so we use rpc as fallback
-    // or just read-then-write with a tight window (existing behavior, still better than before)
-    const { data: existing } = await supabase
-      .from('vip_usage_daily')
-      .select('usage_count')
-      .eq('user_id', userId)
-      .eq('feature_key', feature)
-      .eq('day', today)
-      .maybeSingle()
-
-    const nextCount = (existing?.usage_count || 0) + 1
-
-    const { error } = await supabase
-      .from('vip_usage_daily')
-      .update({
-        usage_count: nextCount,
-        last_used_at: now,
-        updated_at: now,
-      })
-      .eq('user_id', userId)
-      .eq('feature_key', feature)
-      .eq('day', today)
-      // Only update if count hasn't changed (optimistic locking)
-      .eq('usage_count', existing?.usage_count || 0)
-
-    if (error) logError('error', 'Error incrementing VIP usage:', error)
-  }
+  if (error) logError('error', 'Error incrementing VIP usage:', error)
 }
