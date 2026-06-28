@@ -178,13 +178,13 @@ export const StudentWorkoutsTab: React.FC = () => {
                                                 {/* Importar JSON */}
                                                 <button
                                                     onClick={() => { setToolsPanelOpen(false); openJsonImport(); }}
-                                                    className="group w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl hover:bg-gradient-to-r hover:from-purple-500/10 hover:to-transparent transition-all duration-150 active:scale-[0.98]"
+                                                    className="group w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl hover:bg-gradient-to-r hover:from-amber-500/10 hover:to-transparent transition-all duration-150 active:scale-[0.98]"
                                                 >
-                                                    <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-purple-500/20 to-purple-700/10 border border-purple-500/25 flex items-center justify-center flex-shrink-0">
-                                                        <Upload size={13} className="text-purple-400" />
+                                                    <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-amber-500/20 to-amber-700/10 border border-amber-500/25 flex items-center justify-center flex-shrink-0">
+                                                        <Upload size={13} className="text-amber-400" />
                                                     </div>
                                                     <div className="flex-1 text-left">
-                                                        <p className="text-[13px] font-bold text-white group-hover:text-purple-100 leading-tight">Importar JSON</p>
+                                                        <p className="text-[13px] font-bold text-white group-hover:text-amber-100 leading-tight">Importar JSON</p>
                                                         <p className="text-[10px] text-neutral-400">Carregar treino de arquivo</p>
                                                     </div>
                                                 </button>

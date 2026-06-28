@@ -24,13 +24,13 @@ interface Section {
 
 const SECTIONS: Section[] = [
   { id: 'overview',   icon: <BarChart3 size={14} />,   title: 'Visão Geral do Painel',       color: 'text-yellow-400' },
-  { id: 'students',   icon: <Users size={14} />,        title: 'Gerenciando Alunos',           color: 'text-blue-400' },
+  { id: 'students',   icon: <Users size={14} />,        title: 'Gerenciando Alunos',           color: 'text-amber-400' },
   { id: 'workouts',   icon: <Dumbbell size={14} />,     title: 'Treinos e Templates',          color: 'text-green-400' },
-  { id: 'plans',      icon: <CreditCard size={14} />,   title: 'Planos de Serviço',            color: 'text-purple-400' },
+  { id: 'plans',      icon: <CreditCard size={14} />,   title: 'Planos de Serviço',            color: 'text-amber-400' },
   { id: 'intervals',  icon: <Repeat size={14} />,       title: 'Tipos de Cobrança',            color: 'text-orange-400' },
-  { id: 'assign',     icon: <ArrowRight size={14} />,   title: 'Atribuindo Planos',            color: 'text-cyan-400' },
+  { id: 'assign',     icon: <ArrowRight size={14} />,   title: 'Atribuindo Planos',            color: 'text-amber-400' },
   { id: 'payment',    icon: <QrCode size={14} />,       title: 'Pagamento via PIX',            color: 'text-green-400' },
-  { id: 'subs',       icon: <CheckCircle2 size={14} />, title: 'Acompanhar Assinaturas',       color: 'text-teal-400' },
+  { id: 'subs',       icon: <CheckCircle2 size={14} />, title: 'Acompanhar Assinaturas',       color: 'text-amber-400' },
   { id: 'myplan',     icon: <Crown size={14} />,        title: 'Seu Plano na Plataforma',      color: 'text-yellow-400' },
 ]
 
@@ -58,9 +58,9 @@ function Step({ n, children }: { n: number; children: React.ReactNode }) {
 
 function Tip({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex gap-2 items-start bg-blue-500/10 border border-blue-500/20 rounded-xl px-4 py-3 mt-3">
-      <Info size={14} className="text-blue-400 flex-shrink-0 mt-0.5" />
-      <p className="text-xs text-blue-300 leading-relaxed">{children}</p>
+    <div className="flex gap-2 items-start bg-amber-500/10 border border-amber-500/20 rounded-xl px-4 py-3 mt-3">
+      <Info size={14} className="text-amber-400 flex-shrink-0 mt-0.5" />
+      <p className="text-xs text-amber-300 leading-relaxed">{children}</p>
     </div>
   )
 }
@@ -482,7 +482,7 @@ export default function TeacherManualTab() {
             <p className="text-xs font-bold text-neutral-400 uppercase tracking-widest">Gerenciar planos existentes:</p>
             <div className="grid gap-2 sm:grid-cols-2">
               {[
-                { icon: <Edit2 size={13} className="text-blue-400" />, action: 'Editar', desc: 'Altera qualquer campo do plano. Assinaturas existentes não são afetadas.' },
+                { icon: <Edit2 size={13} className="text-amber-400" />, action: 'Editar', desc: 'Altera qualquer campo do plano. Assinaturas existentes não são afetadas.' },
                 { icon: <PowerOff size={13} className="text-red-400" />, action: 'Desativar', desc: 'Oculta o plano da lista de atribuição. Assinaturas ativas continuam válidas.' },
                 { icon: <Power size={13} className="text-green-400" />, action: 'Reativar', desc: 'Torna o plano disponível novamente para novas atribuições.' },
                 { icon: <RefreshCw size={13} className="text-neutral-400" />, action: 'Atualizar', desc: 'Botão de refresh no topo recarrega a lista mais recente do servidor.' },
@@ -519,9 +519,9 @@ export default function TeacherManualTab() {
               },
               {
                 key: 'monthly', label: 'Mensal', subtitle: 'Renovação mensal',
-                days: '30 dias', icon: <Calendar size={16} className="text-blue-400" />,
+                days: '30 dias', icon: <Calendar size={16} className="text-amber-400" />,
                 usecase: 'O mais comum. Aluno paga todo mês para manter acesso à assessoria.',
-                color: 'border-blue-500/25',
+                color: 'border-amber-500/25',
               },
               {
                 key: 'quarterly', label: 'Trimestral', subtitle: 'Pagamento a cada 3 meses',
@@ -537,9 +537,9 @@ export default function TeacherManualTab() {
               },
               {
                 key: 'yearly', label: 'Anual', subtitle: 'Pagamento único anual',
-                days: '365 dias', icon: <Crown size={16} className="text-purple-400" />,
+                days: '365 dias', icon: <Crown size={16} className="text-amber-400" />,
                 usecase: 'Maior desconto. Ideal para alunos comprometidos de longo prazo.',
-                color: 'border-purple-500/25',
+                color: 'border-amber-500/25',
               },
             ].map(t => (
               <div key={t.key} className={`rounded-2xl border bg-neutral-900/50 p-4 ${t.color}`}>
@@ -828,9 +828,9 @@ export default function TeacherManualTab() {
           <div className="grid gap-3 sm:grid-cols-2">
             {[
               { tier: 'Free',      students: '2 alunos',   price: 'Grátis',     color: 'border-neutral-700', badge: 'bg-neutral-800 text-neutral-300', desc: 'Para experimentar a plataforma.' },
-              { tier: 'Starter',   students: '15 alunos',  price: 'R$ 49/mês',  color: 'border-blue-500/30', badge: 'bg-blue-500/15 text-blue-400', desc: 'Para coaches iniciantes.' },
+              { tier: 'Starter',   students: '15 alunos',  price: 'R$ 49/mês',  color: 'border-amber-500/30', badge: 'bg-amber-500/15 text-amber-400', desc: 'Para coaches iniciantes.' },
               { tier: 'Pro',       students: '40 alunos',  price: 'R$ 97/mês',  color: 'border-yellow-500/30', badge: 'bg-yellow-500/15 text-yellow-400 font-black', desc: 'O plano mais popular.' },
-              { tier: 'Elite',     students: '100 alunos', price: 'R$ 179/mês', color: 'border-purple-500/30', badge: 'bg-purple-500/15 text-purple-400', desc: 'Para academia ou equipe.' },
+              { tier: 'Elite',     students: '100 alunos', price: 'R$ 179/mês', color: 'border-amber-500/30', badge: 'bg-amber-500/15 text-amber-400', desc: 'Para academia ou equipe.' },
               { tier: 'Unlimited', students: 'Ilimitado',  price: 'R$ 249/mês', color: 'border-amber-500/30', badge: 'bg-amber-500/15 text-amber-400', desc: 'Sem limites de alunos.' },
             ].map(p => (
               <div key={p.tier} className={`rounded-2xl border bg-neutral-900/50 p-4 ${p.color}`}>
@@ -892,12 +892,12 @@ export default function TeacherManualTab() {
             </div>
             <div className="grid gap-2 sm:grid-cols-2">
               {[
-                { icon: <Users size={13} className="text-blue-400" />, text: 'Gerencie alunos na aba ALUNOS' },
+                { icon: <Users size={13} className="text-amber-400" />, text: 'Gerencie alunos na aba ALUNOS' },
                 { icon: <Dumbbell size={13} className="text-green-400" />, text: 'Crie treinos na aba TREINOS' },
-                { icon: <CreditCard size={13} className="text-purple-400" />, text: 'Crie planos de cobrança em COBRANÇAS' },
-                { icon: <ArrowRight size={13} className="text-cyan-400" />, text: 'Atribua planos aos alunos' },
+                { icon: <CreditCard size={13} className="text-amber-400" />, text: 'Crie planos de cobrança em COBRANÇAS' },
+                { icon: <ArrowRight size={13} className="text-amber-400" />, text: 'Atribua planos aos alunos' },
                 { icon: <QrCode size={13} className="text-green-400" />, text: 'Aluno paga via PIX automaticamente' },
-                { icon: <CheckCircle2 size={13} className="text-teal-400" />, text: 'Assinatura ativa em segundos após PIX' },
+                { icon: <CheckCircle2 size={13} className="text-amber-400" />, text: 'Assinatura ativa em segundos após PIX' },
                 { icon: <AlertCircle size={13} className="text-yellow-400" />, text: 'Acompanhe atrasos em COBRANÇAS' },
                 { icon: <Crown size={13} className="text-yellow-400" />, text: 'Faça upgrade para mais alunos' },
               ].map((item, i) => (

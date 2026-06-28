@@ -19,11 +19,11 @@ export function AcquisitionTab() {
     <div className="space-y-4 animate-in fade-in duration-500">
       <div
         className="rounded-2xl border p-5"
-        style={{ background: 'rgba(59,130,246,0.04)', borderColor: 'rgba(59,130,246,0.18)' }}
+        style={{ background: 'rgba(245,158,11,0.04)', borderColor: 'rgba(245,158,11,0.18)' }}
       >
         <div className="flex items-start gap-3 mb-3">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'rgba(59,130,246,0.12)', border: '1px solid rgba(59,130,246,0.25)' }}>
-            <TrendingUp size={20} className="text-blue-400" />
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center shrink-0" style={{ background: 'rgba(245,158,11,0.12)', border: '1px solid rgba(245,158,11,0.25)' }}>
+            <TrendingUp size={20} className="text-amber-400" />
           </div>
           <div className="flex-1">
             <h2 className="text-lg font-black text-white mb-1">Análise de Aquisição</h2>
