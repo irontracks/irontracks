@@ -1,6 +1,8 @@
-import { notFound } from 'next/navigation'
+import { notFound, redirect } from 'next/navigation'
 import type { Metadata } from 'next'
 import { createAdminClient } from '@/utils/supabase/admin'
+import { createClient } from '@/utils/supabase/server'
+import { canCoachStudent } from '@/utils/auth/studentAccess'
 import { RelatorioCharts } from './RelatorioCharts'
 
 interface PageProps {
@@ -9,14 +11,13 @@ interface PageProps {
 
 export const dynamic = 'force-dynamic'
 
-export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
-  const { userId } = await params
-  const db = createAdminClient()
-  const { data } = await db.from('profiles').select('display_name').eq('id', userId).single()
-  const name = data?.display_name ?? 'Usuário'
+export async function generateMetadata(): Promise<Metadata> {
+  // Página privada e com gate de auth (ver RelatorioPage). Metadata propositalmente
+  // GENÉRICA: link preview/unfurl (WhatsApp, redes) é buscado por bot anônimo, que
+  // ignora o gate de auth e o `noindex`. Antes vazava o nome real no título/OG.
   return {
-    title: `Relatório — ${name} · IronTracks`,
-    description: 'Análise completa de composição corporal, treino e nutrição.',
+    title: 'Relatório · IronTracks',
+    description: 'Relatório de performance — acesso restrito.',
     robots: { index: false, follow: false },
   }
 }
@@ -136,6 +137,19 @@ const CSS = `
 
 export default async function RelatorioPage({ params }: PageProps) {
   const { userId } = await params
+
+  // Authz (auditoria 2026-06-27): este relatório expõe email + composição
+  // corporal + nutrição + marcadores de exame. Antes era PÚBLICO por userId —
+  // qualquer anônimo lia dados de saúde de qualquer pessoa enumerando o UUID
+  // (IDOR, risco LGPD art. 11). Agora exige login e que o visitante seja o
+  // próprio dono, o professor vinculado ou admin.
+  const viewerClient = await createClient()
+  const { data: { user: viewer } } = await viewerClient.auth.getUser()
+  if (!viewer?.id) redirect(`/?next=${encodeURIComponent(`/relatorio/${userId}`)}`)
+  if (viewer.id !== userId && !(await canCoachStudent({ id: viewer.id, email: viewer.email }, userId))) {
+    notFound()
+  }
+
   const db = createAdminClient()
 
   const now = new Date()

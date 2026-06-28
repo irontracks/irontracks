@@ -15,6 +15,51 @@ assert.ok(fs.existsSync(deleteTeacherRoute), 'teachers/delete route missing')
 const deleteTeacherText = fs.readFileSync(deleteTeacherRoute, 'utf8')
 assert.ok(deleteTeacherText.includes('requireRoleOrBearer'), 'teachers/delete should support bearer fallback')
 
+// ── IDOR destrutivo guard (auditoria 2026-06-27) ───────────────────────────
+// teachers/delete apaga profile + auth.users + dados em cascata via RPC.
+// Aceitar role 'teacher' permitia que QUALQUER professor deletasse QUALQUER
+// outro professor passando um `id` arbitrário no body. Deve ser admin-only.
+assert.ok(
+  /requireRoleOrBearer\(\s*req\s*,\s*\[\s*'admin'\s*\]\s*\)/.test(deleteTeacherText),
+  'teachers/delete must restrict to ["admin"] only',
+)
+assert.ok(
+  !/\[\s*'admin'\s*,\s*'teacher'\s*\]/.test(deleteTeacherText),
+  'teachers/delete must NOT allow role "teacher" — reintroduz IDOR destrutivo',
+)
+
+// ── Coach AI IDOR guard (auditoria 2026-06-27) ─────────────────────────────
+// Rotas de IA que recebem `studentId` e leem perfil/avaliações/EXAMES via
+// service-role precisam autorizar o vínculo (self/professor/admin) com
+// canCoachStudent. Sem isso, qualquer usuário autenticado exfiltrava dados de
+// saúde de terceiros (IDOR).
+for (const rel of [
+  ['src', 'app', 'api', 'ai', 'student-workout', 'route.ts'],
+  ['src', 'app', 'api', 'ai', 'assessment-report', 'route.ts'],
+]) {
+  const routePath = path.join(repoRoot, ...rel)
+  assert.ok(fs.existsSync(routePath), `${rel.join('/')} missing`)
+  const text = fs.readFileSync(routePath, 'utf8')
+  assert.ok(text.includes('canCoachStudent'), `${rel.join('/')} must authorize studentId via canCoachStudent`)
+  assert.ok(/status:\s*403/.test(text), `${rel.join('/')} must return 403 when access is denied`)
+}
+
+// ── Relatório público → privado guard (auditoria 2026-06-27) ───────────────
+// /relatorio/[userId] expunha email + composição corporal + nutrição +
+// marcadores de exame a QUALQUER anônimo por enumeração de UUID. Agora exige
+// login + ownership (dono/professor/admin) ANTES de qualquer fetch de dados.
+const relatorioPage = path.join(repoRoot, 'src', 'app', 'relatorio', '[userId]', 'page.tsx')
+assert.ok(fs.existsSync(relatorioPage), 'relatorio page missing')
+const relatorioText = fs.readFileSync(relatorioPage, 'utf8')
+assert.ok(relatorioText.includes('auth.getUser()'), 'relatorio page must authenticate the viewer')
+assert.ok(relatorioText.includes('canCoachStudent'), 'relatorio page must authorize the viewer via ownership (canCoachStudent)')
+// O gate de authz (canCoachStudent) deve rodar ANTES do fetch em massa (Promise.all).
+const gateIdx = relatorioText.indexOf('canCoachStudent')
+const fetchIdx = relatorioText.indexOf('Promise.all')
+assert.ok(gateIdx > -1 && fetchIdx > -1 && gateIdx < fetchIdx, 'relatorio auth gate must run BEFORE the bulk data fetch')
+// generateMetadata não pode vazar identidade via OG/unfurl (bot anônimo ignora o gate).
+assert.ok(!/title:\s*`Relatório — \$\{name\}/.test(relatorioText), 'relatorio generateMetadata must not leak the user name in the title')
+
 // ── Recurring "students" bug guard ─────────────────────────────────────────
 // Two errors kept regressing because every admin route reinvented student
 // lookup:
