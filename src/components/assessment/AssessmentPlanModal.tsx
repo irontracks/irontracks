@@ -5,6 +5,7 @@ import { ArrowLeft } from 'lucide-react'
 import type { AssessmentRow } from './assessmentUtils'
 import { formatDateCompact } from './assessmentChartData'
 import type { AiPlanEntry } from '@/hooks/useAssessmentHistoryData'
+import { useBackHandler } from '@/hooks/useBackHandler'
 
 // ────────────────────────────────────────────────────────────────
 // Props
@@ -46,6 +47,7 @@ function renderList(raw: unknown) {
 // ────────────────────────────────────────────────────────────────
 
 export function AssessmentPlanModal({ assessment, planState, onClose, onRegenerate }: AssessmentPlanModalProps) {
+  useBackHandler(true, onClose)
   const s = planState
   const plan = s?.plan && typeof s.plan === 'object' ? s.plan : null
   const badge = buildBadge(s)

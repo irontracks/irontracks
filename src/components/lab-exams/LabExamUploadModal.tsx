@@ -6,6 +6,7 @@ import { uploadLabExamFile } from '@/utils/storage/labExamUpload'
 import { LAB_EXAM_MAX_FILES, LAB_EXAM_MAX_FILE_BYTES } from '@/types/labExam'
 import { LAB_PROTOCOL_DISCLAIMER, type LabProtocol } from '@/schemas/labExam'
 import { LabExamProtocolView } from './LabExamProtocolView'
+import { useBackHandler } from '@/hooks/useBackHandler'
 
 type Stage = 'select' | 'processing' | 'result' | 'error'
 
@@ -45,6 +46,8 @@ export function LabExamUploadModal({ open, onClose, studentUserId, onSaved }: Pr
     }
     reset(); onClose()
   }, [stage, reset, onClose])
+
+  useBackHandler(open, handleClose)
 
   const addFiles = useCallback((list: FileList | null) => {
     if (!list?.length) return

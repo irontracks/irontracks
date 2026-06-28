@@ -19,6 +19,7 @@ import type { ParsedExercise } from '@/app/api/ai/parse-exercise-voice/route'
 import { requestVoicePermissions, openAppSettings, startNativeSpeechRecognition, stopNativeSpeechRecognition } from '@/utils/native/irontracksNative'
 import { isIosNative } from '@/utils/platform'
 import { useFocusTrap } from '@/hooks/useFocusTrap'
+import { useBackHandler } from '@/hooks/useBackHandler'
 
 // ── Web Speech API types (not fully typed in all TS DOM libs) ─────────────────
 
@@ -589,6 +590,9 @@ export default function VoiceWorkoutModal({
 
   // WCAG 2.4.3 + 2.1.2 — focus trap + Escape
   const focusTrapRef = useFocusTrap(isOpen, onClose)
+
+  // Android back button closes the modal instead of minimizing the app
+  useBackHandler(isOpen, onClose)
 
   if (!isOpen) return null
 

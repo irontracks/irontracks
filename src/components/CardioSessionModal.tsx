@@ -2,6 +2,7 @@
 
 import { useCallback, useState } from 'react'
 import { ChevronLeft, Trash2 } from 'lucide-react'
+import { useBackHandler } from '@/hooks/useBackHandler'
 import type { WorkoutSummary } from '@/components/historyListTypes'
 import { ACTIVITY_TYPES } from '@/components/workout/CardioGPSPanel'
 
@@ -89,6 +90,8 @@ export default function CardioSessionModal({
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [confirmDelete, setConfirmDelete] = useState(false)
+
+  useBackHandler(true, onClose)
 
   const isDirty =
     activityType !== (session.activityType ?? 'running') ||

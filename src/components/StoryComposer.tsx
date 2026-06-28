@@ -8,6 +8,7 @@ import { StoryControlPanel } from '@/components/stories/StoryControlPanel'
 import { StoryComposerIosSavePanel } from './StoryComposerIosSavePanel'
 import { getTemplateById } from '@/components/stories/storyTemplates'
 import { useUserSettings } from '@/hooks/useUserSettings'
+import { useBackHandler } from '@/hooks/useBackHandler'
 import { createClient } from '@/utils/supabase/client'
 import {
   SessionLite,
@@ -93,6 +94,8 @@ export default function StoryComposer({ open, session, onClose, calories }: Stor
     { key: 'cardTempo', label: 'TEMPO' },
     { key: 'cardKcal', label: 'KCAL' },
   ], [])
+
+  useBackHandler(open, onClose)
 
   if (!open) return null
 

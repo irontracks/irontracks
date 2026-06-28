@@ -20,6 +20,7 @@ import { logError } from '@/lib/logger'
 import { parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
 import { apiChat, apiStorage } from '@/lib/api'
+import { useBackHandler } from '@/hooks/useBackHandler'
 
 interface ChatUser {
     uid: string
@@ -99,6 +100,8 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
     const fileInputRef = useRef<HTMLInputElement | null>(null);
     const [debugChat, setDebugChat] = useState(false);
     const [sendingGif, setSendingGif] = useState(false);
+
+    useBackHandler(true, onClose);
 
     const userObj: Record<string, unknown> = isRecord(user) ? user : {}
     const targetObj: Record<string, unknown> = isRecord(targetUser) ? targetUser : {}
