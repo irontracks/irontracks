@@ -1267,6 +1267,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                         user={user as AdminUser}
                                         onClose={() => setView('dashboard')}
                                         onSelectChannel={handleSelectChannel}
+                                        onNavigateCommunity={() => setView('community')}
                                     />
                                 </div>
                             )}

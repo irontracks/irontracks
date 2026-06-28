@@ -141,7 +141,10 @@ export default function StudentDashboard(props: Props) {
   const [editListOpen, setEditListOpen] = useState(false)
   const [editListDraft, setEditListDraft] = useState<{ id: string; title: string; sort_order: number }[]>([])
   const [savingListEdits, setSavingListEdits] = useState(false)
-  const CREATE_WORKOUT_LOADING_TIMEOUT_MS = 900
+  // Fallback de segurança: reseta o loading caso a Promise de onCreateWorkout
+  // nunca resolva (ex.: navegação que não retorna). O reset primário acontece
+  // no finally do await abaixo, ao FIM real da ação.
+  const CREATE_WORKOUT_LOADING_TIMEOUT_MS = 9000
   const isMountedRef = useRef(true)
   const showNewRecordsCard = props.settings?.showNewRecordsCard !== false
   const showIronRank = props.settings?.showIronRank !== false
@@ -358,15 +361,32 @@ export default function StudentDashboard(props: Props) {
               <button
                 onClick={() => {
                   setCreatingWorkout(true)
+                  // Fallback de segurança: garante que o botão não fique travado
+                  // em loading caso a Promise nunca resolva (rede lenta/navegação
+                  // que não retorna). O reset primário é no finally do await.
+                  let fallbackId: number | null = null
                   try {
-                    try { trackUserEvent('click_dashboard_new_workout', { type: 'click', screen: 'dashboard' }) } catch { }
-                    props.onCreateWorkout()
-                  } catch {
-                    setCreatingWorkout(false)
-                  }
-                  try {
-                    window.setTimeout(() => setCreatingWorkout(false), CREATE_WORKOUT_LOADING_TIMEOUT_MS)
+                    fallbackId = window.setTimeout(() => {
+                      if (isMountedRef.current) setCreatingWorkout(false)
+                    }, CREATE_WORKOUT_LOADING_TIMEOUT_MS)
                   } catch { }
+                  const clearFallback = () => {
+                    if (fallbackId != null) {
+                      try { window.clearTimeout(fallbackId) } catch { }
+                      fallbackId = null
+                    }
+                  }
+                  ;(async () => {
+                    try {
+                      try { trackUserEvent('click_dashboard_new_workout', { type: 'click', screen: 'dashboard' }) } catch { }
+                      // Aguarda a ação real concluir (suporta retorno sync ou Promise).
+                      await props.onCreateWorkout()
+                    } finally {
+                      // Reseta o loading ao FIM real da ação, não por timer fixo.
+                      clearFallback()
+                      if (isMountedRef.current) setCreatingWorkout(false)
+                    }
+                  })()
                 }}
                 disabled={creatingWorkout}
                 className={`btn-shimmer-sweep group relative w-full rounded-2xl p-[1px] transition-all duration-300 active:scale-[0.97] disabled:opacity-70 ${

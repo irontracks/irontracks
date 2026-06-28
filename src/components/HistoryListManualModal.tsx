@@ -197,34 +197,35 @@ export function HistoryListManualModal({
                                     {manualExercises.map((ex, idx) => (
                                         <div key={idx} className="p-3 rounded-xl border space-y-2" style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'rgba(255,255,255,0.06)' }}>
                                             <p className="text-sm font-bold text-white">{ex.name}</p>
-                                            <div className="grid grid-cols-4 gap-2">
+                                            <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                                                 <div>
                                                     <div className="text-[10px] text-neutral-400">Sets</div>
-                                                    <input aria-label="Sets" type="number" value={ex.sets} onChange={(e) => updateManualExercise(idx, 'sets', e.target.value)} className="w-full bg-neutral-900 rounded p-2 text-center text-sm" />
+                                                    <input aria-label="Sets" type="number" inputMode="numeric" value={ex.sets} onChange={(e) => updateManualExercise(idx, 'sets', e.target.value)} className="w-full bg-neutral-900 rounded p-2 text-center text-base" />
                                                 </div>
                                                 <div>
                                                     <div className="text-[10px] text-neutral-400">Reps</div>
-                                                    <input aria-label="Reps" value={ex.reps || ''} onChange={(e) => updateManualExercise(idx, 'reps', e.target.value)} className="w-full bg-neutral-900 rounded p-2 text-center text-sm" />
+                                                    <input aria-label="Reps" inputMode="numeric" value={ex.reps || ''} onChange={(e) => updateManualExercise(idx, 'reps', e.target.value)} className="w-full bg-neutral-900 rounded p-2 text-center text-base" />
                                                 </div>
                                                 <div>
                                                     <div className="text-[10px] text-neutral-400">Cadência</div>
-                                                    <input aria-label="Cadência" value={ex.cadence || ''} onChange={(e) => updateManualExercise(idx, 'cadence', e.target.value)} className="w-full bg-neutral-900 rounded p-2 text-center text-sm" />
+                                                    <input aria-label="Cadência" value={ex.cadence || ''} onChange={(e) => updateManualExercise(idx, 'cadence', e.target.value)} className="w-full bg-neutral-900 rounded p-2 text-center text-base" />
                                                 </div>
                                                 <div>
                                                     <div className="text-[10px] text-neutral-400">Descanso (s)</div>
-                                                    <input aria-label="Descanso (s)" type="number" value={ex.restTime || 0} onChange={(e) => updateManualExercise(idx, 'restTime', e.target.value)} className="w-full bg-neutral-900 rounded p-2 text-center text-sm" />
+                                                    <input aria-label="Descanso (s)" type="number" inputMode="numeric" value={ex.restTime || 0} onChange={(e) => updateManualExercise(idx, 'restTime', e.target.value)} className="w-full bg-neutral-900 rounded p-2 text-center text-base" />
                                                 </div>
                                             </div>
                                             <div>
                                                 <div className="text-[10px] text-neutral-400">Pesos por série (kg)</div>
-                                                <div className="grid grid-cols-4 gap-2">
+                                                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                                                     {Array.from({ length: Number(ex.sets) || 0 }).map((_, sIdx) => (
                                                         <input
                                                             key={sIdx}
                                                             aria-label={`Peso série ${sIdx + 1}`}
+                                                            inputMode="decimal"
                                                             value={String(ex.weights?.[sIdx] ?? '')}
                                                             onChange={(e) => updateManualExercise(idx, 'weight', [sIdx, e.target.value])}
-                                                            className="w-full bg-neutral-900 rounded p-2 text-center text-sm text-white outline-none focus:ring-1 ring-yellow-500 placeholder:text-neutral-400 placeholder:opacity-40 focus:placeholder:opacity-0"
+                                                            className="w-full bg-neutral-900 rounded p-2 text-center text-base text-white outline-none focus:ring-1 ring-yellow-500 placeholder:text-neutral-400 placeholder:opacity-40 focus:placeholder:opacity-0"
                                                             placeholder={`#${sIdx + 1}`}
                                                         />
                                                     ))}
@@ -232,14 +233,15 @@ export function HistoryListManualModal({
                                             </div>
                                             <div>
                                                 <div className="text-[10px] text-neutral-400">Reps por série</div>
-                                                <div className="grid grid-cols-4 gap-2">
+                                                <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
                                                     {Array.from({ length: Number(ex.sets) || 0 }).map((_, sIdx) => (
                                                         <input
                                                             key={sIdx}
                                                             aria-label={`Reps série ${sIdx + 1}`}
+                                                            inputMode="numeric"
                                                             value={String(ex.repsPerSet?.[sIdx] ?? '')}
                                                             onChange={(e) => updateManualExercise(idx, 'rep', [sIdx, e.target.value])}
-                                                            className="w-full bg-neutral-900 rounded p-2 text-center text-sm text-white outline-none focus:ring-1 ring-yellow-500 placeholder:text-neutral-400 placeholder:opacity-40 focus:placeholder:opacity-0"
+                                                            className="w-full bg-neutral-900 rounded p-2 text-center text-base text-white outline-none focus:ring-1 ring-yellow-500 placeholder:text-neutral-400 placeholder:opacity-40 focus:placeholder:opacity-0"
                                                             placeholder={`#${sIdx + 1}`}
                                                         />
                                                     ))}

@@ -52,6 +52,7 @@ export function useCommunityData() {
   // ── Feed state ──
   const [feedItems, setFeedItems] = useState<FeedItem[]>([])
   const [feedLoading, setFeedLoading] = useState(false)
+  const [feedError, setFeedError] = useState<string | null>(null)
   const [feedCursor, setFeedCursor] = useState<string | null>(null)
   const [feedHasMore, setFeedHasMore] = useState(true)
   const feedLoadedRef = useRef(false)
@@ -217,6 +218,7 @@ export function useCommunityData() {
   const loadFeed = useCallback(async (reset?: boolean) => {
     if (!userId) return
     setFeedLoading(true)
+    setFeedError(null)
     try {
       const cursor = reset ? '' : feedCursor || ''
       const url = `/api/social/feed?limit=20${cursor ? `&cursor=${encodeURIComponent(cursor)}` : ''}`
@@ -228,8 +230,12 @@ export function useCommunityData() {
         else setFeedItems((prev) => [...prev, ...items])
         setFeedCursor(data.nextCursor || null)
         setFeedHasMore(Boolean(data.nextCursor))
+      } else {
+        setFeedError('Não foi possível carregar o feed.')
       }
-    } catch { }
+    } catch {
+      setFeedError('Não foi possível carregar o feed.')
+    }
     finally { setFeedLoading(false) }
   }, [userId, feedCursor])
 
@@ -342,6 +348,7 @@ export function useCommunityData() {
     // Feed
     feedItems,
     feedLoading,
+    feedError,
     feedHasMore,
     feedLoadedRef,
     loadFeed,

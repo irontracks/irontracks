@@ -92,10 +92,11 @@ export const SetDetailsSection: React.FC<SetDetailsSectionProps> = ({
                                         </div>
                                         <input
                                             type="number"
+                                            inputMode="decimal"
                                             aria-label={`${isIsoPlank ? 'Peso corporal' : 'Carga'} em kg para série ${setIdx + 1}`}
                                             value={(s?.weight ?? '')}
                                             onChange={(e) => onUpdateSetDetail(exerciseIndex, setIdx, { weight: e.target.value === '' ? null : Number(e.target.value) })}
-                                            className="w-full bg-black/30 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+                                            className="w-full bg-black/30 border border-neutral-700 rounded-lg p-2 text-base text-white outline-none focus:ring-1 ring-yellow-500"
                                         />
                                     </div>
                                     <div>
@@ -118,17 +119,18 @@ export const SetDetailsSection: React.FC<SetDetailsSectionProps> = ({
                                                     onUpdateSetDetail(exerciseIndex, setIdx, { reps: v })
                                                 }
                                             }}
-                                            className="w-full bg-black/30 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500"
+                                            className="w-full bg-black/30 border border-neutral-700 rounded-lg p-2 text-base text-white outline-none focus:ring-1 ring-yellow-500"
                                         />
                                     </div>
                                     <div>
                                         <div className="text-[10px] text-yellow-500 uppercase font-bold">RPE</div>
                                         <input
                                             type="number"
+                                            inputMode="decimal"
                                             aria-label={`RPE percebido para série ${setIdx + 1}`}
                                             value={(s?.rpe ?? '')}
                                             onChange={(e) => onUpdateSetDetail(exerciseIndex, setIdx, { rpe: e.target.value === '' ? null : Number(e.target.value) })}
-                                            className="w-full bg-black/30 border border-yellow-500/20 rounded-lg p-2 text-sm text-yellow-500 font-bold outline-none focus:ring-1 ring-yellow-500"
+                                            className="w-full bg-black/30 border border-yellow-500/20 rounded-lg p-2 text-base text-yellow-500 font-bold outline-none focus:ring-1 ring-yellow-500"
                                         />
                                     </div>
                                 </div>

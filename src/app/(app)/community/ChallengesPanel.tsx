@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import Image from 'next/image'
 import { Swords, Loader2, Check, X, Dumbbell, Flame } from 'lucide-react'
+import { useToast } from '@/contexts/ToastContext'
 
 interface Challenge {
   id: string
@@ -48,6 +49,7 @@ export default function ChallengesPanel({
   targetName?: string
   onClose?: () => void
 }) {
+  const { toast } = useToast()
   const [challenges, setChallenges] = useState<Challenge[]>([])
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(!!targetUserId)
@@ -89,8 +91,13 @@ export default function ChallengesPanel({
       if (data?.ok) {
         setCreating(false)
         load()
+      } else {
+        // Mantém o form aberto pro usuário tentar de novo e avisa o erro.
+        toast('Não foi possível enviar o desafio. Tente de novo.', 'error')
       }
-    } catch { }
+    } catch {
+      toast('Não foi possível enviar o desafio. Tente de novo.', 'error')
+    }
     finally { setBusy(false) }
   }
 
@@ -98,13 +105,30 @@ export default function ChallengesPanel({
     if (busy) return
     setBusy(true)
     try {
-      await fetch('/api/social/challenges', {
+      const res = await fetch('/api/social/challenges', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ action, challengeId }),
       })
-      load()
-    } catch { }
+      const data = await res.json().catch(() => null)
+      if (data?.ok) {
+        load()
+      } else {
+        toast(
+          action === 'accept'
+            ? 'Não foi possível aceitar o desafio. Tente de novo.'
+            : 'Não foi possível recusar o desafio. Tente de novo.',
+          'error',
+        )
+      }
+    } catch {
+      toast(
+        action === 'accept'
+          ? 'Não foi possível aceitar o desafio. Tente de novo.'
+          : 'Não foi possível recusar o desafio. Tente de novo.',
+        'error',
+      )
+    }
     finally { setBusy(false) }
   }
 
