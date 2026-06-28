@@ -25,7 +25,8 @@ export const BIA_FILE_LIMIT_LABEL = '15 MB'
 
 export interface BiaUploadResult {
   ok: true
-  publicUrl: string
+  /** Path no bucket privado bioimpedance-files. Persistido em
+   *  assessments.bia_attachment_url e lido via signed URL (getBiaSignedUrl). */
   path: string
 }
 
@@ -93,7 +94,7 @@ export async function uploadBiaAttachment(
   const path = `${userId}/bia/${fileName}`
 
   // 1. Signed upload URL
-  let signed: { ok: boolean; bucket?: string; path?: string; token?: string; publicUrl?: string; error?: string }
+  let signed: { ok: boolean; bucket?: string; path?: string; token?: string; error?: string }
   try {
     const res = await fetch('/api/assessment/bia-attachment/signed-upload', {
       method: 'POST',
@@ -125,6 +126,32 @@ export async function uploadBiaAttachment(
   return {
     ok: true,
     path: signed.path!,
-    publicUrl: signed.publicUrl || '',
   }
+}
+
+/**
+ * Minta uma signed URL de curta duração para LER/abrir um anexo de
+ * bioimpedância (bucket privado). Retorna null em falha (a UI degrada com aviso).
+ */
+export async function getBiaSignedUrl(path: string): Promise<string | null> {
+  const p = String(path || '').trim()
+  if (!p) return null
+  try {
+    const res = await fetch('/api/assessment/bia-attachment/signed-url', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: p }),
+    })
+    const json = await res.json().catch(() => null) as { ok?: boolean; url?: string } | null
+    if (res.ok && json?.ok && json.url) return String(json.url)
+  } catch {
+    /* rede — retorna null */
+  }
+  return null
+}
+
+/** Nome de arquivo amigável a partir do path `{uid}/bia/{ts}_{nome}.{ext}`. */
+export function biaFileNameFromPath(path: string): string {
+  const last = String(path || '').split('/').pop() || 'arquivo'
+  return last.replace(/^\d+_/, '') || 'arquivo'
 }

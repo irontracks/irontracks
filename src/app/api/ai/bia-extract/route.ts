@@ -21,13 +21,15 @@
  */
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { requireUser } from '@/utils/auth/route'
+import { isSafeStoragePath, requireUser } from '@/utils/auth/route'
+import { createAdminClient } from '@/utils/supabase/admin'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { parseJsonBody, parseJsonWithSchema } from '@/utils/zod'
 import { env } from '@/utils/env'
 import { getGeminiModel } from '@/utils/ai/gemini'
 import { safeGemini } from '@/utils/ai/handleGeminiError'
 import { logError } from '@/lib/logger'
+import { BIA_BUCKET, canAccessBiaPath } from '@/utils/storage/biaAttachmentAccess'
 
 export const dynamic = 'force-dynamic'
 
@@ -43,9 +45,9 @@ const ALLOWED_MIMES = [
 
 const BodySchema = z
   .object({
-    /** URL pública do bucket bioimpedance-files (mesma que foi salva
-     *  em assessments.bia_attachment_url). */
-    url: z.string().url().min(1),
+    /** Path no bucket PRIVADO bioimpedance-files: `{uid}/bia/{arquivo}`
+     *  (mesmo valor salvo em assessments.bia_attachment_url). */
+    path: z.string().min(1),
   })
   .strip()
 
@@ -96,58 +98,19 @@ function extractJson(text: string): unknown {
 }
 
 /**
- * Valida que a URL aponta pro nosso bucket Supabase Storage.
- *
- * Audit Finding #5 (SSRF): antes o único check era `url.includes('/bioimpedance-files/')`
- * — trivialmente burlado com `http://169.254.169.254/?/bioimpedance-files/`
- * (instance metadata AWS) ou `http://127.0.0.1:8080/?/bioimpedance-files/`
- * (port-scan interno). Combinado com `redirect: 'follow'`, atacante podia
- * fazer o servidor fetchar qualquer URL.
- *
- * AGORA valida via `new URL()`:
- *   - protocol === 'https:'
- *   - hostname === '<projeto>.supabase.co'
- *   - pathname COMEÇA com '/storage/v1/object/public/bioimpedance-files/'
- *     (não apenas contém — burla `?/bioimpedance-files/` em query string)
+ * Infere o mime pelo sufixo do path quando o Storage não retorna content-type.
+ * O download agora é feito via SDK do Storage (path no bucket privado), então
+ * NÃO há mais fetch de URL externa — a superfície de SSRF foi eliminada.
  */
-function isAllowedAttachmentUrl(url: string): boolean {
-  try {
-    const u = new URL(url)
-    if (u.protocol !== 'https:') return false
-    // Host esperado vem do env. Aceita o hostname exato do projeto Supabase.
-    const supabaseUrl = env.supabase.url
-    if (!supabaseUrl) return false
-    const allowedHost = new URL(supabaseUrl).hostname
-    if (u.hostname !== allowedHost) return false
-    // Pathname deve começar com o prefixo do bucket — não basta conter.
-    return u.pathname.startsWith('/storage/v1/object/public/bioimpedance-files/')
-  } catch {
-    return false
-  }
-}
-
-/**
- * Baixa o arquivo do bucket Supabase. `redirect: 'manual'` rejeita 3xx pra
- * fechar a brecha de redirect-chain SSRF.
- */
-async function downloadAttachment(url: string): Promise<{ ok: true; data: Buffer; mime: string } | { ok: false; error: string }> {
-  try {
-    const res = await fetch(url, { redirect: 'manual' })
-    // 3xx tratado como erro — atacante poderia hostar redirect pra IP interno
-    if (res.status >= 300 && res.status < 400) {
-      return { ok: false, error: 'redirect_not_allowed' }
-    }
-    if (!res.ok) return { ok: false, error: `download_failed_${res.status}` }
-    const contentType = (res.headers.get('content-type') || '').toLowerCase().split(';')[0].trim()
-    if (!ALLOWED_MIMES.includes(contentType)) {
-      return { ok: false, error: `unsupported_mime_${contentType || 'unknown'}` }
-    }
-    const buf = Buffer.from(await res.arrayBuffer())
-    if (buf.length > MAX_DOWNLOAD_BYTES) return { ok: false, error: 'file_too_large' }
-    return { ok: true, data: buf, mime: contentType }
-  } catch (e) {
-    return { ok: false, error: e instanceof Error ? e.message : 'download_error' }
-  }
+function inferMimeFromPath(path: string): string {
+  const ext = (path.split('.').pop() || '').toLowerCase()
+  if (ext === 'pdf') return 'application/pdf'
+  if (ext === 'jpg' || ext === 'jpeg') return 'image/jpeg'
+  if (ext === 'png') return 'image/png'
+  if (ext === 'webp') return 'image/webp'
+  if (ext === 'heic') return 'image/heic'
+  if (ext === 'heif') return 'image/heif'
+  return ''
 }
 
 const PROMPT = [
@@ -223,23 +186,34 @@ export async function POST(req: Request) {
 
     const parsed = await parseJsonBody(req, BodySchema)
     if (parsed.response) return parsed.response
-    const { url } = parsed.data!
+    const { path } = parsed.data!
 
-    // Audit Finding #5: validação estrita de hostname + path prefix em vez
-    // do `url.includes()` antigo que era trivialmente burlado via SSRF.
-    if (!isAllowedAttachmentUrl(url)) {
-      return NextResponse.json({ ok: false, error: 'invalid_attachment_url' }, { status: 400 })
+    // Path do bucket PRIVADO. Download via SDK do Storage — sem fetch de URL
+    // externa, logo sem superfície de SSRF (auditoria 2026-06-27 M2/M5).
+    const safe = isSafeStoragePath(path)
+    if (!safe.ok) return NextResponse.json({ ok: false, error: safe.error }, { status: 400 })
+    if (!(await canAccessBiaPath({ id: userId, email: auth.user.email }, safe.path))) {
+      return NextResponse.json({ ok: false, error: 'forbidden' }, { status: 403 })
     }
 
     const apiKey = env.gemini.apiKey
     if (!apiKey) return NextResponse.json({ ok: false, error: 'ai_not_configured' }, { status: 500 })
 
-    const dl = await downloadAttachment(url)
-    if (!dl.ok) {
-      return NextResponse.json({ ok: false, error: dl.error }, { status: 400 })
+    const admin = createAdminClient()
+    const dl = await admin.storage.from(BIA_BUCKET).download(safe.path)
+    if (dl.error || !dl.data) {
+      return NextResponse.json({ ok: false, error: 'download_failed' }, { status: 400 })
     }
-
-    const base64Data = dl.data.toString('base64')
+    const blob = dl.data
+    const mime = (blob.type || '').toLowerCase().split(';')[0].trim() || inferMimeFromPath(safe.path)
+    if (!ALLOWED_MIMES.includes(mime)) {
+      return NextResponse.json({ ok: false, error: `unsupported_mime_${mime || 'unknown'}` }, { status: 400 })
+    }
+    const arrayBuf = await blob.arrayBuffer()
+    if (arrayBuf.byteLength > MAX_DOWNLOAD_BYTES) {
+      return NextResponse.json({ ok: false, error: 'file_too_large' }, { status: 400 })
+    }
+    const base64Data = Buffer.from(arrayBuf).toString('base64')
 
     // Flash é suficiente pra OCR estruturado e custa muito menos que Pro.
     const model = getGeminiModel(apiKey, env.gemini.fastModelId)
@@ -247,7 +221,7 @@ export async function POST(req: Request) {
     const geminiResult = await safeGemini('bia-extract', () =>
       model.generateContent([
         { text: PROMPT },
-        { inlineData: { mimeType: dl.mime, data: base64Data } },
+        { inlineData: { mimeType: mime, data: base64Data } },
       ]),
     )
     if ('errorResponse' in geminiResult) return geminiResult.errorResponse

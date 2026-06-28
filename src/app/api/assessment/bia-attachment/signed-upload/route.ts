@@ -6,12 +6,12 @@
  * sem que o arquivo passe pelo nosso server.
  *
  * Caminho permitido: `{user_id}/bia/{nome_seguro_unico}.{ext}`
- * Bucket:           `bioimpedance-files` (público)
+ * Bucket:           `bioimpedance-files` (PRIVADO — dado médico)
  * Tipos aceitos:    PDF, JPEG, PNG, WEBP, HEIC
  * Limite por arquivo: 15 MB
  *
- * Após upload o frontend chama `getPublicUrl()` e persiste a URL
- * em `assessments.bia_attachment_url`.
+ * Após upload o frontend persiste o PATH em `assessments.bia_attachment_url`
+ * e lê o arquivo via signed URL curta (rota `bia-attachment/signed-url`).
  */
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/admin'
@@ -86,17 +86,22 @@ export async function POST(request: Request) {
     }
 
     const admin = createAdminClient()
+    // Bucket PRIVADO: documentos médicos de bioimpedância não podem ser
+    // acessíveis por URL pública (auditoria 2026-06-27, M2/M5). A leitura é
+    // feita via signed URL curta (rota signed-url) com checagem de dono/personal.
+    // O ensure abaixo também CONVERTE pra privado um bucket legado que estava
+    // público (auto-heal no primeiro upload após o deploy).
     const b = await admin.storage.getBucket(BUCKET)
     if (!b?.data) {
       const created = await admin.storage.createBucket(BUCKET, {
-        public: true,
+        public: false,
         fileSizeLimit: FILE_LIMIT_BYTES,
         allowedMimeTypes: ALLOWED_CONTENT_TYPES,
       })
       if (created.error) return NextResponse.json({ ok: false, error: created.error.message }, { status: 400 })
-    } else if (b.data.file_size_limit !== FILE_LIMIT_BYTES) {
+    } else if (b.data.public !== false || b.data.file_size_limit !== FILE_LIMIT_BYTES) {
       const updated = await admin.storage.updateBucket(BUCKET, {
-        public: true,
+        public: false,
         fileSizeLimit: FILE_LIMIT_BYTES,
         allowedMimeTypes: ALLOWED_CONTENT_TYPES,
       })
@@ -111,16 +116,12 @@ export async function POST(request: Request) {
       )
     }
 
-    // Public URL é estável e pode ser construída antes do upload existir.
-    // Frontend usa esse mesmo URL após confirmar que o upload deu certo.
-    const { data: pub } = admin.storage.from(BUCKET).getPublicUrl(safe.path)
-
+    // Persistimos o PATH (não uma URL pública). A leitura usa signed URL curta.
     return NextResponse.json({
       ok: true,
       bucket: BUCKET,
       path: safe.path,
       token: data.token,
-      publicUrl: pub.publicUrl,
       bucketLimitBytes: FILE_LIMIT_BYTES,
     })
   } catch (e: unknown) {
