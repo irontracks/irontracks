@@ -3,6 +3,7 @@ import { parseJsonBody } from '@/utils/zod'
 import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { requireUser } from '@/utils/auth/route'
+import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { getErrorMessage } from '@/utils/errorMessage'
 
 const ZodBodySchema = z
@@ -41,6 +42,12 @@ export async function POST(request: Request) {
   try {
     const auth = await requireUser()
     if (!auth.ok) return auth.response
+
+    // Cada chamada executa updateBucket (service-role) — sem rate-limit era um
+    // vetor de DoS leve para qualquer usuário logado (auditoria 2026-06-27, L9).
+    const ip = getRequestIp(request)
+    const rl = await checkRateLimitAsync(`storage:ensure-bucket:${auth.user.id}:${ip}`, 5, 60_000)
+    if (!rl.allowed) return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 })
 
     const admin = createAdminClient()
     const parsedBody = await parseJsonBody(request, ZodBodySchema)
