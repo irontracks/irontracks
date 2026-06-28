@@ -807,7 +807,7 @@ export default function NutritionMixer({
               {goalsOpen ? '✕ Fechar' : '⚙ Metas'}
             </button>
           </div>
-          <MacroBar label="Proteína" value={totals.protein} goal={safeGoals.protein} color="#3b82f6" accent="text-blue-400" />
+          <MacroBar label="Proteína" value={totals.protein} goal={safeGoals.protein} color="#fbbf24" accent="text-amber-300" />
           <MacroBar label="Carboidratos" value={totals.carbs} goal={safeGoals.carbs} color="#f59e0b" accent="text-amber-400" />
           <MacroBar label="Gordura" value={totals.fat} goal={safeGoals.fat} color="#ef4444" accent="text-red-400" />
 

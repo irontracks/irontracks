@@ -348,7 +348,7 @@ const CustomFoodScanner = memo(function CustomFoodScanner({ saving, onSave, onCl
           <div className="rounded-xl bg-neutral-900/60 border border-neutral-800 px-3 py-2 flex flex-wrap gap-x-4 gap-y-1">
             <span className="text-[10px] text-neutral-400">Por {Math.round(label.servingSizeG)}g:</span>
             <span className="text-xs font-semibold text-neutral-100">{Math.round(label.kcalPer100g * label.servingSizeG / 100)} kcal</span>
-            <span className="text-xs text-blue-300">P {(label.proteinPer100g * label.servingSizeG / 100).toFixed(1)}g</span>
+            <span className="text-xs text-amber-300">P {(label.proteinPer100g * label.servingSizeG / 100).toFixed(1)}g</span>
             <span className="text-xs text-orange-300">C {(label.carbsPer100g * label.servingSizeG / 100).toFixed(1)}g</span>
             <span className="text-xs text-yellow-300">G {(label.fatPer100g * label.servingSizeG / 100).toFixed(1)}g</span>
           </div>

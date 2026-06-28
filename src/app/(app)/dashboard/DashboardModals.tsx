@@ -238,7 +238,7 @@ export default function DashboardModals(props: DashboardModalsProps) {
             {showJsonImportModal && (
                 <div className="fixed inset-0 z-[80] bg-black/90 flex items-center justify-center p-4">
                     <div className="bg-neutral-900 p-6 rounded-2xl w-full max-w-sm border border-neutral-800 text-center">
-                        <Upload size={48} className="mx-auto text-blue-500 mb-4" />
+                        <Upload size={48} className="mx-auto text-amber-500 mb-4" />
                         <h3 className="font-bold text-white mb-2 text-xl">Restaurar Backup</h3>
                         <p className="text-neutral-400 text-sm mb-6">Selecione o arquivo .json que você salvou anteriormente.</p>
                         <label className="block w-full cursor-pointer bg-amber-500 hover:bg-amber-400 text-black font-bold py-4 rounded-xl transition-colors">
@@ -369,9 +369,9 @@ export default function DashboardModals(props: DashboardModalsProps) {
                                                             </div>
                                                         )}
                                                         {isSpecialMethod && (
-                                                            <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-violet-500/10 border border-violet-500/20">
-                                                                <Zap size={10} className="text-violet-400" />
-                                                                <span className="text-[10.5px] font-bold text-violet-400">{method}</span>
+                                                            <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20">
+                                                                <Zap size={10} className="text-amber-400" />
+                                                                <span className="text-[10.5px] font-bold text-amber-400">{method}</span>
                                                             </div>
                                                         )}
                                                     </div>

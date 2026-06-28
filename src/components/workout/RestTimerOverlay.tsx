@@ -610,9 +610,9 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
     const isSideRest = kind === 'side_rest';
     const isTransition = kind === 'transition';
     // Ring color: blue for side-rest, orange for transition, yellow/red for normal rest
-    const baseRingColor = isSideRest ? '#3b82f6' : isTransition ? '#f97316' : '#eab308';
+    const baseRingColor = isSideRest ? '#f59e0b' : isTransition ? '#f97316' : '#eab308';
     const ringColor = isOvertime ? '#ef4444' : baseRingColor;
-    const ringGlow = isOvertime ? 'rgba(239,68,68,0.5)' : isSideRest ? 'rgba(59,130,246,0.4)' : isTransition ? 'rgba(249,115,22,0.4)' : 'rgba(234,179,8,0.4)';
+    const ringGlow = isOvertime ? 'rgba(239,68,68,0.5)' : isSideRest ? 'rgba(245,158,11,0.4)' : isTransition ? 'rgba(249,115,22,0.4)' : 'rgba(234,179,8,0.4)';
     const ringOffset = isOvertime ? redOffset : yellowOffset;
 
     return (
@@ -624,7 +624,7 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
             {isFinished && !isTransition && !flashDismissed && (
                 <div
                     role="presentation"
-                    className={`fixed inset-0 z-[2000] backdrop-blur-sm flex flex-col items-center justify-center px-6 overflow-x-hidden cursor-pointer ${isSideRest ? 'bg-blue-600/90' : 'bg-green-600/90'}`}
+                    className={`fixed inset-0 z-[2000] backdrop-blur-sm flex flex-col items-center justify-center px-6 overflow-x-hidden cursor-pointer ${isSideRest ? 'bg-amber-500/90' : 'bg-green-600/90'}`}
                     onClick={(e) => { e.stopPropagation(); setFlashDismissedForTarget(targetTime ?? null); }}
                     onPointerDown={(e) => e.stopPropagation()}
                     onTouchStart={(e) => e.stopPropagation()}
@@ -690,7 +690,7 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
                             <span
                                 className="text-[6px] font-black uppercase mt-0.5 leading-none"
                                 style={{
-                                    color: isOvertime ? '#ef4444' : isSideRest ? '#3b82f6' : isTransition ? '#f97316' : '#737373',
+                                    color: isOvertime ? '#ef4444' : isSideRest ? '#f59e0b' : isTransition ? '#f97316' : '#737373',
                                     letterSpacing: '0.02em',
                                 }}
                             >
@@ -714,7 +714,7 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
                                 onClick={handleStart}
                                 className={`flex-1 py-2 rounded-xl text-black font-black text-sm shadow-lg active:scale-95 transition-shadow ${
                                     isSideRest
-                                        ? 'bg-gradient-to-r from-blue-500 to-blue-400 shadow-blue-900/30 hover:shadow-blue-500/40'
+                                        ? 'bg-gradient-to-r from-amber-500 to-amber-400 shadow-amber-900/30 hover:shadow-amber-500/40'
                                         : isTransition
                                             ? 'bg-gradient-to-r from-orange-500 to-amber-400 shadow-orange-900/30 hover:shadow-orange-500/40'
                                             : 'bg-gradient-to-r from-yellow-500 to-amber-400 shadow-yellow-900/30 hover:shadow-yellow-500/40'
