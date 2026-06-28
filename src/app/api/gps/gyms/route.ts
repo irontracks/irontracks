@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
+import { respondDbError } from '@/utils/api/dbError'
 
 export const dynamic = 'force-dynamic'
 
@@ -24,7 +25,7 @@ export async function GET() {
     .order('is_primary', { ascending: false })
     .limit(20)
 
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+  if (error) return respondDbError('gps:gyms:list', error)
   return NextResponse.json({ ok: true, gyms: data })
 }
 
@@ -60,7 +61,7 @@ export async function POST(req: Request) {
     .select('id, name, latitude, longitude, radius_meters, is_primary, created_at')
     .single()
 
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+  if (error) return respondDbError('gps:gyms:create', error)
   return NextResponse.json({ ok: true, gym: data })
 }
 
@@ -79,6 +80,6 @@ export async function DELETE(req: Request) {
     .eq('id', gymId)
     .eq('user_id', auth.user.id)
 
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+  if (error) return respondDbError('gps:gyms:delete', error)
   return NextResponse.json({ ok: true })
 }

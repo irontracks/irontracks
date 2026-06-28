@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { createClient } from '@/utils/supabase/server'
+import { isTeamSessionMember } from '@/utils/team/sessionMembership'
+import { respondDbError } from '@/utils/api/dbError'
 
 export const dynamic = 'force-dynamic'
 
@@ -22,23 +24,12 @@ export async function GET(req: NextRequest) {
 
     const admin = createAdminClient()
 
-    // R5#1: Verify user is a member of this session (teacher or participant)
-    const { data: session } = await admin
-      .from('team_sessions')
-      .select('id, teacher_id')
-      .eq('id', sessionId)
-      .maybeSingle()
-    if (!session?.id) return NextResponse.json({ ok: false, error: 'session_not_found' }, { status: 404 })
-
-    const isTeacher = session.teacher_id === user.id
-    if (!isTeacher) {
-      const { data: participant } = await admin
-        .from('team_session_participants')
-        .select('id')
-        .eq('session_id', sessionId)
-        .eq('user_id', user.id)
-        .maybeSingle()
-      if (!participant?.id) return NextResponse.json({ ok: false, error: 'forbidden' }, { status: 403 })
+    // Membership: host / participante (participants[] jsonb) / presença ao vivo.
+    // Antes referenciava team_sessions.teacher_id e a tabela
+    // team_session_participants — AMBOS inexistentes no schema real → o GET sempre
+    // falhava (fail-closed, mas quebrado). Auditoria 2026-06-27 (L5).
+    if (!(await isTeamSessionMember(admin, sessionId, user.id))) {
+      return NextResponse.json({ ok: false, error: 'forbidden' }, { status: 403 })
     }
 
     const { data, error } = await admin
@@ -49,7 +40,7 @@ export async function GET(req: NextRequest) {
       .limit(50)
 
     if (error) {
-      return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
+      return respondDbError('team:chat:messages', error, 500)
     }
 
     return NextResponse.json({ ok: true, data: data || [] })

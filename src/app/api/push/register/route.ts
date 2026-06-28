@@ -11,6 +11,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
+import { respondDbError } from '@/utils/api/dbError'
 
 const normalizeToken = (v: unknown) => String(v ?? '').trim()
 
@@ -71,7 +72,7 @@ export async function POST(request: Request) {
       )
 
     if (error) {
-      return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
+      return respondDbError('push:register', error, 500)
     }
 
     return NextResponse.json({ ok: true })

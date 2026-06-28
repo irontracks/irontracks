@@ -39,6 +39,7 @@ import {
 } from '@/lib/videoSuggestions'
 import { parseJsonBody } from '@/utils/zod'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { respondDbError } from '@/utils/api/dbError'
 import { logError, logInfo } from '@/lib/logger'
 
 export const dynamic = 'force-dynamic'
@@ -91,7 +92,7 @@ export async function POST(req: Request) {
       .or('video_url.is.null,video_url.eq.')
       .limit(limit * 3) // sobre-busca pra absorver os que vamos pular
     if (libErr) {
-      return NextResponse.json({ ok: false, error: libErr.message }, { status: 400 })
+      return respondDbError('admin:exercise-videos:auto-pipeline', libErr)
     }
 
     // Quais desses JÁ têm vídeo primary aprovado em exercise_videos

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { requireUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
+import { respondDbError } from '@/utils/api/dbError'
 
 export const dynamic = 'force-dynamic'
 
@@ -73,7 +74,7 @@ export async function GET(req: Request) {
     }
 
     const { data: rows, error } = await query
-    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+    if (error) return respondDbError('social:feed', error)
 
     const rawItems = Array.isArray(rows) ? rows : []
 

@@ -8,6 +8,7 @@ import { requireUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { parseJsonBody } from '@/utils/zod'
 import { checkRateLimitAsync } from '@/utils/rateLimit'
+import { respondDbError } from '@/utils/api/dbError'
 
 export const dynamic = 'force-dynamic'
 
@@ -31,7 +32,7 @@ export async function GET() {
     .order('created_at', { ascending: false })
     .limit(100)
 
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
+  if (error) return respondDbError('progress-photos:list', error, 500)
   return NextResponse.json({ ok: true, photos: data ?? [] })
 }
 
@@ -65,6 +66,6 @@ export async function POST(req: NextRequest) {
     .select('id, url, kind, notes, weight_kg, date, created_at')
     .single()
 
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
+  if (error) return respondDbError('progress-photos:create', error, 500)
   return NextResponse.json({ ok: true, photo: data })
 }

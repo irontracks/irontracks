@@ -12,6 +12,7 @@ import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { requireRoleOrBearer } from '@/utils/auth/route'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
+import { respondDbError } from '@/utils/api/dbError'
 
 export const dynamic = 'force-dynamic'
 
@@ -41,7 +42,7 @@ export async function GET(req: Request) {
       .limit(30)
 
     if (error) {
-      return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+      return respondDbError('admin:notifications:list', error)
     }
 
     const rows = Array.isArray(data) ? data : []

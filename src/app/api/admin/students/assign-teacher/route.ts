@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { requireRoleOrBearer } from '@/utils/auth/route'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { respondDbError } from '@/utils/api/dbError'
 import { safeEmailLike } from '@/utils/safePgFilter'
 import { resolveStudentRow } from '@/utils/admin/resolveStudent'
 
@@ -86,7 +87,7 @@ export async function POST(req: Request) {
       const isNewAssignment = teacher_user_id && (!currentTeacher || currentTeacher !== teacher_user_id)
       if (isNewAssignment) {
         const { data: canAdd, error: limitErr } = await admin.rpc('teacher_can_add_student', { p_teacher_user_id: teacher_user_id })
-        if (limitErr) return NextResponse.json({ ok: false, error: limitErr.message }, { status: 400 })
+        if (limitErr) return respondDbError('admin:students:assign-teacher:limit', limitErr)
         if (!canAdd) {
           return NextResponse.json({
             ok: false,
@@ -98,7 +99,7 @@ export async function POST(req: Request) {
     }
 
     const { error } = await admin.from('students').update({ teacher_id: teacher_user_id }).eq('id', srow.id)
-    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+    if (error) return respondDbError('admin:students:assign-teacher', error)
     return NextResponse.json({ ok: true, student_id: srow.id, teacher_user_id })
   } catch (e: unknown) {
     return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })

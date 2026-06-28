@@ -5,6 +5,7 @@ import { requireRoleOrBearer, requireUser } from '@/utils/auth/route'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { parseJsonBody } from '@/utils/zod'
 import { sendPushToAllPlatforms } from '@/lib/push/sender'
+import { respondDbError } from '@/utils/api/dbError'
 
 export const dynamic = 'force-dynamic'
 
@@ -40,7 +41,7 @@ export async function POST(
         .eq('user_id', studentId)
         .maybeSingle()
 
-      if (selErr) return NextResponse.json({ ok: false, error: selErr.message }, { status: 400 })
+      if (selErr) return respondDbError('teacher:control:select', selErr, 400)
       if (!session) return NextResponse.json({ ok: false, error: 'no active session' }, { status: 404 })
       if (!session.controlled_by) return NextResponse.json({ ok: false, error: 'no control request' }, { status: 400 })
 
@@ -52,7 +53,7 @@ export async function POST(
           .update({ control_status: 'active' })
           .eq('user_id', studentId)
 
-        if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+        if (error) return respondDbError('teacher:control', error, 400)
 
         // Fetch student name for push
         const { data: studentProfile } = await admin
@@ -76,7 +77,7 @@ export async function POST(
         .update({ controlled_by: null, control_status: null })
         .eq('user_id', studentId)
 
-      if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+      if (error) return respondDbError('teacher:control', error, 400)
 
       const { data: studentProfile } = await admin
         .from('profiles')
@@ -106,7 +107,7 @@ export async function POST(
         .eq('user_id', studentId)
         .eq('teacher_id', teacherId)
         .maybeSingle()
-      if (stuErr) return NextResponse.json({ ok: false, error: stuErr.message }, { status: 400 })
+      if (stuErr) return respondDbError('teacher:control:student', stuErr, 400)
       if (!student) return NextResponse.json({ ok: false, error: 'student not found or not yours' }, { status: 403 })
     }
 
@@ -117,7 +118,7 @@ export async function POST(
         .eq('user_id', studentId)
         .maybeSingle()
 
-      if (selErr) return NextResponse.json({ ok: false, error: selErr.message }, { status: 400 })
+      if (selErr) return respondDbError('teacher:control:select', selErr, 400)
       if (!session) return NextResponse.json({ ok: false, error: 'student has no active session' }, { status: 404 })
       if (session.control_status === 'active') {
         return NextResponse.json({ ok: false, error: 'session already controlled' }, { status: 409 })
@@ -141,7 +142,7 @@ export async function POST(
         .update({ controlled_by: teacherId, control_status: 'requested' })
         .eq('user_id', studentId)
 
-      if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+      if (error) return respondDbError('teacher:control', error, 400)
 
       // Fetch teacher name for push
       const { data: teacherProfile } = await admin

@@ -12,6 +12,7 @@ import { requireUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { parseJsonBody } from '@/utils/zod'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
+import { respondDbError } from '@/utils/api/dbError'
 
 export const dynamic = 'force-dynamic'
 
@@ -78,7 +79,7 @@ export async function POST(req: NextRequest) {
     .single()
 
   if (checkinErr) {
-    return NextResponse.json({ ok: false, error: checkinErr.message }, { status: 500 })
+    return respondDbError('gps:qr-checkin', checkinErr, 500)
   }
 
   return NextResponse.json({

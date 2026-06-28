@@ -9,6 +9,7 @@ import { env } from '@/utils/env'
 import { getGeminiModel } from '@/utils/ai/gemini'
 import { safeGemini, handleGeminiError } from '@/utils/ai/handleGeminiError'
 import { buildUserContextBlock } from '@/utils/ai/userContext'
+import { respondDbError } from '@/utils/api/dbError'
 
 export const dynamic = 'force-dynamic'
 
@@ -71,7 +72,7 @@ export async function POST(req: Request) {
       .order('date', { ascending: true })
       .limit(20)
 
-    if (sErr) return NextResponse.json({ ok: false, error: sErr.message }, { status: 500 })
+    if (sErr) return respondDbError('ai:weekly-report', sErr, 500)
 
     const sessionData = (sessions || []).map(row => {
       const r = row as Record<string, unknown>

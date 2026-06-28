@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
 import { parseSearchParams } from '@/utils/zod'
 import { cacheGet, cacheSet } from '@/utils/cache'
+import { respondDbError } from '@/utils/api/dbError'
 
 export const dynamic = 'force-dynamic'
 
@@ -39,7 +40,7 @@ export async function GET(req: Request) {
       .lte('release_date', nowIso)
       .order('release_date', { ascending: false })
       .limit(batchSize)
-    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+    if (error) return respondDbError('updates:unseen', error)
 
     const safeUpdates = Array.isArray(updates) ? updates : []
     const updateIds = safeUpdates.map((u) => u.id).filter(Boolean)
@@ -50,7 +51,7 @@ export async function GET(req: Request) {
       .select('update_id, viewed_at, prompted_at')
       .eq('user_id', user.id)
       .in('update_id', updateIds)
-    if (viewsError) return NextResponse.json({ ok: false, error: viewsError.message }, { status: 400 })
+    if (viewsError) return respondDbError('updates:unseen:views', viewsError)
 
     const viewMap = new Map<string, { viewed_at: string | null; prompted_at: string | null }>()
     ;(Array.isArray(views) ? views : []).forEach((row: Record<string, unknown>) => {

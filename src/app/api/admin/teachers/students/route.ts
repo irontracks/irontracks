@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { requireRoleOrBearer } from '@/utils/auth/route'
 import { parseSearchParams } from '@/utils/zod'
+import { respondDbError } from '@/utils/api/dbError'
 import { cacheGet, cacheSet } from '@/utils/cache'
 
 export const dynamic = 'force-dynamic'
@@ -39,7 +40,7 @@ export async function GET(req: Request) {
       .eq('teacher_id', teacherId)
       .order('name')
       .range(q.offset, q.offset + q.limit - 1)
-    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+    if (error) return respondDbError('admin:teachers:students', error)
 
     const payload = { ok: true, students: rows || [] }
     await cacheSet(cacheKey, payload, 30)

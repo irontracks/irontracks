@@ -11,6 +11,7 @@ import { cacheSetNx, cacheDeletePattern } from '@/utils/cache'
 import { buildReportMetrics, buildWeeklyVolumeStats, buildTrainingLoadFlags } from '@/utils/report/reportMetrics'
 import { logWarn, logError } from '@/lib/logger'
 import { notifyWorkoutFinished } from '@/lib/social/workoutNotifications'
+import { respondDbError } from '@/utils/api/dbError'
 import { env } from '@/utils/env'
 
 const LogEntrySchema = z
@@ -251,7 +252,7 @@ export async function POST(request: Request) {
     const { data, error } = insertRes
     saved = saved || (data as { id: string;[key: string]: unknown } | null)
 
-    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+    if (error) return respondDbError('workouts:finish:insert', error)
 
     try {
       await supabase.from('active_workout_sessions').delete().eq('user_id', user.id)

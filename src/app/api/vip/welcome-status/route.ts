@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { requireUser } from '@/utils/auth/route'
 import { getVipPlanLimits } from '@/utils/vip/limits'
 import { cacheGet, cacheSet } from '@/utils/cache'
+import { respondDbError } from '@/utils/api/dbError'
 
 export const dynamic = 'force-dynamic'
 
@@ -26,7 +27,7 @@ export async function GET() {
       .select('user_id, first_seen_at, last_seen_at')
       .eq('user_id', user.id)
       .maybeSingle()
-    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+    if (error) return respondDbError('vip:welcome-status', error)
 
     const alreadySeen = !!data?.user_id
     const payload = { ok: true, hasVip: true, alreadySeen, shouldShow: !alreadySeen }

@@ -5,6 +5,7 @@ import { requireUser } from '@/utils/auth/route'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { getVipPlanLimits } from '@/utils/vip/limits'
 import { createAdminClient } from '@/utils/supabase/admin'
+import { respondDbError } from '@/utils/api/dbError'
 
 export const dynamic = 'force-dynamic'
 
@@ -66,7 +67,7 @@ export async function POST(req: Request) {
       .eq('is_template', true)
       .order('name', { ascending: true })
       .limit(1000)
-    if (tErr) return NextResponse.json({ ok: false, error: tErr.message }, { status: 400 })
+    if (tErr) return respondDbError('ai:apply-progression-next', tErr)
 
     const templates = safeArray<unknown>(templatesRaw).filter(isRecord)
     const curIdx = templates.findIndex((w) => String(w?.id || '').trim() === originWorkoutId)
@@ -91,7 +92,7 @@ export async function POST(req: Request) {
       .eq('id', targetWorkoutId)
       .eq('user_id', userId)
       .maybeSingle()
-    if (wErr) return NextResponse.json({ ok: false, error: wErr.message }, { status: 400 })
+    if (wErr) return respondDbError('ai:apply-progression-next', wErr)
     if (!workoutRow?.id) return NextResponse.json({ ok: false, error: 'not_found' }, { status: 404 })
 
     const rowObj: Record<string, unknown> = isRecord(workoutRow) ? workoutRow : {}

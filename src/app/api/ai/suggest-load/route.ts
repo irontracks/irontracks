@@ -4,6 +4,7 @@ import { requireUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { parseJsonBody } from '@/utils/zod'
+import { respondDbError } from '@/utils/api/dbError'
 
 export const dynamic = 'force-dynamic'
 
@@ -174,7 +175,7 @@ export async function POST(req: Request) {
       .order('created_at', { ascending: false })
       .limit(30)
 
-    if (sErr) return NextResponse.json({ ok: false, error: sErr.message }, { status: 500 })
+    if (sErr) return respondDbError('ai:suggest-load', sErr, 500)
 
     // Parse logs from each session, find matching exercise
     const allLogs: SetLog[] = []

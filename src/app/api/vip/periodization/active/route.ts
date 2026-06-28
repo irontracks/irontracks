@@ -5,6 +5,7 @@ import { checkVipFeatureAccess } from '@/utils/vip/limits'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { cacheGet, cacheSet } from '@/utils/cache'
+import { respondDbError } from '@/utils/api/dbError'
 
 export const dynamic = 'force-dynamic'
 
@@ -34,7 +35,7 @@ export async function GET() {
       .limit(1)
       .maybeSingle()
 
-    if (pErr) return NextResponse.json({ ok: false, error: pErr.message }, { status: 400 })
+    if (pErr) return respondDbError('vip:periodization:active:program', pErr, 400)
     if (!program?.id) {
       const payload = { ok: true, program: null, workouts: [] }
       await cacheSet(cacheKey, payload, 60)
@@ -50,7 +51,7 @@ export async function GET() {
       .order('day_number', { ascending: true })
       .limit(200)
 
-    if (wErr) return NextResponse.json({ ok: false, error: wErr.message }, { status: 400 })
+    if (wErr) return respondDbError('vip:periodization:active:workouts', wErr, 400)
 
     const workoutIds = (Array.isArray(workouts) ? workouts : []).map((w: Record<string, unknown>) => String(w?.workout_id || '').trim()).filter(Boolean)
     const { data: workoutRows } = workoutIds.length

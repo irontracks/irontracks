@@ -177,6 +177,7 @@ function UploadModal({ onClose, onUploaded }: UploadModalProps) {
       fd.append('signature', sig.signature)
       fd.append('folder', sig.folder)
       fd.append('public_id', sig.publicId)
+      if (sig.allowedFormats) fd.append('allowed_formats', sig.allowedFormats)
       const upRes = await fetch(sig.uploadUrl, { method: 'POST', body: fd })
       const upJson = await upRes.json()
       if (!upRes.ok || !upJson.secure_url) throw new Error('Falha no upload da imagem')

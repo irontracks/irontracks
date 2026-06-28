@@ -19,6 +19,7 @@ import { checkVipFeatureAccess } from '@/utils/vip/limits'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { parseJsonBody } from '@/utils/zod'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { respondDbError } from '@/utils/api/dbError'
 
 export const dynamic = 'force-dynamic'
 
@@ -85,7 +86,7 @@ export async function POST(request: Request) {
       .select('id')
       .single()
 
-    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+    if (error) return respondDbError('lab-exams:create', error)
     const id = String((data as { id?: string } | null)?.id || '')
     if (!id) return NextResponse.json({ ok: false, error: 'create_failed' }, { status: 400 })
 

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { requireUser } from '@/utils/auth/route'
 import { getVipPlanLimits } from '@/utils/vip/limits'
+import { respondDbError } from '@/utils/api/dbError'
 
 export const dynamic = 'force-dynamic'
 
@@ -29,7 +30,7 @@ export async function GET() {
       .insert({ user_id: user.id })
       .select('id, user_id, created_at, updated_at')
       .single()
-    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+    if (error) return respondDbError('vip:chat:thread', error, 400)
     return NextResponse.json({ ok: true, thread: data })
   } catch (e: unknown) {
     return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : String(e) }, { status: 500 })

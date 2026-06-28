@@ -16,6 +16,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
+import { respondDbError } from '@/utils/api/dbError'
 
 export const dynamic = 'force-dynamic'
 
@@ -97,7 +98,7 @@ export async function POST(req: Request) {
     .select('id, gym_id, workout_id, checked_in_at')
     .single()
 
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+  if (error) return respondDbError('gps:checkin:insert', error)
   return NextResponse.json({ ok: true, checkin: data })
 }
 
@@ -116,6 +117,6 @@ export async function GET(req: Request) {
     .order('checked_in_at', { ascending: false })
     .limit(limit)
 
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+  if (error) return respondDbError('gps:checkin:list', error)
   return NextResponse.json({ ok: true, checkins: data })
 }

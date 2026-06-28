@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
 import { parseJsonBody } from '@/utils/zod'
+import { respondDbError } from '@/utils/api/dbError'
 
 export const dynamic = 'force-dynamic'
 
@@ -36,7 +37,7 @@ export async function PATCH(
     .select('id')
     .single()
 
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+  if (error) return respondDbError('gps:cardio:update', error)
   return NextResponse.json({ ok: true, id: data.id })
 }
 
@@ -57,6 +58,6 @@ export async function DELETE(
     .eq('id', id)
     .eq('user_id', auth.user.id) // RLS guard
 
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+  if (error) return respondDbError('gps:cardio:delete', error)
   return NextResponse.json({ ok: true })
 }

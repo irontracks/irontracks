@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { requireUser } from '@/utils/auth/route'
+import { respondDbError } from '@/utils/api/dbError'
 
 export const dynamic = 'force-dynamic'
 
@@ -31,7 +32,7 @@ export async function GET(req: Request) {
     .order('checked_in_at', { ascending: false })
     .limit(20)
 
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+  if (error) return respondDbError('social:gym-presence', error, 400)
 
   // Filter only users who opted in to share presence
   const userIds = (data || []).map((d: Record<string, unknown>) => d.user_id).filter(Boolean)

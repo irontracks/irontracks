@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { requireRoleOrBearer } from '@/utils/auth/route'
 import { parseSearchParams } from '@/utils/zod'
+import { respondDbError } from '@/utils/api/dbError'
 import { safePgLike } from '@/utils/safePgFilter'
 
 export const dynamic = 'force-dynamic'
@@ -46,7 +47,7 @@ export async function GET(req: Request) {
     }
 
     const { data, error } = await query.range(offset, offset + limit - 1)
-    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+    if (error) return respondDbError('admin:user-activity:users', error)
 
     const users = (Array.isArray(data) ? data : []).map((row) => {
       const p = row && typeof row === 'object' ? (row as Record<string, unknown>) : {}

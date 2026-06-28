@@ -6,6 +6,7 @@ import { parseSearchParams } from '@/utils/zod'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { cacheGet, cacheSet } from '@/utils/cache'
+import { respondDbError } from '@/utils/api/dbError'
 
 export const dynamic = 'force-dynamic'
 
@@ -73,7 +74,7 @@ export async function GET(req: Request) {
       .eq('follower_id', userId)
       .eq('status', 'accepted')
 
-    if (fErr) return NextResponse.json({ ok: false, error: fErr.message }, { status: 400 })
+    if (fErr) return respondDbError('social:stories:list:follows', fErr)
 
     const followingIds = (Array.isArray(follows) ? follows : [])
       .map((r: unknown) => String(asRecord(r)?.following_id || '').trim())
@@ -90,7 +91,7 @@ export async function GET(req: Request) {
       .order('created_at', { ascending: false })
       .limit(limit)
 
-    if (sErr) return NextResponse.json({ ok: false, error: sErr.message }, { status: 400 })
+    if (sErr) return respondDbError('social:stories:list:stories', sErr)
     const stories: StoryRow[] = (Array.isArray(storiesRaw) ? storiesRaw : [])
       .map((row: unknown) => {
         const r = asRecord(row)

@@ -11,6 +11,7 @@ import { NextResponse } from 'next/server'
 import { requireUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { respondDbError } from '@/utils/api/dbError'
 import type { BodyPhotoAssessment, BodyPhotoAssessmentPhoto } from '@/types/bodyPhotoAssessment'
 
 export const dynamic = 'force-dynamic'
@@ -35,7 +36,7 @@ export async function GET(request: Request) {
                 .select('*')
                 .eq('id', id)
                 .maybeSingle()
-            if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+            if (error) return respondDbError('body-photo:assessments:detail', error)
             if (!assessment) return NextResponse.json({ ok: false, error: 'not_found' }, { status: 404 })
 
             const a = assessment as unknown as BodyPhotoAssessment
@@ -67,7 +68,7 @@ export async function GET(request: Request) {
             .order('assessment_date', { ascending: false })
             .order('created_at', { ascending: false })
             .limit(100)
-        if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+        if (error) return respondDbError('body-photo:assessments:list', error)
 
         const list = (rows || []) as unknown as BodyPhotoAssessment[]
         if (list.length === 0) return NextResponse.json({ ok: true, assessments: [] })
