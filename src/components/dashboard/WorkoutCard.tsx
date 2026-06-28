@@ -37,7 +37,7 @@ const accentColors = [
   { border: 'border-yellow-500', gradient: 'from-yellow-500/5' },
   { border: 'border-orange-500', gradient: 'from-orange-500/5' },
   { border: 'border-amber-500', gradient: 'from-amber-500/5' },
-  { border: 'border-purple-500', gradient: 'from-purple-500/5' },
+  { border: 'border-amber-600', gradient: 'from-amber-600/5' },
 ]
 
 // ────────────────────────────────────────────────────────────────
@@ -159,7 +159,7 @@ function WorkoutCardInner({
             <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500" />
           </div>
         )}
-        <h3 className="font-black text-white text-base uppercase mb-0.5 pr-28 leading-tight">{String(w?.title || 'Treino')}</h3>
+        <h3 className="font-black text-white text-base uppercase mb-0.5 pr-28 leading-tight line-clamp-2">{String(w?.title || 'Treino')}</h3>
         {/* WCAG 1.4.3 AA — neutral-500 sobre dark falha contraste 4.5:1 */}
         <p className="text-[11px] text-neutral-400 font-mono mb-3">
           {(Number.isFinite(Number(w?.exercises_count)) ? Math.max(0, Math.floor(Number(w.exercises_count))) : Array.isArray(w?.exercises) ? w.exercises.length : 0)} exercícios
