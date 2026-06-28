@@ -156,7 +156,7 @@ export function useUnreadBadges({
             ) return
 
             const { data: senderProfile } = await supabase
-              .from('profiles')
+              .from('profiles_public')
               .select('display_name')
               .eq('id', msg.sender_id)
               .maybeSingle()

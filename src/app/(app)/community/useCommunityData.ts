@@ -90,7 +90,7 @@ export function useCommunityData() {
     })
     if (!missing.length) return out
     try {
-      const { data } = await supabase.from('profiles').select('id, display_name, photo_url, role').in('id', missing).limit(5000)
+      const { data } = await supabase.from('profiles_public').select('id, display_name, photo_url, role').in('id', missing).limit(5000)
       const rows = Array.isArray(data) ? data : []
       const got = new Set<string>()
       rows.forEach((row: Record<string, unknown>) => {
@@ -113,7 +113,7 @@ export function useCommunityData() {
     const id = String(uid || '').trim()
     if (!id) return
     const [profilesRes, followsRes, incomingRes] = await Promise.all([
-      supabase.from('profiles').select('id, display_name, photo_url, role').order('display_name', { ascending: true }).limit(500),
+      supabase.from('profiles_public').select('id, display_name, photo_url, role').order('display_name', { ascending: true }).limit(500),
       supabase.from('social_follows').select('follower_id, following_id, status').eq('follower_id', id).limit(5000),
       supabase.from('social_follows').select('follower_id, following_id, status').eq('following_id', id).eq('status', 'pending').limit(5000),
     ])

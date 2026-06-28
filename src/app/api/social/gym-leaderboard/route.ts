@@ -55,8 +55,8 @@ export async function GET(req: Request) {
 
   // Get profiles
   const { data: profiles } = await auth.supabase
-    .from('profiles')
-    .select('id, display_name, avatar_url')
+    .from('profiles_public')
+    .select('id, display_name, photo_url')
     .in('id', userIds)
 
   const profileMap = new Map((profiles || []).map((p: Record<string, unknown>) => [p.id, p]))
@@ -69,7 +69,7 @@ export async function GET(req: Request) {
         rank: i + 1,
         user_id: id,
         display_name: profile?.display_name || 'Anônimo',
-        avatar_url: profile?.avatar_url || null,
+        avatar_url: profile?.photo_url || null,
         checkin_count: count,
         is_me: id === auth.user.id,
       }

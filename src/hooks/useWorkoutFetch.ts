@@ -392,7 +392,7 @@ async function processAndCache(
             let profiles: Array<{ id: string; display_name?: string | null }> = []
             if (coachIds.length) {
                 const { data: profs } = await supabase
-                    .from('profiles')
+                    .from('profiles_public')
                     .select('id, display_name')
                     .in('id', coachIds)
                 profiles = profs || []
