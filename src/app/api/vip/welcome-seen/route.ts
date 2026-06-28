@@ -5,6 +5,7 @@ import { requireUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { getVipPlanLimits } from '@/utils/vip/limits'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { respondDbError } from '@/utils/api/dbError'
 
 export const dynamic = 'force-dynamic'
 
@@ -36,7 +37,7 @@ export async function POST() {
     const { error } = await supabase
       .from('vip_welcome_views')
       .upsert({ user_id: user.id, last_seen_at: nowIso }, { onConflict: 'user_id' })
-    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+    if (error) return respondDbError('vip:welcome-seen', error)
 
     return NextResponse.json({ ok: true, hasVip: true })
   } catch (e: unknown) {

@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
 import { parseJsonBody } from '@/utils/zod'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { respondDbError } from '@/utils/api/dbError'
 
 export const dynamic = 'force-dynamic'
 
@@ -32,14 +33,14 @@ export async function POST(req: Request) {
       .eq('user_id', user.id)
       .eq('update_id', updateId)
       .maybeSingle()
-    if (existingError) return NextResponse.json({ ok: false, error: existingError.message }, { status: 400 })
+    if (existingError) return respondDbError('updates:mark-prompted:existing', existingError)
     if (existing?.viewed_at) return NextResponse.json({ ok: true, alreadyViewed: true })
 
     const nowIso = new Date().toISOString()
     const { error } = await supabase
       .from('user_update_views')
       .upsert({ user_id: user.id, update_id: updateId, prompted_at: nowIso }, { onConflict: 'user_id,update_id' })
-    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+    if (error) return respondDbError('updates:mark-prompted:upsert', error)
 
     return NextResponse.json({ ok: true })
   } catch (e: unknown) {

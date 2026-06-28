@@ -5,6 +5,7 @@ import { requireUser } from '@/utils/auth/route'
 import { normalizeExerciseName } from '@/utils/normalizeExerciseName'
 import { parseJsonBody } from '@/utils/zod'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { respondDbError } from '@/utils/api/dbError'
 
 const NameValueSchema = z.union([z.string().min(1), z.number().min(0)])
 
@@ -45,7 +46,7 @@ export async function POST(req: Request) {
       .in('normalized_name', normalized)
       .limit(normalized.length)
 
-    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+    if (error) return respondDbError('exercise-library:resolve', error)
 
     const videos: Record<string, string> = {}
     for (const row of data || []) {

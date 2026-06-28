@@ -12,6 +12,7 @@ import { normalizeExerciseName } from '@/utils/normalizeExerciseName'
 import { setTopWeightReps } from '@/utils/report/setVolume'
 import { getGeminiModel } from '@/utils/ai/gemini'
 import { errorResponse } from '@/utils/api'
+import { respondDbError } from '@/utils/api/dbError'
 
 import {
   VipPeriodizationQuestionnaire,
@@ -280,7 +281,8 @@ export async function POST(req: Request) {
       .select('id')
       .single()
 
-    if (pErr || !programRow?.id) return NextResponse.json({ ok: false, error: pErr?.message || 'failed_to_create_program' }, { status: 400 })
+    if (pErr) return respondDbError('vip:periodization:create:program', pErr)
+    if (!programRow?.id) return NextResponse.json({ ok: false, error: 'failed_to_create_program' }, { status: 400 })
 
     const overview = await generateProgramOverviewWithGemini(q, plan.split.split)
     if (overview) {
@@ -319,7 +321,7 @@ export async function POST(req: Request) {
         p_exercises: exercisesPayload,
       })
 
-      if (sErr) return NextResponse.json({ ok: false, error: sErr.message }, { status: 400 })
+      if (sErr) return respondDbError('vip:periodization:create:save-workout', sErr)
       const workoutId = String(savedId || '').trim()
       if (!workoutId) return NextResponse.json({ ok: false, error: 'failed_to_create_workout' }, { status: 400 })
       createdWorkoutIds.push(workoutId)
@@ -335,7 +337,7 @@ export async function POST(req: Request) {
         scheduled_date: day.scheduledDate,
         workout_id: workoutId,
       })
-      if (linkErr) return NextResponse.json({ ok: false, error: linkErr.message }, { status: 400 })
+      if (linkErr) return respondDbError('vip:periodization:create:link', linkErr)
     }
 
     return NextResponse.json({

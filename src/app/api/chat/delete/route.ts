@@ -6,6 +6,7 @@ import { requireUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { parseJsonBody, parseJsonWithSchema } from '@/utils/zod'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { respondDbError } from '@/utils/api/dbError'
 
 export const dynamic = 'force-dynamic'
 
@@ -69,7 +70,7 @@ export async function POST(req: Request) {
       .eq('id', messageId)
       .maybeSingle()
 
-    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+    if (error) return respondDbError('chat:delete', error)
     if (!msg?.id) return NextResponse.json({ ok: false, error: 'not_found' }, { status: 404 })
 
     const ownerId = String((msg as Record<string, unknown>)[ownerCol] || '').trim()
@@ -112,7 +113,7 @@ export async function POST(req: Request) {
     }
 
     const { error: delErr } = await admin.from(table).delete().eq('id', messageId)
-    if (delErr) return NextResponse.json({ ok: false, error: delErr.message }, { status: 400 })
+    if (delErr) return respondDbError('chat:delete', delErr)
 
     return NextResponse.json({ ok: true })
   } catch (e: unknown) {

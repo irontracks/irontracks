@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { runChatDiagnostics } from '@/lib/chatDiagnostics'
 import { cacheGet, cacheSet } from '@/utils/cache'
+import { respondDbError } from '@/utils/api/dbError'
 
 const ZodBodySchema = z
   .object({
@@ -49,7 +50,7 @@ export async function POST(request: Request) {
       .insert({ channel_id: channelId, sender_id: user.id, content: text })
       .select('id, created_at')
       .single()
-    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+    if (error) return respondDbError('diagnostics:chat', error)
     return NextResponse.json({ ok: true, inserted })
   } catch (e: unknown) {
     return NextResponse.json({ ok: false, error: (e as { message?: string })?.message ?? String(e) }, { status: 500 })

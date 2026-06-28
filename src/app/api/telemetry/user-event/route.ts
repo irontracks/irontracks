@@ -5,6 +5,7 @@ import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { createClient } from '@/utils/supabase/server'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { respondDbError } from '@/utils/api/dbError'
 
 export const dynamic = 'force-dynamic'
 
@@ -113,7 +114,7 @@ export async function POST(req: Request) {
     if (!rows.length) return NextResponse.json({ ok: true, inserted: 0 })
 
     const { error } = await admin.from('user_activity_events').insert(rows)
-    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+    if (error) return respondDbError('telemetry:user-event', error)
 
     return NextResponse.json({ ok: true, inserted: rows.length })
   } catch (e: unknown) {

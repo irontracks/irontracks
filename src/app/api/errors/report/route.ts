@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
+import { respondDbError } from '@/utils/api/dbError'
 
 export const dynamic = 'force-dynamic'
 
@@ -81,7 +82,7 @@ export async function POST(request: Request) {
       .select('id')
       .single()
 
-    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+    if (error) return respondDbError('errors:report', error)
     return NextResponse.json({ ok: true, id: data?.id ?? null })
   } catch (e: unknown) {
     return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })

@@ -4,6 +4,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { requireRoleOrBearer } from '@/utils/auth/route'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { parseJsonBody } from '@/utils/zod'
+import { respondDbError } from '@/utils/api/dbError'
 
 export const dynamic = 'force-dynamic'
 
@@ -26,7 +27,7 @@ async function verifyAccess(req: Request, userId: string) {
       .select('user_id')
       .eq('user_id', userId)
       .maybeSingle()
-    if (error) return { ok: false as const, response: NextResponse.json({ ok: false, error: error.message }, { status: 400 }) }
+    if (error) return { ok: false as const, response: respondDbError('teacher:student-session:students-admin', error) }
     if (!student) return { ok: false as const, response: NextResponse.json({ ok: false, error: 'student not found' }, { status: 404 }) }
   } else {
     const { data: student, error } = await admin
@@ -35,7 +36,7 @@ async function verifyAccess(req: Request, userId: string) {
       .eq('user_id', userId)
       .eq('teacher_id', auth.user.id)
       .maybeSingle()
-    if (error) return { ok: false as const, response: NextResponse.json({ ok: false, error: error.message }, { status: 400 }) }
+    if (error) return { ok: false as const, response: respondDbError('teacher:student-session:students-teacher', error) }
     if (!student) return { ok: false as const, response: NextResponse.json({ ok: false, error: 'student not found or not yours' }, { status: 403 }) }
   }
 
@@ -57,7 +58,7 @@ export async function GET(
       .eq('user_id', userId)
       .maybeSingle()
 
-    if (sessionError) return NextResponse.json({ ok: false, error: sessionError.message }, { status: 400 })
+    if (sessionError) return respondDbError('teacher:student-session:get', sessionError)
 
     return NextResponse.json({ ok: true, session: session ?? null })
   } catch (e: unknown) {
@@ -101,7 +102,7 @@ export async function PATCH(
       .eq('user_id', userId)
       .select('user_id')
 
-    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+    if (error) return respondDbError('teacher:student-session:update', error)
     if (!updated || updated.length === 0) {
       return NextResponse.json({ ok: false, error: 'session ended' }, { status: 404 })
     }

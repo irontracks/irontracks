@@ -7,6 +7,7 @@ import { sendPushToAllPlatforms as sendPushToUsers } from '@/lib/push/sender'
 import { logError } from '@/lib/logger'
 import { waitUntil } from '@vercel/functions'
 import { cacheGet } from '@/utils/cache'
+import { respondDbError } from '@/utils/api/dbError'
 
 export const dynamic = 'force-dynamic'
 
@@ -94,7 +95,7 @@ export async function POST(req: Request) {
       read: false,
     })
 
-    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+    if (error) return respondDbError('notifications:direct-message', error)
 
     // Fire push notification to the RECEIVER.
     // The sender enforces both the master switch AND the notifyDirectMessages

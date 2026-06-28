@@ -93,6 +93,7 @@ export default function AvatarUploadModal({ isOpen, onClose, currentPhotoURL, us
       form.append('signature', sign.signature)
       form.append('folder', sign.folder)
       form.append('public_id', sign.publicId)
+      if (sign.allowedFormats) form.append('allowed_formats', sign.allowedFormats)
 
       const uploadRes = await fetch(sign.uploadUrl, { method: 'POST', body: form })
       const uploadData = await uploadRes.json()

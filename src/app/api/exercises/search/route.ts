@@ -6,6 +6,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { normalizeExerciseName } from '@/utils/normalizeExerciseName'
 import { safePgLike } from '@/utils/safePgFilter'
 import { cacheGet, cacheSet } from '@/utils/cache'
+import { respondDbError } from '@/utils/api/dbError'
 
 // Cache TTL: 120s (resultados de busca mudam raramente durante uma sessão)
 const SEARCH_CACHE_TTL = 120
@@ -47,7 +48,7 @@ export async function GET(request: Request) {
       .order('name', { ascending: true })
       .limit(80)
 
-    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+    if (error) return respondDbError('exercises:search', error)
 
     const qNorm = normalizeExerciseName(safeQ)
     const { data: libData } = await admin

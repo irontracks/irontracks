@@ -3,6 +3,7 @@ import { parseJsonBody } from '@/utils/zod'
 import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { respondDbError } from '@/utils/api/dbError'
 
 export const dynamic = 'force-dynamic'
 
@@ -33,7 +34,7 @@ export async function POST(req: Request) {
         { user_id: user.id, update_id: updateId, prompted_at: nowIso, viewed_at: nowIso },
         { onConflict: 'user_id,update_id' }
       )
-    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+    if (error) return respondDbError('updates:mark-viewed', error)
 
     return NextResponse.json({ ok: true })
   } catch (e: unknown) {

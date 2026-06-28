@@ -35,8 +35,15 @@ export async function POST(req: Request) {
   const publicId = `${auth.user.id}/${randomUUID()}`
   const timestamp = Math.round(Date.now() / 1000)
 
-  // Signature: sorted params concatenated + secret (Cloudinary v1 spec)
-  const params = `folder=${folder}&public_id=${publicId}&timestamp=${timestamp}`
+  // allowed_formats ASSINADO: restringe os tipos de arquivo aceitos (a Cloudinary
+  // rejeita formatos fora da lista). Sem isto, dava pra subir formato arbitrário
+  // (svg/html/raw) na nossa conta Cloudinary. Story aceita vídeo; o resto, só
+  // imagem. Auditoria 2026-06-27 (L13).
+  const IMAGE_FORMATS = 'jpg,jpeg,png,webp,gif,heic,heif'
+  const allowedFormats = purpose === 'story' ? `${IMAGE_FORMATS},mp4,mov,webm` : IMAGE_FORMATS
+
+  // Signature: params em ORDEM ALFABÉTICA + secret (Cloudinary v1 spec).
+  const params = `allowed_formats=${allowedFormats}&folder=${folder}&public_id=${publicId}&timestamp=${timestamp}`
   const signature = createHash('sha1').update(params + apiSecret).digest('hex')
 
   return NextResponse.json({
@@ -47,6 +54,7 @@ export async function POST(req: Request) {
     cloudName,
     folder,
     publicId,
+    allowedFormats,
     uploadUrl: `https://api.cloudinary.com/v1_1/${cloudName}/auto/upload`,
   })
 }

@@ -4,6 +4,7 @@ import { requireUser } from '@/utils/auth/route'
 import { parseJsonBody } from '@/utils/zod'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { respondDbError } from '@/utils/api/dbError'
 
 export const dynamic = 'force-dynamic'
 
@@ -48,7 +49,7 @@ export async function POST(req: Request) {
       if (code === '23514') {
         return NextResponse.json({ ok: false, error: 'invalid_format' }, { status: 400 })
       }
-      return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+      return respondDbError('profiles:handle', error)
     }
 
     return NextResponse.json({ ok: true, handle })

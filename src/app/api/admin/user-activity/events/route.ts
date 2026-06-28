@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { requireRoleOrBearer } from '@/utils/auth/route'
 import { parseSearchParams } from '@/utils/zod'
+import { respondDbError } from '@/utils/api/dbError'
 
 export const dynamic = 'force-dynamic'
 
@@ -65,7 +66,7 @@ export async function GET(req: Request) {
     if (before) query = query.lt('created_at', before)
 
     const { data, error } = await query
-    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+    if (error) return respondDbError('admin:user-activity:events', error)
 
     const rows = Array.isArray(data) ? data : []
     const events = rows.map((row) => {

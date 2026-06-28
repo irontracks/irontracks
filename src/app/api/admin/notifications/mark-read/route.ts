@@ -13,6 +13,7 @@ import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { requireRoleOrBearer } from '@/utils/auth/route'
 import { parseJsonBody } from '@/utils/zod'
+import { respondDbError } from '@/utils/api/dbError'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 
 export const dynamic = 'force-dynamic'
@@ -56,7 +57,7 @@ export async function POST(req: Request) {
     if (id) q = q.eq('id', id)
 
     const { error } = await q
-    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+    if (error) return respondDbError('admin:notifications:mark-read', error)
 
     return NextResponse.json({ ok: true, marked: all ? 'all' : id })
   } catch (e) {

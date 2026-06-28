@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { cacheGet, cacheSet } from '@/utils/cache'
+import { respondDbError } from '@/utils/api/dbError'
 
 export async function GET() {
   try {
@@ -19,7 +20,7 @@ export async function GET() {
       .order('created_at', { ascending: false })
       .limit(10)
 
-    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+    if (error) return respondDbError('diagnostics:workouts', error)
     const payload = { ok: true, rows: data }
     await cacheSet(cacheKey, payload, 60)
     return NextResponse.json(payload)

@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { isCronAuthorized } from '@/utils/cron/auth'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { insertNotifications } from '@/lib/social/notifyFollowers'
+import { respondDbError } from '@/utils/api/dbError'
 import { logError, logInfo } from '@/lib/logger'
 
 export const dynamic = 'force-dynamic'
@@ -47,8 +48,7 @@ export async function GET(req: Request) {
       .limit(5000)
 
     if (error) {
-      logError('cron:teacher-plan-suspend', error)
-      return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
+      return respondDbError('cron:teacher-plan-suspend', error, 500)
     }
 
     const targets = (rows ?? []).filter((r) => Boolean(r.user_id))
@@ -67,8 +67,7 @@ export async function GET(req: Request) {
       .in('id', teacherIds)
 
     if (updateErr) {
-      logError('cron:teacher-plan-suspend', updateErr)
-      return NextResponse.json({ ok: false, error: updateErr.message }, { status: 500 })
+      return respondDbError('cron:teacher-plan-suspend:update', updateErr, 500)
     }
 
     // Notify each suspended teacher

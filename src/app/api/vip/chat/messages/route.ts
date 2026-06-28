@@ -4,6 +4,7 @@ import { requireUser } from '@/utils/auth/route'
 import { checkVipFeatureAccess, getVipPlanLimits } from '@/utils/vip/limits'
 import { parseJsonBody } from '@/utils/zod'
 import { checkRateLimitAsync } from '@/utils/rateLimit'
+import { respondDbError } from '@/utils/api/dbError'
 
 export const dynamic = 'force-dynamic'
 
@@ -38,7 +39,7 @@ export async function GET(req: Request) {
       .eq('user_id', user.id)
       .order('created_at', { ascending: true })
       .limit(limit)
-    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+    if (error) return respondDbError('vip:chat:messages:list', error)
     return NextResponse.json({ ok: true, messages: data || [] })
   } catch (e: unknown) {
     return NextResponse.json({ ok: false, error: (e as Record<string, unknown>)?.message ?? String(e) }, { status: 500 })
@@ -83,7 +84,7 @@ export async function POST(req: Request) {
       .insert({ thread_id: threadId, user_id: user.id, role, content })
       .select('id, thread_id, user_id, role, content, created_at')
       .single()
-    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+    if (error) return respondDbError('vip:chat:messages:create', error)
     return NextResponse.json({ ok: true, message: data })
   } catch (e: unknown) {
     return NextResponse.json({ ok: false, error: (e as Record<string, unknown>)?.message ?? String(e) }, { status: 500 })

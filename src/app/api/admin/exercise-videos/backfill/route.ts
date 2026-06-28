@@ -7,6 +7,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { normalizeExerciseName } from '@/utils/normalizeExerciseName'
 import { getVideoQueriesFromGemini, searchYouTubeCandidates } from '@/lib/videoSuggestions'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { respondDbError } from '@/utils/api/dbError'
 
 const ZodBodySchema = z
   .object({
@@ -32,7 +33,7 @@ export async function POST(req: Request) {
       .or('video_url.is.null,video_url.eq.')
       .limit(2000)
 
-    if (exErr) return NextResponse.json({ ok: false, error: exErr.message }, { status: 400 })
+    if (exErr) return respondDbError('admin:exercise-videos:backfill', exErr)
 
     const normalizedToName = new Map<string, string>()
     for (const r of exRows || []) {

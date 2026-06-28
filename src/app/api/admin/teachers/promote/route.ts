@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { requireRoleOrBearer } from '@/utils/auth/route'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { respondDbError } from '@/utils/api/dbError'
 import { safeEmailLike } from '@/utils/safePgFilter'
 
 export const dynamic = 'force-dynamic'
@@ -64,7 +65,7 @@ export async function POST(req: Request) {
           status: 'active',
         })
         .eq('id', teacherRow.id)
-      if (updateErr) return NextResponse.json({ ok: false, error: updateErr.message }, { status: 400 })
+      if (updateErr) return respondDbError('admin:teachers:promote', updateErr)
     } else {
       const { error: insertErr } = await admin
         .from('teachers')
@@ -74,7 +75,7 @@ export async function POST(req: Request) {
           name: profile.display_name || email,
           status: 'active',
         })
-      if (insertErr) return NextResponse.json({ ok: false, error: insertErr.message }, { status: 400 })
+      if (insertErr) return respondDbError('admin:teachers:promote', insertErr)
     }
 
     return NextResponse.json({ ok: true })

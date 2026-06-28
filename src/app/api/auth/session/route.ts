@@ -5,6 +5,7 @@ import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { getSupabaseCookieOptions } from '@/utils/supabase/cookieOptions'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { respondDbError } from '@/utils/api/dbError'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 
 const BodySchema = z.object({
@@ -57,7 +58,7 @@ export async function POST(req: Request) {
       access_token: body.access_token,
       refresh_token: body.refresh_token,
     })
-    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+    if (error) return respondDbError('auth:session', error)
 
     return NextResponse.json({ ok: true }, { headers: { 'cache-control': 'no-store, max-age=0' } })
   } catch (e: unknown) {

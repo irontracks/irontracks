@@ -26,6 +26,7 @@ import { NextResponse } from 'next/server'
 import { requireRoleOrBearer } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { respondDbError } from '@/utils/api/dbError'
 
 export const dynamic = 'force-dynamic'
 
@@ -165,7 +166,7 @@ export async function GET(req: Request) {
       .limit(500)
 
     if (error) {
-      return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+      return respondDbError('admin:crons-status', error)
     }
 
     // Pra cada tipo, encontra o mais recente.

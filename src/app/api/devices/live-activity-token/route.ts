@@ -14,6 +14,7 @@ import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { parseJsonBody } from '@/utils/zod'
+import { respondDbError } from '@/utils/api/dbError'
 
 const norm = (v: unknown) => String(v ?? '').trim()
 
@@ -79,7 +80,7 @@ export async function POST(request: Request) {
       if (tableMissing) {
         return NextResponse.json({ ok: true, deferred: true })
       }
-      return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
+      return respondDbError('devices:live-activity-token', error, 500)
     }
 
     return NextResponse.json({ ok: true })

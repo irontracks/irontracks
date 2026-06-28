@@ -7,6 +7,7 @@ import { requireRoleOrBearer } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { normalizeExerciseName } from '@/utils/normalizeExerciseName'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { respondDbError } from '@/utils/api/dbError'
 import { env } from '@/utils/env'
 import { resolveCanonicalItems } from '@/utils/ai/exerciseCanonicalizeShared'
 
@@ -54,7 +55,7 @@ export async function POST(req: Request) {
       .order('created_at', { ascending: true })
       .limit(limit)
 
-    if (jobsErr) return NextResponse.json({ ok: false, error: jobsErr.message }, { status: 400 })
+    if (jobsErr) return respondDbError('admin:exercises:canonicalize:backfill', jobsErr)
 
     const rows = Array.isArray(jobs) ? jobs : []
     if (!rows.length) return NextResponse.json({ ok: true, processed: 0, created: 0, updated: 0, failed: 0 })

@@ -10,6 +10,7 @@ import { isTeamSessionMember } from '@/utils/team/sessionMembership'
 import { waitUntil } from '@vercel/functions'
 import { extractMentions } from '@/lib/social/extractMentions'
 import { insertNotifications } from '@/lib/social/notifyFollowers'
+import { respondDbError } from '@/utils/api/dbError'
 
 export const dynamic = 'force-dynamic'
 
@@ -64,7 +65,7 @@ export async function POST(req: Request) {
 
     if (insertErr) {
       logError('team-chat', '[TeamChat] INSERT failed', insertErr)
-      return NextResponse.json({ ok: false, error: insertErr.message }, { status: 500 })
+      return respondDbError('team:chat:notify:insert', insertErr, 500)
     }
 
     logInfo('team-chat', `[TeamChat] Persisted msg ${inserted.id} in session ${sessionId}`)

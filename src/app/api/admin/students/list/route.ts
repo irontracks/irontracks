@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { requireRoleOrBearer } from '@/utils/auth/route'
+import { respondDbError } from '@/utils/api/dbError'
 import { z } from 'zod'
 import { parseSearchParams } from '@/utils/zod'
 import { cacheGet, cacheSet } from '@/utils/cache'
@@ -51,7 +52,7 @@ export async function GET(req: Request) {
 
     const { data, error } = await query
 
-    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+    if (error) return respondDbError('admin:students:list', error)
 
     const { data: teachers } = await admin
       .from('teachers')

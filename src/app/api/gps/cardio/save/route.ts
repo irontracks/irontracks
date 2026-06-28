@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
+import { respondDbError } from '@/utils/api/dbError'
 
 export const dynamic = 'force-dynamic'
 
@@ -54,7 +55,7 @@ export async function POST(req: Request) {
     .select('id, distance_meters, duration_seconds, avg_pace_min_km, calories_estimated, created_at')
     .single()
 
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+  if (error) return respondDbError('gps:cardio:save', error)
   return NextResponse.json({ ok: true, track: data })
 }
 
@@ -73,6 +74,6 @@ export async function GET(req: Request) {
     .order('created_at', { ascending: false })
     .limit(limit)
 
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+  if (error) return respondDbError('gps:cardio:list', error)
   return NextResponse.json({ ok: true, tracks: data })
 }
