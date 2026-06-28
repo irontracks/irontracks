@@ -5,6 +5,7 @@ import Image from 'next/image'
 import { X, Dumbbell, Flame, Calendar, Trophy, Loader2, Swords } from 'lucide-react'
 import ChallengesPanel from './ChallengesPanel'
 import { useFocusTrap } from '@/hooks/useFocusTrap'
+import { useBackHandler } from '@/hooks/useBackHandler'
 
 interface ProfileData {
   profile: { id: string; displayName: string | null; photoUrl: string | null; role: string | null }
@@ -47,6 +48,8 @@ export default function UserProfileModal({
 
   // WCAG 2.4.3 + 2.1.2 — focus trap + Escape
   const focusTrapRef = useFocusTrap(true, onClose)
+  // Modal montado só quando aberto → Voltar nativo do Android fecha. M11.
+  useBackHandler(true, onClose)
 
   const p = data?.profile
   const s = data?.stats

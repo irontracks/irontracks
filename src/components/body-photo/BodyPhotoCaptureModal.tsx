@@ -9,6 +9,7 @@ import { compressBodyPhoto, uploadBodyPhoto, type CompressedPhoto } from '@/util
 import { BODY_PHOTO_POSES, POSE_LABELS_PT, type BodyPhotoPose, type BodyPhotoLaudo, type BodyPhotoCorrelation, type TrainingWindowSummary } from '@/types/bodyPhotoAssessment'
 import { BodyPhotoLaudoView } from './BodyPhotoLaudoView'
 import { BodyPhotoCorrelationView } from './BodyPhotoCorrelationView'
+import { useBackHandler } from '@/hooks/useBackHandler'
 
 type Stage = 'capture' | 'processing' | 'result' | 'error'
 
@@ -79,6 +80,8 @@ export const BodyPhotoCaptureModal: React.FC<Props> = ({ open, onClose, studentU
         if (stage === 'processing') return // não fecha no meio da análise
         reset(); onClose()
     }, [stage, reset, onClose])
+
+    useBackHandler(open, handleClose)
 
     const handleFile = useCallback(async (pose: BodyPhotoPose, files: FileList | null) => {
         if (!files?.length) return

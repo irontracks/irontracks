@@ -14,6 +14,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Copy, Download, Loader2, RefreshCw, X, QrCode, Check } from 'lucide-react'
 import { toCanvas as qrToCanvas } from 'qrcode'
+import { useBackHandler } from '@/hooks/useBackHandler'
 
 interface GymQRCodeProps {
   /** UUID of the gym owned by the current user */
@@ -23,6 +24,8 @@ interface GymQRCodeProps {
 }
 
 export default function GymQRCode({ gymId, gymName, onClose }: GymQRCodeProps) {
+  useBackHandler(true, onClose)
+
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const [checkinUrl, setCheckinUrl] = useState('')
   const [loading, setLoading] = useState(true)

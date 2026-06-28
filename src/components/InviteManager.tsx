@@ -5,6 +5,7 @@ import { useDialog } from '@/contexts/DialogContext';
 import { getErrorMessage } from '@/utils/errorMessage'
 import { parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
+import { useBackHandler } from '@/hooks/useBackHandler'
 
 interface InviteCandidate {
     id: string
@@ -29,6 +30,8 @@ const InviteManager = ({ isOpen, onClose, onInvite }: InviteManagerProps) => {
     const [invitedIds, setInvitedIds] = useState(new Set());
     const [pendingIds, setPendingIds] = useState(new Set());
     const [nowMs, setNowMs] = useState(0);
+
+    useBackHandler(isOpen, onClose);
 
     useEffect(() => {
         alertRef.current = alert;

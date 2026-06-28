@@ -3,6 +3,7 @@
 import { useState, useCallback } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { useFocusTrap } from '@/hooks/useFocusTrap'
+import { useBackHandler } from '@/hooks/useBackHandler'
 import { Lock, Eye, EyeOff, Loader2, Check, X } from 'lucide-react'
 
 interface ChangePasswordModalProps {
@@ -31,6 +32,7 @@ export default function ChangePasswordModal({ isOpen, onClose, userEmail }: Chan
     onClose()
   }, [saving, onClose])
   const focusTrapRef = useFocusTrap(isOpen, handleEscape)
+  useBackHandler(isOpen, handleEscape)
 
   if (!isOpen) return null
 

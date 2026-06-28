@@ -7,6 +7,7 @@
 import React, { useCallback, useState } from 'react'
 import { CreditCard, CheckCircle2, Clock, AlertCircle, XCircle, QrCode, Copy, ExternalLink, Loader2, ChevronDown, ChevronUp, X } from 'lucide-react'
 import { useStudentSubscription } from '@/hooks/useStudentSubscription'
+import { useBackHandler } from '@/hooks/useBackHandler'
 import { apiStudentBilling } from '@/lib/api/student-billing'
 import type { StudentCharge } from '@/lib/api/student-billing'
 
@@ -54,6 +55,8 @@ function PixPaymentModal({ subscriptionId, planName, priceCents, existingCharge,
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+
+  useBackHandler(true, onClose)
 
   const handlePay = useCallback(async () => {
     const cpfDigits = onlyDigits(cpf)

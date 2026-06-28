@@ -4,6 +4,7 @@ import React, { useEffect } from 'react'
 import { ArrowLeft } from 'lucide-react'
 import type { WhatsNewEntry } from '@/content/whatsNew'
 import { useFocusTrap } from '@/hooks/useFocusTrap'
+import { useBackHandler } from '@/hooks/useBackHandler'
 
 type UpdateNotification = {
   id: string
@@ -24,6 +25,7 @@ type Props = {
 export default function WhatsNewModal({ isOpen, entry, update, onClose }: Props) {
   // WCAG 2.4.3 + 2.1.2 — focus trap + Escape (substitui listener manual abaixo)
   const focusTrapRef = useFocusTrap(isOpen, onClose)
+  useBackHandler(isOpen, onClose)
 
   // Keep legacy useEffect as no-op to avoid removing in case other handlers expected it.
   useEffect(() => {

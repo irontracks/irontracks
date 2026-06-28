@@ -16,6 +16,7 @@ import { useEffect } from 'react'
 import { InAppNotificationsProvider, useInAppNotifications } from '@/contexts/InAppNotificationsContext'
 import { TeamWorkoutProvider } from '@/contexts/TeamWorkoutContext'
 import WatchSyncProvider from '@/components/WatchSyncProvider'
+import { AndroidBackButtonInit } from '@/components/native/AndroidBackButtonInit'
 import type { WatchDashboard, WatchGym } from '@/hooks/useWatchBridge'
 
 interface DashboardProvidersProps {
@@ -58,6 +59,8 @@ export function DashboardProviders({
       onOpenNotifications={onOpenNotifications}
     >
       <InAppNotifyBinder bind={bindInAppNotify} />
+      {/* Botão Voltar nativo do Android — headless, fecha overlays em vez de minimizar */}
+      <AndroidBackButtonInit />
       {/* Apple Watch sync — headless, sem output visual */}
       <WatchSyncProvider
         dashboard={watchDashboard}

@@ -3,6 +3,7 @@
 import React from 'react';
 import { ArrowLeft } from 'lucide-react';
 import dynamic from 'next/dynamic';
+import { useBackHandler } from '@/hooks/useBackHandler';
 import {
     AssessmentRow,
     getWeightKg,
@@ -52,6 +53,8 @@ export function AssessmentHistoryModal({
     safeGender,
     onClose,
 }: AssessmentHistoryModalProps) {
+    useBackHandler(true, onClose);
+
     return (
         <div
             className="fixed inset-0 z-50 bg-black/85 backdrop-blur-md flex items-center justify-center p-4"

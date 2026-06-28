@@ -4,6 +4,7 @@ import React from 'react';
 import { ArrowLeft } from 'lucide-react';
 import ExerciseEditor from '@/components/ExerciseEditor';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
+import { useBackHandler } from '@/hooks/useBackHandler';
 import { type SupabaseClient } from '@supabase/supabase-js';
 
 export interface ManualExercise {
@@ -79,6 +80,7 @@ export function HistoryListManualModal({
 }: ManualModalProps) {
     // WCAG 2.4.3 Focus Order + 2.1.2 No Keyboard Trap
     const focusTrapRef = useFocusTrap(true, onClose);
+    useBackHandler(true, onClose);
     return (
         <div
             role="button"

@@ -19,6 +19,7 @@ import { useEffect } from 'react'
 import Image from 'next/image'
 import { ArrowLeft } from 'lucide-react'
 import { useFocusTrap } from '@/hooks/useFocusTrap'
+import { useBackHandler } from '@/hooks/useBackHandler'
 
 interface Props {
   onClose: () => void
@@ -38,6 +39,9 @@ export default function MothersDayModal({
 }: Props) {
   // WCAG 2.4.3 + 2.1.2 — focus trap + Escape
   const focusTrapRef = useFocusTrap(true, onClose)
+
+  // Android: botão Voltar nativo fecha o modal em vez de minimizar o app
+  useBackHandler(true, onClose)
 
   // Legacy useEffect kept as no-op for ABI parity (the hook above replaces it).
   useEffect(() => { /* handled by useFocusTrap */ }, [onClose])

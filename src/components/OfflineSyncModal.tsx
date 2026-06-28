@@ -4,6 +4,7 @@ import { bumpOfflineJob, clearOfflineJobs, flushOfflineQueue, getOfflineQueueSum
 import type { QueueSummary, OfflineJob } from '@/lib/offline/offlineSync'
 import { useDialog } from '@/contexts/DialogContext'
 import { useFocusTrap } from '@/hooks/useFocusTrap'
+import { useBackHandler } from '@/hooks/useBackHandler'
 
 const formatEta = (ms: number | string | null | undefined) => {
   const n = Number(ms)
@@ -58,6 +59,8 @@ export default function OfflineSyncModal({ open, onClose, userId }: OfflineSyncM
   // WCAG 2.4.3 + 2.1.2 — Escape fecha + focus trap
   const handleEscape = useCallback(() => { onClose?.() }, [onClose])
   const focusTrapRef = useFocusTrap(open, handleEscape)
+
+  useBackHandler(open, () => onClose?.())
 
   if (!open) return null
 

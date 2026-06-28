@@ -1,4 +1,5 @@
 import { useFocusTrap } from '@/hooks/useFocusTrap'
+import { useBackHandler } from '@/hooks/useBackHandler'
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { ArrowLeft, Send, MessageSquare, User, Bot, Loader2, Sparkles, Save, Trash2, Dumbbell, Check, Plus } from 'lucide-react';
 import { useVipCredits } from '@/hooks/useVipCredits';
@@ -211,6 +212,8 @@ export default function CoachChatModal({
         }
         onClose();
     };
+
+    useBackHandler(isOpen, handleClose);
 
     if (!isOpen) return null;
 
