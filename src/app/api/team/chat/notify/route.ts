@@ -6,6 +6,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { sendPushToAllPlatforms as sendPushToUsers } from '@/lib/push/sender'
 import { logInfo, logError } from '@/lib/logger'
 import { requireUser } from '@/utils/auth/route'
+import { isTeamSessionMember } from '@/utils/team/sessionMembership'
 import { waitUntil } from '@vercel/functions'
 import { extractMentions } from '@/lib/social/extractMentions'
 import { insertNotifications } from '@/lib/social/notifyFollowers'
@@ -40,6 +41,13 @@ export async function POST(req: Request) {
     }
 
     const admin = createAdminClient()
+
+    // Authz: só membros da sessão (host / participante / presença) podem postar.
+    // Antes, qualquer usuário autenticado inseria mensagem em sessão alheia e
+    // disparava push spam para os membros (write-IDOR — auditoria 2026-06-27).
+    if (!(await isTeamSessionMember(admin, sessionId, auth.user.id))) {
+      return NextResponse.json({ ok: false, error: 'forbidden' }, { status: 403 })
+    }
 
     // ─── 1. Persist to dedicated team_chat_messages table ──────────────
     const { data: inserted, error: insertErr } = await admin

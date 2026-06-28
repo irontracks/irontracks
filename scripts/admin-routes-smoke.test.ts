@@ -94,5 +94,28 @@ const assignTeacherText = fs.readFileSync(assignTeacherRoute, 'utf8')
 assert.ok(assignTeacherText.includes('resolveStudentRow'), 'students/assign-teacher must use the shared resolveStudentRow helper')
 assert.ok(!/from\('students'\)\s*\.insert\(\s*\{\s*email/.test(assignTeacherText), 'students/assign-teacher must not INSERT directly — use resolveStudentRow which guarantees name is filled')
 
+// ── Privilege-escalation guard: teachers/accept (auditoria 2026-06-27) ─────
+// O endpoint setava profiles.role='teacher' INCONDICIONALMENTE → qualquer
+// usuário virava professor com um POST. Deve gated na existência de um registro
+// `teachers` legítimo (promover só depois de confirmar), negando com 403.
+const acceptRoute = path.join(repoRoot, 'src', 'app', 'api', 'teachers', 'accept', 'route.ts')
+const acceptText = fs.readFileSync(acceptRoute, 'utf8')
+const denyIdx = acceptText.indexOf('not_a_teacher')
+const promoteIdx = acceptText.indexOf("role: 'teacher'")
+assert.ok(denyIdx > -1, 'teachers/accept must deny non-teachers with not_a_teacher (403)')
+assert.ok(promoteIdx > -1 && denyIdx < promoteIdx, 'teachers/accept must check teacher membership BEFORE promoting profiles.role')
+assert.ok(/status:\s*403/.test(acceptText), 'teachers/accept must return 403 when no teacher record exists')
+
+// ── Write-IDOR guard: team/chat/notify (auditoria 2026-06-27) ──────────────
+// Qualquer autenticado inseria mensagem em sessão alheia + push spam. Deve
+// validar membership (isTeamSessionMember) ANTES de inserir em team_chat_messages.
+const notifyRoute = path.join(repoRoot, 'src', 'app', 'api', 'team', 'chat', 'notify', 'route.ts')
+const notifyText = fs.readFileSync(notifyRoute, 'utf8')
+const memberIdx = notifyText.indexOf('isTeamSessionMember')
+const insertIdx = notifyText.indexOf("from('team_chat_messages')")
+assert.ok(memberIdx > -1, 'team/chat/notify must validate membership via isTeamSessionMember')
+assert.ok(insertIdx > -1 && memberIdx < insertIdx, 'team/chat/notify must check membership BEFORE inserting the message')
+assert.ok(/status:\s*403/.test(notifyText), 'team/chat/notify must return 403 for non-members')
+
 process.stdout.write('ok\n')
 
