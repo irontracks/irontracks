@@ -38,12 +38,12 @@ type TypeConfig = {
 
 const TYPE_CONFIG: Record<string, TypeConfig> = {
     invite: {
-        icon: <Users size={15} />, bg: 'from-blue-500/20 to-blue-600/10',
-        border: 'border-blue-500/30', dot: 'bg-blue-400', label: 'Convite',
+        icon: <Users size={15} />, bg: 'from-amber-500/20 to-amber-600/10',
+        border: 'border-amber-500/30', dot: 'bg-amber-400', label: 'Convite',
     },
     team_invite: {
-        icon: <Users size={15} />, bg: 'from-blue-500/20 to-blue-600/10',
-        border: 'border-blue-500/30', dot: 'bg-blue-400', label: 'Convite',
+        icon: <Users size={15} />, bg: 'from-amber-500/20 to-amber-600/10',
+        border: 'border-amber-500/30', dot: 'bg-amber-400', label: 'Convite',
     },
     friend_pr: {
         icon: <Trophy size={15} />, bg: 'from-yellow-500/20 to-amber-600/10',
@@ -66,52 +66,52 @@ const TYPE_CONFIG: Record<string, TypeConfig> = {
         border: 'border-orange-500/30', dot: 'bg-orange-400', label: 'Iniciou',
     },
     friend_online: {
-        icon: <Activity size={15} />, bg: 'from-cyan-500/20 to-sky-600/10',
-        border: 'border-cyan-500/30', dot: 'bg-cyan-400', label: 'Online',
+        icon: <Activity size={15} />, bg: 'from-emerald-500/20 to-green-600/10',
+        border: 'border-emerald-500/30', dot: 'bg-emerald-400', label: 'Online',
     },
     follow_request: {
-        icon: <UserPlus size={15} />, bg: 'from-blue-500/20 to-indigo-600/10',
-        border: 'border-blue-500/30', dot: 'bg-blue-400', label: 'Seguir',
+        icon: <UserPlus size={15} />, bg: 'from-amber-500/20 to-amber-600/10',
+        border: 'border-amber-500/30', dot: 'bg-amber-400', label: 'Seguir',
     },
     follow_accepted: {
         icon: <UserPlus size={15} />, bg: 'from-green-500/20 to-emerald-600/10',
         border: 'border-green-500/30', dot: 'bg-green-400', label: 'Aceito',
     },
     message: {
-        icon: <MessageSquare size={15} />, bg: 'from-purple-500/20 to-purple-600/10',
-        border: 'border-purple-500/30', dot: 'bg-purple-400', label: 'Mensagem',
+        icon: <MessageSquare size={15} />, bg: 'from-amber-500/20 to-amber-600/10',
+        border: 'border-amber-500/30', dot: 'bg-amber-400', label: 'Mensagem',
     },
     broadcast: {
         icon: <Megaphone size={15} />, bg: 'from-red-500/20 to-red-600/10',
         border: 'border-red-500/30', dot: 'bg-red-400', label: 'Aviso',
     },
     appointment: {
-        icon: <Calendar size={15} />, bg: 'from-indigo-500/20 to-violet-600/10',
-        border: 'border-indigo-500/30', dot: 'bg-indigo-400', label: 'Agenda',
+        icon: <Calendar size={15} />, bg: 'from-amber-500/20 to-amber-600/10',
+        border: 'border-amber-500/30', dot: 'bg-amber-400', label: 'Agenda',
     },
     appointment_created: {
-        icon: <Calendar size={15} />, bg: 'from-indigo-500/20 to-violet-600/10',
-        border: 'border-indigo-500/30', dot: 'bg-indigo-400', label: 'Agenda',
+        icon: <Calendar size={15} />, bg: 'from-amber-500/20 to-amber-600/10',
+        border: 'border-amber-500/30', dot: 'bg-amber-400', label: 'Agenda',
     },
     milestone: {
-        icon: <Star size={15} />, bg: 'from-pink-500/20 to-pink-600/10',
-        border: 'border-pink-500/30', dot: 'bg-pink-400', label: 'Marco',
+        icon: <Star size={15} />, bg: 'from-emerald-500/20 to-green-600/10',
+        border: 'border-emerald-500/30', dot: 'bg-emerald-400', label: 'Marco',
     },
     story_posted: {
-        icon: <Camera size={15} />, bg: 'from-fuchsia-500/20 to-pink-600/10',
-        border: 'border-fuchsia-500/30', dot: 'bg-fuchsia-400', label: 'Story',
+        icon: <Camera size={15} />, bg: 'from-amber-500/20 to-amber-600/10',
+        border: 'border-amber-500/30', dot: 'bg-amber-400', label: 'Story',
     },
     story_like: {
-        icon: <Heart size={15} />, bg: 'from-rose-500/20 to-rose-600/10',
-        border: 'border-rose-500/30', dot: 'bg-rose-400', label: 'Curtiu',
+        icon: <Heart size={15} />, bg: 'from-red-500/20 to-red-600/10',
+        border: 'border-red-500/30', dot: 'bg-red-400', label: 'Curtiu',
     },
     like: {
-        icon: <Heart size={15} />, bg: 'from-rose-500/20 to-rose-600/10',
-        border: 'border-rose-500/30', dot: 'bg-rose-400', label: 'Curtiu',
+        icon: <Heart size={15} />, bg: 'from-red-500/20 to-red-600/10',
+        border: 'border-red-500/30', dot: 'bg-red-400', label: 'Curtiu',
     },
     story_reaction: {
-        icon: <Heart size={15} />, bg: 'from-rose-500/20 to-rose-600/10',
-        border: 'border-rose-500/30', dot: 'bg-rose-400', label: 'Reação',
+        icon: <Heart size={15} />, bg: 'from-red-500/20 to-red-600/10',
+        border: 'border-red-500/30', dot: 'bg-red-400', label: 'Reação',
     },
     challenge_created: {
         icon: <Swords size={15} />, bg: 'from-amber-500/20 to-orange-600/10',
@@ -126,12 +126,12 @@ const TYPE_CONFIG: Record<string, TypeConfig> = {
         border: 'border-neutral-500/30', dot: 'bg-neutral-400', label: 'Recusado',
     },
     meal_reminder: {
-        icon: <Utensils size={15} />, bg: 'from-lime-500/20 to-green-600/10',
-        border: 'border-lime-500/30', dot: 'bg-lime-400', label: 'Refeição',
+        icon: <Utensils size={15} />, bg: 'from-emerald-500/20 to-green-600/10',
+        border: 'border-emerald-500/30', dot: 'bg-emerald-400', label: 'Refeição',
     },
     workout_reminder: {
-        icon: <Activity size={15} />, bg: 'from-teal-500/20 to-cyan-600/10',
-        border: 'border-teal-500/30', dot: 'bg-teal-400', label: 'Lembrete',
+        icon: <Activity size={15} />, bg: 'from-amber-500/20 to-amber-600/10',
+        border: 'border-amber-500/30', dot: 'bg-amber-400', label: 'Lembrete',
     },
     default: {
         icon: <Bell size={15} />, bg: 'from-neutral-700/40 to-neutral-800/20',
@@ -398,7 +398,7 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded, open:
                                 {item.type !== 'invite' && (
                                     <button
                                         onClick={(e) => handleDelete(String(item.id ?? ""), e)}
-                                        className="absolute top-3 right-3 opacity-0 group-hover:opacity-100 p-1 text-neutral-400 hover:text-red-400 transition-all rounded-lg hover:bg-red-500/10"
+                                        className="absolute top-3 right-3 min-h-[44px] min-w-[44px] flex items-center justify-center opacity-60 group-hover:opacity-100 text-neutral-400 hover:text-red-400 transition-all rounded-lg hover:bg-red-500/10"
                                         aria-label="Remover notificação"
                                     >
                                         <Trash2 size={13} />
@@ -483,7 +483,7 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded, open:
                                     )}
                                     <button
                                         onClick={() => setIsOpen(false)}
-                                        className="w-7 h-7 rounded-xl flex items-center justify-center text-neutral-400 hover:text-white transition-all active:scale-90"
+                                        className="min-h-[44px] min-w-[44px] rounded-xl flex items-center justify-center text-neutral-400 hover:text-white transition-all active:scale-90"
                                         style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.08)' }}
                                     >
                                         <X size={13} />

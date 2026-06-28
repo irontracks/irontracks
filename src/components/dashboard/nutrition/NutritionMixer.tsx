@@ -833,8 +833,8 @@ export default function NutritionMixer({
               </div>
               {goalsError && <div className="text-xs text-red-400">{goalsError}</div>}
               <div className="flex justify-end gap-2">
-                <button type="button" onClick={() => setGoalsOpen(false)} className="h-8 px-3 rounded-lg text-xs text-neutral-400 hover:text-white transition">Cancelar</button>
-                <button type="button" onClick={saveGoals} disabled={goalsSaving} className="h-8 px-4 rounded-lg bg-yellow-500 text-black text-xs font-bold hover:bg-yellow-400 disabled:opacity-50 active:scale-95 transition">
+                <button type="button" onClick={() => setGoalsOpen(false)} className="h-10 px-3 rounded-lg text-xs text-neutral-400 hover:text-white transition">Cancelar</button>
+                <button type="button" onClick={saveGoals} disabled={goalsSaving} className="h-11 px-4 rounded-lg bg-yellow-500 text-black text-xs font-bold hover:bg-yellow-400 disabled:opacity-50 active:scale-95 transition">
                   {goalsSaving ? '...' : 'Salvar'}
                 </button>
               </div>
@@ -1048,7 +1048,7 @@ export default function NutritionMixer({
                 )}
               </div>
               {String(error).startsWith('Não reconheci:') && !aiUpgrade && (
-                <button type="button" onClick={estimateWithAi} disabled={aiBusy} className="mt-2 h-8 px-3 rounded-lg bg-white/[0.06] border border-white/[0.08] text-xs font-semibold text-white hover:bg-white/[0.1] disabled:opacity-50 transition">
+                <button type="button" onClick={estimateWithAi} disabled={aiBusy} className="mt-2 h-11 px-3 rounded-lg bg-white/[0.06] border border-white/[0.08] text-xs font-semibold text-white hover:bg-white/[0.1] disabled:opacity-50 transition">
                   {aiBusy ? 'Estimando...' : '🤖 Estimar com IA'}
                 </button>
               )}

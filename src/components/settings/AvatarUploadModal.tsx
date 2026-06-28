@@ -146,11 +146,11 @@ export default function AvatarUploadModal({ isOpen, onClose, currentPhotoURL, us
   return (
     <div className="fixed inset-0 z-[1400] flex items-center justify-center p-4">
       <button type="button" aria-label="Fechar" onClick={handleClose} className="absolute inset-0 bg-black/80 backdrop-blur-sm border-0 cursor-default" />
-      <div ref={focusTrapRef} role="dialog" aria-modal="true" aria-labelledby="avatar-modal-title" className="relative w-full max-w-sm bg-neutral-900 border border-neutral-800 rounded-2xl p-6 shadow-2xl">
+      <div ref={focusTrapRef} role="dialog" aria-modal="true" aria-labelledby="avatar-modal-title" className="relative w-full max-w-sm max-h-[90vh] overflow-y-auto bg-neutral-900 border border-neutral-800 rounded-2xl p-6 shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between mb-5">
           <h2 id="avatar-modal-title" className="text-lg font-black text-white">Foto de Perfil</h2>
-          <button type="button" onClick={handleClose} className="text-neutral-500 hover:text-white p-1">
+          <button type="button" onClick={handleClose} className="flex items-center justify-center min-h-[44px] min-w-[44px] text-neutral-500 hover:text-white">
             <X size={18} />
           </button>
         </div>

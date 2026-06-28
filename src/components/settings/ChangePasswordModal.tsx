@@ -95,7 +95,7 @@ export default function ChangePasswordModal({ isOpen, onClose, userEmail }: Chan
   return (
     <div className="fixed inset-0 z-[1400] flex items-center justify-center p-4">
       <button type="button" aria-label="Fechar" onClick={handleClose} className="absolute inset-0 bg-black/80 backdrop-blur-sm border-0 cursor-default" />
-      <div ref={focusTrapRef} role="dialog" aria-modal="true" aria-labelledby="cp-title" className="relative w-full max-w-md bg-neutral-900 border border-neutral-800 rounded-2xl p-6 shadow-2xl">
+      <div ref={focusTrapRef} role="dialog" aria-modal="true" aria-labelledby="cp-title" className="relative w-full max-w-md max-h-[90vh] overflow-y-auto bg-neutral-900 border border-neutral-800 rounded-2xl p-6 shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-3">
@@ -104,7 +104,7 @@ export default function ChangePasswordModal({ isOpen, onClose, userEmail }: Chan
             </div>
             <h2 id="cp-title" className="text-lg font-black text-white">Trocar Senha</h2>
           </div>
-          <button type="button" onClick={handleClose} className="text-neutral-500 hover:text-white p-1">
+          <button type="button" onClick={handleClose} className="text-neutral-500 hover:text-white p-1 min-h-[44px] min-w-[44px] flex items-center justify-center">
             <X size={18} />
           </button>
         </div>

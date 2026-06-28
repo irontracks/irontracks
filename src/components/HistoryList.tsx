@@ -279,13 +279,13 @@ const HistoryList: React.FC<HistoryListProps> = ({
                                                                     </div>
                                                                 )}
                                                             </div>
-                                                            <div className="flex items-center gap-1.5 shrink-0">
+                                                            <div className="flex items-center gap-2.5 shrink-0">
                                                                 {!isReadOnly && !isSelectionMode && (
                                                                     <>
                                                                         <button
                                                                             type="button"
                                                                             onClick={(e) => handleDeleteClick(e, session)}
-                                                                            className="cursor-pointer relative z-20 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-xl transition-colors bg-neutral-950 text-neutral-400 border border-neutral-800 hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/20 active:scale-95"
+                                                                            className="cursor-pointer relative z-20 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl transition-colors bg-neutral-950 text-neutral-400 border border-neutral-800 hover:bg-red-500/10 hover:text-red-400 hover:border-red-500/20 active:scale-95"
                                                                             aria-label="Excluir"
                                                                         >
                                                                             <Trash2 size={16} className="pointer-events-none" />
@@ -294,7 +294,7 @@ const HistoryList: React.FC<HistoryListProps> = ({
                                                                             <button
                                                                                 type="button"
                                                                                 onClick={(e) => { e.stopPropagation(); openEdit(session); }}
-                                                                                className="cursor-pointer relative z-20 min-h-[40px] min-w-[40px] flex items-center justify-center rounded-xl transition-colors bg-neutral-950 text-neutral-400 border border-neutral-800 hover:bg-yellow-500/10 hover:text-yellow-400 hover:border-yellow-500/20 active:scale-95"
+                                                                                className="cursor-pointer relative z-20 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl transition-colors bg-neutral-950 text-neutral-400 border border-neutral-800 hover:bg-yellow-500/10 hover:text-yellow-400 hover:border-yellow-500/20 active:scale-95"
                                                                                 aria-label="Editar"
                                                                             >
                                                                                 <Edit3 size={16} className="pointer-events-none" />

@@ -103,8 +103,8 @@ const DropSetSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: nu
               onClick={() => toggleNotes(key)} aria-label="Observações"
               className={
                 isNotesOpen || hasAnyNote
-                  ? 'w-7 h-7 inline-flex items-center justify-center rounded-lg text-yellow-500 bg-yellow-500/10 border border-yellow-500/40 hover:bg-yellow-500/15 transition duration-200'
-                  : 'w-7 h-7 inline-flex items-center justify-center rounded-lg text-neutral-500 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'
+                  ? 'h-9 w-9 inline-flex items-center justify-center rounded-lg text-yellow-500 bg-yellow-500/10 border border-yellow-500/40 hover:bg-yellow-500/15 transition duration-200'
+                  : 'h-9 w-9 inline-flex items-center justify-center rounded-lg text-neutral-500 bg-black/30 border border-neutral-700 hover:border-yellow-500/60 hover:text-yellow-500 transition duration-200'
               }
             >
               <MessageSquare size={12} />
@@ -120,7 +120,7 @@ const DropSetSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: nu
           </div>
         ) : (
           /* ── Expanded row when not done ── */
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-2">
             <div className="w-7 text-xs font-mono text-neutral-400 shrink-0">#{setIdx + 1}</div>
             <button
               type="button"
@@ -137,12 +137,12 @@ const DropSetSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: nu
                 const restSec = parseTrainingNumber(ex.rest_time ?? (ex as unknown as Record<string, unknown>).restTime) ?? 0;
                 setDropSetModal({ key, label: modeLabel, stages: baseStages, restSec, rpe: log.rpe ?? '', error: '' });
               }}
-              className="shrink-0 bg-black/30 border border-neutral-700 rounded-lg px-2 py-2 text-sm text-white outline-none hover:border-yellow-500/60 hover:text-yellow-500 transition-colors inline-flex items-center justify-center gap-1.5"
+              className="shrink-0 min-h-[44px] bg-black/30 border border-neutral-700 rounded-lg px-2 py-2 text-sm text-white outline-none hover:border-yellow-500/60 hover:text-yellow-500 transition-colors inline-flex items-center justify-center gap-2"
             >
               <Pencil size={14} />
               <span className="text-xs font-black">Abrir</span>
             </button>
-            <div className="flex items-center gap-1.5 flex-1 min-w-0 ml-1">
+            <div className="flex items-center gap-2 flex-1 min-w-0 ml-1">
               <span className="text-[10px] uppercase tracking-widest font-black text-yellow-500 inline-flex items-center gap-1 group shrink-0">
                 {modeLabel || 'Drop'}
                 <HelpHint
