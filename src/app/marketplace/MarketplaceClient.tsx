@@ -153,9 +153,9 @@ const TIERS = {
   },
   elite: {
     label: 'VIP Elite',
-    color: 'text-purple-400',
-    bg: 'bg-purple-500',
-    border: 'border-purple-500',
+    color: 'text-amber-400',
+    bg: 'bg-amber-500',
+    border: 'border-amber-500',
     icon: Crown,
     tagline: 'Alta performance sem limites',
     features: [
@@ -484,7 +484,7 @@ export default function MarketplaceClient() {
               )}
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-4">
-                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${key === 'elite' ? 'bg-purple-500/20 text-purple-400' : key === 'pro' ? 'bg-yellow-500/20 text-yellow-500' : 'bg-neutral-800 text-white'}`}>
+                  <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${key === 'elite' ? 'bg-amber-500/20 text-amber-400' : key === 'pro' ? 'bg-yellow-500/20 text-yellow-500' : 'bg-neutral-800 text-white'}`}>
                     <Icon size={24} fill={key === 'start' ? "currentColor" : "none"} />
                   </div>
                   <div>
@@ -520,7 +520,7 @@ export default function MarketplaceClient() {
         </button>
 
         <div className="text-center space-y-2 pt-2">
-          <div className={`inline-flex items-center justify-center w-16 h-16 rounded-3xl mb-4 ${selectedTier === 'elite' ? 'bg-purple-500/20 text-purple-400' : selectedTier === 'pro' ? 'bg-yellow-500/20 text-yellow-500' : 'bg-neutral-800 text-white'}`}>
+          <div className={`inline-flex items-center justify-center w-16 h-16 rounded-3xl mb-4 ${selectedTier === 'elite' ? 'bg-amber-500/20 text-amber-400' : selectedTier === 'pro' ? 'bg-yellow-500/20 text-yellow-500' : 'bg-neutral-800 text-white'}`}>
             <tier.icon size={32} fill={selectedTier === 'start' ? "currentColor" : "none"} />
           </div>
           <h1 className={`text-3xl font-black ${tier.color}`}>{tier.label}</h1>
@@ -556,7 +556,7 @@ export default function MarketplaceClient() {
         {/* Action Button */}
         <button
           onClick={() => openCheckout(selectedTier === 'start' ? 'vip_start' : selectedTier === 'pro' ? 'vip_pro' : 'vip_elite', billingCycle)}
-          className={`w-full py-4 rounded-xl font-black text-lg flex items-center justify-center gap-2 shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all ${selectedTier === 'elite' ? 'bg-purple-600 text-white shadow-purple-900/20' : selectedTier === 'pro' ? 'bg-yellow-500 text-black shadow-yellow-900/20' : 'bg-white text-black'}`}
+          className={`w-full py-4 rounded-xl font-black text-lg flex items-center justify-center gap-2 shadow-lg hover:scale-[1.02] active:scale-[0.98] transition-all ${selectedTier === 'elite' ? 'bg-gradient-to-r from-amber-500 to-orange-500 text-black shadow-amber-900/20' : selectedTier === 'pro' ? 'bg-yellow-500 text-black shadow-yellow-900/20' : 'bg-white text-black'}`}
         >
           Assinar {tier.label}
         </button>

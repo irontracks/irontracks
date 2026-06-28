@@ -166,9 +166,9 @@ export default function GuidedTour({
               type="button"
               onClick={handleCancel}
               aria-label="Fechar tour"
-              className="w-8 h-8 rounded-full bg-white/8 flex items-center justify-center text-neutral-400 hover:text-white hover:bg-white/12 transition-colors"
+              className="w-11 h-11 rounded-full bg-white/8 flex items-center justify-center text-neutral-400 hover:text-white hover:bg-white/12 transition-colors"
             >
-              <X size={14} />
+              <X size={16} />
             </button>
           </div>
 

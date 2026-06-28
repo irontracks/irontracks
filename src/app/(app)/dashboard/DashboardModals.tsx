@@ -228,7 +228,7 @@ export default function DashboardModals(props: DashboardModalsProps) {
                         <input value={importCode} onChange={e => setImportCode(e.target.value)} placeholder="Cole o código do treino aqui" className="w-full bg-neutral-800 p-4 rounded-xl mb-4 text-white font-mono text-center uppercase" />
                         <div className="flex gap-2">
                             <button onClick={() => setShowImportModal(false)} className="flex-1 p-3 bg-neutral-800 rounded-xl font-bold text-neutral-400">Cancelar</button>
-                            <button onClick={handleImportWorkout} className="flex-1 p-3 bg-blue-600 rounded-xl font-bold text-white">Importar</button>
+                            <button onClick={handleImportWorkout} className="flex-1 p-3 bg-amber-500 hover:bg-amber-400 rounded-xl font-bold text-black">Importar</button>
                         </div>
                     </div>
                 </div>
@@ -241,7 +241,7 @@ export default function DashboardModals(props: DashboardModalsProps) {
                         <Upload size={48} className="mx-auto text-blue-500 mb-4" />
                         <h3 className="font-bold text-white mb-2 text-xl">Restaurar Backup</h3>
                         <p className="text-neutral-400 text-sm mb-6">Selecione o arquivo .json que você salvou anteriormente.</p>
-                        <label className="block w-full cursor-pointer bg-blue-600 hover:bg-blue-500 text-white font-bold py-4 rounded-xl transition-colors">
+                        <label className="block w-full cursor-pointer bg-amber-500 hover:bg-amber-400 text-black font-bold py-4 rounded-xl transition-colors">
                             Selecionar Arquivo
                             <input type="file" accept=".json" onChange={handleJsonUpload} className="hidden" />
                         </label>

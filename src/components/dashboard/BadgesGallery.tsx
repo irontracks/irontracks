@@ -141,7 +141,7 @@ const BadgesGallery = memo(function BadgesGallery({ badges, currentStreak, total
   const roleLabel = (roleRaw: string | null) => {
     const role = String(roleRaw || '').toLowerCase()
     if (role === 'admin') return { label: 'Admin', cls: 'bg-yellow-500/10 text-yellow-400 border-yellow-500/30' }
-    if (role === 'teacher') return { label: 'Coach', cls: 'bg-purple-500/10 text-purple-300 border-purple-500/30' }
+    if (role === 'teacher') return { label: 'Coach', cls: 'bg-amber-600/10 text-amber-300 border-amber-600/30' }
     return { label: 'Aluno', cls: 'bg-neutral-800 text-neutral-400 border-neutral-700' }
   }
 

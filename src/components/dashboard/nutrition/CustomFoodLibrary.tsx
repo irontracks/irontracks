@@ -28,11 +28,12 @@ function NumField({ label, value, onChange }: { label: string; value: number; on
         id={id}
         aria-label={label}
         type="number"
+        inputMode="decimal"
         min="0"
         step="0.1"
         value={value}
         onChange={e => onChange(Math.max(0, parseFloat(e.target.value) || 0))}
-        className="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-xs text-white focus:outline-none focus:border-yellow-500/60"
+        className="w-full rounded-lg bg-neutral-800 border border-neutral-700 px-2 py-1.5 text-[16px] text-white focus:outline-none focus:border-yellow-500/60"
       />
     </div>
   )

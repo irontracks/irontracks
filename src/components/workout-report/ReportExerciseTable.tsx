@@ -78,7 +78,7 @@ export function ReportExerciseTable({ exercises, historicalBestE1rm }: ReportExe
                   <td className={`px-3 py-2 text-right font-mono ${Number.isFinite(deltaVolume) ? deltaVolumeClass : 'text-neutral-500'}`}>{deltaVolumeLabel}</td>
                   <td className={`px-3 py-2 text-right font-mono ${Number.isFinite(deltaReps) ? deltaRepsClass : 'text-neutral-500'}`}>{deltaRepsLabel}</td>
                   <td className={`px-3 py-2 text-right font-mono ${Number.isFinite(deltaWeight) ? deltaWeightClass : 'text-neutral-500'}`}>{deltaWeightLabel}</td>
-                  <td className="px-3 py-2 text-right font-mono text-blue-300 text-xs">
+                  <td className="px-3 py-2 text-right font-mono text-xs">
                     {(() => {
                       const key = String(name || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim()
                       const hist = historicalBestE1rm[key]

@@ -158,7 +158,7 @@ export default function WeeklyAIReport({ weeklyData, goals }: Props) {
 
               {/* Tip */}
               {report.tip && (
-                <div className="rounded-xl bg-purple-500/10 border border-purple-500/15 px-3 py-2 text-xs text-purple-200 italic">
+                <div className="rounded-xl bg-amber-500/10 border border-amber-500/20 px-3 py-2 text-xs text-amber-200 italic">
                   💡 {report.tip}
                 </div>
               )}
