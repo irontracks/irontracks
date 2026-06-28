@@ -46,15 +46,15 @@ export async function POST(req: Request) {
         const isNew = await cacheSetNx(`social:like:push:${storyId}:${auth.user.id}`, '1', 300)
         if (isNew) {
           const admin = createAdminClient()
-          const { data: story } = await admin.from('social_stories').select('user_id').eq('id', storyId).maybeSingle()
+          const { data: story } = await admin.from('social_stories').select('author_id').eq('id', storyId).maybeSingle()
 
-          if (story?.user_id && story.user_id !== auth.user.id) {
+          if (story?.author_id && story.author_id !== auth.user.id) {
             const { data: me } = await admin.from('profiles').select('display_name').eq('id', auth.user.id).maybeSingle()
             const name = String(me?.display_name || '').trim() || 'Alguém'
 
             await insertNotifications([{
-              user_id: story.user_id,
-              recipient_id: story.user_id,
+              user_id: story.author_id,
+              recipient_id: story.author_id,
               sender_id: auth.user.id,
               type: 'story_like',
               title: 'Nova curtida',
@@ -96,15 +96,15 @@ export async function POST(req: Request) {
       const isNew = await cacheSetNx(`social:like:push:${storyId}:${auth.user.id}`, '1', 300)
       if (isNew) {
         const admin = createAdminClient()
-        const { data: story } = await admin.from('social_stories').select('user_id').eq('id', storyId).maybeSingle()
+        const { data: story } = await admin.from('social_stories').select('author_id').eq('id', storyId).maybeSingle()
 
-        if (story?.user_id && story.user_id !== auth.user.id) {
+        if (story?.author_id && story.author_id !== auth.user.id) {
           const { data: me } = await admin.from('profiles').select('display_name').eq('id', auth.user.id).maybeSingle()
           const name = String(me?.display_name || '').trim() || 'Alguém'
 
           await insertNotifications([{
-            user_id: story.user_id,
-            recipient_id: story.user_id,
+            user_id: story.author_id,
+            recipient_id: story.author_id,
             sender_id: auth.user.id,
             type: 'story_like',
             title: 'Nova curtida',

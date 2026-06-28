@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { logWarn } from '@/lib/logger'
+import { logError, logWarn } from '@/lib/logger'
 import crypto from 'crypto'
 import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
@@ -457,6 +457,9 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: true, ignored: true })
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: (e as { message?: string })?.message ?? String(e) }, { status: 500 })
+    // Não vaza mensagem de erro interna ao caller (endpoint público). Loga server-side
+    // e responde genérico. Auditoria 2026-06-28 (R2).
+    logError('webhook:mercadopago', e)
+    return NextResponse.json({ ok: false, error: 'internal_error' }, { status: 500 })
   }
 }
