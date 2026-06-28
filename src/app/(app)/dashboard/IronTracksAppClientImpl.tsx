@@ -21,6 +21,7 @@ const ChatDirectScreen = dynamic(() => import('@/components/ChatDirectScreen'), 
 const HistoryList = dynamic(() => import('@/components/HistoryList'), { ssr: false });
 const CommunityClient = dynamic(() => import('@/app/(app)/community/CommunityClient'), { ssr: false });
 const WorkoutReport = dynamic(() => import('@/components/WorkoutReport'), { ssr: false });
+const WeeklyMuscleSummary = dynamic(() => import('@/components/dashboard/WeeklyMuscleSummary'), { ssr: false });
 const ExerciseEditor = dynamic(() => import('@/components/ExerciseEditor'), { ssr: false });
 const ProfilePage = dynamic(() => import('@/components/ProfilePage'), { ssr: false });
 import ErrorBoundary from '@/components/ErrorBoundary';
@@ -113,6 +114,7 @@ function pathnameToView(pathname: string | null): string {
     if (pathname === '/dashboard' || pathname === '/dashboard/') return 'dashboard'
     if (pathname.startsWith('/dashboard/history')) return 'history'
     if (pathname.startsWith('/dashboard/active')) return 'active'
+    if (pathname.startsWith('/dashboard/report/weekly')) return 'weeklySummary'
     if (pathname.startsWith('/dashboard/report')) return 'report'
     if (pathname.startsWith('/dashboard/chat/') && pathname.length > '/dashboard/chat/'.length) return 'directChat'
     if (pathname === '/dashboard/chat' || pathname === '/dashboard/chat/') return 'chatList'
@@ -810,7 +812,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         }
     }
 
-    const isHeaderVisible = view !== 'active' && view !== 'report';
+    const isHeaderVisible = view !== 'active' && view !== 'report' && view !== 'weeklySummary';
 
     // ── Apple Watch: dashboard payload ────────────────────────────────────────
     const watchNextWorkout = useMemo((): WatchWorkout | null => {
@@ -1234,6 +1236,13 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                         />
                                     </SectionErrorBoundary>
                                 </div>
+                            )}
+
+                            {/* Resumo muscular da semana — aberto via deep-link da push "Resumo da semana 💪" */}
+                            {view === 'weeklySummary' && (
+                                <SectionErrorBoundary section="Resumo da Semana" fullScreen onReset={() => setView('dashboard')}>
+                                    <WeeklyMuscleSummary onBack={() => setView('dashboard')} />
+                                </SectionErrorBoundary>
                             )}
 
                             {/* Profile Page */}
