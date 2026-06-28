@@ -7,6 +7,7 @@ import { normalizeExerciseName } from '@/utils/normalizeExerciseName'
 import { getVideoQueriesFromGemini, searchYouTubeCandidates } from '@/lib/videoSuggestions'
 import { parseJsonBody } from '@/utils/zod'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { respondDbError } from '@/utils/api/dbError'
 
 const ZodBodySchema = z
   .object({
@@ -86,7 +87,7 @@ export async function POST(req: Request) {
       .upsert(rows, { onConflict: 'exercise_library_id,provider,provider_video_id' })
       .select('id')
 
-    if (insertErr) return NextResponse.json({ ok: false, error: insertErr.message }, { status: 400 })
+    if (insertErr) return respondDbError('admin:exercise-videos:suggest', insertErr, 400)
 
     const count = Array.isArray(inserted) ? inserted.length : 0
     return NextResponse.json({ ok: true, exercise_library_id: libRow.id, created: count })

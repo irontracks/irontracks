@@ -3,6 +3,7 @@ import { logWarn } from '@/lib/logger'
 import { createClient } from '@/utils/supabase/server'
 import { checkRateLimitAsync } from '@/utils/rateLimit'
 import { getUpstashConfig } from '@/utils/cache'
+import { respondDbError } from '@/utils/api/dbError'
 
 export const dynamic = 'force-dynamic'
 
@@ -34,7 +35,7 @@ export async function POST() {
     if (!rl.allowed) return NextResponse.json({ ok: true }, { headers: { 'cache-control': 'no-store, max-age=0' } })
 
     const { error } = await supabase.from('profiles').update({ last_seen: new Date().toISOString() }).eq('id', user.id)
-    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+    if (error) return respondDbError('profiles:ping', error, 400)
 
     return NextResponse.json({ ok: true }, { headers: { 'cache-control': 'no-store, max-age=0' } })
   } catch (e: unknown) {

@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
+import { respondDbError } from '@/utils/api/dbError'
 
 export const dynamic = 'force-dynamic'
 
@@ -49,6 +50,6 @@ export async function PUT(req: Request) {
       { onConflict: 'user_id' },
     )
 
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+  if (error) return respondDbError('gps:settings', error)
   return NextResponse.json({ ok: true })
 }

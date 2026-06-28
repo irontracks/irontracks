@@ -3,6 +3,7 @@ import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { safeEmailLike } from '@/utils/safePgFilter'
+import { respondDbError } from '@/utils/api/dbError'
 
 export async function POST() {
   try {
@@ -38,7 +39,7 @@ export async function POST() {
       .from('teachers')
       .update({ status: 'active', user_id: user.id })
       .eq('id', teacherRowId)
-    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+    if (error) return respondDbError('teachers:accept', error)
 
     await admin.from('profiles').update({ role: 'teacher' }).eq('id', user.id)
     return NextResponse.json({ ok: true })

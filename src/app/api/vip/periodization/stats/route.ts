@@ -6,6 +6,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { computeWeeklyStatsFromSessions } from '@/utils/vip/periodization'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { cacheGet, cacheSet } from '@/utils/cache'
+import { respondDbError } from '@/utils/api/dbError'
 
 export const dynamic = 'force-dynamic'
 
@@ -42,7 +43,7 @@ export async function GET() {
       .order('created_at', { ascending: true })
       .limit(300)
 
-    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+    if (error) return respondDbError('vip:periodization:stats', error)
 
     const sessions = (Array.isArray(data) ? data : []).map((r: Record<string, unknown>) => ({
       created_at: String(r?.created_at || ''),

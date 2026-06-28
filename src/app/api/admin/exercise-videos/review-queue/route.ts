@@ -22,6 +22,7 @@ import { requireRoleOrBearer } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { parseJsonBody } from '@/utils/zod'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { respondDbError } from '@/utils/api/dbError'
 
 export const dynamic = 'force-dynamic'
 
@@ -55,7 +56,7 @@ export async function GET(req: Request) {
       .order('quality_score', { ascending: false })
       .limit(200)
 
-    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+    if (error) return respondDbError('admin:exercise-videos:review-queue', error)
 
     // Buscar nomes dos exercícios
     const exerciseIds = Array.from(new Set((videos || []).map(v => String((v as { exercise_library_id?: string }).exercise_library_id || '')).filter(Boolean)))

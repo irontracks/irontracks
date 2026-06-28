@@ -14,6 +14,7 @@ import { createClient } from '@/utils/supabase/server'
 import { parseJsonBody } from '@/utils/zod'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { logWarn } from '@/lib/logger'
+import { respondDbError } from '@/utils/api/dbError'
 
 const WatchSetLogSchema = z.object({
   id: z.string(),
@@ -52,7 +53,7 @@ export async function POST(request: Request) {
       .eq('user_id', user.id)
       .maybeSingle()
 
-    if (sessionError) return NextResponse.json({ ok: false, error: sessionError.message }, { status: 400 })
+    if (sessionError) return respondDbError('workouts:log-set-from-watch:session', sessionError)
     if (!sessionRow) return NextResponse.json({ ok: false, error: 'no_active_session' }, { status: 404 })
 
     // Parse state
@@ -114,7 +115,7 @@ export async function POST(request: Request) {
         { onConflict: 'user_id' }
       )
 
-    if (upsertError) return NextResponse.json({ ok: false, error: upsertError.message }, { status: 400 })
+    if (upsertError) return respondDbError('workouts:log-set-from-watch:upsert', upsertError)
 
     return NextResponse.json({ ok: true, logKey, exerciseIndex: exIdx, setIndex: setIdx })
   } catch (e: unknown) {

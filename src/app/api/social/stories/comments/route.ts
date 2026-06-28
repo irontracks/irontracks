@@ -10,6 +10,7 @@ import { insertNotifications } from '@/lib/social/notifyFollowers'
 import { extractMentions } from '@/lib/social/extractMentions'
 import { logError } from '@/lib/logger'
 import { waitUntil } from '@vercel/functions'
+import { respondDbError } from '@/utils/api/dbError'
 
 export const dynamic = 'force-dynamic'
 
@@ -67,7 +68,7 @@ export async function GET(req: Request) {
       .order('created_at', { ascending: true })
       .limit(limit)
 
-    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+    if (error) return respondDbError('social:stories:comments:list', error)
     const comments = Array.isArray(commentsRaw) ? commentsRaw : []
     const userIds = Array.from(new Set(comments.map((c: Record<string, unknown>) => String(c?.user_id || '').trim()).filter(Boolean)))
     const { data: profilesRaw } = userIds.length
@@ -128,7 +129,7 @@ export async function POST(req: Request) {
       .select('id, story_id, user_id, body, created_at')
       .maybeSingle()
 
-    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+    if (error) return respondDbError('social:stories:comments:create', error)
 
     // Fire-and-forget: notify the story author (1→1) and any @mentioned users.
     waitUntil(

@@ -10,6 +10,7 @@ import { env } from '@/utils/env'
 import { safeGemini, handleGeminiError } from '@/utils/ai/handleGeminiError'
 import { getGeminiModel } from '@/utils/ai/gemini'
 import { buildUserContextBlock } from '@/utils/ai/userContext'
+import { respondDbError } from '@/utils/api/dbError'
 
 export const dynamic = 'force-dynamic'
 
@@ -216,7 +217,7 @@ export async function POST(req: Request) {
       .select('id, user_id, name, date, created_at, notes')
       .eq('id', resolvedId)
       .maybeSingle()
-    if (wErr) return NextResponse.json({ ok: false, error: wErr.message }, { status: 400 })
+    if (wErr) return respondDbError('ai:post-workout-insights', wErr)
     if (!workout?.id) return NextResponse.json({ ok: false, error: 'not_found' }, { status: 404 })
     if (String(workout.user_id || '') !== userId) return NextResponse.json({ ok: false, error: 'forbidden' }, { status: 403 })
 

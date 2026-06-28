@@ -21,6 +21,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { parseJsonBody } from '@/utils/zod'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { respondDbError } from '@/utils/api/dbError'
 import { BODY_PHOTO_POSES } from '@/types/bodyPhotoAssessment'
 
 export const dynamic = 'force-dynamic'
@@ -60,7 +61,7 @@ export async function POST(request: Request) {
             .select('id, user_id, trainer_id')
             .eq('id', assessmentId)
             .maybeSingle()
-        if (aErr) return NextResponse.json({ ok: false, error: aErr.message }, { status: 400 })
+        if (aErr) return respondDbError('body-photo:signed-upload:assessment', aErr)
         if (!assessment) return NextResponse.json({ ok: false, error: 'not_found' }, { status: 404 })
 
         const assessedUserId = String((assessment as { user_id?: string }).user_id || '')
@@ -74,8 +75,9 @@ export async function POST(request: Request) {
         const { data: signed, error: signErr } = await admin.storage
             .from(BUCKET)
             .createSignedUploadUrl(path, { upsert: true })
-        if (signErr || !signed) {
-            return NextResponse.json({ ok: false, error: signErr?.message || 'failed_to_sign' }, { status: 400 })
+        if (signErr) return respondDbError('body-photo:signed-upload:sign', signErr)
+        if (!signed) {
+            return NextResponse.json({ ok: false, error: 'failed_to_sign' }, { status: 400 })
         }
 
         // Upsert da linha da foto (uma por pose por avaliação — UNIQUE constraint)
@@ -94,7 +96,7 @@ export async function POST(request: Request) {
                 },
                 { onConflict: 'assessment_id,pose' },
             )
-        if (upErr) return NextResponse.json({ ok: false, error: upErr.message }, { status: 400 })
+        if (upErr) return respondDbError('body-photo:signed-upload:photo', upErr)
 
         return NextResponse.json({ ok: true, path: signed.path, token: signed.token })
     } catch (e: unknown) {

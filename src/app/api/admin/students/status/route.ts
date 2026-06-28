@@ -4,6 +4,7 @@ import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { requireRoleOrBearer } from '@/utils/auth/route'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { respondDbError } from '@/utils/api/dbError'
 import { resolveStudentRow } from '@/utils/admin/resolveStudent'
 import { sendPushToAllPlatforms as sendPushToUsers } from '@/lib/push/sender'
 import { waitUntil } from '@vercel/functions'
@@ -79,7 +80,7 @@ export async function POST(req: Request) {
     // Update status — always by the resolved PK so we don't accidentally
     // update 0 rows when the caller sent a profile UUID as `id`.
     const { error } = await admin.from('students').update({ status }).eq('id', resolvedId)
-    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+    if (error) return respondDbError('admin:students:status', error)
 
     // Fire push notification if status changed and student has a linked account
     const pushMsg = STATUS_PUSH[status] ?? null

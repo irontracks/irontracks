@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { createClient } from '@/utils/supabase/server'
 import { isTeamSessionMember } from '@/utils/team/sessionMembership'
+import { respondDbError } from '@/utils/api/dbError'
 
 export const dynamic = 'force-dynamic'
 
@@ -39,7 +40,7 @@ export async function GET(req: NextRequest) {
       .limit(50)
 
     if (error) {
-      return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
+      return respondDbError('team:chat:messages', error, 500)
     }
 
     return NextResponse.json({ ok: true, data: data || [] })

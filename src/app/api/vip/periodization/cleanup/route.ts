@@ -4,6 +4,7 @@ import { checkVipFeatureAccess } from '@/utils/vip/limits'
 // NEEDS ADMIN: RLS bypass required for cross-user data operations
 import { createAdminClient } from '@/utils/supabase/admin'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { respondDbError } from '@/utils/api/dbError'
 
 export const dynamic = 'force-dynamic'
 
@@ -59,7 +60,7 @@ export async function POST() {
     if (!idsToArchive.length) return NextResponse.json({ ok: true, archived: 0 })
 
     const { error } = await admin.from('workouts').update({ archived_at: new Date().toISOString() }).in('id', idsToArchive)
-    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+    if (error) return respondDbError('vip:periodization:cleanup', error)
 
     return NextResponse.json({ ok: true, archived: idsToArchive.length })
   } catch (e: unknown) {

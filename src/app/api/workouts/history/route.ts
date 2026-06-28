@@ -5,6 +5,7 @@ import { createClient } from '@/utils/supabase/server'
 import { getVipPlanLimits } from '@/utils/vip/limits'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { cacheGet, cacheSet } from '@/utils/cache'
+import { respondDbError } from '@/utils/api/dbError'
 
 export const dynamic = 'force-dynamic'
 
@@ -63,7 +64,7 @@ export async function GET(req: Request) {
 
     const [workoutsResult, cardioResult] = await Promise.all([baseQuery, cardioQuery])
 
-    if (workoutsResult.error) return NextResponse.json({ ok: false, error: workoutsResult.error.message }, { status: 400 })
+    if (workoutsResult.error) return respondDbError('workouts:history', workoutsResult.error)
 
     // Shape cardio rows to match the WorkoutSummary expected by the client
     type CardioRow = {

@@ -6,6 +6,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { deleteTemplateFromSubscribers } from '@/lib/workoutSync'
 import { parseJsonBody } from '@/utils/zod'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { respondDbError } from '@/utils/api/dbError'
 
 const ZodBodySchema = z
   .object({
@@ -37,21 +38,21 @@ export async function POST(req: Request) {
       .select('id, user_id, created_by, is_template')
       .eq('id', id)
       .maybeSingle()
-    if (wErr) return NextResponse.json({ ok: false, error: wErr.message }, { status: 400 })
+    if (wErr) return respondDbError('admin:workouts:delete-any', wErr)
     if (!(w as Record<string, unknown>)?.id) return NextResponse.json({ ok: false, error: 'not_found' }, { status: 404 })
 
     const { data: exs, error: exErr } = await admin.from('exercises').select('id').eq('workout_id', id)
-    if (exErr) return NextResponse.json({ ok: false, error: exErr.message }, { status: 400 })
+    if (exErr) return respondDbError('admin:workouts:delete-any', exErr)
     const exIds = (exs || []).map((e: unknown) => (e as Record<string, unknown>)?.id).filter(Boolean)
     if (exIds.length) {
       const { error: setsErr } = await admin.from('sets').delete().in('exercise_id', exIds)
-      if (setsErr) return NextResponse.json({ ok: false, error: setsErr.message }, { status: 400 })
+      if (setsErr) return respondDbError('admin:workouts:delete-any', setsErr)
     }
     const { error: exDelErr } = await admin.from('exercises').delete().eq('workout_id', id)
-    if (exDelErr) return NextResponse.json({ ok: false, error: exDelErr.message }, { status: 400 })
+    if (exDelErr) return respondDbError('admin:workouts:delete-any', exDelErr)
 
     const { error: delErr } = await admin.from('workouts').delete().eq('id', id)
-    if (delErr) return NextResponse.json({ ok: false, error: delErr.message }, { status: 400 })
+    if (delErr) return respondDbError('admin:workouts:delete-any', delErr)
 
     try {
       const isSourceTemplate = w?.is_template === true && String(w?.user_id || '') === String(w?.created_by || '')

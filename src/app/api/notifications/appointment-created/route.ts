@@ -5,6 +5,7 @@ import { requireRole } from '@/utils/auth/route'
 import { parseJsonBody } from '@/utils/zod'
 import { sendPushToAllPlatforms as sendPushToUsers } from '@/lib/push/sender'
 import { waitUntil } from '@vercel/functions'
+import { respondDbError } from '@/utils/api/dbError'
 
 export const dynamic = 'force-dynamic'
 
@@ -43,7 +44,7 @@ export async function POST(req: Request) {
       .maybeSingle()
 
     if (studentError) {
-      return NextResponse.json({ ok: false, error: studentError.message }, { status: 400 })
+      return respondDbError('notifications:appointment-created:student', studentError)
     }
 
     if (!student) {
@@ -80,7 +81,7 @@ export async function POST(req: Request) {
     })
 
     if (insertError) {
-      return NextResponse.json({ ok: false, error: insertError.message }, { status: 400 })
+      return respondDbError('notifications:appointment-created:insert', insertError)
     }
 
     // Fire push notification (pref filter enforced by sender)

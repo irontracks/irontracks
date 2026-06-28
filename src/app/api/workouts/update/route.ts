@@ -5,6 +5,7 @@ import { createClient } from '@/utils/supabase/server'
 import { normalizeWorkoutTitle } from '@/utils/workoutTitle'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { cacheDeletePattern } from '@/utils/cache'
+import { respondDbError } from '@/utils/api/dbError'
 
 const safeString = (v: unknown) => String(v ?? '').trim()
 
@@ -80,7 +81,7 @@ export async function PATCH(request: Request) {
       p_notes: notes,
       p_exercises: exercisesPayload,
     })
-    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+    if (error) return respondDbError('workouts:update', error)
 
     // Invalidar cache de listas para que o bootstrap e workouts/list reflitam a mudança imediatamente
     await Promise.allSettled([

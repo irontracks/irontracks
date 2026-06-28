@@ -12,6 +12,7 @@ import { NextResponse } from 'next/server'
 import { requireUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { respondDbError } from '@/utils/api/dbError'
 import type { LabExam } from '@/types/labExam'
 
 export const dynamic = 'force-dynamic'
@@ -49,7 +50,7 @@ export async function GET(request: Request) {
       .order('created_at', { ascending: false })
       .limit(100)
 
-    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+    if (error) return respondDbError('lab-exams:list', error)
     return NextResponse.json({ ok: true, exams: (data || []) as unknown as LabExam[] })
   } catch (e: unknown) {
     return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })

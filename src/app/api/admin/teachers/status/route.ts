@@ -4,6 +4,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { requireRoleOrBearer } from '@/utils/auth/route'
 import { parseJsonBody } from '@/utils/zod'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { respondDbError } from '@/utils/api/dbError'
 
 const ZodBodySchema = z
   .object({
@@ -22,7 +23,7 @@ export async function POST(req: Request) {
     if (!id || !status) return NextResponse.json({ ok: false, error: 'invalid' }, { status: 400 })
     const admin = createAdminClient()
     const { error } = await admin.from('teachers').update({ status }).eq('id', id)
-    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+    if (error) return respondDbError('admin:teachers:status', error)
     return NextResponse.json({ ok: true })
   } catch (e: unknown) {
     return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })

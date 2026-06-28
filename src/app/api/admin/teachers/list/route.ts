@@ -6,6 +6,7 @@ import { parseSearchParams } from '@/utils/zod'
 import { safePgLike } from '@/utils/safePgFilter'
 import { cacheGet, cacheSet } from '@/utils/cache'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
+import { respondDbError } from '@/utils/api/dbError'
 
 export const dynamic = 'force-dynamic'
 
@@ -45,7 +46,7 @@ export async function GET(req: Request) {
 
     const { data: rows, error } = await query
 
-    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+    if (error) return respondDbError('admin:teachers:list', error)
 
     const teachers = rows || []
     const emails = Array.from(new Set(teachers.map((t) => (t.email || '').toLowerCase()).filter(Boolean)))

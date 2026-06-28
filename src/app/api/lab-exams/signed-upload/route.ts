@@ -19,6 +19,7 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { parseJsonBody } from '@/utils/zod'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { respondDbError } from '@/utils/api/dbError'
 import { LAB_EXAM_ALLOWED_MIMES, LAB_EXAM_MAX_FILE_BYTES, LAB_EXAM_MAX_FILES } from '@/types/labExam'
 
 export const dynamic = 'force-dynamic'
@@ -70,7 +71,7 @@ export async function POST(request: Request) {
       .select('id, user_id, trainer_id')
       .eq('id', examId)
       .maybeSingle()
-    if (eErr) return NextResponse.json({ ok: false, error: eErr.message }, { status: 400 })
+    if (eErr) return respondDbError('lab-exams:signed-upload', eErr, 400)
     if (!exam) return NextResponse.json({ ok: false, error: 'not_found' }, { status: 404 })
 
     const assessedUserId = String((exam as { user_id?: string }).user_id || '')
@@ -106,7 +107,7 @@ export async function POST(request: Request) {
       file_size: fileSize,
       mime_type: mimeType,
     })
-    if (insErr) return NextResponse.json({ ok: false, error: insErr.message }, { status: 400 })
+    if (insErr) return respondDbError('lab-exams:signed-upload:insert', insErr, 400)
 
     return NextResponse.json({ ok: true, path: signed.path, token: signed.token, storagePath: path })
   } catch (e: unknown) {

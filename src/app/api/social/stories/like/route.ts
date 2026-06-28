@@ -7,6 +7,7 @@ import { cacheSetNx } from '@/utils/cache'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { insertNotifications } from '@/lib/social/notifyFollowers'
 import { logError } from '@/lib/logger'
+import { respondDbError } from '@/utils/api/dbError'
 
 export const dynamic = 'force-dynamic'
 
@@ -38,7 +39,7 @@ export async function POST(req: Request) {
     if (shouldLike === true) {
       const { error } = await auth.supabase.from('social_story_likes').insert({ story_id: storyId, user_id: auth.user.id })
       if (error && !String(error.message || '').toLowerCase().includes('duplicate')) {
-        return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+        return respondDbError('social:stories:like:insert', error, 400)
       }
 
       try {
@@ -69,7 +70,7 @@ export async function POST(req: Request) {
     }
     if (shouldLike === false) {
       const { error } = await auth.supabase.from('social_story_likes').delete().eq('story_id', storyId).eq('user_id', auth.user.id)
-      if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+      if (error) return respondDbError('social:stories:like:delete', error, 400)
       return NextResponse.json({ ok: true, liked: false })
     }
 
@@ -82,13 +83,13 @@ export async function POST(req: Request) {
 
     if (existing?.story_id) {
       const { error } = await auth.supabase.from('social_story_likes').delete().eq('story_id', storyId).eq('user_id', auth.user.id)
-      if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+      if (error) return respondDbError('social:stories:like:toggle-delete', error, 400)
       return NextResponse.json({ ok: true, liked: false })
     }
 
     const { error } = await auth.supabase.from('social_story_likes').insert({ story_id: storyId, user_id: auth.user.id })
     if (error && !String(error.message || '').toLowerCase().includes('duplicate')) {
-      return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+      return respondDbError('social:stories:like:toggle-insert', error, 400)
     }
 
     try {

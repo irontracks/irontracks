@@ -6,6 +6,7 @@ import { parseSearchParams } from '@/utils/zod'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { cacheGet, cacheSet } from '@/utils/cache'
+import { respondDbError } from '@/utils/api/dbError'
 
 export const dynamic = 'force-dynamic'
 
@@ -42,7 +43,7 @@ export async function GET(req: Request) {
       .select('id, author_id, is_deleted, expires_at')
       .eq('id', storyId)
       .maybeSingle()
-    if (sErr) return NextResponse.json({ ok: false, error: sErr.message }, { status: 400 })
+    if (sErr) return respondDbError('social:stories:views:story', sErr)
     if (!story?.id) return NextResponse.json({ ok: false, error: 'not_found' }, { status: 404 })
 
     const authorId = String(story.author_id || '').trim()
@@ -54,7 +55,7 @@ export async function GET(req: Request) {
       .eq('story_id', storyId)
       .order('viewed_at', { ascending: false })
       .limit(1000)
-    if (vErr) return NextResponse.json({ ok: false, error: vErr.message }, { status: 400 })
+    if (vErr) return respondDbError('social:stories:views:list', vErr)
 
     const views = Array.isArray(viewsRaw) ? viewsRaw : []
     const viewerIds = views.map((r: Record<string, unknown>) => String(r?.viewer_id || '').trim()).filter(Boolean)

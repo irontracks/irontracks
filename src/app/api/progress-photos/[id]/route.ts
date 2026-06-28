@@ -4,6 +4,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
+import { respondDbError } from '@/utils/api/dbError'
 
 export const dynamic = 'force-dynamic'
 
@@ -24,6 +25,6 @@ export async function DELETE(
     .eq('id', id)
     .eq('user_id', auth.user.id) // RLS double-check
 
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 500 })
+  if (error) return respondDbError('progress-photos:delete', error, 500)
   return NextResponse.json({ ok: true })
 }

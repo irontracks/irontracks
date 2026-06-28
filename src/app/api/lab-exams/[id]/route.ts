@@ -11,6 +11,7 @@ import { requireUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { respondDbError } from '@/utils/api/dbError'
 
 export const dynamic = 'force-dynamic'
 
@@ -37,7 +38,7 @@ export async function DELETE(request: Request, ctx: { params: Promise<{ id: stri
       .select('id, user_id, trainer_id')
       .eq('id', examId)
       .maybeSingle()
-    if (eErr) return NextResponse.json({ ok: false, error: eErr.message }, { status: 400 })
+    if (eErr) return respondDbError('lab-exams:delete:fetch', eErr)
     if (!exam) return NextResponse.json({ ok: false, error: 'not_found' }, { status: 404 })
 
     const assessedUserId = String((exam as { user_id?: string }).user_id || '')
@@ -59,7 +60,7 @@ export async function DELETE(request: Request, ctx: { params: Promise<{ id: stri
     }
 
     const { error: delErr } = await admin.from('lab_exams').delete().eq('id', examId)
-    if (delErr) return NextResponse.json({ ok: false, error: delErr.message }, { status: 400 })
+    if (delErr) return respondDbError('lab-exams:delete', delErr)
 
     return NextResponse.json({ ok: true })
   } catch (e: unknown) {

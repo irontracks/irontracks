@@ -4,6 +4,7 @@ import { requireUser } from '@/utils/auth/route'
 import { parseJsonBody } from '@/utils/zod'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { respondDbError } from '@/utils/api/dbError'
 
 export const dynamic = 'force-dynamic'
 
@@ -67,7 +68,7 @@ export async function POST(req: Request) {
       .update({ acquisition_source: payload })
       .eq('id', auth.user.id)
 
-    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+    if (error) return respondDbError('profiles:acquisition', error)
 
     return NextResponse.json({ ok: true, attributed: payload })
   } catch (e: unknown) {

@@ -6,6 +6,7 @@ import { parseJsonBody } from '@/utils/zod'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { cacheDeletePattern } from '@/utils/cache'
 import { logError } from '@/lib/logger'
+import { respondDbError } from '@/utils/api/dbError'
 
 export const dynamic = 'force-dynamic'
 
@@ -44,7 +45,7 @@ export async function POST(req: Request) {
       .maybeSingle()
 
     if (updErr) {
-      return NextResponse.json({ ok: false, error: updErr.message }, { status: 400 })
+      return respondDbError('social:stories:delete', updErr, 400)
     }
 
     // Fallback: if soft-delete didn't match (is_deleted column might not exist or
@@ -57,7 +58,7 @@ export async function POST(req: Request) {
         .eq('author_id', auth.user.id)
 
       if (hardErr) {
-        return NextResponse.json({ ok: false, error: hardErr.message }, { status: 400 })
+        return respondDbError('social:stories:delete:hard', hardErr, 400)
       }
       if (!count || count === 0) {
         return NextResponse.json({ ok: false, error: 'not_found' }, { status: 404 })

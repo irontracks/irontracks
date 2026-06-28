@@ -21,6 +21,7 @@ import { parseJsonBody, parseJsonWithSchema } from '@/utils/zod'
 import { env } from '@/utils/env'
 import { getGeminiModel } from '@/utils/ai/gemini'
 import { safeGemini } from '@/utils/ai/handleGeminiError'
+import { respondDbError } from '@/utils/api/dbError'
 import { logError } from '@/lib/logger'
 import { BodyPhotoLaudoSchema, POSE_LABELS_PT, type BodyPhotoPose } from '@/types/bodyPhotoAssessment'
 
@@ -115,7 +116,7 @@ export async function POST(req: Request) {
             .select('id, user_id, trainer_id')
             .eq('id', assessmentId)
             .maybeSingle()
-        if (aErr) return NextResponse.json({ ok: false, error: aErr.message }, { status: 400 })
+        if (aErr) return respondDbError('ai:body-composition-photo:load', aErr)
         if (!assessment) return NextResponse.json({ ok: false, error: 'not_found' }, { status: 404 })
         const a = assessment as { user_id: string; trainer_id: string | null }
         if (userId !== a.user_id && userId !== a.trainer_id) {
@@ -185,7 +186,7 @@ export async function POST(req: Request) {
                 status: 'done',
             })
             .eq('id', assessmentId)
-        if (saveErr) return NextResponse.json({ ok: false, error: saveErr.message }, { status: 400 })
+        if (saveErr) return respondDbError('ai:body-composition-photo:save', saveErr)
 
         return NextResponse.json({ ok: true, analysis: laudo })
     } catch (e) {

@@ -4,6 +4,7 @@ import { requireUser } from '@/utils/auth/route'
 import { parseJsonBody } from '@/utils/zod'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
+import { respondDbError } from '@/utils/api/dbError'
 
 export const dynamic = 'force-dynamic'
 
@@ -33,7 +34,7 @@ export async function POST(req: Request) {
       .from('social_story_views')
       .upsert({ story_id: storyId, viewer_id: auth.user.id }, { onConflict: 'story_id,viewer_id' })
 
-    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+    if (error) return respondDbError('social:stories:view', error)
     return NextResponse.json({ ok: true })
   } catch (e: unknown) {
     return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })

@@ -16,6 +16,7 @@ import { requireUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { parseJsonBody, parseJsonWithSchema } from '@/utils/zod'
+import { respondDbError } from '@/utils/api/dbError'
 import { env } from '@/utils/env'
 import { getGeminiModel } from '@/utils/ai/gemini'
 import { safeGemini } from '@/utils/ai/handleGeminiError'
@@ -70,7 +71,7 @@ export async function POST(req: Request) {
             .select('id, user_id, trainer_id, assessment_date, analysis, composition_score, symmetry_score, posture_score, proportion_score, body_fat_estimate_low, body_fat_estimate_high')
             .eq('id', assessmentId)
             .maybeSingle()
-        if (cErr) return NextResponse.json({ ok: false, error: cErr.message }, { status: 400 })
+        if (cErr) return respondDbError('ai:body-composition-correlation', cErr)
         if (!current) return NextResponse.json({ ok: false, error: 'not_found' }, { status: 404 })
         const cur = current as Record<string, unknown>
         const assessedUserId = String(cur.user_id || '')

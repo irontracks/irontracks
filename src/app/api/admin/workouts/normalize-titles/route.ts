@@ -3,6 +3,7 @@ import { requireRoleOrBearer } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { normalizeWorkoutTitle } from '@/utils/workoutTitle'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { respondDbError } from '@/utils/api/dbError'
 
 export async function POST(req: Request) {
   try {
@@ -20,7 +21,7 @@ export async function POST(req: Request) {
       .eq('is_template', true)
       .limit(2000)
 
-    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+    if (error) return respondDbError('admin:workouts:normalize-titles', error)
 
     const updates = (rows || [])
       .map((r: Record<string, unknown>) => {
@@ -34,7 +35,7 @@ export async function POST(req: Request) {
     if (!updates.length) return NextResponse.json({ ok: true, updated: 0 })
 
     const { error: upErr } = await admin.from('workouts').upsert(updates, { onConflict: 'id' })
-    if (upErr) return NextResponse.json({ ok: false, error: upErr.message }, { status: 400 })
+    if (upErr) return respondDbError('admin:workouts:normalize-titles:upsert', upErr)
 
     return NextResponse.json({ ok: true, updated: updates.length })
   } catch (e: unknown) {

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { requireUser } from '@/utils/auth/route'
+import { respondDbError } from '@/utils/api/dbError'
 
 export const dynamic = 'force-dynamic'
 
@@ -28,7 +29,7 @@ export async function GET(req: Request) {
     .eq('gym_id', gymId)
     .gte('checked_in_at', startDate)
 
-  if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+  if (error) return respondDbError('social:gym-leaderboard', error)
   if (!data || data.length === 0) return NextResponse.json({ ok: true, leaderboard: [] })
 
   // Count per user

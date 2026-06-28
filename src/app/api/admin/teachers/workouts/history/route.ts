@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { requireRoleOrBearer } from '@/utils/auth/route'
 import { parseSearchParams } from '@/utils/zod'
+import { respondDbError } from '@/utils/api/dbError'
 
 export const dynamic = 'force-dynamic'
 
@@ -43,7 +44,7 @@ export async function GET(req: Request) {
       .select('user_id, name')
       .eq('teacher_id', teacherId)
       .limit(5000)
-    if (stErr) return NextResponse.json({ ok: false, error: stErr.message }, { status: 400 })
+    if (stErr) return respondDbError('admin:teachers:workouts:history:students', stErr)
 
     const studentUserIds = (students || []).map((s: Record<string, unknown>) => String(s?.user_id || '').trim()).filter(Boolean)
     if (studentUserIds.length === 0) return NextResponse.json({ ok: true, rows: [], next_cursor: null })
@@ -67,7 +68,7 @@ export async function GET(req: Request) {
     if (cursorCreatedAt) query = query.lt('created_at', cursorCreatedAt)
 
     const { data: rows, error } = await query.limit(limit)
-    if (error) return NextResponse.json({ ok: false, error: error.message }, { status: 400 })
+    if (error) return respondDbError('admin:teachers:workouts:history', error)
 
     const enriched: Array<Record<string, unknown>> = (rows || []).map((w: Record<string, unknown>) => ({
       ...w,
