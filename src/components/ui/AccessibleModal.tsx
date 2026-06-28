@@ -50,14 +50,14 @@ export function AccessibleModal({
 
     return (
         <div
-            className={`fixed inset-0 z-50 flex items-center justify-center ${backdropClassName}`}
+            className={`fixed inset-0 z-50 flex items-center justify-center p-4 ${backdropClassName}`}
             style={{ background: 'rgba(0,0,0,0.6)' }}
             onClick={preventBackdropClose ? undefined : onClose}
             aria-hidden="true"
         >
             <div
                 role="none"
-                className={className}
+                className={`max-h-[90vh] overflow-y-auto ${className}`}
                 onClick={(e) => e.stopPropagation()}
             >
                 <div
