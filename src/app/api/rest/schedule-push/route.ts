@@ -13,6 +13,7 @@ import { createClient } from '@/utils/supabase/server'
 import { parseJsonBody } from '@/utils/zod'
 import { scheduleRestEndPush } from '@/lib/push/restEndScheduler'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
+import { cacheSet } from '@/utils/cache'
 
 export const dynamic = 'force-dynamic'
 
@@ -62,6 +63,9 @@ export async function POST(req: Request) {
       // segue como fallback). Não é erro fatal pro cliente.
       return NextResponse.json({ ok: true, scheduleId: null, deferred: true })
     }
+    // Mapping scheduleId→userId para validar ownership no cancel-push (auditoria
+    // 2026-06-27, L8). TTL cobre a janela do descanso (+2min de folga).
+    try { await cacheSet(`rest:push:owner:${scheduleId}`, user.id, delaySec + 120) } catch { /* cache best-effort */ }
     return NextResponse.json({ ok: true, scheduleId })
   } catch (e: unknown) {
     return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : String(e) }, { status: 500 })

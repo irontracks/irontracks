@@ -34,7 +34,7 @@ export async function uploadToCloudinary(
   }
   const sign = await signRes.json() as {
     signature: string; timestamp: number; apiKey: string
-    cloudName: string; folder: string; publicId: string; uploadUrl: string
+    cloudName: string; folder: string; publicId: string; uploadUrl: string; allowedFormats?: string
   }
 
   // Simulate progress start (fetch doesn't support upload progress events)
@@ -48,6 +48,7 @@ export async function uploadToCloudinary(
   form.append('signature', sign.signature)
   form.append('folder', sign.folder)
   form.append('public_id', sign.publicId)
+  if (sign.allowedFormats) form.append('allowed_formats', sign.allowedFormats)
 
   const res = await fetch(sign.uploadUrl, { method: 'POST', body: form })
   const data = await res.json().catch(() => ({})) as { secure_url?: string; error?: { message?: string } }
