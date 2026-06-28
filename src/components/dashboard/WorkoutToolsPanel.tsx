@@ -98,13 +98,13 @@ export const WorkoutToolsPanel = memo(function WorkoutToolsPanel({
                             type="button"
                             aria-label="Importar JSON"
                             onClick={() => { onClose(); onOpenJsonImport() }}
-                            className="group w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl hover:bg-gradient-to-r hover:from-purple-500/10 hover:to-transparent transition-all duration-150 active:scale-[0.98]"
+                            className="group w-full flex items-center gap-3 px-3 py-2.5 rounded-2xl hover:bg-gradient-to-r hover:from-yellow-500/10 hover:to-transparent transition-all duration-150 active:scale-[0.98]"
                         >
-                            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-purple-500/20 to-purple-700/10 border border-purple-500/25 flex items-center justify-center flex-shrink-0">
-                                <span className="text-sm font-black text-purple-400 leading-none">↵</span>
+                            <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-yellow-500/20 to-amber-600/10 border border-yellow-500/25 flex items-center justify-center flex-shrink-0">
+                                <span className="text-sm font-black text-yellow-400 leading-none">↵</span>
                             </div>
                             <div className="flex-1 text-left">
-                                <p className="text-[13px] font-bold text-white group-hover:text-purple-100 leading-tight">Importar JSON</p>
+                                <p className="text-[13px] font-bold text-white group-hover:text-yellow-100 leading-tight">Importar JSON</p>
                                 <p className="text-[10px] text-neutral-400">Carregar treinos salvos</p>
                             </div>
                         </button>

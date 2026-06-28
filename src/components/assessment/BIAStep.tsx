@@ -133,12 +133,12 @@ export const BIAStep: React.FC<BIAStepProps> = ({
       <div
         className="rounded-xl p-3 flex gap-2"
         style={{
-          background: 'rgba(59,130,246,0.06)',
-          border: '1px solid rgba(59,130,246,0.18)',
+          background: 'rgba(245,158,11,0.06)',
+          border: '1px solid rgba(245,158,11,0.18)',
         }}
       >
-        <Info className="w-4 h-4 text-blue-400 shrink-0 mt-0.5" />
-        <p className="text-xs text-blue-200 leading-relaxed">
+        <Info className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
+        <p className="text-xs text-amber-200 leading-relaxed">
           Quando você preencher o % de gordura aqui <strong>e</strong> a soma das 7 dobras na etapa anterior,
           a tela de resultados mostra os dois métodos lado a lado e calcula a média entre eles.
           Se preencher só um, o app usa só esse.

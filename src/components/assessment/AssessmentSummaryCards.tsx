@@ -54,8 +54,8 @@ export const AssessmentSummaryCards = <T,>({
       icon: <Activity className="w-4 h-4" />,
       getValue: getBmrKcal,
       unit: 'kcal',
-      color: '#8b5cf6',
-      bgGlow: 'rgba(139, 92, 246, 0.06)',
+      color: '#f59e0b',
+      bgGlow: 'rgba(245, 158, 11, 0.06)',
       invertProgress: false,
     },
   ]

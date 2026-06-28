@@ -32,8 +32,8 @@ const timeAgo = (iso: string): string => {
 const typeConfig: Record<string, { icon: React.ReactNode; color: string; bg: string; emoji: string }> = {
   workout_start: {
     icon: <Dumbbell size={14} />,
-    color: '#3b82f6',
-    bg: 'rgba(59,130,246,0.12)',
+    color: '#f59e0b',
+    bg: 'rgba(245,158,11,0.12)',
     emoji: '🏋️',
   },
   workout_finish: {
@@ -56,8 +56,8 @@ const typeConfig: Record<string, { icon: React.ReactNode; color: string; bg: str
   },
   friend_goal: {
     icon: <Target size={14} />,
-    color: '#a855f7',
-    bg: 'rgba(168,85,247,0.12)',
+    color: '#f59e0b',
+    bg: 'rgba(245,158,11,0.12)',
     emoji: '🎯',
   },
   story_like: {
@@ -68,8 +68,8 @@ const typeConfig: Record<string, { icon: React.ReactNode; color: string; bg: str
   },
   friend_online: {
     icon: <Wifi size={14} />,
-    color: '#06b6d4',
-    bg: 'rgba(6,182,212,0.10)',
+    color: '#f59e0b',
+    bg: 'rgba(245,158,11,0.10)',
     emoji: '👋',
   },
 }
@@ -180,7 +180,7 @@ export default function FeedCard({
             <div className="mt-2">
               <span
                 className="text-[10px] font-black px-2 py-0.5 rounded-full"
-                style={{ background: 'rgba(168,85,247,0.1)', color: '#a855f7', border: '1px solid rgba(168,85,247,0.2)' }}
+                style={{ background: 'rgba(245,158,11,0.1)', color: '#f59e0b', border: '1px solid rgba(245,158,11,0.2)' }}
               >
                 🎯 {total} treinos
               </span>

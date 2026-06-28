@@ -283,13 +283,14 @@ function UploadModal({ onClose, onUploaded }: UploadModalProps) {
               <input
                 aria-label="Peso em kg"
                 type="number"
+                inputMode="decimal"
                 value={weight}
                 onChange={(e) => setWeight(e.target.value)}
                 placeholder="ex: 85.5"
                 step="0.1"
                 min="20"
                 max="500"
-                className="flex-1 bg-neutral-900 border border-neutral-700 rounded-xl px-4 py-2.5 text-white text-sm focus:outline-none focus:border-yellow-500"
+                className="flex-1 bg-neutral-900 border border-neutral-700 rounded-xl px-4 py-2.5 text-white text-[16px] focus:outline-none focus:border-yellow-500"
               />
               <span className="text-neutral-400 text-sm font-bold">kg</span>
             </div>

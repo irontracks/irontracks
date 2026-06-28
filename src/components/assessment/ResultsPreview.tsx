@@ -263,7 +263,7 @@ export default function ResultsPreview({ formData, onBack: _onBack, studentName 
             const { skinfold, bia, combined } = results.bodyComposition.breakdown;
             const cards: Array<{ label: string; value: number | null; sub: string; tone: string }> = [];
             if (skinfold != null) cards.push({ label: '7 Dobras (Siri)', value: skinfold, sub: 'Pollock + Siri', tone: 'rgba(234,179,8,0.10)' });
-            if (bia != null) cards.push({ label: 'Bioimpedância', value: bia, sub: 'Aparelho do usuário', tone: 'rgba(59,130,246,0.10)' });
+            if (bia != null) cards.push({ label: 'Bioimpedância', value: bia, sub: 'Aparelho do usuário', tone: 'rgba(245,158,11,0.10)' });
             if (skinfold != null && bia != null && combined != null) {
               cards.push({ label: 'Média', value: combined, sub: '(dobras + BIA) ÷ 2', tone: 'rgba(34,197,94,0.10)' });
             }

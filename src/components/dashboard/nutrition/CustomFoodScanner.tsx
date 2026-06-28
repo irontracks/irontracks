@@ -46,11 +46,12 @@ function NumInput({ label, value, onChange }: { label: string; value: number; on
         id={inputId}
         aria-label={label}
         type="number"
+        inputMode="decimal"
         min="0"
         step="0.1"
         value={value}
         onChange={e => onChange(Math.max(0, parseFloat(e.target.value) || 0))}
-        className="w-full rounded-xl bg-neutral-900 border border-neutral-700 px-3 py-2 text-sm text-white placeholder-neutral-600 focus:outline-none focus:border-yellow-500/60"
+        className="w-full rounded-xl bg-neutral-900 border border-neutral-700 px-3 py-2 text-[16px] text-white placeholder-neutral-600 focus:outline-none focus:border-yellow-500/60"
       />
     </div>
   )

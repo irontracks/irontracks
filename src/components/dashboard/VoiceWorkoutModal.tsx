@@ -138,24 +138,27 @@ function MicWave({ active }: { active: boolean }) {
 
 // Inline edit field
 function EditField({
-  label, value, onChange, type = 'text', placeholder,
+  label, value, onChange, type = 'text', placeholder, inputMode,
 }: {
   label: string
   value: string
   onChange: (v: string) => void
   type?: string
   placeholder?: string
+  inputMode?: 'text' | 'decimal' | 'numeric' | 'tel' | 'search' | 'email' | 'url' | 'none'
 }) {
+  const isNumber = type === 'number'
   return (
     <label className="flex flex-col gap-0.5">
       <span className="text-[9px] font-black uppercase tracking-widest text-neutral-400">{label}</span>
       <input
         aria-label={label}
         type={type}
+        inputMode={inputMode ?? (isNumber ? 'decimal' : undefined)}
         value={value}
         onChange={e => onChange(e.target.value)}
         placeholder={placeholder ?? '—'}
-        className="w-full bg-neutral-800 border border-neutral-700 rounded-lg px-2.5 py-1.5 text-sm text-white font-medium focus:outline-none focus:border-yellow-500/60"
+        className={`w-full bg-neutral-800 border border-neutral-700 rounded-lg px-2.5 py-1.5 text-white font-medium focus:outline-none focus:border-yellow-500/60 ${isNumber ? 'text-[16px]' : 'text-sm'}`}
       />
     </label>
   )
