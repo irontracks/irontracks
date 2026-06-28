@@ -8,6 +8,10 @@ import {
     CORRELATION_TREND_LABELS_PT,
 } from '@/types/bodyPhotoAssessment'
 
+// Mesma regra do HistoryList (useHistoryData): 't' só a partir de 1000kg, senão kg arredondado (pt-BR).
+const formatVolume = (kg: number): string =>
+    kg >= 1000 ? `${(kg / 1000).toFixed(1)}t` : `${Math.round(kg).toLocaleString('pt-BR')}kg`
+
 const TREND_STYLE: Record<BodyPhotoCorrelation['links'][number]['trend'], { c: string; b: string; bg: string }> = {
     supported: { c: '#86efac', b: 'rgba(34,197,94,0.3)', bg: 'rgba(34,197,94,0.08)' },
     undertrained: { c: '#fdba74', b: 'rgba(249,115,22,0.3)', bg: 'rgba(249,115,22,0.08)' },
@@ -38,7 +42,7 @@ export const BodyPhotoCorrelationView: React.FC<{
             {/* Stats da janela */}
             <div className="grid grid-cols-3 gap-2">
                 <Stat label="Sessões" value={String(window.sessions)} />
-                <Stat label="Volume" value={`${(window.totalVolumeKg / 1000).toFixed(1)}t`} />
+                <Stat label="Volume" value={formatVolume(window.totalVolumeKg)} />
                 <Stat label="Séries" value={String(window.totalSets)} />
             </div>
 
@@ -66,7 +70,7 @@ export const BodyPhotoCorrelationView: React.FC<{
                     {window.topExercises.slice(0, 5).map((ex, i) => (
                         <div key={i} className="flex items-center justify-between text-sm">
                             <span className="text-neutral-300 truncate">{ex.name}</span>
-                            <span className="text-neutral-500 shrink-0 ml-2">{(ex.volumeKg / 1000).toFixed(1)}t · {ex.sets} séries</span>
+                            <span className="text-neutral-500 shrink-0 ml-2">{formatVolume(ex.volumeKg)} · {ex.sets} séries</span>
                         </div>
                     ))}
                 </div>

@@ -30,8 +30,9 @@ interface ChatListScreenProps {
     user: { id: string | number } | null;
     onClose: () => void;
     onSelectChannel?: (ch: { channel_id: string; other_user_id: string; other_user_name: string | null; other_user_photo: string | null }) => void;
+    onNavigateCommunity?: () => void;
 }
-const ChatListScreen = ({ user, onClose, onSelectChannel }: ChatListScreenProps) => {
+const ChatListScreen = ({ user, onClose, onSelectChannel, onNavigateCommunity }: ChatListScreenProps) => {
     const [users, setUsers] = useState<ChatUser[]>([]);
     const [loading, setLoading] = useState(true);
     const [nowMs, setNowMs] = useState(0);
@@ -208,7 +209,16 @@ const ChatListScreen = ({ user, onClose, onSelectChannel }: ChatListScreenProps)
                             <MessageSquare size={32} className="text-neutral-400" />
                         </div>
                         <p className="text-neutral-400 font-bold">Nenhum contato encontrado</p>
-                        <p className="text-sm text-neutral-400 mt-1">Crie usuários para iniciar conversas</p>
+                        <p className="text-sm text-neutral-400 mt-1">Siga amigos na Comunidade para conversar aqui.</p>
+                        {onNavigateCommunity && (
+                            <button
+                                onClick={onNavigateCommunity}
+                                className="mt-5 inline-flex items-center justify-center px-5 py-2.5 rounded-xl font-black text-sm text-black active:scale-95 transition-all"
+                                style={{ background: 'linear-gradient(135deg, #f59e0b, #d97706)', boxShadow: '0 4px 12px rgba(234,179,8,0.3)' }}
+                            >
+                                Ir para a Comunidade
+                            </button>
+                        )}
                     </div>
                 ) : (
                     <div>

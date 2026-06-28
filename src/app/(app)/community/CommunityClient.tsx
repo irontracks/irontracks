@@ -150,7 +150,7 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
   const {
     supabase, userId, loading, profiles, follows, followRequests, loadError,
     busyId, busyRequestId,
-    feedItems, feedLoading, feedHasMore, feedLoadedRef, loadFeed,
+    feedItems, feedLoading, feedError, feedHasMore, feedLoadedRef, loadFeed,
     onlineFriends, onlineFriendProfiles,
     respondFollowRequest, cancelFollowRequest, follow, unfollow,
   } = useCommunityData()
@@ -448,6 +448,18 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
                     <div className="p-8 flex flex-col items-center gap-3">
                       <Loader2 size={28} className="text-yellow-500 animate-spin" />
                       <div className="text-sm text-neutral-400">Carregando feed…</div>
+                    </div>
+                  </GoldGradientBorder>
+                ) : feedError && feedItems.length === 0 ? (
+                  <GoldGradientBorder>
+                    <div className="p-8 flex flex-col items-center gap-3 text-center">
+                      <Rss size={28} className="text-neutral-500" />
+                      <div className="text-sm font-bold text-white">Não foi possível carregar o feed.</div>
+                      <div className="text-xs text-neutral-400">Verifique sua conexão e tente novamente.</div>
+                      <GoldButton onClick={() => loadFeed(true)} disabled={feedLoading} variant="gold" className="mt-1">
+                        {feedLoading ? <Loader2 size={13} className="animate-spin" /> : null}
+                        Tentar novamente
+                      </GoldButton>
                     </div>
                   </GoldGradientBorder>
                 ) : feedItems.length === 0 ? (
