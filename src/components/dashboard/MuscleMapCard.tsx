@@ -522,24 +522,24 @@ const MuscleMapCard = memo(function MuscleMapCard(props: Props) {
                     setSelected((prev) => (prev === id ? null : id))
                   }}
                 />
-                <div className="mt-3 grid grid-cols-5 gap-1.5 text-[10px] font-black uppercase tracking-widest">
-                  <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-2 text-center">
+                <div className="mt-3 grid grid-cols-5 gap-1.5 text-[9px] leading-none font-black uppercase tracking-widest">
+                  <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-1.5 text-center">
                     <div className="text-neutral-400">Nenhum</div>
                     <div className="h-2 rounded-full mt-1 bg-neutral-700/40" />
                   </div>
-                  <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-2 text-center">
+                  <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-1.5 text-center">
                     <div className="text-yellow-500/80">Baixo</div>
                     <div className="h-2 rounded-full mt-1 bg-gradient-to-r from-yellow-500/60 to-yellow-400" />
                   </div>
-                  <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-2 text-center">
+                  <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-1.5 text-center">
                     <div className="text-amber-400/80">Na meta</div>
                     <div className="h-2 rounded-full mt-1 bg-gradient-to-r from-amber-500/70 to-amber-400" />
                   </div>
-                  <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-2 text-center">
+                  <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-1.5 text-center">
                     <div className="text-orange-400/80">Alto</div>
                     <div className="h-2 rounded-full mt-1 bg-gradient-to-r from-orange-500/70 to-orange-400" />
                   </div>
-                  <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-2 text-center">
+                  <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-1.5 text-center">
                     <div className="text-red-400/80">Acima</div>
                     <div className="h-2 rounded-full mt-1 bg-gradient-to-r from-red-600/80 to-red-400" />
                   </div>

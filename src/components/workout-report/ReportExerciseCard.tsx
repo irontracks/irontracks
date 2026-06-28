@@ -194,7 +194,7 @@ export const ReportExerciseCard = ({ exercise, exIdx, sessionLogs, prevLogs, bas
     return (
         <div className="break-inside-avoid">
             <div className="flex justify-between items-end mb-2 border-b-2 border-neutral-800 pb-2">
-                <h3 className="text-xl font-bold uppercase flex items-center gap-2">
+                <h3 className="text-xl font-bold uppercase flex items-center gap-2 min-w-0 flex-1 truncate">
                     <span className="bg-black text-white w-6 h-6 flex items-center justify-center rounded text-xs">{exIdx + 1}</span>
                     {exName || '—'}
                     {prCount > 0 && (
@@ -203,10 +203,10 @@ export const ReportExerciseCard = ({ exercise, exIdx, sessionLogs, prevLogs, bas
                         </span>
                     )}
                 </h3>
-                <div className="flex gap-3 text-xs font-mono text-neutral-400">
+                <div className="flex gap-3 text-xs font-mono text-neutral-400 shrink-0">
                     {baseText && <span>Base: <span className="font-bold text-neutral-100">{baseText}</span></span>}
                     {bestE1rm != null && (
-                        <span>1RM est: <span className="font-bold text-blue-300">{bestE1rm.toFixed(1)} kg</span></span>
+                        <span>1RM est: <span className="font-bold text-amber-300">{bestE1rm.toFixed(1)} kg</span></span>
                     )}
                     {(() => {
                         const m = String((obj?.method ?? '') as string).trim()
@@ -249,10 +249,10 @@ export const ReportExerciseCard = ({ exercise, exIdx, sessionLogs, prevLogs, bas
                                             #{sIdx + 1}
                                             {isPr && <span className="text-yellow-400">★</span>}
                                             {sIdx === bestSetIdx && !isPr && (
-                                                <span className="text-[9px] bg-blue-500/20 text-blue-300 border border-blue-500/30 px-1 rounded font-black">Melhor</span>
+                                                <span className="text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1 rounded font-black">Melhor</span>
                                             )}
                                             {sIdx === bestSetIdx && isPr && (
-                                                <span className="text-[9px] bg-blue-500/20 text-blue-300 border border-blue-500/30 px-1 rounded font-black">Melhor</span>
+                                                <span className="text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1 rounded font-black">Melhor</span>
                                             )}
                                         </div>
                                     </td>
@@ -262,7 +262,7 @@ export const ReportExerciseCard = ({ exercise, exIdx, sessionLogs, prevLogs, bas
                                     <td className="py-2 text-center font-mono text-sm">
                                         {logObj.reps != null && String(logObj.reps) !== '' ? String(logObj.reps) : '—'}
                                     </td>
-                                    <td className="py-2 text-center text-[11px] font-mono text-blue-300">
+                                    <td className="py-2 text-center text-[11px] font-mono text-amber-300">
                                         {e1rmText ?? '—'}
                                     </td>
                                     <td className={`py-2 text-center text-[11px] ${rowClass}`}>
