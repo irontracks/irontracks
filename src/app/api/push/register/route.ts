@@ -40,6 +40,22 @@ export async function POST(request: Request) {
     }
 
     const admin = createAdminClient()
+
+    // IDOR guard: um push token pertence a UM device. Como a gravação usa
+    // service-role (RLS off) e o upsert resolve conflito por PK 'token', um
+    // usuário podia reivindicar o token já registrado por OUTRO usuário,
+    // sequestrando/derrubando as notificações da vítima. Rejeita o conflito de
+    // dono diferente (auditoria 2026-06-27). Caso de device compartilhado entre
+    // contas exige que o dono anterior remova o token primeiro.
+    const { data: existingToken } = await admin
+      .from('device_push_tokens')
+      .select('user_id')
+      .eq('token', token)
+      .maybeSingle()
+    if (existingToken && existingToken.user_id && existingToken.user_id !== user.id) {
+      return NextResponse.json({ ok: false, error: 'token_owned_by_another_user' }, { status: 409 })
+    }
+
     const { error } = await admin
       .from('device_push_tokens')
       .upsert(

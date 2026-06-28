@@ -10,6 +10,7 @@ import { getErrorMessage } from '@/utils/errorMessage'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { enqueueStoryJob, guessMediaType } from '@/lib/queue/storyQueue'
 import { cacheDeletePattern } from '@/utils/cache'
+import { env } from '@/utils/env'
 
 export const dynamic = 'force-dynamic'
 const BodySchema = z.unknown()
@@ -49,9 +50,18 @@ export async function POST(req: Request) {
 
     const { mediaPath, caption, meta } = validation.data
 
-    // Cloudinary URLs (https://res.cloudinary.com/...) are already validated by the signed upload
-    // — skip path ownership check and Supabase MIME check for them
-    const isCloudinaryPath = mediaPath.startsWith('https://res.cloudinary.com/')
+    // Cloudinary URLs já validadas pelo signed upload — pulam a checagem de path
+    // ownership e MIME. Mas precisa ser do NOSSO cloud, na NOSSA folder e com o
+    // userId no public_id (sign-cloudinary monta folder=irontracks/user-uploads/*
+    // e public_id=${userId}/${uuid}). Antes bastava começar com
+    // 'https://res.cloudinary.com/' — atacante apontava para a própria conta
+    // Cloudinary (conteúdo arbitrário / bypass de MIME e ownership) — auditoria 2026-06-27.
+    const cloudName = String(env.cloudinary.cloudName || '').trim()
+    const isCloudinaryPath =
+      !!cloudName &&
+      mediaPath.startsWith(`https://res.cloudinary.com/${cloudName}/`) &&
+      mediaPath.includes('/irontracks/user-uploads/') &&
+      mediaPath.includes(`/${auth.user.id}/`)
 
     if (!isCloudinaryPath) {
       if (!isAllowedStoryPath(auth.user.id, mediaPath)) return NextResponse.json({ ok: false, error: 'forbidden' }, { status: 403 })

@@ -13,6 +13,19 @@ const BodySchema = z
   })
   .strip()
 
+// Tipos de mídia esperados no chat (imagem/vídeo/áudio). SVG e HTML ficam de
+// fora de propósito (stored XSS em bucket público).
+const CHAT_MEDIA_EXT = new Set([
+  'jpg', 'jpeg', 'png', 'gif', 'webp', 'heic', 'heif',
+  'mp4', 'mov', 'm4v', 'webm',
+  'm4a', 'mp3', 'aac', 'wav', 'ogg', 'caf',
+])
+const CHAT_MEDIA_MIME = [
+  'image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/heic', 'image/heif',
+  'video/mp4', 'video/quicktime', 'video/webm',
+  'audio/mpeg', 'audio/mp4', 'audio/aac', 'audio/wav', 'audio/ogg',
+]
+
 export async function POST(request: Request) {
   try {
     const auth = await requireUser()
@@ -34,8 +47,22 @@ export async function POST(request: Request) {
     const allowed = await canUploadToChatMediaPath(auth.user.id, safe.channelId)
     if (!allowed) return NextResponse.json({ ok: false, error: 'forbidden' }, { status: 403 })
 
+    // Allowlist de extensão: o path é assinado e armazenado como está; sem isto
+    // dava pra assinar caminhos .html/.svg/.* e hospedar conteúdo arbitrário no
+    // bucket público (stored XSS / abuso de storage) — auditoria 2026-06-27.
+    const ext = (safe.path.split('.').pop() || '').toLowerCase()
+    if (!ext || !CHAT_MEDIA_EXT.has(ext)) {
+      return NextResponse.json({ ok: false, error: 'invalid_file_type' }, { status: 400 })
+    }
+
     const b = await admin.storage.getBucket(bucket)
-    if (!b?.data) await admin.storage.createBucket(bucket, { public: true })
+    if (!b?.data) {
+      await admin.storage.createBucket(bucket, {
+        public: true,
+        fileSizeLimit: '50MB',
+        allowedMimeTypes: CHAT_MEDIA_MIME,
+      })
+    }
 
     const { data, error } = await admin.storage.from(bucket).createSignedUploadUrl(safe.path)
     if (error || !data) return NextResponse.json({ ok: false, error: error?.message || 'failed to sign' }, { status: 400 })
