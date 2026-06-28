@@ -100,7 +100,7 @@ export async function POST(req: Request) {
     const rl = await checkRateLimitAsync(`ai:lab-extract:${userId}:${ip}`, 5, 60_000)
     if (!rl.allowed) return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 })
 
-    const access = await checkVipFeatureAccess(auth.supabase, userId, 'lab_exams')
+    const access = await checkVipFeatureAccess(auth.supabase, userId, 'lab_exams', { meter: true })
     if (!access.allowed) return NextResponse.json({ ok: false, error: 'vip_required' }, { status: 403 })
 
     const parsed = await parseJsonBody(req, BodySchema)

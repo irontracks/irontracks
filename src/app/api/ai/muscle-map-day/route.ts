@@ -278,7 +278,7 @@ export async function POST(req: Request) {
 
     const supabase = auth.supabase
     const userId = String(auth.user.id || '').trim()
-    const access = await checkVipFeatureAccess(supabase, userId, 'analytics')
+    const access = await checkVipFeatureAccess(supabase, userId, 'analytics', { meter: true })
     const isVip = Boolean(access.allowed)
     const ip = getRequestIp(req)
     const rl = await checkRateLimitAsync(`ai:muscle-map-day:${userId}:${ip}`, 40, 60_000)
