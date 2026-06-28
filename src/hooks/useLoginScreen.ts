@@ -8,6 +8,7 @@ import { logError } from '@/lib/logger'
 import { apiAuth } from '@/lib/api'
 import { writeSessionBackup, readSessionBackup, clearSessionBackup } from '@/utils/auth/sessionBackup'
 import { decodeAppleEmailFromToken } from '@/utils/auth/appleToken'
+import { sha256Hex } from '@/utils/auth/appleNonce'
 
 // ─── Capacitor optional imports ───────────────────────────────────────────────
 let Capacitor: { getPlatform: () => string } = { getPlatform: () => 'web' }
@@ -205,16 +206,21 @@ export function useLoginScreen() {
                 const clientId = String(process.env.NEXT_PUBLIC_APPLE_IOS_CLIENT_ID || 'com.irontracks.app').trim()
                 if (!clientId) throw new Error('Client ID da Apple não configurado.')
                 const state = randomString(16)
-                // For native iOS, we do NOT use a nonce. The ASAuthorizationAppleIDRequest flow
-                // delivers the token directly via the OS — no web redirect replay risk.
-                // Passing a nonce causes a persistent "Nonces mismatch" because the Apple JWT
-                // nonce claim verification depends on exact matching between client sessions.
+                // Nonce anti-replay (auditoria 2026-06-27, L6). Padrão correto
+                // Supabase + Apple nativo: a Apple recebe o SHA256 do nonce (grava esse
+                // hash no claim `nonce` do id_token); o Supabase recebe o nonce CRU e
+                // hasheia pra comparar. Passar o MESMO valor pros dois causava o
+                // "Nonces mismatch" (motivo do nonce ter sido desabilitado antes) — NÃO
+                // era perda em reload (authorize() e signInWithIdToken() rodam em
+                // sequência, o reload é só no fim).
+                const rawNonce = randomString(32)
+                const hashedNonce = await sha256Hex(rawNonce)
                 //
                 // NOTE: setIsLoading is called AFTER authorize() returns, NOT before.
                 // The native Apple dialog can take >8s (user reads, uses Face ID, etc.)
                 // and starting the LoadingScreen before it would trigger the 8s safety
                 // valve showing "Não foi possível carregar o app" mid-auth.
-                const result = await SignInWithApple.authorize({ clientId, scopes: 'name email', state })
+                const result = await SignInWithApple.authorize({ clientId, scopes: 'name email', state, nonce: hashedNonce })
                 setIsLoading(true)
                 const token = result?.response?.identityToken
                 if (!token) throw new Error('Falha ao obter token da Apple.')
@@ -229,8 +235,10 @@ export function useLoginScreen() {
                     try { await apiAuth.appleSignInPreflight(email, fullName) } catch { }
                 }
                 const supabase = createClient()
-                // No nonce: Supabase skips nonce verification, validates purely by Apple JWT signature
-                const { data, error } = await supabase.auth.signInWithIdToken({ provider: 'apple', token })
+                // Nonce CRU pro Supabase — ele hasheia (SHA256) e compara com o claim do
+                // JWT (= SHA256(rawNonce) que a Apple gravou). Vincula o token a ESTA
+                // sessão de login, fechando replay/injeção de id_token (L6).
+                const { data, error } = await supabase.auth.signInWithIdToken({ provider: 'apple', token, nonce: rawNonce })
                 if (error) throw error
                 const userId = data?.user?.id
                 const userEmail = data?.user?.email?.trim().toLowerCase() || email
