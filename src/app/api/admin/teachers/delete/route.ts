@@ -16,9 +16,14 @@ const ZodBodySchema = z
 
 export async function POST(req: Request) {
   try {
-    // Auth first (before consuming request body)
-    // Accept both admin and teacher roles — the admin panel already gates access
-    const auth = await requireRoleOrBearer(req, ['admin', 'teacher'])
+    // Auth first (before consuming request body).
+    // ADMIN ONLY: deletar um professor é operação destrutiva de plataforma
+    // (apaga profile + auth.users + dados em cascata via RPC). Aceitar role
+    // 'teacher' aqui permitia que qualquer professor deletasse QUALQUER outro
+    // professor passando um `id` arbitrário no body (IDOR destrutivo — auditoria
+    // 2026-06-27). O painel admin usa a server action deleteTeacher (checkAdmin),
+    // não esta rota, então restringir a admin não quebra fluxo legítimo.
+    const auth = await requireRoleOrBearer(req, ['admin'])
     if (!auth.ok) return auth.response
 
     // actorId must be a valid UUID or null — never an empty string (causes Postgres UUID cast error)

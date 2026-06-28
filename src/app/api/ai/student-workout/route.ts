@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
+import { canCoachStudent } from '@/utils/auth/studentAccess'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { parseJsonBody, parseJsonWithSchema } from '@/utils/zod'
@@ -58,6 +59,13 @@ export async function POST(req: Request) {
     const parsed = await parseJsonBody(req, ZodBody)
     if (parsed.response) return parsed.response
     const body = parsed.data as z.infer<typeof ZodBody>
+
+    // Authz: só o próprio aluno, o professor vinculado ou admin podem ler os
+    // dados sensíveis (perfil/avaliações/exames) deste studentId. Sem isto,
+    // qualquer usuário autenticado exfiltrava dados de saúde de terceiros (IDOR).
+    if (!(await canCoachStudent({ id: userId, email: auth.user.email }, body.studentId))) {
+      return NextResponse.json({ ok: false, error: 'forbidden' }, { status: 403 })
+    }
 
     const admin = createAdminClient()
 
