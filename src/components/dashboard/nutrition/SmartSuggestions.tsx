@@ -132,7 +132,7 @@ export default function SmartSuggestions({ goals, consumed, onSelect }: SmartSug
               </div>
               <div className="flex items-center gap-3 mt-1">
                 <span className="text-[10px] text-neutral-400">{s.portion}</span>
-                <span className="text-[10px] text-blue-400">P {s.protein}g</span>
+                <span className="text-[10px] text-amber-400">P {s.protein}g</span>
                 <span className="text-[10px] text-yellow-300">C {s.carbs}g</span>
                 <span className="text-[10px] text-red-400">G {s.fat}g</span>
               </div>

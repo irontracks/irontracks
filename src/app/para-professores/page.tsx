@@ -29,9 +29,9 @@ const Tag = ({ children, color = 'yellow' }: { children: React.ReactNode; color?
     color === 'green'
       ? 'bg-green-500/15 text-green-400 border-green-500/30'
       : color === 'blue'
-      ? 'bg-blue-500/15 text-blue-400 border-blue-500/30'
+      ? 'bg-amber-500/15 text-amber-400 border-amber-500/30'
       : color === 'violet'
-      ? 'bg-violet-500/15 text-violet-400 border-violet-500/30'
+      ? 'bg-amber-500/15 text-amber-400 border-amber-500/30'
       : 'bg-yellow-500/15 text-yellow-400 border-yellow-500/30'
   return (
     <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-widest border ${cls}`}>
@@ -247,9 +247,9 @@ const AssessmentMockup = () => (
       <div className="grid grid-cols-2 gap-2">
         {[
           { label: 'Gordura Corporal', value: '14.2%', color: 'text-green-400' },
-          { label: 'Massa Magra', value: '71.3 kg', color: 'text-blue-400' },
+          { label: 'Massa Magra', value: '71.3 kg', color: 'text-amber-400' },
           { label: 'Massa Gorda', value: '11.8 kg', color: 'text-yellow-400' },
-          { label: 'TMB', value: '1.840 kcal', color: 'text-violet-400' },
+          { label: 'TMB', value: '1.840 kcal', color: 'text-amber-400' },
         ].map(({ label, value, color }) => (
           <div key={label} className="bg-neutral-800/60 rounded-xl p-3 border border-neutral-700/40">
             <p className={`text-sm font-black ${color}`}>{value}</p>

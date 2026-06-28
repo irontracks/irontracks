@@ -287,18 +287,18 @@ export default function PartnerExerciseOverlay({ share, onSendUpdate, onEnd }: P
     return (
         <div className="fixed inset-0 z-[1500] bg-black/95 backdrop-blur-xl flex flex-col">
             {/* Header */}
-            <div className="relative px-4 pt-safe pb-3 border-b border-indigo-500/30 bg-gradient-to-b from-indigo-950/50 to-transparent">
-                <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-indigo-500/60 to-transparent" />
+            <div className="relative px-4 pt-safe pb-3 border-b border-amber-500/30 bg-gradient-to-b from-amber-950/50 to-transparent">
+                <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-amber-500/60 to-transparent" />
                 <div className="flex items-center justify-between gap-3 mt-2">
                     <div className="flex items-center gap-3 min-w-0">
-                        <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-indigo-500/25 to-purple-600/15 border border-indigo-500/30 flex items-center justify-center flex-shrink-0 shadow-lg shadow-indigo-500/10">
-                            <Dumbbell size={18} className="text-indigo-400" />
+                        <div className="w-10 h-10 rounded-2xl bg-gradient-to-br from-amber-500/25 to-amber-600/15 border border-amber-500/30 flex items-center justify-center flex-shrink-0 shadow-lg shadow-amber-500/10">
+                            <Dumbbell size={18} className="text-amber-400" />
                         </div>
                         <div className="min-w-0">
-                            <div className="text-[10px] font-black uppercase tracking-[0.25em] text-indigo-400/70 leading-none mb-0.5">Modo Spotter</div>
+                            <div className="text-[10px] font-black uppercase tracking-[0.25em] text-amber-400/70 leading-none mb-0.5">Modo Spotter</div>
                             <h2 className="font-black text-white text-lg leading-snug truncate">{name}</h2>
-                            <div className="text-[11px] text-indigo-300/60 font-bold">
-                                Controlando para <span className="text-indigo-300">{share.fromName}</span>
+                            <div className="text-[11px] text-amber-300/60 font-bold">
+                                Controlando para <span className="text-amber-300">{share.fromName}</span>
                             </div>
                         </div>
                     </div>
@@ -313,7 +313,7 @@ export default function PartnerExerciseOverlay({ share, onSendUpdate, onEnd }: P
                 {/* Progress bar */}
                 <div className="mt-3 h-1 w-full bg-neutral-800 rounded-full overflow-hidden">
                     <div
-                        className="h-full bg-gradient-to-r from-indigo-500 to-purple-400 transition-all duration-500"
+                        className="h-full bg-gradient-to-r from-amber-500 to-amber-400 transition-all duration-500"
                         style={{ width: `${progressPct}%` }}
                     />
                 </div>
@@ -325,10 +325,10 @@ export default function PartnerExerciseOverlay({ share, onSendUpdate, onEnd }: P
 
             {/* Rest timer banner */}
             {restActive && (
-                <div className="px-4 py-3 bg-indigo-600/20 border-b border-indigo-500/20 flex items-center justify-center gap-3">
-                    <Timer size={16} className="text-indigo-400 animate-pulse" />
-                    <span className="font-mono font-black text-xl text-indigo-300 tabular-nums">{formatTime(restTimeLeft)}</span>
-                    <span className="text-xs text-indigo-400/60 font-bold uppercase">descanso</span>
+                <div className="px-4 py-3 bg-amber-500/20 border-b border-amber-500/20 flex items-center justify-center gap-3">
+                    <Timer size={16} className="text-amber-400 animate-pulse" />
+                    <span className="font-mono font-black text-xl text-amber-300 tabular-nums">{formatTime(restTimeLeft)}</span>
+                    <span className="text-xs text-amber-400/60 font-bold uppercase">descanso</span>
                 </div>
             )}
 
@@ -348,14 +348,14 @@ export default function PartnerExerciseOverlay({ share, onSendUpdate, onEnd }: P
             </WorkoutProvider>
 
             {/* Footer */}
-            <div className="px-4 py-3 pb-[max(env(safe-area-inset-bottom),12px)] border-t border-indigo-500/20 bg-neutral-950/80">
+            <div className="px-4 py-3 pb-[max(env(safe-area-inset-bottom),12px)] border-t border-amber-500/20 bg-neutral-950/80">
                 <button
                     onClick={onEnd}
                     className={[
                         'w-full py-4 rounded-2xl font-black text-sm uppercase tracking-wider transition-all active:scale-[0.98]',
                         doneSets >= setsCount
                             ? 'bg-gradient-to-r from-emerald-500 to-green-400 text-black shadow-lg shadow-emerald-500/25'
-                            : 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white shadow-lg shadow-indigo-500/25',
+                            : 'bg-gradient-to-r from-amber-500 to-amber-600 text-black shadow-lg shadow-amber-500/25',
                     ].join(' ')}
                 >
                     {doneSets >= setsCount ? '✅ Concluir Exercício' : `Devolver Controle (${doneSets}/${setsCount})`}

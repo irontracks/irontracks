@@ -148,7 +148,7 @@ const CustomFoodLibrary = memo(function CustomFoodLibrary({ foods, loading, onUs
                   <div className="text-sm font-semibold text-white truncate">{food.name}</div>
                   <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-0.5">
                     <span className="text-[11px] text-neutral-400">{Math.round(food.kcal_per100g)} kcal/100g</span>
-                    <span className="text-[11px] text-blue-400">P {food.protein_per100g.toFixed(1)}g</span>
+                    <span className="text-[11px] text-amber-400">P {food.protein_per100g.toFixed(1)}g</span>
                     <span className="text-[11px] text-orange-400">C {food.carbs_per100g.toFixed(1)}g</span>
                     <span className="text-[11px] text-yellow-400">G {food.fat_per100g.toFixed(1)}g</span>
                   </div>

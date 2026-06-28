@@ -533,7 +533,7 @@ export default function Modals() {
                 <button
                   type="button"
                   onClick={() => setEditExerciseDraft((prev) => ({ ...prev, isUnilateral: !prev?.isUnilateral }))}
-                  className={`w-12 h-7 rounded-full transition-all duration-200 relative flex-shrink-0 overflow-visible ${editExerciseDraft?.isUnilateral ? 'bg-blue-500' : 'bg-neutral-700'}`}
+                  className={`w-12 h-7 rounded-full transition-all duration-200 relative flex-shrink-0 overflow-visible ${editExerciseDraft?.isUnilateral ? 'bg-amber-500' : 'bg-neutral-700'}`}
                   aria-label="Toggle unilateral"
                   style={{ minWidth: '3rem' }}
                 >
@@ -551,7 +551,7 @@ export default function Modals() {
                       inputMode="decimal"
                       value={String(editExerciseDraft?.sideRestTime ?? '')}
                       onChange={(e) => setEditExerciseDraft((prev) => ({ ...prev, sideRestTime: e?.target?.value ?? '' }))}
-                      className="mt-2 w-full bg-black/30 border border-neutral-700 rounded-xl px-3 py-3 text-[16px] text-white outline-none focus:ring-1 ring-blue-500 placeholder:text-neutral-400 placeholder:opacity-40"
+                      className="mt-2 w-full bg-black/30 border border-neutral-700 rounded-xl px-3 py-3 text-[16px] text-white outline-none focus:ring-1 ring-amber-500 placeholder:text-neutral-400 placeholder:opacity-40"
                       placeholder="15"
                     />
                   </div>

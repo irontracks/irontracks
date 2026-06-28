@@ -173,7 +173,7 @@ export default function DietGenerator({
                                 </div>
                                 <div className="mt-1 flex gap-3 text-[10px] tabular-nums text-neutral-400">
                                   <span>{Math.round(it.calories)} kcal</span>
-                                  <span className="text-blue-400/80">P {Math.round(it.protein)}g</span>
+                                  <span className="text-yellow-400/80">P {Math.round(it.protein)}g</span>
                                   <span className="text-amber-400/80">C {Math.round(it.carbs)}g</span>
                                   <span className="text-red-400/80">G {Math.round(it.fat)}g</span>
                                 </div>

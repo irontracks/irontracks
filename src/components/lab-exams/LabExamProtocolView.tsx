@@ -14,7 +14,7 @@ const PRIORITY_STYLE: Record<Priority, { label: string; cls: string }> = {
 const SEVERITY_STYLE: Record<string, string> = {
   urgent: 'bg-red-500/15 border-red-500/40 text-red-200',
   moderate: 'bg-amber-500/15 border-amber-500/40 text-amber-200',
-  watch: 'bg-sky-500/10 border-sky-500/30 text-sky-200',
+  watch: 'bg-amber-500/10 border-amber-500/30 text-amber-200',
 }
 
 function PriorityBadge({ p }: { p: Priority }) {
