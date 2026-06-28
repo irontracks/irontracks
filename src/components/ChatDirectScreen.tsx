@@ -523,10 +523,29 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
             notifyRecipientPush(text);
         } catch (error) {
             logError('error', 'Erro ao enviar mensagem:', error);
-            // Marca a bolha como 'failed' (mantém o texto) para oferecer Reenviar,
-            // em vez de remover e perder o conteúdo digitado.
+            // Edge-case (timeout/abort no cliente, mas a linha FOI gravada no
+            // servidor): o realtime já anexou a versão real (sem _sendStatus,
+            // mesmo sender, mesmo texto, recém-chegada). Marcar 'failed' aqui
+            // criaria uma bolha fantasma duplicada — e Reenviar duplicaria de vez
+            // no servidor. Se a real já está no estado, só removemos a temp; senão
+            // marcamos 'failed' (mantém o texto) para oferecer Reenviar.
             setMessages(prev => {
                 const safePrev = Array.isArray(prev) ? prev : [];
+                const tempRow = safePrev.find(m => m.id === localId);
+                const tempTs = tempRow ? new Date(String(tempRow.created_at ?? '')).getTime() : NaN;
+                const RECONCILE_WINDOW_MS = 15_000;
+                const realAlreadyArrived = safePrev.some(m => {
+                    if (m.id === localId) return false;
+                    if (m._sendStatus) return false;
+                    if (String(m.user_id || '') !== safeUserId) return false;
+                    if (typeof m.content !== 'string' || m.content !== text) return false;
+                    if (!Number.isFinite(tempTs)) return true;
+                    const realTs = new Date(String(m.created_at ?? '')).getTime();
+                    return Number.isFinite(realTs) && Math.abs(realTs - tempTs) <= RECONCILE_WINDOW_MS;
+                });
+                if (realAlreadyArrived) {
+                    return safePrev.filter(m => m.id !== localId);
+                }
                 return safePrev.map(m => (m.id === localId ? { ...m, _sendStatus: 'failed' as const } : m));
             });
             const msg = String((error as Record<string, unknown>)?.message ?? error ?? '');

@@ -115,7 +115,7 @@ export default function AISuggestionBadge({
       <button
         type="button"
         onClick={(e) => { e.stopPropagation(); fetchSuggestion() }}
-        className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-violet-500/10 border border-violet-500/25 text-violet-400 text-[10px] font-bold hover:bg-violet-500/20 transition-colors active:scale-95"
+        className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-amber-500/10 border border-amber-500/25 text-amber-400 text-[10px] font-bold hover:bg-amber-500/20 transition-colors active:scale-95"
         title="Sugestão de carga AI"
         aria-label="Pedir sugestão de carga"
       >
@@ -128,7 +128,7 @@ export default function AISuggestionBadge({
   // Loading
   if (loading) {
     return (
-      <div className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-violet-500/10 border border-violet-500/25 text-violet-400 text-[10px] font-bold">
+      <div className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-amber-500/10 border border-amber-500/25 text-amber-400 text-[10px] font-bold">
         <Loader2 size={11} className="animate-spin" />
         <span>Analisando…</span>
       </div>
@@ -152,12 +152,12 @@ export default function AISuggestionBadge({
       <button
         type="button"
         onClick={() => setExpanded(!expanded)}
-        className="w-full flex items-center gap-2 px-3 py-2 rounded-xl bg-gradient-to-r from-violet-950/50 to-purple-950/40 border border-violet-500/20 hover:border-violet-500/40 transition-all"
+        className="w-full flex items-center gap-2 px-3 py-2 rounded-xl bg-gradient-to-r from-amber-950/50 to-amber-950/40 border border-amber-500/20 hover:border-amber-500/40 transition-all"
       >
-        <Sparkles size={13} className="text-violet-400 shrink-0" />
+        <Sparkles size={13} className="text-amber-400 shrink-0" />
         <div className="flex-1 text-left min-w-0">
           <div className="flex items-center gap-1.5">
-            <span className="text-violet-300 font-black text-sm">
+            <span className="text-amber-300 font-black text-sm">
               {suggestion.suggestedWeight}kg × {suggestion.suggestedReps}
             </span>
             <TrendIcon size={13} className={trendColor} />
@@ -167,13 +167,13 @@ export default function AISuggestionBadge({
               </span>
             )}
           </div>
-          <p className="text-[10px] text-violet-400/70 truncate">{suggestion.reason}</p>
+          <p className="text-[10px] text-amber-400/70 truncate">{suggestion.reason}</p>
         </div>
         {onApply && !applied && (
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); handleApply() }}
-            className="shrink-0 px-2.5 py-1.5 rounded-lg bg-violet-500/20 border border-violet-500/30 text-violet-300 text-[10px] font-black hover:bg-violet-500/30 active:scale-95 transition-all"
+            className="shrink-0 px-2.5 py-1.5 rounded-lg bg-amber-500/20 border border-amber-500/30 text-amber-300 text-[10px] font-black hover:bg-amber-500/30 active:scale-95 transition-all"
           >
             USAR
           </button>

@@ -362,7 +362,7 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded, open:
                                         {cfg.icon}
                                     </IconBubble>
 
-                                    <div className="flex-1 min-w-0 pr-4">
+                                    <div className="flex-1 min-w-0 pr-14">
                                         <div className="flex items-center gap-2 mb-0.5">
                                             <p className="text-sm font-black text-white leading-tight truncate">{item.title}</p>
                                             {!item.read && (

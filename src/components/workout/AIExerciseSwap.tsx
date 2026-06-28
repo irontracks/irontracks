@@ -140,7 +140,7 @@ export default function AIExerciseSwap({
               <button
                 type="button"
                 onClick={() => { fetchedRef.current = false; fetchAlternatives() }}
-                style={{ marginTop: '0.75rem', padding: '0.5rem 1rem', borderRadius: '0.75rem', background: 'rgba(139,92,246,0.2)', border: '1px solid rgba(139,92,246,0.3)', color: '#c4b5fd', fontSize: '0.875rem', fontWeight: 700, cursor: 'pointer' }}
+                style={{ marginTop: '0.75rem', padding: '0.5rem 1rem', borderRadius: '0.75rem', background: 'rgba(245,158,11,0.2)', border: '1px solid rgba(245,158,11,0.3)', color: '#fcd34d', fontSize: '0.875rem', fontWeight: 700, cursor: 'pointer' }}
               >
                 Tentar novamente
               </button>
@@ -163,7 +163,7 @@ export default function AIExerciseSwap({
                   }}
                 >
                   <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem' }}>
-                    <div style={{ width: '2rem', height: '2rem', borderRadius: '0.5rem', background: 'rgba(139,92,246,0.1)', border: '1px solid rgba(139,92,246,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '2px' }}>
+                    <div style={{ width: '2rem', height: '2rem', borderRadius: '0.5rem', background: 'rgba(245,158,11,0.1)', border: '1px solid rgba(245,158,11,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, marginTop: '2px' }}>
                       {applied === alt.name ? <Check size={14} style={{ color: '#34d399' }} /> : <Dumbbell size={14} style={{ color: '#a78bfa' }} />}
                     </div>
                     <div style={{ flex: 1, minWidth: 0 }}>
@@ -212,7 +212,7 @@ export default function AIExerciseSwap({
           e.stopPropagation()
           fetchAlternatives()
         }}
-        className="h-9 w-9 inline-flex items-center justify-center rounded-xl bg-neutral-900 border border-neutral-800 text-violet-400 hover:bg-neutral-800 transition-colors active:scale-95 flex-shrink-0"
+        className="h-9 w-9 inline-flex items-center justify-center rounded-xl bg-neutral-900 border border-neutral-800 text-amber-400 hover:bg-neutral-800 transition-colors active:scale-95 flex-shrink-0"
         title="Trocar exercício (AI)"
         aria-label="Sugerir exercícios alternativos"
       >
