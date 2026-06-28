@@ -252,7 +252,7 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
                                         <button
                                             onClick={() => toggleExerciseType(index, exerciseType)}
                                             className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border transition-colors ${exerciseType === 'cardio'
-                                                ? 'bg-blue-500/20 text-blue-400 border-blue-500/50'
+                                                ? 'bg-amber-500/20 text-amber-400 border-amber-500/50'
                                                 : 'bg-neutral-700 text-neutral-400 border-neutral-600 hover:border-neutral-400'
                                                 }`}
                                         >
@@ -284,7 +284,7 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
                                                     aria-label="Modalidade"
                                                     value={exercise.name || ''}
                                                     onChange={e => updateExercise(index, 'name', e.target.value)}
-                                                    className="w-full bg-neutral-900 font-bold text-white text-lg p-3 rounded-xl border border-neutral-700 outline-none focus:border-blue-500 transition-colors appearance-none"
+                                                    className="w-full bg-neutral-900 font-bold text-white text-lg p-3 rounded-xl border border-neutral-700 outline-none focus:border-amber-500 transition-colors appearance-none"
                                                 >
                                                     {CARDIO_OPTIONS.map(opt => (
                                                         <option key={opt} value={opt}>{opt}</option>
@@ -427,7 +427,7 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
 
                                                 <div>
                                                     <div className="flex items-center justify-between gap-3 mb-1">
-                                                        <p className="text-[10px] text-blue-400 uppercase font-bold block">Vídeo Demonstração (URL)</p>
+                                                        <p className="text-[10px] text-amber-400 uppercase font-bold block">Vídeo Demonstração (URL)</p>
                                                         {String(exercise.videoUrl || '').trim() ? (
                                                             <button
                                                                 type="button"
@@ -440,7 +440,7 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
                                                                         window.open(String(exercise.videoUrl || '').trim(), '_blank', 'noopener,noreferrer');
                                                                     } catch { }
                                                                 }}
-                                                                className="inline-flex items-center gap-2 text-blue-300 hover:text-blue-200 text-[11px] font-bold opacity-70 hover:opacity-100"
+                                                                className="inline-flex items-center gap-2 text-amber-300 hover:text-amber-200 text-[11px] font-bold opacity-70 hover:opacity-100"
                                                                 title="Ver vídeo"
                                                             >
                                                                 <Play size={14} />
@@ -452,7 +452,7 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
                                                         aria-label="URL do vídeo de demonstração"
                                                         value={exercise.videoUrl || ''}
                                                         onChange={e => updateExercise(index, 'videoUrl', e.target.value)}
-                                                        className="w-full bg-blue-500/5 border border-blue-500/20 rounded-lg p-2 text-xs text-blue-200 focus:border-blue-500 outline-none placeholder-blue-500/30 transition-colors"
+                                                        className="w-full bg-amber-500/5 border border-amber-500/20 rounded-lg p-2 text-xs text-amber-200 focus:border-amber-500 outline-none placeholder-amber-500/30 transition-colors"
                                                         placeholder="https://youtube.com/..."
                                                     />
                                                 </div>

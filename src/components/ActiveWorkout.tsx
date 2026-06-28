@@ -200,10 +200,10 @@ export default function ActiveWorkout(props: ActiveWorkoutProps & { controlledBy
         <div className="flex-1 overflow-y-auto overflow-x-hidden">
           {/* Teacher control badge — subtle indicator when a teacher is controlling */}
           {props.controlledByName && (
-            <div className="bg-indigo-500/10 border-b border-indigo-500/20 px-4 py-2 flex items-center gap-2 text-sm">
-              <Gamepad2 size={13} className="text-indigo-400 shrink-0" />
-              <span className="text-indigo-300 font-bold text-xs">
-                Prof. <strong className="text-indigo-200">{props.controlledByName}</strong> no controle
+            <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-2 flex items-center gap-2 text-sm">
+              <Gamepad2 size={13} className="text-amber-400 shrink-0" />
+              <span className="text-amber-300 font-bold text-xs">
+                Prof. <strong className="text-amber-200">{props.controlledByName}</strong> no controle
               </span>
             </div>
           )}
@@ -223,17 +223,17 @@ export default function ActiveWorkout(props: ActiveWorkoutProps & { controlledBy
 
           {/* Workout edit sync banner — shown when a teammate edited the workout (hidden while paused) */}
           {inTeamSession && pendingEdit && !teamCtx.sessionPaused && (
-            <div className="bg-blue-500/15 border-b border-blue-500/30 px-4 py-2.5 flex items-center justify-between gap-2 text-sm">
+            <div className="bg-amber-500/15 border-b border-amber-500/30 px-4 py-2.5 flex items-center justify-between gap-2 text-sm">
               <div className="flex items-center gap-2 min-w-0">
-                <Pencil size={14} className="text-blue-300 shrink-0" />
-                <span className="text-blue-200 font-semibold truncate">
-                  <strong className="text-blue-100">{pendingEdit.fromName}</strong> editou o treino
+                <Pencil size={14} className="text-amber-300 shrink-0" />
+                <span className="text-amber-200 font-semibold truncate">
+                  <strong className="text-amber-100">{pendingEdit.fromName}</strong> editou o treino
                 </span>
               </div>
               <div className="flex items-center gap-1.5 flex-shrink-0">
                 <button
                   onClick={handleAcceptWorkoutEdit}
-                  className="text-[11px] font-black bg-blue-500 text-white px-3 py-1.5 rounded-lg hover:bg-blue-400 transition-colors"
+                  className="text-[11px] font-black bg-amber-500 text-white px-3 py-1.5 rounded-lg hover:bg-amber-400 transition-colors"
                 >
                   Aceitar
                 </button>

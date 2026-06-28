@@ -75,21 +75,21 @@ export default function WeeklyAIReport() {
         type="button"
         onClick={fetchReport}
         disabled={loading}
-        className="w-full rounded-2xl bg-gradient-to-r from-violet-950/40 to-purple-950/30 border border-violet-500/20 p-4 text-left hover:border-violet-500/40 transition-all active:scale-[0.99]"
+        className="w-full rounded-2xl bg-gradient-to-r from-amber-950/40 to-amber-950/30 border border-amber-500/20 p-4 text-left hover:border-amber-500/40 transition-all active:scale-[0.99]"
       >
         <div className="flex items-center gap-3">
           {loading ? (
-            <Loader2 size={20} className="text-violet-400 animate-spin" />
+            <Loader2 size={20} className="text-amber-400 animate-spin" />
           ) : (
-            <Brain size={20} className="text-violet-400" />
+            <Brain size={20} className="text-amber-400" />
           )}
           <div className="flex-1">
             <h3 className="font-black text-white text-sm">Relatório Semanal AI</h3>
-            <p className="text-[10px] text-violet-400/70 mt-0.5">
+            <p className="text-[10px] text-amber-400/70 mt-0.5">
               {loading ? 'Analisando seus treinos da semana…' : 'Toque para gerar seu resumo semanal com IA'}
             </p>
           </div>
-          <Sparkles size={16} className="text-violet-500/50" />
+          <Sparkles size={16} className="text-amber-500/50" />
         </div>
       </button>
     )
@@ -106,18 +106,18 @@ export default function WeeklyAIReport() {
   if (!report) return null
 
   return (
-    <div className="rounded-2xl bg-gradient-to-br from-violet-950/30 via-neutral-900/90 to-purple-950/20 border border-violet-500/15 overflow-hidden">
+    <div className="rounded-2xl bg-gradient-to-br from-amber-950/30 via-neutral-900/90 to-amber-950/20 border border-amber-500/15 overflow-hidden">
       {/* Header */}
       <button
         type="button"
         onClick={() => setExpanded(!expanded)}
         className="w-full flex items-center gap-3 p-4 text-left"
       >
-        <Brain size={18} className="text-violet-400 shrink-0" />
+        <Brain size={18} className="text-amber-400 shrink-0" />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <h3 className="font-black text-white text-sm">Resumo da Semana</h3>
-            <span className="px-1.5 py-0.5 rounded-md bg-violet-500/15 border border-violet-500/25 text-[9px] font-black text-violet-400">
+            <span className="px-1.5 py-0.5 rounded-md bg-amber-500/15 border border-amber-500/25 text-[9px] font-black text-amber-400">
               AI
             </span>
           </div>
@@ -168,7 +168,7 @@ export default function WeeklyAIReport() {
           {/* Muscle Balance */}
           {report.muscleBalance?.length > 0 && (
             <div className="space-y-1.5">
-              <div className="flex items-center gap-1.5 text-[9px] font-black text-violet-400/80 uppercase tracking-wider">
+              <div className="flex items-center gap-1.5 text-[9px] font-black text-amber-400/80 uppercase tracking-wider">
                 <Target size={10} />
                 <span>Balanço Muscular</span>
               </div>
@@ -190,13 +190,13 @@ export default function WeeklyAIReport() {
           {/* Progression Tips */}
           {report.progressionTips && report.progressionTips.length > 0 && (
             <div className="space-y-1">
-              <div className="flex items-center gap-1.5 text-[9px] font-black text-blue-400/80 uppercase tracking-wider">
+              <div className="flex items-center gap-1.5 text-[9px] font-black text-amber-400/80 uppercase tracking-wider">
                 <Lightbulb size={10} />
                 <span>Próxima Semana</span>
               </div>
               {report.progressionTips.map((t, i) => (
                 <div key={i} className="flex items-start gap-2 text-xs text-neutral-300">
-                  <span className="text-blue-400 shrink-0 mt-0.5">▸</span>
+                  <span className="text-amber-400 shrink-0 mt-0.5">▸</span>
                   <span>{t}</span>
                 </div>
               ))}
@@ -204,8 +204,8 @@ export default function WeeklyAIReport() {
           )}
 
           {/* Motivation */}
-          <div className="rounded-xl bg-gradient-to-r from-violet-500/10 to-purple-500/10 border border-violet-500/15 p-3">
-            <p className="text-sm text-violet-200 italic">&ldquo;{report.motivation}&rdquo;</p>
+          <div className="rounded-xl bg-gradient-to-r from-amber-500/10 to-amber-500/10 border border-amber-500/15 p-3">
+            <p className="text-sm text-amber-200 italic">&ldquo;{report.motivation}&rdquo;</p>
           </div>
         </div>
       )}

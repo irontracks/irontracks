@@ -92,25 +92,25 @@ function CardContent({
       <div style={{
         position: 'absolute', top: 0, left: 0, right: 0,
         height: 6 * scale,
-        background: 'linear-gradient(90deg, #ca8a04 0%, #eab308 50%, #ca8a04 100%)',
+        background: 'linear-gradient(90deg, #d97706 0%, #f59e0b 50%, #d97706 100%)',
       }} />
 
       {/* Decorative radial glow */}
       <div style={{
         position: 'absolute', top: -180 * scale, right: -180 * scale,
         width: 600 * scale, height: 600 * scale, borderRadius: '50%',
-        background: 'radial-gradient(circle, rgba(234,179,8,0.12) 0%, transparent 70%)',
+        background: 'radial-gradient(circle, rgba(245,158,11,0.12) 0%, transparent 70%)',
         pointerEvents: 'none',
       }} />
 
       {/* Geometric accent lines */}
       <div style={{
         position: 'absolute', bottom: 220 * scale, left: 0, right: 0,
-        height: 1 * scale, background: 'rgba(234,179,8,0.15)',
+        height: 1 * scale, background: 'rgba(245,158,11,0.15)',
       }} />
       <div style={{
         position: 'absolute', bottom: 224 * scale, left: 0, right: 0,
-        height: 1 * scale, background: 'rgba(234,179,8,0.06)',
+        height: 1 * scale, background: 'rgba(245,158,11,0.06)',
       }} />
 
       {/* ── HEADER ────────────────────────────────────────────────── */}
@@ -120,7 +120,7 @@ function CardContent({
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2 * scale }}>
             <div style={{ fontSize: 22 * scale, fontWeight: 900, letterSpacing: '0.06em', lineHeight: 1 }}>
               <span style={{ color: '#f5f5f5' }}>IRON</span>
-              <span style={{ color: '#eab308' }}>TRACKS</span>
+              <span style={{ color: '#f59e0b' }}>TRACKS</span>
             </div>
             <div style={{ fontSize: 9 * scale, fontWeight: 700, letterSpacing: '0.28em', color: '#737373', textTransform: 'uppercase' }}>
               Performance Log
@@ -129,10 +129,10 @@ function CardContent({
           {/* Date pill */}
           <div style={{
             padding: `${6 * scale}px ${14 * scale}px`,
-            background: 'rgba(234,179,8,0.1)',
-            border: '1px solid rgba(234,179,8,0.25)',
+            background: 'rgba(245,158,11,0.1)',
+            border: '1px solid rgba(245,158,11,0.25)',
             borderRadius: 40 * scale,
-            fontSize: 10 * scale, fontWeight: 700, color: '#eab308', letterSpacing: '0.08em',
+            fontSize: 10 * scale, fontWeight: 700, color: '#f59e0b', letterSpacing: '0.08em',
           }}>
             {dateStr}
           </div>
@@ -144,7 +144,7 @@ function CardContent({
         position: 'absolute', top: 160 * scale, left: 56 * scale, right: 56 * scale,
       }}>
         <div style={{
-          fontSize: 11 * scale, fontWeight: 700, letterSpacing: '0.3em', color: '#eab308',
+          fontSize: 11 * scale, fontWeight: 700, letterSpacing: '0.3em', color: '#f59e0b',
           textTransform: 'uppercase', marginBottom: 14 * scale,
         }}>
           Treino de Hoje
@@ -177,15 +177,15 @@ function CardContent({
         ].map(({ value, label, accent }) => (
           <div key={label} style={{
             background: accent
-              ? 'linear-gradient(135deg, rgba(234,179,8,0.15) 0%, rgba(234,179,8,0.05) 100%)'
+              ? 'linear-gradient(135deg, rgba(245,158,11,0.15) 0%, rgba(245,158,11,0.05) 100%)'
               : 'rgba(255,255,255,0.04)',
-            border: accent ? '1px solid rgba(234,179,8,0.3)' : '1px solid rgba(255,255,255,0.07)',
+            border: accent ? '1px solid rgba(245,158,11,0.3)' : '1px solid rgba(255,255,255,0.07)',
             borderRadius: 16 * scale,
             padding: `${24 * scale}px ${24 * scale}px`,
             display: 'flex', flexDirection: 'column', gap: 6 * scale,
           }}>
             <div style={{
-              fontSize: 32 * scale, fontWeight: 900, color: accent ? '#eab308' : '#ffffff',
+              fontSize: 32 * scale, fontWeight: 900, color: accent ? '#f59e0b' : '#ffffff',
               letterSpacing: '-0.02em', lineHeight: 1,
             }}>
               {value}
@@ -204,13 +204,13 @@ function CardContent({
             display: 'flex', alignItems: 'center', gap: 10 * scale, marginBottom: 16 * scale,
           }}>
             <div style={{
-              background: '#eab308', color: '#000', fontSize: 9 * scale, fontWeight: 900,
+              background: '#f59e0b', color: '#000', fontSize: 9 * scale, fontWeight: 900,
               letterSpacing: '0.2em', padding: `${4 * scale}px ${10 * scale}px`,
               borderRadius: 4 * scale, textTransform: 'uppercase',
             }}>
               PR
             </div>
-            <div style={{ fontSize: 13 * scale, fontWeight: 800, color: '#eab308', letterSpacing: '0.04em' }}>
+            <div style={{ fontSize: 13 * scale, fontWeight: 800, color: '#f59e0b', letterSpacing: '0.04em' }}>
               {prCount === 1 ? '1 recorde pessoal' : `${prCount} recordes pessoais`}
             </div>
           </div>
@@ -222,14 +222,14 @@ function CardContent({
               return (
                 <div key={i} style={{
                   display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                  background: 'rgba(234,179,8,0.07)', border: '1px solid rgba(234,179,8,0.2)',
+                  background: 'rgba(245,158,11,0.07)', border: '1px solid rgba(245,158,11,0.2)',
                   borderRadius: 12 * scale, padding: `${14 * scale}px ${20 * scale}px`,
                 }}>
                   <div style={{ fontSize: 13 * scale, fontWeight: 700, color: '#d4d4d4', letterSpacing: '0.02em' }}>
                     {name || 'EXERCÍCIO'}
                   </div>
                   {val != null && (
-                    <div style={{ fontSize: 18 * scale, fontWeight: 900, color: '#eab308' }}>
+                    <div style={{ fontSize: 18 * scale, fontWeight: 900, color: '#f59e0b' }}>
                       {Number(val).toFixed(1)}kg
                     </div>
                   )}
@@ -262,7 +262,7 @@ function CardContent({
       <div style={{
         position: 'absolute', bottom: 0, right: 0,
         width: 120 * scale, height: 120 * scale,
-        background: 'linear-gradient(225deg, rgba(234,179,8,0.08) 0%, transparent 70%)',
+        background: 'linear-gradient(225deg, rgba(245,158,11,0.08) 0%, transparent 70%)',
         pointerEvents: 'none',
       }} />
     </div>

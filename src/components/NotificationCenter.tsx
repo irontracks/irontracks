@@ -381,7 +381,7 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded, open:
                                     <div className="flex gap-2 mt-3">
                                         <button
                                             onClick={() => handleAccept(item)}
-                                            className="flex-1 bg-blue-500 hover:bg-blue-400 active:scale-95 text-white text-xs font-black py-2 rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-lg shadow-blue-900/30"
+                                            className="flex-1 bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-white text-xs font-black py-2 rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-lg shadow-emerald-900/30"
                                         >
                                             <Check size={12} /> Aceitar
                                         </button>
