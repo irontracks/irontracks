@@ -261,8 +261,8 @@ export const DashboardTab: React.FC = () => {
                         className="flex flex-col items-center justify-center gap-2 py-4 px-2 rounded-2xl border transition-all active:scale-[0.97] hover:bg-white/[0.05]"
                         style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'rgba(255,255,255,0.08)' }}
                     >
-                        <div className="w-10 h-10 rounded-xl bg-blue-500/15 border border-blue-400/25 flex items-center justify-center">
-                            <Dumbbell size={18} className="text-blue-400" />
+                        <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-400/25 flex items-center justify-center">
+                            <Dumbbell size={18} className="text-amber-400" />
                         </div>
                         <span className="text-[11px] font-black text-white uppercase tracking-wide">+ Treino</span>
                     </button>
@@ -272,8 +272,8 @@ export const DashboardTab: React.FC = () => {
                         className="flex flex-col items-center justify-center gap-2 py-4 px-2 rounded-2xl border transition-all active:scale-[0.97] hover:bg-white/[0.05]"
                         style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'rgba(255,255,255,0.08)' }}
                     >
-                        <div className="w-10 h-10 rounded-xl bg-purple-500/15 border border-purple-400/25 flex items-center justify-center">
-                            <Crown size={18} className="text-purple-400" />
+                        <div className="w-10 h-10 rounded-xl bg-amber-500/15 border border-amber-400/25 flex items-center justify-center">
+                            <Crown size={18} className="text-amber-400" />
                         </div>
                         <span className="text-[11px] font-black text-white uppercase tracking-wide">
                             {isAdmin ? 'VIP' : 'Coach'}

@@ -179,8 +179,8 @@ export function AnalyticsTab() {
               />
               <KpiCard
                 icon={Activity}
-                iconColor="text-blue-400"
-                iconBg="rgba(59,130,246,0.15)"
+                iconColor="text-amber-400"
+                iconBg="rgba(245,158,11,0.15)"
                 label="WAU"
                 value={summary.wau}
                 sub="Últimos 7d"
@@ -195,8 +195,8 @@ export function AnalyticsTab() {
               />
               <KpiCard
                 icon={TrendingUp}
-                iconColor="text-purple-400"
-                iconBg="rgba(168,85,247,0.15)"
+                iconColor="text-amber-400"
+                iconBg="rgba(245,158,11,0.15)"
                 label="Stickiness"
                 value={summary.stickiness}
                 suffix="%"
@@ -277,15 +277,15 @@ export function AnalyticsTab() {
             <div className="grid grid-cols-2 gap-2">
               <KpiCard
                 icon={Send}
-                iconColor="text-blue-400"
-                iconBg="rgba(59,130,246,0.15)"
+                iconColor="text-amber-400"
+                iconBg="rgba(245,158,11,0.15)"
                 label="Últimas 24h"
                 value={summary.pushes24h}
               />
               <KpiCard
                 icon={Send}
-                iconColor="text-blue-400"
-                iconBg="rgba(59,130,246,0.15)"
+                iconColor="text-amber-400"
+                iconBg="rgba(245,158,11,0.15)"
                 label="Últimos 7d"
                 value={summary.pushes7d}
               />

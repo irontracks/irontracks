@@ -210,7 +210,7 @@ export const SystemTab: React.FC = () => {
                         disabled={systemExporting}
                         className="p-4 bg-neutral-800 hover:bg-neutral-700 border border-neutral-700 rounded-xl flex items-center justify-center gap-3 transition-all disabled:opacity-50"
                     >
-                        <Download size={20} className="text-blue-400" />
+                        <Download size={20} className="text-amber-400" />
                         <div className="text-left">
                             <div className="font-bold text-white">Exportar Backup</div>
                             <div className="text-xs text-neutral-400">Baixar JSON completo do sistema</div>

@@ -244,12 +244,12 @@ export function BillingDiagnosticPanel() {
       {/* ── Simulator ──────────────────────────────────────────────── */}
       <div className="mt-6 pt-5 border-t border-neutral-800">
         <h4 className="font-black text-white text-sm mb-1 flex items-center gap-2">
-          <Beaker size={16} className="text-purple-400" />
+          <Beaker size={16} className="text-amber-400" />
           Simulador de Pagamento
         </h4>
         <p className="text-xs text-neutral-400 mb-3">
           Ativa um plano para o professor escolhido <strong>sem tocar no Mercado Pago</strong>.
-          A fatura criada fica marcada como <code className="text-purple-300">raw.simulated = true</code>.
+          A fatura criada fica marcada como <code className="text-amber-300">raw.simulated = true</code>.
         </p>
 
         <div className="space-y-2">
@@ -260,7 +260,7 @@ export function BillingDiagnosticPanel() {
               value={selectedTeacherId}
               onChange={(e) => setSelectedTeacherId(e.target.value)}
               disabled={loadingTeachers || simBusy}
-              className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500/60"
+              className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500/60"
             >
               <option value="">{loadingTeachers ? 'Carregando…' : '— escolha um professor —'}</option>
               {teachers.map((t) => (
@@ -278,7 +278,7 @@ export function BillingDiagnosticPanel() {
               value={selectedPlan}
               onChange={(e) => setSelectedPlan(e.target.value as typeof PLAN_OPTIONS[number]['value'])}
               disabled={simBusy}
-              className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-purple-500/60"
+              className="w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500/60"
             >
               {PLAN_OPTIONS.map((p) => (
                 <option key={p.value} value={p.value}>{p.label}</option>
@@ -289,7 +289,7 @@ export function BillingDiagnosticPanel() {
           <button
             onClick={() => void handleSimulate()}
             disabled={!selectedTeacherId || simBusy}
-            className="w-full py-2.5 rounded-xl bg-purple-500 hover:bg-purple-400 active:bg-purple-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-black text-sm transition-colors flex items-center justify-center gap-2"
+            className="w-full py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 active:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed text-white font-black text-sm transition-colors flex items-center justify-center gap-2"
           >
             {simBusy ? <Loader2 size={14} className="animate-spin" /> : <Beaker size={14} />}
             {simBusy ? 'Ativando…' : 'Simular ativação'}

@@ -265,7 +265,7 @@ export const VipTab: React.FC = () => {
             {/* ─── Header ─────────────────────────────────────────── */}
             <div className="flex items-center justify-between gap-4">
                 <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-yellow-500/20 via-amber-500/10 to-purple-500/10 border border-yellow-500/30 flex items-center justify-center shadow-lg shadow-yellow-500/10">
+                    <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-yellow-500/20 via-amber-500/10 to-amber-600/10 border border-yellow-500/30 flex items-center justify-center shadow-lg shadow-yellow-500/10">
                         <Crown size={22} className="text-yellow-400" />
                     </div>
                     <div>
