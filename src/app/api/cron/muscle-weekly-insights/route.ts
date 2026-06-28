@@ -90,7 +90,7 @@ export async function GET(req: Request) {
       const body = firstLine || `Você treinou ${workoutsCount}x essa semana. Veja seu balanço muscular.`
 
       try {
-        const res = await sendPushToAllPlatforms([userId], 'Resumo da semana 💪', body, { type: 'muscle_weekly_insights', weekStartDate })
+        const res = await sendPushToAllPlatforms([userId], 'Resumo da semana 💪', body, { type: 'muscle_weekly_insights', weekStartDate, link: `/dashboard/report/weekly?week=${weekStartDate}` })
         if (res.some((r) => r.ok)) pushed += 1
       } catch (e) { logWarn('cron:muscle-weekly-insights', `push falhou p/ ${userId}`, e) }
 
