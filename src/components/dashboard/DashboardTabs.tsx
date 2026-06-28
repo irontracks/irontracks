@@ -44,7 +44,7 @@ export const DashboardTabs = memo(({
 
   // WCAG 1.4.3 AA — tab labels visíveis precisam de contraste 4.5:1 sobre dark; neutral-500 falha
   const tabCls = (active: boolean) =>
-    `flex-1 min-w-0 min-h-[52px] px-1 sm:px-3 rounded-xl text-[10px] sm:text-xs uppercase tracking-tight sm:tracking-wider whitespace-nowrap leading-none overflow-hidden transition-colors duration-200 flex flex-col items-center justify-center gap-[5px] relative z-10 ${active
+    `flex-1 min-w-0 min-h-[52px] px-0.5 sm:px-3 rounded-xl uppercase tracking-tight sm:tracking-wider overflow-hidden transition-colors duration-200 flex flex-col items-center justify-center gap-[5px] relative z-10 ${active
       ? 'text-yellow-400 font-black'
       : 'text-neutral-400 hover:text-neutral-200 font-bold'
     }`
@@ -114,7 +114,7 @@ export const DashboardTabs = memo(({
                 >
                   {renderIndicator(active)}
                   {renderIcon(Icon, active)}
-                  <span>{label}</span>
+                  <span className="max-w-full truncate text-[9px] sm:text-xs leading-none">{label}</span>
                 </button>
               )
             })}
@@ -130,7 +130,7 @@ export const DashboardTabs = memo(({
                 >
                   {renderIndicator(active)}
                   {renderIcon(Users, active)}
-                  <span>Comunidade</span>
+                  <span className="max-w-full truncate text-[9px] sm:text-xs leading-none">Comunidade</span>
                 </button>
               )
             })()}
@@ -145,7 +145,7 @@ export const DashboardTabs = memo(({
               >
                 {renderIndicator(!!nutritionActive)}
                 {renderIcon(Apple, !!nutritionActive)}
-                <span>Nutrição</span>
+                <span className="max-w-full truncate text-[9px] sm:text-xs leading-none">Nutrição</span>
               </button>
             )}
 
@@ -160,7 +160,7 @@ export const DashboardTabs = memo(({
                 >
                   {renderIndicator(active)}
                   {renderIcon(Crown, active)}
-                  <span>{vipLabel}{vipLocked ? ' 🔒' : ''}</span>
+                  <span className="max-w-full truncate text-[9px] sm:text-xs leading-none">{vipLabel}{vipLocked ? ' 🔒' : ''}</span>
                 </button>
               )
             })()}

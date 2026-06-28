@@ -115,7 +115,7 @@ export function DashboardHeader({
               mas funcional, e ninguém em prod ainda roda iOS 15 com
               Capacitor 8).
             */}
-            <div className="bg-neutral-950 flex justify-between items-center fixed top-0 left-0 right-0 z-40 border-b border-zinc-800 px-6 shadow-lg pt-[env(safe-area-inset-top)] min-h-[calc(4rem+env(safe-area-inset-top))] overflow-x-clip">
+            <div className="bg-neutral-950 flex justify-between items-center fixed top-0 left-0 right-0 z-40 border-b border-zinc-800 px-4 sm:px-6 shadow-lg pt-[env(safe-area-inset-top)] min-h-[calc(4rem+env(safe-area-inset-top))] overflow-x-clip">
                 {/*
                   Logo + VIP badge container. Previously this whole block was a
                   single <button> wrapping the logo AND the VIP <button>, which
@@ -142,7 +142,7 @@ export function DashboardHeader({
                             style={{ filter: 'drop-shadow(0 0 6px rgba(245,158,11,0.55))' }}
                         />
                         <h1
-                            className="text-[1.7rem] font-black italic leading-none select-none group-hover:opacity-80 transition-opacity"
+                            className="text-[1.5rem] sm:text-[1.7rem] font-black italic leading-none select-none group-hover:opacity-80 transition-opacity"
                             style={{ letterSpacing: '-0.04em' }}
                         >
                             <span style={{ color: '#ffffff' }}>IRON</span><span

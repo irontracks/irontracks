@@ -833,11 +833,11 @@ const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose,
                 {/* ─── AI Section Header with Brain illustration ───────────────────── */}
                 <div className="mb-3 flex items-center gap-3">
                     <div className="w-14 h-14 rounded-2xl overflow-hidden shrink-0 opacity-90"
-                        style={{ background: 'rgba(15,10,30,0.8)', border: '1px solid rgba(100,60,255,0.2)', boxShadow: '0 0 16px rgba(80,40,255,0.12)' }}>
+                        style={{ background: 'rgba(30,20,5,0.8)', border: '1px solid rgba(251,191,36,0.2)', boxShadow: '0 0 16px rgba(245,158,11,0.12)' }}>
                         <NextImage src="/report-ai-brain.png" alt="" width={56} height={56} className="w-full h-full object-cover" />
                     </div>
                     <div>
-                        <div className="text-[10px] font-black uppercase tracking-widest text-purple-400">Análise Inteligente</div>
+                        <div className="text-[10px] font-black uppercase tracking-widest text-amber-400">Análise Inteligente</div>
                         <div className="text-base font-black text-white leading-tight">Coach IA & Insights</div>
                     </div>
                 </div>

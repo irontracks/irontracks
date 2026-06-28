@@ -77,9 +77,9 @@ export default function GymPresenceCard({ gymId, gymName }: GymPresenceCardProps
                   {person.display_name.charAt(0).toUpperCase()}
                 </div>
               )}
-              <span className="text-xs font-medium text-white/70">{person.display_name}</span>
+              <span className="text-xs font-medium text-white/70 truncate max-w-[120px]">{person.display_name}</span>
               <span
-                className="h-2 w-2 rounded-full"
+                className="h-2 w-2 rounded-full shrink-0"
                 style={{ background: '#22c55e', boxShadow: '0 0 4px rgba(34,197,94,0.5)' }}
               />
             </div>

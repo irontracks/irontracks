@@ -44,7 +44,7 @@ function RestComplianceBadge({ planned, actual }: { planned: number | null; actu
   }
   if (ratio < 0.8) {
     return (
-      <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-widest text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-full border border-blue-500/20">
+      <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-widest text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
         <AlertTriangle size={10} /> {Math.abs(deltaPct)}% curto
       </span>
     )
@@ -69,7 +69,7 @@ function CadenceBadge({ pct }: { pct: number | null }) {
   }
   if (pct < 80) {
     return (
-      <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-widest text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-full border border-blue-500/20">
+      <span className="inline-flex items-center gap-1 text-[10px] font-black uppercase tracking-widest text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded-full border border-amber-500/20">
         <AlertTriangle size={10} /> Acelerado ({Math.round(pct)}%)
       </span>
     )
@@ -93,12 +93,12 @@ function ComplianceBar({ onTime, tooShort, tooLong }: { onTime: number; tooShort
     <div className="mt-2 space-y-1">
       <div className="flex rounded-full overflow-hidden h-1.5 bg-neutral-800">
         {pctOk > 0 && <div className="bg-green-500 transition-all" style={{ width: `${pctOk}%` }} />}
-        {pctShort > 0 && <div className="bg-blue-400 transition-all" style={{ width: `${pctShort}%` }} />}
+        {pctShort > 0 && <div className="bg-amber-400 transition-all" style={{ width: `${pctShort}%` }} />}
         {pctLong > 0 && <div className="bg-yellow-400 transition-all" style={{ width: `${pctLong}%` }} />}
       </div>
       <div className="flex gap-3 flex-wrap text-[9px] font-black uppercase tracking-widest">
         {onTime > 0 && <span className="text-green-400">✓ {onTime} na meta</span>}
-        {tooShort > 0 && <span className="text-blue-400">↓ {tooShort} curto</span>}
+        {tooShort > 0 && <span className="text-amber-400">↓ {tooShort} curto</span>}
         {tooLong > 0 && <span className="text-yellow-400">↑ {tooLong} longo</span>}
       </div>
     </div>

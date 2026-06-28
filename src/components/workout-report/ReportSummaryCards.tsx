@@ -51,8 +51,8 @@ export const ReportSummaryCards = memo(({
                 {/* Tempo Total */}
                 <div className="bg-gradient-to-br from-neutral-900 to-neutral-950 p-4 rounded-2xl border border-neutral-800 flex flex-col gap-2 shadow-sm shadow-black/30">
                     <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center">
-                            <Clock size={16} className="text-blue-400" />
+                        <div className="w-8 h-8 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center">
+                            <Clock size={16} className="text-amber-400" />
                         </div>
                         <p className="text-[10px] font-black uppercase tracking-widest text-neutral-500">Tempo</p>
                     </div>
@@ -67,8 +67,8 @@ export const ReportSummaryCards = memo(({
                         </div>
                         <p className="text-[10px] font-black uppercase tracking-widest text-neutral-500">Volume</p>
                     </div>
-                    <div className="flex items-baseline gap-1">
-                        <span className="text-2xl font-black font-mono text-white">{animVol.toLocaleString('pt-BR')}</span>
+                    <div className="flex items-baseline gap-1 min-w-0">
+                        <span className="text-xl sm:text-2xl font-black font-mono tabular-nums text-white truncate">{animVol.toLocaleString('pt-BR')}</span>
                         <span className="text-xs font-black text-neutral-400">kg</span>
                     </div>
                     {hasPreviousSession && Number.isFinite(volumeDelta) && (

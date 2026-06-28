@@ -452,8 +452,8 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
           <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mt-4">
             {[
               { onClick: () => onOpenWizard?.(), icon: <Zap size={18} className="text-yellow-400" />, label: 'Wizard', sub: 'Gere treino rápido' },
-              { onClick: () => setInsightsOpen((v) => !v), icon: <Sparkles size={18} className="text-purple-300" />, label: 'Insights', sub: 'Relatórios e PRs' },
-              { onClick: () => onOpenHistory?.(), icon: <BarChart3 size={18} className="text-purple-400" />, label: 'Histórico', sub: 'Todos os treinos' },
+              { onClick: () => setInsightsOpen((v) => !v), icon: <Sparkles size={18} className="text-amber-300" />, label: 'Insights', sub: 'Relatórios e PRs' },
+              { onClick: () => onOpenHistory?.(), icon: <BarChart3 size={18} className="text-amber-400" />, label: 'Histórico', sub: 'Todos os treinos' },
               { onClick: openNutrition, icon: <ChefHat size={18} className="text-green-400" />, label: 'Nutrição', sub: nutritionSubtitle },
             ].map(({ onClick, icon, label, sub }, i) => (
               <button
@@ -536,13 +536,13 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
               key={m.key}
               type="button"
               onClick={() => setMode(m.key)}
-              className="flex-1 min-h-[36px] px-2 py-1.5 rounded-lg text-center transition-all active:scale-[0.97]"
+              className="flex-1 min-h-[36px] px-1.5 py-1.5 rounded-lg text-center transition-all active:scale-[0.97]"
               style={mode === m.key
                 ? { background: 'linear-gradient(135deg, rgba(234,179,8,0.15), rgba(234,179,8,0.06))', border: '1px solid rgba(234,179,8,0.3)', boxShadow: '0 2px 8px rgba(234,179,8,0.1)' }
                 : { background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.05)' }
               }
             >
-              <div className={`text-[11px] font-black ${mode === m.key ? 'text-yellow-400' : 'text-neutral-400'}`}>{m.label}</div>
+              <div className={`text-[10px] font-black whitespace-nowrap ${mode === m.key ? 'text-yellow-400' : 'text-neutral-400'}`}>{m.label}</div>
             </button>
           ))}
         </div>

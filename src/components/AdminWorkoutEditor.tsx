@@ -106,7 +106,7 @@ const AdminWorkoutEditor: React.FC<AdminWorkoutEditorProps> = ({ initialData, on
 
             <button
                 onClick={() => onSave(workout)}
-                className="w-full bg-green-600 hover:bg-green-700 text-white font-bold py-3 px-4 rounded-xl mt-4 mb-6 shadow-lg transform transition hover:scale-[1.02] flex items-center justify-center gap-2"
+                className="w-full bg-amber-500 hover:bg-amber-400 text-black font-bold py-3 px-4 rounded-xl mt-4 mb-6 shadow-lg transform transition hover:scale-[1.02] flex items-center justify-center gap-2"
             >
                 💾 SALVAR TREINO
             </button>
@@ -130,7 +130,7 @@ const AdminWorkoutEditor: React.FC<AdminWorkoutEditorProps> = ({ initialData, on
                                 className="w-full bg-transparent font-bold text-white border-b border-neutral-600 pb-1 outline-none"
                                 placeholder="Nome do Exercício"
                             />
-                            <div className="grid grid-cols-6 gap-2 text-center mb-2">
+                            <div className="grid grid-cols-3 gap-2 sm:grid-cols-6 text-center mb-2">
                                 <div className="col-span-1">
                                     <div className="text-[10px] text-neutral-500 block">Sets</div>
                                     <div className="flex items-center gap-1">
@@ -139,7 +139,7 @@ const AdminWorkoutEditor: React.FC<AdminWorkoutEditorProps> = ({ initialData, on
                                             type="number"
                                             value={ex.sets}
                                             onChange={e => updateExercise(idx, 'sets', e.target.value)}
-                                            className="w-full bg-neutral-900 rounded p-2 text-center outline-none text-sm text-white"
+                                            className="w-full bg-neutral-900 rounded py-2 px-1.5 text-center outline-none text-sm text-white"
                                         />
                                         <button
                                             onClick={() => updateExercise(idx, 'duplicate', true)}
@@ -156,7 +156,7 @@ const AdminWorkoutEditor: React.FC<AdminWorkoutEditorProps> = ({ initialData, on
                                         aria-label="Reps"
                                         value={ex.reps}
                                         onChange={e => updateExercise(idx, 'reps', e.target.value)}
-                                        className="w-full bg-neutral-900 rounded p-2 text-center text-sm text-white outline-none"
+                                        className="w-full bg-neutral-900 rounded py-2 px-1.5 text-center text-sm text-white outline-none"
                                     />
                                 </div>
                                 <div className="col-span-1">
@@ -166,7 +166,7 @@ const AdminWorkoutEditor: React.FC<AdminWorkoutEditorProps> = ({ initialData, on
                                         type="number"
                                         value={ex.rpe}
                                         onChange={e => updateExercise(idx, 'rpe', e.target.value)}
-                                        className="w-full bg-neutral-900 border border-yellow-500/30 rounded p-2 text-center text-sm text-yellow-500 font-bold outline-none"
+                                        className="w-full bg-neutral-900 border border-yellow-500/30 rounded py-2 px-1.5 text-center text-sm text-yellow-500 font-bold outline-none"
                                         placeholder="1-10"
                                     />
                                 </div>
@@ -177,7 +177,7 @@ const AdminWorkoutEditor: React.FC<AdminWorkoutEditorProps> = ({ initialData, on
                                         type="number"
                                         value={ex.restTime}
                                         onChange={e => updateExercise(idx, 'restTime', e.target.value)}
-                                        className="w-full bg-neutral-900 rounded p-2 text-center text-sm text-white outline-none"
+                                        className="w-full bg-neutral-900 rounded py-2 px-1.5 text-center text-sm text-white outline-none"
                                     />
                                 </div>
                                 <div className="col-span-1">
@@ -186,7 +186,7 @@ const AdminWorkoutEditor: React.FC<AdminWorkoutEditorProps> = ({ initialData, on
                                         aria-label="Cadência"
                                         value={ex.cadence}
                                         onChange={e => updateExercise(idx, 'cadence', e.target.value)}
-                                        className="w-full bg-neutral-900 rounded p-2 text-center text-sm text-white outline-none"
+                                        className="w-full bg-neutral-900 rounded py-2 px-1.5 text-center text-sm text-white outline-none"
                                     />
                                 </div>
                                 <div className="col-span-1">
@@ -195,7 +195,7 @@ const AdminWorkoutEditor: React.FC<AdminWorkoutEditorProps> = ({ initialData, on
                                         aria-label="Método"
                                         value={['warm-up', 'warm_up', 'warmup'].includes(String(ex.method || '').toLowerCase()) ? 'Normal' : (ex.method || 'Normal')}
                                         onChange={e => updateExercise(idx, 'method', e.target.value)}
-                                        className="w-full bg-neutral-900 rounded p-2 text-center text-[10px] h-[38px] outline-none text-white"
+                                        className="w-full bg-neutral-900 rounded py-2 px-1.5 text-center text-[10px] h-[38px] outline-none text-white"
                                     >
                                         <option value="Normal">Normal</option>
                                         <option value="Drop-set">Drop-set</option>
@@ -207,12 +207,12 @@ const AdminWorkoutEditor: React.FC<AdminWorkoutEditorProps> = ({ initialData, on
                             </div>
 
                             <div className="mb-2">
-                                <div className="text-[10px] text-blue-400 flex items-center gap-1 mb-1">🎥 VÍDEO DEMONSTRAÇÃO (URL)</div>
+                                <div className="text-[10px] text-amber-400 flex items-center gap-1 mb-1">🎥 VÍDEO DEMONSTRAÇÃO (URL)</div>
                                 <input
                                     aria-label="URL do vídeo de demonstração"
                                     value={ex.videoUrl || ''}
                                     onChange={e => updateExercise(idx, 'videoUrl', e.target.value)}
-                                    className="w-full bg-blue-500/5 border border-blue-500/20 rounded p-2 text-xs text-blue-200 outline-none"
+                                    className="w-full bg-amber-500/5 border border-amber-500/20 rounded p-2 text-xs text-amber-200 outline-none"
                                     placeholder="https://youtube.com/..."
                                 />
                             </div>
