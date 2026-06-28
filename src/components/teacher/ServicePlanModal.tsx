@@ -186,12 +186,13 @@ export default function ServicePlanModal({ open, plan, onClose, onSaved }: Servi
                 id="sp-price"
                 aria-label="Valor do plano em reais"
                 type="number"
+                inputMode="decimal"
                 min={0}
                 step={0.01}
                 value={priceReal || ''}
                 onChange={e => set('price_cents', Math.round(parseFloat(e.target.value || '0') * 100))}
                 placeholder="0,00"
-                className="w-full bg-neutral-900 border border-neutral-700 rounded-xl pl-10 pr-4 py-3 text-sm text-white placeholder-neutral-600 focus:outline-none focus:border-yellow-500/60"
+                className="w-full bg-neutral-900 border border-neutral-700 rounded-xl pl-10 pr-4 py-3 text-base text-white placeholder-neutral-600 focus:outline-none focus:border-yellow-500/60"
               />
             </div>
             {form.price_cents > 0 && (
@@ -231,11 +232,12 @@ export default function ServicePlanModal({ open, plan, onClose, onSaved }: Servi
               id="sp-days"
               aria-label="Duração do plano em dias"
               type="number"
+              inputMode="numeric"
               min={1}
               max={3650}
               value={form.duration_days}
               onChange={e => set('duration_days', Math.max(1, parseInt(e.target.value || '1', 10)))}
-              className="w-full bg-neutral-900 border border-neutral-700 rounded-xl px-4 py-3 text-sm text-white focus:outline-none focus:border-yellow-500/60"
+              className="w-full bg-neutral-900 border border-neutral-700 rounded-xl px-4 py-3 text-base text-white focus:outline-none focus:border-yellow-500/60"
             />
           </div>
 
@@ -275,13 +277,14 @@ export default function ServicePlanModal({ open, plan, onClose, onSaved }: Servi
                 id="sp-duration"
                 aria-label="Duração de cada sessão em minutos"
                 type="number"
+                inputMode="numeric"
                 min={15}
                 max={300}
                 step={5}
                 value={form.session_duration_minutes ?? ''}
                 onChange={e => set('session_duration_minutes', parseInt(e.target.value || '0', 10) || null)}
                 placeholder="60"
-                className="w-full bg-neutral-900 border border-neutral-700 rounded-xl px-4 py-3 text-sm text-white placeholder-neutral-600 focus:outline-none focus:border-yellow-500/60"
+                className="w-full bg-neutral-900 border border-neutral-700 rounded-xl px-4 py-3 text-base text-white placeholder-neutral-600 focus:outline-none focus:border-yellow-500/60"
               />
             </div>
             <div>
@@ -292,12 +295,13 @@ export default function ServicePlanModal({ open, plan, onClose, onSaved }: Servi
                 id="sp-sessions"
                 aria-label="Número de sessões por semana"
                 type="number"
+                inputMode="numeric"
                 min={1}
                 max={7}
                 value={form.sessions_per_week ?? ''}
                 onChange={e => set('sessions_per_week', parseInt(e.target.value || '0', 10) || null)}
                 placeholder="3"
-                className="w-full bg-neutral-900 border border-neutral-700 rounded-xl px-4 py-3 text-sm text-white placeholder-neutral-600 focus:outline-none focus:border-yellow-500/60"
+                className="w-full bg-neutral-900 border border-neutral-700 rounded-xl px-4 py-3 text-base text-white placeholder-neutral-600 focus:outline-none focus:border-yellow-500/60"
               />
             </div>
           </div>

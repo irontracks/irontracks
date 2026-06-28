@@ -443,12 +443,13 @@ export default function ProfilePage({ settings, displayName, onSave, onBack }: P
                 <Calendar size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-400" />
                 <input
                   type="number"
+                  inputMode="numeric"
                   aria-label="Idade"
                   min="10" max="100"
                   value={draft.age ?? ''}
                   onChange={e => set('age', e.target.value ? Number(e.target.value) : null as unknown as number)}
                   placeholder="Ex: 28"
-                  className="w-full bg-neutral-800/80 border border-neutral-700/60 rounded-xl pl-9 pr-4 py-3 text-white text-sm placeholder-neutral-600 focus:outline-none focus:border-yellow-500/60 transition-colors"
+                  className="w-full bg-neutral-800/80 border border-neutral-700/60 rounded-xl pl-9 pr-4 py-3 text-white text-base placeholder-neutral-600 focus:outline-none focus:border-yellow-500/60 transition-colors"
                 />
               </div>
             </div>
@@ -481,12 +482,12 @@ export default function ProfilePage({ settings, displayName, onSave, onBack }: P
                 <div className="relative">
                   <Scale size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
                   <input
-                    type="number" step="0.1" min="30" max="300"
+                    type="number" inputMode="decimal" step="0.1" min="30" max="300"
                     aria-label="Peso em kg"
                     value={draft.bodyWeightKg ?? ''}
                     onChange={e => set('bodyWeightKg', e.target.value ? Number(e.target.value) : null as unknown as number)}
                     placeholder="Ex: 80.5"
-                    className="w-full bg-neutral-800/80 border border-neutral-700/60 rounded-xl pl-8 pr-4 py-3 text-white text-sm placeholder-neutral-600 focus:outline-none focus:border-yellow-500/60 transition-colors"
+                    className="w-full bg-neutral-800/80 border border-neutral-700/60 rounded-xl pl-8 pr-4 py-3 text-white text-base placeholder-neutral-600 focus:outline-none focus:border-yellow-500/60 transition-colors"
                   />
                 </div>
               </div>
@@ -496,12 +497,12 @@ export default function ProfilePage({ settings, displayName, onSave, onBack }: P
                 <div className="relative">
                   <Ruler size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
                   <input
-                    type="number" step="0.5" min="100" max="250"
+                    type="number" inputMode="decimal" step="0.5" min="100" max="250"
                     aria-label="Altura em cm"
                     value={draft.heightCm ?? ''}
                     onChange={e => set('heightCm', e.target.value ? Number(e.target.value) : null as unknown as number)}
                     placeholder="Ex: 175"
-                    className="w-full bg-neutral-800/80 border border-neutral-700/60 rounded-xl pl-8 pr-4 py-3 text-white text-sm placeholder-neutral-600 focus:outline-none focus:border-yellow-500/60 transition-colors"
+                    className="w-full bg-neutral-800/80 border border-neutral-700/60 rounded-xl pl-8 pr-4 py-3 text-white text-base placeholder-neutral-600 focus:outline-none focus:border-yellow-500/60 transition-colors"
                   />
                 </div>
               </div>
@@ -569,12 +570,12 @@ export default function ProfilePage({ settings, displayName, onSave, onBack }: P
               <div className="relative">
                 <BarChart3 size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-400" />
                 <input
-                  type="number" step="0.5" min="0" max="50"
+                  type="number" inputMode="decimal" step="0.5" min="0" max="50"
                   aria-label="Anos de treino"
                   value={draft.trainingExperienceYears ?? ''}
                   onChange={e => set('trainingExperienceYears', e.target.value ? Number(e.target.value) : null as unknown as number)}
                   placeholder="Ex: 2.5"
-                  className="w-full bg-neutral-800/80 border border-neutral-700/60 rounded-xl pl-8 pr-4 py-3 text-white text-sm placeholder-neutral-600 focus:outline-none focus:border-yellow-500/60 transition-colors"
+                  className="w-full bg-neutral-800/80 border border-neutral-700/60 rounded-xl pl-8 pr-4 py-3 text-white text-base placeholder-neutral-600 focus:outline-none focus:border-yellow-500/60 transition-colors"
                 />
               </div>
             </div>

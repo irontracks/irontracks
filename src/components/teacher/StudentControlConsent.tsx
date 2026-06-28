@@ -26,21 +26,21 @@ export function StudentControlConsent({ teacherName, onAccept, onReject }: Stude
     <div
       className="mx-3 mb-2 rounded-2xl px-4 py-3 flex items-center gap-3 animate-in slide-in-from-top duration-300"
       style={{
-        background: 'rgba(99,102,241,0.12)',
-        border: '1px solid rgba(99,102,241,0.35)',
-        boxShadow: '0 4px 20px rgba(99,102,241,0.15)',
+        background: 'rgba(245,158,11,0.12)',
+        border: '1px solid rgba(245,158,11,0.35)',
+        boxShadow: '0 4px 20px rgba(245,158,11,0.15)',
       }}
     >
       <div
         className="w-9 h-9 flex-shrink-0 rounded-xl flex items-center justify-center"
-        style={{ background: 'rgba(99,102,241,0.2)' }}
+        style={{ background: 'rgba(245,158,11,0.2)' }}
       >
-        <Gamepad2 size={18} className="text-indigo-400" />
+        <Gamepad2 size={18} className="text-amber-400" />
       </div>
 
       <div className="flex-1 min-w-0">
         <p className="text-[12px] font-black text-white leading-snug">
-          Prof. <span className="text-indigo-300">{teacherName}</span> quer controlar seu treino
+          Prof. <span className="text-amber-300">{teacherName}</span> quer controlar seu treino
         </p>
         <p className="text-[10px] text-white/40 mt-0.5">Ele poderá anotar séries e editar exercícios</p>
       </div>
@@ -50,7 +50,7 @@ export function StudentControlConsent({ teacherName, onAccept, onReject }: Stude
           type="button"
           disabled={loading !== null}
           onClick={() => handle('reject')}
-          className="w-8 h-8 rounded-xl flex items-center justify-center transition-all active:scale-95 disabled:opacity-50"
+          className="w-11 h-11 rounded-xl flex items-center justify-center transition-all active:scale-95 disabled:opacity-50"
           style={{ background: 'rgba(239,68,68,0.15)', border: '1px solid rgba(239,68,68,0.3)' }}
           aria-label="Recusar controle"
         >
@@ -60,7 +60,7 @@ export function StudentControlConsent({ teacherName, onAccept, onReject }: Stude
           type="button"
           disabled={loading !== null}
           onClick={() => handle('accept')}
-          className="w-8 h-8 rounded-xl flex items-center justify-center transition-all active:scale-95 disabled:opacity-50"
+          className="w-11 h-11 rounded-xl flex items-center justify-center transition-all active:scale-95 disabled:opacity-50"
           style={{ background: 'rgba(34,197,94,0.15)', border: '1px solid rgba(34,197,94,0.3)' }}
           aria-label="Aceitar controle"
         >

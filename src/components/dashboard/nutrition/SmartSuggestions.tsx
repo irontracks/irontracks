@@ -71,9 +71,9 @@ export default function SmartSuggestions({ goals, consumed, onSelect }: SmartSug
           onClick={fetchSuggestions}
           disabled={loading}
           className="
-            w-full rounded-2xl border border-purple-500/20 bg-purple-500/8
-            px-4 py-3 text-sm text-purple-200
-            hover:bg-purple-500/15 hover:border-purple-500/30 transition-all
+            w-full rounded-2xl border border-amber-500/20 bg-amber-500/8
+            px-4 py-3 text-sm text-amber-200
+            hover:bg-amber-500/15 hover:border-amber-500/30 transition-all
             flex items-center justify-center gap-2
           "
         >
@@ -84,9 +84,9 @@ export default function SmartSuggestions({ goals, consumed, onSelect }: SmartSug
 
       {/* Suggestions panel */}
       {open && (
-        <div className="rounded-2xl border border-purple-500/20 bg-neutral-900/90 p-4 space-y-3">
+        <div className="rounded-2xl border border-amber-500/20 bg-neutral-900/90 p-4 space-y-3">
           <div className="flex items-center justify-between">
-            <div className="text-[10px] uppercase tracking-[0.22em] text-purple-300 flex items-center gap-1.5">
+            <div className="text-[10px] uppercase tracking-[0.22em] text-amber-300 flex items-center gap-1.5">
               <span>🧠</span> Sugestões IA
             </div>
             <button
@@ -123,7 +123,7 @@ export default function SmartSuggestions({ goals, consumed, onSelect }: SmartSug
               }}
               className="
                 w-full text-left rounded-xl border border-neutral-800/50 bg-neutral-800/40
-                px-3 py-2.5 hover:bg-neutral-800/60 hover:border-purple-500/20 transition-all
+                px-3 py-2.5 hover:bg-neutral-800/60 hover:border-amber-500/20 transition-all
               "
             >
               <div className="flex items-center justify-between">
@@ -140,7 +140,7 @@ export default function SmartSuggestions({ goals, consumed, onSelect }: SmartSug
           ))}
 
           {tip && (
-            <div className="rounded-xl bg-purple-500/10 border border-purple-500/15 px-3 py-2 text-xs text-purple-200 italic">
+            <div className="rounded-xl bg-amber-500/10 border border-amber-500/15 px-3 py-2 text-xs text-amber-200 italic">
               💡 {tip}
             </div>
           )}

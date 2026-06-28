@@ -295,7 +295,7 @@ export function ModalsComplexMethods() {
                         onClick={() => setDropSetModal(null)}
                     >
                         <div
-                            className="w-full max-w-2xl bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden"
+                            className="w-full max-w-2xl bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
                             onClick={(e) => e.stopPropagation()}
                         >
                             <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
@@ -314,7 +314,7 @@ export function ModalsComplexMethods() {
                                 </button>
                             </div>
 
-                            <div className="p-4 space-y-3 max-h-[70vh] overflow-y-auto custom-scrollbar">
+                            <div className="p-4 space-y-3 flex-1 overflow-y-auto custom-scrollbar">
                                 {dropSetModal?.error ? (
                                     <div className="rounded-xl border border-yellow-500/20 bg-yellow-500/10 p-3 text-sm text-neutral-200">
                                         {String(dropSetModal.error)}
@@ -444,7 +444,7 @@ export function ModalsComplexMethods() {
                     : [];
                 return (
                     <div className="fixed inset-0 z-[1400] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe" role="button" tabIndex={-1} aria-label="Fechar modal Stripping" onClick={() => setStrippingModal(null)} onKeyDown={(e) => { if (e.key === 'Escape') setStrippingModal(null) }}>
-                        <div className="w-full max-w-2xl bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                        <div className="w-full max-w-2xl bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
                             <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
                                 <div className="min-w-0">
                                     <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Stripping</div>
@@ -453,7 +453,7 @@ export function ModalsComplexMethods() {
                                 </div>
                                 <button type="button" onClick={() => setStrippingModal(null)} className="w-10 h-10 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 inline-flex items-center justify-center" aria-label="Fechar"><X size={18} /></button>
                             </div>
-                            <div className="p-4 space-y-3 max-h-[70vh] overflow-y-auto custom-scrollbar">
+                            <div className="p-4 space-y-3 flex-1 overflow-y-auto custom-scrollbar">
                                 {strippingModal.error ? <div className="rounded-xl border border-yellow-500/20 bg-yellow-500/10 p-3 text-sm text-neutral-200">{String(strippingModal.error)}</div> : null}
                                 <div className="flex gap-2 mb-2">
                                     <button type="button" onClick={() => setStrippingModal((prev) => { if (!prev || typeof prev !== 'object') return prev; const list = Array.isArray(prev.stages) ? [...(prev.stages as unknown[])] : []; list.push({ weight: '', reps: null }); return { ...prev, stages: list, error: '' }; })} className="px-3 py-1.5 rounded-lg bg-neutral-800 border border-neutral-700 text-xs text-neutral-300 hover:bg-neutral-700">+ Etapa</button>
@@ -486,7 +486,7 @@ export function ModalsComplexMethods() {
                 const intraSec = parseTrainingNumber(fst7Modal.intra_sec) ?? 30;
                 return (
                     <div className="fixed inset-0 z-[1400] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe" role="button" tabIndex={-1} aria-label="Fechar modal FST-7" onClick={() => setFst7Modal(null)} onKeyDown={(e) => { if (e.key === 'Escape') setFst7Modal(null) }}>
-                        <div className="w-full max-w-2xl bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                        <div className="w-full max-w-2xl bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
                             <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
                                 <div className="min-w-0">
                                     <div className="text-xs font-black uppercase tracking-widest text-yellow-500">FST-7</div>
@@ -495,7 +495,7 @@ export function ModalsComplexMethods() {
                                 </div>
                                 <button type="button" onClick={() => setFst7Modal(null)} className="w-10 h-10 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 inline-flex items-center justify-center" aria-label="Fechar"><X size={18} /></button>
                             </div>
-                            <div className="p-4 space-y-3 max-h-[70vh] overflow-y-auto custom-scrollbar">
+                            <div className="p-4 space-y-3 flex-1 overflow-y-auto custom-scrollbar">
                                 {fst7Modal.error ? <div className="rounded-xl border border-yellow-500/20 bg-yellow-500/10 p-3 text-sm text-neutral-200">{String(fst7Modal.error)}</div> : null}
                                 <div className="space-y-1">
                                     <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Descanso intra-série</div>
@@ -534,7 +534,7 @@ export function ModalsComplexMethods() {
                     : [{ heavy: 3, medium: 5, ultra: 2 }, { heavy: 3, medium: 5, ultra: 2 }];
                 return (
                     <div className="fixed inset-0 z-[1400] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe" role="button" tabIndex={-1} aria-label="Fechar modal Wave" onClick={() => setWaveModal(null)} onKeyDown={(e) => { if (e.key === 'Escape') setWaveModal(null) }}>
-                        <div className="w-full max-w-2xl bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
+                        <div className="w-full max-w-2xl bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]" onClick={(e) => e.stopPropagation()}>
                             <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
                                 <div className="min-w-0">
                                     <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Onda (Wave Loading)</div>
@@ -543,7 +543,7 @@ export function ModalsComplexMethods() {
                                 </div>
                                 <button type="button" onClick={() => setWaveModal(null)} className="w-10 h-10 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 inline-flex items-center justify-center" aria-label="Fechar"><X size={18} /></button>
                             </div>
-                            <div className="p-4 space-y-3 max-h-[70vh] overflow-y-auto custom-scrollbar">
+                            <div className="p-4 space-y-3 flex-1 overflow-y-auto custom-scrollbar">
                                 {waveModal.error ? <div className="rounded-xl border border-yellow-500/20 bg-yellow-500/10 p-3 text-sm text-neutral-200">{String(waveModal.error)}</div> : null}
                                 <div className="grid grid-cols-2 gap-3">
                                     <div className="space-y-1">
@@ -598,7 +598,7 @@ export function ModalsComplexMethods() {
                     onClick={() => setClusterModal(null)}
                 >
                     <div
-                        className="w-full max-w-2xl bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden"
+                        className="w-full max-w-2xl bg-neutral-900 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]"
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
@@ -624,7 +624,7 @@ export function ModalsComplexMethods() {
                             </button>
                         </div>
 
-                        <div className="p-4 space-y-3 max-h-[70vh] overflow-y-auto custom-scrollbar">
+                        <div className="p-4 space-y-3 flex-1 overflow-y-auto custom-scrollbar">
                             {clusterModal?.error ? (
                                 <div className="rounded-xl border border-yellow-500/20 bg-yellow-500/10 p-3 text-sm text-neutral-200">
                                     {String(clusterModal.error)}

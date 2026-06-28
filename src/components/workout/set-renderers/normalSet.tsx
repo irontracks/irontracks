@@ -527,7 +527,7 @@ const NormalSetInner = ({
               warmup or feeler (popover) — taps do nothing to avoid accidents
               during sweaty workouts. */}
           <div className="grid items-center gap-1.5"
-            style={{ gridTemplateColumns: '32px 28px minmax(0,3fr) minmax(0,2.5fr) minmax(0,1.5fr) 76px' }}>
+            style={{ gridTemplateColumns: '32px 36px minmax(0,3fr) minmax(0,2.5fr) minmax(0,1.5fr) 76px' }}>
 
             {/* Set-number badge with long-press → SetTypePopover */}
             <button
