@@ -29,8 +29,22 @@ const ensureCtx = (opts: SoundOpts | null | undefined): AudioContext | null => {
     if (!__ctx || __ctx.state === 'closed') {
         if (!__unlocked && !allowCreate) return null;
         __ctx = new AC();
+        // iOS WKWebView: o AudioContext pode ser SUSPENSO (app em background) ou
+        // INTERROMPIDO ('interrupted' — chamada/Siri/alarme, ou o som da notificação
+        // NATIVA de fim de descanso que dispara a cada rest) e ficar mudo o resto da
+        // sessão (era o bug "da metade do treino em diante o som para"). Auto-retoma
+        // sempre que o estado sair de 'running'. ('interrupted' não está no tipo padrão.)
+        try {
+            __ctx.onstatechange = () => {
+                const s = String(__ctx?.state || '');
+                if (s === 'suspended' || s === 'interrupted') {
+                    try { __ctx?.resume(); } catch { /* best effort */ }
+                }
+            };
+        } catch { /* ignore */ }
     }
-    if (__ctx.state === 'suspended') { try { __ctx.resume(); } catch { /* best effort: resume AudioContext */ } }
+    const st = String(__ctx.state);
+    if (st === 'suspended' || st === 'interrupted') { try { __ctx.resume(); } catch { /* best effort: resume AudioContext */ } }
     return __ctx;
 };
 
@@ -39,7 +53,7 @@ export const unlockAudio = () => {
         __unlocked = true;
         const ctx = ensureCtx({ create: true });
         if (!ctx) return;
-        if (ctx.state === 'suspended') {
+        if (String(ctx.state) === 'suspended' || String(ctx.state) === 'interrupted') {
             try {
                 const maybePromise = ctx.resume();
                 if (maybePromise && typeof maybePromise.then === 'function') {
