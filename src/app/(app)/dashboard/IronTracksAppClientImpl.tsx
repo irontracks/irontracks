@@ -1208,6 +1208,21 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                             const sid = isRecord(s) ? String((s as Record<string, unknown>).id ?? 'active') : 'active'
                                             router.push(`/dashboard/report/${encodeURIComponent(sid)}`)
                                         }}
+                                        onResume={(payload) => {
+                                            // Reabre um treino finalizado como ATIVO, preservando os logs (séries
+                                            // registradas) — pra quem finalizou sem querer e quer voltar de onde parou.
+                                            const exercises = Array.isArray(payload?.exercises) ? payload.exercises : []
+                                            if (!exercises.length) return
+                                            setActiveSession({
+                                                workout: { title: payload.title, exercises } as unknown as ActiveSession,
+                                                logs: (payload.logs || {}) as Record<string, unknown>,
+                                                ui: { baseExerciseCount: exercises.length, pendingTemplateUpdate: false, preCheckin: null },
+                                                startedAt: Date.now(),
+                                                timerTargetTime: null,
+                                                timerContext: null,
+                                            } as ActiveWorkoutSession)
+                                            setView('active')
+                                        }}
                                         onBack={() => setView('dashboard')}
                                         targetId={user?.id || ''}
                                         targetEmail={user?.email ? String(user.email) : ''}
