@@ -13,7 +13,13 @@ private struct TimerCountdownText: View {
     let color: Color
 
     var body: some View {
-        if isFinished {
+        // Self-healing: se o endDate JÁ PASSOU, trata como finalizado mesmo que a flag
+        // isFinished não tenha sido atualizada. Quando o app fica suspenso muito tempo
+        // em background (ex: esperando o equipamento liberar), o auto-finish nativo
+        // (Task.sleep) não roda e isFinished fica false; aí Date() > endDate tornava o
+        // range `Date()...endDate` INVÁLIDO (início > fim), e o iOS renderizava um
+        // spinner travado. Derivar de endDate evita isso sem depender do background.
+        if isFinished || endDate <= Date() {
             // Count UP from when the timer ended (shows overtime: +0:01, +0:02, …)
             Text(timerInterval: endDate...Date.distantFuture, countsDown: false)
                 .font(font)
@@ -253,26 +259,30 @@ struct LockScreenBannerView: View {
     let context: ActivityViewContext<RestTimerAttributes>
 
     var body: some View {
-        VStack(spacing: 10) {
+        // Mesma lógica self-healing do TimerCountdownText: trata como finalizado se o
+        // endDate já passou, pra todo o banner (ícone/label/botão) ficar coerente mesmo
+        // quando o app ficou suspenso e não atualizou isFinished.
+        let finished = context.state.isFinished || context.state.endDate <= Date()
+        return VStack(spacing: 10) {
             // ── Top row: icon + labels + rest countdown ──────────────────
             HStack(spacing: 14) {
                 // Circular icon
                 ZStack {
                     Circle()
-                        .fill(context.state.isFinished
+                        .fill(finished
                               ? Color.green.opacity(0.25)
                               : Color.yellow.opacity(0.15))
                         .frame(width: 44, height: 44)
-                    Image(systemName: context.state.isFinished
+                    Image(systemName: finished
                           ? "checkmark.circle.fill"
                           : "timer")
                         .font(.title3.bold())
-                        .foregroundColor(context.state.isFinished ? .green : .yellow)
+                        .foregroundColor(finished ? .green : .yellow)
                 }
 
                 // Labels
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(context.state.isFinished ? "Hora de Treinar!" : "Descansando")
+                    Text(finished ? "Hora de Treinar!" : "Descansando")
                         .font(.caption.bold())
                         .foregroundColor(.secondary)
                     Text(context.attributes.exerciseName)
@@ -286,9 +296,9 @@ struct LockScreenBannerView: View {
                 // Rest countdown / count-up
                 TimerCountdownText(
                     endDate: context.state.endDate,
-                    isFinished: context.state.isFinished,
+                    isFinished: finished,
                     font: .system(.title2, design: .rounded).bold(),
-                    color: context.state.isFinished ? .green : .primary
+                    color: finished ? .green : .primary
                 )
             }
 
@@ -315,7 +325,7 @@ struct LockScreenBannerView: View {
             // OK appears only when the rest is done (to dismiss the banner).
             if #available(iOS 17.0, *) {
                 HStack(spacing: 10) {
-                    if context.state.isFinished {
+                    if finished {
                         // OK — dismisses the Live Activity banner
                         Button(intent: DismissTimerIntent()) {
                             Text("OK")
@@ -333,13 +343,13 @@ struct LockScreenBannerView: View {
                     Button(intent: StartSetIntent()) {
                         HStack(spacing: 5) {
                             Image(systemName: "play.fill")
-                            Text(context.state.isFinished ? "INICIAR SÉRIE" : "PULAR DESCANSO")
+                            Text(finished ? "INICIAR SÉRIE" : "PULAR DESCANSO")
                         }
                         .font(.subheadline.bold())
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 9)
-                        .background(context.state.isFinished ? Color.green : Color.white.opacity(0.15))
-                        .foregroundColor(context.state.isFinished ? .black : .white)
+                        .background(finished ? Color.green : Color.white.opacity(0.15))
+                        .foregroundColor(finished ? .black : .white)
                         .clipShape(RoundedRectangle(cornerRadius: 10))
                     }
                     .buttonStyle(.plain)
