@@ -198,6 +198,22 @@ export function useHistoryActions({ user, supabase, setHistory, alert, confirm }
         setSelectedSession(isRecord(payload) ? payload : null);
     };
 
+    // ── Retomar treino: reabre uma sessão finalizada como treino ativo, ──────
+    // PRESERVANDO os logs (séries registradas). Pra quando o usuário finalizou
+    // sem querer e quer voltar de onde parou. raw.logs usa o mesmo formato de
+    // chave ("exIdx-setIdx") do treino ativo, então é reutilizado direto.
+    const openResume = (
+        session: WorkoutSummary,
+        onResume?: (payload: { title: string; exercises: unknown[]; logs: Record<string, unknown> }) => void,
+    ) => {
+        const raw = parseRawSession(session?.rawSession ?? session?.notes);
+        const exercises = Array.isArray(raw?.exercises) ? raw.exercises : [];
+        if (!exercises.length) return;
+        const logs = raw?.logs && isRecord(raw.logs) ? (raw.logs as Record<string, unknown>) : {};
+        const title = session.workoutTitle || raw?.workoutTitle || 'Treino';
+        onResume?.({ title, exercises, logs });
+    };
+
     // ── Session metadata ─────────────────────────────────────────────────────
     const getSessionMeta = (s: WorkoutSummary) => {
         const raw = parseRawSession(s?.rawSession ?? s?.notes);
@@ -213,7 +229,7 @@ export function useHistoryActions({ user, supabase, setHistory, alert, confirm }
         showEdit, setShowEdit, editId, editTitle, setEditTitle, editDate, setEditDate,
         editDuration, setEditDuration, editNotes, setEditNotes, editExercises,
         openEdit, updateEditExercise, saveEdit,
-        selectedSession, setSelectedSession, openSession,
+        selectedSession, setSelectedSession, openSession, openResume,
         getSessionMeta, updateCardioSession,
     };
 }

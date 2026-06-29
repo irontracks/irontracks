@@ -6,7 +6,7 @@ import { HistoryEmptyState, HistoryEmptyPeriod } from '@/components/history/Hist
 import {
     CalendarDays, ChevronLeft, ChevronRight, Clock,
     Dumbbell, Edit3, History, MapPin, Plus, Trash2, TrendingUp,
-    CheckCircle2, Circle, Lock, Activity,
+    CheckCircle2, Circle, Lock, Activity, RotateCcw,
 } from 'lucide-react';
 import { useWindowVirtualizer } from '@tanstack/react-virtual';
 import WorkoutReport from '@/components/WorkoutReport';
@@ -22,7 +22,7 @@ import { useHistoryActions } from '@/components/history/hooks/useHistoryActions'
 import { useHistoryPeriodReport } from '@/components/history/hooks/useHistoryPeriodReport';
 
 const HistoryList: React.FC<HistoryListProps> = ({
-    user, settings, onViewReport, onBack, targetId, targetEmail,
+    user, settings, onViewReport, onResume, onBack, targetId, targetEmail,
     readOnly, title, embedded = false, vipLimits, onUpgrade,
 }) => {
     const { confirm, alert } = useDialog();
@@ -49,11 +49,21 @@ const HistoryList: React.FC<HistoryListProps> = ({
         showEdit, setShowEdit, editTitle, setEditTitle, editDate, setEditDate,
         editDuration, setEditDuration, editNotes, setEditNotes, editExercises,
         openEdit, updateEditExercise, saveEdit,
-        selectedSession, setSelectedSession, openSession,
+        selectedSession, setSelectedSession, openSession, openResume,
         getSessionMeta, updateCardioSession,
     } = actions;
 
     const [selectedCardioSession, setSelectedCardioSession] = useState<WorkoutSummary | null>(null);
+
+    // Retomar treino: confirma e reabre a sessão finalizada como treino ativo
+    // (preservando as séries registradas). Pra quem finalizou sem querer.
+    const handleResumeClick = async (e: React.MouseEvent, session: WorkoutSummary) => {
+        e.stopPropagation();
+        if (!onResume) return;
+        const ok = await confirm('Retomar este treino de onde você parou? As séries já registradas serão mantidas.', 'Retomar treino');
+        if (!ok) return;
+        openResume(session, onResume);
+    };
 
     // ── Period report hook ───────────────────────────────────────────────────
     const report = useHistoryPeriodReport({ historyItems, user, alert });
@@ -290,6 +300,17 @@ const HistoryList: React.FC<HistoryListProps> = ({
                                                                         >
                                                                             <Trash2 size={16} className="pointer-events-none" />
                                                                         </button>
+                                                                        {!isCardio && onResume && (
+                                                                            <button
+                                                                                type="button"
+                                                                                onClick={(e) => handleResumeClick(e, session)}
+                                                                                className="cursor-pointer relative z-20 min-h-[44px] min-w-[44px] flex items-center justify-center rounded-xl transition-colors bg-neutral-950 text-neutral-400 border border-neutral-800 hover:bg-emerald-500/10 hover:text-emerald-400 hover:border-emerald-500/20 active:scale-95"
+                                                                                aria-label="Retomar treino"
+                                                                                title="Retomar de onde parou"
+                                                                            >
+                                                                                <RotateCcw size={16} className="pointer-events-none" />
+                                                                            </button>
+                                                                        )}
                                                                         {!isCardio && (
                                                                             <button
                                                                                 type="button"

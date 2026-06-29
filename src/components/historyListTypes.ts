@@ -98,6 +98,8 @@ export interface HistoryListProps {
     user: { id: string; email?: string; displayName?: string; name?: string; role?: string } | null;
     settings?: Record<string, unknown>;
     onViewReport?: (session: unknown) => void;
+    /** Retomar um treino finalizado como treino ativo (preservando as séries registradas). */
+    onResume?: (payload: { title: string; exercises: unknown[]; logs: Record<string, unknown> }) => void;
     onBack?: () => void;
     targetId?: string;
     targetEmail?: string;
