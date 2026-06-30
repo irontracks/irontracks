@@ -196,7 +196,13 @@ export class VideoCompositor {
         if (!AudioCtxCtor) throw new Error('AudioContext not available')
         this.audioCtx = new AudioCtxCtor();
         if (this.audioCtx.state === 'suspended') {
-            this.audioCtx.resume();
+            // resume() pode rejeitar de forma assíncrona (iOS WKWebView: "Failed to
+            // start the audio device"). Sem .catch() vira unhandledrejection → diálogo
+            // de erro. É best-effort, então engolimos a rejeição.
+            try {
+                const p = this.audioCtx.resume();
+                if (p && typeof p.then === 'function') p.catch(() => { /* best effort */ });
+            } catch { /* best effort */ }
         }
         this.destNode = this.audioCtx.createMediaStreamDestination();
 

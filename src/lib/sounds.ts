@@ -20,6 +20,19 @@ const resolveSoundOpts = (opts: SoundOpts | null | undefined) => {
     return { enabled, volume };
 };
 
+// AudioContext.resume() devolve uma Promise que pode REJEITAR de forma ASSÍNCRONA
+// (iOS WKWebView com a sessão de áudio interrompida → "Failed to start the audio
+// device"). Um try/catch SÍNCRONO não captura essa rejeição: ela vira um
+// unhandledrejection que o ErrorReporterProvider transforma num diálogo de erro
+// no meio do treino. resume é best-effort (é retentado no próximo statechange e
+// no próximo som), então engolimos a rejeição aqui — sync E async.
+const safeResume = (ctx: AudioContext | null | undefined) => {
+    try {
+        const p = ctx?.resume();
+        if (p && typeof p.then === 'function') p.catch(() => { /* best effort */ });
+    } catch { /* best effort: resume AudioContext */ }
+};
+
 const ensureCtx = (opts: SoundOpts | null | undefined): AudioContext | null => {
     if (typeof window === 'undefined') return null;
     const w = window as unknown as { AudioContext?: typeof AudioContext; webkitAudioContext?: typeof AudioContext }
@@ -37,14 +50,12 @@ const ensureCtx = (opts: SoundOpts | null | undefined): AudioContext | null => {
         try {
             __ctx.onstatechange = () => {
                 const s = String(__ctx?.state || '');
-                if (s === 'suspended' || s === 'interrupted') {
-                    try { __ctx?.resume(); } catch { /* best effort */ }
-                }
+                if (s === 'suspended' || s === 'interrupted') safeResume(__ctx);
             };
         } catch { /* ignore */ }
     }
     const st = String(__ctx.state);
-    if (st === 'suspended' || st === 'interrupted') { try { __ctx.resume(); } catch { /* best effort: resume AudioContext */ } }
+    if (st === 'suspended' || st === 'interrupted') safeResume(__ctx);
     return __ctx;
 };
 
@@ -54,12 +65,7 @@ export const unlockAudio = () => {
         const ctx = ensureCtx({ create: true });
         if (!ctx) return;
         if (String(ctx.state) === 'suspended' || String(ctx.state) === 'interrupted') {
-            try {
-                const maybePromise = ctx.resume();
-                if (maybePromise && typeof maybePromise.then === 'function') {
-                    maybePromise.catch(() => { });
-                }
-            } catch { /* best effort: play audio */ }
+            safeResume(ctx);
         }
         try {
             const osc = ctx.createOscillator();
