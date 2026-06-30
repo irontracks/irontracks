@@ -204,6 +204,7 @@ export function useStoryComposer({
         // ── Linhas por exercício pro layout "Treino" — top set (mais pesado) ──
         const workoutRows = (exerciseNames || []).map((name, exIdx) => {
             let bestW = 0, bestReps = 0, bestRpe = 0, performed = false
+            let totalReps = 0 // soma das reps de TODAS as séries = total de execuções do exercício
             Object.entries(logs).forEach(([key, log]) => {
                 if (Number(key.split('-')[0]) !== exIdx) return
                 const obj = log && typeof log === 'object' ? (log as Record<string, unknown>) : null
@@ -211,6 +212,7 @@ export function useStoryComposer({
                 const { weight: w, reps: r } = setTopWeightReps(obj)
                 if (w <= 0 && r <= 0) return
                 performed = true
+                if (r > 0) totalReps += r
                 if (w > bestW || (w === bestW && r > bestReps)) {
                     bestW = w; bestReps = r
                     const rn = Number(String(obj.rpe ?? obj.L_rpe ?? obj.R_rpe ?? '').replace(',', '.'))
@@ -223,8 +225,9 @@ export function useStoryComposer({
                 reps: bestReps > 0 ? String(bestReps) : '—',
                 weight: bestW > 0 ? bestW.toLocaleString('pt-BR') : '—',
                 rpe: bestRpe > 0 ? String(bestRpe) : (rpe ? String(rpe) : '—'),
+                totalReps: totalReps > 0 ? String(totalReps) : '—',
             }
-        }).filter(Boolean) as { name: string; reps: string; weight: string; rpe: string }[]
+        }).filter(Boolean) as { name: string; reps: string; weight: string; rpe: string; totalReps: string }[]
 
         // ── Prefer explicit exec/rest seconds from session ────────────────────
         const execSeconds = Number(s?.executionTotalSeconds ?? s?.execution_total_seconds ?? 0) || 0
