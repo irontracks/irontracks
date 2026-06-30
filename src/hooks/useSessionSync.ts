@@ -144,6 +144,17 @@ export function useSessionSync({
     // Prevents effect #1 from re-running the restore logic if deps change
     // while userId stays the same.
     const restoredForUserRef = useRef<string>('')
+    // Espelha o activeSession atual num ref pra o handler de Realtime (effect #2)
+    // ler sem precisar entrar nas suas deps. É o DISCRIMINADOR DETERMINÍSTICO do
+    // DELETE: o payload de DELETE do Postgres não traz o _deviceId, então não dá
+    // pra saber pelo evento quem deletou. Mas o estado LOCAL resolve: se a sessão
+    // local já é null quando o DELETE chega, foi o PRÓPRIO fim de treino ecoando
+    // de volta (suprime o banner); se ainda há sessão ativa, foi outro device/
+    // professor que finalizou (mostra "Treino finalizado em outro dispositivo").
+    // Substitui a janela de 8s (suppressForeignFinishToastUntilRef), que falhava
+    // com latência do Realtime, background pós-finish, ou DELETE duplicado.
+    const activeSessionRef = useRef(activeSession)
+    useEffect(() => { activeSessionRef.current = activeSession }, [activeSession])
 
     const notifyMigrationWarning = useCallback(() => {
         if (serverSessionSyncWarnedRef.current) return
@@ -293,21 +304,29 @@ export function useSessionSync({
                             if (!mounted) return
                             const ev = String(payload?.eventType || '').toUpperCase()
                             if (ev === 'DELETE') {
-                                if (Date.now() < (suppressForeignFinishToastUntilRef.current || 0)) {
-                                    suppressForeignFinishToastUntilRef.current = 0
-                                    return
-                                }
+                                // Discriminador determinístico (o payload de DELETE não traz
+                                // _deviceId): se ESTE device ainda tinha sessão ativa, o delete
+                                // veio de FORA (outro device/professor finalizou) → avisa. Se a
+                                // sessão local já era null, foi o PRÓPRIO fim de treino ecoando
+                                // de volta → suprime o banner. A janela de 8s vira só reforço
+                                // (cobre cancel/finish disparado milissegundos antes do commit
+                                // local do estado).
+                                const wasForeign = !!activeSessionRef.current
+                                const suppressedByWindow = Date.now() < (suppressForeignFinishToastUntilRef.current || 0)
+                                suppressForeignFinishToastUntilRef.current = 0
                                 setActiveSession(null)
                                 setView((prev: string) => (prev === 'active' ? 'dashboard' : prev))
                                 try { localStorage.removeItem(`irontracks.activeSession.v2.${uid}`) } catch { }
-                                try {
-                                    inAppNotify({
-                                        text: 'Treino finalizado em outro dispositivo.',
-                                        senderName: 'Aviso do Sistema',
-                                        displayName: 'Sistema',
-                                        photoURL: null,
-                                    })
-                                } catch { }
+                                if (wasForeign && !suppressedByWindow) {
+                                    try {
+                                        inAppNotify({
+                                            text: 'Treino finalizado em outro dispositivo.',
+                                            senderName: 'Aviso do Sistema',
+                                            displayName: 'Sistema',
+                                            photoURL: null,
+                                        })
+                                    } catch { }
+                                }
                                 return
                             }
 
@@ -455,12 +474,9 @@ export function useSessionSync({
 
     // 5. Heartbeat auto-save (30s interval)
     // Complements the debounced upsert (#3) by ensuring periodic server-side
-    // snapshots even when React state hasn't changed. Uses a ref to avoid
-    // restarting the interval on every state change. Atualização do .current
-    // dentro de useEffect (não em render) — pattern do React 19 + lint refs.
-    const activeSessionRef = useRef(activeSession)
-    useEffect(() => { activeSessionRef.current = activeSession }, [activeSession])
-
+    // snapshots even when React state hasn't changed. Uses activeSessionRef
+    // (declarado no topo do hook) pra ler o estado sem reiniciar o interval a
+    // cada mudança.
     // Dep boolean nomeado: extraído pra deixar a intenção explícita no array de
     // deps abaixo (antes era `!!activeSession` inline + eslint-disable).
     const hasActiveSession = !!activeSession
