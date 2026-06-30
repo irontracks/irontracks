@@ -27,6 +27,8 @@ export interface WorkoutRow {
     reps: string;
     weight: string;
     rpe: string;
+    /** Total de execuções (soma das reps de todas as séries) do exercício. */
+    totalReps?: string;
 }
 
 export interface Metrics {
@@ -668,12 +670,16 @@ export const drawStory = ({
         ctx.fillText(metrics?.date ? `TREINO DO DIA · ${metrics.date}` : 'TREINO DO DIA', left, dY);
         ctx.letterSpacing = '0px';
 
-        // Footer cards (CALORIAS + VOLUME TOTAL) ancorados no rodapé seguro
+        // Footer cards (TEMPO + CALORIAS + VOLUME TOTAL) ancorados no rodapé seguro
         const footerH = cardH;
         const footerY = safeBottomY - footerH;
-        const fW = Math.floor((right - left - gap) / 2);
-        drawCard({ x: left, y: footerY, w: fW, h: footerH }, { label: 'CALORIAS', value: `${Math.round(Number(metrics?.kcal) || 0)} kcal` });
-        drawCard({ x: left + fW + gap, y: footerY, w: fW, h: footerH }, { label: 'VOLUME TOTAL', value: `${Math.round(Number(metrics?.volume) || 0).toLocaleString('pt-BR')} kg` });
+        const fW = Math.floor((right - left - gap * 2) / 3);
+        const tSecs = Math.max(0, Math.round(Number(metrics?.totalTime) || 0));
+        const tMin = Math.floor(tSecs / 60);
+        const tempoStr = tMin >= 60 ? `${Math.floor(tMin / 60)}h ${String(tMin % 60).padStart(2, '0')}min` : `${tMin}min`;
+        drawCard({ x: left, y: footerY, w: fW, h: footerH }, { label: 'TEMPO', value: tempoStr });
+        drawCard({ x: left + fW + gap, y: footerY, w: fW, h: footerH }, { label: 'CALORIAS', value: `${Math.round(Number(metrics?.kcal) || 0)} kcal` });
+        drawCard({ x: left + (fW + gap) * 2, y: footerY, w: fW, h: footerH }, { label: 'VOLUME TOTAL', value: `${Math.round(Number(metrics?.volume) || 0).toLocaleString('pt-BR')} kg` });
 
         // Cartão da tabela
         const tableTop = dY + 44;
@@ -703,7 +709,7 @@ export const drawStory = ({
         ctx.textAlign = 'right';
         ctx.fillText('REPS', repsR, headY);
         ctx.fillText('PESO', pesoR, headY);
-        ctx.fillText('RPE', rpeR, headY);
+        ctx.fillText('TOTAL', rpeR, headY);
         ctx.letterSpacing = '0px';
 
         // Divisória
@@ -739,7 +745,7 @@ export const drawStory = ({
             ctx.fillText(String(row?.reps ?? '—'), repsR, ry);
             ctx.fillText(String(row?.weight ?? '—'), pesoR, ry);
             ctx.fillStyle = C.cardAccent;
-            ctx.fillText(String(row?.rpe ?? '—'), rpeR, ry);
+            ctx.fillText(String(row?.totalReps ?? row?.rpe ?? '—'), rpeR, ry);
         });
         if (overflow && rows.length > visible.length) {
             ctx.textAlign = 'left';
