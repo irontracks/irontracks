@@ -92,6 +92,15 @@ export default function ErrorReporterProvider({ children }: { children: React.Re
       return;
     }
 
+    // Skip benign Web Audio errors — AudioContext.resume() rejeita ("Failed to
+    // start the audio device" / autoplay sem gesto) quando o iOS WKWebView não
+    // consegue iniciar o áudio naquele instante (sessão interrompida por chamada/
+    // Siri/som nativo). É best-effort (retentado no próximo som) e não é acionável
+    // pelo usuário — não deve abrir diálogo nem ir pro painel de erros.
+    if (/failed to start the audio device|audiocontext was not allowed to start|the request is not allowed by the user agent/i.test(message)) {
+      return;
+    }
+
     const stack = getErrorStack(error);
     const signature = normalizeKey([source, pathname, message, stack?.slice(0, 400)].join('|'));
     if (shouldThrottle(signature)) return;
