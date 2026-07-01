@@ -138,17 +138,10 @@ export async function POST(req: Request) {
         continue
       }
 
-      const { error: iErr } = await admin.from('sets').insert({
-        exercise_id: String(ex.id),
-        set_number: 1,
-        weight: null,
-        reps: null,
-        rpe: null,
-        is_warmup: false,
-        completed: false,
-        advanced_config: { ai_suggestion: suggestion },
-      })
-      if (!iErr) applied += 1
+      // Exercício sem nenhuma série: NÃO fabricar uma série fantasma (set_number 1,
+      // reps null) só pra pendurar a sugestão da IA — isso poluía a contagem de séries
+      // com uma série de reps nulo (parte do bug "séries mudou sozinho"). Sem série
+      // pra anotar, a sugestão é simplesmente ignorada para este exercício.
     }
 
     return NextResponse.json({ ok: true, templateId: targetWorkoutId, applied })
