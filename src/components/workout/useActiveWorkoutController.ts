@@ -180,7 +180,10 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
           for (let setIdx = 0; setIdx < setsCount; setIdx++) {
             const linkedKey = `${exIdx}-${setIdx}`;
             const prev = getLog(linkedKey);
-            const linkedMerged = { ...prev, weight: patchObj.weight };
+            // A série ATUAL recebe o patch COMPLETO (done/reps/set_type/etc); as demais
+            // recebem só o peso. Antes o early-return propagava o peso e DESCARTAVA o
+            // resto do que foi digitado na série atual (a série nem marcava como feita).
+            const linkedMerged = setIdx === sIdx ? { ...prev, ...patchObj } : { ...prev, weight: patchObj.weight };
             propsRef.current.onUpdateLog(linkedKey, linkedMerged);
             logsRef.current = { ...logsRef.current, [linkedKey]: linkedMerged };
           }
@@ -188,7 +191,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
           try {
             const w = String(patchObj.weight ?? '')
             if (broadcastMyLog && w) broadcastMyLog(exIdx, 0, w, String(patchObj.reps ?? getLog(`${exIdx}-0`)?.reps ?? ''))
-          } catch { }
+          } catch (e) { logError('hook:useActiveWorkoutController.broadcastLinked', e) }
           return;
         }
       }
@@ -212,7 +215,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
           const r = String(merged.reps ?? '')
           if (w || r) broadcastMyLog(exIdx, sIdx, w, r)
         }
-      } catch { }
+      } catch (e) { logError('hook:useActiveWorkoutController.broadcastLog', e) }
     } catch (e) { logError('hook:useActiveWorkoutController.updateLog', e) }
   }, [exercises, linkedWeightExercises, broadcastMyLog, getLog]);
 
@@ -240,6 +243,9 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
         if (typeof propsRef.current?.onUpdateLog === 'function') {
           propsRef.current.onUpdateLog(key, merged)
         }
+        // Atualiza a "memória rápida" (logsRef) na hora: sem isso, uma ação local logo
+        // em seguida lia o logsRef velho e sobrescrevia a mudança do parceiro/professor.
+        logsRef.current = { ...logsRef.current, [key]: merged }
       } catch (e) { logError('hook:useActiveWorkoutController.applyPartnerUpdate', e) }
     }
   }, [exerciseControlUpdates, getLog])
@@ -368,7 +374,8 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     organizeSaving, setOrganizeSaving,
     organizeError, setOrganizeError,
     organizeOpen, setOrganizeOpen,
-    organizeDirty, organizeBaseKeysRef: organizeBaseKeysRef as unknown as React.MutableRefObject<string>,
+    organizeDirty, organizeBaseKeysRef,
+    currentExerciseIdx, setCurrentExerciseIdx,
     deleteConfirmIdx, setDeleteConfirmIdx,
     onUpdateSession: (updatedWorkout: UnknownRecord) => {
       props.onUpdateSession?.(updatedWorkout);

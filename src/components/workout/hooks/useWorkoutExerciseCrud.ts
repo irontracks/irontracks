@@ -41,7 +41,9 @@ interface ExerciseCrudDeps {
   organizeOpen: boolean;
   setOrganizeOpen: (v: boolean) => void;
   organizeDirty: boolean;
-  organizeBaseKeysRef: React.MutableRefObject<string>;
+  organizeBaseKeysRef: React.MutableRefObject<string[]>;
+  currentExerciseIdx: number;
+  setCurrentExerciseIdx: (v: number) => void;
   deleteConfirmIdx: number | null;
   setDeleteConfirmIdx: (v: number | null) => void;
   onUpdateSession: ((update: Record<string, unknown>) => void) | undefined;
@@ -68,6 +70,7 @@ export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
     setOrganizeError,
     setOrganizeOpen,
     organizeDirty, organizeBaseKeysRef,
+    currentExerciseIdx, setCurrentExerciseIdx,
     deleteConfirmIdx, setDeleteConfirmIdx,
     onUpdateSession,
     alert, confirm,
@@ -322,7 +325,7 @@ export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
     const draft = buildExerciseDraft(exercises);
     const safeDraft: UnknownRecord[] = Array.isArray(draft) ? (draft as UnknownRecord[]) : [];
     setOrganizeDraft(safeDraft);
-    organizeBaseKeysRef.current = Array.isArray(draftOrderKeys(safeDraft)) ? (draftOrderKeys(safeDraft) as string[]).join(',') : String(draftOrderKeys(safeDraft));
+    organizeBaseKeysRef.current = draftOrderKeys(safeDraft);
     setOrganizeError('');
     setOrganizeOpen(true);
   };
@@ -352,6 +355,23 @@ export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
     setOrganizeError('');
     try {
       const orderedExercises = applyExerciseOrder(exercises, organizeDraft);
+      // Mapa índice-antigo → índice-novo (por IDENTIDADE de objeto: applyExerciseOrder
+      // preserva as referências). Sem remapear, os logs/collapsed/linked ficavam presos
+      // no índice antigo e cada card passava a mostrar o dado de OUTRO exercício.
+      const remap = new Map<number, number>();
+      orderedExercises.forEach((exObj, newIdx) => {
+        const oldIdx = exercises.indexOf(exObj as WorkoutExercise);
+        if (oldIdx >= 0) remap.set(oldIdx, newIdx);
+      });
+      const remapIdx = (i: number) => (remap.has(i) ? (remap.get(i) as number) : i);
+      const nextLogs: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(logs && typeof logs === 'object' ? logs : {})) {
+        const dash = k.indexOf('-');
+        if (dash === -1) { nextLogs[k] = v; continue; }
+        const exI = parseInt(k.slice(0, dash), 10);
+        if (Number.isNaN(exI) || !remap.has(exI)) { nextLogs[k] = v; continue; }
+        nextLogs[`${remap.get(exI)}${k.slice(dash)}`] = v;
+      }
       const payload = { ...workout, exercises: orderedExercises };
       const response = await fetch('/api/workouts/update', {
         method: 'PATCH',
@@ -365,9 +385,12 @@ export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
         return;
       }
       if (typeof onUpdateSession === 'function') {
-        onUpdateSession({ workout: { ...workout, exercises: orderedExercises } });
+        onUpdateSession({ workout: { ...workout, exercises: orderedExercises }, logs: nextLogs });
       }
-      organizeBaseKeysRef.current = Array.isArray(draftOrderKeys(organizeDraft)) ? (draftOrderKeys(organizeDraft) as string[]).join(',') : String(draftOrderKeys(organizeDraft));
+      // collapsed e linked-weights seguem o mesmo remapeamento de índice
+      setCollapsed((prev) => { const n = new Set<number>(); for (const i of prev) n.add(remapIdx(i)); return n; });
+      setLinkedWeightExercises((prev) => { const n = new Set<number>(); for (const i of prev) n.add(remapIdx(i)); return n; });
+      organizeBaseKeysRef.current = draftOrderKeys(organizeDraft);
       setOrganizeOpen(false);
       try {
         await alert('Ordem dos exercícios salva com sucesso.');
@@ -412,6 +435,13 @@ export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
       for (const i of prev) { if (i !== idx) next.add(i > idx ? i - 1 : i); }
       return next;
     });
+
+    // reindexa o exercício atual (rodapé/Ilha Dinâmica) pra seguir o deslocamento —
+    // sem isso, após remover um exercício ANTES do atual, o rodapé apontava pro errado.
+    if (typeof currentExerciseIdx === 'number' && typeof setCurrentExerciseIdx === 'function') {
+      if (currentExerciseIdx > idx) setCurrentExerciseIdx(currentExerciseIdx - 1);
+      else if (currentExerciseIdx === idx) setCurrentExerciseIdx(Math.max(0, Math.min(idx, nextExercises.length - 1)));
+    }
 
     setDeleteConfirmIdx(null);
     onUpdateSession({ workout: { ...workout, exercises: nextExercises }, logs: nextLogs });
