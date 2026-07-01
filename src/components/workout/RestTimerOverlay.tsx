@@ -248,12 +248,27 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
     useEffect(() => {
         if (isFinished) {
             alarmActiveRef.current = true;
+            // Limite do alarme: se "alarme contínuo" está DESLIGADO, o alarme para
+            // sozinho ao atingir o MENOR entre repeatMaxSeconds e (repeatMaxCount ×
+            // intervalo). Antes esses limites eram gravados mas NUNCA lidos → o beep/
+            // vibração tocavam pra SEMPRE (só paravam no toque do usuário ou com o app
+            // em background), ignorando a preferência e drenando bateria.
+            const maxAlarmMs = continuousAlarmRef.current
+                ? Number.POSITIVE_INFINITY
+                : Math.min(
+                    repeatMaxSecondsRef.current * 1000,
+                    repeatMaxCountRef.current * repeatIntervalMs
+                );
+            const alarmStartMs = Date.now();
+            const reachedLimit = () => Date.now() - alarmStartMs >= maxAlarmMs;
+
             if (soundsEnabled) {
                 playTimerFinishSound({ volume: soundVolume, enabled: soundsEnabled });
                 if (repeatAlarm) {
                     if (soundIntervalRef.current) clearInterval(soundIntervalRef.current);
                     soundIntervalRef.current = setInterval(() => {
                         if (!alarmActiveRef.current) return;
+                        if (reachedLimit()) { stopAlarm(false); return; }
                         playTimerFinishSound({ volume: soundVolume, enabled: soundsEnabled });
                     }, repeatIntervalMs);
                 }
@@ -265,6 +280,7 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
                     if (vibrateIntervalRef.current) clearInterval(vibrateIntervalRef.current);
                     vibrateIntervalRef.current = setInterval(() => {
                         if (!alarmActiveRef.current) return;
+                        if (reachedLimit()) { stopAlarm(false); return; }
                         triggerHaptic('warning').catch(() => {});
                     }, repeatIntervalMs);
                 }
