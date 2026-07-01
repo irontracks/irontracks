@@ -11,6 +11,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { getFinishBackup, clearFinishBackup, type FinishBackup } from '@/lib/workoutSafetyNet'
 import { queueFinishWorkout, isOnline } from '@/lib/offline/offlineSync'
 import { logInfo, logError } from '@/lib/logger'
+import * as Sentry from '@sentry/nextjs'
 
 export interface WorkoutRecoveryState {
   backup: FinishBackup | null
@@ -90,10 +91,12 @@ export function useWorkoutRecovery(userId: string | null | undefined): WorkoutRe
         setRecovered(true)
         logInfo('workoutRecovery', 'Workout recovered successfully (offline queue)')
       } catch (queueErr) {
+        Sentry.captureException(queueErr, { tags: { area: 'workout-recovery', phase: 'both-failed' } })
         logError('workoutRecovery', 'Both online and offline recovery failed', queueErr)
         setError('Não foi possível recuperar. Tente novamente mais tarde.')
       }
     } catch (e) {
+      Sentry.captureException(e, { tags: { area: 'workout-recovery', phase: 'unexpected' } })
       setError(String((e as Error)?.message || 'Erro inesperado'))
     } finally {
       setRecovering(false)
