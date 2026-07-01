@@ -48,6 +48,9 @@ export const PlankSetInput: React.FC<Props> = ({ ex, exIdx, setIdx, setsCount })
   const [targetSeconds, setTargetSeconds] = useState(initialDuration)
   const [isRunning, setIsRunning] = useState(false)
   const startedAtRef = useRef<number>(0)
+  // Trava anti-duplo-toque (mesma proteção de ~400ms dos sets normais): dedo
+  // suado / duplo toque não inicia nem para o timer/log duas vezes.
+  const lastToggleRef = useRef<number>(0)
 
   const inputBase =
     'w-full bg-black/40 border border-neutral-700/80 rounded-xl px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500 focus:border-yellow-500/50'
@@ -65,7 +68,9 @@ export const PlankSetInput: React.FC<Props> = ({ ex, exIdx, setIdx, setsCount })
         const firstSetOfNext = document.querySelector<HTMLElement>(`[data-set-first="${exIdx + 1}"]`)
         const nextCard = document.querySelector<HTMLElement>(`[data-exercise-idx="${exIdx + 1}"]`)
         const target = firstSetOfNext ?? nextCard
-        target?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        // 'instant' (nunca 'smooth'): a rolagem suave dispara o zoom automático
+        // travado do iPhone (bug já visto em produção). Igual ao resto do app.
+        target?.scrollIntoView({ behavior: 'instant', block: 'start' })
       } catch { /* silenced */ }
     }, delay)
   }, [setCollapsed, exIdx])
@@ -77,8 +82,13 @@ export const PlankSetInput: React.FC<Props> = ({ ex, exIdx, setIdx, setsCount })
   }, [setsCount, setIdx, collapseAndScroll])
 
   const handleStart = useCallback(() => {
-    const sec = Number(targetSeconds)
-    if (!Number.isFinite(sec) || sec <= 0) return
+    if (Date.now() - lastToggleRef.current < 400) return
+    const raw = Number(targetSeconds)
+    if (!Number.isFinite(raw) || raw <= 0) return
+    // Limita o tempo alvo a 1..3600s: colar um valor absurdo (ex.: "999999")
+    // criava um timer gigante e podia travar a Live Activity no iOS.
+    const sec = Math.min(3600, Math.max(1, Math.round(raw)))
+    lastToggleRef.current = Date.now()
     startedAtRef.current = Date.now()
     setIsRunning(true)
 
@@ -89,7 +99,7 @@ export const PlankSetInput: React.FC<Props> = ({ ex, exIdx, setIdx, setsCount })
       onComplete: () => {
         const nowMs = Date.now()
         updateLog(key, {
-          weight: weight === '' ? null : Number(weight),
+          weight: parseTrainingNumber(weight) ?? null,
           reps: null,
           durationSeconds: sec,
           done: true,
@@ -108,11 +118,13 @@ export const PlankSetInput: React.FC<Props> = ({ ex, exIdx, setIdx, setsCount })
   }, [targetSeconds, startTimer, key, ex, updateLog, weight, restTime, maybeCollapseIfLastSet])
 
   const handleStop = useCallback(() => {
+    if (Date.now() - lastToggleRef.current < 400) return
+    lastToggleRef.current = Date.now()
     const elapsedMs = Date.now() - startedAtRef.current
     const aguentou = Math.max(1, Math.round(elapsedMs / 1000))
     const nowMs = Date.now()
     updateLog(key, {
-      weight: weight === '' ? null : Number(weight),
+      weight: parseTrainingNumber(weight) ?? null,
       reps: null,
       durationSeconds: aguentou,
       done: true,
