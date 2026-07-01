@@ -10,6 +10,17 @@ import {
 } from '@/utils/native/irontracksNative'
 import { isIosNative } from '@/utils/platform'
 
+// Notifica a UI (badge de pendências) que a fila mudou — o hook useOfflineSync
+// ouve 'irontracks.offlineQueueChanged' mas NINGUÉM disparava, então o badge só
+// atualizava no tick de 15s. Guardado p/ SSR/worker (sem window).
+const notifyQueueChanged = () => {
+  try {
+    if (typeof window !== 'undefined' && typeof window.dispatchEvent === 'function') {
+      window.dispatchEvent(new Event('irontracks.offlineQueueChanged'))
+    }
+  } catch { /* best effort */ }
+}
+
 const DB_NAME = 'irontracks'
 const DB_VERSION = 1
 const STORE_KV = 'kv'
@@ -162,6 +173,7 @@ export const queuePut = async (job: unknown): Promise<boolean> => {
       const next = list.filter((x: Record<string, unknown>) => String(x?.id || '') !== id)
       next.push(jobObj)
       window.localStorage.setItem('it.queue.v1', JSON.stringify(next))
+      notifyQueueChanged()
       return true
     } catch {
       return false
@@ -171,6 +183,7 @@ export const queuePut = async (job: unknown): Promise<boolean> => {
   const tx = db.transaction(STORE_QUEUE, 'readwrite')
   tx.objectStore(STORE_QUEUE).put(jobObj)
   await txDone(tx).catch((): null => null)
+  notifyQueueChanged()
   return true
 }
 
@@ -178,12 +191,14 @@ export const queueDelete = async (id: unknown): Promise<boolean> => {
   const key = String(id || '').trim()
   if (!key) return false
 
-  // Remove from native filesystem too
-  nfsDeleteJob(key).catch(() => { /* best effort */ })
+  // Remove from native filesystem too. AWAIT: se soltar sem esperar, uma leitura
+  // seguinte (queueGetAll) podia ver o arquivo ainda lá e "ressuscitar" o job já
+  // concluído → reprocessado → duplicata no banco (iOS nativo).
+  await nfsDeleteJob(key).catch(() => { /* best effort */ })
 
   // Remove from native SQLite3 cache (Feature 16)
   if (isIosNative()) {
-    void nativeQueueDelete(key).catch(() => { /* best effort */ })
+    await nativeQueueDelete(key).catch(() => { /* best effort */ })
   }
 
   if (!hasIndexedDb()) {
@@ -192,6 +207,7 @@ export const queueDelete = async (id: unknown): Promise<boolean> => {
       const list = parseJsonWithSchema(raw, z.array(z.record(z.unknown()))) || []
       const next = list.filter((x: Record<string, unknown>) => String(x?.id || '') !== key)
       window.localStorage.setItem('it.queue.v1', JSON.stringify(next))
+      notifyQueueChanged()
       return true
     } catch {
       return false
@@ -201,6 +217,7 @@ export const queueDelete = async (id: unknown): Promise<boolean> => {
   const tx = db.transaction(STORE_QUEUE, 'readwrite')
   tx.objectStore(STORE_QUEUE).delete(key)
   await txDone(tx).catch((): null => null)
+  notifyQueueChanged()
   return true
 }
 

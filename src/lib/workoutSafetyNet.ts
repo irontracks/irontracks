@@ -70,6 +70,34 @@ export function clearFinishBackup(userId: string): void {
 }
 
 /**
+ * Clear the finish backup that matches a given idempotencyKey. Chamado pela fila
+ * offline quando o job de finalização sincroniza com sucesso, pra remover a
+ * "recuperação fantasma" que apareceria no próximo boot. Varre as chaves de
+ * backup (uma por usuário) e remove a que bate pelo idempotencyKey do payload.
+ */
+export function clearFinishBackupByIdempotencyKey(idempotencyKey: string): void {
+  try {
+    if (!idempotencyKey || typeof localStorage === 'undefined') return
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const key = localStorage.key(i)
+      if (!key || !key.startsWith(BACKUP_KEY_PREFIX)) continue
+      try {
+        const raw = localStorage.getItem(key)
+        if (!raw) continue
+        const backup = JSON.parse(raw) as FinishBackup
+        const idk = (backup?.payload as Record<string, unknown> | undefined)?.idempotencyKey
+        if (idk && String(idk) === String(idempotencyKey)) {
+          localStorage.removeItem(key)
+          logInfo('workoutSafetyNet', 'Finish backup cleared (offline sync confirmed)')
+        }
+      } catch { /* skip corrupted entry */ }
+    }
+  } catch (e) {
+    logWarn('workoutSafetyNet', 'clearFinishBackupByIdempotencyKey failed', e)
+  }
+}
+
+/**
  * Retrieve an orphaned finish backup, if one exists.
  * Returns null if no backup, or if the backup is older than 7 days.
  */
