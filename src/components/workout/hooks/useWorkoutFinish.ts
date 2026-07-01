@@ -22,6 +22,7 @@ import { saveFinishBackup, clearFinishBackup } from '@/lib/workoutSafetyNet'
 import { logWarn } from '@/lib/logger'
 import { endAllRestLiveActivities, triggerHaptic, requestNativeReview } from '@/utils/native/irontracksNative'
 import { apiAi } from '@/lib/api/ai'
+import * as Sentry from '@sentry/nextjs'
 
 interface UseWorkoutFinishProps {
   session: WorkoutSession | null
@@ -81,7 +82,14 @@ export function useWorkoutFinish(props: UseWorkoutFinishProps) {
     if (finishing) return
 
     const startedAtMs = parseStartedAtMs(session?.startedAt)
-    const elapsedSeconds = startedAtMs > 0 ? Math.max(0, Math.floor((Date.now() - startedAtMs) / 1000)) : 0
+    // Tempo total: guarda contra relógio que voltou atrás (negativo → 0) e limita a
+    // 4h. App esquecido aberto (ou morto e restaurado horas depois) não vira mais um
+    // treino de "6h" no histórico. (A subtração exata da pausa depende do timer e fica
+    // pra um passo futuro; o teto já mata a pior distorção.)
+    const MAX_WORKOUT_SECONDS = 4 * 60 * 60
+    let elapsedSeconds = startedAtMs > 0 ? Math.floor((Date.now() - startedAtMs) / 1000) : 0
+    if (!Number.isFinite(elapsedSeconds) || elapsedSeconds < 0) elapsedSeconds = 0
+    if (elapsedSeconds > MAX_WORKOUT_SECONDS) elapsedSeconds = MAX_WORKOUT_SECONDS
 
     // Always show report (removed "Gerar relatório?" dialog per user request)
     const showReport = true
@@ -126,7 +134,14 @@ export function useWorkoutFinish(props: UseWorkoutFinishProps) {
 
       let savedId = null
       if (shouldSaveHistory) {
-        const idempotencyKey = `finish_${workout?.id || 'unknown'}_${Date.now()}_${Math.random().toString(36).slice(2)}`
+        // Chave anti-duplicata ESTÁVEL: derivada de workout + horário de início.
+        // Qualquer nova tentativa de finalizar o MESMO treino (rede caiu após salvar,
+        // app morreu e foi restaurado, dois dispositivos) gera a MESMA chave → o
+        // servidor deduplica em vez de gravar dois treinos. (Antes usava hora+aleatório,
+        // que mudava a cada tentativa e permitia duplicata.) Fallback único só quando
+        // não há horário de início, pra não colar dois treinos distintos por engano.
+        const finishAnchor = startedAtMs > 0 ? String(startedAtMs) : `${Date.now()}_${Math.random().toString(36).slice(2)}`
+        const idempotencyKey = `finish_${workout?.id || 'unknown'}_${finishAnchor}`
         const submission = { session: payload, idempotencyKey }
 
         // ── SAFETY NET: backup BEFORE any save attempt ──
@@ -137,7 +152,6 @@ export function useWorkoutFinish(props: UseWorkoutFinishProps) {
 
         try {
           let onlineSuccess = false
-          let offlineQueued = false
 
           if (isOnline()) {
             try {
@@ -160,6 +174,7 @@ export function useWorkoutFinish(props: UseWorkoutFinishProps) {
               }
             } catch (fetchErr: unknown) {
               if (String(fetchErr).includes('Erro de validação')) throw fetchErr
+              Sentry.captureException(fetchErr, { tags: { area: 'workout-finish', phase: 'online-save' } })
               logWarn('useWorkoutFinish', 'Online save failed, attempting offline queue', fetchErr)
             }
           }
@@ -167,10 +182,10 @@ export function useWorkoutFinish(props: UseWorkoutFinishProps) {
           if (!onlineSuccess) {
             try {
               await queueFinishWorkout(submission)
-              offlineQueued = true
               await alert('Sem conexão estável. Treino salvo na fila e será sincronizado automaticamente.', 'Salvo Offline')
               savedId = 'offline-pending'
             } catch (queueErr) {
+              Sentry.captureException(queueErr, { tags: { area: 'workout-finish', phase: 'offline-queue' } })
               logWarn('useWorkoutFinish', 'IDB queue also failed', queueErr)
               // Both failed — but localStorage backup survives
               await alert(
@@ -181,8 +196,12 @@ export function useWorkoutFinish(props: UseWorkoutFinishProps) {
             }
           }
 
-          // ── SAFETY NET: clear backup only after confirmed save ──
-          if (safeUserId && (onlineSuccess || offlineQueued)) {
+          // ── SAFETY NET: só limpa o backup com confirmação REAL do servidor.
+          // Se foi apenas enfileirado offline, MANTÉM o backup: se o job da fila
+          // falhar depois (token/validação), a recuperação ainda tem o treino. O
+          // re-envio usa a MESMA idempotencyKey → o servidor deduplica (sem duplicata).
+          // (A fila limpa o backup ao sincronizar com sucesso — ver lote offline.)
+          if (safeUserId && onlineSuccess) {
             clearFinishBackup(safeUserId)
           }
 
@@ -195,6 +214,7 @@ export function useWorkoutFinish(props: UseWorkoutFinishProps) {
 
         } catch (e: unknown) {
           const msg = isObject(e) && typeof e.message === 'string' ? e.message : String(e)
+          Sentry.captureException(e, { tags: { area: 'workout-finish', phase: msg.includes('Erro de validação') ? 'validation' : 'critical-save' } })
           if (msg.includes('Erro de validação')) {
             // Validation errors are terminal — clear backup since retries won't help
             const safeUid = String(userId || '').trim()
@@ -236,6 +256,7 @@ export function useWorkoutFinish(props: UseWorkoutFinishProps) {
       } catch { /* swallow */ }
     } catch (e: unknown) {
       const msg = isObject(e) && typeof e.message === 'string' ? e.message : String(e)
+      Sentry.captureException(e, { tags: { area: 'workout-finish', phase: 'finalize' } })
       await alert('Erro ao finalizar: ' + (msg || 'erro inesperado'))
     } finally {
       setFinishing(false)
