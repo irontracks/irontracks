@@ -575,5 +575,19 @@ describe('estimateCaloriesMet', () => {
       expect(restBaixo).toBe(restAlto)
       expect(restBaixo).toBeGreaterThan(0)
     })
+
+    it('exec+descanso reportados acima da duração NÃO inflam as calorias', () => {
+      const logs: Record<string, unknown> = {
+        '0-0': { weight: '80', reps: '10', done: true },
+        '0-1': { weight: '80', reps: '10', done: true },
+      }
+      // Timers do device são independentes: exec 30 + rest 45 = 75 min numa sessão
+      // de 60 min (ex.: descanso contado em background no iOS). O gasto não pode
+      // passar do caso que cabe certinho (exec 30 + rest 30). Antes, o max() sem teto
+      // contava 75 min de trabalho em 60 → calorias infladas.
+      const estoura = estimateCaloriesMet(logs, 60, 78, ['supino'], null, 30, 45)
+      const cabe = estimateCaloriesMet(logs, 60, 78, ['supino'], null, 30, 30)
+      expect(estoura).toBe(cabe)
+    })
   })
 })

@@ -521,19 +521,20 @@ export const estimateCaloriesMet = (
   // while rest kcal (MET 1.5) dominate — severely underestimating total burn.
   const minActiveMinutes = effectiveDuration * 0.40
   const activeMinutes = (() => {
-    if (execMinutesOverride != null && execMinutesOverride > 0)
-      return Math.max(execMinutesOverride, minActiveMinutes)
-    return computeActiveWorkMinutes(sessionLogs, effectiveDuration)
+    const raw = (execMinutesOverride != null && execMinutesOverride > 0)
+      ? Math.max(execMinutesOverride, minActiveMinutes)
+      : computeActiveWorkMinutes(sessionLogs, effectiveDuration)
+    // Ativo nunca passa da duração total (senão active+rest > sessão → kcal inflada).
+    return Math.min(raw, effectiveDuration)
   })()
-  const restMinutes = (() => {
-    if (restMinutesOverride != null && restMinutesOverride >= 0)
-      // O descanso ABSORVE o tempo que sobra depois do ativo (piso no descanso
-      // reportado). Antes travava no valor reportado e deixava um "buraco" na
-      // duração: exec 10 + rest 10 numa sessão de 90 min contava só 46 min, e os
-      // outros 44 davam 0 kcal — subestimando o gasto do treino.
-      return Math.max(restMinutesOverride, Math.max(0, effectiveDuration - activeMinutes))
-    return Math.max(0, effectiveDuration - activeMinutes)
-  })()
+  // O descanso preenche EXATAMENTE o tempo que sobra depois do ativo: nem "buraco"
+  // (tempo sem contar calorias, subestimava) nem estouro (mais minutos que a sessão,
+  // superestimava). Os timers de exec e descanso são medidas independentes do device
+  // e podem somar mais que a duração real (ex.: descanso contado em background no
+  // iOS) — por isso o descanso é o COMPLEMENTO do ativo, não o valor reportado cru.
+  // (restMinutesOverride é mantido na assinatura por compatibilidade com os callers.)
+  void restMinutesOverride
+  const restMinutes = Math.max(0, effectiveDuration - activeMinutes)
 
   // ── 5. Base MET from density ─────────────────────────────────────────────
   const baseMet = selectBaseMet(totalVolume, activeMinutes)
