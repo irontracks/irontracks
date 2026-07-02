@@ -22,6 +22,7 @@ type IronTracksNativePlugin = {
   // Generic app notification
   scheduleAppNotification: (opts: { id?: string; title: string; body: string; delaySeconds?: number }) => Promise<{ id: string }>
   // Alarm sound
+  playAlarmSound: () => Promise<{ played?: boolean }>
   stopAlarmSound: () => Promise<void>
   // Haptics
   triggerHaptic: (opts: { style: HapticStyle }) => Promise<void>
@@ -155,6 +156,7 @@ const webFallback: IronTracksNativePlugin = {
   endRestLiveActivity: async () => { },
   endAllRestLiveActivities: async () => { },
   scheduleAppNotification: async () => ({ id: '' }),
+  playAlarmSound: async () => ({ played: false }),
   stopAlarmSound: async () => { },
   triggerHaptic: async () => { },
   checkBiometricsAvailable: async () => ({ available: false, biometryType: 'none' as const }),
@@ -490,6 +492,16 @@ export const scheduleAppNotification = async (opts: {
 }
 
 // ─── Alarm Sound ─────────────────────────────────────────────────────────────
+
+export const playAlarmSound = async (): Promise<boolean> => {
+  try {
+    if (!isNativePlatform()) return false
+    const res = await Native.playAlarmSound()
+    return !!(res && (res as { played?: boolean }).played)
+  } catch {
+    return false // build sem o método → fallback pro beep in-JS
+  }
+}
 
 export const stopAlarmSound = async () => {
   try {
