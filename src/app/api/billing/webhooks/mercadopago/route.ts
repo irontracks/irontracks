@@ -220,7 +220,7 @@ export async function POST(req: Request) {
                   valid_until: end ? end.toISOString() : null,
                   metadata: { mercadopago: { kind: 'preapproval', subscription_id: providerSubscriptionId, raw: preapproval } },
                 },
-                { onConflict: 'provider,provider_subscription_id' },
+                { onConflict: 'user_id,provider,provider_subscription_id' },
               )
             await admin
               .from('app_subscriptions')
@@ -461,7 +461,10 @@ export async function POST(req: Request) {
                 valid_until: end ? end.toISOString() : null,
                 metadata: { mercadopago: { kind: 'payment', payment_id: dataId, subscription_id: entSubId || null, raw: payment } },
               },
-              { onConflict: 'provider,provider_subscription_id' },
+              // Índice único é (user_id, provider, provider_subscription_id). `payment:${dataId}`
+              // já é único por usuário (id global do pagamento MP), então incluir user_id é
+              // no-op de comportamento e casa com o índice — sem ele o upsert lança 42P10.
+              { onConflict: 'user_id,provider,provider_subscription_id' },
             )
         }
 

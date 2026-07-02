@@ -153,7 +153,7 @@ export async function POST() {
       .maybeSingle()
 
     if (existingEnt?.id) {
-      await admin
+      const { error: entUpdErr } = await admin
         .from('user_entitlements')
         .update({
           plan_id: resolvedPlanId,
@@ -164,8 +164,9 @@ export async function POST() {
           updated_at: new Date().toISOString(),
         })
         .eq('id', existingEnt.id)
+      if (entUpdErr) logError('billing:revenuecat:sync:entitlement-update', entUpdErr, { userId: user.id, productId })
     } else {
-      await admin
+      const { error: entInsErr } = await admin
         .from('user_entitlements')
         .insert({
           user_id: user.id,
@@ -179,6 +180,11 @@ export async function POST() {
           current_period_end: expiresDate,
           metadata: meta,
         })
+      // 23505 = já existe (corrida do MESMO usuário): idempotente. Outro erro era
+      // engolido em silêncio (o VIP não entrava na tabela primária sem ninguém saber).
+      if (entInsErr && (entInsErr as { code?: string }).code !== '23505') {
+        logError('billing:revenuecat:sync:entitlement-insert', entInsErr, { userId: user.id, productId })
+      }
     }
 
     // Invalidate VIP caches so the user sees the new status immediately
