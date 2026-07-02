@@ -390,7 +390,10 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin, CLLocationMana
         let content = UNMutableNotificationContent()
         content.title = title
         content.body = body
-        content.sound = UNNotificationSound.default
+        // Alarme sonoro CUSTOM (~8s) empacotado no app — toca com o app ABERTO
+        // (presentationOptions inclui .sound) E com a tela BLOQUEADA. Substitui o
+        // "ding" fraco do UNNotificationSound.default.
+        content.sound = UNNotificationSound(named: UNNotificationSoundName(rawValue: "rest_alarm.wav"))
         content.categoryIdentifier = "REST_TIMER"
         if #available(iOS 15.0, *) {
             content.interruptionLevel = .timeSensitive
@@ -418,7 +421,7 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin, CLLocationMana
                     let repeatContent = UNMutableNotificationContent()
                     repeatContent.title = title
                     repeatContent.body = body
-                    repeatContent.sound = UNNotificationSound.default
+                    repeatContent.sound = UNNotificationSound(named: UNNotificationSoundName(rawValue: "rest_alarm.wav"))
                     repeatContent.categoryIdentifier = "REST_TIMER"
                     if #available(iOS 15.0, *) {
                         repeatContent.interruptionLevel = .timeSensitive

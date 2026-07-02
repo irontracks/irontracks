@@ -265,7 +265,12 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
             const alarmStartMs = Date.now();
             const reachedLimit = () => Date.now() - alarmStartMs >= maxAlarmMs;
 
-            if (soundsEnabled) {
+            // No app NATIVO o alarme sonoro é a NOTIFICAÇÃO custom (rest_alarm.wav ~8s),
+            // que toca com o app ABERTO (presentationOptions .sound) E BLOQUEADO de forma
+            // confiável. O beep in-JS (Web Audio) competia com ela e morria depois de ~2
+            // no iOS (AudioContext interrompido) — então só roda no WEB. A vibração segue
+            // nos dois (não compete com áudio).
+            if (soundsEnabled && !isNativePlatform()) {
                 playTimerFinishSound({ volume: soundVolume, enabled: soundsEnabled });
                 if (repeatAlarm) {
                     if (soundIntervalRef.current) clearInterval(soundIntervalRef.current);
