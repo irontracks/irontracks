@@ -8,7 +8,18 @@ import { ArrowLeft, Check, Copy, CreditCard, ExternalLink, QrCode, X, Zap, Crown
 import { Purchases, CustomerInfo, PurchasesOfferings, PurchasesPackage } from '@revenuecat/purchases-capacitor'
 import { isIosNative as getIsIosNative } from '@/utils/platform'
 import { getErrorMessage } from '@/utils/errorMessage'
-import { apiBilling } from '@/lib/api'
+import { apiBilling, ApiError } from '@/lib/api'
+import { logError } from '@/lib/logger'
+
+// 402 no_active_entitlement: o backend consultou o RevenueCat e não achou entitlement
+// ativo. Logo após a compra isso costuma ser LAG de propagação (retry resolve); no
+// restore costuma ser assinatura inexistente (mensagem amigável). Detecta pelos dois
+// sinais (status HTTP e mensagem) pra não depender só de um.
+const isNoActiveEntitlement = (e: unknown): boolean => {
+  const status = e instanceof ApiError ? e.status : 0
+  const msg = String(getErrorMessage(e) || '').toLowerCase()
+  return status === 402 || msg.includes('no_active_entitlement')
+}
 
 type AppPlan = {
   id: string
@@ -236,6 +247,8 @@ export default function MarketplaceClient() {
             await Purchases.configure({ apiKey, appUserID: user.id })
             setIapConfigured(true)
           } catch (e: unknown) {
+            // Falha ao configurar o RevenueCat → sem IAP no device → Sentry.
+            logError('marketplace:iap:configure', e)
             setIapConfigured(false)
             setIapError(getErrorMessage(e) ? String(getErrorMessage(e)) : 'Falha ao iniciar compra pela App Store.')
           }
@@ -300,6 +313,8 @@ export default function MarketplaceClient() {
       const { customerInfo } = await Purchases.getCustomerInfo()
       setIapCustomerInfo(customerInfo || null)
     } catch (e: unknown) {
+      // Falha ao carregar offerings/customerInfo do RevenueCat → Sentry.
+      logError('marketplace:iap:load-state', e)
       setIapError(getErrorMessage(e) ? String(getErrorMessage(e)) : 'Falha ao carregar opções da App Store.')
     } finally {
       setIapLoading(false)
@@ -323,15 +338,37 @@ export default function MarketplaceClient() {
     return loose || pkgs[0]
   }, [])
 
-  const syncIapToBackend = useCallback(async () => {
-    try {
-      const json = await apiBilling.syncRevenueCat().catch((e: unknown) => { throw e })
-      if (!json?.ok) throw new Error(String((json as { error?: string })?.error || 'Falha ao validar assinatura.'))
-      return true
-    } catch (e: unknown) {
-      setIapError(getErrorMessage(e) ? String(getErrorMessage(e)) : 'Falha ao validar assinatura.')
-      return false
+  // Valida a assinatura no backend (sync RevenueCat). Após a compra, o RevenueCat pode
+  // levar alguns segundos pra propagar o entitlement, e o sync devolve 402
+  // no_active_entitlement nesse intervalo — por isso `retryOn402` refaz com backoff
+  // (1.2s, 2.4s, 3.6s) pra não deixar o usuário pagar e não virar VIP. Erros inesperados
+  // vão pro Sentry; o 402 (esperado) não polui o Sentry. Retorna `noActiveEntitlement`
+  // pra quem chama decidir a mensagem (ex.: restore sem assinatura).
+  const syncIapToBackend = useCallback(async (opts?: { retryOn402?: boolean }): Promise<{ ok: boolean; noActiveEntitlement: boolean }> => {
+    const maxAttempts = opts?.retryOn402 ? 4 : 1
+    let lastErr: unknown = null
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      try {
+        const json = await apiBilling.syncRevenueCat()
+        if (!json?.ok) throw new Error(String((json as { error?: string })?.error || 'Falha ao validar assinatura.'))
+        return { ok: true, noActiveEntitlement: false }
+      } catch (e: unknown) {
+        lastErr = e
+        if (isNoActiveEntitlement(e) && attempt < maxAttempts) {
+          await new Promise((r) => setTimeout(r, 1200 * attempt))
+          continue
+        }
+        break
+      }
     }
+    const noActive = isNoActiveEntitlement(lastErr)
+    if (!noActive) {
+      // Erro real de billing (rede, 5xx, resposta inválida) → Sentry (CLAUDE.md: erros
+      // de IAP devem ir pro Sentry). O 402 esperado não é reportado.
+      logError('marketplace:iap:sync', lastErr)
+      setIapError(getErrorMessage(lastErr) ? String(getErrorMessage(lastErr)) : 'Falha ao validar assinatura.')
+    }
+    return { ok: false, noActiveEntitlement: noActive }
   }, [])
 
   const startIapPurchase = useCallback(async () => {
@@ -347,10 +384,16 @@ export default function MarketplaceClient() {
       const result = await Purchases.purchasePackage({ aPackage: pkg })
       const info = result?.customerInfo
       if (info) setIapCustomerInfo(info || null)
-      const ok = await syncIapToBackend()
+      // Compra confirmada pela Apple — o entitlement pode levar alguns segundos pra
+      // propagar no RevenueCat, então validamos com retry no 402 (retryOn402).
+      const { ok, noActiveEntitlement } = await syncIapToBackend({ retryOn402: true })
       if (ok) {
         window.alert('Assinatura ativada com sucesso.')
         closeCheckout()
+      } else if (noActiveEntitlement) {
+        // Compra ok, mas o RevenueCat ainda não propagou após os retries. Não é falha
+        // de pagamento — orienta o usuário sem alarmar.
+        setIapError('Compra concluída. A ativação pode levar alguns instantes — se o VIP não aparecer, toque em "Restaurar compras".')
       }
     } catch (e: unknown) {
       const msg = getErrorMessage(e) ? String(getErrorMessage(e)) : String(e || '')
@@ -358,6 +401,8 @@ export default function MarketplaceClient() {
       if (String(eRec.userCancelled || '').toLowerCase() === 'true' || msg.toLowerCase().includes('cancel')) {
         setIapError('Compra cancelada.')
       } else {
+        // Falha real da compra (não cancelamento) → Sentry.
+        logError('marketplace:iap:purchase', e)
         setIapError(msg || 'Falha ao concluir compra.')
       }
     } finally {
@@ -374,9 +419,17 @@ export default function MarketplaceClient() {
     try {
       const { customerInfo } = await Purchases.restorePurchases()
       setIapCustomerInfo(customerInfo || null)
-      const ok = await syncIapToBackend()
-      if (ok) window.alert('Compras restauradas.')
+      // No restore não retry-amos o 402: se não há entitlement, é assinatura inexistente
+      // (não lag de propagação como na compra) → mensagem amigável em vez do erro cru.
+      const { ok, noActiveEntitlement } = await syncIapToBackend()
+      if (ok) {
+        window.alert('Compras restauradas.')
+      } else if (noActiveEntitlement) {
+        setIapError('Nenhuma assinatura ativa encontrada para restaurar.')
+      }
     } catch (e: unknown) {
+      // Falha do restore (rede, plugin) → Sentry.
+      logError('marketplace:iap:restore', e)
       setIapError(getErrorMessage(e) ? String(getErrorMessage(e)) : 'Falha ao restaurar compras.')
     } finally {
       setIapLoading(false)
