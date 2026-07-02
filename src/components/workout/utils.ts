@@ -27,7 +27,6 @@ export const DELOAD_SUGGEST_MODE = 'watermark';
 export const DEFAULT_SUGGESTED_RPE = 8;
 export const AI_SUGGESTION_MIN_HISTORY = 2;
 export const AI_SUGGESTION_TIMEOUT_MS = 8000;
-export const DROPSET_STAGE_LIMIT = 20;
 
 export const isObject = (v: unknown): v is UnknownRecord => v !== null && typeof v === 'object' && !Array.isArray(v);
 
