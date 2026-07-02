@@ -31,12 +31,18 @@ function linearRegression(points: Array<{ x: number; y: number }>) {
     sumXY += p.x * p.y
     sumXX += p.x * p.x
   }
-  const slope = (n * sumXY - sumX * sumY) / (n * sumXX - sumX * sumX)
+  // Denominador zera quando todos os pontos têm o mesmo x (ex.: 3 registros na
+  // MESMA data) → slope viraria NaN, e o guard "slope <= 0" não pega NaN, gerando
+  // "~NaN semanas". Retorna null nesse caso (sem dados pra tendência).
+  const denom = n * sumXX - sumX * sumX
+  if (denom === 0) return null
+  const slope = (n * sumXY - sumX * sumY) / denom
   const intercept = (sumY - slope * sumX) / n
+  if (!Number.isFinite(slope) || !Number.isFinite(intercept)) return null
   return { slope, intercept }
 }
 
-function predictWeeksToTarget(
+export function predictWeeksToTarget(
   history: Array<{ date: string; weight: number }>,
   target: number
 ): { weeks: number; confidence: 'high' | 'medium' | 'low' } | null {
