@@ -219,7 +219,10 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
         if (cancelNative && notifyIdRef.current) {
             cancelRestNotification(notifyIdRef.current);
         }
-        // Stop native background alarm sound
+        // Best-effort: hoje o app NÃO toca um alarme NATIVO em background — o loop de
+        // beep/vibração é in-JS e, com o app em background, o iOS mostra só 1
+        // notificação local. stopAlarmSound() é um no-op nativo reservado pra quando/
+        // se um alarme de background for implementado (precisa de teste em device).
         stopAlarmSound();
     };
 
