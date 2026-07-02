@@ -75,7 +75,9 @@ export function useTeacherControl(
 
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const channelRef = useRef<RealtimeChannel | null>(null)
-  const lastTeacherSaveAtRef = useRef<number>(0)
+  // Guard de staleness usa o updated_at do SERVIDOR (monotônico), não relógio de
+  // cliente — evita comparar relógios de celulares diferentes (skew).
+  const lastSeenUpdatedAtRef = useRef<number>(0)
 
   // Load the student's session on mount / when studentUserId changes
   useEffect(() => {
@@ -136,9 +138,13 @@ export function useTeacherControl(
               const incomingDeviceId = String(state._deviceId ?? '')
               if (incomingDeviceId === TEACHER_DEVICE_ID) return
 
-              // Secondary guard: reject stale echoes
-              const incomingSavedAt = Number(state._savedAt ?? 0)
-              if (incomingSavedAt > 0 && incomingSavedAt <= lastTeacherSaveAtRef.current) return
+              // Secondary guard: rejeita ecos FORA DE ORDEM pelo updated_at do
+              // SERVIDOR (monotônico), não pelo _savedAt do cliente — que dependia de
+              // comparar relógios de celulares diferentes e podia descartar um update
+              // válido do aluno (skew de relógio).
+              const incomingUpdatedAt = new Date(String(rowNew?.updated_at ?? 0)).getTime()
+              if (incomingUpdatedAt > 0 && incomingUpdatedAt <= lastSeenUpdatedAtRef.current) return
+              if (incomingUpdatedAt > 0) lastSeenUpdatedAtRef.current = incomingUpdatedAt
 
               setSession(state as unknown as ActiveWorkoutSession)
             } catch (e) { logError('useTeacherControl.realtimeHandler', e) }
@@ -173,9 +179,7 @@ export function useTeacherControl(
         headers: { 'Content-Type': 'application/json', ...headers },
         body: JSON.stringify({ state: patchedState }),
       })
-      if (res.ok) {
-        lastTeacherSaveAtRef.current = savedAt
-      } else if (res.status === 404) {
+      if (!res.ok && res.status === 404) {
         // Student finished the workout — signal modal to close
         setSessionEnded(true)
       }
@@ -259,9 +263,6 @@ export function useTeacherControl(
           // Fire e esquece — o request continua via keepalive mesmo se a
           // página for descarregada. Erros aqui são best-effort.
           fetch(`/api/teacher/student-session/${sid}`, init)
-            .then((res) => {
-              if (res.ok) lastTeacherSaveAtRef.current = savedAt
-            })
             .catch(() => { /* page may already be gone */ })
         } catch (e) {
           logWarn('useTeacherControl.flushImmediate', 'flush failed', { error: String(e) })
