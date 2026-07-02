@@ -72,3 +72,19 @@ export const setTopWeightReps = (log: unknown): { weight: number; reps: number }
   const reps = parseRepsValue(log.reps) || parseRepsValue(log.L_reps) || parseRepsValue(log.R_reps)
   return { weight, reps }
 }
+
+/**
+ * True se a série CONTA para estatísticas: foi feita (done) E não é aquecimento
+ * nem feeler. Mesma regra do relatório de finalização (reportMetrics), pra o card
+ * "Resumo" do histórico não superestimar o volume contando aquecimento.
+ */
+export const isWorkingSet = (log: unknown): boolean => {
+  if (!isRec(log)) return false
+  const doneRaw = log.done ?? log.isDone ?? log.completed ?? null
+  const done = doneRaw == null ? true : doneRaw === true || String(doneRaw ?? '').toLowerCase() === 'true'
+  if (!done) return false
+  const rawType = log.set_type ?? log.setType
+  if (rawType === 'warmup' || rawType === 'feeler') return false
+  if (!rawType && (log.is_warmup || log.isWarmup)) return false
+  return true
+}
