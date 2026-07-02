@@ -411,8 +411,9 @@ export const queueDeleteWorkout = async (payload: Record<string, unknown>) => {
 // ─── Nutrition Job Processors ─────────────────────────────────────────────────
 
 /**
- * POST helper para os jobs de nutrição: 4xx vira erro terminal (a fila marca
- * `failed` sem retry); 5xx/erro de rede sobe pra retry com backoff.
+ * POST helper para os jobs de nutrição: 4xx de validação/auth vira erro terminal
+ * (a fila marca `failed` sem retry). 408 (timeout), 429 (rate limit), 5xx e erro
+ * de rede são transitórios → sobem pra retry com backoff.
  */
 async function postNutritionJob(url: string, payload: unknown) {
   const response = await fetch(url, {
