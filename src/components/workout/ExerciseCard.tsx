@@ -137,6 +137,8 @@ function ExerciseCardInner({ ex, exIdx, groupPos }: { ex: WorkoutExercise; exIdx
       let sessionMax = 0;
       for (let i = 0; i < setsCount; i++) {
         const log = logsObj[`${exIdx}-${i}`];
+        // Ignora séries de AQUECIMENTO: um aquecimento pesado não é recorde.
+        if (log?.set_type === 'warmup' || log?.is_warmup === true) continue;
         const w = Number(log?.weight ?? log?.total_weight ?? 0);
         if (w > sessionMax) sessionMax = w;
       }
