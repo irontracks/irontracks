@@ -380,10 +380,15 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
                 cancelRestNotification(id).then(() => {
                     requestNativeNotifications().then((res) => {
                         if (!res?.granted) return;
-                        // Only 1 push notification — repeat alerting is handled in-app
-                        // (sound/vibration loop). Scheduling multiple notifications causes
-                        // repeated banners when the app is backgrounded and JS can't cancel them.
-                        scheduleRestNotification(id, seconds, notifyTitle, notifyBody, 0, 0);
+                        // Alarme REPETIDO nativo. Bloqueado/background, o Web Audio (beep
+                        // in-JS) NÃO toca — só a notificação nativa. Sem willPresent, o iOS
+                        // SUPRIME essas notificações no foreground (aí o beep in-JS cobre, sem
+                        // spam de banner); BLOQUEADO, elas tocam com som como alarme. Ao voltar
+                        // pro app, cancelRestNotification cancela os repeats pendentes.
+                        // Respeita a preferência de repetição (repeatAlarm/continuousAlarm).
+                        const nativeRepeatCount = repeatAlarmRef.current ? (continuousAlarmRef.current ? 20 : 6) : 0;
+                        const nativeRepeatEvery = Math.max(3, Math.min(15, Math.round((repeatIntervalMsRef.current || 3000) / 1000) || 3));
+                        scheduleRestNotification(id, seconds, notifyTitle, notifyBody, nativeRepeatCount, nativeRepeatEvery);
                     }).catch(() => { });
                 }).catch(() => { });
             }
