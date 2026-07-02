@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
-import { checkVipFeatureAccess, incrementVipUsage } from '@/utils/vip/limits'
+import { checkVipFeatureAccess } from '@/utils/vip/limits'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { parseJsonBody } from '@/utils/zod'
 import { logInfo, logError } from '@/lib/logger'
@@ -52,19 +52,23 @@ export async function POST(req: Request) {
     const rl = await checkRateLimitAsync(`ai:coach-chat:${userId}:${ip}`, 30, 60_000)
     if (!rl.allowed) return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 })
 
-    const access = await checkVipFeatureAccess(supabase, userId, 'chat_daily')
+    const parsedBody = await parseJsonBody(req, BodySchema)
+    if (parsedBody.response) return parsedBody.response
+    const body = parsedBody.data!
+    const messages = normalizeMessages(body.messages)
+    const context = body.context ?? null
+
+    // Cota consumida ATÔMICA aqui (meter), depois do parse e antes do Gemini: fecha a
+    // janela TOCTOU do antigo check-then-act (que deixava requests paralelos furarem o
+    // limite e queimarem cota de IA paga). Um corpo malformado é rejeitado acima, sem
+    // consumir cota. Consome uma única vez — não há incremento pós-resposta.
+    const access = await checkVipFeatureAccess(supabase, userId, 'chat_daily', { meter: true })
     if (!access.allowed) {
       return NextResponse.json(
         { ok: false, error: 'limit_reached', upgradeRequired: true, message: 'Limite de mensagens atingido. Faça upgrade para continuar.' },
         { status: 403 },
       )
     }
-
-    const parsedBody = await parseJsonBody(req, BodySchema)
-    if (parsedBody.response) return parsedBody.response
-    const body = parsedBody.data!
-    const messages = normalizeMessages(body.messages)
-    const context = body.context ?? null
 
     // Pull a compact summary of the user's last 5 workouts so the coach can
     // answer questions about progression, weights, recent volume, etc.
@@ -184,7 +188,6 @@ export async function POST(req: Request) {
       }
     }
 
-    await incrementVipUsage(supabase, userId, 'chat')
     return NextResponse.json({ ok: true, content: text, workout })
   } catch (e: unknown) {
     return handleGeminiError('coach-chat', e)
