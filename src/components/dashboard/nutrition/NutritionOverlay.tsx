@@ -6,6 +6,7 @@ import NutritionMixer from './NutritionMixer'
 import { SkeletonList } from '@/components/ui/Skeleton'
 import { estimateSessionKcal } from '@/utils/calories/sessionKcal'
 import { getNutritionOverlayCache, setNutritionOverlayCache } from '@/lib/offline/nutritionCache'
+import { calculateNutritionGoals } from '@/lib/nutrition/goals'
 
 type Totals = { calories: number; protein: number; carbs: number; fat: number }
 type Gender = 'MALE' | 'FEMALE'
@@ -14,33 +15,15 @@ type Goal = 'CUT' | 'MAINTAIN' | 'BULK'
 
 const DEFAULT_GOALS: Totals = { calories: 2000, protein: 150, carbs: 200, fat: 60 }
 
-const ACTIVITY_MULTIPLIER: Record<ActivityLevel, number> = {
-  SEDENTARY: 1.2, LIGHT: 1.375, MODERATE: 1.55, VERY_ACTIVE: 1.725, EXTRA_ACTIVE: 1.9,
-}
-const GOAL_CAL_MULT: Record<Goal, number> = { CUT: 0.85, MAINTAIN: 1, BULK: 1.1 }
-const GOAL_SPLIT: Record<Goal, { protein: number; carbs: number; fat: number }> = {
-  CUT: { protein: 0.35, carbs: 0.4, fat: 0.25 },
-  MAINTAIN: { protein: 0.3, carbs: 0.4, fat: 0.3 },
-  BULK: { protein: 0.25, carbs: 0.5, fat: 0.25 },
-}
-
 function safeNumber(value: unknown): number {
   const n = Number(value)
   return Number.isFinite(n) ? n : 0
 }
 
-function computeGoals(weight: number, height: number, age: number, gender: Gender, activityLevel: ActivityLevel, goal: Goal): Totals {
-  const bmr = gender === 'MALE'
-    ? 88.362 + 13.397 * weight + 4.799 * height - 5.677 * age
-    : 447.593 + 9.247 * weight + 3.098 * height - 4.33 * age
-  const tdee = Math.round(bmr * (ACTIVITY_MULTIPLIER[activityLevel] ?? 1.55))
-  const calories = Math.round(tdee * (GOAL_CAL_MULT[goal] ?? 1))
-  const split = GOAL_SPLIT[goal]
-  const protein = Math.max(0, Math.round((calories * split.protein) / 4))
-  const fat = Math.max(0, Math.round((calories * split.fat) / 9))
-  const carbs = Math.max(0, Math.round((calories - protein * 4 - fat * 9) / 4))
-  return { calories, protein, carbs, fat }
-}
+// O cálculo de metas (BMR + TDEE + macros) vive numa fonte ÚNICA no engine
+// (@/lib/nutrition/engine → calculateNutritionGoals). Antes o overlay tinha uma
+// cópia própria com Harris-Benedict + proteína por %, que divergia do resto do
+// app. Agora reusa o engine (Mifflin-St Jeor + proteína g/kg).
 
 function mapFitnessGoal(fg: string | null | undefined): Goal {
   switch (fg) {
@@ -169,8 +152,13 @@ export default function NutritionOverlay({ onClose: _onClose, canViewMacros }: N
             const age = Number(prefs.age)
             const gender = mapGender(prefs.biologicalSex as string)
             if (Number.isFinite(weight) && weight > 0 && Number.isFinite(height) && height > 0 && Number.isFinite(age) && age > 0 && gender) {
-              goals = computeGoals(weight, height, age, gender, mapActivityLevel(prefs.trainingFrequencyPerWeek as number), mapFitnessGoal(prefs.fitnessGoal as string))
-              goalsSource = 'profile'
+              try {
+                goals = calculateNutritionGoals(
+                  { weight, height, age, gender, activityLevel: mapActivityLevel(prefs.trainingFrequencyPerWeek as number) },
+                  mapFitnessGoal(prefs.fitnessGoal as string),
+                )
+                goalsSource = 'profile'
+              } catch { /* entradas inválidas → mantém DEFAULT_GOALS */ }
             }
           }
         }

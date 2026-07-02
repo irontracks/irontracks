@@ -26,15 +26,15 @@ describe('calculateBMR', () => {
   const femaleStats: UserStats = { weight: 60, height: 165, age: 25, gender: 'FEMALE', activityLevel: 'MODERATE' }
 
   it('calculates male BMR correctly (Mifflin-St Jeor)', () => {
-    // 88.362 + 13.397*80 + 4.799*180 - 5.677*30 = 88.362 + 1071.76 + 863.82 - 170.31 = 1853.632
+    // 10*80 + 6.25*180 - 5*30 + 5 = 800 + 1125 - 150 + 5 = 1780
     const bmr = calculateBMR(maleStats)
-    expect(bmr).toBe(1854) // Math.round(1853.632)
+    expect(bmr).toBe(1780)
   })
 
-  it('calculates female BMR correctly', () => {
-    // 447.593 + 9.247*60 + 3.098*165 - 4.33*25 = 447.593 + 554.82 + 511.17 - 108.25 = 1405.333
+  it('calculates female BMR correctly (Mifflin-St Jeor)', () => {
+    // 10*60 + 6.25*165 - 5*25 - 161 = 600 + 1031.25 - 125 - 161 = 1345.25
     const bmr = calculateBMR(femaleStats)
-    expect(bmr).toBe(1405) // Math.round(1405.333)
+    expect(bmr).toBe(1345) // Math.round(1345.25)
   })
 
   it('returns a positive number', () => {
@@ -122,6 +122,18 @@ describe('calculateMacros', () => {
   it('throws on invalid goal', () => {
     expect(() => calculateMacros(2500, 'INVALID' as never)).toThrow('nutrition_invalid_goal')
   })
+
+  it('proteína por g/kg quando o peso é passado (não % das calorias)', () => {
+    // MAINTAIN 2,0 g/kg · CUT 2,2 · BULK 1,8 (independe das calorias)
+    expect(calculateMacros(2500, 'MAINTAIN', 80).protein).toBe(160)
+    expect(calculateMacros(2500, 'CUT', 80).protein).toBe(176)
+    expect(calculateMacros(2500, 'BULK', 80).protein).toBe(144)
+  })
+
+  it('sem peso: cai no % das calorias (compatibilidade)', () => {
+    // MAINTAIN 0,30 × 2500 / 4 = 187,5 → 188
+    expect(calculateMacros(2500, 'MAINTAIN').protein).toBe(188)
+  })
 })
 
 // ── calculateNutritionGoals ────────────────────────────────────
@@ -134,6 +146,11 @@ describe('calculateNutritionGoals', () => {
     expect(goals.protein).toBeGreaterThan(0)
     expect(goals.carbs).toBeGreaterThan(0)
     expect(goals.fat).toBeGreaterThan(0)
+  })
+
+  it('proteína das metas usa g/kg do peso do usuário', () => {
+    // 80 kg × 2,0 (MAINTAIN) = 160 g
+    expect(calculateNutritionGoals(stats, 'MAINTAIN').protein).toBe(160)
   })
 
   it('CUT calories < MAINTAIN calories < BULK calories', () => {
