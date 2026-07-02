@@ -43,6 +43,7 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin, CLLocationMana
         // App notification
         CAPPluginMethod(name: "scheduleAppNotification", returnType: CAPPluginReturnPromise),
         // Alarm sound
+        CAPPluginMethod(name: "playAlarmSound", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "stopAlarmSound", returnType: CAPPluginReturnPromise),
         // Haptics
         CAPPluginMethod(name: "triggerHaptic", returnType: CAPPluginReturnPromise),
@@ -167,6 +168,12 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin, CLLocationMana
     /// Runs independently of JS so the Dynamic Island / Lock Screen update even when
     /// the app is backgrounded and JavaScript execution is throttled by iOS.
     private var autoFinishTask: Task<Void, Never>? = nil
+
+    /// Player do alarme sonoro de fim de descanso, tocado com o app ABERTO
+    /// (foreground), onde a notificação é suprimida e o Web Audio do WKWebView é
+    /// instável. A notificação cobre o bloqueado; este player cobre o foreground de
+    /// forma confiável e é STOPPABLE (corta ao tocar START).
+    private var alarmPlayer: AVAudioPlayer? = nil
 
     /// On plugin load, end any stale Live Activities left from a previous session
     /// (e.g. app was killed while a rest timer was running).
@@ -1258,14 +1265,39 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin, CLLocationMana
 
     // ─── Alarm Sound ───────────────────────────────────────────────────────────
 
-    // No-op INTENCIONAL: hoje NÃO existe um alarme sonoro NATIVO tocando em
-    // background pra ser parado. O loop de beep/vibração do fim de descanso é
-    // in-JS (WebView); com o app em background o iOS emite só 1 notificação local.
-    // Este método fica como ponto de extensão pra quando/se um alarme de background
-    // for implementado (exigiria AVAudioSession + background audio mode + teste em
-    // device físico). Até lá, resolver sem efeito é o comportamento correto.
+    // Toca o alarme sonoro (rest_alarm.wav) via AVAudioPlayer — usado com o app
+    // ABERTO (foreground), onde a notificação é suprimida e o Web Audio do WKWebView
+    // é instável. É STOPPABLE (stopAlarmSound corta na hora, ao tocar START). O
+    // bloqueado é coberto pela notificação (que também usa rest_alarm.wav).
+    @objc func playAlarmSound(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            guard let url = Bundle.main.url(forResource: "rest_alarm", withExtension: "wav") else {
+                call.resolve(["played": false])
+                return
+            }
+            do {
+                // Reforça a sessão .playback (.mixWithOthers pra não silenciar música).
+                try? AVAudioSession.sharedInstance().setCategory(.playback, mode: .default, options: [.mixWithOthers])
+                try? AVAudioSession.sharedInstance().setActive(true)
+                self.alarmPlayer?.stop()
+                let player = try AVAudioPlayer(contentsOf: url)
+                player.numberOfLoops = 0
+                player.prepareToPlay()
+                player.play()
+                self.alarmPlayer = player
+                call.resolve(["played": true])
+            } catch {
+                call.resolve(["played": false])
+            }
+        }
+    }
+
     @objc func stopAlarmSound(_ call: CAPPluginCall) {
-        call.resolve()
+        DispatchQueue.main.async {
+            self.alarmPlayer?.stop()
+            self.alarmPlayer = nil
+            call.resolve()
+        }
     }
 
     // ─── Haptics ───────────────────────────────────────────────────────────────
