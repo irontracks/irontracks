@@ -497,8 +497,12 @@ export function useSessionSync({
                 if (!session) return
                 if (!session.startedAt || !session.workout) return
 
-                // Only upsert if data changed since last heartbeat
-                const hash = (() => { try { return JSON.stringify(session.logs || {}) } catch { return '' } })()
+                // Only upsert if data changed since last heartbeat.
+                // Inclui a ESTRUTURA (workout/exercícios/séries), não só os logs:
+                // adicionar um exercício ou série muda a estrutura sem mexer nos logs,
+                // e o heartbeat pulava essa mudança → outro device/restauração puxava
+                // a versão antiga sem o que foi adicionado (família do "séries sumindo").
+                const hash = (() => { try { return JSON.stringify({ l: session.logs || {}, w: session.workout || {} }) } catch { return '' } })()
                 if (hash === lastHash) return
                 lastHash = hash
 
@@ -537,6 +541,9 @@ export function useSessionSync({
     // 6. Prevent accidental tab close during active workout (beforeunload)
     useEffect(() => {
         if (!activeSession) return
+        // beforeunload não dispara no WKWebView/WebView nativo (não existe "fechar
+        // aba"): registrar lá é inócuo. Só faz sentido no navegador web.
+        if (isIosNative() || isAndroidNative()) return
 
         const handler = (e: BeforeUnloadEvent) => {
             e.preventDefault()
@@ -660,19 +667,32 @@ export function useSessionSync({
         const uid = userId ? String(userId) : ''
         if (!uid) return
 
-        const onResume = () => {
+        const restoreFrom = (parsed: unknown): boolean => {
+            if (!isRecord(parsed) || !parsed.startedAt || !parsed.workout) return false
+            if (activeSessionRef.current) return true // hidratou nesse meio tempo
+            const clean = sanitizeRestoredSession(parsed as Record<string, unknown>)
+            setActiveSession(clean as unknown as ActiveWorkoutSession)
+            setView('active')
+            return true
+        }
+
+        const onResume = async () => {
             if (document.visibilityState !== 'visible') return
             if (activeSessionRef.current) return // sessão já em estado — nada a restaurar
 
             const scopedKey = `irontracks.activeSession.v2.${uid}`
             try {
                 const raw = localStorage.getItem(scopedKey) || localStorage.getItem('activeSession')
-                if (!raw) return
-                const parsed: unknown = parseJsonWithSchema(raw, z.record(z.unknown()))
-                if (!isRecord(parsed) || !parsed.startedAt || !parsed.workout) return
-                const clean = sanitizeRestoredSession(parsed as Record<string, unknown>)
-                setActiveSession(clean as unknown as ActiveWorkoutSession)
-                setView('active')
+                if (raw) {
+                    const parsed: unknown = parseJsonWithSchema(raw, z.record(z.unknown()))
+                    if (restoreFrom(parsed)) return
+                }
+                // Fallback: o iOS descarta o localStorage antes do IDB/FS nativo. Se o
+                // snapshot do localStorage sumiu/evictou, tenta o armazenamento mais
+                // confiável (IDB/FS) — evita "treino sumido" após o WebView ser morto.
+                if (activeSessionRef.current) return
+                const recovered = await recoverActiveSession(uid)
+                restoreFrom(recovered)
             } catch { }
         }
 
