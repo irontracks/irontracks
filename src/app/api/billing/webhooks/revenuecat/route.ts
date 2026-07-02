@@ -317,6 +317,17 @@ export async function POST(request: NextRequest) {
             metadata: meta,
           })
       }
+    } else if (targetStatus === 'active') {
+      // ⚠️ Ativação com plano NÃO reconhecido (SKU novo da Apple antes de ser
+      // mapeado em app_plans): user_entitlements — a tabela PRIMÁRIA de VIP — NÃO
+      // é sincronizada, então o usuário pagou mas pode não virar VIP. Antes isso
+      // passava em silêncio (200 OK). Agora loga (→ Sentry, alertável) pra permitir
+      // grant manual + adicionar o mapeamento do SKU. Não altera a resposta.
+      logError(
+        'webhook:revenuecat:unmapped-plan',
+        new Error('active purchase with unmapped plan — user_entitlements NOT synced'),
+        { userId, productId, eventType },
+      )
     }
 
     // Invalidate VIP caches
