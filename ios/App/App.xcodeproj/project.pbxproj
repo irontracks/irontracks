@@ -30,6 +30,7 @@
 		B588F44A4347B5C1BEB44831 /* IronTracksWatch Watch App.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = ED8BD25E5B0958E7A3CD3698 /* IronTracksWatch Watch App.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		BB1C08C7B06F81EC6C61A1EB /* CheckinView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1774FDD63F12185176BB635F /* CheckinView.swift */; };
 		BBBB0001BBBB0001BBBB0001 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBBB0002BBBB0002BBBB0002 /* SceneDelegate.swift */; };
+		C1E9220281BF27A05CD2915D /* rest_alarm.wav in Resources */ = {isa = PBXBuildFile; fileRef = C02BF2E4C79C7C4727E02F34 /* rest_alarm.wav */; };
 		D020BD329DFEB2BBCC69AE7A /* VipGatePaywallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 651BC0018D7F1DC7967BB96D /* VipGatePaywallView.swift */; };
 		E335CEEE42B6C9C7223A91E6 /* WatchBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B30C6B0FBC688E04227E7D4 /* WatchBridge.swift */; };
 		E445517AABE3AE7D00E1F373 /* HealthKitManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDBD28EEA1B02677FB2632AB /* HealthKitManager.swift */; };
@@ -120,6 +121,7 @@
 		AAAA0001AAAA0001AAAA0001 /* IronTracksNativePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IronTracksNativePlugin.swift; sourceTree = "<group>"; };
 		AAAA0007AAAA0007AAAA0007 /* App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
 		BBBB0002BBBB0002BBBB0002 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
+		C02BF2E4C79C7C4727E02F34 /* rest_alarm.wav */ = {isa = PBXFileReference; includeInIndex = 1; path = rest_alarm.wav; sourceTree = "<group>"; };
 		D4F5306B577DAB4CF49320B7 /* SharedModels.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SharedModels.swift; sourceTree = "<group>"; };
 		D63264B20D182409F2E8EB56 /* WorkoutView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WorkoutView.swift; sourceTree = "<group>"; };
 		DDBD28EEA1B02677FB2632AB /* HealthKitManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = HealthKitManager.swift; sourceTree = "<group>"; };
@@ -230,6 +232,7 @@
 				2FAD9762203C412B000D30F8 /* config.xml */,
 				50B271D01FEDC1A000F3C39B /* public */,
 				3B30C6B0FBC688E04227E7D4 /* WatchBridge.swift */,
+				C02BF2E4C79C7C4727E02F34 /* rest_alarm.wav */,
 			);
 			path = App;
 			sourceTree = "<group>";
@@ -461,6 +464,7 @@
 				17D0776378C2E91F24C7CE68 /* PrivacyInfo.xcprivacy in Resources */,
 				504EC30D1FED79650016851F /* Main.storyboard in Resources */,
 				2FAD9763203C412B000D30F8 /* config.xml in Resources */,
+				C1E9220281BF27A05CD2915D /* rest_alarm.wav in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
