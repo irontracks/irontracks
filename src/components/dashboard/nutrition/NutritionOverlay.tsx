@@ -6,7 +6,7 @@ import NutritionMixer from './NutritionMixer'
 import { SkeletonList } from '@/components/ui/Skeleton'
 import { estimateSessionKcal } from '@/utils/calories/sessionKcal'
 import { getNutritionOverlayCache, setNutritionOverlayCache } from '@/lib/offline/nutritionCache'
-import { calculateNutritionGoals } from '@/lib/nutrition/engine'
+import { calculateNutritionGoals } from '@/lib/nutrition/goals'
 
 type Totals = { calories: number; protein: number; carbs: number; fat: number }
 type Gender = 'MALE' | 'FEMALE'
