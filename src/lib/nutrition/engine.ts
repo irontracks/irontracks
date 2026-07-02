@@ -39,10 +39,12 @@ export function calculateBMR(stats: UserStats): number {
   if (!Number.isFinite(age) || age <= 0) throw new Error('nutrition_invalid_age')
   if (gender !== 'MALE' && gender !== 'FEMALE') throw new Error('nutrition_invalid_gender')
 
+  // Mifflin-St Jeor (padrão atual da literatura; substitui a Harris-Benedict, que
+  // superestimava ~5%). Homem: +5; mulher: −161.
   const bmr =
     gender === 'MALE'
-      ? 88.362 + 13.397 * weight + 4.799 * height - 5.677 * age
-      : 447.593 + 9.247 * weight + 3.098 * height - 4.33 * age
+      ? 10 * weight + 6.25 * height - 5 * age + 5
+      : 10 * weight + 6.25 * height - 5 * age - 161
 
   if (!Number.isFinite(bmr) || bmr <= 0) throw new Error('nutrition_bmr_invalid_result')
   return Math.round(bmr)
@@ -76,11 +78,20 @@ const GOAL_MACRO_SPLIT: Record<Goal, { protein: number; carbs: number; fat: numb
   BULK: { protein: 0.25, carbs: 0.5, fat: 0.25 },
 }
 
+// Proteína-alvo por g/kg de peso (padrão fisiológico 1,6–2,2 g/kg), não por % das
+// calorias — que podia estourar a faixa (ex.: 2,7 g/kg). Mais proteína no corte
+// (preserva massa magra em déficit) e menos no bulk (sobra energia pra carbo).
+const GOAL_PROTEIN_G_PER_KG: Record<Goal, number> = {
+  CUT: 2.2,
+  MAINTAIN: 2.0,
+  BULK: 1.8,
+}
+
 /**
  * Calculates macro targets from a TDEE (or BMR) base and a goal.
  * For accurate results, pass TDEE (not raw BMR) as the first parameter.
  */
-export function calculateMacros(tdee: number, goal: Goal): { protein: number; carbs: number; fat: number } {
+export function calculateMacros(tdee: number, goal: Goal, weightKg?: number | null): { protein: number; carbs: number; fat: number } {
   const baseCalories = Number(tdee)
   if (!Number.isFinite(baseCalories) || baseCalories <= 0) throw new Error('nutrition_invalid_calories')
   if (goal !== 'CUT' && goal !== 'MAINTAIN' && goal !== 'BULK') throw new Error('nutrition_invalid_goal')
@@ -88,7 +99,13 @@ export function calculateMacros(tdee: number, goal: Goal): { protein: number; ca
   const targetCalories = Math.round(baseCalories * (GOAL_CALORIE_MULTIPLIER[goal] ?? 1))
   const split = GOAL_MACRO_SPLIT[goal]
 
-  const protein = Math.max(0, Math.round((targetCalories * split.protein) / CALORIES_PER_GRAM.protein))
+  // Proteína por g/kg (padrão fisiológico) quando o peso está disponível; sem peso
+  // (chamada só com calorias), cai no % das calorias por compatibilidade.
+  const w = Number(weightKg)
+  const protein = (Number.isFinite(w) && w > 0)
+    ? Math.max(0, Math.round(w * GOAL_PROTEIN_G_PER_KG[goal]))
+    : Math.max(0, Math.round((targetCalories * split.protein) / CALORIES_PER_GRAM.protein))
+
   const fat = Math.max(0, Math.round((targetCalories * split.fat) / CALORIES_PER_GRAM.fat))
 
   const remainingCalories = targetCalories - protein * CALORIES_PER_GRAM.protein - fat * CALORIES_PER_GRAM.fat
@@ -106,7 +123,8 @@ export function calculateNutritionGoals(stats: UserStats, goal: Goal): {
 } {
   const tdee = calculateTDEE(stats)
   const targetCalories = Math.round(tdee * (GOAL_CALORIE_MULTIPLIER[goal] ?? 1))
-  const macros = calculateMacros(tdee, goal)
+  // Passa o peso pra proteína ser calculada por g/kg (não % das calorias).
+  const macros = calculateMacros(tdee, goal, stats?.weight)
   return { calories: targetCalories, ...macros }
 }
 

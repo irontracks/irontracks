@@ -11,9 +11,8 @@ describe('Nutrition Engine', () => {
         gender: 'MALE',
         activityLevel: 'MODERATE',
       }
-      // 88.362 + 13.397*80 + 4.799*180 - 5.677*30
-      // 88.362 + 1071.76 + 863.82 - 170.31 = 1853.632 -> 1854
-      expect(calculateBMR(stats)).toBe(1854)
+      // Mifflin-St Jeor: 10*80 + 6.25*180 - 5*30 + 5 = 800 + 1125 - 150 + 5 = 1780
+      expect(calculateBMR(stats)).toBe(1780)
     })
 
     it('should calculate correct BMR for a female', () => {
@@ -24,9 +23,8 @@ describe('Nutrition Engine', () => {
         gender: 'FEMALE',
         activityLevel: 'SEDENTARY',
       }
-      // 447.593 + 9.247*60 + 3.098*165 - 4.33*25
-      // 447.593 + 554.82 + 511.17 - 108.25 = 1405.333 -> 1405
-      expect(calculateBMR(stats)).toBe(1405)
+      // Mifflin-St Jeor: 10*60 + 6.25*165 - 5*25 - 161 = 600 + 1031.25 - 125 - 161 = 1345.25
+      expect(calculateBMR(stats)).toBe(1345)
     })
 
     it('should throw error for invalid inputs', () => {

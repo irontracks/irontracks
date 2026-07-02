@@ -228,7 +228,8 @@ export const classifyBodyFat = (bodyFatPercentage: number, gender: 'M' | 'F', ag
 };
 
 /**
- * Calcula a taxa de metabolismo basal (BMR) - Fórmula de Harris-Benedict
+ * Calcula a taxa de metabolismo basal (BMR) - Fórmula de Mifflin-St Jeor
+ * (padrão atual da literatura; substitui a Harris-Benedict, que superestimava ~5%).
  * @param weight - Peso em kg
  * @param height - Altura em cm
  * @param age - Idade em anos
@@ -240,13 +241,8 @@ export const calculateBMR = (weight: number, height: number, age: number, gender
     throw new Error('Peso, altura e idade devem ser maiores que zero');
   }
 
-  let bmr: number;
-
-  if (gender === 'M') {
-    bmr = 88.362 + (13.397 * weight) + (4.799 * height) - (5.677 * age);
-  } else {
-    bmr = 447.593 + (9.247 * weight) + (3.098 * height) - (4.330 * age);
-  }
+  // Mifflin-St Jeor. Homem: +5; mulher: −161.
+  const bmr = (10 * weight) + (6.25 * height) - (5 * age) + (gender === 'M' ? 5 : -161);
 
   return Math.round(bmr * 100) / 100; // 2 casas decimais
 };
