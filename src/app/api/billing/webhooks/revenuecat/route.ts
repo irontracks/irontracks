@@ -13,7 +13,7 @@ import { env } from '@/utils/env'
 import { insertNotifications } from '@/lib/social/notifyFollowers'
 import { waitUntil } from '@vercel/functions'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
-import { logWarn } from '@/lib/logger'
+import { logWarn, logError } from '@/lib/logger'
 import { respondDbError } from '@/utils/api/dbError'
 
 /**
@@ -345,6 +345,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ ok: true, event: eventType, status: targetStatus })
   } catch (e: unknown) {
+    logError('webhook:revenuecat', e)
     const msg = e instanceof Error ? e.message : String(e)
     return NextResponse.json({ ok: false, error: msg }, { status: 500 })
   }
