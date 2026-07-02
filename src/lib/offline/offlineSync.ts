@@ -1,6 +1,7 @@
 
 import { kvGet, kvSet, queuePut, queueGetAll, queueDelete } from './idb';
 import { logError, logWarn } from '@/lib/logger'
+import { clearFinishBackupByIdempotencyKey } from '@/lib/workoutSafetyNet'
 
 const CACHE_KEY_WORKOUTS = 'offline_workouts_cache';
 
@@ -51,7 +52,11 @@ export const cacheGetWorkouts = async (_opts: unknown = null) => {
 export const getPendingCount = async () => {
   try {
     const all = await queueGetAll();
-    return Array.isArray(all) ? all.length : 0;
+    if (!Array.isArray(all)) return 0;
+    // Conta só jobs ELEGÍVEIS (exclui 'failed'). Antes contava tudo: um job
+    // 'failed' preso deixava o contador > 0 pra sempre e o auto-flush de 15s
+    // disparava eternamente sem fazer nada (dreno de bateria/dados).
+    return all.filter((j) => String((j as OfflineJob)?.status || 'pending') !== 'failed').length;
   } catch {
     return 0;
   }
@@ -138,9 +143,24 @@ export const bumpOfflineJob = async ({ id }: { id: string }) => {
   }
 };
 
-export const flushOfflineQueue = async ({ max: _max = 50, force = false } = {}) => {
-  if (!isOnline() && !force) return { processed: 0, errors: 0 };
+// Mutex de MÓDULO compartilhado por TODOS os callers (hook, tarefa de background
+// do iOS, botão "Sincronizar", finish, recuperação): sem ele, dois flushes
+// simultâneos podiam pegar o MESMO job e enviá-lo duas vezes → duplicata no banco.
+let flushInProgress = false
 
+export const flushOfflineQueue = async (opts: { max?: number; force?: boolean } = {}) => {
+  const { force = false } = opts;
+  if (!isOnline() && !force) return { processed: 0, errors: 0 };
+  if (flushInProgress) return { processed: 0, errors: 0, skipped: true };
+  flushInProgress = true;
+  try {
+    return await runFlushOfflineQueue(opts);
+  } finally {
+    flushInProgress = false;
+  }
+};
+
+const runFlushOfflineQueue = async ({ max: _max = 50, force = false }: { max?: number; force?: boolean } = {}) => {
   let all: unknown = [];
   try {
     all = await queueGetAll();
@@ -154,7 +174,16 @@ export const flushOfflineQueue = async ({ max: _max = 50, force = false } = {}) 
   let errors = 0;
   const now = Date.now();
 
-  for (const jobItem of all) {
+  // Processa na ordem de CRIAÇÃO (não na ordem que o backend devolve — IDB por
+  // chave, iOS por rowid, localStorage por push): garante ex. "criar treino"
+  // ANTES de "editar treino" do mesmo item feito offline.
+  const ordered = [...all].sort((a, b) => {
+    const ta = new Date(String((a as OfflineJob)?.createdAt || 0)).getTime() || 0;
+    const tb = new Date(String((b as OfflineJob)?.createdAt || 0)).getTime() || 0;
+    return ta - tb;
+  });
+
+  for (const jobItem of ordered) {
     const j = jobItem && typeof jobItem === 'object' ? (jobItem as OfflineJob) : ({} as OfflineJob)
     // Check eligibility
     if (!force) {
@@ -256,6 +285,13 @@ async function processFinishWorkout(job: OfflineJob) {
     const errorText = await response.text();
     throw new Error(`API error: ${response.status} - ${errorText}`);
   }
+
+  // Sincronizou com sucesso: limpa o backup local correspondente pra sumir a
+  // "recuperação fantasma" no próximo boot. Casa pelo idempotencyKey do payload.
+  try {
+    const idk = (payload as Record<string, unknown>)?.idempotencyKey;
+    if (typeof idk === 'string' && idk) clearFinishBackupByIdempotencyKey(idk);
+  } catch { /* best effort */ }
 }
 
 // ─── CRUD Job Processors ──────────────────────────────────────────────────────
