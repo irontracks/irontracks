@@ -558,4 +558,22 @@ describe('estimateCaloriesMet', () => {
       expect(estimateCaloriesMet({}, -1)).toBe(0)
     })
   })
+
+  describe('buraco temporal — descanso absorve o tempo residual (item 4)', () => {
+    it('descanso reportado baixo não deixa tempo sem contar calorias', () => {
+      const logs: Record<string, unknown> = {
+        '0-0': { weight: '80', reps: '10', done: true },
+        '0-1': { weight: '80', reps: '10', done: true },
+        '0-2': { weight: '80', reps: '10', done: true },
+      }
+      // Sessão de 90 min, execução reportada = 10 min (ativo trava em 40% = 36 min).
+      // Descanso residual = 90 − 36 = 54 min. Com o fix, tanto rest=10 quanto rest=50
+      // são absorvidos pelos 54 min residuais → MESMO gasto. Antes, rest travava no
+      // valor reportado e deixava um "buraco" (44 de 90 min contando 0 kcal).
+      const restBaixo = estimateCaloriesMet(logs, 90, 78, ['supino'], null, 10, 10)
+      const restAlto = estimateCaloriesMet(logs, 90, 78, ['supino'], null, 10, 50)
+      expect(restBaixo).toBe(restAlto)
+      expect(restBaixo).toBeGreaterThan(0)
+    })
+  })
 })

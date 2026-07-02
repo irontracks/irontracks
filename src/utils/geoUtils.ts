@@ -78,8 +78,11 @@ export function speedKmh(distanceMeters: number, durationSeconds: number): numbe
  */
 export function formatPace(paceMinKm: number | null): string {
   if (paceMinKm === null || !Number.isFinite(paceMinKm) || paceMinKm <= 0) return '--:--'
-  const mins = Math.floor(paceMinKm)
-  const secs = Math.round((paceMinKm - mins) * 60)
+  let mins = Math.floor(paceMinKm)
+  let secs = Math.round((paceMinKm - mins) * 60)
+  // Carry: 59,94 s arredonda pra 60 → mostrava "4:60" (formato impossível).
+  // Sobe pro minuto seguinte: "5:00".
+  if (secs === 60) { secs = 0; mins += 1 }
   return `${mins}:${String(secs).padStart(2, '0')}`
 }
 
