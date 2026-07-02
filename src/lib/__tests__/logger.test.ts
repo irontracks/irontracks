@@ -1,4 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import * as Sentry from '@sentry/nextjs'
+
+vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn() }))
 
 // We test the sanitize logic via the logger's behavior.
 // Since sanitize is not exported, we spy on console methods and check output.
@@ -65,6 +68,44 @@ describe('logger sanitization', () => {
     logError('test', new Error('boom'))
     expect(console.error).toHaveBeenCalled()
     process.env.NODE_ENV = orig
+  })
+})
+
+describe('logError → Sentry', () => {
+  beforeEach(() => {
+    vi.mocked(Sentry.captureException).mockClear()
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+  })
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('reporta o erro ao Sentry com o contexto como tag logContext', async () => {
+    const { logError } = await import('@/lib/logger')
+    const err = new Error('boom')
+    logError('api:test', err)
+    expect(Sentry.captureException).toHaveBeenCalledTimes(1)
+    const [captured, opts] = vi.mocked(Sentry.captureException).mock.calls[0]
+    expect(captured).toBe(err)
+    expect((opts as { tags?: { logContext?: string } })?.tags?.logContext).toBe('api:test')
+  })
+
+  it('valor não-Error vira Error sintético com o contexto na mensagem', async () => {
+    const { logError } = await import('@/lib/logger')
+    logError('api:test', 'falhou feio')
+    const [captured] = vi.mocked(Sentry.captureException).mock.calls[0]
+    expect(captured).toBeInstanceOf(Error)
+    expect((captured as Error).message).toContain('falhou feio')
+    expect((captured as Error).message).toContain('api:test')
+  })
+
+  it('redige dados sensíveis no extra antes de mandar pro Sentry', async () => {
+    const { logError } = await import('@/lib/logger')
+    logError('api:test', new Error('x'), { token: 'abc', userId: '42' })
+    const [, opts] = vi.mocked(Sentry.captureException).mock.calls[0]
+    const detail = (opts as { extra?: { detail?: Record<string, unknown> } })?.extra?.detail
+    expect(detail?.token).toBe('[redacted]')
+    expect(detail?.userId).toBe('42')
   })
 })
 
