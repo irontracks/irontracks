@@ -360,6 +360,14 @@ export function useCardioTracking({
     if (idbDebounceRef.current) clearTimeout(idbDebounceRef.current)
     const capturedUserId = userId
     idbDebounceRef.current = setTimeout(() => {
+      // Guard anti-zumbi: o cleanup do effect NÃO cancela o timer (ver comentário
+      // abaixo), então um timer agendado enquanto corria pode disparar DEPOIS do
+      // stop()+save+clearPersistedCardio(kvSet null) e regravar o cardio já
+      // finalizado por cima do null — ressuscitando a corrida (banner "Retomar?"
+      // fantasma + risco de duplicata no histórico se o usuário retomar e parar).
+      // isTrackingRef continua true durante PAUSE, então persistência legítima de
+      // pausa segue passando. Só o stop real (isTracking=false) bloqueia a escrita.
+      if (!isTrackingRef.current) { idbDebounceRef.current = null; return }
       persistActiveCardio(capturedUserId, {
         trackPoints,
         metrics,
