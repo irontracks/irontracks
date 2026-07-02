@@ -4,7 +4,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { playTimerFinishSound, playTick } from '@/lib/sounds';
 import { isNativePlatform } from '@/utils/platform';
-import { addWidgetStartSetListener, cancelRestNotification, checkPendingWidgetAction, endRestLiveActivity, requestNativeNotifications, scheduleRestNotification, startRestLiveActivity, playAlarmSound, stopAlarmSound, triggerHaptic, updateRestLiveActivity } from '@/utils/native/irontracksNative';
+import { addWidgetStartSetListener, cancelRestNotification, checkPendingWidgetAction, endRestLiveActivity, requestNativeNotifications, scheduleRestNotification, startRestLiveActivity, stopAlarmSound, triggerHaptic, updateRestLiveActivity } from '@/utils/native/irontracksNative';
 import { scheduleRestEndPush as scheduleRestEndPushApi, cancelRestEndPush as cancelRestEndPushApi } from '@/lib/workout/restEndPush';
 
 interface RestTimerContext {
@@ -265,29 +265,21 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
             const alarmStartMs = Date.now();
             const reachedLimit = () => Date.now() - alarmStartMs >= maxAlarmMs;
 
+            // Foreground: beep in-JS (Web Audio). É IMPERFEITO no iOS (o AudioContext
+            // pode interromper e o beep falhar/parar), MAS é transitório e NÃO segura a
+            // sessão de áudio nativa — então NÃO quebra a notificação do BLOQUEADO, que é
+            // o alarme confiável (rest_alarm.wav ~8s). O player nativo (AVAudioPlayer)
+            // dava um foreground melhor, mas interferia na notificação do bloqueado, então
+            // foi desativado (locked > foreground perfeito).
             if (soundsEnabled) {
-                if (isNativePlatform()) {
-                    // App ABERTO: player NATIVO toca o alarme (rest_alarm.wav) de forma
-                    // confiável e é cortado no START (stopAlarm → stopAlarmSound). A
-                    // NOTIFICAÇÃO cobre o bloqueado. O beep in-JS (Web Audio) morria depois
-                    // de ~2 no iOS, então não roda no nativo. Fallback pro beep in-JS só se
-                    // o build ainda não tiver o playAlarmSound nativo.
-                    void playAlarmSound().then((played) => {
-                        if (!played && alarmActiveRef.current) {
-                            playTimerFinishSound({ volume: soundVolume, enabled: soundsEnabled });
-                        }
-                    });
-                } else {
-                    // Web: beep in-JS com loop (não há notificação/player nativo).
-                    playTimerFinishSound({ volume: soundVolume, enabled: soundsEnabled });
-                    if (repeatAlarm) {
-                        if (soundIntervalRef.current) clearInterval(soundIntervalRef.current);
-                        soundIntervalRef.current = setInterval(() => {
-                            if (!alarmActiveRef.current) return;
-                            if (reachedLimit()) { stopAlarm(false); return; }
-                            playTimerFinishSound({ volume: soundVolume, enabled: soundsEnabled });
-                        }, repeatIntervalMs);
-                    }
+                playTimerFinishSound({ volume: soundVolume, enabled: soundsEnabled });
+                if (repeatAlarm) {
+                    if (soundIntervalRef.current) clearInterval(soundIntervalRef.current);
+                    soundIntervalRef.current = setInterval(() => {
+                        if (!alarmActiveRef.current) return;
+                        if (reachedLimit()) { stopAlarm(false); return; }
+                        playTimerFinishSound({ volume: soundVolume, enabled: soundsEnabled });
+                    }, repeatIntervalMs);
                 }
             }
 
