@@ -160,7 +160,7 @@ export const flushOfflineQueue = async (opts: { max?: number; force?: boolean } 
   }
 };
 
-const runFlushOfflineQueue = async ({ max: _max = 50, force = false }: { max?: number; force?: boolean } = {}) => {
+const runFlushOfflineQueue = async ({ max = 50, force = false }: { max?: number; force?: boolean } = {}) => {
   let all: unknown = [];
   try {
     all = await queueGetAll();
@@ -222,22 +222,30 @@ const runFlushOfflineQueue = async ({ max: _max = 50, force = false }: { max?: n
       logError('Failed to process offline job:', j, err);
       errors++;
 
-      // R7#2: 4xx errors are terminal — validation/auth errors never resolve on retry
+      // Terminal = 4xx de validação/auth (nunca resolve no retry). Os processors
+      // marcam esse caso com "Validation error (4xx)". 408/429/5xx/erro de rede NÃO
+      // contêm esse marcador → sobem pro backoff. (Antes um regex /\b4\d{2}\b/ na
+      // mensagem inteira marcava 429/408 como terminais e PERDIA o dado.)
       const errMsg = String((err as Error)?.message || err)
-      const is4xx = /\b4\d{2}\b/.test(errMsg) || errMsg.toLowerCase().includes('validation error')
+      const isTerminal = errMsg.toLowerCase().includes('validation error')
 
       // Update job with failure info
       const attempts = (Number(j.attempts) || 0) + 1
       const nextAttemptAt = now + (1000 * 60 * Math.pow(2, attempts))
       const nextJob: OfflineJob = { ...j, attempts, lastError: errMsg, nextAttemptAt, status: 'pending' }
 
-      if (is4xx || attempts >= (Number(j.maxAttempts) || 7)) {
+      if (isTerminal || attempts >= (Number(j.maxAttempts) || 7)) {
         nextJob.status = 'failed';
       } else {
         nextJob.status = 'pending';
       }
       await queuePut(nextJob);
     }
+
+    // Respeita o limite de lote (`max`, antes ignorado como `_max`): não dispara
+    // TODOS os jobs numa rajada que estoura o rate limit (429). O resto vai no
+    // próximo flush (tick de 15s / evento 'online').
+    if (processed + errors >= max) break;
   }
 
   // After successful sync, invalidate SW API cache so fresh data is fetched
@@ -278,7 +286,9 @@ async function processFinishWorkout(job: OfflineJob) {
 
   if (!response.ok) {
     const status = response.status;
-    if (status >= 400 && status < 500) {
+    // 408 (timeout) e 429 (rate limit) são transitórios → sobem pro backoff (não
+    // terminam o job). Só 4xx de validação/auth é terminal.
+    if (status >= 400 && status < 500 && status !== 408 && status !== 429) {
       const text = await response.text();
       throw new Error(`Validation error (4xx): ${text}`);
     }
@@ -305,7 +315,7 @@ async function processCreateWorkout(job: OfflineJob) {
   })
   if (!response.ok) {
     const text = await response.text()
-    if (response.status >= 400 && response.status < 500) {
+    if (response.status >= 400 && response.status < 500 && response.status !== 408 && response.status !== 429) {
       throw new Error(`Validation error (4xx): ${text}`)
     }
     throw new Error(`API error: ${response.status} - ${text}`)
@@ -321,7 +331,7 @@ async function processUpdateWorkout(job: OfflineJob) {
   })
   if (!response.ok) {
     const text = await response.text()
-    if (response.status >= 400 && response.status < 500) {
+    if (response.status >= 400 && response.status < 500 && response.status !== 408 && response.status !== 429) {
       throw new Error(`Validation error (4xx): ${text}`)
     }
     throw new Error(`API error: ${response.status} - ${text}`)
@@ -338,7 +348,7 @@ async function processDeleteWorkout(job: OfflineJob) {
   })
   if (!response.ok) {
     const text = await response.text()
-    if (response.status >= 400 && response.status < 500) {
+    if (response.status >= 400 && response.status < 500 && response.status !== 408 && response.status !== 429) {
       throw new Error(`Validation error (4xx): ${text}`)
     }
     throw new Error(`API error: ${response.status} - ${text}`)
@@ -412,7 +422,7 @@ async function postNutritionJob(url: string, payload: unknown) {
   })
   if (!response.ok) {
     const text = await response.text()
-    if (response.status >= 400 && response.status < 500) {
+    if (response.status >= 400 && response.status < 500 && response.status !== 408 && response.status !== 429) {
       throw new Error(`Validation error (4xx): ${text}`)
     }
     throw new Error(`API error: ${response.status} - ${text}`)
