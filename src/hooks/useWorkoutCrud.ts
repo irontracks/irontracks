@@ -50,7 +50,6 @@ interface UseWorkoutCrudOptions {
     editActiveAddExerciseRef: React.MutableRefObject<boolean>
     setEditActiveDraft: (draft: Record<string, unknown> | null) => void
     setEditActiveOpen: (open: boolean) => void
-    inAppNotify: (payload: unknown) => void
 }
 
 interface UseWorkoutCrudReturn {
@@ -94,7 +93,6 @@ export function useWorkoutCrud({
     editActiveAddExerciseRef,
     setEditActiveDraft,
     setEditActiveOpen,
-    inAppNotify: _inAppNotify,
 }: UseWorkoutCrudOptions): UseWorkoutCrudReturn {
 
     const handleStartSession = useCallback(async (workout: unknown) => {

@@ -1255,6 +1255,12 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin, CLLocationMana
 
     // ─── Alarm Sound ───────────────────────────────────────────────────────────
 
+    // No-op INTENCIONAL: hoje NÃO existe um alarme sonoro NATIVO tocando em
+    // background pra ser parado. O loop de beep/vibração do fim de descanso é
+    // in-JS (WebView); com o app em background o iOS emite só 1 notificação local.
+    // Este método fica como ponto de extensão pra quando/se um alarme de background
+    // for implementado (exigiria AVAudioSession + background audio mode + teste em
+    // device físico). Até lá, resolver sem efeito é o comportamento correto.
     @objc func stopAlarmSound(_ call: CAPPluginCall) {
         call.resolve()
     }
