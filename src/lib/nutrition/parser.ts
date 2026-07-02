@@ -32,6 +32,29 @@ function buildFoodEntries(extraFoods?: Record<string, FoodItem>) {
   return [...normalizedFoodEntries, ...extras]
 }
 
+// Pesos-por-porção TÍPICOS (g) para alimentos externos (TACO/OFF/aprendidos) que
+// não trazem tabela `approx`. Antes tudo caía num fixo de 50 g — "1 prato" e "1
+// fatia" pesavam igual, errando muito (fatia de pão ~2× a mais, prato ~5× a menos).
+// Continua sendo estimativa (o ideal é o alimento ter `approx`), mas erra bem menos.
+const TYPICAL_GRAMS_PER_UNIT: Record<string, number> = {
+  colher: 15,
+  concha: 80,
+  bife: 100,
+  fatia: 25,
+  pedaco: 50,
+  lata: 150,
+  scoop: 30,
+  xicara: 120,
+  copo: 200,
+  prato: 250,
+  rodela: 20,
+  espiga: 100,
+  posta: 120,
+  medalhao: 80,
+  espetinho: 80,
+  unidade: 50,
+}
+
 type MacroTotals = { p: number; c: number; f: number; kcal: number }
 
 /** A single recognized food line, with its resolved grams and macros. */
@@ -189,7 +212,8 @@ export function analyzeMeal(text: string, extraFoods?: Record<string, FoodItem>)
       if (typeof gramsPerUnit === 'number' && Number.isFinite(gramsPerUnit) && gramsPerUnit > 0) {
         grams = qtd * gramsPerUnit
       } else {
-        grams = qtd * 50
+        // Sem `approx` no alimento: usa o peso típico da unidade em vez de 50 g cego.
+        grams = qtd * (TYPICAL_GRAMS_PER_UNIT[unitUsed] ?? 50)
       }
     } else {
       grams = qtd
