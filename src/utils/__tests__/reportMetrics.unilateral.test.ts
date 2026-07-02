@@ -18,15 +18,30 @@ describe('buildReportMetrics — volume unilateral e cluster', () => {
     expect(m.exercises[0].volumeKg).toBe(1600)
   })
 
-  it('cluster soma os blocks', () => {
+  it('cluster de peso variável usa os blocks (não lastWeight×total do topo)', () => {
+    // Formato REAL do saver: topo weight=lastWeight(80)/reps=total(15) + blocksDetailed
+    // com o peso próprio de cada bloco.
     const session = {
       exercises: [{ name: 'Barra Fixa Cluster', sets: 1 }],
       logs: {
-        '0-0': { cluster: { blocks: [{ weight: '50', reps: '5' }, { weight: '50', reps: '5' }] }, done: true },
+        '0-0': {
+          weight: '80', reps: '15', done: true,
+          cluster: {
+            blocks: [5, 5, 5],
+            blocksDetailed: [
+              { weight: '100', reps: '5' },
+              { weight: '90', reps: '5' },
+              { weight: '80', reps: '5' },
+            ],
+          },
+        },
       },
     }
     const m = buildReportMetrics(session)
-    expect(m.totals.volumeKg).toBe(500)
+    // Soma real dos blocks: 100×5+90×5+80×5 = 1350 (antes dava 80×15=1200)
+    expect(m.totals.volumeKg).toBe(1350)
+    // Melhor bloco: 100×5 → 116,7 (antes dava 80×15 → 120, sem sentido físico)
+    expect(m.exercises[0].bestE1rm).toBe(116.7)
   })
 
   it('aquecimento não entra no volume; série normal entra', () => {
@@ -81,5 +96,23 @@ describe('buildReportMetrics — bestE1rm (máx por série)', () => {
     }
     const m = buildReportMetrics(session)
     expect(m.exercises[0].bestE1rm).toBeNull()
+  })
+
+  it('dropset: bestE1rm usa a etapa mais pesada (não o topo mais leve)', () => {
+    // Saver grava topo weight=última etapa(20)/reps=total(18) + drop_set.stages
+    const session = {
+      exercises: [{ name: 'Rosca Direta', sets: 1 }],
+      logs: {
+        '0-0': {
+          weight: '20', reps: '18', done: true,
+          drop_set: { stages: [{ weight: '30', reps: '10' }, { weight: '20', reps: '8' }] },
+        },
+      },
+    }
+    const m = buildReportMetrics(session)
+    // Volume soma as etapas: 30×10 + 20×8 = 460
+    expect(m.exercises[0].volumeKg).toBe(460)
+    // Melhor etapa 30×10 → 30×(1+10/30) = 40 (o topo 20×18 daria 32, mais baixo)
+    expect(m.exercises[0].bestE1rm).toBe(40)
   })
 })

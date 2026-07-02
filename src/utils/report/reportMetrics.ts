@@ -1,6 +1,6 @@
 
 import type { UnknownRecord } from '@/types/app'
-import { setVolume, setTopWeightReps } from './setVolume'
+import { setVolume, setTopWeightReps, setBestE1rm } from './setVolume'
 
 const isObject = (value: unknown): value is UnknownRecord =>
   value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -30,26 +30,15 @@ const resolvePlannedReps = (exercise: UnknownRecord) => {
   return reps || null
 }
 
-// Epley 1RM: peso × (1 + reps/30). 1 rep = o próprio peso. 0 se inválido.
-const epley1rm = (weight: number, reps: number): number => {
-  if (!(weight > 0) || !(reps > 0)) return 0
-  return reps === 1 ? weight : weight * (1 + reps / 30)
-}
-
 const buildLogVolume = (logs: UnknownRecord, exerciseIndex: number) => {
   let volume = 0
   let sets = 0
   let reps = 0
   let weightSum = 0
   let weightCount = 0
-  // Melhor 1RM estimado do dia = MÁXIMO por série (não média×média). Usado pro
-  // Δ1RM da tabela não ficar falsamente negativo quando a série mais pesada bate
-  // o recorde mas a média puxa pra baixo.
+  // Melhor 1RM estimado do dia = MÁXIMO por série. Mesma fonte única (setBestE1rm)
+  // do baseline histórico, pro Δ1RM comparar maçãs com maçãs.
   let bestE1rm = 0
-  const trackE1rm = (w: number, r: number) => {
-    const e = epley1rm(w, r)
-    if (e > bestE1rm) bestE1rm = e
-  }
   Object.entries(logs).forEach(([key, value]) => {
     const parts = String(key || '').split('-')
     const eIdx = Number(parts[0])
@@ -64,6 +53,26 @@ const buildLogVolume = (logs: UnknownRecord, exerciseIndex: number) => {
     if (rawType === 'warmup' || rawType === 'feeler') return
     if (!rawType && (value.is_warmup || value.isWarmup)) return
 
+    // 1RM do dia — fonte única (trata dropset/cluster/unilateral/normal/reps===1)
+    const e1 = setBestE1rm(value)
+    if (e1 > bestE1rm) bestE1rm = e1
+
+    // ── Cluster: soma os blocks (blocksDetailed), não lastWeight×total do topo ──
+    // O saver grava weight=lastWeight/reps=total no topo, que enganaria o cálculo
+    // normal (volume = lastWeight×total). setVolume soma o peso próprio de cada bloco
+    // (igual ao histórico e à tendência semanal).
+    if (isObject(value.cluster)) {
+      const cv = setVolume(value)
+      if (cv > 0) {
+        volume += cv
+        const cTop = setTopWeightReps(value)
+        if (cTop.reps > 0) reps += cTop.reps
+        if (cTop.weight > 0) { weightSum += cTop.weight; weightCount += 1 }
+      }
+      sets += 1
+      return
+    }
+
     // ── Drop-set: sum each stage's volume; use first-stage (main) weight as avg ──
     const dropSet = isObject(value.drop_set) ? (value.drop_set as UnknownRecord) : null
     const dropStages = dropSet && Array.isArray(dropSet.stages) ? (dropSet.stages as unknown[]) : []
@@ -71,7 +80,6 @@ const buildLogVolume = (logs: UnknownRecord, exerciseIndex: number) => {
       let dropVol = 0
       let totalReps = 0
       let firstWeight: number | null = null
-      let firstReps = 0
       for (const stage of dropStages) {
         if (!isObject(stage)) continue
         const sw = toNumber((stage as UnknownRecord).weight)
@@ -79,12 +87,12 @@ const buildLogVolume = (logs: UnknownRecord, exerciseIndex: number) => {
         if (sw > 0 && sr > 0) {
           dropVol += sw * sr
           totalReps += sr
-          if (firstWeight === null) { firstWeight = sw; firstReps = sr }
+          if (firstWeight === null) firstWeight = sw
         }
       }
       if (totalReps > 0) reps += totalReps
       if (dropVol > 0) volume += dropVol
-      if (firstWeight !== null) { weightSum += firstWeight; weightCount += 1; trackE1rm(firstWeight, firstReps) }
+      if (firstWeight !== null) { weightSum += firstWeight; weightCount += 1 }
       sets += 1
       return
     }
@@ -99,21 +107,17 @@ const buildLogVolume = (logs: UnknownRecord, exerciseIndex: number) => {
       reps += repsVal
       weightSum += weight
       weightCount += 1
-      if (durationSec === 0) trackE1rm(weight, repsVal) // prancha (duração) não tem 1RM
     } else if (repsVal > 0) {
       reps += repsVal
     } else {
-      // Unilateral (L_weight/R_weight) e cluster (blocks) NÃO gravam weight/reps no
-      // topo do log → caíam aqui com volume 0. Usa a fonte única setVolume/
-      // setTopWeightReps (a mesma do card "Volume total" e do histórico), que soma
-      // L+R e os blocks. Sem isso, o volume salvo/densidade zeravam nesses exercícios.
+      // Unilateral (L_weight/R_weight) NÃO grava weight/reps no topo → caía aqui com
+      // volume 0. Usa a fonte única setVolume/setTopWeightReps (soma L+R).
       const uniVol = setVolume(value)
       if (uniVol > 0) {
         volume += uniVol
         const top = setTopWeightReps(value)
         if (top.weight > 0) { weightSum += top.weight; weightCount += 1 }
         if (top.reps > 0) reps += top.reps
-        trackE1rm(top.weight, top.reps)
       }
     }
     sets += 1
