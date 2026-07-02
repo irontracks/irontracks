@@ -17,7 +17,7 @@ import { createClient } from '@/utils/supabase/client'
 import { getKcalEstimate } from '@/utils/calories/kcalClient'
 import { normalizeExerciseKey, calculateTotalVolume } from '@/utils/report/formatters'
 import { isSetCompleted } from '@/utils/report/setCompletion'
-import { setTopWeightReps } from '@/utils/report/setVolume'
+import { setBestE1rm, isWorkingSet } from '@/utils/report/setVolume'
 import { estimateCaloriesMet, getBodyweightFraction, DEFAULT_BODY_WEIGHT_KG } from '@/utils/calories/metEstimate'
 import { useCheckins } from './useCheckins'
 import { usePreviousSessionData } from './usePreviousSessionData'
@@ -563,24 +563,27 @@ export const useReportData = ({ session, previousSession, user, settings }: UseR
           const log = sessionLogs[key]
           if (!log || typeof log !== 'object') continue
           const logObj = log as AnyObj
-          // setTopWeightReps pega o lado (L/R) dos exercícios unilaterais — antes
-          // lia só weight/reps do topo e o PR/1RM sumia nesses exercícios.
-          const { weight: cw, reps: cr } = setTopWeightReps(logObj)
-          const curE1rm = (cw > 0 && cr > 0) ? cw * (1 + cr / 30) : 0
+          // Ignora aquecimento/feeler — MESMA regra do relatório do dia e do baseline
+          // histórico. Sem isso, um aquecimento pesado (single acima da série de
+          // trabalho) inflava bestCurE1rm e disparava PR all-time FALSO, já que o
+          // histórico (getHistoricalBestE1rm) filtra aquecimento e o atual não.
+          if (!isWorkingSet(logObj)) continue
+          // setBestE1rm = mesma fonte única (trata dropset/cluster/unilateral/reps===1)
+          const curE1rm = setBestE1rm(logObj)
           if (curE1rm > bestCurE1rm) bestCurE1rm = curE1rm
 
           const prevLog = prevExLogs[sIdx]
-          if (prevLog && typeof prevLog === 'object') {
-            const pObj = prevLog as AnyObj
-            const { weight: pw, reps: pr } = setTopWeightReps(pObj)
-            const prevE1rm = (pw > 0 && pr > 0) ? pw * (1 + pr / 30) : 0
+          if (prevLog && typeof prevLog === 'object' && isWorkingSet(prevLog)) {
+            const prevE1rm = setBestE1rm(prevLog)
             if (prevE1rm > bestPrevE1rm) bestPrevE1rm = prevE1rm
           }
         }
 
         if (bestCurE1rm > 0 && bestCurE1rm > bestPrevE1rm) {
           const allTimeBest = historicalBestE1rm[normalizedKey] ?? 0
-          const isAllTimePr = bestCurE1rm > allTimeBest
+          // historicalBestE1rm vem arredondado a 1 casa (getHistoricalBestE1rm) —
+          // arredonda o do dia igual pra não disparar PR all-time por ruído.
+          const isAllTimePr = Math.round(bestCurE1rm * 10) / 10 > allTimeBest
           prs.push({ exerciseName: exName, e1rm: bestCurE1rm, prevE1rm: bestPrevE1rm, isAllTimePr })
         }
       })

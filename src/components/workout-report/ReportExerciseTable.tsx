@@ -83,9 +83,10 @@ export function ReportExerciseTable({ exercises, historicalBestE1rm }: ReportExe
                       const key = String(name || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/\s+/g, ' ').trim()
                       const hist = historicalBestE1rm[key]
                       if (!hist || hist <= 0) return '—'
-                      const avgW = Number(ex.avgWeightKg || 0)
-                      const avgR = Number(ex.repsDone || 0) / Math.max(1, Number(ex.setsDone || 1))
-                      const curE1rm = avgW > 0 && avgR > 0 ? avgW * (1 + avgR / 30) : 0
+                      // 1RM do dia = melhor SÉRIE (máx por set, vindo do reportMetrics),
+                      // não média×média — senão o Δ fica falsamente negativo quando a
+                      // série mais pesada iguala/bate o recorde mas a média puxa pra baixo.
+                      const curE1rm = Number(ex.bestE1rm || 0)
                       if (curE1rm <= 0) return '—'
                       const delta = curE1rm - hist
                       if (!Number.isFinite(delta)) return '—'

@@ -88,3 +88,46 @@ export const isWorkingSet = (log: unknown): boolean => {
   if (!rawType && (log.is_warmup || log.isWarmup)) return false
   return true
 }
+
+/** Epley 1RM: peso × (1 + reps/30). 1 rep = o próprio peso. 0 se inválido. */
+export const epley1rm = (weight: number, reps: number): number => {
+  if (!(weight > 0) || !(reps > 0)) return 0
+  return reps === 1 ? weight : weight * (1 + reps / 30)
+}
+
+/**
+ * Melhor 1RM estimado de UMA série (Epley), tratando os formatos especiais:
+ *   - dropset: melhor etapa (stages)
+ *   - cluster: melhor bloco (blocksDetailed, com o peso próprio de cada bloco)
+ *   - unilateral: o lado com carga (setTopWeightReps)
+ *   - normal: weight/reps do topo
+ *
+ * Fonte ÚNICA usada pelo relatório (dia) E pelo baseline histórico
+ * (getHistoricalBestE1rm), pra o Δ1RM comparar maçãs com maçãs — sem isso, cada
+ * lado usava uma regra e o Δ ficava falso (dropset, unilateral, singles).
+ */
+export const setBestE1rm = (log: unknown): number => {
+  if (!isRec(log)) return 0
+  let best = 0
+  const bump = (w: number, r: number) => { const e = epley1rm(w, r); if (e > best) best = e }
+  // dropset: melhor etapa (o topo grava a etapa mais leve × total de reps → enganoso)
+  const drop = isRec(log.drop_set) ? log.drop_set : null
+  const stages = drop && Array.isArray(drop.stages) ? drop.stages : null
+  if (stages && stages.length > 0) {
+    for (const s of stages) if (isRec(s)) bump(parseWeightValue(s.weight), parseRepsValue(s.reps))
+    if (best > 0) return best
+  }
+  // cluster: melhor bloco (blocksDetailed tem o peso próprio de cada bloco)
+  const cl = isRec(log.cluster) ? log.cluster : null
+  const blocks = cl
+    ? (Array.isArray(cl.blocksDetailed) ? cl.blocksDetailed : Array.isArray(cl.blocks) ? cl.blocks : null)
+    : null
+  if (blocks && blocks.length > 0) {
+    for (const b of blocks) if (isRec(b)) bump(parseWeightValue(b.weight), parseRepsValue(b.reps))
+    if (best > 0) return best
+  }
+  // unilateral / normal
+  const { weight, reps } = setTopWeightReps(log)
+  bump(weight, reps)
+  return best
+}
