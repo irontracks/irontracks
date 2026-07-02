@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { calculateBMI, classifyBMI, calculateBodyFatPercentage, calculateBodyDensity } from '../bodyComposition'
+import { calculateBMI, classifyBMI, calculateBodyFatPercentage, calculateBodyDensity, combinedBodyFat } from '../bodyComposition'
 
 describe('Body Composition Calculations', () => {
   describe('calculateBMI', () => {
@@ -62,6 +62,25 @@ describe('Body Composition Calculations', () => {
       // 471.42857 - 450 = 21.42857
       const fat = calculateBodyFatPercentage(1.05)
       expect(fat).toBeCloseTo(21.429, 3)
+    })
+  })
+
+  describe('combinedBodyFat — trava fisiológica do blend (3–60%)', () => {
+    it('média simples quando ambos plausíveis', () => {
+      expect(combinedBodyFat(20, 18)).toBe(19)
+    })
+    it('BIA absurdo (90%, erro de vírgula) é descartado — usa só as dobras', () => {
+      expect(combinedBodyFat(20, 90)).toBe(20)
+    })
+    it('BIA zerado por engano não puxa a média pela metade', () => {
+      expect(combinedBodyFat(25, 0)).toBe(25)
+    })
+    it('só BIA plausível → usa BIA', () => {
+      expect(combinedBodyFat(null, 22)).toBe(22)
+    })
+    it('nenhum plausível → null', () => {
+      expect(combinedBodyFat(null, 200)).toBeNull()
+      expect(combinedBodyFat(1, 90)).toBeNull()
     })
   })
 })
