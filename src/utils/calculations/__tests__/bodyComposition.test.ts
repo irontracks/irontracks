@@ -65,12 +65,20 @@ describe('Body Composition Calculations', () => {
     })
   })
 
-  describe('combinedBodyFat — trava fisiológica do blend (3–60%)', () => {
+  describe('combinedBodyFat — trava fisiológica do blend (3–75%)', () => {
     it('média simples quando ambos plausíveis', () => {
       expect(combinedBodyFat(20, 18)).toBe(19)
     })
     it('BIA absurdo (90%, erro de vírgula) é descartado — usa só as dobras', () => {
       expect(combinedBodyFat(20, 90)).toBe(20)
+    })
+    it('obesidade extrema real (BIA 62%) ENTRA na média — não é perda de dado', () => {
+      expect(combinedBodyFat(20, 62)).toBe(41)
+      expect(combinedBodyFat(null, 62)).toBe(62)
+    })
+    it('acima de 75% (erro claro) é descartado', () => {
+      expect(combinedBodyFat(30, 76)).toBe(30)
+      expect(combinedBodyFat(null, 80)).toBeNull()
     })
     it('BIA zerado por engano não puxa a média pela metade', () => {
       expect(combinedBodyFat(25, 0)).toBe(25)
