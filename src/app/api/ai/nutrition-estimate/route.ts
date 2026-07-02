@@ -37,14 +37,28 @@ export async function POST(req: Request) {
     const rl = await checkRateLimitAsync(`ai:nutrition-estimate:${userId}:${ip}`, 10, 60_000)
     if (!rl.allowed) return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 })
 
+    const parsedBody = await parseJsonBody(req, BodySchema)
+    if (parsedBody.response) return parsedBody.response
+    const { text, dateKey, mealName, clientId } = parsedBody.data!
+
+    // Idempotência: se a fila offline já lançou ESTA refeição (mesmo clientId), NÃO
+    // re-chama o Gemini nem re-mete a cota — devolve a linha existente. O retry só
+    // ocorre quando a resposta HTTP se perdeu após o commit (rede móvel instável).
+    const cid = typeof clientId === 'string' && clientId.trim() ? clientId.trim().slice(0, 64) : null
+    if (cid) {
+      const { data: existing } = await supabase
+        .from('nutrition_meal_entries')
+        .select('id, created_at, food_name, calories, protein, carbs, fat, items')
+        .eq('user_id', userId)
+        .eq('client_id', cid)
+        .maybeSingle()
+      if (existing) return NextResponse.json({ ok: true, row: existing, idempotent: true })
+    }
+
     const access = await checkVipFeatureAccess(supabase, userId, 'nutrition_macros', { meter: true })
     if (!access.allowed) {
       return NextResponse.json({ ok: false, error: 'vip_required', upgradeRequired: true }, { status: 403 })
     }
-
-    const parsedBody = await parseJsonBody(req, BodySchema)
-    if (parsedBody.response) return parsedBody.response
-    const { text, dateKey, mealName, clientId } = parsedBody.data!
 
     const apiKey = env.gemini.apiKey
     if (!apiKey) return NextResponse.json({ ok: false, error: 'ai_not_configured' }, { status: 500 })
