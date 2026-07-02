@@ -567,7 +567,7 @@ export default function NutritionMixer({
         }
         const next = [newEntry, ...(Array.isArray(entries) ? entries : [])].slice(0, 30)
         setEntries(next); setTotals(sumTotals(next)); cacheDay(next)
-        void queueNutritionLog(cid, { foodName, calories: a.meal.calories, protein: a.meal.protein, carbs: a.meal.carbs, fat: a.meal.fat, items, dateKey: currentDateKey }, false)
+        void queueNutritionLog(cid, { foodName, calories: a.meal.calories, protein: a.meal.protein, carbs: a.meal.carbs, fat: a.meal.fat, items, dateKey: currentDateKey, clientId: cid }, false)
         setInput(''); setMealName('')
       } else {
         // Fora da base local: fica pendente sem macros; a IA calcula no sync.
@@ -578,7 +578,7 @@ export default function NutritionMixer({
         }
         const next = [newEntry, ...(Array.isArray(entries) ? entries : [])].slice(0, 30)
         setEntries(next); cacheDay(next)
-        void queueNutritionLog(cid, { text, dateKey: currentDateKey, mealName: customName || undefined }, true)
+        void queueNutritionLog(cid, { text, dateKey: currentDateKey, mealName: customName || undefined, clientId: cid }, true)
         setInput(''); setMealName('')
         setError('Sem internet: vou calcular os macros e salvar quando a conexão voltar.')
       }
