@@ -355,6 +355,32 @@ export async function checkVipFeatureAccess(
   // Numeric limits (chat_daily, wizard_weekly)
   if (feature === 'chat_daily') {
     const today = new Date().toISOString().split('T')[0]
+
+    // Consumo atômico ANTES de chamar o modelo (opts.meter): incrementa 'chat' via RPC e
+    // bloqueia se passar do limite. Fecha a janela TOCTOU do check-then-act — sem isso, N
+    // requests paralelos liam a mesma contagem, todos passavam e queimavam cota de Gemini
+    // pago. O RPC seta last_used_at = now(), então a re-soma semanal (free) já inclui este
+    // increment. Comparação é `<= limit` (pós-incremento): consumir a N-ésima unidade dá
+    // contagem N, permitida enquanto N <= limite. Auditoria 2026-07-02 (PA3 #8).
+    if (opts?.meter) {
+      const { data: newCount } = await supabase.rpc('increment_vip_usage_daily', {
+        p_user_id: userId, p_feature_key: 'chat', p_day: today,
+      })
+      if (normalizedTier === 'free') {
+        const weekStart = getWeeklyResetStart(new Date()).toISOString()
+        const { data: usages } = await supabase
+          .from('vip_usage_daily')
+          .select('usage_count')
+          .eq('user_id', userId)
+          .eq('feature_key', 'chat')
+          .gte('last_used_at', weekStart)
+        const current = usages?.reduce((sum, row) => sum + row.usage_count, 0) || 0
+        return { allowed: current <= limit, currentUsage: current, limit, tier }
+      }
+      const c = Number(newCount || 0)
+      return { allowed: c <= limit, currentUsage: c, limit, tier }
+    }
+
     if (normalizedTier === 'free') {
       const weekStart = getWeeklyResetStart(new Date()).toISOString()
       const { data: usages } = await supabase
@@ -416,4 +442,25 @@ export async function incrementVipUsage(
   })
 
   if (error) logError('error', 'Error incrementing VIP usage:', error)
+}
+
+/**
+ * Reembolsa (decrementa, piso 0) uma unidade de cota consumida no gate (meter) quando a
+ * resposta NÃO foi entregue — falha do modelo, config ausente, ou request bloqueado por
+ * limite. Assim o usuário só é cobrado por respostas que recebeu, sem reabrir a janela
+ * TOCTOU (o gate segue atômico e bloqueia o excedente ANTES de chamar o modelo).
+ * Best-effort: erro no reembolso é logado, não propagado. Auditoria 2026-07-02 (PA3).
+ */
+export async function refundVipUsage(
+  supabase: SupabaseClient,
+  userId: string,
+  feature: 'chat' | 'wizard' | 'insights'
+) {
+  const today = new Date().toISOString().split('T')[0]
+  const { error } = await supabase.rpc('decrement_vip_usage_daily', {
+    p_user_id: userId,
+    p_feature_key: feature,
+    p_day: today,
+  })
+  if (error) logError('vip:refund', 'Error refunding VIP usage:', error)
 }
