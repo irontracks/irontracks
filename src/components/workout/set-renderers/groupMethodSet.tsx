@@ -49,7 +49,11 @@ const GroupMethodSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx
   const isNotesOpen = openNotesKeys.has(key);
   const hasAnyNote = hasNotes || !!prevNote;
   const restTime = parseTrainingNumber(ex?.restTime ?? ex?.rest_time);
-  const plannedSet = ex?.sets ? (Array.isArray(ex.sets) ? ex.sets[setIdx] : null) : null;
+  // ex.sets é a CONTAGEM (número), nunca um array — o Array.isArray(ex.sets) dava
+  // SEMPRE false e o watermark planejado por-série nunca aparecia. O plano por-série
+  // vive em setDetails.
+  const sdArr = Array.isArray(ex?.setDetails) ? ex.setDetails : (Array.isArray(ex?.set_details) ? ex.set_details : null);
+  const plannedSet = sdArr ? (sdArr[setIdx] ?? null) : null;
   const plannedReps = String(isObject(plannedSet) ? (plannedSet as UnknownRecord).reps ?? '' : ex?.reps ?? '').trim();
 
   const plannedWeight = parseTrainingNumber(isObject(plannedSet) ? (plannedSet as UnknownRecord).weight ?? ex?.weight ?? null : ex?.weight ?? null);
