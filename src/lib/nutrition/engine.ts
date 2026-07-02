@@ -31,7 +31,7 @@ export type MealItem = {
   fat: number
 }
 
-export async function trackMeal(userId: string, meal: MealLog, dateKey?: string, items?: MealItem[] | null): Promise<Record<string, unknown> | null> {
+export async function trackMeal(userId: string, meal: MealLog, dateKey?: string, items?: MealItem[] | null, clientId?: string | null): Promise<Record<string, unknown> | null> {
   try {
     const safeUserId = typeof userId === 'string' ? userId.trim() : ''
     if (!safeUserId) throw new Error('nutrition_invalid_user_id')
@@ -71,8 +71,13 @@ export async function trackMeal(userId: string, meal: MealLog, dateKey?: string,
         }))
       : null
 
+    // client_id = uuid otimista da fila offline. Presente → o insert é idempotente
+    // (índice único parcial user_id+client_id): um reenvio do mesmo lançamento
+    // (resposta perdida após o commit) NÃO duplica. Ausente → insere normal.
+    const cid = typeof clientId === 'string' && clientId.trim() ? clientId.trim().slice(0, 64) : null
+
     // 1. Insert the meal entry directly (bypassing broken RPC)
-    const { data: insertedEntry, error: insertError } = await supabase
+    const insertRes = await supabase
       .from('nutrition_meal_entries')
       .insert({
         user_id: safeUserId,
@@ -83,11 +88,28 @@ export async function trackMeal(userId: string, meal: MealLog, dateKey?: string,
         carbs,
         fat,
         items: safeItems,
+        client_id: cid,
       })
       .select('id, created_at, food_name, calories, protein, carbs, fat, items')
       .single()
 
-    if (insertError) throw new Error(insertError.message || 'nutrition_insert_entry_failed')
+    let insertedEntry = insertRes.data
+    if (insertRes.error) {
+      // 23505 = unique_violation: reenvio idempotente do mesmo lançamento offline.
+      // Busca a linha já gravada e segue como sucesso — sem duplicar nem inflar os
+      // totais do dia. (Só ocorre com cid != null; sem clientId, seria insert normal.)
+      if (cid && (insertRes.error as { code?: string }).code === '23505') {
+        const { data: existing } = await supabase
+          .from('nutrition_meal_entries')
+          .select('id, created_at, food_name, calories, protein, carbs, fat, items')
+          .eq('user_id', safeUserId)
+          .eq('client_id', cid)
+          .maybeSingle()
+        insertedEntry = existing ?? null
+      } else {
+        throw new Error(insertRes.error.message || 'nutrition_insert_entry_failed')
+      }
+    }
 
     // 2. Recalculate daily totals from all entries for this date
     const { data: allEntries, error: sumError } = await supabase

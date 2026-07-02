@@ -36,6 +36,8 @@ const BodySchema = z
     fat: z.coerce.number().nonnegative(),
     items: z.array(ItemSchema).nullable().optional(),
     dateKey: z.string().optional(),
+    // uuid otimista da fila offline → idempotência (reenvio não duplica a refeição).
+    clientId: z.string().max(64).optional(),
   })
   .strip()
 
@@ -72,7 +74,7 @@ export async function POST(req: Request) {
         }))
       : null
 
-    const row = await trackMeal(userId, meal, resolveDateKey(body.dateKey), items)
+    const row = await trackMeal(userId, meal, resolveDateKey(body.dateKey), items, body.clientId)
     return NextResponse.json({ ok: true, row: row || null })
   } catch (e: unknown) {
     const message = e instanceof Error ? e.message : String(e)
