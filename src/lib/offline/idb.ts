@@ -221,6 +221,29 @@ export const queueDelete = async (id: unknown): Promise<boolean> => {
   return true
 }
 
+// Lê a fila SÓ do IndexedDB (sem cascata). Usado no ramo iOS pra mesclar jobs que
+// só existem no IDB — um write nativo (nativeQueuePut) pode falhar/ser descartado
+// sem await, deixando o job apenas no IDB e invisível enquanto o SQLite tiver
+// outros jobs (o ramo iOS retornava só o SQLite).
+const idbGetAllJobs = async (): Promise<Record<string, unknown>[]> => {
+  if (!hasIndexedDb()) return []
+  try {
+    const db = await openDb()
+    const tx = db.transaction(STORE_QUEUE, 'readonly')
+    const req = tx.objectStore(STORE_QUEUE).getAll()
+    const list = await new Promise<unknown[]>((resolve) => {
+      req.onsuccess = () => resolve(Array.isArray(req.result) ? (req.result as unknown[]) : [])
+      req.onerror = () => resolve([])
+    })
+    await txDone(tx).catch((): null => null)
+    return list.filter((j): j is Record<string, unknown> => Boolean(j && typeof j === 'object'))
+  } catch {
+    return []
+  }
+}
+
+const jobId = (j: unknown): string => String((j as Record<string, unknown>)?.id || '').trim()
+
 export const queueGetAll = async (): Promise<unknown[]> => {
   // Native SQLite3 first on iOS — fastest path, indexed by next_attempt_at.
   // If empty, fall through to IDB / FS / localStorage so we recover any
@@ -228,16 +251,22 @@ export const queueGetAll = async (): Promise<unknown[]> => {
   if (isIosNative()) {
     try {
       const payloads = await nativeQueueGetAll(1000)
-      if (payloads.length > 0) {
-        const jobs: Record<string, unknown>[] = []
-        for (const p of payloads) {
-          try {
-            const parsed = parseJsonWithSchema(p, z.record(z.unknown()))
-            if (parsed && typeof parsed === 'object') jobs.push(parsed as Record<string, unknown>)
-          } catch { /* skip corrupted */ }
-        }
-        if (jobs.length > 0) return jobs
+      const jobs: Record<string, unknown>[] = []
+      for (const p of payloads) {
+        try {
+          const parsed = parseJsonWithSchema(p, z.record(z.unknown()))
+          if (parsed && typeof parsed === 'object') jobs.push(parsed as Record<string, unknown>)
+        } catch { /* skip corrupted */ }
       }
+      // Mescla jobs que só existem no IDB (write nativo falhou/descartado) — dedup
+      // por id, SQLite tem prioridade. Sem isso, um job IDB-only ficava invisível a
+      // todo flush enquanto o SQLite tivesse outros jobs (ex.: um 'failed' preso).
+      const seen = new Set(jobs.map(jobId))
+      for (const j of await idbGetAllJobs()) {
+        const id = jobId(j)
+        if (id && !seen.has(id)) { jobs.push(j); seen.add(id) }
+      }
+      if (jobs.length > 0) return jobs
     } catch { /* fall through */ }
   }
 
