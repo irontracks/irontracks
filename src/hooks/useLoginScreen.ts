@@ -59,6 +59,9 @@ const friendlyAuthError = (raw: string): string => {
     if (m.includes('invalid login') || m.includes('invalid credentials')) return 'E-mail ou senha incorretos.'
     if (m.includes('user already registered') || m.includes('already registered')) return 'Este e-mail já possui uma conta. Tente entrar ou recuperar a senha.'
     if (m.includes('email rate limit')) return 'Muitas tentativas. Aguarde alguns minutos e tente novamente.'
+    // Rate limit de requisição/login (HTTP 429) — espera de segundos, não minutos. Vem
+    // depois do 'email rate limit' (mais específico, minutos) pra não sobrescrevê-lo.
+    if (m.includes('429') || m.includes('rate_limited') || m.includes('too many request') || m.includes('over_request_rate') || m.includes('request rate limit') || m.includes('rate limit')) return 'Muitas tentativas agora. Aguarde alguns segundos e tente de novo.'
     if (m.includes('error sending recovery') || m.includes('smtp')) return 'Não foi possível enviar o e-mail. Tente novamente em instantes.'
     if (m.includes('network') || m.includes('fetch') || m.includes('conexão')) return 'Sem conexão com a internet. Verifique sua rede e tente novamente.'
     // Postgres whitelist trigger: "Database error saving new user" — account not pre-registered
