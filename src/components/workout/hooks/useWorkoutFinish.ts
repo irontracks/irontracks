@@ -23,6 +23,7 @@ import { logWarn } from '@/lib/logger'
 import { endAllRestLiveActivities, triggerHaptic, requestNativeReview } from '@/utils/native/irontracksNative'
 import { apiAi } from '@/lib/api/ai'
 import * as Sentry from '@sentry/nextjs'
+import { playFinishSound } from '@/lib/sounds'
 
 interface UseWorkoutFinishProps {
   session: WorkoutSession | null
@@ -233,6 +234,17 @@ export function useWorkoutFinish(props: UseWorkoutFinishProps) {
         ...payload,
         id: savedId,
       }
+
+      // Som de fim de TREINO (distinto do beep de fim de descanso) — marca o
+      // momento de conclusão. Gated na preferência de som; best-effort, nunca
+      // bloqueia a finalização. (Antes playFinishSound existia mas nunca era tocado.)
+      try {
+        const soundsOn = settings ? settings.enableSounds !== false : true
+        if (soundsOn) {
+          const vol = Math.max(0, Math.min(1, Number(settings?.soundVolume ?? 100) / 100))
+          playFinishSound({ enabled: true, volume: vol })
+        }
+      } catch { /* best effort */ }
 
       // Ensure any active rest timer Live Activity is cleared when workout ends
       endAllRestLiveActivities().catch(() => { })
