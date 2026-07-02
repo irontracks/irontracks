@@ -1,114 +1,18 @@
 import { getErrorMessage } from '@/utils/errorMessage'
 import { logWarn } from '@/lib/logger'
-export type Gender = 'MALE' | 'FEMALE'
 
-export type ActivityLevel = 'SEDENTARY' | 'LIGHT' | 'MODERATE' | 'VERY_ACTIVE' | 'EXTRA_ACTIVE'
-
-export interface UserStats {
-  weight: number
-  height: number
-  age: number
-  gender: Gender
-  activityLevel: ActivityLevel
-}
-
-export type Goal = 'CUT' | 'MAINTAIN' | 'BULK'
-
-// ── Activity level multipliers (Harris-Benedict / Mifflin extension) ─────────
-const ACTIVITY_MULTIPLIER: Record<ActivityLevel, number> = {
-  SEDENTARY: 1.2,
-  LIGHT: 1.375,
-  MODERATE: 1.55,
-  VERY_ACTIVE: 1.725,
-  EXTRA_ACTIVE: 1.9,
-}
-
-export function getActivityMultiplier(level: ActivityLevel | string | null | undefined): number {
-  const key = String(level ?? '').toUpperCase() as ActivityLevel
-  return ACTIVITY_MULTIPLIER[key] ?? ACTIVITY_MULTIPLIER.MODERATE
-}
-
-export function calculateBMR(stats: UserStats): number {
-  const weight = Number(stats?.weight)
-  const height = Number(stats?.height)
-  const age = Number(stats?.age)
-  const gender = stats?.gender
-
-  if (!Number.isFinite(weight) || weight <= 0) throw new Error('nutrition_invalid_weight')
-  if (!Number.isFinite(height) || height <= 0) throw new Error('nutrition_invalid_height')
-  if (!Number.isFinite(age) || age <= 0) throw new Error('nutrition_invalid_age')
-  if (gender !== 'MALE' && gender !== 'FEMALE') throw new Error('nutrition_invalid_gender')
-
-  const bmr =
-    gender === 'MALE'
-      ? 88.362 + 13.397 * weight + 4.799 * height - 5.677 * age
-      : 447.593 + 9.247 * weight + 3.098 * height - 4.33 * age
-
-  if (!Number.isFinite(bmr) || bmr <= 0) throw new Error('nutrition_bmr_invalid_result')
-  return Math.round(bmr)
-}
-
-/**
- * Calculates TDEE (Total Daily Energy Expenditure) = BMR × activity multiplier.
- * This is the actual calorie need per day before goal adjustment.
- */
-export function calculateTDEE(stats: UserStats): number {
-  const bmr = calculateBMR(stats)
-  const multiplier = getActivityMultiplier(stats.activityLevel)
-  return Math.round(bmr * multiplier)
-}
-
-const CALORIES_PER_GRAM = {
-  protein: 4,
-  carbs: 4,
-  fat: 9,
-} as const
-
-const GOAL_CALORIE_MULTIPLIER: Record<Goal, number> = {
-  CUT: 0.85,
-  MAINTAIN: 1,
-  BULK: 1.1,
-}
-
-const GOAL_MACRO_SPLIT: Record<Goal, { protein: number; carbs: number; fat: number }> = {
-  CUT: { protein: 0.35, carbs: 0.4, fat: 0.25 },
-  MAINTAIN: { protein: 0.3, carbs: 0.4, fat: 0.3 },
-  BULK: { protein: 0.25, carbs: 0.5, fat: 0.25 },
-}
-
-/**
- * Calculates macro targets from a TDEE (or BMR) base and a goal.
- * For accurate results, pass TDEE (not raw BMR) as the first parameter.
- */
-export function calculateMacros(tdee: number, goal: Goal): { protein: number; carbs: number; fat: number } {
-  const baseCalories = Number(tdee)
-  if (!Number.isFinite(baseCalories) || baseCalories <= 0) throw new Error('nutrition_invalid_calories')
-  if (goal !== 'CUT' && goal !== 'MAINTAIN' && goal !== 'BULK') throw new Error('nutrition_invalid_goal')
-
-  const targetCalories = Math.round(baseCalories * (GOAL_CALORIE_MULTIPLIER[goal] ?? 1))
-  const split = GOAL_MACRO_SPLIT[goal]
-
-  const protein = Math.max(0, Math.round((targetCalories * split.protein) / CALORIES_PER_GRAM.protein))
-  const fat = Math.max(0, Math.round((targetCalories * split.fat) / CALORIES_PER_GRAM.fat))
-
-  const remainingCalories = targetCalories - protein * CALORIES_PER_GRAM.protein - fat * CALORIES_PER_GRAM.fat
-  const carbs = Math.max(0, Math.round(remainingCalories / CALORIES_PER_GRAM.carbs))
-
-  return { protein, carbs, fat }
-}
-
-/**
- * Convenience: calculates full nutrition goals (calories + macros) from user stats + goal.
- * Uses TDEE (not raw BMR) as the base.
- */
-export function calculateNutritionGoals(stats: UserStats, goal: Goal): {
-  calories: number; protein: number; carbs: number; fat: number
-} {
-  const tdee = calculateTDEE(stats)
-  const targetCalories = Math.round(tdee * (GOAL_CALORIE_MULTIPLIER[goal] ?? 1))
-  const macros = calculateMacros(tdee, goal)
-  return { calories: targetCalories, ...macros }
-}
+// Funções PURAS de cálculo (BMR/TDEE/macros) vivem em ./goals — sem dependência de
+// servidor, pra poderem ser importadas no client sem puxar supabase/server (que
+// importa next/headers) pro bundle. Re-exportadas aqui por compatibilidade com quem
+// já importa de '@/lib/nutrition/engine'.
+export {
+  getActivityMultiplier,
+  calculateBMR,
+  calculateTDEE,
+  calculateMacros,
+  calculateNutritionGoals,
+} from './goals'
+export type { Gender, ActivityLevel, UserStats, Goal } from './goals'
 
 export interface MealLog {
   foodName: string
