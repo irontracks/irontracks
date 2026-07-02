@@ -15,7 +15,7 @@ import {
 } from './assessmentUtils'
 import { formatDateCompact, formatWeekdayCompact, safeGender } from './assessmentChartData'
 import type { AiPlanEntry } from '@/hooks/useAssessmentHistoryData'
-import { combinedBodyFat } from '@/utils/calculations/bodyComposition'
+import { combinedBodyFat, isPlausibleBodyFat } from '@/utils/calculations/bodyComposition'
 import { resolveBodyFatFromPair } from '@/utils/calculations/assessmentPairing'
 import { FileText, ImageIcon } from 'lucide-react'
 import { getBiaSignedUrl } from '@/utils/storage/biaAttachmentUpload'
@@ -499,7 +499,11 @@ export function AssessmentListItem({
               } : null,
             );
             const combined = combinedBodyFat(breakdown.skinfold, breakdown.bia);
-            const hasBoth = breakdown.skinfold != null && breakdown.bia != null;
+            // O card "Média ÷ 2" só faz sentido quando os DOIS valores realmente
+            // entram no blend (ambos plausíveis). Se o BIA é implausível (ex.: 90 por
+            // erro de vírgula), combinedBodyFat o descarta e retorna só as dobras —
+            // mostrar isso rotulado "(dobras + BIA) ÷ 2" seria enganoso.
+            const hasBoth = isPlausibleBodyFat(breakdown.skinfold) && isPlausibleBodyFat(breakdown.bia);
             const hasAny = breakdown.skinfold != null || breakdown.bia != null;
             if (!hasAny) return null;
             const cards: Array<{ label: string; value: number | null; sub: string; tone: string }> = [];

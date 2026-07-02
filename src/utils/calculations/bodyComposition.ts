@@ -395,9 +395,12 @@ const isValidPercent = (v: number | null | undefined): v is number =>
 // engano — é DESCARTADO do blend pra não distorcer massa magra/gorda. Continua
 // visível no breakdown bruto (o usuário precisa enxergar o valor pra corrigir).
 // As dobras já são travadas em 3–50% na origem; aqui protegemos também o BIA.
-const PLAUSIBLE_BF_MIN = 3;
-const PLAUSIBLE_BF_MAX = 60;
-const isPlausibleBodyFat = (v: number | null | undefined): v is number =>
+// Teto = 75%: obesidade extrema real chega a ~60% e balanças BIA superestimam em
+// alta adiposidade (podem marcar 60–70%), então 3–75 salva o caso real e ainda
+// rejeita erro de vírgula (80/90). Exportado pra UI mostrar só a "média" real.
+export const PLAUSIBLE_BF_MIN = 3;
+export const PLAUSIBLE_BF_MAX = 75;
+export const isPlausibleBodyFat = (v: number | null | undefined): v is number =>
   isValidPercent(v) && v >= PLAUSIBLE_BF_MIN && v <= PLAUSIBLE_BF_MAX;
 
 /**
