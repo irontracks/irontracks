@@ -527,7 +527,11 @@ export const estimateCaloriesMet = (
   })()
   const restMinutes = (() => {
     if (restMinutesOverride != null && restMinutesOverride >= 0)
-      return Math.min(restMinutesOverride, effectiveDuration - minActiveMinutes)
+      // O descanso ABSORVE o tempo que sobra depois do ativo (piso no descanso
+      // reportado). Antes travava no valor reportado e deixava um "buraco" na
+      // duração: exec 10 + rest 10 numa sessão de 90 min contava só 46 min, e os
+      // outros 44 davam 0 kcal — subestimando o gasto do treino.
+      return Math.max(restMinutesOverride, Math.max(0, effectiveDuration - activeMinutes))
     return Math.max(0, effectiveDuration - activeMinutes)
   })()
 

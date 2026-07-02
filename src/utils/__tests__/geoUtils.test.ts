@@ -102,6 +102,13 @@ describe('geoUtils', () => {
     it('returns --:-- for null', () => {
       expect(formatPace(null)).toBe('--:--')
     })
+
+    it('não gera "M:60" — faz carry pro minuto seguinte', () => {
+      // 4,999 → 4 min + round(59,94 s)=60 → antes mostrava "4:60"
+      expect(formatPace(4.999)).toBe('5:00')
+      // 5 min 59,6 s → arredonda pra 6:00, não "5:60"
+      expect(formatPace(5 + 59.6 / 60)).toBe('6:00')
+    })
   })
 
   describe('formatDistance', () => {
