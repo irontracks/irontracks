@@ -16,6 +16,7 @@ import { getMuscleMapWeek } from '@/actions/workout-actions'
 import { parseJsonWithSchema } from '@/utils/zod'
 import { normalizeExerciseName } from '@/utils/normalizeExerciseName'
 import { MUSCLE_BY_ID } from '@/utils/muscleMapConfig'
+import { setVolume } from '@/utils/report/setVolume'
 import { z } from 'zod'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
@@ -226,11 +227,9 @@ export const useMuscleTrends = ({
               const eIdx = Number(parts[0])
               if (!Number.isFinite(eIdx) || eIdx !== exIdx) return
               if (!v || typeof v !== 'object') return
-              const obj = v as AnyObj
-              const w = Number(String(obj.weight ?? '').replace(',', '.'))
-              const r = Number(String(obj.reps ?? '').replace(',', '.'))
-              if (!Number.isFinite(w) || !Number.isFinite(r) || w <= 0 || r <= 0) return
-              volume += w * r
+              // setVolume trata unilateral (L+R) e cluster — antes só lia weight/reps
+              // do topo e zerava esses exercícios na tendência semanal.
+              volume += setVolume(v)
             })
             bucket.values[weekIdx] += volume
           })

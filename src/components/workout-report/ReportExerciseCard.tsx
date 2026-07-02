@@ -1,5 +1,6 @@
 'use client'
 import React from 'react'
+import { setTopWeightReps } from '@/utils/report/setVolume'
 
 type AnyObj = Record<string, unknown>
 
@@ -22,14 +23,12 @@ function epley1RM(weight: number, reps: number): number | null {
     return weight * (1 + reps / 30)
 }
 
-// Parse weight/reps safely from a log object
+// Parse weight/reps safely from a log object.
+// setTopWeightReps pega o lado (L/R) dos exercícios unilaterais — antes lia só
+// weight/reps do topo e zerava 1RM/PR/"Melhor série" nesses exercícios.
 function parseWR(logObj: AnyObj): { w: number; r: number } {
-    const w = Number(String(logObj?.weight ?? '').replace(',', '.'))
-    const r = Number(String(logObj?.reps ?? '').replace(',', '.'))
-    return {
-        w: Number.isFinite(w) && w > 0 ? w : 0,
-        r: Number.isFinite(r) && r > 0 ? r : 0,
-    }
+    const { weight, reps } = setTopWeightReps(logObj)
+    return { w: weight, r: reps }
 }
 
 // ─── Progression logic ────────────────────────────────────────────────────────
@@ -237,7 +236,10 @@ export const ReportExerciseCard = ({ exercise, exIdx, sessionLogs, prevLogs, bas
 
                         if (!log || typeof log !== 'object') return null
                         const logObj = log as AnyObj
-                        if (!logObj.weight && !logObj.reps) return null
+                        // dispW/dispR já resolvem unilateral (L/R) — sem isso a linha
+                        // sumia porque weight/reps do topo vêm vazios nesses exercícios.
+                        const { w: dispW, r: dispR } = parseWR(logObj)
+                        if (dispW <= 0 && dispR <= 0) return null
 
                         const { text: progressionText, rowClass, isPr, e1rmText } = computeProgression(logObj, prevLog)
 
@@ -257,10 +259,10 @@ export const ReportExerciseCard = ({ exercise, exIdx, sessionLogs, prevLogs, bas
                                         </div>
                                     </td>
                                     <td className="py-2 text-center font-semibold text-sm">
-                                        {logObj.weight != null && String(logObj.weight) !== '' ? `${String(logObj.weight)} kg` : '—'}
+                                        {logObj.weight != null && String(logObj.weight) !== '' ? `${String(logObj.weight)} kg` : dispW > 0 ? `${dispW} kg` : '—'}
                                     </td>
                                     <td className="py-2 text-center font-mono text-sm">
-                                        {logObj.reps != null && String(logObj.reps) !== '' ? String(logObj.reps) : '—'}
+                                        {logObj.reps != null && String(logObj.reps) !== '' ? String(logObj.reps) : dispR > 0 ? String(dispR) : '—'}
                                     </td>
                                     <td className="py-2 text-center text-[11px] font-mono text-amber-300">
                                         {e1rmText ?? '—'}

@@ -1,5 +1,6 @@
 
 import type { UnknownRecord } from '@/types/app'
+import { setVolume, setTopWeightReps } from './setVolume'
 
 const isObject = (value: unknown): value is UnknownRecord =>
   value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -85,6 +86,18 @@ const buildLogVolume = (logs: UnknownRecord, exerciseIndex: number) => {
       weightCount += 1
     } else if (repsVal > 0) {
       reps += repsVal
+    } else {
+      // Unilateral (L_weight/R_weight) e cluster (blocks) NÃO gravam weight/reps no
+      // topo do log → caíam aqui com volume 0. Usa a fonte única setVolume/
+      // setTopWeightReps (a mesma do card "Volume total" e do histórico), que soma
+      // L+R e os blocks. Sem isso, o volume salvo/densidade zeravam nesses exercícios.
+      const uniVol = setVolume(value)
+      if (uniVol > 0) {
+        volume += uniVol
+        const top = setTopWeightReps(value)
+        if (top.weight > 0) { weightSum += top.weight; weightCount += 1 }
+        if (top.reps > 0) reps += top.reps
+      }
     }
     sets += 1
   })

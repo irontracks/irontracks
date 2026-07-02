@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { createClient } from '@/utils/supabase/client';
 import { adminFetchJson } from '@/utils/admin/adminFetch';
 import { logError } from '@/lib/logger';
-import { setVolume } from '@/utils/report/setVolume';
+import { setVolume, isWorkingSet } from '@/utils/report/setVolume';
 import {
     WorkoutLog, WorkoutSummary, WorkoutTemplate, ManualExercise,
     NewWorkoutState, HistoryListProps,
@@ -54,6 +54,9 @@ export function calculateTotalVolumeFromLogs(logs: unknown): number {
         let volume = 0;
         Object.values(safeLogs).forEach((log) => {
             if (!isRecord(log)) return;
+            // Exclui aquecimento/feeler e séries não feitas — mesma regra do
+            // relatório de finalização, pra o "Resumo" não superestimar o volume.
+            if (!isWorkingSet(log)) return;
             // setVolume trata cluster + unilateral (L+R) + série normal.
             volume += setVolume(log);
         });

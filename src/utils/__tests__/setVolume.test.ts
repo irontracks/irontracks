@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { setVolume, setTopWeightReps, parseWeightValue, parseRepsValue } from '@/utils/report/setVolume'
+import { setVolume, setTopWeightReps, parseWeightValue, parseRepsValue, isWorkingSet } from '@/utils/report/setVolume'
 
 describe('parseWeightValue / parseRepsValue', () => {
   it('trata vírgula decimal e inválidos', () => {
@@ -65,5 +65,33 @@ describe('setTopWeightReps', () => {
   it('vazio → 0/0', () => {
     expect(setTopWeightReps({})).toEqual({ weight: 0, reps: 0 })
     expect(setTopWeightReps(null)).toEqual({ weight: 0, reps: 0 })
+  })
+})
+
+describe('isWorkingSet', () => {
+  it('série de trabalho padrão conta (sem set_type, done implícito)', () => {
+    expect(isWorkingSet({ weight: '80', reps: '8' })).toBe(true)
+  })
+
+  it('aquecimento e feeler NÃO contam', () => {
+    expect(isWorkingSet({ set_type: 'warmup', weight: '40', reps: '10' })).toBe(false)
+    expect(isWorkingSet({ setType: 'feeler', weight: '40', reps: '10' })).toBe(false)
+    expect(isWorkingSet({ is_warmup: true, weight: '40', reps: '10' })).toBe(false)
+    expect(isWorkingSet({ isWarmup: true, weight: '40', reps: '10' })).toBe(false)
+  })
+
+  it('série marcada como não feita NÃO conta', () => {
+    expect(isWorkingSet({ done: false, weight: '80', reps: '8' })).toBe(false)
+    expect(isWorkingSet({ completed: 'false', weight: '80', reps: '8' })).toBe(false)
+  })
+
+  it('done explícito e set_type working contam', () => {
+    expect(isWorkingSet({ done: true, set_type: 'working', weight: '80', reps: '8' })).toBe(true)
+    expect(isWorkingSet({ isDone: true, weight: '80', reps: '8' })).toBe(true)
+  })
+
+  it('inválido → false', () => {
+    expect(isWorkingSet(null)).toBe(false)
+    expect(isWorkingSet('nope')).toBe(false)
   })
 })

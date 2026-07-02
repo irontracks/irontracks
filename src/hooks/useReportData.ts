@@ -17,6 +17,7 @@ import { createClient } from '@/utils/supabase/client'
 import { getKcalEstimate } from '@/utils/calories/kcalClient'
 import { normalizeExerciseKey, calculateTotalVolume } from '@/utils/report/formatters'
 import { isSetCompleted } from '@/utils/report/setCompletion'
+import { setTopWeightReps } from '@/utils/report/setVolume'
 import { estimateCaloriesMet, getBodyweightFraction, DEFAULT_BODY_WEIGHT_KG } from '@/utils/calories/metEstimate'
 import { useCheckins } from './useCheckins'
 import { usePreviousSessionData } from './usePreviousSessionData'
@@ -562,16 +563,16 @@ export const useReportData = ({ session, previousSession, user, settings }: UseR
           const log = sessionLogs[key]
           if (!log || typeof log !== 'object') continue
           const logObj = log as AnyObj
-          const cw = Number(String(logObj?.weight ?? '').replace(',', '.'))
-          const cr = Number(String(logObj?.reps ?? '').replace(',', '.'))
+          // setTopWeightReps pega o lado (L/R) dos exercícios unilaterais — antes
+          // lia só weight/reps do topo e o PR/1RM sumia nesses exercícios.
+          const { weight: cw, reps: cr } = setTopWeightReps(logObj)
           const curE1rm = (cw > 0 && cr > 0) ? cw * (1 + cr / 30) : 0
           if (curE1rm > bestCurE1rm) bestCurE1rm = curE1rm
 
           const prevLog = prevExLogs[sIdx]
           if (prevLog && typeof prevLog === 'object') {
             const pObj = prevLog as AnyObj
-            const pw = Number(String(pObj?.weight ?? '').replace(',', '.'))
-            const pr = Number(String(pObj?.reps ?? '').replace(',', '.'))
+            const { weight: pw, reps: pr } = setTopWeightReps(pObj)
             const prevE1rm = (pw > 0 && pr > 0) ? pw * (1 + pr / 30) : 0
             if (prevE1rm > bestPrevE1rm) bestPrevE1rm = prevE1rm
           }
