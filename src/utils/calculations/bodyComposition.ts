@@ -390,6 +390,16 @@ export const safeCalculateSumSkinfolds = (assessment: Partial<Assessment>): numb
 const isValidPercent = (v: number | null | undefined): v is number =>
   typeof v === 'number' && Number.isFinite(v) && v >= 0 && v <= 100;
 
+// Faixa fisiologicamente plausível de %BF para ENTRAR NA MÉDIA. Um valor fora
+// dela — BIA digitado como "90" por erro de vírgula, ou "0" num campo zerado por
+// engano — é DESCARTADO do blend pra não distorcer massa magra/gorda. Continua
+// visível no breakdown bruto (o usuário precisa enxergar o valor pra corrigir).
+// As dobras já são travadas em 3–50% na origem; aqui protegemos também o BIA.
+const PLAUSIBLE_BF_MIN = 3;
+const PLAUSIBLE_BF_MAX = 60;
+const isPlausibleBodyFat = (v: number | null | undefined): v is number =>
+  isValidPercent(v) && v >= PLAUSIBLE_BF_MIN && v <= PLAUSIBLE_BF_MAX;
+
 /**
  * Returns the "blended" body-fat % to store/display as the single primary
  * value. Behaviour:
@@ -404,8 +414,8 @@ export const combinedBodyFat = (
   skinfoldBF: number | null | undefined,
   biaBF: number | null | undefined,
 ): number | null => {
-  const sf = isValidPercent(skinfoldBF) ? skinfoldBF : null;
-  const bia = isValidPercent(biaBF) ? biaBF : null;
+  const sf = isPlausibleBodyFat(skinfoldBF) ? skinfoldBF : null;
+  const bia = isPlausibleBodyFat(biaBF) ? biaBF : null;
   if (sf != null && bia != null) return (sf + bia) / 2;
   if (sf != null) return sf;
   if (bia != null) return bia;
