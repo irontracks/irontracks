@@ -30,12 +30,26 @@ const resolvePlannedReps = (exercise: UnknownRecord) => {
   return reps || null
 }
 
+// Epley 1RM: peso × (1 + reps/30). 1 rep = o próprio peso. 0 se inválido.
+const epley1rm = (weight: number, reps: number): number => {
+  if (!(weight > 0) || !(reps > 0)) return 0
+  return reps === 1 ? weight : weight * (1 + reps / 30)
+}
+
 const buildLogVolume = (logs: UnknownRecord, exerciseIndex: number) => {
   let volume = 0
   let sets = 0
   let reps = 0
   let weightSum = 0
   let weightCount = 0
+  // Melhor 1RM estimado do dia = MÁXIMO por série (não média×média). Usado pro
+  // Δ1RM da tabela não ficar falsamente negativo quando a série mais pesada bate
+  // o recorde mas a média puxa pra baixo.
+  let bestE1rm = 0
+  const trackE1rm = (w: number, r: number) => {
+    const e = epley1rm(w, r)
+    if (e > bestE1rm) bestE1rm = e
+  }
   Object.entries(logs).forEach(([key, value]) => {
     const parts = String(key || '').split('-')
     const eIdx = Number(parts[0])
@@ -57,6 +71,7 @@ const buildLogVolume = (logs: UnknownRecord, exerciseIndex: number) => {
       let dropVol = 0
       let totalReps = 0
       let firstWeight: number | null = null
+      let firstReps = 0
       for (const stage of dropStages) {
         if (!isObject(stage)) continue
         const sw = toNumber((stage as UnknownRecord).weight)
@@ -64,12 +79,12 @@ const buildLogVolume = (logs: UnknownRecord, exerciseIndex: number) => {
         if (sw > 0 && sr > 0) {
           dropVol += sw * sr
           totalReps += sr
-          if (firstWeight === null) firstWeight = sw
+          if (firstWeight === null) { firstWeight = sw; firstReps = sr }
         }
       }
       if (totalReps > 0) reps += totalReps
       if (dropVol > 0) volume += dropVol
-      if (firstWeight !== null) { weightSum += firstWeight; weightCount += 1 }
+      if (firstWeight !== null) { weightSum += firstWeight; weightCount += 1; trackE1rm(firstWeight, firstReps) }
       sets += 1
       return
     }
@@ -84,6 +99,7 @@ const buildLogVolume = (logs: UnknownRecord, exerciseIndex: number) => {
       reps += repsVal
       weightSum += weight
       weightCount += 1
+      if (durationSec === 0) trackE1rm(weight, repsVal) // prancha (duração) não tem 1RM
     } else if (repsVal > 0) {
       reps += repsVal
     } else {
@@ -97,12 +113,19 @@ const buildLogVolume = (logs: UnknownRecord, exerciseIndex: number) => {
         const top = setTopWeightReps(value)
         if (top.weight > 0) { weightSum += top.weight; weightCount += 1 }
         if (top.reps > 0) reps += top.reps
+        trackE1rm(top.weight, top.reps)
       }
     }
     sets += 1
   })
   const avgWeight = weightCount > 0 ? Math.round((weightSum / weightCount) * 10) / 10 : null
-  return { volumeKg: Math.round(volume * 10) / 10, sets, reps, avgWeight }
+  return {
+    volumeKg: Math.round(volume * 10) / 10,
+    sets,
+    reps,
+    avgWeight,
+    bestE1rm: bestE1rm > 0 ? Math.round(bestE1rm * 10) / 10 : null,
+  }
 }
 
 /**
@@ -296,6 +319,8 @@ export type ReportExerciseMetrics = {
   setsDone: number
   repsDone: number
   avgWeightKg: number | null
+  /** Melhor 1RM estimado do dia (máx por série, Epley). null se sem carga válida. */
+  bestE1rm: number | null
   delta: {
     volumeKg: number | null
     reps: number | null
@@ -422,6 +447,7 @@ export const buildReportMetrics = (session: UnknownRecord, previousSession?: Unk
       setsDone: logVolume.sets,
       repsDone: logVolume.reps,
       avgWeightKg: logVolume.avgWeight,
+      bestE1rm: logVolume.bestE1rm,
       delta: {
         volumeKg: deltaVolume,
         reps: deltaReps,
