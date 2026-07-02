@@ -641,7 +641,13 @@ export function ModalsComplexMethods() {
                                                 const plannedBlocks = Array.isArray(prev?.plannedBlocks) ? prev.plannedBlocks : [];
                                                 const restsByGap = Array.isArray(prev?.restsByGap) ? prev.restsByGap : [];
                                                 const baseWeight = String(prev?.baseWeight ?? '').trim();
-                                                const blocks = plannedBlocks.map((p) => ({ planned: p, weight: baseWeight, reps: (p ?? null) as number | null }));
+                                                // "Resetar pesos" reseta SÓ o peso (pro baseWeight). As reps já digitadas
+                                                // são PRESERVADAS (antes voltavam pro planejado, contradizendo o rótulo).
+                                                const prevBlocks = Array.isArray(prev?.blocks) ? prev.blocks : [];
+                                                const blocks = plannedBlocks.map((p, i) => {
+                                                    const cur = prevBlocks[i] && typeof prevBlocks[i] === 'object' ? (prevBlocks[i] as UnknownRecord) : null;
+                                                    return { planned: p, weight: baseWeight, reps: (cur?.reps ?? (p ?? null)) as number | null };
+                                                });
                                                 return { ...prev, restsByGap, blocks, error: '' };
                                             });
                                         }}

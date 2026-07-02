@@ -182,8 +182,11 @@ const NormalSetInner = ({
   const hasAnyNote = hasNotes || !!prevNote;
 
   // ── Input fields — non-unilateral ────────────────────────────────────
+  // Peso nunca é negativo (viraria volume negativo no resumo/sugestão). Normaliza
+  // tirando o sinal na gravação. (reps NÃO passa por aqui — pode ser faixa "8-12".)
+  const noNegWeight = (v: string) => String(v ?? '').replace(/-/g, '');
   const weightField = useInputField(extWeight, (v) =>
-    updateLog(key, { weight: v, advanced_config: cfg ?? log.advanced_config ?? null }),
+    updateLog(key, { weight: noNegWeight(v), advanced_config: cfg ?? log.advanced_config ?? null }),
   );
   const repsField = useInputField(extReps, (v) =>
     updateLog(key, { reps: v, advanced_config: cfg ?? log.advanced_config ?? null }),
@@ -196,8 +199,8 @@ const NormalSetInner = ({
   );
 
   // ── Input fields — unilateral ─────────────────────────────────────────
-  const lWeightField = useInputField(extLWeight, (v) => updateLog(key, { L_weight: v }));
-  const rWeightField = useInputField(extRWeight, (v) => updateLog(key, { R_weight: v }));
+  const lWeightField = useInputField(extLWeight, (v) => updateLog(key, { L_weight: noNegWeight(v) }));
+  const rWeightField = useInputField(extRWeight, (v) => updateLog(key, { R_weight: noNegWeight(v) }));
   const lRepsField   = useInputField(extLReps,   (v) => updateLog(key, { L_reps: v }));
   const rRepsField   = useInputField(extRReps,   (v) => updateLog(key, { R_reps: v }));
   const lRpeField    = useInputField(extLRpe,    (v) => updateLog(key, { L_rpe: v }));
