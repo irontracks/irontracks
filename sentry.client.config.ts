@@ -1,5 +1,6 @@
 import * as Sentry from "@sentry/nextjs"
 import { isNoiseByName, isNoiseException } from "@/utils/sentryFilters"
+import { scrubSentryEvent } from "@/utils/sentryScrub"
 
 // Detect Capacitor native WebView inline (sem import — Sentry init roda muito cedo).
 // Em mobile native, Sentry tracing duplica spans que já cobrimos via crash reports
@@ -68,7 +69,8 @@ Sentry.init({
       }
     }
 
-    return event
+    // Redige tokens/segredos (mensagens + variáveis locais) antes de enviar (LGPD).
+    return scrubSentryEvent(event)
   },
 })
 
