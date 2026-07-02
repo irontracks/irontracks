@@ -1,6 +1,7 @@
 import { createClient } from '@/utils/supabase/client'
 import { parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
+import { setBestE1rm, isWorkingSet } from '@/utils/report/setVolume'
 
 // ─── Private helpers ──────────────────────────────────────────────────────────
 
@@ -212,12 +213,15 @@ export async function getHistoricalBestE1rm(params: {
                     if (!Number.isFinite(eIdx) || eIdx !== exIdx) return
                     if (!v || typeof v !== 'object') return
                     const obj = v as Record<string, unknown>
-                    const w = Number(String(obj?.weight ?? '').replace(',', '.'))
-                    const r = Number(String(obj?.reps ?? '').replace(',', '.'))
-                    if (w <= 0 || r <= 0 || !Number.isFinite(w) || !Number.isFinite(r)) return
-                    const e1rm = w * (1 + r / 30)
-                    if (!Number.isFinite(e1rm)) return
-                    if (!bestE1rm[key] || e1rm > bestE1rm[key]) bestE1rm[key] = e1rm
+                    // Fonte ÚNICA (mesma do relatório do dia): trata dropset (melhor
+                    // etapa), cluster (melhor bloco), unilateral (lado) e reps===1, e
+                    // filtra aquecimento/feeler. Sem isso o Δ1RM comparava o baseline
+                    // histórico (regra crua) contra o dia (regra nova) → Δ falso.
+                    if (!isWorkingSet(obj)) return
+                    const e1rm = setBestE1rm(obj)
+                    if (!(e1rm > 0) || !Number.isFinite(e1rm)) return
+                    const rounded = Math.round(e1rm * 10) / 10
+                    if (!bestE1rm[key] || rounded > bestE1rm[key]) bestE1rm[key] = rounded
                 })
             })
         }

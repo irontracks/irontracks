@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { setVolume, setTopWeightReps, parseWeightValue, parseRepsValue, isWorkingSet } from '@/utils/report/setVolume'
+import { setVolume, setTopWeightReps, parseWeightValue, parseRepsValue, isWorkingSet, epley1rm, setBestE1rm } from '@/utils/report/setVolume'
 
 describe('parseWeightValue / parseRepsValue', () => {
   it('trata vírgula decimal e inválidos', () => {
@@ -93,5 +93,57 @@ describe('isWorkingSet', () => {
   it('inválido → false', () => {
     expect(isWorkingSet(null)).toBe(false)
     expect(isWorkingSet('nope')).toBe(false)
+  })
+})
+
+describe('epley1rm', () => {
+  it('peso × (1 + reps/30)', () => {
+    expect(epley1rm(100, 5)).toBeCloseTo(116.667, 2)
+  })
+  it('1 rep = o próprio peso (não infla)', () => {
+    expect(epley1rm(100, 1)).toBe(100)
+  })
+  it('inválido → 0', () => {
+    expect(epley1rm(0, 5)).toBe(0)
+    expect(epley1rm(100, 0)).toBe(0)
+  })
+})
+
+describe('setBestE1rm — fonte única do Δ1RM (dia + histórico)', () => {
+  it('série normal', () => {
+    expect(setBestE1rm({ weight: '100', reps: '5' })).toBeCloseTo(116.667, 2)
+  })
+
+  it('unilateral: usa o lado (não soma L+R)', () => {
+    // 22×(1+10/30) = 29,33 por perna
+    expect(setBestE1rm({ L_weight: '22', L_reps: '10', R_weight: '22', R_reps: '10' })).toBeCloseTo(29.333, 2)
+  })
+
+  it('dropset: melhor etapa (a mais pesada), não o topo mais leve', () => {
+    const log = {
+      weight: '20', reps: '18', // topo = última etapa × total (enganoso)
+      drop_set: { stages: [{ weight: '30', reps: '10' }, { weight: '20', reps: '8' }] },
+    }
+    // 30×(1+10/30) = 40, não 20×(1+18/30) = 32
+    expect(setBestE1rm(log)).toBe(40)
+  })
+
+  it('cluster: melhor bloco (blocksDetailed), não lastWeight×total', () => {
+    const log = {
+      weight: '80', reps: '15',
+      cluster: { blocks: [5, 5, 5], blocksDetailed: [{ weight: '100', reps: '5' }, { weight: '90', reps: '5' }, { weight: '80', reps: '5' }] },
+    }
+    // 100×(1+5/30) = 116,67, não 80×(1+15/30) = 120
+    expect(setBestE1rm(log)).toBeCloseTo(116.667, 2)
+  })
+
+  it('1 rep não infla (peso puro)', () => {
+    expect(setBestE1rm({ weight: '100', reps: '1' })).toBe(100)
+  })
+
+  it('sem carga (prancha só duração) / inválido → 0', () => {
+    expect(setBestE1rm({ durationSeconds: '60' })).toBe(0)
+    expect(setBestE1rm(null)).toBe(0)
+    expect(setBestE1rm({})).toBe(0)
   })
 })
