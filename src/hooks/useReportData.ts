@@ -17,7 +17,7 @@ import { createClient } from '@/utils/supabase/client'
 import { getKcalEstimate } from '@/utils/calories/kcalClient'
 import { normalizeExerciseKey, calculateTotalVolume } from '@/utils/report/formatters'
 import { isSetCompleted } from '@/utils/report/setCompletion'
-import { setBestE1rm } from '@/utils/report/setVolume'
+import { setBestE1rm, isWorkingSet } from '@/utils/report/setVolume'
 import { estimateCaloriesMet, getBodyweightFraction, DEFAULT_BODY_WEIGHT_KG } from '@/utils/calories/metEstimate'
 import { useCheckins } from './useCheckins'
 import { usePreviousSessionData } from './usePreviousSessionData'
@@ -563,14 +563,17 @@ export const useReportData = ({ session, previousSession, user, settings }: UseR
           const log = sessionLogs[key]
           if (!log || typeof log !== 'object') continue
           const logObj = log as AnyObj
-          // setBestE1rm = mesma fonte única do relatório do dia e do baseline
-          // histórico (trata dropset/cluster/unilateral/reps===1) — pro all-time PR
-          // comparar maçãs com maçãs.
+          // Ignora aquecimento/feeler — MESMA regra do relatório do dia e do baseline
+          // histórico. Sem isso, um aquecimento pesado (single acima da série de
+          // trabalho) inflava bestCurE1rm e disparava PR all-time FALSO, já que o
+          // histórico (getHistoricalBestE1rm) filtra aquecimento e o atual não.
+          if (!isWorkingSet(logObj)) continue
+          // setBestE1rm = mesma fonte única (trata dropset/cluster/unilateral/reps===1)
           const curE1rm = setBestE1rm(logObj)
           if (curE1rm > bestCurE1rm) bestCurE1rm = curE1rm
 
           const prevLog = prevExLogs[sIdx]
-          if (prevLog && typeof prevLog === 'object') {
+          if (prevLog && typeof prevLog === 'object' && isWorkingSet(prevLog)) {
             const prevE1rm = setBestE1rm(prevLog)
             if (prevE1rm > bestPrevE1rm) bestPrevE1rm = prevE1rm
           }
