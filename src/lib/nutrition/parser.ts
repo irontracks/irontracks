@@ -6,7 +6,10 @@ function normalizeFoodText(input: string): string {
   return (input || '')
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
-    .replace(/[^a-zA-Z0-9\s]/g, ' ')
+    // Preserva o decimal com v\u00edrgula ("1,5" \u2192 "1.5") ANTES de tirar a pontua\u00e7\u00e3o \u2014
+    // sen\u00e3o "1,5 prato" virava "1 5 prato" e o parser lia qtd=5 (~3,3\u00d7 a mais).
+    .replace(/(\d),(\d)/g, '$1.$2')
+    .replace(/[^a-zA-Z0-9.\s]/g, ' ') // mant\u00e9m o ponto (separador decimal)
     .replace(/\s+/g, ' ')
     .trim()
     .toLowerCase()
@@ -127,7 +130,7 @@ export function analyzeMeal(text: string, extraFoods?: Record<string, FoodItem>)
     // database, and treating it as a unit ate the food name ("2 ovos cozidos"
     // → unit "ovos" + name "cozidos" → no match). Let count-parsing handle it.
     const approxRegex =
-      /(\d+(?:[.,]\d+)?)\s*(colheres?|conchas?|bifes?|fatias?|pedacos?|latas?|scoops?|doses?|unidades?|xicaras?|copos?|pratos?|rodelas?|espigas?|postas?|medalhoes?|espetinhos?|un|unid)\b/i
+      /(\d+(?:[.,]\d+)?)\s*(colher(?:es)?|conchas?|bifes?|fatias?|pedacos?|latas?|scoops?|doses?|unidades?|xicaras?|copos?|pratos?|rodelas?|espigas?|postas?|medalh(?:ao|oes)?|espetinhos?|un|unid)\b/i
     const gramRegex = /(\d+(?:[.,]\d+)?)\s*(g|gr|ml)\b/i
     const countRegex = /^(\d+(?:[.,]\d+)?)\s+(.+)$/i
 
