@@ -290,7 +290,7 @@ export async function POST(request: NextRequest) {
         .maybeSingle()
 
       if (existingEnt?.id) {
-        await admin
+        const { error: entUpdErr } = await admin
           .from('user_entitlements')
           .update({
             plan_id: dbPlanId,
@@ -301,8 +301,9 @@ export async function POST(request: NextRequest) {
             updated_at: new Date().toISOString(),
           })
           .eq('id', existingEnt.id)
+        if (entUpdErr) logError('webhook:revenuecat:entitlement-update', entUpdErr, { userId, productId, eventType })
       } else if (targetStatus === 'active') {
-        await admin
+        const { error: entInsErr } = await admin
           .from('user_entitlements')
           .insert({
             user_id: userId,
@@ -316,6 +317,13 @@ export async function POST(request: NextRequest) {
             current_period_end: expiresDate,
             metadata: meta,
           })
+        // 23505 = já existe (re-entrega/corrida do MESMO usuário): idempotente, ok.
+        // Qualquer OUTRO erro era ENGOLIDO em silêncio (200 OK mascarava a falha do
+        // VIP na tabela primária) — agora loga (→ Sentry). O bug crítico (colisão
+        // ENTRE usuários pelo SKU) foi fechado pela migration que incluiu user_id.
+        if (entInsErr && (entInsErr as { code?: string }).code !== '23505') {
+          logError('webhook:revenuecat:entitlement-insert', entInsErr, { userId, productId, eventType })
+        }
       }
     } else if (targetStatus === 'active') {
       // ⚠️ Ativação com plano NÃO reconhecido (SKU novo da Apple antes de ser
