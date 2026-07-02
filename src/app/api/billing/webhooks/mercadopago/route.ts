@@ -220,7 +220,7 @@ export async function POST(req: Request) {
                   valid_until: end ? end.toISOString() : null,
                   metadata: { mercadopago: { kind: 'preapproval', subscription_id: providerSubscriptionId, raw: preapproval } },
                 },
-                { onConflict: 'provider,provider_subscription_id' },
+                { onConflict: 'user_id,provider,provider_subscription_id' },
               )
             await admin
               .from('app_subscriptions')
