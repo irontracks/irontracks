@@ -21,6 +21,8 @@ const BodySchema = z
     text: z.string().min(1).transform((s) => s.slice(0, 600)),
     dateKey: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     mealName: z.string().transform((s) => s.slice(0, 60)).optional(),
+    // uuid otimista da fila offline → idempotência (reenvio não duplica a refeição).
+    clientId: z.string().max(64).optional(),
   })
   .strict()
 
@@ -42,7 +44,7 @@ export async function POST(req: Request) {
 
     const parsedBody = await parseJsonBody(req, BodySchema)
     if (parsedBody.response) return parsedBody.response
-    const { text, dateKey, mealName } = parsedBody.data!
+    const { text, dateKey, mealName, clientId } = parsedBody.data!
 
     const apiKey = env.gemini.apiKey
     if (!apiKey) return NextResponse.json({ ok: false, error: 'ai_not_configured' }, { status: 500 })
@@ -72,7 +74,7 @@ export async function POST(req: Request) {
       protein,
       carbs,
       fat,
-    }, dateKey, [{ label: itemLabel, grams: 0, calories, protein, carbs, fat }])
+    }, dateKey, [{ label: itemLabel, grams: 0, calories, protein, carbs, fat }], clientId)
 
     // Auto-learn: save the AI-estimated food so the local parser
     // recognizes it next time without needing the AI again.
