@@ -288,6 +288,7 @@ export async function POST(request: Request) {
 
     return NextResponse.json({ ok: true, saved, idempotent })
   } catch (e: unknown) {
+    logError('api:workouts:finish', e)
     const msg = (e as Record<string, unknown>)?.message
     return NextResponse.json({ ok: false, error: typeof msg === 'string' ? msg : 'unknown_error' }, { status: 500 })
   }

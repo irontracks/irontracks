@@ -1,4 +1,5 @@
 import * as Sentry from "@sentry/nextjs"
+import { scrubSentryEvent } from "@/utils/sentryScrub"
 
 Sentry.init({
   dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
@@ -27,4 +28,8 @@ Sentry.init({
     stackFrameVariables: true,
     frameContextLines: 7,
   },
+
+  // Redige tokens/segredos das mensagens e das variáveis locais (stackFrameVariables)
+  // antes de enviar — evita vazar access_token/refresh_token pro Sentry (LGPD).
+  beforeSend: scrubSentryEvent,
 })

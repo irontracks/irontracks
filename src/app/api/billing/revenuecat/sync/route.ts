@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { logError } from '@/lib/logger'
 import { respondDbError } from '@/utils/api/dbError'
 import { cacheDelete } from '@/utils/cache'
 import { env } from '@/utils/env'
@@ -188,6 +189,7 @@ export async function POST() {
 
     return NextResponse.json({ ok: true, planId: resolvedPlanId, expiresDate })
   } catch (e: unknown) {
+    logError('billing:revenuecat:sync', e)
     return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 400 })
   }
 }
