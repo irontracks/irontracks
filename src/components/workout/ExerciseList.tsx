@@ -167,12 +167,12 @@ export default function ExerciseList() {
           blocks.map((b) => {
             if (b.type === 'solo') {
               const exIdx = b.idx;
-              return <ExerciseCard key={String(exercises[exIdx]?.id ?? exercises[exIdx]?.name ?? exIdx)} ex={exercises[exIdx]} exIdx={exIdx} />;
+              return <ExerciseCard key={String(exercises[exIdx]?.id ?? `noid-${exIdx}-${exercises[exIdx]?.name ?? ''}`)} ex={exercises[exIdx]} exIdx={exIdx} />;
             }
             return (
               <div key={`grp-${b.members[0]}`} className="rounded-2xl bg-yellow-500/[0.02] border border-yellow-500/10 p-1.5 space-y-0">
                 {b.members.map((exIdx, i) => (
-                  <React.Fragment key={String(exercises[exIdx]?.id ?? exercises[exIdx]?.name ?? exIdx)}>
+                  <React.Fragment key={String(exercises[exIdx]?.id ?? `noid-${exIdx}-${exercises[exIdx]?.name ?? ''}`)}>
                     <ExerciseCard
                       ex={exercises[exIdx]}
                       exIdx={exIdx}
