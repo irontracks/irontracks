@@ -583,7 +583,6 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         editActiveAddExerciseRef,
         setEditActiveDraft,
         setEditActiveOpen,
-        inAppNotify,
     })
 
     // Wrap handleFinishSession to save workout to Apple Health when enabled

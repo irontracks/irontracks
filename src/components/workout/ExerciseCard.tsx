@@ -18,7 +18,7 @@ import {
   Sistema21Set,
   WaveSet,
   GroupMethodSet,
-} from './SetRenderers';
+} from './set-renderers';
 import { HelpHint } from '@/components/ui/HelpHint';
 import { HELP_TERMS } from '@/utils/help/terms';
 import { parseTrainingNumber } from '@/utils/trainingNumber';
