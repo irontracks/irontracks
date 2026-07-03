@@ -11,6 +11,7 @@ import { redirect } from 'next/navigation'
 import DashboardClientEntry from './DashboardClientEntry'
 import { resolveRoleByUser } from '@/utils/auth/route'
 import { safePg } from '@/utils/safePgFilter'
+import { logWarn } from '@/lib/logger'
 
 const hydrateWorkouts = async (
   supabase: Awaited<ReturnType<typeof import('@/utils/supabase/server').createClient>>,
@@ -81,12 +82,18 @@ const tryRpcBootstrap = async (
 ): Promise<Record<string, unknown> | null> => {
   try {
     const { data, error } = await supabase.rpc('get_dashboard_bootstrap', { p_user_id: userId })
-    if (error) return null
+    if (error) {
+      // Fallback funciona, mas a regressão de latência não pode ficar invisível.
+      logWarn('dashboard:ssr', 'bootstrap RPC falhou — usando cadeia manual', error.message)
+      return null
+    }
     if (data && typeof data === 'object' && (data as Record<string, unknown>).ok) {
       return data as Record<string, unknown>
     }
+    logWarn('dashboard:ssr', 'bootstrap RPC com shape inesperado — usando cadeia manual')
     return null
-  } catch {
+  } catch (e) {
+    logWarn('dashboard:ssr', 'bootstrap RPC lançou — usando cadeia manual', e instanceof Error ? e.message : String(e))
     return null
   }
 }
