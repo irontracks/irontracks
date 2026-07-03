@@ -168,9 +168,12 @@ export function useCommunityData() {
     let mounted = true
     let incomingChannel: RealtimeChannel | null = null
     let outgoingChannel: RealtimeChannel | null = null
-    const run = async () => {
-      setLoading(true)
-      try { await loadAll(userId) } catch { if (!mounted) return; setProfiles([]); setFollows(new Map()); setFollowRequests([]) } finally { if (mounted) setLoading(false) }
+    // silent=true (refresh ao voltar pro app): NÃO liga o loading (a lista para de piscar
+    // /esvaziar na academia) e NÃO limpa os dados num erro — manter o que está na tela é
+    // melhor que zerar. O load inicial (silent=false) mantém o spinner + limpa em falha.
+    const run = async (silent = false) => {
+      if (!silent) setLoading(true)
+      try { await loadAll(userId) } catch { if (!mounted) return; if (!silent) { setProfiles([]); setFollows(new Map()); setFollowRequests([]) } } finally { if (mounted && !silent) setLoading(false) }
     }
     run()
     try {
@@ -202,7 +205,7 @@ export function useCommunityData() {
         } catch { }
       }).subscribe()
     } catch { }
-    const refresh = () => { try { if (!mounted) return; run() } catch { } }
+    const refresh = () => { try { if (!mounted) return; run(true) } catch { } }
     const handleVisibilityChange = () => { try { if (document.visibilityState === 'visible') refresh() } catch { } }
     try { document.addEventListener('visibilitychange', handleVisibilityChange); window.addEventListener('pageshow', refresh) } catch { }
     return () => {
