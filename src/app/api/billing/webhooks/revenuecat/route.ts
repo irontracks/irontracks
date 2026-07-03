@@ -223,21 +223,14 @@ export async function POST(request: NextRequest) {
     }
 
     // Evento ATIVO com SKU cujo plano NÃO existe em app_plans (SKU novo da Apple ainda não
-    // mapeado). Gravar uma linha NOVA com esse plan_id violaria a FK (23503 → 500 em
-    // loop): por isso os INSERTs abaixo só rodam quando resolvedPlanId existe. Mas os
-    // UPDATEs usam plan_id condicional e RENOVAM uma assinatura/entitlement JÁ existente
-    // sem tocar no plano — cobrindo a RENOVAÇÃO de um plano que saiu de app_plans (senão o
-    // valid_until não renovava e o VIP pago expiraria). Aqui só ALERTAMOS (→ Sentry: ops
-    // mapeia o SKU / concede manual pra usuário novo); o handler segue e responde 200,
-    // sem 500 nem retry-loop.
+    // mapeado). Gravar linha NOVA com esse plan_id violaria a FK (23503 → 500 em loop): por
+    // isso os INSERTs abaixo só rodam com resolvedPlanId. Os UPDATEs usam plan_id
+    // condicional e RENOVAM a JANELA (valid_until) de uma assinatura/entitlement existente
+    // sem tocar no plano — mas se o plano gravado tiver saído de app_plans o TIER cai pra
+    // free em getVipPlanLimits (renova a janela, não o benefício). O alerta PÓS-bloco
+    // distingue renovação-ok (warn) do órfão sem linha (error). Responde 200, sem retry.
     const unmappedActive = targetStatus === 'active' && !resolvedPlanId
-    if (unmappedActive) {
-      logError(
-        'webhook:revenuecat:unmapped-plan',
-        new Error('active event with SKU not in app_plans — new grant skipped; existing entitlement is still renewed if present'),
-        { userId, productId, dbPlanId, eventType },
-      )
-    }
+    let renewedExistingEnt = false
 
     // The app_subscriptions.provider CHECK constraint allows a fixed set of
     // values: asaas / stripe / apple / google / manual / admin / mercadopago.
@@ -327,13 +320,15 @@ export async function POST(request: NextRequest) {
         .maybeSingle()
 
       if (existingEnt?.id) {
+        renewedExistingEnt = true
         const { error: entUpdErr } = await admin
           .from('user_entitlements')
           .update({
             ...(resolvedPlanId ? { plan_id: resolvedPlanId } : {}),
             status: entStatus,
-            valid_until: expiresDate,
-            current_period_end: expiresDate,
+            // Num evento ativo SEM expiração (RENEWAL malformado) não sobrescreve a janela
+            // com null — valid_until=null resolveria como VIP vitalício. Mantém o valor.
+            ...((targetStatus === 'active' && expiresDate === null) ? {} : { valid_until: expiresDate, current_period_end: expiresDate }),
             metadata: meta,
             updated_at: new Date().toISOString(),
           })
@@ -361,6 +356,18 @@ export async function POST(request: NextRequest) {
         if (entInsErr && (entInsErr as { code?: string }).code !== '23505') {
           logError('webhook:revenuecat:entitlement-insert', entInsErr, { userId, productId, eventType })
         }
+      }
+    }
+
+    // Alerta do SKU não mapeado, com nível conforme o desfecho: renovação da JANELA de uma
+    // linha existente = warn (funcionou; só falta mapear o SKU pro tier resolver certo);
+    // ativação de usuário SEM linha prévia = error (órfão, precisa de grant manual). Evita
+    // ruído de erro no Sentry a cada renovação legítima de um SKU não mapeado.
+    if (unmappedActive) {
+      if (renewedExistingEnt) {
+        logWarn('webhook:revenuecat', 'active event with SKU not in app_plans — existing entitlement window renewed; map the SKU so the tier resolves', { userId, productId, dbPlanId, eventType })
+      } else {
+        logError('webhook:revenuecat:unmapped-plan', new Error('active event with SKU not in app_plans and no existing entitlement — manual grant required'), { userId, productId, dbPlanId, eventType })
       }
     }
 
