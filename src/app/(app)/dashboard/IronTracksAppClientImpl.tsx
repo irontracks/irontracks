@@ -808,6 +808,17 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         (authLoading && !hasCachedWorkouts) || (!user?.id && !hasCachedWorkouts) || !isDashboardReady
     ));
 
+    // perf: handlers ESTÁVEIS pros cards. O React.memo do WorkoutCard só surte efeito com
+    // props estáveis; os handleX subjacentes já são useCallback (useWorkoutCrud/Export),
+    // aqui só fixamos as arrows que antes eram recriadas inline a cada render — o que
+    // re-renderizava todos os cards a cada abertura de modal/menu no dashboard.
+    const cardQuickView = useCallback((w: unknown) => setQuickViewWorkout(w as Parameters<typeof setQuickViewWorkout>[0]), [setQuickViewWorkout])
+    const cardStartSession = useCallback((w: unknown) => handleStartSession(w), [handleStartSession])
+    const cardRestore = useCallback((w: unknown) => handleRestoreWorkout(w), [handleRestoreWorkout])
+    const cardShare = useCallback((w: unknown) => handleShareWorkout(w), [handleShareWorkout])
+    const cardEdit = useCallback((w: unknown) => handleEditWorkout(w), [handleEditWorkout])
+    const cardDelete = useCallback((id: unknown, title: unknown) => { if (id) handleDeleteWorkout(String(id), String(title || '')) }, [handleDeleteWorkout])
+
     const currentWorkoutId = activeSession?.workout?.id;
     let nextWorkout = null;
     if (currentWorkoutId && Array.isArray(workouts) && workouts.length > 0) {
@@ -1030,14 +1041,12 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                     onCreateWorkout={handleCreateWorkout}
                                     onExpressWorkout={() => setExpressWorkoutOpen(true)}
                                     onStartCardio={() => setStandaloneCardioOpen(true)}
-                                    onQuickView={(w) => setQuickViewWorkout(w)}
-                                    onStartSession={(w) => handleStartSession(w)}
-                                    onRestoreWorkout={(w: unknown) => handleRestoreWorkout(w)}
-                                    onShareWorkout={(w: unknown) => handleShareWorkout(w)}
-                                    onEditWorkout={(w: unknown) => handleEditWorkout(w)}
-                                    onDeleteWorkout={(id: unknown, title: unknown) => {
-                                        if (id) handleDeleteWorkout(String(id), String(title || ''))
-                                    }}
+                                    onQuickView={cardQuickView}
+                                    onStartSession={cardStartSession}
+                                    onRestoreWorkout={cardRestore}
+                                    onShareWorkout={cardShare}
+                                    onEditWorkout={cardEdit}
+                                    onDeleteWorkout={cardDelete}
                                     onBulkEditWorkouts={handleBulkEditWorkouts}
                                     currentUserId={String(user?.id || initialUserObj?.id || '')}
                                     exportingAll={Boolean(exportingAll)}
