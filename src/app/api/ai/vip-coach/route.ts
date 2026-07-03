@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
-import { checkVipFeatureAccess, incrementVipUsage } from '@/utils/vip/limits'
+import { checkVipFeatureAccess, refundVipUsage } from '@/utils/vip/limits'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { parseJsonBody } from '@/utils/zod'
 import { logInfo, logError } from '@/lib/logger'
@@ -79,6 +79,10 @@ function summariseAssessment(row: AnyObj): string {
 // ── Main handler ────────────────────────────────────────────────────────────
 
 export async function POST(req: Request) {
+  // Mesmo padrão do coach-chat: consome a cota no gate (meter) e reembolsa no finally se
+  // não entregar resposta — sem cobrar por falha do Gemini nem reabrir o TOCTOU.
+  let delivered = false
+  let refund: (() => Promise<void>) | null = null
   try {
     const auth = await requireUser()
     if (!auth.ok) return auth.response
@@ -91,17 +95,21 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 })
     }
 
-    const access = await checkVipFeatureAccess(supabase, userId, 'chat_daily')
+    const parsedBody = await parseJsonBody(req, BodySchema)
+    if (parsedBody.response) return parsedBody.response
+    const { message, mode } = parsedBody.data!
+
+    // Cota consumida ATÔMICA aqui (meter), depois do parse e antes do Gemini: fecha a
+    // janela TOCTOU do antigo check-then-act. Um corpo malformado é rejeitado acima, sem
+    // consumir. A partir daqui a cota já foi consumida; o finally reembolsa se não entregarmos.
+    const access = await checkVipFeatureAccess(supabase, userId, 'chat_daily', { meter: true })
+    refund = () => refundVipUsage(supabase, userId, 'chat')
     if (!access.allowed) {
       return NextResponse.json(
         { ok: false, error: 'limit_reached', upgradeRequired: true, message: 'Limite de mensagens atingido. Faça upgrade para continuar.' },
         { status: 403 },
       )
     }
-
-    const parsedBody = await parseJsonBody(req, BodySchema)
-    if (parsedBody.response) return parsedBody.response
-    const { message, mode } = parsedBody.data!
 
     const apiKey = env.gemini.apiKey
     if (!apiKey) {
@@ -293,9 +301,13 @@ export async function POST(req: Request) {
       }
     }
 
-    await incrementVipUsage(supabase, userId, 'chat')
+    delivered = true
     return NextResponse.json({ ok: true, answer, dataUsed: dataSources, followUps: [], actions: [], workout })
   } catch (e: unknown) {
     return handleGeminiError('vip-coach', e)
+  } finally {
+    // Consumiu a cota mas não entregou resposta (limite, falha do Gemini, config) →
+    // reembolsa. Best-effort: falha no reembolso é logada dentro de refundVipUsage.
+    if (refund && !delivered) await refund()
   }
 }
