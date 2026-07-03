@@ -530,11 +530,14 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
   // cada render do controller. Sem isso, qualquer mudança no controller (ticker
   // de pausa, deps do live activity, etc) faria todos os 50-80 consumers
   // (ExerciseCard, NormalSet, etc) re-renderizarem — anulando React.memo.
-  return useMemo(() => ({
+  // Split de context (perf): o value principal NÃO inclui `logs` (mapa cru que muda a
+  // CADA tecla). Os derivados (completedSets/progressPct/...) são primitivos e só mudam
+  // ao marcar série feita, então ficam aqui sem forçar re-render por tecla. `logs` é
+  // servido no WorkoutLogsContext, consumido só por ExerciseList/ExerciseCard.
+  const value = useMemo(() => ({
     session,
     workout,
     exercises,
-    logs,
     ui,
     settings,
     collapsed,
@@ -673,7 +676,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     currentExSetsCount,
     currentExDoneSets,
   }), [
-    session, workout, exercises, logs, ui, settings,
+    session, workout, exercises, ui, settings,
     collapsed, setCollapsed, finishing,
     openNotesKeys, setOpenNotesKeys,
     inviteOpen, setInviteOpen,
@@ -725,4 +728,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     completedSets, totalSets, progressPct, remainingSets,
     currentExSetsCount, currentExDoneSets,
   ]);
+
+  // `logs` sai do value principal e vem à parte: ActiveWorkout injeta no WorkoutLogsContext.
+  return { value, logs };
 }
