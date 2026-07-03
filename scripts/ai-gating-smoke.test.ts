@@ -160,7 +160,7 @@ async function main(): Promise<void> {
     if (count429 === 0) {
       process.stderr.write(
         `[WARN] rate limit did not trigger 429 in ${BATCH} burst requests ` +
-        `(expected ~${BATCH - 20}). Distribution: ${distribution}. ` +
+        `(expected ~${BATCH - 15}). Distribution: ${distribution}. ` +
         `Likely causes: Upstash Redis unreachable from the app (silently ` +
         `falls back to in-memory per-instance mode), or Vercel distributing ` +
         `across edge nodes faster than the memory-mode bucket fills. ` +
