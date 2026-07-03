@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { useWorkoutContext } from './WorkoutContext';
+import { useWorkoutContext, useWorkoutLogs } from './WorkoutContext';
 import ExerciseCard from './ExerciseCard';
 import { buildExerciseGroups } from '@/lib/workoutGroups';
 import dynamic from 'next/dynamic';
@@ -40,7 +40,8 @@ function GroupConnector({ method }: { method: string }) {
 }
 
 export default function ExerciseList() {
-  const { exercises, session, logs, collapsed, setCollapsed } = useWorkoutContext();
+  const { exercises, session, collapsed, setCollapsed } = useWorkoutContext();
+  const logs = useWorkoutLogs();
   const containerRef = React.useRef<HTMLDivElement | null>(null);
   const prevCompletedRef = React.useRef<Set<number>>(new Set());
   const prevDoneKeysRef = React.useRef<Set<string>>(new Set());
