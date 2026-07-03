@@ -5,7 +5,7 @@ import { motion } from 'framer-motion';
 import { Pause, Pencil, Gamepad2 } from 'lucide-react';
 import { BackButton } from '@/components/ui/BackButton';
 import { useActiveWorkoutController } from './workout/useActiveWorkoutController';
-import { WorkoutProvider } from './workout/WorkoutContext';
+import { WorkoutProvider, WorkoutLogsProvider } from './workout/WorkoutContext';
 import type { WorkoutContextType } from './workout/WorkoutContext';
 import { WorkoutTimerProvider } from './workout/WorkoutTimerContext';
 import { useWorkoutLiveActivity } from '@/hooks/useWorkoutLiveActivity';
@@ -25,7 +25,7 @@ const TeamChatDrawer = dynamic(
 );
 
 export default function ActiveWorkout(props: ActiveWorkoutProps & { controlledByName?: string | null }) {
-  const controller = useActiveWorkoutController(props);
+  const { value: controller, logs } = useActiveWorkoutController(props);
   const { session, workout, exercises } = controller;
 
   // ── iOS Workout Live Activity (Dynamic Island + Lock Screen) ──
@@ -184,6 +184,7 @@ export default function ActiveWorkout(props: ActiveWorkoutProps & { controlledBy
 
   return (
     <WorkoutProvider value={enhancedController}>
+     <WorkoutLogsProvider value={logs}>
      <WorkoutTimerProvider startedAtMs={startedAtMs}>
       <motion.div
         initial={{ y: '100%' }}
@@ -267,6 +268,7 @@ export default function ActiveWorkout(props: ActiveWorkoutProps & { controlledBy
         )}
       </motion.div>
      </WorkoutTimerProvider>
+     </WorkoutLogsProvider>
     </WorkoutProvider>
   );
 }

@@ -2,7 +2,7 @@
 
 import React, { useMemo, useState, useEffect } from 'react';
 import { ArrowDown, CheckCircle2, ChevronDown, ChevronUp, Dumbbell, Link, Loader2, Pencil, Play, Plus, Share2, Trash2, Trophy } from 'lucide-react';
-import { useWorkoutContext } from './WorkoutContext';
+import { useWorkoutContext, useWorkoutLogs } from './WorkoutContext';
 import {
   NormalSet,
   RestPauseSet,
@@ -42,9 +42,9 @@ function useSafeTeamWorkout() {
 type GroupPos = 'first' | 'middle' | 'last';
 
 function ExerciseCardInner({ ex, exIdx, groupPos }: { ex: WorkoutExercise; exIdx: number; groupPos?: GroupPos }) {
+  const logs = useWorkoutLogs();
   const {
     workout,
-    logs,
     collapsed,
     toggleCollapse,
     setCurrentExerciseIdx,
