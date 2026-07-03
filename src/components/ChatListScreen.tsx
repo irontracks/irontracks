@@ -77,11 +77,26 @@ const ChatListScreen = ({ user, onClose, onSelectChannel, onNavigateCommunity }:
         }
     }, [safeUserId, alert, supabase]);
 
+    useEffect(() => { loadUsers(); }, [loadUsers]);
+
+    // Presença dos contatos: canal ÚNICO por usuário + subscription ESTREITADA aos ids da
+    // lista (id=in.(...)). Antes escutava TODA UPDATE de `profiles` (presença de TODO
+    // usuário do app) num canal de nome fixo — rede/bateria à toa no mobile. contactIdsKey
+    // é estável entre updates de presença (mesma SET de ids) → NÃO re-inscreve a cada
+    // heartbeat, só quando a lista de contatos muda. Acima de 100 contatos cai pro
+    // sem-filtro (evita estourar o tamanho do filtro). Pior caso se o `in` não propagar:
+    // presença fica estática (a lista já carregou por loadUsers) — degradação, não quebra.
+    const contactIdsKey = useMemo(() => {
+        const ids = (Array.isArray(users) ? users : []).map((u) => String(u?.id || '')).filter(Boolean);
+        return Array.from(new Set(ids)).sort().join(',');
+    }, [users]);
     useEffect(() => {
-        loadUsers();
+        if (!safeUserId || !contactIdsKey) return;
+        const ids = contactIdsKey.split(',');
+        const narrow = ids.length > 0 && ids.length <= 100;
         const sub = supabase
-            .channel('profiles_presence_list')
-            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles' }, (payload) => {
+            .channel(`profiles_presence_list:${safeUserId}`)
+            .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'profiles', ...(narrow ? { filter: `id=in.(${ids.join(',')})` } : {}) }, (payload) => {
                 try {
                     const p = payload?.new && typeof payload.new === 'object' ? (payload.new as ProfilePresenceRow) : null
                     const pid = p?.id ? String(p.id) : ''
@@ -105,7 +120,7 @@ const ChatListScreen = ({ user, onClose, onSelectChannel, onNavigateCommunity }:
             })
             .subscribe();
         return () => { supabase.removeChannel(sub); };
-    }, [loadUsers, supabase]);
+    }, [safeUserId, contactIdsKey, supabase]);
 
     const isUserOnline = (lastSeen: string | number | null) => {
         if (!lastSeen || !nowMs) return false;
