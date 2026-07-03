@@ -2,18 +2,20 @@
 /**
  * Smoke test: AI endpoint gating (auth + rate-limit) against prod.
  *
- * Validates the gating chain for /api/ai/exercise-chat (no VIP gate,
+ * Validates the gating chain for /api/ai/exercise-swap (no VIP gate,
  * just auth + rate-limit — simplest endpoint to exercise the rate path).
+ * (Era /api/ai/exercise-chat; a rota foi renomeada e o alvo antigo passou a
+ * cair no fallback HTML de página — 200 — quebrando as asserções.)
  *
  * Scenarios:
  *   1. Unauthenticated request       → 401 (requireUser fails)
- *   2. Authenticated user × 25 hits  → mix of 400 (body invalid, parsed
+ *   2. Authenticated user × 60 hits  → mix of 400 (body invalid, parsed
  *                                       after rate-limit passes) and
- *                                       429 (rate-limit hit: 20/min cap)
+ *                                       429 (rate-limit hit: 15/min cap)
  *      Both counts must be > 0. Zero 2xx allowed because the body is
  *      deliberately invalid — any 2xx would mean zod parsing was bypassed.
  *
- * Zero Gemini quota consumed: exercise-chat checks rate-limit FIRST, then
+ * Zero Gemini quota consumed: exercise-swap checks rate-limit FIRST, then
  * parses the body. Invalid bodies return 400 before touching the LLM.
  * Overflow requests hit 429 before even parsing. Cost: zero tokens.
  *
@@ -49,7 +51,7 @@ const EMAIL = `ai-gate-${NONCE}@irontracks-test.local`
 const PASSWORD = `Ai-Gate-${NONCE}-${randomBytes(6).toString('hex')}`
 const FULL_NAME = `AI Gate ${NONCE}`
 
-const EXERCISE_CHAT_URL = `${BASE_URL}/api/ai/exercise-chat`
+const EXERCISE_SWAP_URL = `${BASE_URL}/api/ai/exercise-swap`
 
 const PROJECT_REF = new URL(SUPABASE_URL).host.split('.')[0]
 const COOKIE_NAME = `sb-${PROJECT_REF}-auth-token`
@@ -109,7 +111,7 @@ const body = JSON.stringify({ not_a_valid_field: true })
 async function post(cookie?: string): Promise<number> {
   const headers: Record<string, string> = { 'content-type': 'application/json' }
   if (cookie) headers.cookie = cookie
-  const res = await fetch(EXERCISE_CHAT_URL, { method: 'POST', headers, body })
+  const res = await fetch(EXERCISE_SWAP_URL, { method: 'POST', headers, body })
   return res.status
 }
 
@@ -121,15 +123,15 @@ async function main(): Promise<void> {
     // Scenario 1: unauthenticated request → 401
     const unauthStatus = await post()
     check(
-      'unauthenticated POST /api/ai/exercise-chat → 401',
+      'unauthenticated POST /api/ai/exercise-swap → 401',
       unauthStatus === 401,
       `got ${unauthStatus}`,
     )
 
     // Scenario 2: 60 parallel authenticated requests with invalid body.
-    // Rate-limit cap is 20/min (ai:exercise-chat:<userId>:<ip>). Expected:
-    //   - ~20 × 400 (rate-limit passes, body fails zod validation)
-    //   - ~40 × 429 (rate-limit hit)
+    // Rate-limit cap is 15/min (ai:exercise-swap:<userId>:<ip>). Expected:
+    //   - ~15 × 400 (rate-limit passes, body fails zod validation)
+    //   - ~45 × 429 (rate-limit hit)
     //   - 0 × 2xx (invalid body would need to bypass zod)
     //
     // If count429 === 0 that's a prod finding — rate-limit may have fallen
@@ -158,7 +160,7 @@ async function main(): Promise<void> {
     if (count429 === 0) {
       process.stderr.write(
         `[WARN] rate limit did not trigger 429 in ${BATCH} burst requests ` +
-        `(expected ~${BATCH - 20}). Distribution: ${distribution}. ` +
+        `(expected ~${BATCH - 15}). Distribution: ${distribution}. ` +
         `Likely causes: Upstash Redis unreachable from the app (silently ` +
         `falls back to in-memory per-instance mode), or Vercel distributing ` +
         `across edge nodes faster than the memory-mode bucket fills. ` +

@@ -16,12 +16,15 @@ export async function GET(_req: Request) {
     const cached = await cacheGet<Record<string, unknown>>(cacheKey, (v) => (v && typeof v === 'object' ? (v as Record<string, unknown>) : null))
     if (cached) return NextResponse.json(cached)
 
-    // Get Plan Limits
-    const { tier, limits, source, debug } = await getVipPlanLimits(supabase, userId)
-
-    // Get Usage
-    const chatUsage = await checkVipFeatureAccess(supabase, userId, 'chat_daily')
-    const wizardUsage = await checkVipFeatureAccess(supabase, userId, 'wizard_weekly')
+    // Resolve o plano UMA vez e injeta nas checagens (antes: 3 resoluções completas por
+    // request — 1 direta + 1 dentro de cada checkVipFeatureAccess). As 2 leituras de
+    // usage são read-only (sem meter) e independentes → paralelas.
+    const plan = await getVipPlanLimits(supabase, userId)
+    const { tier, limits, source, debug } = plan
+    const [chatUsage, wizardUsage] = await Promise.all([
+      checkVipFeatureAccess(supabase, userId, 'chat_daily', { plan }),
+      checkVipFeatureAccess(supabase, userId, 'wizard_weekly', { plan }),
+    ])
 
     const payload = {
       ok: true,

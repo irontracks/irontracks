@@ -54,7 +54,8 @@ export async function POST(req: Request) {
 
   const entitlement = await getVipPlanLimits(supabase, user.id)
   if (entitlement.tier === 'free') return NextResponse.json({ ok: false, error: 'vip_required' }, { status: 403 })
-  const access = await checkVipFeatureAccess(supabase, user.id, 'chat_daily')
+  // Injeta o plano já resolvido — evita a 2ª resolução completa dentro do check.
+  const access = await checkVipFeatureAccess(supabase, user.id, 'chat_daily', { plan: entitlement })
   if (!access.allowed) {
     return NextResponse.json(
       { ok: false, error: 'limit_reached', upgradeRequired: true, message: 'Limite de mensagens atingido. Faça upgrade para continuar.' },
