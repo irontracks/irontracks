@@ -7,6 +7,7 @@ import dynamic from 'next/dynamic';
 import { createClient } from '@/utils/supabase/client';
 
 import LoadingScreen from '@/components/LoadingScreen';
+import CommunityLoading from '@/app/(app)/community/loading';
 const ActiveWorkout = dynamic(() => import('@/components/ActiveWorkout'), { ssr: false });
 const RestTimerOverlay = dynamic(() => import('@/components/workout/RestTimerOverlay'), { ssr: false });
 const IncomingInviteModal = dynamic(() => import('@/components/IncomingInviteModal'), { ssr: false, loading: () => null });
@@ -19,8 +20,10 @@ const AdminPanelV2 = dynamic(() => import('@/components/AdminPanelV2'), { ssr: f
 const ChatListScreen = dynamic(() => import('@/components/ChatListScreen'), { ssr: false });
 const ChatDirectScreen = dynamic(() => import('@/components/ChatDirectScreen'), { ssr: false });
 const HistoryList = dynamic(() => import('@/components/HistoryList'), { ssr: false });
-const CommunityClient = dynamic(() => import('@/app/(app)/community/CommunityClient'), { ssr: false });
-const WorkoutReport = dynamic(() => import('@/components/WorkoutReport'), { ssr: false });
+// perf/boot: fallback enquanto o chunk baixa — evita a área ficar preta/vazia ao tocar a aba.
+const LazyScreenFallback = () => <div className="min-h-screen bg-neutral-950 animate-pulse" aria-hidden="true" />;
+const CommunityClient = dynamic(() => import('@/app/(app)/community/CommunityClient'), { ssr: false, loading: () => <CommunityLoading /> });
+const WorkoutReport = dynamic(() => import('@/components/WorkoutReport'), { ssr: false, loading: () => <LazyScreenFallback /> });
 const WeeklyMuscleSummary = dynamic(() => import('@/components/dashboard/WeeklyMuscleSummary'), { ssr: false });
 const ExerciseEditor = dynamic(() => import('@/components/ExerciseEditor'), { ssr: false });
 const ProfilePage = dynamic(() => import('@/components/ProfilePage'), { ssr: false });
@@ -96,7 +99,7 @@ const HealthWidget = dynamic(() => import('@/components/dashboard/HealthWidget')
 const GymDetectToastWrapper = dynamic(() => import('@/components/dashboard/GymDetectToastWrapper'), { ssr: false })
 
 const AssessmentHistory = dynamic(() => import('@/components/assessment/AssessmentHistory'), { ssr: false });
-const VipHub = dynamic(() => import('@/components/VipHub'), { ssr: false });
+const VipHub = dynamic(() => import('@/components/VipHub'), { ssr: false, loading: () => <LazyScreenFallback /> });
 
 const appId = 'irontracks-production';
 
@@ -770,7 +773,10 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
     // to show. In that case, render the dashboard immediately (workouts will be
     // refreshed silently in the background once auth completes).
     const hasCachedWorkouts = Array.isArray(workouts) && workouts.length > 0
-    const isDashboardReady = userSettingsApi.loaded; // streakLoading intentionally excluded (secondary data, must not block app)
+    // perf/boot: com treinos cacheados, NÃO travar o app inteiro esperando o round-trip
+    // de user_settings — renderiza o dashboard na hora com os defaults e aplica as
+    // preferências (som/unidades) quando chegarem. streakLoading segue excluído (secundário).
+    const isDashboardReady = userSettingsApi.loaded || hasCachedWorkouts;
     // Quando view='active' mas activeSession=null: o WKWebView foi morto pelo iOS
     // enquanto o app estava em background. A shell nativa preservou a URL
     // /dashboard/active, mas o JS recomeçou do zero — activeSession ainda não foi
