@@ -209,7 +209,7 @@ function WorkoutCardInner({
         </div>
       </div>
 
-      <div className="absolute top-2 right-2 flex gap-1 opacity-100 transition-opacity z-20 bg-neutral-900/50 backdrop-blur-sm rounded-lg p-1 border border-white/5 md:opacity-0 md:group-hover:opacity-100">
+      <div className="absolute top-2 right-2 flex gap-1 opacity-100 transition-opacity z-20 bg-neutral-900/90 rounded-lg p-1 border border-white/5 md:opacity-0 md:group-hover:opacity-100">
         <button
           onClick={async (e) => { e.stopPropagation(); await runAction('share', () => onShareWorkout(w)) }}
           disabled={isBusy}
