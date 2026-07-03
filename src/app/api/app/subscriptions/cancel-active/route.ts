@@ -10,6 +10,7 @@ import { mercadopagoRequest } from '@/lib/mercadopago'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { respondDbError } from '@/utils/api/dbError'
 import { logError } from '@/lib/logger'
+import { cacheDelete } from '@/utils/cache'
 
 export const dynamic = 'force-dynamic'
 
@@ -109,6 +110,13 @@ export async function POST(req: Request) {
         .eq('user_id', user.id)
         .in('status', ['active', 'trialing', 'past_due'])
     } catch (e) { logError('api:subscriptions:cancel-active:revoke-entitlements', e) }
+
+    // Sem isto o cache (vip:access TTL 30s / bootstrap) manteria o VIP "ativo" por até
+    // 30s após o cancelamento — contradizendo o "removed immediately" acima.
+    await Promise.all([
+      cacheDelete(`vip:access:${user.id}`).catch(() => {}),
+      cacheDelete(`dashboard:bootstrap:${user.id}`).catch(() => {}),
+    ])
 
     return NextResponse.json({ ok: true, cancelled: true, id: sub.id })
   } catch (e: unknown) {

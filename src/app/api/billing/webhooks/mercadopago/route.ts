@@ -6,8 +6,22 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { mercadopagoRequest } from '@/lib/mercadopago'
 import { parseJsonBody } from '@/utils/zod'
 import { env } from '@/utils/env'
+import { cacheDelete } from '@/utils/cache'
 
 export const dynamic = 'force-dynamic'
+
+// Invalida os caches de VIP do usuário após conceder/revogar entitlement. Sem isto, o
+// comprador via MercadoPago ficava com o cache antigo (vip:access TTL 30s / bootstrap)
+// e não via o VIP na hora — os webhooks de RevenueCat/Asaas já faziam isso; o de MP não.
+// Best-effort: falha na invalidação não quebra o webhook.
+async function bustVipCaches(userId: string) {
+  const uid = String(userId || '').trim()
+  if (!uid) return
+  await Promise.all([
+    cacheDelete(`vip:access:${uid}`).catch(() => {}),
+    cacheDelete(`dashboard:bootstrap:${uid}`).catch(() => {}),
+  ])
+}
 
 const parseSignature = (raw: string) => {
   const parts = raw.split(',').map((p) => p.trim()).filter(Boolean)
@@ -230,6 +244,8 @@ export async function POST(req: Request) {
                 updated_at: new Date().toISOString(),
               })
               .eq('id', sub.id)
+            // VIP concedido/renovado por preapproval → invalida o cache pra refletir na hora.
+            await bustVipCaches(sub.user_id)
           }
         }
       }
@@ -502,6 +518,10 @@ export async function POST(req: Request) {
             .eq('user_id', userId)
             .in('status', ['active', 'past_due', 'pending'])
         }
+
+        // VIP concedido (payment aprovado) ou revogado (refund/chargeback) → invalida o
+        // cache do usuário pra refletir na hora (evita ficar FREE por até 30s pós-compra).
+        await bustVipCaches(userId)
       }
 
       return NextResponse.json({ ok: true })
