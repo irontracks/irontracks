@@ -71,20 +71,30 @@ const hydrateWorkouts = async (
   return base.map((w) => ({ ...w, exercises: exByWorkout.get((w as Record<string, unknown>).id as string) || [] }))
 }
 
+// RPC get_dashboard_bootstrap: 1 round-trip com profile + workouts JÁ hidratados
+// (exercises + sets inline, mesmos fallbacks template→any→student da cadeia manual;
+// migration 20260703210000 completou created_by/is_unilateral/side_rest_time/
+// transition_time/is_warmup). null em erro/shape inesperado → cai na cadeia manual.
+const tryRpcBootstrap = async (
+  supabase: Awaited<ReturnType<typeof import('@/utils/supabase/server').createClient>>,
+  userId: string,
+): Promise<Record<string, unknown> | null> => {
+  try {
+    const { data, error } = await supabase.rpc('get_dashboard_bootstrap', { p_user_id: userId })
+    if (error) return null
+    if (data && typeof data === 'object' && (data as Record<string, unknown>).ok) {
+      return data as Record<string, unknown>
+    }
+    return null
+  } catch {
+    return null
+  }
+}
+
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
   const { data: { user }, error } = await supabase.auth.getUser()
   if (error || !user?.id) redirect('/?next=/dashboard')
-
-  // Parallel fetch: profile + role + initial workouts
-  const [{ data: profile }, resolved] = await Promise.all([
-    supabase
-      .from('profiles')
-      .select('role, display_name, photo_url')
-      .eq('id', user.id)
-      .maybeSingle(),
-    resolveRoleByUser({ id: user.id, email: user.email ?? null }),
-  ])
 
   const initialUser = {
     id: user.id,
@@ -92,55 +102,85 @@ export default async function DashboardLayout({ children }: { children: React.Re
     user_metadata: user.user_metadata ?? {},
   }
 
-  const initialProfile = {
-    role: resolved?.role ?? profile?.role ?? null,
-    display_name: profile?.display_name ?? null,
-    photo_url: profile?.photo_url ?? null,
-  }
+  // Caminho rápido: RPC (1 round-trip) + role em paralelo. A cadeia manual abaixo fica
+  // como fallback integral (RPC ausente/erro) — pior caso = comportamento anterior.
+  const [rpcData, resolved] = await Promise.all([
+    tryRpcBootstrap(supabase, user.id),
+    resolveRoleByUser({ id: user.id, email: user.email ?? null }),
+  ])
 
-  let baseWorkouts: unknown[] = []
-  try {
-    const { data } = await supabase
-      .from('workouts')
-      .select('id, name, notes, is_template, user_id, created_by, archived_at, sort_order, created_at, student_id')
-      .eq('is_template', true)
-      .eq('user_id', user.id)
-      .order('name', { ascending: true })
-      .limit(500)
-    baseWorkouts = Array.isArray(data) ? data : []
-  } catch {
-    baseWorkouts = []
-  }
+  let initialProfile: { role: string | null; display_name: string | null; photo_url: string | null }
+  let initialWorkouts: unknown[]
 
-  if (!baseWorkouts.length) {
+  const rpcProfile = rpcData && rpcData.profile && typeof rpcData.profile === 'object'
+    ? (rpcData.profile as Record<string, unknown>)
+    : null
+
+  if (rpcData && Array.isArray(rpcData.workouts)) {
+    initialProfile = {
+      role: resolved?.role ?? (typeof rpcProfile?.role === 'string' ? rpcProfile.role : null),
+      display_name: typeof rpcProfile?.display_name === 'string' ? rpcProfile.display_name : null,
+      photo_url: typeof rpcProfile?.photo_url === 'string' ? rpcProfile.photo_url : null,
+    }
+    initialWorkouts = rpcData.workouts
+  } else {
+    // ── Fallback: cadeia manual (comportamento anterior, intacto) ──
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role, display_name, photo_url')
+      .eq('id', user.id)
+      .maybeSingle()
+
+    initialProfile = {
+      role: resolved?.role ?? profile?.role ?? null,
+      display_name: profile?.display_name ?? null,
+      photo_url: profile?.photo_url ?? null,
+    }
+
+    let baseWorkouts: unknown[] = []
     try {
-      const { data } = await supabase.from('workouts').select('id, name, notes, is_template, user_id, created_by, archived_at, sort_order, created_at, student_id').eq('user_id', user.id).order('name', { ascending: true }).limit(500)
+      const { data } = await supabase
+        .from('workouts')
+        .select('id, name, notes, is_template, user_id, created_by, archived_at, sort_order, created_at, student_id')
+        .eq('is_template', true)
+        .eq('user_id', user.id)
+        .order('name', { ascending: true })
+        .limit(500)
       baseWorkouts = Array.isArray(data) ? data : []
     } catch {
       baseWorkouts = []
     }
-  }
 
-  if (!baseWorkouts.length) {
-    try {
-      const { data: student } = await supabase.from('students').select('id').eq('user_id', user.id).maybeSingle()
-      const studentId = student?.id ? String(student.id) : ''
-      if (studentId) {
-        const { data } = await supabase
-          .from('workouts')
-          .select('id, name, notes, is_template, user_id, created_by, archived_at, sort_order, created_at, student_id')
-          .eq('is_template', true)
-          .or(`user_id.eq.${safePg(studentId)},student_id.eq.${safePg(studentId)}`)
-          .order('name', { ascending: true })
-          .limit(500)
+    if (!baseWorkouts.length) {
+      try {
+        const { data } = await supabase.from('workouts').select('id, name, notes, is_template, user_id, created_by, archived_at, sort_order, created_at, student_id').eq('user_id', user.id).order('name', { ascending: true }).limit(500)
         baseWorkouts = Array.isArray(data) ? data : []
+      } catch {
+        baseWorkouts = []
       }
-    } catch {
-      baseWorkouts = []
     }
-  }
 
-  const initialWorkouts = await hydrateWorkouts(supabase, baseWorkouts)
+    if (!baseWorkouts.length) {
+      try {
+        const { data: student } = await supabase.from('students').select('id').eq('user_id', user.id).maybeSingle()
+        const studentId = student?.id ? String(student.id) : ''
+        if (studentId) {
+          const { data } = await supabase
+            .from('workouts')
+            .select('id, name, notes, is_template, user_id, created_by, archived_at, sort_order, created_at, student_id')
+            .eq('is_template', true)
+            .or(`user_id.eq.${safePg(studentId)},student_id.eq.${safePg(studentId)}`)
+            .order('name', { ascending: true })
+            .limit(500)
+          baseWorkouts = Array.isArray(data) ? data : []
+        }
+      } catch {
+        baseWorkouts = []
+      }
+    }
+
+    initialWorkouts = await hydrateWorkouts(supabase, baseWorkouts)
+  }
 
   return (
     <>
