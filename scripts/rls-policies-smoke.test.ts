@@ -8,6 +8,10 @@
  *   1. access_requests: anon cannot INSERT status='approved'; can INSERT 'pending'
  *   2. users_share_private_channel RPC (now checks direct_channels): false
  *      for disconnected users, true for users that share a direct_channel
+ *   3. Students can read assigned workouts (migration 20260703220000):
+ *      aluno (students.user_id = auth.uid()) LÊ workout/exercise/set onde
+ *      workouts.student_id = students.id; NÃO consegue UPDATE/DELETE; e um
+ *      terceiro sem vínculo não vê nada
  *
  * Creates 2 synthetic users (userA, userB) via service_role, signs them in
  * via the anon key to obtain real JWTs, then exercises each vector. All
@@ -47,6 +51,8 @@ interface Ctx {
   userA: { id: string; email: string }
   userB: { id: string; email: string }
   createdDirectChannelIds: string[]
+  createdStudentIds: string[]
+  createdWorkoutIds: string[]
 }
 
 async function setup(): Promise<Ctx> {
@@ -77,6 +83,8 @@ async function setup(): Promise<Ctx> {
     userA: { id: a.user.id, email: emailA },
     userB: { id: b.user.id, email: emailB },
     createdDirectChannelIds: [],
+    createdStudentIds: [],
+    createdWorkoutIds: [],
   }
 }
 
@@ -84,6 +92,12 @@ async function cleanup(ctx: Ctx): Promise<void> {
   if (ctx.createdDirectChannelIds.length > 0) {
     await ctx.admin.from('direct_messages').delete().in('channel_id', ctx.createdDirectChannelIds)
     await ctx.admin.from('direct_channels').delete().in('id', ctx.createdDirectChannelIds)
+  }
+  if (ctx.createdWorkoutIds.length > 0) {
+    await ctx.admin.from('workouts').delete().in('id', ctx.createdWorkoutIds)
+  }
+  if (ctx.createdStudentIds.length > 0) {
+    await ctx.admin.from('students').delete().in('id', ctx.createdStudentIds)
   }
   await ctx.admin.from('access_requests').delete().like('email', `${EMAIL_PREFIX}%`)
   await ctx.admin.auth.admin.deleteUser(ctx.userA.id)
@@ -166,12 +180,105 @@ async function test_users_share_private_channel_rpc(ctx: Ctx): Promise<void> {
   }
 }
 
+async function test_students_read_assigned_workouts(ctx: Ctx): Promise<void> {
+  // Cenário: userB é o teacher; userA é o aluno com registro em students
+  // (user_id preenchido). Workout atribuído via student_id, user_id NULL —
+  // exatamente o padrão do assignWorkoutToStudent pra aluno sem conta que
+  // depois foi vinculado.
+  const { data: student, error: stErr } = await ctx.admin
+    .from('students')
+    .insert({ teacher_id: ctx.userB.id, user_id: ctx.userA.id, name: 'RLS Aluno A', email: ctx.userA.email })
+    .select('id')
+    .single()
+  if (stErr || !student) {
+    check('students_read_assigned setup (students insert)', false, stErr?.message)
+    return
+  }
+  ctx.createdStudentIds.push(student.id)
+
+  const { data: workout, error: wErr } = await ctx.admin
+    .from('workouts')
+    .insert({ user_id: null, student_id: student.id, name: 'RLS Treino Atribuído', is_template: true, created_by: ctx.userB.id })
+    .select('id')
+    .single()
+  if (wErr || !workout) {
+    check('students_read_assigned setup (workouts insert)', false, wErr?.message)
+    return
+  }
+  ctx.createdWorkoutIds.push(workout.id)
+
+  const { data: exercise } = await ctx.admin
+    .from('exercises')
+    .insert({ workout_id: workout.id, name: 'Supino', order: 0 })
+    .select('id')
+    .single()
+  if (exercise) {
+    await ctx.admin.from('sets').insert({ exercise_id: exercise.id, set_number: 1, reps: '10', weight: 40 })
+  }
+
+  // Aluno (userA) autenticado deve LER o workout, exercises e sets
+  const alunoClient = createClient(SUPABASE_URL!, ANON_KEY!, { auth: { persistSession: false } })
+  const { error: signInErr } = await alunoClient.auth.signInWithPassword({ email: ctx.userA.email, password: PASSWORD })
+  if (signInErr) {
+    check('students_read_assigned setup (signIn aluno)', false, signInErr.message)
+    return
+  }
+
+  const { data: wRows } = await alunoClient.from('workouts').select('id, name').eq('id', workout.id)
+  check(
+    'aluno SELECT workout atribuído via student_id',
+    Array.isArray(wRows) && wRows.length === 1,
+    `got ${JSON.stringify(wRows)}`,
+  )
+
+  const { data: exRows } = await alunoClient.from('exercises').select('id').eq('workout_id', workout.id)
+  check(
+    'aluno SELECT exercises do workout atribuído',
+    Array.isArray(exRows) && exRows.length === 1,
+    `got ${JSON.stringify(exRows)}`,
+  )
+
+  if (exercise) {
+    const { data: setRows } = await alunoClient.from('sets').select('id').eq('exercise_id', exercise.id)
+    check(
+      'aluno SELECT sets do workout atribuído',
+      Array.isArray(setRows) && setRows.length === 1,
+      `got ${JSON.stringify(setRows)}`,
+    )
+  }
+
+  // Policy é SELECT-only: UPDATE/DELETE não afetam nenhuma linha
+  const { data: updRows } = await alunoClient.from('workouts').update({ name: 'hacked' }).eq('id', workout.id).select('id')
+  check(
+    'aluno NÃO consegue UPDATE no workout atribuído (SELECT-only)',
+    !updRows || updRows.length === 0,
+    `update afetou ${JSON.stringify(updRows)}`,
+  )
+  const { data: delRows } = await alunoClient.from('workouts').delete().eq('id', workout.id).select('id')
+  check(
+    'aluno NÃO consegue DELETE no workout atribuído (SELECT-only)',
+    !delRows || delRows.length === 0,
+    `delete afetou ${JSON.stringify(delRows)}`,
+  )
+  await alunoClient.auth.signOut()
+
+  // Terceiro sem vínculo (anon, sem sessão) não vê nada
+  const anon = createClient(SUPABASE_URL!, ANON_KEY!, { auth: { persistSession: false } })
+  const { data: anonRows } = await anon.from('workouts').select('id').eq('id', workout.id)
+  check(
+    'anon não vê workout atribuído',
+    !anonRows || anonRows.length === 0,
+    `got ${JSON.stringify(anonRows)}`,
+  )
+}
+
 async function main(): Promise<void> {
   let ctx: Ctx | null = null
   try {
     ctx = await setup()
     await test_access_requests_status_pending(ctx)
     await test_users_share_private_channel_rpc(ctx)
+    await test_students_read_assigned_workouts(ctx)
   } finally {
     if (ctx) {
       try {
