@@ -209,6 +209,32 @@ export async function POST(request: NextRequest) {
 
     const admin = createAdminClient()
 
+    // Resolve o plano contra app_plans. Há FK (user_entitlements.plan_id e
+    // app_subscriptions.plan_id → app_plans.id): gravar um plan_id inexistente lança
+    // 23503, então resolveDbPlanId (só transformação de string) NÃO basta. Tenta o
+    // productId cru e o dbPlanId normalizado (mesma lógica do /revenuecat/sync).
+    let resolvedPlanId: string | null = null
+    for (const candidate of [...new Set([productId, dbPlanId].filter(Boolean))]) {
+      const { data: plan } = await admin.from('app_plans').select('id').eq('id', candidate).maybeSingle()
+      if (plan?.id) { resolvedPlanId = plan.id; break }
+    }
+
+    // Ativação com SKU cujo plano NÃO existe em app_plans (SKU novo da Apple ainda não
+    // mapeado): gravar app_subscriptions/user_entitlements com esse plan_id violaria a FK
+    // (23503 → 500) e a RevenueCat entraria em retry-loop, sem nunca conceder VIP nem
+    // gerar alerta útil (o alerta antigo ficava DEPOIS do INSERT que dava 500 → nunca
+    // rodava). Em vez disso: ALERTA (→ Sentry: ops mapeia o SKU + concede manual) e ACK
+    // 200 pra encerrar o retry. O grant fica manual — honesto, pois não dá pra inferir o
+    // tier — mas agora observável, e sem 500 em loop.
+    if (targetStatus === 'active' && !resolvedPlanId) {
+      logError(
+        'webhook:revenuecat:unmapped-plan',
+        new Error('active purchase with SKU not in app_plans — manual grant required'),
+        { userId, productId, dbPlanId, eventType },
+      )
+      return NextResponse.json({ ok: true, skipped: 'unmapped_plan' })
+    }
+
     // The app_subscriptions.provider CHECK constraint allows a fixed set of
     // values: asaas / stripe / apple / google / manual / admin / mercadopago.
     // RevenueCat is an intermediary over Apple IAP — the source of truth is
@@ -245,7 +271,9 @@ export async function POST(request: NextRequest) {
       const { error } = await admin
         .from('app_subscriptions')
         .update({
-          plan_id: dbPlanId || productId || undefined,
+          // Só sobrescreve o plano quando resolvido; num evento inativo com plano não
+          // resolvido, mantém o plan_id existente (evita FK 23503).
+          ...(resolvedPlanId ? { plan_id: resolvedPlanId } : {}),
           status: targetStatus,
           current_period_end: expiresDate,
           cancel_at_period_end: targetStatus === 'canceled',
@@ -262,7 +290,8 @@ export async function POST(request: NextRequest) {
         .from('app_subscriptions')
         .insert({
           user_id: userId,
-          plan_id: dbPlanId || productId,
+          // Ativação passou pelo guard acima → resolvedPlanId garantido non-null.
+          plan_id: resolvedPlanId as string,
           status: 'active',
           provider: 'apple',
           current_period_start: new Date().toISOString(),
@@ -278,7 +307,10 @@ export async function POST(request: NextRequest) {
     // Sync to user_entitlements (primary VIP resolution table)
     // provider must be 'apple' (RevenueCat is an intermediary for Apple IAP)
     // status mapping: active→active, canceled→cancelled, expired→inactive
-    if (dbPlanId) {
+    // Ativação com SKU não mapeado já retornou acima (com alerta). Aqui, pra ATIVAÇÃO o
+    // resolvedPlanId está garantido; pra evento inativo só mudamos o status (o plan_id só
+    // é sobrescrito quando resolvido, evitando FK 23503 num evento de plano não mapeado).
+    {
       const entStatus = targetStatus === 'active' ? 'active' : targetStatus === 'canceled' ? 'cancelled' : 'inactive'
       const { data: existingEnt } = await admin
         .from('user_entitlements')
@@ -293,7 +325,7 @@ export async function POST(request: NextRequest) {
         const { error: entUpdErr } = await admin
           .from('user_entitlements')
           .update({
-            plan_id: dbPlanId,
+            ...(resolvedPlanId ? { plan_id: resolvedPlanId } : {}),
             status: entStatus,
             valid_until: expiresDate,
             current_period_end: expiresDate,
@@ -307,7 +339,7 @@ export async function POST(request: NextRequest) {
           .from('user_entitlements')
           .insert({
             user_id: userId,
-            plan_id: dbPlanId,
+            plan_id: resolvedPlanId as string,
             status: 'active',
             provider: 'apple',
             provider_subscription_id: productId,
@@ -325,17 +357,6 @@ export async function POST(request: NextRequest) {
           logError('webhook:revenuecat:entitlement-insert', entInsErr, { userId, productId, eventType })
         }
       }
-    } else if (targetStatus === 'active') {
-      // ⚠️ Ativação com plano NÃO reconhecido (SKU novo da Apple antes de ser
-      // mapeado em app_plans): user_entitlements — a tabela PRIMÁRIA de VIP — NÃO
-      // é sincronizada, então o usuário pagou mas pode não virar VIP. Antes isso
-      // passava em silêncio (200 OK). Agora loga (→ Sentry, alertável) pra permitir
-      // grant manual + adicionar o mapeamento do SKU. Não altera a resposta.
-      logError(
-        'webhook:revenuecat:unmapped-plan',
-        new Error('active purchase with unmapped plan — user_entitlements NOT synced'),
-        { userId, productId, eventType },
-      )
     }
 
     // Invalidate VIP caches
