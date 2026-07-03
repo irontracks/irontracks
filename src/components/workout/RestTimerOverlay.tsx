@@ -674,7 +674,9 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
                 </div>
             )}
 
-            <div style={{ bottom: kbInset || undefined }} className="fixed bottom-0 left-0 right-0 bg-neutral-950/97 backdrop-blur-xl border-t border-neutral-800/80 py-2 px-4 shadow-2xl z-[2100] animate-slide-up pb-safe overflow-x-hidden transition-[bottom] duration-150">
+            {/* perf: fundo sólido em vez de backdrop-blur-xl — o blur roda o descanso
+                inteiro (efeito iOS mais caro da tela) e engasga o scroll da lista por baixo. */}
+            <div style={{ bottom: kbInset || undefined }} className="fixed bottom-0 left-0 right-0 bg-neutral-950 border-t border-neutral-800/80 py-2 px-4 shadow-2xl z-[2100] animate-slide-up pb-safe overflow-x-hidden transition-[bottom] duration-150">
                 <div className="flex items-center gap-3 max-w-md mx-auto min-w-0">
                     {/* Circular SVG ring — compact size matching bar height */}
                     <div className="relative flex-shrink-0" style={{ width: 68, height: 68 }}>

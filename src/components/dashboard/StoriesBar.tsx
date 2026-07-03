@@ -312,7 +312,9 @@ export default function StoriesBar({
                         background: 'conic-gradient(from 0deg, #f59e0b, #ef4444, #8b5cf6, #3b82f6, #10b981, #f59e0b)',
                         padding: '2.5px',
                         borderRadius: '9999px',
-                        animation: 'spin-slow 6s linear infinite, aurora-pulse 2s ease-in-out infinite',
+                        // perf: só spin-slow (transform, barato na GPU). Removido aurora-pulse,
+                        // que anima `filter` e recalcula todo frame em N rings, pra sempre, no topo.
+                        animation: 'spin-slow 6s linear infinite',
                       }}
                     />
                   )}
