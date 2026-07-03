@@ -308,9 +308,13 @@ export async function checkVipFeatureAccess(
   supabase: SupabaseClient,
   userId: string,
   feature: keyof VipTierLimits,
-  opts?: { meter?: boolean }
+  // opts.plan: resultado de getVipPlanLimits JÁ resolvido pelo caller — evita re-resolver
+  // o plano (~3-4 queries) quando a rota checa várias features no mesmo request (ex.:
+  // vip/status checava 2 features + 1 resolução direta = 3 resoluções). Opcional e
+  // backward-compatible: sem `plan`, resolve internamente como sempre.
+  opts?: { meter?: boolean, plan?: VipPlanResult }
 ): Promise<{ allowed: boolean, currentUsage: number, limit: number | null, tier: string }> {
-  const { tier, limits, source } = await getVipPlanLimits(supabase, userId)
+  const { tier, limits, source } = opts?.plan ?? await getVipPlanLimits(supabase, userId)
   const normalizedTier = normalizePlanId(tier)
 
   // Fix #7: Check limits object first (respects limits_override from admin)

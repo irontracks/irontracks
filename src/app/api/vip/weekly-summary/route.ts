@@ -98,11 +98,14 @@ export async function GET() {
   const supabase = auth.supabase
   const user = auth.user
 
-  const access = await checkVipFeatureAccess(supabase, user.id, 'analytics', { meter: true })
+  // Resolve o plano UMA vez e injeta no check (antes: 2 resoluções — a do meter interno
+  // + a direta). Resolver antes do meter não muda comportamento: o consumo atômico e os
+  // gates (allowed + limits.analytics) seguem idênticos.
+  const plan = await getVipPlanLimits(supabase, user.id)
+  const access = await checkVipFeatureAccess(supabase, user.id, 'analytics', { meter: true, plan })
   if (!access.allowed) {
     return NextResponse.json({ ok: false, error: 'vip_required', upgradeRequired: true }, { status: 403 })
   }
-  const plan = await getVipPlanLimits(supabase, user.id)
   if (!plan?.limits?.analytics) {
     return NextResponse.json({ ok: false, error: 'vip_required', upgradeRequired: true }, { status: 403 })
   }
