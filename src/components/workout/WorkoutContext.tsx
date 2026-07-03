@@ -25,8 +25,15 @@ export const WorkoutProvider = WorkoutContext.Provider;
 // ── Logs em context separado ────────────────────────────────────────────────
 // Só ExerciseList/ExerciseCard consomem — assim uma tecla no peso/reps re-renderiza
 // apenas eles, não os ~48 consumers do context principal.
-const WorkoutLogsContext = createContext<WorkoutLogs>({} as WorkoutLogs);
+// null como default (não `{}`) pra falhar ALTO se algum componente futuro consumir fora
+// do provider — igual ao useWorkoutContext. Um mapa vazio legítimo (sem séries ainda)
+// chega como `{}` DO provider, distinto do null de "sem provider".
+const WorkoutLogsContext = createContext<WorkoutLogs | null>(null);
 
-export const useWorkoutLogs = () => useContext(WorkoutLogsContext);
+export const useWorkoutLogs = (): WorkoutLogs => {
+  const ctx = useContext(WorkoutLogsContext);
+  if (ctx === null) throw new Error('useWorkoutLogs must be used within WorkoutLogsProvider');
+  return ctx;
+};
 
 export const WorkoutLogsProvider = WorkoutLogsContext.Provider;
