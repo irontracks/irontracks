@@ -207,13 +207,21 @@ async function test_students_read_assigned_workouts(ctx: Ctx): Promise<void> {
   }
   ctx.createdWorkoutIds.push(workout.id)
 
-  const { data: exercise } = await ctx.admin
+  const { data: exercise, error: exInsErr } = await ctx.admin
     .from('exercises')
     .insert({ workout_id: workout.id, name: 'Supino', order: 0 })
     .select('id')
     .single()
-  if (exercise) {
-    await ctx.admin.from('sets').insert({ exercise_id: exercise.id, set_number: 1, reps: '10', weight: 40 })
+  if (exInsErr || !exercise) {
+    check('students_read_assigned setup (exercises insert)', false, exInsErr?.message)
+    return
+  }
+  const { error: setInsErr } = await ctx.admin
+    .from('sets')
+    .insert({ exercise_id: exercise.id, set_number: 1, reps: '10', weight: 40 })
+  if (setInsErr) {
+    check('students_read_assigned setup (sets insert)', false, setInsErr.message)
+    return
   }
 
   // Aluno (userA) autenticado deve LER o workout, exercises e sets
@@ -238,14 +246,12 @@ async function test_students_read_assigned_workouts(ctx: Ctx): Promise<void> {
     `got ${JSON.stringify(exRows)}`,
   )
 
-  if (exercise) {
-    const { data: setRows } = await alunoClient.from('sets').select('id').eq('exercise_id', exercise.id)
-    check(
-      'aluno SELECT sets do workout atribuído',
-      Array.isArray(setRows) && setRows.length === 1,
-      `got ${JSON.stringify(setRows)}`,
-    )
-  }
+  const { data: setRows } = await alunoClient.from('sets').select('id').eq('exercise_id', exercise.id)
+  check(
+    'aluno SELECT sets do workout atribuído',
+    Array.isArray(setRows) && setRows.length === 1,
+    `got ${JSON.stringify(setRows)}`,
+  )
 
   // Policy é SELECT-only: UPDATE/DELETE não afetam nenhuma linha
   const { data: updRows } = await alunoClient.from('workouts').update({ name: 'hacked' }).eq('id', workout.id).select('id')
@@ -259,6 +265,13 @@ async function test_students_read_assigned_workouts(ctx: Ctx): Promise<void> {
     'aluno NÃO consegue DELETE no workout atribuído (SELECT-only)',
     !delRows || delRows.length === 0,
     `delete afetou ${JSON.stringify(delRows)}`,
+  )
+  // Confirma no banco (via admin) que UPDATE/DELETE realmente não surtiram efeito
+  const { data: intact } = await ctx.admin.from('workouts').select('name').eq('id', workout.id).single()
+  check(
+    'workout atribuído permanece intacto após tentativas de escrita do aluno',
+    intact?.name === 'RLS Treino Atribuído',
+    `got ${JSON.stringify(intact)}`,
   )
   await alunoClient.auth.signOut()
 
