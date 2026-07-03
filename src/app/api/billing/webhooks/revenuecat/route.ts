@@ -215,25 +215,22 @@ export async function POST(request: NextRequest) {
     // productId cru e o dbPlanId normalizado (mesma lógica do /revenuecat/sync).
     let resolvedPlanId: string | null = null
     for (const candidate of [...new Set([productId, dbPlanId].filter(Boolean))]) {
-      const { data: plan } = await admin.from('app_plans').select('id').eq('id', candidate).maybeSingle()
+      const { data: plan, error: planErr } = await admin.from('app_plans').select('id').eq('id', candidate).maybeSingle()
+      // Erro de query (hiccup do DB, não "SKU desconhecido") → logWarn pra distinguir do
+      // alerta unmapped-plan no diagnóstico. Não interrompe: tenta o próximo candidato.
+      if (planErr) logWarn('webhook:revenuecat', 'app_plans lookup failed', { candidate, error: planErr.message })
       if (plan?.id) { resolvedPlanId = plan.id; break }
     }
 
-    // Ativação com SKU cujo plano NÃO existe em app_plans (SKU novo da Apple ainda não
-    // mapeado): gravar app_subscriptions/user_entitlements com esse plan_id violaria a FK
-    // (23503 → 500) e a RevenueCat entraria em retry-loop, sem nunca conceder VIP nem
-    // gerar alerta útil (o alerta antigo ficava DEPOIS do INSERT que dava 500 → nunca
-    // rodava). Em vez disso: ALERTA (→ Sentry: ops mapeia o SKU + concede manual) e ACK
-    // 200 pra encerrar o retry. O grant fica manual — honesto, pois não dá pra inferir o
-    // tier — mas agora observável, e sem 500 em loop.
-    if (targetStatus === 'active' && !resolvedPlanId) {
-      logError(
-        'webhook:revenuecat:unmapped-plan',
-        new Error('active purchase with SKU not in app_plans — manual grant required'),
-        { userId, productId, dbPlanId, eventType },
-      )
-      return NextResponse.json({ ok: true, skipped: 'unmapped_plan' })
-    }
+    // Evento ATIVO com SKU cujo plano NÃO existe em app_plans (SKU novo da Apple ainda não
+    // mapeado). Gravar linha NOVA com esse plan_id violaria a FK (23503 → 500 em loop): por
+    // isso os INSERTs abaixo só rodam com resolvedPlanId. Os UPDATEs usam plan_id
+    // condicional e RENOVAM a JANELA (valid_until) de uma assinatura/entitlement existente
+    // sem tocar no plano — mas se o plano gravado tiver saído de app_plans o TIER cai pra
+    // free em getVipPlanLimits (renova a janela, não o benefício). O alerta PÓS-bloco
+    // distingue renovação-ok (warn) do órfão sem linha (error). Responde 200, sem retry.
+    const unmappedActive = targetStatus === 'active' && !resolvedPlanId
+    let renewedExistingEnt = false
 
     // The app_subscriptions.provider CHECK constraint allows a fixed set of
     // values: asaas / stripe / apple / google / manual / admin / mercadopago.
@@ -284,14 +281,14 @@ export async function POST(request: NextRequest) {
       if (error) {
         return respondDbError('revenuecat:webhook:subscription-update', error, 500)
       }
-    } else if (targetStatus === 'active') {
-      // Only create new subscription record for activation events
+    } else if (targetStatus === 'active' && resolvedPlanId) {
+      // Só cria assinatura nova em ativação COM plano resolvido (senão FK 23503). Ativação
+      // sem plano resolvido já foi alertada acima e não cria linha nova.
       const { error } = await admin
         .from('app_subscriptions')
         .insert({
           user_id: userId,
-          // Ativação passou pelo guard acima → resolvedPlanId garantido non-null.
-          plan_id: resolvedPlanId as string,
+          plan_id: resolvedPlanId,
           status: 'active',
           provider: 'apple',
           current_period_start: new Date().toISOString(),
@@ -307,9 +304,10 @@ export async function POST(request: NextRequest) {
     // Sync to user_entitlements (primary VIP resolution table)
     // provider must be 'apple' (RevenueCat is an intermediary for Apple IAP)
     // status mapping: active→active, canceled→cancelled, expired→inactive
-    // Ativação com SKU não mapeado já retornou acima (com alerta). Aqui, pra ATIVAÇÃO o
-    // resolvedPlanId está garantido; pra evento inativo só mudamos o status (o plan_id só
-    // é sobrescrito quando resolvido, evitando FK 23503 num evento de plano não mapeado).
+    // UPDATE renova/ajusta a linha existente sem tocar no plano quando não resolvido
+    // (plan_id condicional) — cobre a renovação de SKU não mapeado. INSERT (linha nova) só
+    // roda em ativação COM plano resolvido, evitando FK 23503. Ativação não mapeada sem
+    // linha prévia já foi alertada acima.
     {
       const entStatus = targetStatus === 'active' ? 'active' : targetStatus === 'canceled' ? 'cancelled' : 'inactive'
       const { data: existingEnt } = await admin
@@ -322,24 +320,26 @@ export async function POST(request: NextRequest) {
         .maybeSingle()
 
       if (existingEnt?.id) {
+        renewedExistingEnt = true
         const { error: entUpdErr } = await admin
           .from('user_entitlements')
           .update({
             ...(resolvedPlanId ? { plan_id: resolvedPlanId } : {}),
             status: entStatus,
-            valid_until: expiresDate,
-            current_period_end: expiresDate,
+            // Num evento ativo SEM expiração (RENEWAL malformado) não sobrescreve a janela
+            // com null — valid_until=null resolveria como VIP vitalício. Mantém o valor.
+            ...((targetStatus === 'active' && expiresDate === null) ? {} : { valid_until: expiresDate, current_period_end: expiresDate }),
             metadata: meta,
             updated_at: new Date().toISOString(),
           })
           .eq('id', existingEnt.id)
         if (entUpdErr) logError('webhook:revenuecat:entitlement-update', entUpdErr, { userId, productId, eventType })
-      } else if (targetStatus === 'active') {
+      } else if (targetStatus === 'active' && resolvedPlanId) {
         const { error: entInsErr } = await admin
           .from('user_entitlements')
           .insert({
             user_id: userId,
-            plan_id: resolvedPlanId as string,
+            plan_id: resolvedPlanId,
             status: 'active',
             provider: 'apple',
             provider_subscription_id: productId,
@@ -356,6 +356,18 @@ export async function POST(request: NextRequest) {
         if (entInsErr && (entInsErr as { code?: string }).code !== '23505') {
           logError('webhook:revenuecat:entitlement-insert', entInsErr, { userId, productId, eventType })
         }
+      }
+    }
+
+    // Alerta do SKU não mapeado, com nível conforme o desfecho: renovação da JANELA de uma
+    // linha existente = warn (funcionou; só falta mapear o SKU pro tier resolver certo);
+    // ativação de usuário SEM linha prévia = error (órfão, precisa de grant manual). Evita
+    // ruído de erro no Sentry a cada renovação legítima de um SKU não mapeado.
+    if (unmappedActive) {
+      if (renewedExistingEnt) {
+        logWarn('webhook:revenuecat', 'active event with SKU not in app_plans — existing entitlement window renewed; map the SKU so the tier resolves', { userId, productId, dbPlanId, eventType })
+      } else {
+        logError('webhook:revenuecat:unmapped-plan', new Error('active event with SKU not in app_plans and no existing entitlement — manual grant required'), { userId, productId, dbPlanId, eventType })
       }
     }
 
