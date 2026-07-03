@@ -214,12 +214,21 @@ export async function POST(req: Request) {
 
     const { data: workout, error: wErr } = await admin
       .from('workouts')
-      .select('id, user_id, name, date, created_at, notes')
+      .select('id, user_id, student_id, name, date, created_at, notes')
       .eq('id', resolvedId)
       .maybeSingle()
     if (wErr) return respondDbError('ai:post-workout-insights', wErr)
     if (!workout?.id) return NextResponse.json({ ok: false, error: 'not_found' }, { status: 404 })
-    if (String(workout.user_id || '') !== userId) return NextResponse.json({ ok: false, error: 'forbidden' }, { status: 403 })
+    if (String(workout.user_id || '') !== userId) {
+      // Treino atribuído por professor: workouts.user_id pode ser NULL com
+      // student_id → students.user_id = aluno (mesma condição da policy RLS
+      // "Students can read assigned workouts")
+      const studentId = String(workout.student_id || '')
+      const { data: studentRow } = studentId
+        ? await admin.from('students').select('id').eq('id', studentId).eq('user_id', userId).maybeSingle()
+        : { data: null }
+      if (!studentRow?.id) return NextResponse.json({ ok: false, error: 'forbidden' }, { status: 403 })
+    }
 
     const sessionFromNotes = (() => {
       const n = workout?.notes
@@ -368,7 +377,10 @@ export async function POST(req: Request) {
     })()
 
     try {
-      await admin.from('workouts').update({ notes: JSON.stringify(mergedSession) }).eq('id', String(workout.id)).eq('user_id', userId)
+      // Acesso já autorizado acima (dono ou aluno vinculado via student_id);
+      // filtrar por user_id aqui tornaria o save um no-op silencioso em
+      // treinos atribuídos com user_id NULL
+      await admin.from('workouts').update({ notes: JSON.stringify(mergedSession) }).eq('id', String(workout.id))
     } catch (e) { logWarn('ai:post-workout-insights', 'silenced', e) }
 
     // Increment Usage (Counts as Insights)
