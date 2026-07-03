@@ -31,13 +31,63 @@ if (!existsSync(iosDir)) {
 console.log('[patch-ios] Aplicando patches iOS...');
 
 // ── Fix capacitor-swift-pm version conflicts for Xcode 26+ ──────────────────
-// SPM in Xcode 26+ treats `from: "7.0.0"` as 7.x only (semver major boundary),
-// which conflicts with CapApp-SPM's `exact: "8.0.2"`. This patch aligns all
-// plugin Package.swift files to use `exact` instead of `from`.
+// SPM resolves the SPM package graph from CapApp-SPM/Package.swift (the app's
+// root manifest). `cap sync` regenerates it pinning capacitor-swift-pm to the
+// installed Capacitor version via `exact: "<X>"` (e.g. 8.4.1). Any plugin whose
+// Package.swift asks for a DIFFERENT version breaks resolution:
+//   • Stale plugins (e.g. @capacitor-community/apple-sign-in@7.x) still declare
+//     `from: "7.0.0"`, which SPM treats as 7.x only — incompatible with 8.x.
+//   • A hardcoded target here (the old `8.0.2`) fights the version `cap sync`
+//     wrote into CapApp-SPM and reintroduces the conflict on every sync.
+//
+// Fix: derive the target from the installed Capacitor (single source of truth,
+// same value cap sync uses) and align EVERYTHING — CapApp-SPM + every plugin —
+// to that exact version. capacitor-swift-pm is versioned in lockstep with
+// @capacitor/ios, so this always tracks the real installed toolchain.
 import { readFileSync, writeFileSync } from 'node:fs';
 
-const TARGET_VERSION = '8.0.2';
+// Matches `capacitor-swift-pm.git", from|exact: "X.Y.Z"` and captures the leading
+// text so we can rewrite only the version spec while preserving surrounding chars.
+const SWIFT_PM_SPEC = /(capacitor-swift-pm\.git",\s*)(?:from|exact):\s*"[\d.]+"/g;
+
+const CAP_APP_SPM = 'ios/App/CapApp-SPM/Package.swift';
+const FALLBACK_VERSION = '8.4.1';
+
+function readJsonVersion(rel) {
+    const abs = join(process.cwd(), rel);
+    if (!existsSync(abs)) return null;
+    try {
+        const v = JSON.parse(readFileSync(abs, 'utf8')).version;
+        return typeof v === 'string' && /^\d+\.\d+\.\d+$/.test(v) ? v : null;
+    } catch {
+        return null;
+    }
+}
+
+function readSwiftPmVersion(rel) {
+    const abs = join(process.cwd(), rel);
+    if (!existsSync(abs)) return null;
+    const m = readFileSync(abs, 'utf8').match(
+        /capacitor-swift-pm\.git",\s*(?:from|exact):\s*"([\d.]+)"/
+    );
+    return m ? m[1] : null;
+}
+
+// Priority: installed @capacitor/ios (canonical) → whatever cap sync wrote into
+// CapApp-SPM → hardcoded fallback. This self-heals even if CapApp-SPM was
+// manually reverted to a stale pin.
+const capacitorIosVersion = readJsonVersion('node_modules/@capacitor/ios/package.json');
+const capAppSpmVersion = readSwiftPmVersion(CAP_APP_SPM);
+const TARGET_VERSION = capacitorIosVersion || capAppSpmVersion || FALLBACK_VERSION;
+const targetSource = capacitorIosVersion
+    ? '@capacitor/ios'
+    : capAppSpmVersion
+        ? 'CapApp-SPM'
+        : 'fallback';
+console.log(`  ℹ️  capacitor-swift-pm target: ${TARGET_VERSION} (fonte: ${targetSource})`);
+
 const PACKAGES = [
+    CAP_APP_SPM,
     'node_modules/@capacitor/app/Package.swift',
     'node_modules/@capacitor/device/Package.swift',
     'node_modules/@capacitor/filesystem/Package.swift',
@@ -52,14 +102,14 @@ for (const rel of PACKAGES) {
     const abs = join(process.cwd(), rel);
     if (!existsSync(abs)) continue;
     const content = readFileSync(abs, 'utf8');
-    const patched = content.replace(
-        /capacitor-swift-pm\.git",\s*from:\s*"[\d.]+"/g,
-        `capacitor-swift-pm.git", exact: "${TARGET_VERSION}"`
-    );
+    const patched = content.replace(SWIFT_PM_SPEC, `$1exact: "${TARGET_VERSION}"`);
     if (patched !== content) {
         writeFileSync(abs, patched);
         fixed++;
-        const name = rel.replace('node_modules/', '').replace('/Package.swift', '');
+        const name = rel
+            .replace('node_modules/', '')
+            .replace('ios/App/', '')
+            .replace('/Package.swift', '');
         console.log(`  ✔ ${name} → exact: "${TARGET_VERSION}"`);
     }
 }
