@@ -468,6 +468,7 @@ export const addIntentActionListener = (handler: (action: IntentAction) => void)
         }
       } catch { /* swallow */ }
     })
+    listenerPromise.catch(() => { }) // neutraliza rejeição solta (ex.: plugin ausente em binário nativo antigo)
     return () => { listenerPromise.then((l: PluginListenerHandle) => l.remove()).catch(() => { }) }
   } catch {
     return () => { }
@@ -796,6 +797,7 @@ export const addWidgetStartSetListener = (callback: () => void): (() => void) =>
   if (!isIosNative()) return () => {}
   try {
     const listenerPromise = Native.addListener('widgetStartSet', callback)
+    listenerPromise.catch(() => {}) // neutraliza rejeição solta (ex.: plugin ausente em binário nativo antigo)
     return () => { listenerPromise.then((l: PluginListenerHandle) => l.remove()).catch(() => {}) }
   } catch { return () => {} }
 }
@@ -942,6 +944,7 @@ export const addGymGeofenceListener = (callback: (gymName: string) => void): (()
     const listenerPromise = Native.addListener('gymGeofenceEntered', (data: { gymName: string }) => {
       try { callback(String(data?.gymName || '')) } catch { /* swallow */ }
     })
+    listenerPromise.catch(() => { }) // neutraliza rejeição solta (ex.: plugin ausente em binário nativo antigo)
     return () => { listenerPromise.then((l: PluginListenerHandle) => l.remove()).catch(() => { }) }
   } catch { return () => { } }
 }
@@ -968,6 +971,7 @@ export const addBackgroundRefreshListener = (
     const listenerPromise = Native.addListener('backgroundRefresh', (data: { kind: 'refresh' | 'sync' }) => {
       try { callback(data?.kind === 'sync' ? 'sync' : 'refresh') } catch { /* swallow */ }
     })
+    listenerPromise.catch(() => { }) // neutraliza rejeição solta (ex.: plugin ausente em binário nativo antigo)
     return () => { listenerPromise.then((l: PluginListenerHandle) => l.remove()).catch(() => { }) }
   } catch { return () => { } }
 }
@@ -1009,6 +1013,7 @@ export const addLiveActivityPushTokenListener = (
         } catch { /* swallow */ }
       },
     )
+    listenerPromise.catch(() => { }) // neutraliza rejeição solta (ex.: plugin ausente em binário nativo antigo)
     return () => { listenerPromise.then((l: PluginListenerHandle) => l.remove()).catch(() => { }) }
   } catch { return () => { } }
 }
@@ -1125,6 +1130,7 @@ export const addStoryComposeProgressListener = (callback: (progress: number) => 
         if (Number.isFinite(n)) callback(Math.max(0, Math.min(1, n)))
       } catch { /* swallow */ }
     })
+    listenerPromise.catch(() => {}) // neutraliza rejeição solta (ex.: plugin ausente em binário nativo antigo)
     return () => { listenerPromise.then((l: PluginListenerHandle) => l.remove()).catch(() => {}) }
   } catch {
     return () => {}
@@ -1202,6 +1208,7 @@ const safeAddListener = <T>(
   try {
     // @ts-expect-error — addListener overloads exigem a string literal
     const listenerPromise = Native.addListener(event, cb)
+    listenerPromise.catch(() => {}) // neutraliza rejeição solta (ex.: plugin ausente em binário nativo antigo)
     return () => { listenerPromise.then((l: PluginListenerHandle) => l.remove()).catch(() => {}) }
   } catch {
     return () => {}
