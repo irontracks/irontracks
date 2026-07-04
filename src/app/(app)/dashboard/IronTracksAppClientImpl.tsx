@@ -44,6 +44,7 @@ const NutritionOverlay = dynamic(() => import('@/components/dashboard/nutrition/
 import { getTourSteps } from '@/utils/tourSteps'
 const OfflineSyncModal = dynamic(() => import('@/components/OfflineSyncModal'), { ssr: false })
 const WorkoutRecoveryBanner = dynamic(() => import('@/components/WorkoutRecoveryBanner'), { ssr: false, loading: () => null })
+const RestDayPromptCard = dynamic(() => import('@/components/dashboard/RestDayPromptCard'), { ssr: false, loading: () => null })
 const StudentControlConsent = dynamic(
     () => import('@/components/teacher/StudentControlConsent').then(m => ({ default: m.StudentControlConsent })),
     { ssr: false, loading: () => null },
@@ -988,6 +989,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                             {(view === 'dashboard' || view === 'assessments' || view === 'community' || view === 'vip') && (
                               <>
                                 {view === 'dashboard' && <WorkoutRecoveryBanner userId={String(user?.id || initialUserObj?.id || '')} />}
+                                {view === 'dashboard' && <RestDayPromptCard userId={String(user?.id || initialUserObj?.id || '')} />}
                                 {view === 'dashboard' && appleHealthEnabled && <HealthWidget data={healthData} />}
                                 <StudentDashboard
                                     workouts={Array.isArray(workouts) ? workouts : []}
