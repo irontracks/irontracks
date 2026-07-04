@@ -7,6 +7,7 @@ import { checkVipFeatureAccess } from '@/utils/vip/limits'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { calculateNutritionGoals } from '@/lib/nutrition/engine'
 import type { Gender, ActivityLevel, Goal } from '@/lib/nutrition/engine'
+import { computeRestDayAdjustment } from '@/lib/nutrition/restDay'
 
 export const dynamic = 'force-dynamic'
 
@@ -221,6 +222,51 @@ export default async function NutritionPage() {
     }
   } catch { /* silent — table may not exist or have no data */ }
 
+  // ── Modo dia de descanso ──────────────────────────────────────────────────
+  // Se o usuário respondeu "vou descansar" hoje (e ainda não treinou), desconta
+  // o gasto médio de ~1 treino da meta. Proteína intacta; corte em carbo/gordura.
+  // Toggle liga/desliga em preferences.restDayAdjustEnabled (default: ligado).
+  // Detecção de "treinou hoje" reusa workoutCaloriesToday (> 0 = treinou →
+  // autocorreção: mesmo tendo dito "descanso", a meta volta ao normal).
+  let restDayReduction = 0
+  try {
+    const restEnabled = userPrefs?.restDayAdjustEnabled !== false
+    if (restEnabled && workoutCaloriesToday <= 0) {
+      const { data: intent } = await supabase
+        .from('rest_day_intents')
+        .select('will_train')
+        .eq('user_id', authUserId)
+        .eq('date_key', dateKey)
+        .maybeSingle()
+      const willTrain = (intent as { will_train?: boolean } | null)?.will_train
+      if (intent && willTrain === false) {
+        // Gasto médio de um treino: média das últimas sessões concluídas.
+        const { data: recent } = await supabase
+          .from('workout_session_logs')
+          .select('duration_seconds, metadata')
+          .eq('user_id', authUserId)
+          .not('finished_at', 'is', null)
+          .order('finished_at', { ascending: false })
+          .limit(20)
+        const kcals: number[] = []
+        for (const s of Array.isArray(recent) ? recent : []) {
+          const r = s as Record<string, unknown>
+          const meta = r.metadata && typeof r.metadata === 'object' ? (r.metadata as Record<string, unknown>) : {}
+          const kcalMeta = Number(meta.calories ?? meta.calories_estimate)
+          if (Number.isFinite(kcalMeta) && kcalMeta > 0) { kcals.push(kcalMeta); continue }
+          const seconds = Number(r.duration_seconds)
+          if (Number.isFinite(seconds) && seconds > 0) kcals.push(Math.round((seconds / 60) * 7))
+        }
+        const avgWorkoutKcal = kcals.length ? kcals.reduce((a, b) => a + b, 0) / kcals.length : 0
+        const adjusted = computeRestDayAdjustment(goals, avgWorkoutKcal)
+        if (adjusted.reduction > 0) {
+          goals = { calories: adjusted.calories, protein: adjusted.protein, carbs: adjusted.carbs, fat: adjusted.fat }
+          restDayReduction = adjusted.reduction
+        }
+      }
+    }
+  } catch { /* tabela pode não existir ainda / sem dados — sem ajuste */ }
+
   // Check VIP Access for Macros
   let canViewMacros = false
   try {
@@ -239,7 +285,7 @@ export default async function NutritionPage() {
 
   return (
     <NutritionConsoleShell title="Nutrition Console" subtitle={`Hoje · ${dateKey}`}>
-      <NutritionMixer dateKey={dateKey} initialTotals={initialTotals} goals={goals} schemaMissing={schemaMissing} canViewMacros={canViewMacros} workoutCaloriesToday={workoutCaloriesToday} goalsSource={goalsSource} />
+      <NutritionMixer dateKey={dateKey} initialTotals={initialTotals} goals={goals} schemaMissing={schemaMissing} canViewMacros={canViewMacros} workoutCaloriesToday={workoutCaloriesToday} goalsSource={goalsSource} restDayReduction={restDayReduction} />
     </NutritionConsoleShell>
   )
 }

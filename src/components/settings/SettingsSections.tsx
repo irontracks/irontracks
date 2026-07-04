@@ -298,6 +298,7 @@ export function SettingsToolsSection({ draft, setValue, onOpenWhatsNew, onOpenPr
     const showIronRank = Boolean(draft?.showIronRank ?? true)
     const showBadges = Boolean(draft?.showBadges ?? true)
     const showStoriesBar = Boolean(draft?.showStoriesBar ?? true)
+    const restDayAdjustEnabled = Boolean(draft?.restDayAdjustEnabled ?? true)
     const whatsNewAutoOpen = Boolean(draft?.whatsNewAutoOpen ?? true)
     const whatsNewRemind24h = Boolean(draft?.whatsNewRemind24h ?? true)
     return (
@@ -319,6 +320,10 @@ export function SettingsToolsSection({ draft, setValue, onOpenWhatsNew, onOpenPr
                 <div className="flex items-center justify-between gap-3">
                     <div><div className="text-sm font-bold text-white">Stories no Dashboard</div><div className="text-xs text-neutral-400">Mostra a barra de stories no topo do dashboard.</div></div>
                     <ToggleSwitch checked={showStoriesBar} onChange={() => setValue('showStoriesBar', !showStoriesBar)} />
+                </div>
+                <div className="flex items-center justify-between gap-3">
+                    <div><div className="text-sm font-bold text-white">Ajuste em dias de descanso</div><div className="text-xs text-neutral-400">Pergunta de manhã se vai treinar; se for descansar, reduz a meta de calorias do dia (proteína mantida).</div></div>
+                    <ToggleSwitch checked={restDayAdjustEnabled} onChange={() => setValue('restDayAdjustEnabled', !restDayAdjustEnabled)} />
                 </div>
                 {onOpenProgressPhotos && (
                     <div className="flex items-center justify-between gap-3">

@@ -74,7 +74,7 @@ export async function GET(req: Request) {
         sender_id: uid,
         type: 'morning_briefing',
         title: 'Bom dia 🌅',
-        message: 'Hoje é um ótimo dia pra treinar. Vamos?',
+        message: 'Vai treinar hoje? Abra o app e responda — se for descansar, ajusto suas calorias do dia.',
         is_read: false,
         metadata: {},
       })),
