@@ -126,3 +126,6 @@ ios-native/.build/
 .worktrees/
 scripts/taco-data.json
 knowledge-base/
+
+# Changelog automático gerado por hook local do Claude Code
+CLAUDE_CHANGES.md
