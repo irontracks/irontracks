@@ -191,6 +191,7 @@ export default function NutritionMixer({
   canViewMacros,
   workoutCaloriesToday,
   goalsSource,
+  restDayReduction,
 }: {
   dateKey: string
   initialTotals: Totals
@@ -199,6 +200,7 @@ export default function NutritionMixer({
   canViewMacros?: boolean
   workoutCaloriesToday?: number
   goalsSource?: 'saved' | 'profile' | 'default'
+  restDayReduction?: number
 }) {
   const supabase = useMemo(() => createClient(), [])
   const isIosNative = useIsIosNative()
@@ -764,6 +766,18 @@ export default function NutritionMixer({
             {!calorieOver && remaining > 0 && (
               <div className="text-xs text-neutral-400">
                 Restam <span className="text-emerald-400 font-semibold">{Math.round(remaining)}</span> kcal
+              </div>
+            )}
+
+            {/* Dia de descanso — meta reduzida por decisão do usuário na pergunta
+                matinal. Mostra o quanto foi descontado (transparência). */}
+            {safeNumber(restDayReduction) > 0 && (
+              <div className="mt-1.5 inline-flex items-center gap-1.5 rounded-lg border border-sky-500/15 bg-sky-500/[0.06] px-2 py-1">
+                <span className="text-[11px] leading-none">😴</span>
+                <span className="text-[10px] leading-tight text-sky-300">
+                  Dia de descanso: meta ajustada <span className="font-semibold">−{Math.round(safeNumber(restDayReduction))} kcal</span>
+                  <span className="text-neutral-500"> · proteína mantida</span>
+                </span>
               </div>
             )}
 
