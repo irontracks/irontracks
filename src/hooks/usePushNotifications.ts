@@ -3,6 +3,11 @@
 import { useEffect, useRef } from 'react'
 import { isNativePlatform } from '@/utils/platform'
 import { logWarn } from '@/lib/logger'
+import { savePendingRestDayAnswer, flushPendingRestDayIntent } from '@/lib/nutrition/restDayIntent'
+
+// IDs das ações do push "vai treinar hoje?" (registradas na categoria
+// REST_DAY_PROMPT no plugin nativo). Devem casar com os identifiers do Swift.
+const REST_DAY_ACTIONS: Record<string, boolean> = { WILL_TRAIN: true, WILL_REST: false }
 
 type ListenerHandle = { remove: () => void }
 type PushPermission = { receive: string }
@@ -35,6 +40,10 @@ export function usePushNotifications(userId?: string | null) {
         ])
 
         if (!alive) return
+
+        // Grava resposta pendente do push (caso o app tenha aberto a frio pelo
+        // toque antes da sessão carregar).
+        void flushPendingRestDayIntent(String(userId || ''))
 
         try {
           await PushNotifications.removeAllDeliveredNotifications()
@@ -113,6 +122,20 @@ export function usePushNotifications(userId?: string | null) {
             try {
               if (!alive) return
               const act = action && typeof action === 'object' ? (action as Record<string, unknown>) : null
+
+              // Ação "vai treinar hoje?" (botões WILL_TRAIN / WILL_REST no push).
+              // Salva a resposta e leva o usuário pra nutrição ver a meta ajustada.
+              const tappedAction = act ? String(act.actionId || '').trim() : ''
+              if (tappedAction in REST_DAY_ACTIONS) {
+                const willTrain = REST_DAY_ACTIONS[tappedAction]
+                savePendingRestDayAnswer(willTrain)
+                void flushPendingRestDayIntent(String(userId || ''))
+                if (!willTrain) {
+                  window.dispatchEvent(new CustomEvent('irontracks:push:navigate', { detail: { link: '/dashboard/nutrition', type: 'rest_day' } }))
+                }
+                return
+              }
+
               const notification = act?.notification && typeof act.notification === 'object'
                 ? (act.notification as Record<string, unknown>) : null
               const data = notification?.data && typeof notification.data === 'object'
