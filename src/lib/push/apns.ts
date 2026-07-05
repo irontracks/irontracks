@@ -124,6 +124,10 @@ async function sendOneApnsPush(
                     })(),
                     // Wake the NSE for either Communication upgrade or rich-image attachment.
                     ...(wakesScreen || hasRichImage ? { 'mutable-content': 1 } : {}),
+                    // Notificação com botões: a briefing matinal ("vai treinar hoje?")
+                    // usa a categoria REST_DAY_PROMPT pra iOS mostrar Vou treinar /
+                    // Vou descansar (Opção A: ao tocar, abre o app e salva a resposta).
+                    ...(notifType === 'morning_briefing' ? { category: 'REST_DAY_PROMPT' } : {}),
                 },
                 // Spread extra but omit the internal __badge key used only for the aps.badge field
                 ...Object.fromEntries(Object.entries(extra ?? {}).filter(([k]) => k !== '__badge')),

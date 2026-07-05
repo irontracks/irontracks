@@ -382,7 +382,28 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin, CLLocationMana
             intentIdentifiers: [],
             options: []
         )
-        UNUserNotificationCenter.current().setNotificationCategories([restCategory])
+
+        // Categoria da pergunta matinal "vai treinar hoje?". As ações usam
+        // .foreground: ao tocar, o app abre e o JS (usePushNotifications) salva a
+        // resposta e leva pra nutrição. O push carrega category=REST_DAY_PROMPT.
+        let willTrainAction = UNNotificationAction(
+            identifier: "WILL_TRAIN",
+            title: "Vou treinar",
+            options: [.foreground]
+        )
+        let willRestAction = UNNotificationAction(
+            identifier: "WILL_REST",
+            title: "Vou descansar",
+            options: [.foreground]
+        )
+        let restDayCategory = UNNotificationCategory(
+            identifier: "REST_DAY_PROMPT",
+            actions: [willTrainAction, willRestAction],
+            intentIdentifiers: [],
+            options: []
+        )
+
+        UNUserNotificationCenter.current().setNotificationCategories([restCategory, restDayCategory])
         call.resolve()
     }
 
