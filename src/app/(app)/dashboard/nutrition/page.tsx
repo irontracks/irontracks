@@ -8,6 +8,7 @@ import { getErrorMessage } from '@/utils/errorMessage'
 import { calculateNutritionGoals } from '@/lib/nutrition/engine'
 import type { Gender, ActivityLevel, Goal } from '@/lib/nutrition/engine'
 import { computeRestDayAdjustment } from '@/lib/nutrition/restDay'
+import { estimateSessionKcal } from '@/utils/calories/sessionKcal'
 
 export const dynamic = 'force-dynamic'
 
@@ -223,15 +224,15 @@ export default async function NutritionPage() {
   } catch { /* silent — table may not exist or have no data */ }
 
   // ── Modo dia de descanso ──────────────────────────────────────────────────
-  // Se o usuário respondeu "vou descansar" hoje (e ainda não treinou), desconta
-  // o gasto médio de ~1 treino da meta. Proteína intacta; corte em carbo/gordura.
-  // Toggle liga/desliga em preferences.restDayAdjustEnabled (default: ligado).
-  // Detecção de "treinou hoje" reusa workoutCaloriesToday (> 0 = treinou →
-  // autocorreção: mesmo tendo dito "descanso", a meta volta ao normal).
+  // Guiado pela RESPOSTA à pergunta matinal "vai treinar hoje?": se o usuário
+  // respondeu "vou descansar", desconta o gasto médio de ~1 treino da meta
+  // (proteína intacta; corte em carbo/gordura). Rede de segurança: se ele
+  // REALMENTE treinou hoje, a meta volta ao normal — não faz sentido manter
+  // déficit num dia treinado. Toggle: preferences.restDayAdjustEnabled (default on).
   let restDayReduction = 0
   try {
     const restEnabled = userPrefs?.restDayAdjustEnabled !== false
-    if (restEnabled && workoutCaloriesToday <= 0) {
+    if (restEnabled) {
       const { data: intent } = await supabase
         .from('rest_day_intents')
         .select('will_train')
@@ -240,32 +241,47 @@ export default async function NutritionPage() {
         .maybeSingle()
       const willTrain = (intent as { will_train?: boolean } | null)?.will_train
       if (intent && willTrain === false) {
-        // Gasto médio de um treino: média das últimas sessões concluídas.
-        const { data: recent } = await supabase
-          .from('workout_session_logs')
-          .select('duration_seconds, metadata')
+        // Os treinos ficam salvos em `workouts` (notes = JSON da sessão);
+        // workout_session_logs não é populada em produção.
+        const { data: recentWorkouts } = await supabase
+          .from('workouts')
+          .select('date, notes')
           .eq('user_id', authUserId)
-          .not('finished_at', 'is', null)
-          .order('finished_at', { ascending: false })
-          .limit(20)
-        const kcals: number[] = []
-        for (const s of Array.isArray(recent) ? recent : []) {
-          const r = s as Record<string, unknown>
-          const meta = r.metadata && typeof r.metadata === 'object' ? (r.metadata as Record<string, unknown>) : {}
-          const kcalMeta = Number(meta.calories ?? meta.calories_estimate)
-          if (Number.isFinite(kcalMeta) && kcalMeta > 0) { kcals.push(kcalMeta); continue }
-          const seconds = Number(r.duration_seconds)
-          if (Number.isFinite(seconds) && seconds > 0) kcals.push(Math.round((seconds / 60) * 7))
+          .eq('is_template', false)
+          .order('date', { ascending: false })
+          .limit(30)
+        const rows = Array.isArray(recentWorkouts) ? recentWorkouts : []
+
+        // Rede de segurança: treinou hoje (BRT)? Não reduz — segue meta cheia.
+        const toBrtKey = (v: unknown) => {
+          try {
+            return new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit' }).format(new Date(String(v)))
+          } catch { return '' }
         }
-        const avgWorkoutKcal = kcals.length ? kcals.reduce((a, b) => a + b, 0) / kcals.length : 0
-        const adjusted = computeRestDayAdjustment(goals, avgWorkoutKcal)
-        if (adjusted.reduction > 0) {
-          goals = { calories: adjusted.calories, protein: adjusted.protein, carbs: adjusted.carbs, fat: adjusted.fat }
-          restDayReduction = adjusted.reduction
+        const trainedToday = rows.some((w) => toBrtKey((w as { date?: string }).date) === dateKey)
+
+        if (!trainedToday) {
+          const bodyWeightKg = Number(userPrefs?.bodyWeightKg) || null
+          const biologicalSex = typeof userPrefs?.biologicalSex === 'string' ? (userPrefs.biologicalSex as string) : null
+          const kcals: number[] = []
+          for (const w of rows) {
+            if (kcals.length >= 10) break
+            let session: unknown = (w as { notes?: unknown }).notes
+            if (typeof session === 'string') { try { session = JSON.parse(session) } catch { session = null } }
+            if (!session || typeof session !== 'object') continue
+            const k = estimateSessionKcal(session, { bodyWeightKg, biologicalSex })
+            if (k > 0) kcals.push(k)
+          }
+          const avgWorkoutKcal = kcals.length ? kcals.reduce((a, b) => a + b, 0) / kcals.length : 0
+          const adjusted = computeRestDayAdjustment(goals, avgWorkoutKcal)
+          if (adjusted.reduction > 0) {
+            goals = { calories: adjusted.calories, protein: adjusted.protein, carbs: adjusted.carbs, fat: adjusted.fat }
+            restDayReduction = adjusted.reduction
+          }
         }
       }
     }
-  } catch { /* tabela pode não existir ainda / sem dados — sem ajuste */ }
+  } catch { /* tabela ausente / sem dados — sem ajuste */ }
 
   // Check VIP Access for Macros
   let canViewMacros = false

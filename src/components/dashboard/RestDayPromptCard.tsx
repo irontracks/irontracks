@@ -33,18 +33,24 @@ export default function RestDayPromptCard({ userId }: { userId?: string }) {
       if (intent) { setState('hidden'); return }
 
       // Já treinou hoje? Está claramente treinando — não faz sentido perguntar.
+      // Sessões ficam em `workouts` (date em BRT após conversão).
       try {
         const supabase = createClient()
         const day = brtDateKey()
         const { data } = await supabase
-          .from('workout_session_logs')
-          .select('id')
+          .from('workouts')
+          .select('date')
           .eq('user_id', uid)
-          .gte('finished_at', `${day}T00:00:00`)
-          .lte('finished_at', `${day}T23:59:59`)
-          .limit(1)
+          .eq('is_template', false)
+          .order('date', { ascending: false })
+          .limit(5)
         if (cancelled) return
-        if (Array.isArray(data) && data.length > 0) { setState('hidden'); return }
+        const trained = (Array.isArray(data) ? data : []).some((w) => {
+          try {
+            return new Date(String((w as { date?: string }).date)).toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }) === day
+          } catch { return false }
+        })
+        if (trained) { setState('hidden'); return }
       } catch { /* sem dados / tabela ausente — segue mostrando */ }
 
       if (!cancelled) setState('show')
