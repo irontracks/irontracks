@@ -7,6 +7,7 @@ import { SkeletonList } from '@/components/ui/Skeleton'
 import { estimateSessionKcal } from '@/utils/calories/sessionKcal'
 import { getNutritionOverlayCache, setNutritionOverlayCache } from '@/lib/offline/nutritionCache'
 import { calculateNutritionGoals } from '@/lib/nutrition/goals'
+import { computeRestDayAdjustment } from '@/lib/nutrition/restDay'
 
 type Totals = { calories: number; protein: number; carbs: number; fat: number }
 type Gender = 'MALE' | 'FEMALE'
@@ -62,6 +63,7 @@ export default function NutritionOverlay({ onClose: _onClose, canViewMacros }: N
     goals: Totals
     goalsSource: 'saved' | 'profile' | 'default'
     workoutCalories: number
+    restDayReduction: number
   } | null>(null)
 
   const dateKey = useMemo(() => {
@@ -101,6 +103,7 @@ export default function NutritionOverlay({ onClose: _onClose, canViewMacros }: N
           goals: c.goals,
           goalsSource: (c.goalsSource as 'saved' | 'profile' | 'default') || 'default',
           workoutCalories: safeNumber(c.workoutCalories),
+          restDayReduction: 0,
         })
         return true
       }
@@ -117,11 +120,13 @@ export default function NutritionOverlay({ onClose: _onClose, canViewMacros }: N
       }
 
       try {
-        const [totalsRes, goalsRes, settingsRes, sessionsRes] = await Promise.all([
+        const [totalsRes, goalsRes, settingsRes, sessionsRes, intentRes, recentRes] = await Promise.all([
           supabase.from('daily_nutrition_logs').select('calories,protein,carbs,fat').eq('user_id', uid).eq('date', dateKey).maybeSingle(),
           supabase.from('nutrition_goals').select('calories,protein,carbs,fat').eq('user_id', uid).order('updated_at', { ascending: false }).limit(1).maybeSingle(),
           supabase.from('user_settings').select('preferences').eq('user_id', uid).maybeSingle(),
           supabase.from('workouts').select('id, notes').eq('user_id', uid).eq('is_template', false).gte('completed_at', `${dateKey}T00:00:00`).lte('completed_at', `${dateKey}T23:59:59`),
+          supabase.from('rest_day_intents').select('will_train').eq('user_id', uid).eq('date_key', dateKey).maybeSingle(),
+          supabase.from('workouts').select('notes').eq('user_id', uid).eq('is_template', false).order('date', { ascending: false }).limit(30),
         ])
 
         if (cancelled) return
@@ -180,14 +185,45 @@ export default function NutritionOverlay({ onClose: _onClose, canViewMacros }: N
           } catch { /* sem JSON de sessão → ignora este treino */ }
         }
 
+        // Modo dia de descanso: se respondeu "vou descansar" hoje e não treinou,
+        // desconta ~1 treino da meta (proteína intacta). Rede de segurança: se
+        // treinou hoje (sessão concluída), segue a meta cheia.
+        let restDayReduction = 0
+        try {
+          const rdPrefs = settingsRes.data?.preferences as Record<string, unknown> | null
+          const restEnabled = rdPrefs?.restDayAdjustEnabled !== false
+          const willTrain = (intentRes.data as { will_train?: boolean } | null)?.will_train
+          const trainedToday = Array.isArray(sessionsRes.data) && sessionsRes.data.length > 0
+          if (restEnabled && intentRes.data && willTrain === false && !trainedToday) {
+            const kcals: number[] = []
+            for (const w of Array.isArray(recentRes.data) ? recentRes.data : []) {
+              if (kcals.length >= 10) break
+              let session: unknown = (w as { notes?: unknown }).notes
+              if (typeof session === 'string') { try { session = JSON.parse(session) } catch { session = null } }
+              if (!session || typeof session !== 'object') continue
+              const k = estimateSessionKcal(session, {
+                bodyWeightKg: Number.isFinite(kcalBodyWeight) ? kcalBodyWeight : null,
+                biologicalSex: kcalSex,
+              })
+              if (k > 0) kcals.push(k)
+            }
+            const avgWorkoutKcal = kcals.length ? kcals.reduce((a, b) => a + b, 0) / kcals.length : 0
+            const adjusted = computeRestDayAdjustment(goals, avgWorkoutKcal)
+            if (adjusted.reduction > 0) {
+              goals = { calories: adjusted.calories, protein: adjusted.protein, carbs: adjusted.carbs, fat: adjusted.fat }
+              restDayReduction = adjusted.reduction
+            }
+          }
+        } catch { /* sem ajuste */ }
+
         if (!cancelled) {
-          setData({ dateKey, totals, goals, goalsSource, workoutCalories })
+          setData({ dateKey, totals, goals, goalsSource, workoutCalories, restDayReduction })
           void setNutritionOverlayCache(uid, dateKey, { totals, goals, goalsSource, workoutCalories })
         }
       } catch {
         // Falha (rede/transitória): tenta o cache antes de cair pro estado vazio.
         if (await serveFromCache(uid)) return
-        if (!cancelled) setData({ dateKey, totals: { calories: 0, protein: 0, carbs: 0, fat: 0 }, goals: DEFAULT_GOALS, goalsSource: 'default', workoutCalories: 0 })
+        if (!cancelled) setData({ dateKey, totals: { calories: 0, protein: 0, carbs: 0, fat: 0 }, goals: DEFAULT_GOALS, goalsSource: 'default', workoutCalories: 0, restDayReduction: 0 })
       }
     }
 
@@ -209,6 +245,7 @@ export default function NutritionOverlay({ onClose: _onClose, canViewMacros }: N
             canViewMacros={canViewMacros}
             workoutCaloriesToday={data.workoutCalories}
             goalsSource={data.goalsSource}
+            restDayReduction={data.restDayReduction}
           />
         ) : (
           <div className="space-y-4">
