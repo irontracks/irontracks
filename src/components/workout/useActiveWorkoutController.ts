@@ -403,6 +403,8 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     addExtraExerciseToWorkout, swapExerciseName,
     openOrganizeModal, requestCloseOrganize, saveOrganize,
     openDeleteConfirm, closeDeleteConfirm, removeExerciseFromWorkout,
+    fullEditorOpen, fullEditorWorkout, setFullEditorWorkout,
+    openFullEditor, closeFullEditor, saveFullEditor,
   } = exerciseCrud;
 
   // ── Method savers (cluster, rest-pause, drop-set, etc) ──────────────────
@@ -642,6 +644,12 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     openDeleteConfirm,
     closeDeleteConfirm,
     removeExerciseFromWorkout,
+    fullEditorOpen,
+    fullEditorWorkout,
+    setFullEditorWorkout,
+    openFullEditor,
+    closeFullEditor,
+    saveFullEditor,
     finishWorkout,
     openDeloadModal,
     startTimer,
@@ -681,6 +689,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     openNotesKeys, setOpenNotesKeys,
     inviteOpen, setInviteOpen,
     addExerciseOpen, setAddExerciseOpen, addExerciseDraft, setAddExerciseDraft,
+    fullEditorOpen, fullEditorWorkout,
     organizeOpen, setOrganizeOpen, organizeDraft, setOrganizeDraft,
     organizeSaving, organizeDirty, organizeError, setOrganizeError,
     deloadModal, setDeloadModal,
@@ -717,6 +726,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     openEditExercise, saveEditExercise, swapExerciseName, addExtraExerciseToWorkout,
     openOrganizeModal, requestCloseOrganize, saveOrganize,
     openDeleteConfirm, closeDeleteConfirm, removeExerciseFromWorkout, deleteConfirmIdx,
+    openFullEditor, closeFullEditor, saveFullEditor, setFullEditorWorkout,
     finishWorkout, openDeloadModal, startTimer, handleTimerFinish,
     saveClusterModal, saveRestPauseModal, saveDropSetModal, saveStrippingModal,
     saveFst7Modal, saveHeavyDutyModal, savePontoZeroModal,

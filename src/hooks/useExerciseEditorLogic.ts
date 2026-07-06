@@ -192,6 +192,11 @@ export function useExerciseEditorLogic({
             if (onSave) {
                 const res = await onSave({ ...workout, created_by: user.id, user_id: user.id })
                 if (res && typeof res === 'object' && (res as Record<string, unknown>).ok === false) { await alert(`Erro ao salvar: ${(res as Record<string, unknown>).error || 'Falha ao salvar treino'}`); return }
+                // O onSave já tratou tudo (mensagens/fluxo próprios) — não dispara o
+                // alerta genérico de sucesso. Usado pelo editor no treino ativo.
+                if (res && typeof res === 'object' && (res as Record<string, unknown>).handled === true) {
+                    if (typeof onSaved === 'function') onSaved(); return
+                }
                 if (res && typeof res === 'object' && (res as Record<string, unknown>).deferred === true) {
                     await alert('Exercício adicionado ao treino ativo.\nAo finalizar o treino, você poderá escolher se deseja salvar essa mudança no modelo.', 'Exercício adicionado')
                     if (typeof onSaved === 'function') onSaved(); return

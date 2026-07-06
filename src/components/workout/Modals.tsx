@@ -3,8 +3,13 @@
 /* eslint-disable jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions, jsx-a11y/control-has-associated-label */
 
 import React from 'react';
+import dynamic from 'next/dynamic';
 import { ArrowDown, ArrowUp, Check, Clock, GripVertical, Loader2, Save, X } from 'lucide-react';
 import { Reorder, useDragControls } from 'framer-motion';
+
+import type { Workout as EditorWorkout } from '@/components/ExerciseEditor/types';
+
+const ExerciseEditor = dynamic(() => import('@/components/ExerciseEditor'), { ssr: false });
 import { parseTrainingNumber } from '@/utils/trainingNumber';
 import { moveDraftItem } from '@/lib/workoutReorder';
 import { useWorkoutContext } from './WorkoutContext';
@@ -103,6 +108,11 @@ export default function Modals() {
     addExerciseDraft,
     setAddExerciseDraft,
     addExtraExerciseToWorkout,
+    fullEditorOpen,
+    fullEditorWorkout,
+    setFullEditorWorkout,
+    saveFullEditor,
+    closeFullEditor,
     editExerciseOpen,
     setEditExerciseOpen,
     editExerciseIdx,
@@ -130,6 +140,21 @@ export default function Modals() {
 
   return (
     <>
+      {/* Editor completo durante o treino ativo (cardio, métodos, apagar/reordenar).
+          Ao salvar, os logs das séries feitas são remapeados e o usuário escolhe
+          "só hoje" ou "pra sempre". */}
+      {fullEditorOpen && fullEditorWorkout && (
+        <div className="fixed inset-0 z-[110] bg-neutral-950 overflow-y-auto overscroll-none pt-safe pb-safe">
+          <ExerciseEditor
+            workout={fullEditorWorkout as unknown as EditorWorkout}
+            onChange={(w: EditorWorkout) => setFullEditorWorkout?.(w as unknown as UnknownRecord)}
+            onSave={async (w: EditorWorkout) => saveFullEditor?.(w as unknown as UnknownRecord)}
+            onCancel={() => closeFullEditor?.()}
+            onSaved={() => closeFullEditor?.()}
+          />
+        </div>
+      )}
+
       {postCheckinOpen && (
         <div
           className="fixed inset-0 z-[1200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe"
