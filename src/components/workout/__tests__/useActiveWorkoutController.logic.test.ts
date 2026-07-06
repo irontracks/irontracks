@@ -265,7 +265,7 @@ describe('getSuggestion / watermarkPlaceholder', () => {
 describe('buildWorkoutSummary', () => {
     const exs = [{ name: 'Supino reto' }, { name: 'Crucifixo' }]
 
-    it('séries uniformes → reps×peso; totais corretos', () => {
+    it('séries uniformes → volume total; totais corretos', () => {
         const logs = {
             '0-0': { done: true, weight: '100', reps: '10' },
             '0-1': { done: true, weight: '100', reps: '10' },
@@ -275,8 +275,8 @@ describe('buildWorkoutSummary', () => {
         expect(r.exercises).toBe(2)
         expect(r.sets).toBe(3)
         expect(r.volume).toBe(100 * 10 + 100 * 10 + 20 * 12) // 2240
-        expect(r.text).toContain('Supino reto — 2×10 · 100 kg')
-        expect(r.text).toContain('Crucifixo — 1×12 · 20 kg')
+        expect(r.text).toContain('Supino reto — 2 séries · 2.000 kg')
+        expect(r.text).toContain('Crucifixo — 1 série · 240 kg')
         expect(r.text).toContain('2 exercícios · 3 séries')
     })
 
@@ -307,15 +307,15 @@ describe('buildWorkoutSummary', () => {
         const logs = { '0-0': { done: true, weight: '28,5', reps: '10' } }
         const r = buildWorkoutSummary(exs, logs)
         expect(r.volume).toBe(285)
-        expect(r.text).toContain('Supino reto — 1×10 · 28,5 kg')
+        expect(r.text).toContain('Supino reto — 1 série · 285 kg')
     })
 
     it('não confunde exercício 1 com 10 (prefixo ancorado no traço)', () => {
         const many = Array.from({ length: 11 }, (_, i) => ({ name: `Ex${i}` }))
         const logs = { '1-0': { done: true, weight: '10', reps: '10' }, '10-0': { done: true, weight: '5', reps: '5' } }
         const r = buildWorkoutSummary(many, logs)
-        expect(r.text).toContain('Ex1 — 1×10 · 10 kg')
-        expect(r.text).toContain('Ex10 — 1×5 · 5 kg')
+        expect(r.text).toContain('Ex1 — 1 série · 100 kg')
+        expect(r.text).toContain('Ex10 — 1 série · 25 kg')
     })
 
     it('texto vazio quando nada foi feito', () => {
@@ -332,7 +332,7 @@ describe('buildWorkoutSummary', () => {
         const r = buildWorkoutSummary(uniExs, logs)
         expect(r.sets).toBe(2)
         expect(r.volume).toBe(960) // 2 × (20×12 + 20×12)
-        expect(r.text).toContain('Rosca unilateral — 2×12 · 20 kg') // exibe por lado
+        expect(r.text).toContain('Rosca unilateral — 2 séries · 960 kg') // soma os dois lados
         expect(r.text).not.toContain('sem carga')
     })
 })
