@@ -1,8 +1,16 @@
+import { useState } from 'react';
+
 import type { UnknownRecord, WorkoutExercise, WorkoutSetDetail } from '../types';
 import { isObject } from '../utils';
 
 import { parseTrainingNumber } from '@/utils/trainingNumber';
 import { applyExerciseOrder, buildExerciseDraft, draftOrderKeys } from '@/lib/workoutReorder';
+import {
+  tagExercisesForEdit,
+  reconcileEditedExercises,
+  remapIndexSet,
+  remapCurrentIndex,
+} from '../helpers/reconcileEditedExercises';
 
 const MAX_EXTRA_SETS_PER_EXERCISE = 50;
 const MAX_EXTRA_EXERCISES_PER_WORKOUT = 50;
@@ -483,6 +491,83 @@ export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
     } catch { /* silent */ }
   };
 
+  // ── Editor completo DURANTE o treino ativo ─────────────────────────────────
+  // O botão "+ Exercício" abre o ExerciseEditor completo (cardio, métodos,
+  // apagar/reordenar). Ao salvar, os logs das séries já feitas são remapeados
+  // por chave estável e o usuário escolhe "só hoje" (sessão) ou "pra sempre"
+  // (template). O estado do editor vive aqui (local).
+  const [fullEditorOpen, setFullEditorOpen] = useState(false);
+  const [fullEditorWorkout, setFullEditorWorkout] = useState<UnknownRecord | null>(null);
+
+  const openFullEditor = () => {
+    if (!workout) return;
+    setFullEditorWorkout({ ...workout, exercises: tagExercisesForEdit(exercises) });
+    setFullEditorOpen(true);
+  };
+
+  const closeFullEditor = () => {
+    setFullEditorOpen(false);
+    setFullEditorWorkout(null);
+  };
+
+  const saveFullEditor = async (edited: UnknownRecord): Promise<{ handled: true }> => {
+    if (!workout || typeof onUpdateSession !== 'function') { closeFullEditor(); return { handled: true }; }
+    // Re-etiqueta a partir dos exercícios ATUAIS da sessão (inalterados durante a
+    // edição) — mesmas chaves usadas ao abrir, então o casamento é exato.
+    const taggedOriginal = tagExercisesForEdit(exercises);
+    const editedExercises = Array.isArray((edited as UnknownRecord)?.exercises)
+      ? ((edited as UnknownRecord).exercises as unknown[])
+      : [];
+    const { exercises: nextExercises, logs: nextLogs, remap } = reconcileEditedExercises(
+      taggedOriginal,
+      editedExercises,
+      logs as Record<string, unknown>,
+    );
+
+    // Pergunta: só hoje (sessão) ou pra sempre (template)?
+    let persist = false;
+    try {
+      persist = typeof confirm === 'function'
+        ? await confirm(
+          'Guardar estas mudanças também para as próximas vezes, ou só neste treino de hoje?',
+          'Salvar edição',
+          { confirmText: 'Pra sempre', cancelText: 'Só hoje' },
+        )
+        : false;
+    } catch { persist = false; }
+
+    // Aplica na sessão ativa (sempre).
+    onUpdateSession({ workout: { ...workout, exercises: nextExercises }, logs: nextLogs });
+    setCollapsed((prev) => remapIndexSet(prev, remap));
+    setLinkedWeightExercises((prev) => remapIndexSet(prev, remap));
+    if (typeof currentExerciseIdx === 'number' && typeof setCurrentExerciseIdx === 'function') {
+      setCurrentExerciseIdx(remapCurrentIndex(currentExerciseIdx, remap, nextExercises.length));
+    }
+
+    // Persiste no template quando "pra sempre".
+    if (persist) {
+      const workoutId = String(workout?.id ?? (workout as UnknownRecord)?.workout_id ?? '').trim();
+      if (workoutId) {
+        try {
+          const response = await fetch('/api/workouts/update', {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: workoutId, workout: { ...workout, exercises: nextExercises } }),
+          }).catch((): null => null);
+          const result = response ? await response.json().catch((): null => null) : null;
+          if (!response?.ok || !(result as UnknownRecord)?.ok) {
+            try { await alert('As mudanças valem para hoje, mas não consegui salvar no treino para as próximas vezes.'); } catch { }
+          }
+        } catch {
+          try { await alert('As mudanças valem para hoje, mas não consegui salvar no treino para as próximas vezes.'); } catch { }
+        }
+      }
+    }
+
+    closeFullEditor();
+    return { handled: true };
+  };
+
   return {
     toggleCollapse,
     toggleLinkWeights,
@@ -498,5 +583,12 @@ export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
     openDeleteConfirm,
     closeDeleteConfirm,
     removeExerciseFromWorkout,
+    // Editor completo (treino ativo)
+    fullEditorOpen,
+    fullEditorWorkout,
+    setFullEditorWorkout,
+    openFullEditor,
+    closeFullEditor,
+    saveFullEditor,
   };
 }
