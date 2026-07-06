@@ -119,3 +119,18 @@ export const mapWorkoutRow = (w: unknown): Record<string, unknown> => {
         createdAt: workout.created_at ?? null,
     }
 }
+
+/**
+ * Ordenação canônica da lista de treinos: por `sortOrder` (a organização manual
+ * do usuário), com o título como desempate. Fonte ÚNICA usada em todo caminho que
+ * hidrata a lista (SSR, bootstrap, refetch) — assim o primeiro paint já vem na
+ * ordem certa, sem o flash "bagunçado (alfabético) → corrige". Ordena in place.
+ */
+export function sortWorkoutsByOrder(list: Array<Record<string, unknown>>): Array<Record<string, unknown>> {
+    return list.sort((a, b) => {
+        const ao = Number.isFinite(Number(a?.sortOrder)) ? Number(a.sortOrder) : 0
+        const bo = Number.isFinite(Number(b?.sortOrder)) ? Number(b.sortOrder) : 0
+        if (ao !== bo) return ao - bo
+        return String(a?.title || '').localeCompare(String(b?.title || ''))
+    })
+}
