@@ -309,10 +309,6 @@ export const buildWorkoutSummary = (
     let done = 0;
     let vol = 0;
     let missing = false;
-    const weights = new Set<number>();
-    const repsSet = new Set<number>();
-    let lastWeight = 0;
-    let lastReps = 0;
 
     for (const [key, val] of Object.entries(logMap)) {
       if (!key.startsWith(`${i}-`)) continue; // séries do exercício i (chave "i-s")
@@ -323,10 +319,6 @@ export const buildWorkoutSummary = (
       const { weight: w, reps: r } = setTopWeightReps(log);
       if (v > 0 && w > 0 && r > 0) {
         vol += v;
-        weights.add(w);
-        repsSet.add(r);
-        lastWeight = w;
-        lastReps = r;
       } else {
         missing = true;
       }
@@ -336,12 +328,10 @@ export const buildWorkoutSummary = (
     totalSets += done;
     totalVolume += vol;
 
-    // Uniforme (mesmo peso e reps em todas as séries) → "4×10 · 100 kg".
-    // Variando → volume total. Sem peso/reps → só a contagem (+ flag abaixo).
+    // Sempre volume total (consistente pra todos os exercícios): "N séries · X kg".
+    // Sem peso/reps → só a contagem (+ flag "sem carga" abaixo).
     let detail: string;
-    if (!missing && weights.size === 1 && repsSet.size === 1) {
-      detail = `${done}×${lastReps} · ${lastWeight.toLocaleString('pt-BR')} kg`;
-    } else if (vol > 0) {
+    if (vol > 0) {
       detail = `${done} série${done !== 1 ? 's' : ''} · ${Math.round(vol).toLocaleString('pt-BR')} kg`;
     } else {
       detail = `${done} série${done !== 1 ? 's' : ''}`;
