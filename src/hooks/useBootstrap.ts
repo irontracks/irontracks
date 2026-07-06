@@ -2,7 +2,7 @@
 
 import { useEffect } from 'react'
 import type { UserRecord } from '@/types/app'
-import { mapWorkoutRow } from '@/utils/mapWorkoutRow'
+import { mapWorkoutRow, sortWorkoutsByOrder } from '@/utils/mapWorkoutRow'
 
 interface UseBootstrapOptions {
   userId: string | undefined
@@ -81,12 +81,11 @@ export function useBootstrap({
           ? (jsonObj.workouts as unknown[])
           : []
         if (workoutsRaw.length) {
-          const mapped = workoutsRaw
-            .map((row: unknown) => mapWorkoutRow(row))
-            .filter(Boolean)
-            .sort((a: Record<string, unknown>, b: Record<string, unknown>) =>
-              String(a.title || '').localeCompare(String(b.title || ''))
-            )
+          const mapped = sortWorkoutsByOrder(
+            workoutsRaw
+              .map((row: unknown) => mapWorkoutRow(row))
+              .filter(Boolean) as Array<Record<string, unknown>>
+          )
           setWorkouts(mapped)
           const totalEx = mapped.reduce(
             (acc: number, w: Record<string, unknown>) =>

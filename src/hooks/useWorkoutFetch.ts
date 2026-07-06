@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef } from 'react'
 import type { MutableRefObject } from 'react'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { mapWorkoutRow } from '@/utils/mapWorkoutRow'
+import { mapWorkoutRow, sortWorkoutsByOrder } from '@/utils/mapWorkoutRow'
 import { cacheGetWorkouts, cacheSetWorkouts } from '@/lib/offline/offlineSync'
 import { logError, logWarn } from '@/lib/logger'
 import { safePg } from '@/utils/safePgFilter'
@@ -326,13 +326,8 @@ async function processAndCache(
 ): Promise<WorkoutFetchResult> {
     const role = String(currentUser?.role || 'user') || 'user'
 
-    const mappedRaw = raw.workouts.map((row) => mapWorkoutRow(row)).filter(Boolean)
-    const mapped = mappedRaw.sort((a: Record<string, unknown>, b: Record<string, unknown>) => {
-        const ao = Number.isFinite(Number(a?.sortOrder)) ? Number(a.sortOrder) : 0
-        const bo = Number.isFinite(Number(b?.sortOrder)) ? Number(b.sortOrder) : 0
-        if (ao !== bo) return ao - bo
-        return String(a.title || '').localeCompare(String(b.title || ''))
-    })
+    const mappedRaw = raw.workouts.map((row) => mapWorkoutRow(row)).filter(Boolean) as Array<Record<string, unknown>>
+    const mapped = sortWorkoutsByOrder(mappedRaw)
 
     // Cache em IDB + localStorage pro próximo boot
     try { await cacheSetWorkouts({ userId: currentUser.id, workouts: mapped }) }
@@ -514,7 +509,7 @@ export function useWorkoutFetch({
     const initial = useMemo<WorkoutFetchResult | undefined>(() => {
         if (!userId) return undefined
         if (Array.isArray(initialWorkouts) && initialWorkouts.length > 0) {
-            const mapped = initialWorkouts.map((w) => mapWorkoutRow(w))
+            const mapped = sortWorkoutsByOrder(initialWorkouts.map((w) => mapWorkoutRow(w)).filter(Boolean) as Array<Record<string, unknown>>)
             const totalEx = mapped.reduce(
                 (acc: number, w: Record<string, unknown>) =>
                     acc + (Array.isArray(w?.exercises) ? (w.exercises as unknown[]).length : 0),
