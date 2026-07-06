@@ -14,7 +14,7 @@ export default function WorkoutHeader() {
     exercises,
     inviteOpen,
     setInviteOpen,
-    setAddExerciseOpen,
+    openFullEditor,
     openOrganizeModal,
     sendInvite,
     alert,
@@ -63,12 +63,12 @@ export default function WorkoutHeader() {
             >
               <button
                 type="button"
-                onClick={() => setAddExerciseOpen(true)}
+                onClick={() => openFullEditor?.()}
                 className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-yellow-500 text-black hover:bg-yellow-400 transition-colors active:scale-95 whitespace-nowrap"
-                title="Adicionar exercício extra"
+                title="Editar treino (exercícios, cardio, ordem)"
               >
                 <Plus size={16} />
-                <span className="text-sm font-black hidden sm:inline">Exercício</span>
+                <span className="text-sm font-black hidden sm:inline">Editar treino</span>
               </button>
 
               {/* Overflow menu */}
