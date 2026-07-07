@@ -47,10 +47,16 @@ export default function ReferralSection() {
 
   const handleShare = async () => {
     if (sharing) return
+    // Web Share API não existe em desktop/alguns browsers — cai pra copiar o link
+    // (antes o botão não fazia nada: navigator.share estourava e o catch engolia).
+    if (typeof navigator === 'undefined' || typeof navigator.share !== 'function') {
+      await handleCopy()
+      return
+    }
     setSharing(true)
     try {
       await navigator.share({ title: 'IronTracks', text: 'Entre no IronTracks com meu convite!', url: referralUrl })
-    } catch { /* ignore */ } finally {
+    } catch { /* usuário cancelou ou share falhou — silencioso */ } finally {
       setSharing(false)
     }
   }
