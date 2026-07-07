@@ -58,5 +58,8 @@ export const buildFinishWorkoutPayload = ({
     originWorkoutId: w?.id ?? null,
     preCheckin: isObject(ui) ? (ui as Record<string, unknown>)?.preCheckin ?? null : null,
     postCheckin: postCheckin ?? null,
+    // Treino em dupla: participantes carimbados em ui.teamMeta durante a sessão.
+    // Sem isto a dupla era gravada como "solo" e o relatório não mostrava parceiros.
+    teamMeta: isObject(ui) ? (ui as Record<string, unknown>)?.teamMeta ?? null : null,
   }
 }
