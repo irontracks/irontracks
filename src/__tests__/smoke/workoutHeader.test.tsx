@@ -34,9 +34,30 @@ describe('WorkoutHeader — smoke tests', () => {
         expect(screen.getByLabelText(/fechar editor/i)).toBeInTheDocument()
     })
 
-    it('renders JSON import button with aria-label', () => {
+    it('renders the overflow menu trigger', () => {
         render(<WorkoutHeader {...defaultProps} />)
-        expect(screen.getByLabelText(/carregar treino a partir de arquivo json/i)).toBeInTheDocument()
+        expect(screen.getByLabelText(/mais opções/i)).toBeInTheDocument()
+    })
+
+    it('exposes JSON import inside the overflow menu', () => {
+        render(<WorkoutHeader {...defaultProps} />)
+        // Menu começa fechado — o item de JSON não deve aparecer ainda.
+        expect(screen.queryByText(/carregar json/i)).not.toBeInTheDocument()
+        fireEvent.click(screen.getByLabelText(/mais opções/i))
+        expect(screen.getByText(/carregar json/i)).toBeInTheDocument()
+    })
+
+    it('calls onImportJsonClick when the JSON menu item is clicked', () => {
+        const onImportJsonClick = vi.fn()
+        render(<WorkoutHeader {...defaultProps} onImportJsonClick={onImportJsonClick} />)
+        fireEvent.click(screen.getByLabelText(/mais opções/i))
+        fireEvent.click(screen.getByText(/carregar json/i))
+        expect(onImportJsonClick).toHaveBeenCalledTimes(1)
+    })
+
+    it('keeps the hidden file input for JSON selection', () => {
+        render(<WorkoutHeader {...defaultProps} />)
+        expect(screen.getByLabelText(/selecionar arquivo json do treino/i)).toBeInTheDocument()
     })
 
     it('disables save button when saving is true', () => {
