@@ -486,7 +486,10 @@ export function useTeamInvites({
             if (!targetUserObj?.id) throw new Error('Aluno inválido');
             const targetUserId = String(targetUserObj.id);
 
-            let sessionId = currentTeamSessionId;
+            // Reaproveita a sessão existente quando o caller não passa o id
+            // (ex.: botão de convite no header do treino ativo) — sem isto, um
+            // segundo convite criava outra team_session e abandonava o 1º parceiro.
+            let sessionId = currentTeamSessionId || (teamSession?.id ? String(teamSession.id) : undefined);
             const u = user as { id: string; email?: string | null; displayName?: string; photoURL?: string | null };
 
             // Enforce max participants (5)
@@ -584,8 +587,10 @@ export function useTeamInvites({
             const tObj = target && typeof target === 'object' ? (target as { id?: string }) : null
             const uid = String(tObj?.id || '').trim()
             try {
-                await _sendInvite(target, workout, createdSessionId)
-                if (!createdSessionId && teamSession?.id) createdSessionId = teamSession.id
+                // Usa o sessionId RETORNADO (o state teamSession não atualiza dentro
+                // do loop) — assim todos os convites entram na MESMA sessão.
+                const sid = await _sendInvite(target, workout, createdSessionId)
+                if (!createdSessionId && sid) createdSessionId = String(sid)
                 results.push({ userId: uid, ok: true })
             } catch (e: unknown) {
                 results.push({ userId: uid, ok: false, error: e instanceof Error ? e.message : String(e || '') })
