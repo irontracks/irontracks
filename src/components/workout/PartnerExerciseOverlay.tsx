@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { X, Dumbbell, Timer } from 'lucide-react'
 import type { ExerciseSharePayload } from '@/contexts/team/types'
 import ExerciseCard from './ExerciseCard'
-import { WorkoutProvider } from './WorkoutContext'
+import { WorkoutProvider, WorkoutLogsProvider } from './WorkoutContext'
 import { ModalsComplexMethods } from './ModalsComplexMethods'
 import { ModalsSimpleMethods } from './ModalsSimpleMethods'
 import { useWorkoutMethodSavers } from './hooks/useWorkoutMethodSavers'
@@ -207,6 +207,15 @@ export default function PartnerExerciseOverlay({ share, onSendUpdate, onEnd }: P
         removeExtraSetFromExercise: noopWithArg,
         linkedWeightExercises: new Set<number>(),
         toggleLinkWeights: noopWithArg,
+        // Funções que o ExerciseCard/set-renderers/AI-swap chamam sem guard —
+        // no Modo Spotter viram no-op (o parceiro loga séries, não reestrutura o
+        // treino do atleta), mas PRECISAM existir pra não dar TypeError.
+        updateSetType: noop,
+        swapExerciseName: noop,
+        deleteConfirmIdx: null,
+        openDeleteConfirm: noopWithArg,
+        closeDeleteConfirm: noop,
+        removeExerciseFromWorkout: noopAsync,
 
         // Real modal state (not no-ops!)
         clusterModal, setClusterModal: setClusterModal as never,
@@ -332,8 +341,11 @@ export default function PartnerExerciseOverlay({ share, onSendUpdate, onEnd }: P
                 </div>
             )}
 
-            {/* Exercise card + method modals — all inside WorkoutProvider */}
+            {/* Exercise card + method modals — dentro do WorkoutProvider E do
+                WorkoutLogsProvider (ExerciseCard usa useWorkoutLogs, que lança sem
+                este provider — era o crash do Modo Spotter). */}
             <WorkoutProvider value={contextValue as never}>
+              <WorkoutLogsProvider value={localLogs as never}>
                 <div className="flex-1 overflow-y-auto px-4 py-3">
                     <ExerciseCard
                         ex={exercise as WorkoutExercise}
@@ -345,6 +357,7 @@ export default function PartnerExerciseOverlay({ share, onSendUpdate, onEnd }: P
                     <ModalsComplexMethods />
                     <ModalsSimpleMethods />
                 </div>
+              </WorkoutLogsProvider>
             </WorkoutProvider>
 
             {/* Footer */}
