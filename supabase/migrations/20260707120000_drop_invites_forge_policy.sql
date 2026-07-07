@@ -1,0 +1,21 @@
+-- Migration: fecha o buraco de RLS que permitia FORJAR convites em `invites`.
+--
+-- PROBLEMA: a policy antiga "Users manage invites" (ALL) sobreviveu ao dedup de
+-- policies. O USING dela é `auth.uid() = from_uid OR auth.uid() = to_uid`, e como
+-- policies permissivas são combinadas por OR, o WITH CHECK efetivo do INSERT
+-- passava a aceitar linhas com `to_uid = auth.uid()` — permitindo que um usuário
+-- inserisse um convite forjando `from_uid` (fingir que outra pessoa o convidou) e,
+-- de posse do UUID de uma sessão, se auto-convidar e entrar nela via
+-- accept_team_invite (que só valida to_uid). Também disparava o modal
+-- "fulano aceitou seu convite" na vítima.
+--
+-- CORREÇÃO: dropar a policy redundante. As granulares já cobrem o acesso legítimo
+-- com o INSERT corretamente restrito a `from_uid = auth.uid()`:
+--   invites_insert  → WITH CHECK (is_admin() OR from_uid = auth.uid())
+--   invites_select  → USING (is_admin() OR from_uid = auth.uid() OR to_uid = auth.uid())
+--   invites_update  → USING/CHECK (is_admin() OR from_uid = auth.uid() OR to_uid = auth.uid())
+--   invites_delete  → USING (is_admin() OR from_uid = auth.uid())
+--
+-- ESCOPO: apenas remove a policy redundante. Nenhuma mudança de dados nem de RPC.
+
+DROP POLICY IF EXISTS "Users manage invites" ON public.invites;
