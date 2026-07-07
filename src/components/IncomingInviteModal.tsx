@@ -9,7 +9,7 @@ import type { Workout } from '@/types/app';
 import { getErrorMessage } from '@/utils/errorMessage'
 
 interface IncomingInviteModalProps {
-    onStartSession: (workout: Workout) => void;
+    onStartSession: (workout: Workout, opts?: { skipConfirm?: boolean }) => void;
 }
 
 const IncomingInviteModal = ({ onStartSession }: IncomingInviteModalProps) => {
@@ -47,7 +47,8 @@ const IncomingInviteModal = ({ onStartSession }: IncomingInviteModalProps) => {
         try {
             if (typeof acceptInvite !== 'function') return;
             const workout = await acceptInvite(latestInvite);
-            if (workout && typeof onStartSession === 'function') onStartSession(workout);
+            // O modal já foi a confirmação ("BORA!") — pula o 2º confirm no start.
+            if (workout && typeof onStartSession === 'function') onStartSession(workout as Workout, { skipConfirm: true });
         } catch (e: unknown) {
             await alert("Erro: " + (getErrorMessage(e)));
         } finally {
