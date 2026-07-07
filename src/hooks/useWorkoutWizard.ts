@@ -18,7 +18,7 @@ interface UseWorkoutWizardParams {
   setCreateWizardOpen: (v: boolean) => void
   fetchWorkouts: () => Promise<void>
   alert: (msg: string, title?: string) => Promise<boolean>
-  programTitleStartDay?: number | null
+  programTitleStartDay?: string | null
 }
 
 interface UseWorkoutWizardReturn {
