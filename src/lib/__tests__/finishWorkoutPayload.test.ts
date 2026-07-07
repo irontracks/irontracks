@@ -40,6 +40,29 @@ describe('buildFinishWorkoutPayload', () => {
       expect(result.workoutTitle).toBe('Treino')
     })
 
+    it('inclui teamMeta quando presente em ui (treino em dupla)', () => {
+      const teamMeta = { participants: [{ uid: 'a', name: 'Ana' }, { uid: 'b', name: 'Bia' }] }
+      const result = buildFinishWorkoutPayload({
+        workout: MOCK_WORKOUT,
+        elapsedSeconds: 100,
+        logs: {},
+        ui: { teamMeta },
+        postCheckin: null,
+      })
+      expect(result.teamMeta).toEqual(teamMeta)
+    })
+
+    it('teamMeta é null quando não há treino em dupla', () => {
+      const result = buildFinishWorkoutPayload({
+        workout: MOCK_WORKOUT,
+        elapsedSeconds: 100,
+        logs: {},
+        ui: {},
+        postCheckin: null,
+      })
+      expect(result.teamMeta).toBeNull()
+    })
+
     it('propaga elapsedSeconds para totalTime e realTotalTime', () => {
       const result = buildFinishWorkoutPayload({
         workout: MOCK_WORKOUT,
