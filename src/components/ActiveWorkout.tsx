@@ -57,6 +57,13 @@ export default function ActiveWorkout(props: ActiveWorkoutProps & { controlledBy
   const [isExiting, setIsExiting] = React.useState(false);
   const exitTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   React.useEffect(() => () => { if (exitTimerRef.current) clearTimeout(exitTimerRef.current); }, []);
+
+  // Ao finalizar OU cancelar o treino, sai da sessão de dupla (se houver): o RPC
+  // encerra a sessão (host) ou remove o participante, e o parceiro recebe o
+  // broadcast de "leave". Sem isto a team_session ficava 'active' pra sempre e o
+  // parceiro achava que o outro ainda treinava. Mantido em ref pra ser chamado
+  // do enhancedController (declarado antes do teamCtx).
+  const endTeamSessionRef = React.useRef<() => void>(() => {});
   const triggerExit = React.useCallback((cb: () => void) => {
     if (exitTimerRef.current) return; // already exiting — prevent double-tap
     setIsExiting(true);
@@ -84,7 +91,7 @@ export default function ActiveWorkout(props: ActiveWorkoutProps & { controlledBy
     return {
       ...controller,
       onFinish: originalOnFinish
-        ? (s: unknown, saved: boolean) => triggerExit(() => originalOnFinish(s, saved))
+        ? (s: unknown, saved: boolean) => triggerExit(() => { try { endTeamSessionRef.current?.(); } catch { } originalOnFinish(s, saved); })
         : originalOnFinish,
       // cancelWorkout bypasses triggerExit entirely — the cancel flow must
       // NEVER be blocked by a stale exitTimerRef from a previous Finalizar
@@ -95,6 +102,7 @@ export default function ActiveWorkout(props: ActiveWorkoutProps & { controlledBy
             // Clear any pending exit animation so it doesn't interfere
             if (exitTimerRef.current) { clearTimeout(exitTimerRef.current); exitTimerRef.current = null; }
             setIsExiting(true);
+            try { endTeamSessionRef.current?.(); } catch { }
             setTimeout(() => {
               try { originalOnFinish(null, false); } catch (e) { logError('ActiveWorkout.cancelWorkout', e); }
             }, 100);
@@ -107,6 +115,7 @@ export default function ActiveWorkout(props: ActiveWorkoutProps & { controlledBy
   // Team context for chat, pause banner and workout edit sync
   const teamCtx = useTeamWorkout() as unknown as {
     teamSession: { id: string } | null
+    leaveSession: () => Promise<void>
     sessionPaused: boolean
     pauseSession: () => void
     resumeSession: () => void
@@ -115,6 +124,16 @@ export default function ActiveWorkout(props: ActiveWorkoutProps & { controlledBy
     pendingWorkoutEdit: { id: string; fromName: string; workout: Record<string, unknown> } | null
     dismissWorkoutEdit: () => void
   }
+
+  // Mantém o ref de encerramento apontando pro leaveSession atual (só age se
+  // houver sessão de dupla). Chamado no finish/cancel via enhancedController.
+  React.useEffect(() => {
+    endTeamSessionRef.current = () => {
+      try {
+        if (teamCtx.teamSession?.id && typeof teamCtx.leaveSession === 'function') void teamCtx.leaveSession();
+      } catch { /* silent */ }
+    };
+  }, [teamCtx]);
 
   // Accept incoming workout edit from a teammate.
   // Instead of replacing the entire workout (which erases B's exercises),
