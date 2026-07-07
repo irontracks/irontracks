@@ -523,13 +523,18 @@ export default function DashboardModals(props: DashboardModalsProps) {
                 />
             )}
 
-            {/* Partner Exercise Control Overlay */}
+            {/* Partner Exercise Control Overlay — key por share.id reinicializa o
+                estado a cada novo exercício compartilhado; error boundary evita que
+                uma falha do overlay derrube o app inteiro. */}
             {teamWorkoutCtx?.incomingExerciseShare && (
-                <PartnerExerciseOverlay
-                    share={teamWorkoutCtx.incomingExerciseShare}
-                    onSendUpdate={teamWorkoutCtx.sendExerciseControlUpdate}
-                    onEnd={teamWorkoutCtx.endExerciseShare}
-                />
+                <SectionErrorBoundary section="Modo Spotter" onReset={() => teamWorkoutCtx.endExerciseShare()}>
+                    <PartnerExerciseOverlay
+                        key={String(teamWorkoutCtx.incomingExerciseShare.id ?? '')}
+                        share={teamWorkoutCtx.incomingExerciseShare}
+                        onSendUpdate={teamWorkoutCtx.sendExerciseControlUpdate}
+                        onEnd={teamWorkoutCtx.endExerciseShare}
+                    />
+                </SectionErrorBoundary>
             )}
 
             {/* Session Floating Bar */}
