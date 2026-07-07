@@ -1,5 +1,5 @@
 import React from 'react';
-import { Trash2, Plus, ArrowLeft, Link2, Play } from 'lucide-react';
+import { Trash2, Plus, Link2, Play, ChevronDown } from 'lucide-react';
 import { useDialog } from '@/contexts/DialogContext';
 import { HelpHint } from '@/components/ui/HelpHint';
 import { HELP_TERMS } from '@/utils/help/terms';
@@ -24,6 +24,10 @@ interface ExerciseEditorProps {
 const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCancel, onChange, onSaved }) => {
     useDialog();
     const [saving, setSaving] = React.useState(false);
+    // Override explícito do usuário pra abrir/fechar a lista de "séries por série".
+    // Efetivo = override[key] ?? (tem customização). Assim o caso comum nasce
+    // recolhido (mata a duplicação visual) sem esconder dados personalizados.
+    const [seriesOpen, setSeriesOpen] = React.useState<Record<string, boolean>>({});
 
     const fileInputRef = React.useRef<HTMLInputElement>(null);
 
@@ -177,43 +181,37 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
     if (!workout) return null;
 
     return (
-        <div className="h-full flex flex-col bg-neutral-900">
+        <div className="h-full flex flex-col bg-depth-0">
             <WorkoutHeader
                 saving={saving}
                 fileInputRef={fileInputRef}
                 onSave={handleSave}
-                onCancel={() => onCancel?.()}
+                onCancel={handleCancel}
                 onImportJsonClick={handleImportJsonClick}
                 onImportJson={handleImportJson}
             />
 
-            <div className="flex-1 overflow-y-auto p-4 space-y-6">
+            <div className="flex-1 overflow-y-auto px-4 py-5 space-y-6">
+                {/* Nome do treino */}
                 <div>
-                    <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-3">
-                            <button
-                                onClick={handleCancel}
-                                className="inline-flex items-center gap-2 px-3 py-2 text-neutral-300 hover:text-white rounded-full bg-neutral-900 border border-neutral-700 hover:bg-neutral-800 transition-colors text-xs min-h-[44px]"
-                                title="Voltar"
-                            >
-                                <ArrowLeft size={16} />
-                                <span>Voltar</span>
-                            </button>
-                            <p className="text-xs font-bold text-neutral-400 uppercase">Nome do Treino</p>
-                        </div>
-                    </div>
+                    <label htmlFor="workout-title" className="block text-[11px] font-black uppercase tracking-[0.2em] text-neutral-500 mb-2">
+                        Nome do Treino
+                    </label>
                     <input
+                        id="workout-title"
                         aria-label="Nome do Treino"
                         value={workout.title || ''}
                         onChange={e => onChange?.({ ...workout, title: e.target.value })}
-                        className="w-full bg-neutral-800 text-xl font-bold p-4 rounded-xl border border-neutral-700 outline-none focus:border-yellow-500 text-white placeholder-neutral-600 transition-colors"
+                        className="w-full bg-depth-1 text-xl font-black p-4 rounded-2xl border border-white/[0.06] outline-none focus:border-yellow-500/60 text-white placeholder-neutral-700 transition-colors"
                         placeholder="Ex: Treino A - Peito e Tríceps"
                     />
                 </div>
 
+                {/* Lista de exercícios */}
                 <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                        <p className="text-xs font-bold text-neutral-400 uppercase">Exercícios ({workout.exercises?.length || 0})</p>
+                    <div className="flex items-center justify-between px-1">
+                        <p className="text-[11px] font-black uppercase tracking-[0.2em] text-neutral-500">Exercícios</p>
+                        <span className="text-[11px] font-black text-neutral-500 tabular-nums">{workout.exercises?.length || 0}</span>
                     </div>
 
                     {(workout.exercises || []).map((exercise, index) => {
@@ -240,151 +238,178 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
                             ?? (exercise as { _itx_exKey?: string })?._itx_exKey
                             ?? `${exercise?.name || 'ex'}-${index}`
                         );
+
+                        // Canônico (só força) e detecção de séries customizadas — dirige o
+                        // default recolhido/expandido da lista "séries por série".
+                        const canonicalInfo = exerciseType !== 'cardio'
+                            ? resolveCanonicalExerciseName(exercise.name || '')
+                            : null;
+                        const hasCustomSeries = setDetails.some((s) =>
+                            !!(s?.is_warmup ?? s?.isWarmup) ||
+                            (s?.advanced_config ?? s?.advancedConfig) != null ||
+                            s?.weight != null ||
+                            (s?.reps != null && String(s.reps) !== String(exercise?.reps ?? ''))
+                        );
+                        const seriesExpanded = seriesOpen[stableKey] ?? hasCustomSeries;
+                        const toggleSeries = () => setSeriesOpen((prevState) => ({ ...prevState, [stableKey]: !seriesExpanded }));
+
                         return (
                             <React.Fragment key={stableKey}>
                                 <div
-                                    className={`bg-neutral-800 p-4 border border-neutral-700 relative group transition-all hover:border-neutral-600 ${linkedFromPrev ? '-mt-4 rounded-t-none border-t-0' : 'rounded-xl'} ${isBiSet && hasNext ? 'rounded-b-none' : ''}`}
+                                    className={`bg-depth-1 border border-white/[0.06] p-4 relative transition-colors hover:border-white/10 ${linkedFromPrev ? '-mt-4 rounded-t-none border-t-0' : 'rounded-2xl'} ${isBiSet && hasNext ? 'rounded-b-none' : ''}`}
                                 >
                                     {(isBiSet || linkedFromPrev) && (
-                                        <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-1 bg-yellow-500/20" />
+                                        <div className="pointer-events-none absolute left-0 top-0 bottom-0 w-1 bg-yellow-500/40" />
                                     )}
-                                    <div className="absolute top-2 right-2 flex gap-2">
-                                        <button
-                                            onClick={() => toggleExerciseType(index, exerciseType)}
-                                            className={`px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border transition-colors ${exerciseType === 'cardio'
-                                                ? 'bg-amber-500/20 text-amber-400 border-amber-500/50'
-                                                : 'bg-neutral-700 text-neutral-400 border-neutral-600 hover:border-neutral-400'
-                                                }`}
-                                        >
-                                            {exerciseType === 'cardio' ? 'Cardio' : 'Força'}
-                                        </button>
-                                        {isBiSet && hasNext && (
-                                            <button
-                                                type="button"
-                                                onClick={() => toggleBiSetWithNext(index)}
-                                                className="px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border border-yellow-500/30 text-yellow-500 hover:text-yellow-400 hover:border-yellow-500/50 bg-yellow-500/10"
-                                                title="Deslinkar do próximo"
-                                            >
-                                                Deslinkar
-                                            </button>
-                                        )}
-                                        <button
-                                            onClick={() => removeExercise(index)}
-                                            className="text-neutral-400 hover:text-red-500 p-1 transition-colors"
-                                        >
-                                            <Trash2 size={16} />
-                                        </button>
-                                    </div>
 
-                                    <div className="space-y-4 pr-0 pt-6">
-                                        {exerciseType === 'cardio' ? (
-                                            <div>
-                                                <p className="text-[10px] text-neutral-400 uppercase font-bold mb-1 block">Modalidade</p>
-                                                <select
-                                                    aria-label="Modalidade"
-                                                    value={exercise.name || ''}
-                                                    onChange={e => updateExercise(index, 'name', e.target.value)}
-                                                    className="w-full bg-neutral-900 font-bold text-white text-lg p-3 rounded-xl border border-neutral-700 outline-none focus:border-amber-500 transition-colors appearance-none"
-                                                >
-                                                    {CARDIO_OPTIONS.map(opt => (
-                                                        <option key={opt} value={opt}>{opt}</option>
-                                                    ))}
-                                                </select>
-                                            </div>
-                                        ) : (
-                                            <div>
+                                    {/* Cabeçalho: índice + identidade + ações */}
+                                    <div className="flex items-start gap-3">
+                                        <div className="shrink-0 h-9 w-9 rounded-xl bg-yellow-500/10 border border-yellow-500/25 flex items-center justify-center text-sm font-black text-yellow-500 tabular-nums">
+                                            {index + 1}
+                                        </div>
+
+                                        <div className="flex-1 min-w-0">
+                                            {exerciseType === 'cardio' ? (
+                                                <>
+                                                    <span className="block text-[10px] text-neutral-500 uppercase font-black tracking-wider mb-1">Modalidade</span>
+                                                    <select
+                                                        aria-label="Modalidade"
+                                                        value={exercise.name || ''}
+                                                        onChange={e => updateExercise(index, 'name', e.target.value)}
+                                                        className="w-full bg-depth-2 font-black text-white text-lg px-3 py-2.5 rounded-xl border border-white/[0.06] outline-none focus:border-amber-500/60 transition-colors appearance-none"
+                                                    >
+                                                        {CARDIO_OPTIONS.map(opt => (
+                                                            <option key={opt} value={opt}>{opt}</option>
+                                                        ))}
+                                                    </select>
+                                                </>
+                                            ) : (
                                                 <input
                                                     aria-label="Nome do exercício"
                                                     value={exercise.name || ''}
                                                     onChange={e => updateExercise(index, 'name', e.target.value)}
-                                                    className="w-full bg-transparent font-bold text-white text-lg border-b border-neutral-700 pb-2 focus:border-yellow-500 outline-none placeholder-neutral-600 transition-colors"
+                                                    className="w-full bg-transparent font-black text-white text-lg border-b border-white/[0.06] pb-2 focus:border-yellow-500/60 outline-none placeholder-neutral-700 transition-colors"
                                                     placeholder="Nome do exercício"
                                                 />
-                                                {(() => {
-                                                    const info = resolveCanonicalExerciseName(exercise.name || '')
-                                                    if (!info?.changed || !info?.canonical) return null
-                                                    return (
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => updateExercise(index, 'name', info.canonical)}
-                                                            className="mt-2 inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-yellow-500/10 border border-yellow-500/30 text-yellow-500 font-bold text-xs hover:bg-yellow-500/15"
-                                                        >
-                                                            Padronizar: {info.canonical}
-                                                        </button>
-                                                    )
-                                                })()}
-                                            </div>
-                                        )}
+                                            )}
+                                        </div>
 
-                                        <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
+                                        <div className="shrink-0 flex items-center gap-1.5 pt-0.5">
+                                            <button
+                                                onClick={() => toggleExerciseType(index, exerciseType)}
+                                                className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border transition-colors ${exerciseType === 'cardio'
+                                                    ? 'bg-amber-500/15 text-amber-400 border-amber-500/40'
+                                                    : 'bg-white/[0.04] text-neutral-400 border-white/[0.08] hover:border-white/20'
+                                                    }`}
+                                            >
+                                                {exerciseType === 'cardio' ? 'Cardio' : 'Força'}
+                                            </button>
+                                            {isBiSet && hasNext && (
+                                                <button
+                                                    type="button"
+                                                    onClick={() => toggleBiSetWithNext(index)}
+                                                    className="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border border-yellow-500/30 text-yellow-500 hover:text-yellow-400 hover:border-yellow-500/50 bg-yellow-500/10 transition-colors"
+                                                    title="Deslinkar do próximo"
+                                                >
+                                                    Deslinkar
+                                                </button>
+                                            )}
+                                            <button
+                                                onClick={() => removeExercise(index)}
+                                                aria-label="Remover exercício"
+                                                className="h-8 w-8 flex items-center justify-center rounded-lg text-neutral-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                                            >
+                                                <Trash2 size={16} />
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    {canonicalInfo?.changed && canonicalInfo?.canonical && (
+                                        <button
+                                            type="button"
+                                            onClick={() => updateExercise(index, 'name', canonicalInfo.canonical)}
+                                            className="mt-3 inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-yellow-500/10 border border-yellow-500/25 text-yellow-500 font-black text-xs hover:bg-yellow-500/15 transition-colors"
+                                        >
+                                            Padronizar: {canonicalInfo.canonical}
+                                        </button>
+                                    )}
+
+                                    <div className="mt-4 space-y-3">
+                                        {/* Parâmetros primários */}
+                                        <div className="grid grid-cols-3 gap-2.5">
                                             <div>
-                                                <p className="text-[10px] text-neutral-400 uppercase font-bold text-center block mb-1">Sets</p>
+                                                <span className="block text-[10px] text-neutral-400 uppercase font-black tracking-wider text-center mb-1.5">Sets</span>
                                                 <div className="flex items-center gap-1">
                                                     <input
                                                         aria-label="Número de sets"
                                                         type="number"
                                                         value={setsCount || ''}
                                                         onChange={e => updateExercise(index, 'sets', e.target.value)}
-                                                        className="w-full bg-neutral-900 rounded-lg p-2 text-center text-sm font-bold text-white outline-none focus:ring-1 ring-yellow-500"
+                                                        className="w-full bg-depth-2 border border-white/[0.06] rounded-xl px-2 py-2.5 text-center text-base font-black text-white outline-none focus:border-yellow-500/60 transition-colors"
                                                     />
                                                     <button
                                                         onClick={() => updateExercise(index, 'duplicate', true)}
-                                                        className="h-8 w-8 bg-neutral-700 hover:bg-white hover:text-black text-neutral-400 rounded-lg flex items-center justify-center transition-colors"
+                                                        className="shrink-0 h-10 w-10 bg-white/[0.04] border border-white/[0.06] hover:bg-yellow-500 hover:text-black hover:border-yellow-500 text-neutral-400 rounded-xl flex items-center justify-center transition-colors"
                                                         title="Duplicar Série"
+                                                        aria-label="Duplicar série"
                                                     >
-                                                        <Plus size={14} />
+                                                        <Plus size={15} />
                                                     </button>
                                                 </div>
                                             </div>
                                             <div>
-                                                <p className="text-[10px] text-neutral-400 uppercase font-bold text-center block mb-1">Reps</p>
+                                                <span className="block text-[10px] text-neutral-400 uppercase font-black tracking-wider text-center mb-1.5">Reps</span>
                                                 <input
                                                     aria-label="Repetições"
                                                     type="text"
                                                     value={exercise.reps ? String(exercise.reps) : ''}
                                                     onChange={e => updateExercise(index, 'reps', e.target.value)}
-                                                    className="w-full bg-neutral-900 rounded-lg p-2 text-center text-sm font-bold text-white outline-none focus:ring-1 ring-yellow-500"
+                                                    className="w-full bg-depth-2 border border-white/[0.06] rounded-xl px-2 py-2.5 text-center text-base font-black text-white outline-none focus:border-yellow-500/60 transition-colors"
                                                 />
                                             </div>
                                             <div>
-                                                <p className="text-[10px] text-yellow-500 uppercase font-bold text-center block mb-1 inline-flex items-center justify-center gap-1 group">
+                                                <span className="text-[10px] text-yellow-500 uppercase font-black tracking-wider text-center mb-1.5 flex items-center justify-center gap-1">
                                                     RPE
                                                     <HelpHint title={HELP_TERMS.rpe.title} text={HELP_TERMS.rpe.text} tooltip={HELP_TERMS.rpe.tooltip} className="h-4 w-4 text-[10px]" />
-                                                </p>
+                                                </span>
                                                 <input
                                                     aria-label="RPE"
                                                     type="number"
                                                     value={exercise.rpe ? String(exercise.rpe) : ''}
                                                     onChange={e => updateExercise(index, 'rpe', e.target.value)}
-                                                    className="w-full bg-neutral-900 border border-yellow-500/20 rounded-lg p-2 text-center text-sm font-bold text-yellow-500 outline-none focus:ring-1 ring-yellow-500 placeholder-yellow-500/30"
+                                                    className="w-full bg-depth-2 border border-white/[0.06] rounded-xl px-2 py-2.5 text-center text-base font-black text-yellow-500 outline-none focus:border-yellow-500/60 placeholder-yellow-500/30 transition-colors"
                                                     placeholder="8"
                                                 />
                                             </div>
+                                        </div>
+
+                                        {/* Parâmetros secundários — recolhidos num plano mais fundo */}
+                                        <div className="grid grid-cols-3 gap-2.5 rounded-xl bg-black/20 p-2.5">
                                             <div>
-                                                <p className="text-[10px] text-neutral-400 uppercase font-bold text-center block mb-1">Rest(s)</p>
+                                                <span className="block text-[10px] text-neutral-500 uppercase font-black tracking-wider text-center mb-1.5">Rest(s)</span>
                                                 <input
                                                     aria-label="Descanso em segundos"
                                                     type="number"
                                                     value={(exercise.restTime ?? '')}
                                                     onChange={e => updateExercise(index, 'restTime', e.target.value)}
-                                                    className="w-full bg-neutral-900 rounded-lg p-2 text-center text-sm font-bold text-white outline-none focus:ring-1 ring-yellow-500"
+                                                    className="w-full bg-depth-1 border border-white/[0.06] rounded-lg px-2 py-2 text-center text-sm font-bold text-neutral-200 outline-none focus:border-yellow-500/60 transition-colors"
                                                 />
                                             </div>
                                             <div>
-                                                <p className="text-[10px] text-neutral-400 uppercase font-bold text-center block mb-1 inline-flex items-center justify-center gap-1 group">
+                                                <span className="text-[10px] text-neutral-500 uppercase font-black tracking-wider text-center mb-1.5 flex items-center justify-center gap-1">
                                                     Cad
                                                     <HelpHint title={HELP_TERMS.cadence.title} text={HELP_TERMS.cadence.text} tooltip={HELP_TERMS.cadence.tooltip} className="h-4 w-4 text-[10px]" />
-                                                </p>
+                                                </span>
                                                 <input
                                                     aria-label="Cadência"
                                                     type="text"
                                                     value={exercise.cadence || ''}
                                                     onChange={e => updateExercise(index, 'cadence', e.target.value)}
-                                                    className="w-full bg-neutral-900 rounded-lg p-2 text-center text-sm font-bold text-white outline-none focus:ring-1 ring-yellow-500"
+                                                    className="w-full bg-depth-1 border border-white/[0.06] rounded-lg px-2 py-2 text-center text-sm font-bold text-neutral-200 outline-none focus:border-yellow-500/60 transition-colors"
                                                 />
                                             </div>
                                             <div>
-                                                <p className="text-[10px] text-neutral-400 uppercase font-bold text-center block mb-1 inline-flex items-center justify-center gap-1 group">
+                                                <span className="text-[10px] text-neutral-500 uppercase font-black tracking-wider text-center mb-1.5 flex items-center justify-center gap-1">
                                                     Método
                                                     {(() => {
                                                         const m = String(safeMethod || 'Normal');
@@ -400,12 +425,12 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
                                                                             : null;
                                                         return term ? <HelpHint title={term.title} text={term.text} tooltip={term.tooltip} className="h-4 w-4 text-[10px]" /> : null;
                                                     })()}
-                                                </p>
+                                                </span>
                                                 <select
                                                     aria-label="Método de treino"
                                                     value={safeMethod || 'Normal'}
                                                     onChange={e => updateExercise(index, 'method', e.target.value)}
-                                                    className="w-full bg-neutral-900 rounded-lg p-2 text-center text-[10px] font-bold text-white h-[36px] outline-none focus:ring-1 ring-yellow-500"
+                                                    className="w-full bg-depth-1 border border-white/[0.06] rounded-lg px-1 py-2 text-center text-[11px] font-bold text-neutral-200 h-[38px] outline-none focus:border-yellow-500/60 transition-colors appearance-none"
                                                 >
                                                     <option value="Normal">Normal</option>
                                                     <option value="Drop-set">Drop</option>
@@ -415,6 +440,7 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
                                                 </select>
                                             </div>
                                         </div>
+
                                         {exerciseType === 'cardio' ? (
                                             <CardioFields
                                                 exercise={exercise}
@@ -423,11 +449,10 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
                                                 onUpdateSetDetail={(setIdx, patch) => updateSetDetail(index, setIdx, patch)}
                                             />
                                         ) : (
-                                            <div className="grid grid-cols-3 sm:grid-cols-6 gap-3">
-
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                                 <div>
-                                                    <div className="flex items-center justify-between gap-3 mb-1">
-                                                        <p className="text-[10px] text-amber-400 uppercase font-bold block">Vídeo Demonstração (URL)</p>
+                                                    <div className="flex items-center justify-between gap-3 mb-1.5">
+                                                        <span className="text-[10px] text-neutral-500 uppercase font-black tracking-wider">Vídeo (URL)</span>
                                                         {String(exercise.videoUrl || '').trim() ? (
                                                             <button
                                                                 type="button"
@@ -440,10 +465,10 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
                                                                         window.open(String(exercise.videoUrl || '').trim(), '_blank', 'noopener,noreferrer');
                                                                     } catch { }
                                                                 }}
-                                                                className="inline-flex items-center gap-2 text-amber-300 hover:text-amber-200 text-[11px] font-bold opacity-70 hover:opacity-100"
+                                                                className="inline-flex items-center gap-1.5 text-amber-400 hover:text-amber-300 text-[11px] font-black transition-colors"
                                                                 title="Ver vídeo"
                                                             >
-                                                                <Play size={14} />
+                                                                <Play size={13} />
                                                                 Ver vídeo
                                                             </button>
                                                         ) : null}
@@ -452,17 +477,17 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
                                                         aria-label="URL do vídeo de demonstração"
                                                         value={exercise.videoUrl || ''}
                                                         onChange={e => updateExercise(index, 'videoUrl', e.target.value)}
-                                                        className="w-full bg-amber-500/5 border border-amber-500/20 rounded-lg p-2 text-xs text-amber-200 focus:border-amber-500 outline-none placeholder-amber-500/30 transition-colors"
+                                                        className="w-full bg-depth-2 border border-white/[0.06] rounded-xl px-3 py-2.5 text-xs text-neutral-200 focus:border-amber-500/50 outline-none placeholder-neutral-700 transition-colors"
                                                         placeholder="https://youtube.com/..."
                                                     />
                                                 </div>
                                                 <div>
-                                                    <p className="text-[10px] text-neutral-400 uppercase font-bold mb-1 block">Notas</p>
+                                                    <span className="block text-[10px] text-neutral-500 uppercase font-black tracking-wider mb-1.5">Notas</span>
                                                     <textarea
                                                         aria-label="Notas do exercício"
                                                         value={exercise.notes || ''}
                                                         onChange={e => updateExercise(index, 'notes', e.target.value)}
-                                                        className="w-full bg-neutral-900 rounded-lg p-2 text-sm text-white outline-none focus:ring-1 ring-yellow-500 min-h-[60px] resize-none"
+                                                        className="w-full bg-depth-2 border border-white/[0.06] rounded-xl px-3 py-2.5 text-sm text-white outline-none focus:border-yellow-500/60 min-h-[60px] resize-none transition-colors"
                                                         placeholder="Dicas de execução..."
                                                     />
                                                 </div>
@@ -470,20 +495,42 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
                                         )}
 
                                         {setsCount > 0 && exerciseType !== 'cardio' && (
-                                            <SetDetailsSection
-                                                setDetails={setDetails}
-                                                safeMethod={safeMethod}
-                                                exerciseIndex={index}
-                                                exerciseName={exercise.name || ''}
-                                                onUpdateSetDetail={updateSetDetail}
-                                            />
+                                            <div className="rounded-xl bg-black/20 overflow-hidden">
+                                                <button
+                                                    type="button"
+                                                    onClick={toggleSeries}
+                                                    aria-expanded={seriesExpanded}
+                                                    className="w-full flex items-center justify-between px-3 py-2.5 text-left hover:bg-white/[0.02] transition-colors"
+                                                >
+                                                    <span className="flex items-center gap-2 text-[10px] font-black uppercase tracking-wider text-neutral-400">
+                                                        Séries por série
+                                                        {hasCustomSeries && <span className="h-1.5 w-1.5 rounded-full bg-yellow-500" title="Séries personalizadas" />}
+                                                    </span>
+                                                    <span className="flex items-center gap-2 text-[10px] font-black text-neutral-500 tabular-nums">
+                                                        {setDetails.length}
+                                                        <ChevronDown size={14} className={`transition-transform duration-200 ${seriesExpanded ? 'rotate-180' : ''}`} />
+                                                    </span>
+                                                </button>
+                                                {seriesExpanded && (
+                                                    <div className="px-2 pb-2 expand-enter">
+                                                        <SetDetailsSection
+                                                            setDetails={setDetails}
+                                                            safeMethod={safeMethod}
+                                                            exerciseIndex={index}
+                                                            exerciseName={exercise.name || ''}
+                                                            onUpdateSetDetail={updateSetDetail}
+                                                            hideHeader
+                                                        />
+                                                    </div>
+                                                )}
+                                            </div>
                                         )}
                                     </div>
 
                                     {isBiSet && hasNext && (
-                                        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-neutral-900 border border-neutral-700 rounded-full px-3 py-1 flex items-center gap-2 z-20 shadow-lg">
+                                        <div className="absolute bottom-2 left-1/2 -translate-x-1/2 bg-depth-3 border border-yellow-500/30 rounded-full px-3 py-1 flex items-center gap-2 z-20 shadow-lg">
                                             <Link2 size={14} className="text-yellow-500" />
-                                            <span className="text-[10px] text-neutral-300 font-bold">BI-SET</span>
+                                            <span className="text-[10px] text-neutral-200 font-black tracking-wider">BI-SET</span>
                                         </div>
                                     )}
                                 </div>
@@ -493,7 +540,7 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
                                         <button
                                             type="button"
                                             onClick={() => toggleBiSetWithNext(index)}
-                                            className="mt-3 mb-3 inline-flex items-center gap-2 px-4 py-2 bg-neutral-900 border border-neutral-700 rounded-full text-xs font-bold text-neutral-200 hover:bg-neutral-800 hover:text-white transition-colors min-h-[44px]"
+                                            className="my-3 inline-flex items-center gap-2 px-4 py-2 bg-depth-2 border border-white/[0.08] rounded-full text-xs font-black text-neutral-300 hover:text-white hover:border-yellow-500/40 transition-colors min-h-[44px]"
                                             title="Linkar com próximo (Bi-set)"
                                         >
                                             <Link2 size={16} className="text-yellow-500" />
@@ -508,7 +555,7 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
 
                 <button
                     onClick={addExercise}
-                    className="w-full py-4 border-2 border-dashed border-neutral-800 text-neutral-400 rounded-xl font-bold hover:bg-neutral-800 hover:text-white hover:border-neutral-700 transition-all flex items-center justify-center gap-2"
+                    className="w-full py-4 rounded-2xl border-2 border-dashed border-white/[0.08] text-neutral-400 font-black hover:border-yellow-500/40 hover:text-yellow-500 hover:bg-yellow-500/[0.03] transition-all flex items-center justify-center gap-2 active:scale-[0.99]"
                 >
                     <Plus size={20} /> Adicionar Exercício
                 </button>
