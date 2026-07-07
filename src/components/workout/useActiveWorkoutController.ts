@@ -230,13 +230,16 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
 
   // ── Apply partner exercise control updates ───────────────────────────────
   const exerciseControlUpdates = teamWorkout.exerciseControlUpdates
-  const lastAppliedUpdateTs = useRef(0)
+  // Dedup POR SÉRIE (exIdx-setIdx), não por um ts global: o spotter emite vários
+  // patches num mesmo tick (ex.: um por série num drop-set) com o mesmo Date.now()
+  // em ms — com um ts único, só o 1º era aplicado e os demais sumiam.
+  const lastAppliedTsByKey = useRef<Record<string, number>>({})
   useEffect(() => {
     if (!exerciseControlUpdates?.length) return
     for (const update of exerciseControlUpdates) {
-      if (update.ts <= lastAppliedUpdateTs.current) continue
-      lastAppliedUpdateTs.current = update.ts
       const key = `${update.exerciseIdx}-${update.setIdx}`
+      if (update.ts <= (lastAppliedTsByKey.current[key] ?? 0)) continue
+      lastAppliedTsByKey.current[key] = update.ts
       try {
         const prev = getLog(key)
         const merged = { ...prev, ...update.patch }
