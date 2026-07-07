@@ -114,7 +114,7 @@ export default function ActiveWorkout(props: ActiveWorkoutProps & { controlledBy
 
   // Team context for chat, pause banner and workout edit sync
   const teamCtx = useTeamWorkout() as unknown as {
-    teamSession: { id: string } | null
+    teamSession: { id: string; participants?: unknown[] } | null
     leaveSession: () => Promise<void>
     sessionPaused: boolean
     pauseSession: () => void
@@ -134,6 +134,23 @@ export default function ActiveWorkout(props: ActiveWorkoutProps & { controlledBy
       } catch { /* silent */ }
     };
   }, [teamCtx]);
+
+  // Carimba os participantes da dupla em session.ui.teamMeta — o payload de
+  // finalização lê daqui pra gravar o treino como "em dupla" (senão vira "solo"
+  // no histórico e o relatório não mostra parceiros). Roda uma vez por mudança
+  // na contagem de participantes; preserva o restante do ui (preCheckin etc.).
+  const teamParticipants = teamCtx.teamSession?.participants
+  React.useEffect(() => {
+    const parts = Array.isArray(teamParticipants) ? teamParticipants : []
+    if (!teamCtx.teamSession?.id || parts.length === 0) return
+    if (typeof props.onUpdateSession !== 'function') return
+    const currentUi = (session as { ui?: Record<string, unknown> } | null)?.ui
+    const uiObj = currentUi && typeof currentUi === 'object' ? currentUi : {}
+    const existing = uiObj.teamMeta as { participants?: unknown[] } | undefined
+    const existingCount = existing && Array.isArray(existing.participants) ? existing.participants.length : -1
+    if (existingCount === parts.length) return
+    props.onUpdateSession({ ui: { ...uiObj, teamMeta: { participants: parts } } })
+  }, [teamParticipants, teamCtx.teamSession?.id, session, props])
 
   // Accept incoming workout edit from a teammate.
   // Instead of replacing the entire workout (which erases B's exercises),
