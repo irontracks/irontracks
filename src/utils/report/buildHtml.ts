@@ -8,8 +8,9 @@ import {
   normalizeExerciseKey,
   calculateTotalVolume,
 } from '@/utils/report/formatters'
-import { setTopWeightReps } from '@/utils/report/setVolume'
+import { setTopWeightReps, setVolume, isWorkingSet } from '@/utils/report/setVolume'
 import { estimateCaloriesMet } from '@/utils/calories/metEstimate'
+import { distributeKcalByExercise } from '@/utils/calories/distributeKcal'
 
 
 const getSetTag = (log: unknown): string | null => {
@@ -192,6 +193,7 @@ export function buildReportData(
     type Progression = { type: 'weight' | 'reps' | 'volume'; deltaText: string; direction: 'up' | 'down' | 'flat' }
     type SetRow = { index: number; weight: unknown; reps: unknown; cadence: unknown; tag: string | null; note: string | null; progression: Progression | null }
     const sets: SetRow[] = []
+    let exVolume = 0
     for (let sIdx = 0; sIdx < setsPlanned; sIdx++) {
       const key = `${exIdx}-${sIdx}`
       const log = sessionLogs[key]
@@ -205,6 +207,11 @@ export function buildReportData(
       const { weight: pw, reps: pr } = setTopWeightReps(prevLog)
       if (cw <= 0 && cr <= 0) continue
 
+      // Volume do exercício (soma L+R, cluster etc.) — base do rateio de calorias.
+      // Só séries de trabalho (exclui aquecimento/feeler), pra bater com o volume
+      // total do card e o cálculo canônico de calorias.
+      if (isWorkingSet(log)) exVolume += setVolume(log)
+
       const canWeight = Number.isFinite(cw) && cw > 0 && Number.isFinite(pw) && pw > 0
       const canReps = Number.isFinite(cr) && cr > 0 && Number.isFinite(pr) && pr > 0
 
@@ -212,7 +219,8 @@ export function buildReportData(
       if (isRecord(prevLog)) {
         if (canWeight) {
           const delta = cw - pw
-          const fmt = (n: unknown) => (Number.isFinite(Number(n)) ? String(n).replace(/\.0+$/, '') : String(n))
+          // Arredonda pra 1 casa e remove ".0" — evita lixo de float (ex.: +0.1000000000142kg).
+          const fmt = (n: number) => String(Math.round(n * 10) / 10).replace(/\.0$/, '')
           const deltaText = delta > 0 ? `+${fmt(delta)}kg` : delta < 0 ? `${fmt(delta)}kg` : '='
           const direction = delta > 0 ? 'up' : delta < 0 ? 'down' : 'flat'
           progression = { type: 'weight', deltaText, direction }
@@ -259,9 +267,25 @@ export function buildReportData(
       cadence: exObj?.cadence ?? null,
       baseLabel,
       showProgression,
+      volumeKg: exVolume,
+      caloriesKcal: 0,
       sets,
     }
   })
+
+  // Calorias por exercício: rateia o total da sessão (caloriesEstimate) por volume.
+  // Distribui SÓ entre os exercícios visíveis (com série logada) — os sem série são
+  // escondidos no PDF, então não podem receber kcal (senão a soma visível < total).
+  if (caloriesEstimate > 0) {
+    const visible = exercises.filter((e) => Array.isArray(e.sets) && e.sets.length > 0)
+    if (visible.length > 0) {
+      const perKcal = distributeKcalByExercise(
+        visible.map((e) => ({ volumeKg: Number(e.volumeKg) || 0 })),
+        caloriesEstimate,
+      )
+      visible.forEach((e, i) => { e.caloriesKcal = perKcal[i] ?? 0 })
+    }
+  }
 
   const summaryMetrics = (() => {
     try {
@@ -560,6 +584,7 @@ export function buildReportHTML(
     const baseText = ex?.baseLabel ? String(ex.baseLabel) : ''
     const method = ex?.method ? String(ex.method) : ''
     const rpe = ex?.rpe != null ? String(ex.rpe) : ''
+    const kcal = Number((ex as { caloriesKcal?: unknown })?.caloriesKcal) || 0
 
     const rows = sets.map((set, rowIdx) => {
       const tag = set?.tag ? String(set.tag) : ''
@@ -607,6 +632,7 @@ export function buildReportHTML(
             ${baseText ? `<span class="meta-pill">${escapeHtml(baseText)}</span>` : ''}
             ${method ? `<span class="meta-pill meta-pill-red">${escapeHtml(method)}</span>` : ''}
             ${rpe ? `<span class="meta-pill">RPE <strong style="color:#fafafa">${escapeHtml(rpe)}</strong></span>` : ''}
+            ${kcal > 0 ? `<span class="meta-pill" style="color:#fbbf24">~${escapeHtml(kcal.toLocaleString('pt-BR'))} kcal</span>` : ''}
           </div>
         </div>
         <div class="table-wrap">
@@ -631,7 +657,15 @@ export function buildReportHTML(
   const workoutTitleSafe = escapeHtml(reportData?.session?.workoutTitle || 'Treino')
   const studentNameSafe = escapeHtml(reportData?.athlete?.name || '')
   const dateSafe = escapeHtml(formatDate(isRecord(session) ? (session as Record<string, unknown>).date : null))
-  const timeSafe = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })
+  // Hora do TREINO (não da geração do PDF), em horário de Brasília.
+  const timeSafe = (() => {
+    try {
+      const raw = isRecord(session) ? (session as Record<string, unknown>).date : null
+      const d = new Date(String(raw ?? ''))
+      if (!Number.isFinite(d.getTime())) return ''
+      return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Sao_Paulo' })
+    } catch { return '' }
+  })()
 
   const volDelta = reportData?.summaryMetrics?.volumeDeltaPctVsPrev
   const volDeltaColor = volDelta != null && Number(volDelta) >= 0 ? '#4ade80' : '#f87171'
@@ -881,7 +915,7 @@ export function buildReportHTML(
     </div>
     <div class="header-right">
       <div class="header-workout">${workoutTitleSafe}</div>
-      <div class="header-date">${dateSafe} &nbsp;·&nbsp; ${timeSafe}</div>
+      <div class="header-date">${dateSafe}${timeSafe ? ` &nbsp;·&nbsp; ${timeSafe}` : ''}</div>
       ${studentNameSafe ? `<div class="header-athlete">Atleta: <strong>${studentNameSafe}</strong></div>` : ''}
     </div>
   </div>
