@@ -19,7 +19,7 @@ export function ReportExerciseTable({ exercises, historicalBestE1rm }: ReportExe
         <div className="min-w-0">
           <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Ordem e execução</div>
           <div className="text-lg font-black text-white">Detalhe por exercício</div>
-          <div className="text-xs text-neutral-300">Ordem, descanso e volume executado.</div>
+          <div className="text-xs text-neutral-300">Ordem, descanso, volume e calorias (estimativa ~; soma fecha com o total da sessão).</div>
         </div>
       </div>
       <div className="mt-4 overflow-x-auto">
@@ -35,6 +35,7 @@ export function ReportExerciseTable({ exercises, historicalBestE1rm }: ReportExe
               <th className="px-3 py-2 text-center">Descanso (plan)</th>
               <th className="px-3 py-2 text-right">Peso médio</th>
               <th className="px-3 py-2 text-right">Volume</th>
+              <th className="px-3 py-2 text-right">Calorias</th>
               <th className="px-3 py-2 text-right">Δ Volume</th>
               <th className="px-3 py-2 text-right">Δ Reps</th>
               <th className="px-3 py-2 text-right">Δ Peso</th>
@@ -55,6 +56,7 @@ export function ReportExerciseTable({ exercises, historicalBestE1rm }: ReportExe
               const rest = Number(ex.restTimePlannedSec || 0)
               const avgWeight = Number(ex.avgWeightKg || 0)
               const volume = Number(ex.volumeKg || 0)
+              const kcal = Number(ex.caloriesKcal || 0)
               const deltaVolume = ex.delta && typeof ex.delta === 'object' ? Number((ex.delta as AnyObj).volumeKg) : NaN
               const deltaReps = ex.delta && typeof ex.delta === 'object' ? Number((ex.delta as AnyObj).reps) : NaN
               const deltaWeight = ex.delta && typeof ex.delta === 'object' ? Number((ex.delta as AnyObj).avgWeightKg) : NaN
@@ -75,6 +77,7 @@ export function ReportExerciseTable({ exercises, historicalBestE1rm }: ReportExe
                   <td className="px-3 py-2 text-center font-mono text-neutral-300">{Number.isFinite(rest) && rest > 0 ? `${Math.round(rest)}s` : '—'}</td>
                   <td className="px-3 py-2 text-right font-mono text-neutral-200">{Number.isFinite(avgWeight) && avgWeight > 0 ? `${avgWeight.toFixed(1)} kg` : '—'}</td>
                   <td className="px-3 py-2 text-right font-mono text-neutral-200">{Number.isFinite(volume) && volume > 0 ? `${volume.toLocaleString('pt-BR')} kg` : '—'}</td>
+                  <td className="px-3 py-2 text-right font-mono text-amber-300">{Number.isFinite(kcal) && kcal > 0 ? `~${kcal.toLocaleString('pt-BR')} kcal` : '—'}</td>
                   <td className={`px-3 py-2 text-right font-mono ${Number.isFinite(deltaVolume) ? deltaVolumeClass : 'text-neutral-500'}`}>{deltaVolumeLabel}</td>
                   <td className={`px-3 py-2 text-right font-mono ${Number.isFinite(deltaReps) ? deltaRepsClass : 'text-neutral-500'}`}>{deltaRepsLabel}</td>
                   <td className={`px-3 py-2 text-right font-mono ${Number.isFinite(deltaWeight) ? deltaWeightClass : 'text-neutral-500'}`}>{deltaWeightLabel}</td>

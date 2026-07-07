@@ -1,6 +1,8 @@
 
 import type { UnknownRecord } from '@/types/app'
 import { setVolume, setTopWeightReps, setBestE1rm } from './setVolume'
+import { estimateSessionKcal } from '@/utils/calories/sessionKcal'
+import { distributeKcalByExercise } from '@/utils/calories/distributeKcal'
 
 const isObject = (value: unknown): value is UnknownRecord =>
   value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -323,6 +325,8 @@ export type ReportExerciseMetrics = {
   setsDone: number
   repsDone: number
   avgWeightKg: number | null
+  /** Calorias estimadas do exercício (rateio do total da sessão). Σ = total. */
+  caloriesKcal?: number
   /** Melhor 1RM estimado do dia (máx por série, Epley). null se sem carga válida. */
   bestE1rm: number | null
   delta: {
@@ -459,6 +463,19 @@ export const buildReportMetrics = (session: UnknownRecord, previousSession?: Unk
       },
     })
   })
+
+  // Calorias por exercício: rateio do total canônico da sessão (mesmo modelo MET
+  // usado no card de nutrição/relatório) pra a soma fechar com o total exibido.
+  try {
+    const sessionKcal = estimateSessionKcal(session, {})
+    if (sessionKcal > 0 && metrics.length > 0) {
+      const perExercise = distributeKcalByExercise(
+        metrics.map((m) => ({ volumeKg: m.volumeKg, executionMinutes: m.executionMinutes })),
+        sessionKcal,
+      )
+      metrics.forEach((m, i) => { m.caloriesKcal = perExercise[i] ?? 0 })
+    }
+  } catch { /* sem calorias — não bloqueia o resto do relatório */ }
 
   const avgActualRestSec = actualRestSetsTracked > 0
     ? Math.round(actualRestSum / actualRestSetsTracked)
