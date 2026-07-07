@@ -11,7 +11,7 @@ const isRecord = (v: unknown): v is Record<string, unknown> =>
 
 interface UseWorkoutNormalizeOptions {
     workouts: Array<Record<string, unknown>>
-    programTitleStartDay?: number
+    programTitleStartDay?: string
     fetchWorkouts: () => Promise<void>
     alert: (msg: string, title?: string) => Promise<unknown>
     confirm: (msg: string, title?: string) => Promise<boolean>

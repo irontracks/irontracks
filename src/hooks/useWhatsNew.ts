@@ -80,7 +80,50 @@ export function useWhatsNew({ userId, userSettingsApi }: UseWhatsNewOptions): Us
       setWhatsNewOpen(false)
       const updateId = pendingUpdate?.id ? String(pendingUpdate.id) : ''
 
+      const prefsNow =
+        userSettingsApi?.settings && typeof userSettingsApi.settings === 'object'
+          ? (userSettingsApi.settings as Record<string, unknown>)
+          : {}
+
+      // Persiste um patch nos settings mantendo o resto intacto.
+      const persist = async (patch: Record<string, unknown>) => {
+        const next = { ...(prefsNow || {}), ...patch }
+        try {
+          userSettingsApi?.setSettings?.(
+            next as Parameters<NonNullable<typeof userSettingsApi>['setSettings']>[0],
+          )
+        } catch (e) { logWarn('useWhatsNew', 'silenced error', e) }
+        try {
+          await userSettingsApi?.save?.(
+            next as Parameters<NonNullable<typeof userSettingsApi>['save']>[0],
+          )
+        } catch (e) { logWarn('useWhatsNew', 'silenced error', e) }
+      }
+
       if (updateId) {
+        // "Repetir por 24h" (default ligado): ao fechar, o aviso NÃO some de vez —
+        // é reagendado (o /unseen tem cooldown de 2h) e volta a aparecer até 24h
+        // após o primeiro prompt. Desligado: fecha = dispensa permanente.
+        const remind24h = prefsNow?.whatsNewRemind24h !== false
+        const now = Date.now()
+        const sameId = String(prefsNow?.whatsNewRemindId || '') === updateId
+        const existingUntil = Number(prefsNow?.whatsNewRemindUntil) || 0
+        const remindUntil = sameId && existingUntil > 0 ? existingUntil : now + 24 * 60 * 60 * 1000
+
+        if (remind24h && now < remindUntil) {
+          try {
+            await fetch('/api/updates/mark-prompted', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ updateId }),
+            })
+          } catch (e) { logWarn('useWhatsNew', 'silenced error', e) }
+          await persist({ whatsNewRemindId: updateId, whatsNewRemindUntil: remindUntil })
+          setPendingUpdate(null)
+          return
+        }
+
+        // Janela expirou ou toggle desligado → dispensa definitiva.
         try {
           await fetch('/api/updates/mark-viewed', {
             method: 'POST',
@@ -88,6 +131,7 @@ export function useWhatsNew({ userId, userSettingsApi }: UseWhatsNewOptions): Us
             body: JSON.stringify({ updateId }),
           })
         } catch (e) { logWarn('useWhatsNew', 'silenced error', e) }
+        await persist({ whatsNewRemindId: '', whatsNewRemindUntil: 0 })
         setPendingUpdate(null)
         return
       }

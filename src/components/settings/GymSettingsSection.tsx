@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react'
 import { useGeoLocation } from '@/hooks/useGeoLocation'
+import { logError } from '@/lib/logger'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 const GymQRCode = lazy(() => import('@/components/GymQRCode'))
@@ -52,6 +53,9 @@ export default function GymSettingsSection({ userId, supabase }: GymSettingsSect
   const [addingGym, setAddingGym] = useState(false)
   const [newGymName, setNewGymName] = useState('')
   const [saving, setSaving] = useState(false)
+  // Mensagem de erro das ações (add/remove/toggle/principal). Antes as escritas
+  // eram otimistas e engoliam falhas — a UI dizia "salvo" mesmo com erro.
+  const [actionError, setActionError] = useState<string | null>(null)
 
   // Autocomplete state
   const [suggestions, setSuggestions] = useState<GymSuggestion[]>([])
@@ -144,16 +148,24 @@ export default function GymSettingsSection({ userId, supabase }: GymSettingsSect
   // Toggle setting
   const toggleSetting = useCallback(async (key: keyof LocationSettings) => {
     const newVal = !settings[key]
+    setActionError(null)
     setSettings(prev => ({ ...prev, [key]: newVal }))
-    await supabase.from('user_location_settings').upsert(
+    const { error } = await supabase.from('user_location_settings').upsert(
       { user_id: userId, [key]: newVal, updated_at: new Date().toISOString() },
       { onConflict: 'user_id' },
     )
+    if (error) {
+      // Reverte o otimismo e avisa — antes ficava "ligado" na tela sem gravar.
+      logError('component:GymSettingsSection.toggleSetting', error)
+      setSettings(prev => ({ ...prev, [key]: !newVal }))
+      setActionError('Não foi possível salvar a preferência. Tente novamente.')
+    }
   }, [settings, supabase, userId])
 
   // Add gym — use selected suggestion coords or current GPS position
   const addGym = useCallback(async () => {
     if (!newGymName.trim()) return
+    setActionError(null)
     setSaving(true)
 
     let lat: number
@@ -188,22 +200,42 @@ export default function GymSettingsSection({ userId, supabase }: GymSettingsSect
       setNewGymName('')
       setAddingGym(false)
       setSelectedSuggestion(null)
+    } else if (error) {
+      logError('component:GymSettingsSection.addGym', error)
+      setActionError('Não foi possível adicionar a academia. Tente novamente.')
     }
     setSaving(false)
   }, [newGymName, selectedSuggestion, getCurrentPosition, supabase, userId, gyms.length])
 
   // Delete gym
   const deleteGym = useCallback(async (gymId: string) => {
-    await supabase.from('user_gyms').delete().eq('id', gymId).eq('user_id', userId)
+    setActionError(null)
+    // Guarda o estado atual pra reverter se a exclusão falhar no banco.
+    const prevGyms = gyms
     setGyms(prev => prev.filter(g => g.id !== gymId))
-  }, [supabase, userId])
+    const { error } = await supabase.from('user_gyms').delete().eq('id', gymId).eq('user_id', userId)
+    if (error) {
+      logError('component:GymSettingsSection.deleteGym', error)
+      setGyms(prevGyms)
+      setActionError('Não foi possível remover a academia. Tente novamente.')
+    }
+  }, [gyms, supabase, userId])
 
   // Set primary
   const setPrimary = useCallback(async (gymId: string) => {
-    await supabase.from('user_gyms').update({ is_primary: false }).eq('user_id', userId)
-    await supabase.from('user_gyms').update({ is_primary: true }).eq('id', gymId).eq('user_id', userId)
+    setActionError(null)
+    const prevGyms = gyms
     setGyms(prev => prev.map(g => ({ ...g, is_primary: g.id === gymId })))
-  }, [supabase, userId])
+    const clear = await supabase.from('user_gyms').update({ is_primary: false }).eq('user_id', userId)
+    const set = clear.error
+      ? clear
+      : await supabase.from('user_gyms').update({ is_primary: true }).eq('id', gymId).eq('user_id', userId)
+    if (set.error) {
+      logError('component:GymSettingsSection.setPrimary', set.error)
+      setGyms(prevGyms)
+      setActionError('Não foi possível definir a academia principal. Tente novamente.')
+    }
+  }, [gyms, supabase, userId])
 
   if (loading) return <div className="animate-pulse h-20 rounded-xl bg-white/5" />
 
@@ -214,6 +246,12 @@ export default function GymSettingsSection({ userId, supabase }: GymSettingsSect
         <span className="text-lg">📍</span>
         <h3 className="text-base font-bold text-white">Localização & GPS</h3>
       </div>
+
+      {actionError && (
+        <div className="rounded-xl px-3 py-2 text-xs font-semibold text-red-300" style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.2)' }}>
+          {actionError}
+        </div>
+      )}
 
       {/* Toggles */}
       <div className="space-y-3">
