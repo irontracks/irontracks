@@ -25,6 +25,7 @@ import { ReportSummaryCards } from '@/components/workout-report/ReportSummaryCar
 import { ReportExerciseCard } from '@/components/workout-report/ReportExerciseCard'
 import { ReportHighlightsPanel } from '@/components/workout-report/ReportHighlightsPanel'
 import { ReportExerciseTable } from '@/components/workout-report/ReportExerciseTable'
+import { distributeKcalByExercise } from '@/utils/calories/distributeKcal'
 import { ReportTeamSection } from '@/components/workout-report/ReportTeamSection'
 import { ReportTimePanel } from '@/components/workout-report/ReportTimePanel'
 
@@ -123,6 +124,22 @@ const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose,
         isGenerating, setIsGenerating,
         pdfUrl, setPdfUrl, pdfBlob, setPdfBlob, pdfFrameRef,
     } = useReportData({ session, previousSession, user, settings });
+
+    // Calorias por exercício: distribui o total EXIBIDO da sessão (mesmo número do
+    // stat "Calorias") pelos exercícios, garantindo que a soma feche. Funciona pra
+    // treinos novos e antigos (não depende do reportMeta salvo ter kcal).
+    const exercisesWithKcal = useMemo(() => {
+        const list = Array.isArray((reportMeta as AnyObj | null)?.exercises)
+            ? ((reportMeta as AnyObj).exercises as AnyObj[]) : [];
+        if (list.length === 0) return list;
+        const total = Number(calories) || 0;
+        if (!(total > 0)) return list;
+        const per = distributeKcalByExercise(
+            list.map((e) => ({ volumeKg: Number(e?.volumeKg) || 0, executionMinutes: Number(e?.executionMinutes) || 0 })),
+            total,
+        );
+        return list.map((e, i) => ({ ...e, caloriesKcal: per[i] ?? 0 }));
+    }, [reportMeta, calories]);
 
     // Weekly muscle map for the in-report visualization + PDF export.
     // Fetches once when the report opens; re-export wraps cached server data.
@@ -824,7 +841,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose,
                 </Suspense>
 
                 <ReportExerciseTable
-                    exercises={reportMeta?.exercises as unknown[] || []}
+                    exercises={exercisesWithKcal}
                     historicalBestE1rm={historicalBestE1rm}
                 />
 
