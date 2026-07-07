@@ -1,9 +1,28 @@
 export interface TeamParticipant {
     id?: string
     user_id?: string
+    /** Formato gravado no banco/RPC (accept_team_invite, createJoinCode): {uid,name,photo} */
+    uid?: string
     display_name?: string
+    name?: string
     photo_url?: string | null
+    photo?: string | null
     status?: string
+}
+
+/**
+ * Normaliza um participante que pode vir em DOIS formatos: o do banco/RPC
+ * ({uid,name,photo}) ou o do cliente ({user_id,display_name,photo_url}). Sem
+ * isto, o painel/chat nunca casavam o parceiro (aparecia "Parceiro" sem foto).
+ */
+export function normalizeParticipant(p: TeamParticipant | null | undefined): {
+    userId: string; displayName: string; photoUrl: string | null
+} {
+    return {
+        userId: String(p?.user_id ?? p?.uid ?? p?.id ?? '').trim(),
+        displayName: String(p?.display_name ?? p?.name ?? '').trim(),
+        photoUrl: (p?.photo_url ?? p?.photo ?? null) as string | null,
+    }
 }
 
 export interface TeamSession {

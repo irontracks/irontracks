@@ -53,7 +53,7 @@ interface UseWorkoutCrudOptions {
 }
 
 interface UseWorkoutCrudReturn {
-    handleStartSession: (workout: unknown) => Promise<void>
+    handleStartSession: (workout: unknown, opts?: { skipConfirm?: boolean }) => Promise<void>
     handleFinishSession: (sessionData: unknown, showReport?: boolean) => Promise<void>
     handleCreateWorkout: () => void
     handleEditWorkout: (workout: unknown) => Promise<void>
@@ -95,7 +95,7 @@ export function useWorkoutCrud({
     setEditActiveOpen,
 }: UseWorkoutCrudOptions): UseWorkoutCrudReturn {
 
-    const handleStartSession = useCallback(async (workout: unknown) => {
+    const handleStartSession = useCallback(async (workout: unknown, opts?: { skipConfirm?: boolean }) => {
         const workoutObj = workout && typeof workout === 'object'
             ? (workout as Record<string, unknown>)
             : ({} as Record<string, unknown>)
@@ -110,6 +110,16 @@ export function useWorkoutCrud({
             return
         }
 
+        // Já treinando? Confirma antes de descartar (ex.: aceitar convite no meio de
+        // outro treino sobrescrevia a sessão em andamento sem aviso). Sempre pergunta.
+        if (activeSession?.workout) {
+            const trocar = await confirm(
+                'Você já está treinando. Iniciar este treino vai descartar o treino atual em andamento. Continuar?',
+                'Trocar de treino?',
+            )
+            if (!trocar) return
+        }
+
         const first = exercisesList[0] || {}
         const exMin = toMinutesRounded(estimateExerciseSeconds(first))
         const totalMin = toMinutesRounded(
@@ -119,11 +129,16 @@ export function useWorkoutCrud({
             )
         )
         const workoutTitle = String(workoutObj?.title || workoutObj?.name || 'Treino')
-        const ok = await confirm(
-            `Iniciar "${workoutTitle}"? Primeiro exercício: ~${exMin} min. Estimado total: ~${totalMin} min.`,
-            'Iniciar Treino'
-        )
-        if (!ok) return
+        // Vindo de convite, o IncomingInviteModal já é a confirmação ("BORA!") —
+        // pular o 2º confirm evita deixar o convidado preso na sessão se ele recusar
+        // aqui depois de já ter aceitado.
+        if (!opts?.skipConfirm) {
+            const ok = await confirm(
+                `Iniciar "${workoutTitle}"? Primeiro exercício: ~${exMin} min. Estimado total: ~${totalMin} min.`,
+                'Iniciar Treino'
+            )
+            if (!ok) return
+        }
 
         // Pre-workout check-in
         let preCheckin = null
@@ -227,6 +242,7 @@ export function useWorkoutCrud({
             }
         }
     }, [
+        activeSession?.workout,
         alert,
         confirm,
         persistExerciseVideoUrls,

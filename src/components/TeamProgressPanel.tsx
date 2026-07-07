@@ -3,6 +3,7 @@ import React, { useState, useMemo } from 'react'
 import { Users, ChevronDown, ChevronUp, Zap } from 'lucide-react'
 import { useTeamWorkout } from '@/contexts/TeamWorkoutContext'
 import type { SharedLogsMap } from '@/contexts/TeamWorkoutContext'
+import { normalizeParticipant } from '@/contexts/team/types'
 
 interface Exercise {
     name?: string
@@ -28,10 +29,9 @@ export function TeamProgressPanel({ exercises, participants }: TeamProgressPanel
     const sessionParticipants = teamSession?.participants ?? []
 
     const getParticipantName = (uid: string) => {
-        const fromProp = Array.isArray(participants) ? participants.find(p => String(p.user_id || '') === uid) : null
-        if (fromProp?.display_name) return fromProp.display_name
-        const fromSession = sessionParticipants.find(p => String(p.user_id || p.id || '') === uid)
-        return String(fromSession?.display_name || 'Parceiro').trim()
+        const all = [...(Array.isArray(participants) ? participants : []), ...sessionParticipants]
+        const match = all.map(normalizeParticipant).find(n => n.userId === uid)
+        return match?.displayName || 'Parceiro'
     }
 
     if (!teamSession?.id || partnerIds.length === 0) return null
