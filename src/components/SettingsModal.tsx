@@ -198,6 +198,10 @@ export default function SettingsModal(props: SettingsModalProps) {
       if (granted) {
         // Persist the user's consent so useHealthKit knows to fetch data
         await props?.patchSettings?.({ appleHealthSync: true }).catch(() => { })
+        // Também espelha no draft local — senão um "Salvar" posterior gravaria
+        // o draft antigo (appleHealthSync=false) por cima, desligando o sync
+        // que acabou de ser concedido.
+        setValue('appleHealthSync', true)
       }
     } catch (e) { logError('component:SettingsModal.requestHealthKit', e); setHealthKitGranted(false) } finally { setHealthKitBusy(false) }
   }
