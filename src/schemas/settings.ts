@@ -32,6 +32,10 @@ export const UserSettingsSchema = z
     whatsNewLastSeenAt: z.number().default(0),
     whatsNewAutoOpen: z.boolean().default(true),
     whatsNewRemind24h: z.boolean().default(true),
+    // Janela do "Repetir por 24h": id do update e timestamp-limite até quando
+    // ele deve reaparecer após o usuário fechar (em vez de sumir de vez).
+    whatsNewRemindId: z.string().default(''),
+    whatsNewRemindUntil: z.number().default(0),
     enableSounds: z.boolean().default(true),
     allowTeamInvites: z.boolean().default(true),
     allowSocialFollows: z.boolean().default(true),

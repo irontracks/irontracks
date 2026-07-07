@@ -93,6 +93,7 @@ const NormalSetInner = ({
     deloadSuggestions,
     setCollapsed,
     reportHistory,
+    settings,
   } = useWorkoutContext();
 
   const completeBusyRef = useRef(false);
@@ -127,7 +128,16 @@ const NormalSetInner = ({
     updateSetType(exIdx, setIdx, next);
   }, [updateSetType, exIdx, setIdx]);
   const longPressHandlers = useLongPress(openSetTypePopover);
-  const restTime = parseTrainingNumber(ex?.restTime ?? ex?.rest_time);
+  const configuredRestTime = parseTrainingNumber(ex?.restTime ?? ex?.rest_time);
+  // autoRestTimerWhenMissing: quando o exercício não tem descanso definido,
+  // inicia o descanso padrão (restTimerDefaultSeconds) em vez de não iniciar
+  // nada. Sem a flag, mantém o comportamento antigo (só inicia se configurado).
+  const restSettings = settings as Record<string, unknown> | null;
+  const autoRestWhenMissing = Boolean(restSettings?.autoRestTimerWhenMissing);
+  const defaultRestSeconds = Math.max(15, Math.min(600, Number(restSettings?.restTimerDefaultSeconds ?? 90) || 90));
+  const restTime = (configuredRestTime && configuredRestTime > 0)
+    ? configuredRestTime
+    : (autoRestWhenMissing ? defaultRestSeconds : configuredRestTime);
 
   // Unilateral config — explicit flag, with fallback to name detection
   // (catches templates created before the flag existed or imported without it)
