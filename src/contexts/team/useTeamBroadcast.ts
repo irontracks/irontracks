@@ -337,7 +337,14 @@ export function useTeamBroadcast({
                 senderPhoto: myPhotoUrlRef.current,
                 text: trimmed,
             }),
-        }).catch((e) => { logError('useTeamBroadcast.sendChatMessage', e) })
+        })
+            .then((res) => { if (!res.ok) throw new Error(`chat notify ${res.status}`) })
+            .catch((e) => {
+                logError('useTeamBroadcast.sendChatMessage', e)
+                // Reverte a mensagem otimista: sem isto ela ficava exibida como
+                // "enviada" mesmo tendo falhado (rede/membership), sem o parceiro receber.
+                setChatMessages(prev => prev.filter(m => m.id !== tempId))
+            })
     }, [user?.id, teamSession?.id, myDisplayNameRef, myPhotoUrlRef])
 
     // ── Reliable chat: postgres_changes on team_chat_messages + polling fallback ──
