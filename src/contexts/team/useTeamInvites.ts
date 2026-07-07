@@ -53,28 +53,46 @@ export function useTeamInvites({
                 }
                 const { data } = await supabase
                     .from('invites')
-                    .select('*, profiles:from_uid(display_name, photo_url)')
+                    .select('*')
                     .eq('to_uid', safeUserId)
                     .eq('status', 'pending')
                     .order('created_at', { ascending: false });
                 const list = Array.isArray(data) ? data : [];
+                // O nome/foto do remetente vem de profiles_public (a tabela profiles
+                // está trancada por RLS — o embed devolvia null e mostrava "Alguém").
+                const fromIds = Array.from(new Set(list.map(i => String(i?.from_uid || '')).filter(Boolean)));
+                const profById = new Map<string, { display_name?: string | null; photo_url?: string | null }>();
+                if (fromIds.length) {
+                    try {
+                        const { data: profs } = await supabase
+                            .from('profiles_public')
+                            .select('id, display_name, photo_url')
+                            .in('id', fromIds);
+                        for (const p of Array.isArray(profs) ? profs : []) {
+                            if (p?.id) profById.set(String(p.id), { display_name: p.display_name ?? null, photo_url: p.photo_url ?? null });
+                        }
+                    } catch (e) { logError('useTeamInvites.refetchInvites.profiles', e); }
+                }
                 const mapped = list
                     .filter((inv) => inv && typeof inv === 'object')
-                    .map(inv => ({
-                        id: inv.id,
-                        created_at: inv.created_at,
-                        from_uid: inv.from_uid,
-                        team_session_id: inv.team_session_id ?? null,
-                        status: inv.status,
-                        workout_data: inv.workout_data ?? null,
-                        profiles: inv.profiles ?? null,
-                        from: {
-                            displayName: inv.profiles?.display_name || 'Unknown',
-                            photoURL: inv.profiles?.photo_url,
-                            uid: inv.from_uid
-                        },
-                        workout: inv.workout_data
-                    }));
+                    .map(inv => {
+                        const prof = profById.get(String(inv.from_uid || '')) ?? null;
+                        return {
+                            id: inv.id,
+                            created_at: inv.created_at,
+                            from_uid: inv.from_uid,
+                            team_session_id: inv.team_session_id ?? null,
+                            status: inv.status,
+                            workout_data: inv.workout_data ?? null,
+                            profiles: prof,
+                            from: {
+                                displayName: prof?.display_name || 'Alguém',
+                                photoURL: prof?.photo_url,
+                                uid: inv.from_uid
+                            },
+                            workout: inv.workout_data
+                        };
+                    });
                 setIncomingInvites(mapped as IncomingInvite[]);
             } catch (e) {
                 logError('useTeamInvites.refetchInvites', e);
@@ -130,7 +148,7 @@ export function useTeamInvites({
                                 workout_data: (newInvite.workout_data ?? null) as Record<string, unknown> | null,
                                 profiles: profile && typeof profile === 'object' ? { display_name: profile.display_name ?? null, photo_url: profile.photo_url ?? null } : null,
                                 from: {
-                                    displayName: profile?.display_name || 'Unknown',
+                                    displayName: profile?.display_name || 'Alguém',
                                     photoURL: profile?.photo_url,
                                     uid: newInvite.from_uid
                                 },
@@ -201,29 +219,46 @@ export function useTeamInvites({
             try {
                 const { data } = await supabase
                     .from('invites')
-                    .select('*, profiles:from_uid(display_name, photo_url)')
+                    .select('*')
                     .eq('to_uid', safeUserId)
                     .eq('status', 'pending')
                     .order('created_at', { ascending: false });
                 if (!mounted) return;
                 const list = Array.isArray(data) ? data : [];
+                const fromIds = Array.from(new Set(list.map(i => String(i?.from_uid || '')).filter(Boolean)));
+                const profById = new Map<string, { display_name?: string | null; photo_url?: string | null }>();
+                if (fromIds.length) {
+                    try {
+                        const { data: profs } = await supabase
+                            .from('profiles_public')
+                            .select('id, display_name, photo_url')
+                            .in('id', fromIds);
+                        for (const p of Array.isArray(profs) ? profs : []) {
+                            if (p?.id) profById.set(String(p.id), { display_name: p.display_name ?? null, photo_url: p.photo_url ?? null });
+                        }
+                    } catch (e) { logError('useTeamInvites.fallbackRefetch.profiles', e); }
+                }
+                if (!mounted) return;
                 const mapped = list
                     .filter((inv) => inv && typeof inv === 'object')
-                    .map(inv => ({
-                        id: inv.id,
-                        created_at: inv.created_at,
-                        from_uid: inv.from_uid,
-                        team_session_id: inv.team_session_id ?? null,
-                        status: inv.status,
-                        workout_data: inv.workout_data ?? null,
-                        profiles: inv.profiles ?? null,
-                        from: {
-                            displayName: inv.profiles?.display_name || 'Unknown',
-                            photoURL: inv.profiles?.photo_url,
-                            uid: inv.from_uid
-                        },
-                        workout: inv.workout_data
-                    }));
+                    .map(inv => {
+                        const prof = profById.get(String(inv.from_uid || '')) ?? null;
+                        return {
+                            id: inv.id,
+                            created_at: inv.created_at,
+                            from_uid: inv.from_uid,
+                            team_session_id: inv.team_session_id ?? null,
+                            status: inv.status,
+                            workout_data: inv.workout_data ?? null,
+                            profiles: prof,
+                            from: {
+                                displayName: prof?.display_name || 'Alguém',
+                                photoURL: prof?.photo_url,
+                                uid: inv.from_uid
+                            },
+                            workout: inv.workout_data
+                        };
+                    });
                 setIncomingInvites(mapped as IncomingInvite[]);
             } catch (e) {
                 logError('useTeamInvites.fallbackRefetch', e);
@@ -562,7 +597,7 @@ export function useTeamInvites({
                         workoutTitle: String(workoutTitle).slice(0, 120),
                         sessionId: sessionId ?? undefined,
                     }),
-                }).catch(() => { });
+                }).catch((e) => { logError('useTeamInvites.notifyPush.fetch', e); });
             } catch (e) {
                 logError('useTeamInvites.notifyPush', e);
             }
@@ -662,7 +697,10 @@ export function useTeamInvites({
                 .from('invites')
                 .update({ status: 'rejected' })
                 .eq('id', safeId)
-                .eq('to_uid', user?.id || '');
+                .eq('to_uid', user?.id || '')
+                // Só recusa se ainda estiver pendente — evita reverter um 'accepted'
+                // feito em outro device (usuário logado em 2 aparelhos).
+                .eq('status', 'pending');
 
             setIncomingInvites(prev => {
                 const current = Array.isArray(prev) ? prev : [];
