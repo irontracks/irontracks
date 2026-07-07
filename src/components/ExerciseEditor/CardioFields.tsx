@@ -49,8 +49,8 @@ export const CardioFields: React.FC<CardioFieldsProps> = ({
         <>
             <div className="grid grid-cols-2 gap-4">
                 <div>
-                    <div className="text-[10px] text-neutral-400 uppercase font-bold text-center block mb-1">
-                        {isBikeOutdoor ? 'Tempo (minutos) (opcional)' : 'Tempo (minutos)'}
+                    <div className="text-[10px] text-neutral-400 uppercase font-black tracking-wider text-center block mb-1.5">
+                        {isBikeOutdoor ? 'Tempo (min) (opcional)' : 'Tempo (minutos)'}
                     </div>
                     <input
                         type="number"
@@ -58,28 +58,28 @@ export const CardioFields: React.FC<CardioFieldsProps> = ({
                         aria-label="Tempo em minutos do exercício de cardio"
                         value={exercise.reps ? String(exercise.reps) : ''}
                         onChange={(e) => onUpdateExercise('reps', e.target.value)}
-                        className="w-full bg-neutral-900 rounded-xl p-4 text-center text-xl font-bold text-white outline-none focus:ring-1 ring-yellow-500 border border-neutral-700"
+                        className="w-full bg-depth-2 rounded-2xl p-4 text-center text-xl font-black text-white outline-none focus:border-yellow-500/60 border border-white/[0.06] placeholder-neutral-700 transition-colors"
                         placeholder={isBikeOutdoor ? 'Livre' : '30'}
                     />
                 </div>
                 <div>
-                    <div className="text-[10px] text-yellow-500 uppercase font-bold text-center block mb-1">Intensidade</div>
+                    <div className="text-[10px] text-yellow-500 uppercase font-black tracking-wider text-center block mb-1.5">Intensidade</div>
                     <input
                         type="number"
                         min="1"
                         aria-label="Intensidade percebida do cardio (RPE)"
                         value={exercise.rpe ? String(exercise.rpe) : ''}
                         onChange={(e) => onUpdateExercise('rpe', e.target.value)}
-                        className="w-full bg-neutral-900 border border-yellow-500/20 rounded-xl p-4 text-center text-xl font-bold text-yellow-500 outline-none focus:ring-1 ring-yellow-500 placeholder-yellow-500/30"
+                        className="w-full bg-depth-2 border border-white/[0.06] rounded-2xl p-4 text-center text-xl font-black text-yellow-500 outline-none focus:border-yellow-500/60 placeholder-yellow-500/30 transition-colors"
                         placeholder="5"
                     />
                 </div>
             </div>
 
-            <div className="mt-4 pt-4 border-t border-neutral-800">
+            <div className="mt-4 pt-4 border-t border-white/[0.06]">
                 <div className="flex items-center justify-between mb-3">
-                    <div className="text-[10px] font-bold text-neutral-400 uppercase">Configurações Avançadas</div>
-                    <label className="text-[10px] font-bold text-white uppercase cursor-pointer select-none flex items-center gap-2">
+                    <div className="text-[10px] font-black text-neutral-400 uppercase tracking-wider">Configurações Avançadas</div>
+                    <label className="text-[10px] font-black text-white uppercase cursor-pointer select-none flex items-center gap-2">
                         Modo HIT
                         <input
                             type="checkbox"
@@ -92,48 +92,48 @@ export const CardioFields: React.FC<CardioFieldsProps> = ({
                 </div>
 
                 {isHIT && (
-                    <div className="bg-neutral-900/50 p-3 rounded-xl border border-neutral-800 mb-3 animate-in slide-in-from-top-2">
+                    <div className="bg-black/20 p-3 rounded-xl border border-white/[0.06] mb-3 animate-in slide-in-from-top-2">
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                             <div>
-                                <div className="text-[10px] text-green-400 uppercase font-bold block mb-1">Trabalho (s)</div>
+                                <div className="text-[10px] text-green-400 uppercase font-black tracking-wider block mb-1">Trabalho (s)</div>
                                 <input
                                     type="number"
                                     aria-label="Segundos de trabalho no HIT"
                                     value={config.workSec ?? ''}
                                     onChange={(e) => updateCardioConfig('workSec', Number(e.target.value))}
-                                    className="w-full bg-neutral-900 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:border-green-500 placeholder-neutral-700"
+                                    className="w-full bg-depth-1 border border-white/[0.06] rounded-lg p-2 text-sm text-white outline-none focus:border-green-500 placeholder-neutral-700 transition-colors"
                                     placeholder="30"
                                 />
                             </div>
                             <div>
-                                <div className="text-[10px] text-red-400 uppercase font-bold block mb-1">Descanso (s)</div>
+                                <div className="text-[10px] text-red-400 uppercase font-black tracking-wider block mb-1">Descanso (s)</div>
                                 <input
                                     type="number"
                                     aria-label="Segundos de descanso no HIT"
                                     value={config.restSec ?? ''}
                                     onChange={(e) => updateCardioConfig('restSec', Number(e.target.value))}
-                                    className={`w-full bg-neutral-900 border rounded-lg p-2 text-sm text-white outline-none focus:border-red-500 placeholder-neutral-700 ${hitInvalid ? 'border-red-500/50' : 'border-neutral-700'}`}
+                                    className={`w-full bg-depth-1 border rounded-lg p-2 text-sm text-white outline-none focus:border-red-500 placeholder-neutral-700 transition-colors ${hitInvalid ? 'border-red-500/50' : 'border-white/[0.06]'}`}
                                     placeholder="10"
                                 />
                             </div>
                             <div>
-                                <div className="text-[10px] text-neutral-400 uppercase font-bold block mb-1">Rounds</div>
+                                <div className="text-[10px] text-neutral-400 uppercase font-black tracking-wider block mb-1">Rounds</div>
                                 <input
                                     type="number"
                                     aria-label="Número de rounds do HIT"
                                     value={config.rounds ?? ''}
                                     onChange={(e) => updateCardioConfig('rounds', Number(e.target.value))}
-                                    className="w-full bg-neutral-900 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:border-yellow-500 placeholder-neutral-700"
+                                    className="w-full bg-depth-1 border border-white/[0.06] rounded-lg p-2 text-sm text-white outline-none focus:border-yellow-500/60 placeholder-neutral-700 transition-colors"
                                     placeholder="10"
                                 />
                             </div>
                             <div>
-                                <div className="text-[10px] text-neutral-400 uppercase font-bold block mb-1">Nível</div>
+                                <div className="text-[10px] text-neutral-400 uppercase font-black tracking-wider block mb-1">Nível</div>
                                 <select
                                     value={config.hitIntensity ?? 'high'}
                                     onChange={(e) => updateCardioConfig('hitIntensity', e.target.value)}
                                     aria-label="Nível de intensidade do HIT"
-                                    className="w-full bg-neutral-900 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:border-yellow-500 h-[38px]"
+                                    className="w-full bg-depth-1 border border-white/[0.06] rounded-lg p-2 text-sm text-white outline-none focus:border-yellow-500/60 h-[38px] transition-colors"
                                 >
                                     <option value="low">Baixa</option>
                                     <option value="medium">Média</option>
@@ -142,7 +142,7 @@ export const CardioFields: React.FC<CardioFieldsProps> = ({
                             </div>
                         </div>
                         {hitInvalid && (
-                            <div className="mt-2 text-[10px] text-red-400 font-bold">
+                            <div className="mt-2 text-[10px] text-red-400 font-black">
                                 ⚠️ O tempo de descanso deve ser menor que o tempo de trabalho.
                             </div>
                         )}
@@ -155,53 +155,53 @@ export const CardioFields: React.FC<CardioFieldsProps> = ({
                 )}
 
                 <details className="group">
-                    <summary className="flex items-center gap-2 text-[10px] font-bold text-neutral-400 uppercase cursor-pointer hover:text-yellow-500 transition-colors select-none">
+                    <summary className="flex items-center gap-2 text-[10px] font-black text-neutral-400 uppercase tracking-wider cursor-pointer hover:text-yellow-500 transition-colors select-none">
                         <span>Parâmetros de Equipamento</span>
                         <span className="group-open:rotate-180 transition-transform">▼</span>
                     </summary>
-                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3 animate-in slide-in-from-top-2 duration-200 bg-neutral-900/30 p-3 rounded-xl">
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3 animate-in slide-in-from-top-2 duration-200 bg-black/20 p-3 rounded-xl">
                         <div>
-                            <div className="text-[10px] text-neutral-400 uppercase font-bold block mb-1">Inclinação (%)</div>
+                            <div className="text-[10px] text-neutral-400 uppercase font-black tracking-wider block mb-1">Inclinação (%)</div>
                             <input
                                 type="number"
                                 aria-label="Inclinação da esteira em porcentagem"
                                 value={config.incline ?? ''}
                                 onChange={(e) => updateCardioConfig('incline', e.target.value)}
-                                className="w-full bg-neutral-900 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:border-yellow-500 placeholder-neutral-700"
+                                className="w-full bg-depth-1 border border-white/[0.06] rounded-lg p-2 text-sm text-white outline-none focus:border-yellow-500/60 placeholder-neutral-700 transition-colors"
                                 placeholder="0"
                             />
                         </div>
                         <div>
-                            <div className="text-[10px] text-neutral-400 uppercase font-bold block mb-1">Velocidade</div>
+                            <div className="text-[10px] text-neutral-400 uppercase font-black tracking-wider block mb-1">Velocidade</div>
                             <input
                                 type="number"
                                 step="0.1"
                                 aria-label="Velocidade em km/h"
                                 value={config.speed ?? ''}
                                 onChange={(e) => updateCardioConfig('speed', e.target.value)}
-                                className="w-full bg-neutral-900 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:border-yellow-500 placeholder-neutral-700"
+                                className="w-full bg-depth-1 border border-white/[0.06] rounded-lg p-2 text-sm text-white outline-none focus:border-yellow-500/60 placeholder-neutral-700 transition-colors"
                                 placeholder="km/h"
                             />
                         </div>
                         <div>
-                            <div className="text-[10px] text-neutral-400 uppercase font-bold block mb-1">Carga/Nível</div>
+                            <div className="text-[10px] text-neutral-400 uppercase font-black tracking-wider block mb-1">Carga/Nível</div>
                             <input
                                 type="number"
                                 aria-label="Carga ou nível de resistência do equipamento"
                                 value={config.resistance ?? ''}
                                 onChange={(e) => updateCardioConfig('resistance', e.target.value)}
-                                className="w-full bg-neutral-900 border border-neutral-700 rounded-lg p-2 text-sm text-white outline-none focus:border-yellow-500 placeholder-neutral-700"
+                                className="w-full bg-depth-1 border border-white/[0.06] rounded-lg p-2 text-sm text-white outline-none focus:border-yellow-500/60 placeholder-neutral-700 transition-colors"
                                 placeholder="Nível"
                             />
                         </div>
                         <div>
-                            <div className="text-[10px] text-neutral-400 uppercase font-bold block mb-1">FC Alvo (BPM)</div>
+                            <div className="text-[10px] text-neutral-400 uppercase font-black tracking-wider block mb-1">FC Alvo (BPM)</div>
                             <input
                                 type="number"
                                 aria-label="Frequência cardíaca alvo em BPM"
                                 value={config.heart_rate ?? ''}
                                 onChange={(e) => updateCardioConfig('heart_rate', e.target.value)}
-                                className="w-full bg-neutral-900 border border-neutral-700 rounded-lg p-2 text-sm text-red-400 font-bold outline-none focus:border-red-500 placeholder-neutral-700"
+                                className="w-full bg-depth-1 border border-white/[0.06] rounded-lg p-2 text-sm text-red-400 font-black outline-none focus:border-red-500 placeholder-neutral-700 transition-colors"
                                 placeholder="♥"
                             />
                         </div>
