@@ -4,6 +4,7 @@ import { MessageCircle, Send, ChevronDown } from 'lucide-react'
 import Image from 'next/image'
 import { useTeamWorkout } from '@/contexts/TeamWorkoutContext'
 import { useWorkoutContext } from './workout/WorkoutContext'
+import { normalizeParticipant } from '@/contexts/team/types'
 
 export interface ChatMessage {
     id: string
@@ -94,13 +95,13 @@ export function TeamChatDrawer({ myUserId, myPhotoURL, participants }: TeamChatD
         if (uid === myUserId) return 'Você'
         // Prefer the displayName from the broadcast message payload
         if (msgDisplayName && msgDisplayName !== 'Parceiro') return msgDisplayName
-        const p = Array.isArray(participants) ? participants.find(p => String(p.user_id || '') === uid) : null
-        return String(p?.display_name || msgDisplayName || 'Parceiro').trim()
+        const match = Array.isArray(participants) ? participants.map(normalizeParticipant).find(n => n.userId === uid) : null
+        return String(match?.displayName || msgDisplayName || 'Parceiro').trim()
     }
     const getParticipantPhoto = (uid: string) => {
         if (uid === myUserId) return myPhotoURL ?? null
-        const p = Array.isArray(participants) ? participants.find(p => String(p.user_id || '') === uid) : null
-        return p?.photo_url ?? null
+        const match = Array.isArray(participants) ? participants.map(normalizeParticipant).find(n => n.userId === uid) : null
+        return match?.photoUrl ?? null
     }
 
     if (!teamSession?.id) return null
