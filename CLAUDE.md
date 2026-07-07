@@ -1,3 +1,7 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
 # IronTracks — Instruções para Claude Code
 
 ## O que é este projeto
@@ -32,6 +36,30 @@ ios/            # Projeto Xcode (Capacitor)
 android/        # Projeto Android Studio (Capacitor)
 scripts/        # Scripts de build e utilitários
 ```
+
+## Arquitetura de alto nível (exige ler vários arquivos)
+
+**Carregamento remoto (crítico p/ decidir o que precisa de build):** o app nativo carrega o front do **servidor remoto** (`capacitor.config.*` → `server.url` = `https://irontracks.com.br`), NÃO dos assets embutidos. Logo: mudanças de **web/JS/servidor entram em produção pra todos os apps já instalados via deploy web (Vercel)**; **só mudanças nativas (Swift/plugin em `ios/`) exigem nova build no TestFlight**. Classifique toda tarefa por esse eixo.
+
+**Treino ativo** (`src/components/ActiveWorkout.tsx`): estado em `useActiveWorkoutController` (retorna `{ value, logs }`). O `value` (estável) vai no `WorkoutProvider`; os `logs` (mudam a cada tecla) num `WorkoutLogsProvider` separado (`components/workout/WorkoutContext.tsx`) — por performance. **`ExerciseCard` consome os DOIS**; renderizar fora de um deles lança erro (foi um crash real no overlay do parceiro). Logs = mapa com chave `"exIdx-setIdx"`. CRUD/organizar/editor-completo em `components/workout/hooks/useWorkoutExerciseCrud.ts`; editar mid-sessão remapeia os logs por índice (`helpers/reconcileEditedExercises.ts`).
+
+**Sessões ficam em `workouts.notes`** (JSON serializado como TEXT), NÃO numa tabela de sessões. `workout_session_logs` está praticamente vazia em produção — **não confie nela**. Finalização: `useWorkoutFinish` → `buildFinishWorkoutPayload` (`src/lib/finishWorkoutPayload.ts`) → `POST /api/workouts/finish` (idempotente via `finish_idempotency_key` + lock Upstash). No finish, `buildReportMetrics` (`utils/report/reportMetrics.ts`) computa e grava `reportMeta` dentro do notes.
+
+**Calorias:** modelo MET em `utils/calories/metEstimate.ts` (`estimateCaloriesMet`) + wrapper `estimateSessionKcal` (lê o JSON de `workouts.notes`). Por exercício = rateio do total via `utils/calories/distributeKcal.ts`. Relatório React usa `reportMetrics`; o **PDF/compartilhamento é um gerador HTML separado** em `utils/report/buildHtml.ts` (`buildReportHTML`/`buildReportData`) — mexeu num, cheque o outro.
+
+**Nutrição:** DUAS superfícies distintas — a página `/dashboard/nutrition` (`NutritionMixer`) e o `NutritionOverlay` (a aba NUTRIÇÃO do dashboard). Ambas derivam a meta de `nutrition_goals` (salvo) ou do TDEE do perfil (`user_settings.preferences`). Ao mexer em meta/nutrição, ajuste as DUAS.
+
+**Treino em dupla** (atrás da flag `featureTeamworkV2`): `contexts/TeamWorkoutContext.tsx` compõe os hooks de `contexts/team/*` (invites/session/presence/broadcast). Tabelas c/ RLS e na publication realtime: `invites`, `team_sessions`, `team_session_presence`, `team_chat_messages`. RPCs SECURITY DEFINER: `accept_team_invite`, `leave_team_session`, `can_view_team_session`. Participantes são gravados como `{uid,name,photo}` no banco mas lidos como `{user_id,display_name,photo_url}` no cliente → **sempre use `normalizeParticipant`** (`contexts/team/types.ts`). Sync ao vivo é **broadcast efêmero** do Supabase (sem replay — perde eventos se o parceiro fica em background). Máx. 5 participantes (`MAX_TEAM_PARTICIPANTS`, host incluso).
+
+**Dashboard shell:** `src/app/(app)/dashboard/IronTracksAppClientImpl.tsx` é o client component central; navega por estado `view` ('dashboard'|'active'|'edit'|'assessments'|'community'|'vip'). Boot: `/api/dashboard/bootstrap` (RPC `get_dashboard_bootstrap`) + `useBootstrap` + `useWorkoutFetch`. **Toda hidratação da lista de treinos (SSR inicial, bootstrap, refetch) deve ordenar por `sortWorkoutsByOrder`** (`utils/mapWorkoutRow.ts`) — senão a lista pisca desordenada.
+
+**Feature flags:** `utils/featureFlags.ts` (`isFeatureEnabled(settings, FEATURE_KEYS.x)`), guardadas em `user_settings.preferences` (default = desligado, salvo override explícito).
+
+## Gotchas específicos deste repo
+- **Git worktrees NÃO têm `node_modules`.** Pro ESLint num worktree, aponte pro binário do repo principal: `node --import tsx "<repo-principal>/node_modules/eslint/bin/eslint.js" --config eslint.config.mjs <arquivos> --max-warnings 0`. Pra build iOS num worktree, rode `npm ci` NO worktree antes — **NÃO** faça symlink pro `node_modules` do main (conflito de versão no grafo SPM do iOS).
+- **Supabase project id:** `enbueukmvgodngydkpzm` (via MCP `mcp__supabase__*`).
+- **Versão iOS:** `ios:release` só bumpa o build number (`CURRENT_PROJECT_VERSION`). A **versão pública (`MARKETING_VERSION`) é bumpada à mão** no `project.pbxproj` (6 build configs) antes de um release novo.
+- **App Store Connect API:** chave em `~/.appstoreconnect/keys/AuthKey_W834H36CBM.p8` (Key ID `W834H36CBM`); o **Issuer ID não fica no disco** (pegar no painel Users and Access → Integrations). Detalhes em `docs/ios-release.md`.
 
 ## Regra crítica: `npm run deploy` deve sempre funcionar
 O deploy usa `husky` + `lint-staged` com **zero tolerância a warnings ESLint**. Qualquer warning bloqueia o commit e o deploy falha.
