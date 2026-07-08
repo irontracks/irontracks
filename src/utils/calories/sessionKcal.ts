@@ -7,6 +7,7 @@
  * treino, em vez de uma estimativa fixa.
  */
 import { estimateCaloriesMet } from './metEstimate'
+import { estimateCardioKcal } from './cardioKcal'
 
 const isRecord = (v: unknown): v is Record<string, unknown> =>
   !!v && typeof v === 'object' && !Array.isArray(v)
@@ -66,18 +67,31 @@ export function estimateSessionKcal(session: unknown, opts: SessionKcalOpts = {}
   const execSec = Number(sessionObj.executionTotalSeconds ?? sessionObj.execution_total_seconds ?? 0) || 0
   const restSec = Number(sessionObj.restTotalSeconds ?? sessionObj.rest_total_seconds ?? 0) || 0
 
-  const kcal = estimateCaloriesMet(
-    sessionLogs,
-    totalTimeSeconds / 60,
-    bodyWeightKg,
-    exerciseNames,
-    rpeValue,
-    execSec > 0 ? execSec / 60 : null,
-    restSec > 0 ? restSec / 60 : null,
-    bioSex,
-    null,
-    null,
-    cadenceNames && cadenceNames.length > 0 ? cadenceNames : null,
-  )
+  // Cardio pelo MET da modalidade (o modelo de força trataria como leve).
+  const cardio = estimateCardioKcal(sessionObj, { bodyWeightKg, biologicalSex: bioSex })
+
+  // Modelo de força cobre só o tempo NÃO-cardio (senão o tempo de cardio contaria
+  // duas vezes: como leve aqui e como modalidade no cardio).
+  const totalMin = totalTimeSeconds / 60
+  const strengthMin = Math.max(0, totalMin - cardio.cardioMinutes)
+  const strengthExecMin = execSec > 0 ? Math.max(0, execSec / 60 - cardio.cardioMinutes) : null
+
+  const strengthKcal = strengthMin > 0
+    ? estimateCaloriesMet(
+      sessionLogs,
+      strengthMin,
+      bodyWeightKg,
+      exerciseNames,
+      rpeValue,
+      strengthExecMin,
+      restSec > 0 ? restSec / 60 : null,
+      bioSex,
+      null,
+      null,
+      cadenceNames && cadenceNames.length > 0 ? cadenceNames : null,
+    )
+    : 0
+
+  const kcal = strengthKcal + cardio.totalKcal
   return kcal > 0 ? kcal : 0
 }

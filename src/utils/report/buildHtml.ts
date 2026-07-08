@@ -9,7 +9,7 @@ import {
   calculateTotalVolume,
 } from '@/utils/report/formatters'
 import { setTopWeightReps, setVolume, isWorkingSet } from '@/utils/report/setVolume'
-import { estimateCaloriesMet } from '@/utils/calories/metEstimate'
+import { estimateSessionKcal } from '@/utils/calories/sessionKcal'
 import { distributeKcalByExercise } from '@/utils/calories/distributeKcal'
 
 
@@ -92,55 +92,14 @@ export function buildReportData(
     if (Number.isFinite(ov) && ov > 0) return Math.round(ov)
     const bikeKcal = Number(outdoorBike?.caloriesKcal)
     if (Number.isFinite(bikeKcal) && bikeKcal > 0) return Math.round(bikeKcal)
-    // Full MET V9 model with all available session data
-    const exerciseNames = Array.isArray(sessionObj?.exercises)
-      ? (sessionObj.exercises as unknown[]).map((ex) => {
-        const e = isRecord(ex) ? ex : null
-        return String(e?.name || '').trim()
-      }).filter(Boolean) as string[]
-      : null
-
-    // Cadence / rep tempo from exercise config
-    const cadenceNames = Array.isArray(sessionObj?.exercises)
-      ? (sessionObj.exercises as unknown[]).map((ex) => {
-        const e = isRecord(ex) ? ex : null
-        return String(e?.cadence || e?.tempo || '').trim()
-      }).filter(Boolean) as string[]
-      : null
-
-    // Body weight priority: 1. opts.bodyWeightKg (user profile), 2. preCheckin answers, 3. null (uses 78kg default)
-    const profileBw = Number(isRecord(opts.bodyWeightKg) ? null : opts.bodyWeightKg)
-    const profileBwValid = Number.isFinite(profileBw) && profileBw >= 20 && profileBw <= 300
-    const pcRaw = isRecord(sessionObj?.preCheckin) ? (sessionObj.preCheckin as Record<string, unknown>) : null
-    const bwCandidates = [
-      profileBwValid ? profileBw : null,
-      pcRaw?.weight,
-      pcRaw?.body_weight_kg,
-      isRecord(pcRaw?.answers) ? (pcRaw.answers as Record<string, unknown>).body_weight_kg : null
-    ]
-    const bodyWeightKg = bwCandidates.reduce<number | null>((acc, c) => {
-      if (acc !== null) return acc
-      const n = Number(c)
-      return Number.isFinite(n) && n >= 20 && n <= 300 ? n : null
-    }, null)
-
-    // Biological sex: opts.biologicalSex first (user profile), then session
-    const sexFromOpts = String(opts.biologicalSex ?? '').toLowerCase()
-    const sexFromSession = String(sessionObj?.biologicalSex ?? '').toLowerCase()
-    const sexRaw = sexFromOpts || sexFromSession
-    const bioSex = sexRaw === 'male' || sexRaw === 'female' ? sexRaw : null
-
-    // RPE from opts (post-checkin) if available
-    const rpeFromOpts = Number(opts.rpe)
-    const rpeValue = Number.isFinite(rpeFromOpts) && rpeFromOpts >= 1 && rpeFromOpts <= 10 ? rpeFromOpts : null
-
-    const execSec = Number(sessionObj?.executionTotalSeconds ?? sessionObj?.execution_total_seconds ?? 0) || 0
-    const restSec = Number(sessionObj?.restTotalSeconds ?? sessionObj?.rest_total_seconds ?? 0) || 0
-    const kcal = estimateCaloriesMet(
-      sessionLogs, totalTimeSeconds / 60, bodyWeightKg, exerciseNames,
-      rpeValue, execSec > 0 ? execSec / 60 : null, restSec > 0 ? restSec / 60 : null,
-      bioSex, null, null, cadenceNames && cadenceNames.length > 0 ? cadenceNames : null,
-    )
+    // Modelo unificado: força (densidade de volume) + cardio (MET da modalidade).
+    // O MESMO estimateSessionKcal do painel de nutrição/relatório React — antes o
+    // PDF duplicava a extração inline e ignorava cardio (subestimava esteira/HIT).
+    const kcal = estimateSessionKcal(sessionObj, {
+      bodyWeightKg: typeof opts.bodyWeightKg === 'number' ? opts.bodyWeightKg : null,
+      biologicalSex: typeof opts.biologicalSex === 'string' ? opts.biologicalSex : null,
+      rpe: typeof opts.rpe === 'number' ? opts.rpe : null,
+    })
     return kcal > 0 ? kcal : 0
   })()
 
