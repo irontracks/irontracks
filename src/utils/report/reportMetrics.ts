@@ -1,8 +1,8 @@
 
 import type { UnknownRecord } from '@/types/app'
 import { setVolume, setTopWeightReps, setBestE1rm } from './setVolume'
-import { estimateSessionKcal } from '@/utils/calories/sessionKcal'
-import { distributeKcalByExercise } from '@/utils/calories/distributeKcal'
+import { estimateSessionKcalBreakdown } from '@/utils/calories/sessionKcal'
+import { distributeKcalWithFixed } from '@/utils/calories/distributeKcal'
 
 const isObject = (value: unknown): value is UnknownRecord =>
   value !== null && typeof value === 'object' && !Array.isArray(value)
@@ -464,14 +464,19 @@ export const buildReportMetrics = (session: UnknownRecord, previousSession?: Unk
     })
   })
 
-  // Calorias por exercício: rateio do total canônico da sessão (mesmo modelo MET
-  // usado no card de nutrição/relatório) pra a soma fechar com o total exibido.
+  // Calorias por exercício: cada CARDIO recebe sua kcal-MET exata; a parte de
+  // FORÇA é rateada entre os demais por tempo/volume. Σ = total exibido.
+  // (cardioPerExerciseKcal é keyed por índice de session.exercises = order-1.)
   try {
-    const sessionKcal = estimateSessionKcal(session, {})
-    if (sessionKcal > 0 && metrics.length > 0) {
-      const perExercise = distributeKcalByExercise(
-        metrics.map((m) => ({ volumeKg: m.volumeKg, executionMinutes: m.executionMinutes })),
-        sessionKcal,
+    const bd = estimateSessionKcalBreakdown(session, {})
+    if (bd.total > 0 && metrics.length > 0) {
+      const perExercise = distributeKcalWithFixed(
+        metrics.map((m) => ({
+          volumeKg: m.volumeKg,
+          executionMinutes: m.executionMinutes,
+          fixedKcal: bd.cardioPerExerciseKcal[(m.order ?? 0) - 1] ?? null,
+        })),
+        bd.strengthKcal,
       )
       metrics.forEach((m, i) => { m.caloriesKcal = perExercise[i] ?? 0 })
     }
