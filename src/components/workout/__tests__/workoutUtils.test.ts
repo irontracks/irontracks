@@ -20,7 +20,34 @@ import {
   normalizeExerciseKey,
   extractLogWeight,
   estimate1Rm,
+  computeRecoveryPauseMs,
 } from '../utils';
+
+// ─── computeRecoveryPauseMs (recuperação: gap longo = pausa) ──────────────────
+describe('computeRecoveryPauseMs', () => {
+  const LONG = 2 * 60 * 1000; // 2 min
+  const start = 1_000_000;
+  it('gap longo (app morto por horas) vira pausa = o gap inteiro', () => {
+    const lastActive = 1_100_000;
+    const now = lastActive + 5 * 60 * 60 * 1000; // +5h
+    expect(computeRecoveryPauseMs(lastActive, start, now, LONG)).toBe(5 * 60 * 60 * 1000);
+  });
+  it('gap curto (persistência normal) → 0 (conta como treino)', () => {
+    const lastActive = 1_100_000;
+    const now = lastActive + 30 * 1000; // +30s
+    expect(computeRecoveryPauseMs(lastActive, start, now, LONG)).toBe(0);
+  });
+  it('sem lastActive (sessão nova) → 0', () => {
+    expect(computeRecoveryPauseMs(0, start, start + 9_999_999, LONG)).toBe(0);
+  });
+  it('sem startedAt → 0', () => {
+    expect(computeRecoveryPauseMs(1_100_000, 0, 9_999_999, LONG)).toBe(0);
+  });
+  it('exatamente no limiar não conta (precisa ser > limiar)', () => {
+    const lastActive = 1_100_000;
+    expect(computeRecoveryPauseMs(lastActive, start, lastActive + LONG, LONG)).toBe(0);
+  });
+});
 
 // ─── toNumber ────────────────────────────────────────────────────────────────
 
