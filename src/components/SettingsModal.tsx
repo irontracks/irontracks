@@ -349,6 +349,25 @@ export default function SettingsModal(props: SettingsModalProps) {
                 <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ background: 'rgba(234,179,8,0.12)', border: '1px solid rgba(234,179,8,0.2)' }}><Crown size={13} className="text-yellow-500" /></div>
                 <div className="text-xs font-black uppercase tracking-[0.16em]" style={{ color: '#f59e0b' }}>Assinatura</div>
               </div>
+              {/* Caminho pra ASSINAR (paywall in-app / RevenueCat) — antes só havia
+                  "Gerenciar Assinatura" (App Store), então um usuário não-VIP não
+                  encontrava o fluxo de compra (rejeição Apple 2.1: "not able to
+                  access the subscription purchase flow"). */}
+              <button
+                type="button"
+                onClick={() => { try { window.location.href = '/marketplace' } catch { } }}
+                className="w-full flex items-center gap-3 p-3 rounded-xl border transition-all group mb-2"
+                style={{ background: 'rgba(234,179,8,0.08)', borderColor: 'rgba(234,179,8,0.25)' }}
+              >
+                <div className="w-10 h-10 rounded-xl bg-yellow-500/15 border border-yellow-500/30 inline-flex items-center justify-center shrink-0">
+                  <Crown size={18} className="text-yellow-500" />
+                </div>
+                <div className="flex-1 text-left min-w-0">
+                  <div className="text-sm font-bold text-white">Ver Planos e Assinar</div>
+                  <div className="text-xs text-neutral-400">Conheça os planos VIP e assine</div>
+                </div>
+                <ChevronRight size={14} className="text-yellow-500 shrink-0" />
+              </button>
               <button
                 type="button"
                 onClick={() => {
