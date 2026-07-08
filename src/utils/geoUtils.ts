@@ -31,7 +31,10 @@ export function haversineDistance(a: GeoPoint, b: GeoPoint): number {
   const sinLat = Math.sin(dLat / 2)
   const sinLng = Math.sin(dLng / 2)
   const h = sinLat * sinLat + Math.cos(toRad(a.latitude)) * Math.cos(toRad(b.latitude)) * sinLng * sinLng
-  return 2 * EARTH_RADIUS_METERS * Math.asin(Math.sqrt(h))
+  // Clamp defensivo: erro de float pode fazer √h passar de 1 (pontos ~antipodais),
+  // e Math.asin(>1) = NaN. Nunca acontece entre fixes de cardio (metros), mas
+  // evita um NaN vazar pra distância/pace se a função for usada com pontos longe.
+  return 2 * EARTH_RADIUS_METERS * Math.asin(Math.min(1, Math.sqrt(h)))
 }
 
 /**

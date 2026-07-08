@@ -110,6 +110,10 @@ export function useGeoLocation(): UseGeoLocationResult {
 
   // Refs that must survive re-renders / avoid effect churn
   const watchIdRef = useRef<string | number | null>(null)
+  // Sentinela SÍNCRONA: watchIdRef só é setado após os awaits do setup, então o
+  // guard `watchIdRef !== null` não barra duas chamadas concorrentes de
+  // startWatching (double-tap/re-render) → dois watchers ativos. Esta flag barra.
+  const startingRef = useRef(false)
   const isNativeRef = useRef(false)
   const lastFixRef = useRef<GeoFix | null>(null)
   const mountedRef = useRef(true)
@@ -317,105 +321,112 @@ export function useGeoLocation(): UseGeoLocationResult {
   // ── Continuous watch ──────────────────────────────────────────────────────
 
   const startWatching = useCallback(async (): Promise<void> => {
-    if (watchIdRef.current !== null) return // already watching
-    safeSetError(null)
-
-    let perm = await checkPermission()
-    if (perm === 'unavailable') {
-      safeSetStatus('unavailable')
-      safeSetError('GPS não disponível neste dispositivo.')
-      return
-    }
-    if (perm === 'prompt') perm = await requestPermission()
-    if (perm === 'denied') {
-      safeSetStatus('denied')
-      safeSetError(friendlyGeoError(1))
-      return
-    }
-
-    safeSetStatus('acquiring')
-
+    if (watchIdRef.current !== null || startingRef.current) return // já observando ou iniciando
+    startingRef.current = true
     try {
-      if (isNativeRef.current) {
-        const loaded = await loadCapacitorGeolocation()
-        if (loaded) {
-          try {
-            const id = await loaded.geo.watchPosition(
-              { enableHighAccuracy: true, timeout: 30000 },
-              (
-                pos: {
-                  coords: {
-                    latitude: number
-                    longitude: number
-                    accuracy: number
-                    altitude?: number | null
-                    speed?: number | null
-                    heading?: number | null
-                  }
-                  timestamp?: number
-                } | null,
-                err?: unknown,
-              ) => {
-                if (err) {
-                  // Don't flip to error on transient signal loss — just stay
-                  // in 'watching' and log. A persistent failure is surfaced
-                  // by no position updates for the caller to handle.
-                  logWarn('useGeoLocation.watch.native', 'transient error', err)
-                  return
-                }
-                if (!pos) return
-                applyFix({
-                  latitude:  pos.coords.latitude,
-                  longitude: pos.coords.longitude,
-                  accuracyMeters:  Number(pos.coords.accuracy) || 99,
-                  altitudeMeters:  pos.coords.altitude ?? null,
-                  speedMps:        pos.coords.speed ?? null,
-                  headingDeg:      pos.coords.heading ?? null,
-                  timestamp:       pos.timestamp ?? Date.now(),
-                })
-                safeSetStatus('watching')
-              },
-            )
-            watchIdRef.current = id
-            return
-          } catch (e) {
-            logWarn('useGeoLocation.watch.native.setup', 'failed', e)
-            isNativeRef.current = false
-          }
-        }
-      }
+      safeSetError(null)
 
-      // Web fallback
-      if (typeof navigator !== 'undefined' && navigator.geolocation) {
-        const id = navigator.geolocation.watchPosition(
-          (pos) => {
-            applyFix({
-              latitude:  pos.coords.latitude,
-              longitude: pos.coords.longitude,
-              accuracyMeters:  pos.coords.accuracy ?? 99,
-              altitudeMeters:  pos.coords.altitude ?? null,
-              speedMps:        pos.coords.speed ?? null,
-              headingDeg:      pos.coords.heading ?? null,
-              timestamp:       pos.timestamp,
-            })
-            safeSetStatus('watching')
-          },
-          (err) => {
-            // Persistent failure path — surface to UI.
-            safeSetError(friendlyGeoError(err.code))
-            safeSetStatus('error')
-          },
-          { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 },
-        )
-        watchIdRef.current = id
-      } else {
+      let perm = await checkPermission()
+      if (perm === 'unavailable') {
         safeSetStatus('unavailable')
         safeSetError('GPS não disponível neste dispositivo.')
+        return
       }
-    } catch (e) {
-      logWarn('useGeoLocation.startWatching', 'failed', e)
-      safeSetError(e instanceof Error ? e.message : 'Erro ao iniciar GPS.')
-      safeSetStatus('error')
+      if (perm === 'prompt') perm = await requestPermission()
+      if (perm === 'denied') {
+        safeSetStatus('denied')
+        safeSetError(friendlyGeoError(1))
+        return
+      }
+
+      safeSetStatus('acquiring')
+
+      try {
+        if (isNativeRef.current) {
+          const loaded = await loadCapacitorGeolocation()
+          if (loaded) {
+            try {
+              const id = await loaded.geo.watchPosition(
+                { enableHighAccuracy: true, timeout: 30000 },
+                (
+                  pos: {
+                    coords: {
+                      latitude: number
+                      longitude: number
+                      accuracy: number
+                      altitude?: number | null
+                      speed?: number | null
+                      heading?: number | null
+                    }
+                    timestamp?: number
+                  } | null,
+                  err?: unknown,
+                ) => {
+                  if (err) {
+                    // Don't flip to error on transient signal loss — just stay
+                    // in 'watching' and log. A persistent failure is surfaced
+                    // by no position updates for the caller to handle.
+                    logWarn('useGeoLocation.watch.native', 'transient error', err)
+                    return
+                  }
+                  if (!pos) return
+                  applyFix({
+                    latitude:  pos.coords.latitude,
+                    longitude: pos.coords.longitude,
+                    accuracyMeters:  Number(pos.coords.accuracy) || 99,
+                    altitudeMeters:  pos.coords.altitude ?? null,
+                    speedMps:        pos.coords.speed ?? null,
+                    headingDeg:      pos.coords.heading ?? null,
+                    timestamp:       pos.timestamp ?? Date.now(),
+                  })
+                  safeSetStatus('watching')
+                },
+              )
+              watchIdRef.current = id
+              return
+            } catch (e) {
+              logWarn('useGeoLocation.watch.native.setup', 'failed', e)
+              isNativeRef.current = false
+            }
+          }
+        }
+
+        // Web fallback
+        if (typeof navigator !== 'undefined' && navigator.geolocation) {
+          const id = navigator.geolocation.watchPosition(
+            (pos) => {
+              applyFix({
+                latitude:  pos.coords.latitude,
+                longitude: pos.coords.longitude,
+                // `?? 99` não pega NaN (só null/undefined) — um accuracy NaN passaria
+                // o gate de qualidade e vazaria pra UI. `Number.isFinite` cobre os dois.
+                accuracyMeters:  Number.isFinite(pos.coords.accuracy) ? pos.coords.accuracy : 99,
+                altitudeMeters:  pos.coords.altitude ?? null,
+                speedMps:        pos.coords.speed ?? null,
+                headingDeg:      pos.coords.heading ?? null,
+                timestamp:       pos.timestamp,
+              })
+              safeSetStatus('watching')
+            },
+            (err) => {
+              // Persistent failure path — surface to UI.
+              safeSetError(friendlyGeoError(err.code))
+              safeSetStatus('error')
+            },
+            { enableHighAccuracy: true, timeout: 30000, maximumAge: 0 },
+          )
+          watchIdRef.current = id
+        } else {
+          safeSetStatus('unavailable')
+          safeSetError('GPS não disponível neste dispositivo.')
+        }
+      } catch (e) {
+        logWarn('useGeoLocation.startWatching', 'failed', e)
+        safeSetError(e instanceof Error ? e.message : 'Erro ao iniciar GPS.')
+        safeSetStatus('error')
+      }
+    } finally {
+      startingRef.current = false
     }
   }, [applyFix, checkPermission, requestPermission, safeSetError, safeSetStatus])
 

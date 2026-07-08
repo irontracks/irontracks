@@ -102,22 +102,29 @@ export default function WatchSyncProvider({
         if (onCardioFinishedRef.current) {
           onCardioFinishedRef.current(summary)
         } else {
-          await fetch('/api/gps/cardio/save', {
+          // Payload no shape do saveTrackSchema (senão 400): `route` é
+          // obrigatório e o campo é `calories_estimated` (não `calories`).
+          // Batimentos não têm coluna em cardio_tracks → não são enviados.
+          const res = await fetch('/api/gps/cardio/save', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
-              source: 'apple-watch',
+              activity_type: 'running',
               distance_meters: summary.distanceMeters,
-              duration_seconds: summary.durationSeconds,
-              avg_heart_rate: summary.avgHeartRate ?? null,
-              max_heart_rate: summary.maxHeartRate ?? null,
-              calories: summary.caloriesEstimated,
+              duration_seconds: Math.round(summary.durationSeconds),
+              calories_estimated: Math.round(summary.caloriesEstimated),
               avg_pace_min_km: summary.avgPaceMinKm ?? null,
+              route: [],
               started_at: summary.startedAt,
               finished_at: summary.finishedAt,
             }),
           }).catch(() => null)
-          toastCtx?.('Cardio do Watch salvo!', 'success' as const)
+          if (res && res.ok) {
+            toastCtx?.('Cardio do Watch salvo!', 'success' as const)
+          } else {
+            logWarn('WatchSync', 'cardio-save do Watch falhou', res?.status)
+            toastCtx?.('Não foi possível salvar o cardio do Watch.', 'error' as const)
+          }
         }
       } catch (e) {
         logWarn('WatchSync', 'cardio-save falhou:', e)
