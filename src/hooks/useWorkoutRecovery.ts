@@ -70,8 +70,12 @@ export function useWorkoutRecovery(userId: string | null | undefined): WorkoutRe
             return
           }
 
-          // 4xx = terminal, don't retry
-          if (resp.status >= 400 && resp.status < 500) {
+          // 4xx = terminal, don't retry — EXCETO 401/408/429 (transitórios:
+          // sessão expirada, timeout, rate limit). Esses caem na fila offline
+          // (preserva o backup pra próxima recuperação), em vez de apagar o
+          // treino recuperado.
+          const transient = resp.status === 401 || resp.status === 408 || resp.status === 429
+          if (resp.status >= 400 && resp.status < 500 && !transient) {
             const errText = await resp.text()
             setError(`Erro de validação: ${errText}`)
             clearFinishBackup(uid) // Don't keep invalid data
