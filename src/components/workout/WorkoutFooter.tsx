@@ -186,7 +186,9 @@ export default function WorkoutFooter() {
               if (finishBusyRef.current) return;
               finishBusyRef.current = true;
               setTimeout(() => { finishBusyRef.current = false; }, 1000);
-              finishWorkout();
+              // Passa o tempo do cronômetro exibido (já desconta a pausa) pra o
+              // histórico gravar o MESMO número que o usuário viu.
+              finishWorkout(elapsedSeconds);
             }}
             className={[
               'inline-flex items-center gap-2 px-5 py-3 rounded-xl font-black text-black text-sm transition-all duration-300',
