@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { estimateCardioKcal, isCardioExercise, metForCardio } from '../cardioKcal'
-import { estimateSessionKcal } from '../sessionKcal'
+import { estimateSessionKcal, estimateSessionKcalBreakdown } from '../sessionKcal'
 
 describe('isCardioExercise', () => {
   it('detecta por type, method e nome de modalidade', () => {
@@ -105,5 +105,31 @@ describe('estimateSessionKcal — integração de cardio', () => {
     const kcal = estimateSessionKcal(session, { bodyWeightKg: 78, biologicalSex: 'male' })
     // Modelo leve (MET 3.5) daria ~136 kcal em 30 min; corrida intensa deve ser bem mais.
     expect(kcal).toBeGreaterThan(300)
+  })
+})
+
+describe('estimateSessionKcalBreakdown', () => {
+  it('separa força × cardio e o total fecha', () => {
+    const session = {
+      totalTime: 600,
+      exercises: [{ name: 'Esteira', type: 'cardio', reps: 10, rpe: 8 }],
+      logs: {},
+    }
+    const bd = estimateSessionKcalBreakdown(session, { bodyWeightKg: 78, biologicalSex: 'male' })
+    expect(bd.cardioTotalKcal).toBe(94)
+    expect(bd.cardioPerExerciseKcal[0]).toBe(94)
+    expect(bd.strengthKcal).toBe(0) // sessão só de cardio
+    expect(bd.total).toBe(bd.strengthKcal + bd.cardioTotalKcal)
+  })
+
+  it('sessão sem cardio: cardio zerado, total = força', () => {
+    const session = {
+      totalTime: 1200,
+      exercises: [{ name: 'Supino reto', type: 'strength', reps: 10 }],
+      logs: { '0-0': { weight: 80, reps: 10, done: true } },
+    }
+    const bd = estimateSessionKcalBreakdown(session, { bodyWeightKg: 80, biologicalSex: 'male' })
+    expect(bd.cardioTotalKcal).toBe(0)
+    expect(bd.total).toBe(bd.strengthKcal)
   })
 })

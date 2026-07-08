@@ -18,13 +18,23 @@ export interface SessionKcalOpts {
   rpe?: number | null
 }
 
+export interface SessionKcalBreakdown {
+  /** Total da sessão (força + cardio), arredondado. */
+  total: number
+  /** kcal do modelo de força (só o tempo não-cardio). */
+  strengthKcal: number
+  /** kcal somada de todos os cardios. */
+  cardioTotalKcal: number
+  /** kcal de cardio por índice de exercício (na ordem de session.exercises). */
+  cardioPerExerciseKcal: Record<number, number>
+}
+
 /**
- * Estimates calories burned for a completed strength session, given its saved
- * session object (the parsed `workouts.notes` JSON). Returns 0 when there's not
- * enough data. Body weight / sex from the user profile take precedence over the
- * session's pre-checkin values.
+ * Como estimateSessionKcal, mas retorna as PARTES (força × cardio) — usado pelo
+ * relatório pra dar a cada exercício de cardio sua kcal-MET exata e ratear só o
+ * restante (força) entre os demais.
  */
-export function estimateSessionKcal(session: unknown, opts: SessionKcalOpts = {}): number {
+export function estimateSessionKcalBreakdown(session: unknown, opts: SessionKcalOpts = {}): SessionKcalBreakdown {
   const sessionObj = isRecord(session) ? session : {}
   const sessionLogs = isRecord(sessionObj.logs) ? sessionObj.logs : {}
   const totalTimeSeconds = Number(sessionObj.totalTime) || 0
@@ -92,6 +102,21 @@ export function estimateSessionKcal(session: unknown, opts: SessionKcalOpts = {}
     )
     : 0
 
-  const kcal = strengthKcal + cardio.totalKcal
-  return kcal > 0 ? kcal : 0
+  const total = Math.max(0, strengthKcal + cardio.totalKcal)
+  return {
+    total,
+    strengthKcal: Math.max(0, strengthKcal),
+    cardioTotalKcal: cardio.totalKcal,
+    cardioPerExerciseKcal: cardio.perExerciseKcal,
+  }
+}
+
+/**
+ * Estimates calories burned for a completed session (strength + cardio), given
+ * its saved session object (the parsed `workouts.notes` JSON). Returns 0 when
+ * there's not enough data. Body weight / sex from the user profile take
+ * precedence over the session's pre-checkin values.
+ */
+export function estimateSessionKcal(session: unknown, opts: SessionKcalOpts = {}): number {
+  return estimateSessionKcalBreakdown(session, opts).total
 }
