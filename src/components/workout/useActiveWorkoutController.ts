@@ -539,8 +539,21 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
   // CADA tecla). Os derivados (completedSets/progressPct/...) são primitivos e só mudam
   // ao marcar série feita, então ficam aqui sem forçar re-render por tecla. `logs` é
   // servido no WorkoutLogsContext, consumido só por ExerciseList/ExerciseCard.
+  // True quando QUALQUER modal/overlay do treino está aberto. Usado pelo FAB do
+  // chat de equipe pra não flutuar por cima do modal — durante o descanso o FAB
+  // sobe pra um z-index alto (pra clarear a barra de descanso) e acabava cobrindo
+  // o botão Salvar do "Editar exercício".
+  const anyModalOpen = !!(
+    editExerciseOpen || addExerciseOpen || organizeOpen || fullEditorOpen ||
+    postCheckinOpen || inviteOpen ||
+    deloadModal || clusterModal || restPauseModal || dropSetModal || strippingModal ||
+    fst7Modal || heavyDutyModal || pontoZeroModal || forcedRepsModal ||
+    negativeRepsModal || partialRepsModal || sistema21Modal || waveModal || groupMethodModal
+  )
+
   const value = useMemo(() => ({
     session,
+    anyModalOpen,
     workout,
     exercises,
     ui,
@@ -687,7 +700,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     currentExSetsCount,
     currentExDoneSets,
   }), [
-    session, workout, exercises, ui, settings,
+    session, anyModalOpen, workout, exercises, ui, settings,
     collapsed, setCollapsed, finishing,
     openNotesKeys, setOpenNotesKeys,
     inviteOpen, setInviteOpen,
