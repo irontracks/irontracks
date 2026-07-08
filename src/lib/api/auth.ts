@@ -41,6 +41,19 @@ export const apiAuth = {
       ...(checkOnly ? { check_only: true } : {}),
     }),
 
+  /**
+   * POST — cria uma SOLICITAÇÃO de acesso pendente a partir do identityToken da
+   * Apple (autorizado pelo próprio token, sem sessão). Necessário pra um Apple ID
+   * NOVO conseguir passar pelo trigger de whitelist no signInWithIdToken —
+   * antes o Sign in with Apple barrava novos usuários (rejeição Apple 2.1a).
+   * Retorna status: 'existed' | 'requested' | 'approved'.
+   */
+  appleRequestAccess: (token: string, fullName: string) =>
+    apiPost<{ ok: boolean; status?: 'existed' | 'requested' | 'approved'; error?: string }>(
+      '/api/auth/apple/request-access',
+      { token, full_name: fullName },
+    ),
+
   /** POST persist server-side session cookie */
   persistSession: (accessToken: string, refreshToken: string) =>
     apiPost<SessionResult>('/api/auth/session', {
