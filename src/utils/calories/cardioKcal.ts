@@ -48,6 +48,17 @@ const CARDIO_MET_BASE: Record<string, number> = {
 
 const DEFAULT_CARDIO_MET = 6.0
 
+/** Teto de sanidade pra kcal de uma sessão (bate com o cap do /gps/cardio/save). */
+export const MAX_SESSION_KCAL = 50_000
+
+/** Clampa uma kcal de sessão em [0, MAX_SESSION_KCAL]; retorna 0 se inválida.
+ *  Usado no override do "bike outdoor", que vem do cliente (workouts.notes). */
+export const clampSessionKcal = (v: unknown): number => {
+  const n = Number(v)
+  if (!Number.isFinite(n) || n <= 0) return 0
+  return Math.min(MAX_SESSION_KCAL, Math.round(n))
+}
+
 /** True se o exercício é cardio (por type, method ou nome de modalidade). */
 export const isCardioExercise = (ex: unknown): boolean => {
   const e = isRecord(ex) ? ex : null

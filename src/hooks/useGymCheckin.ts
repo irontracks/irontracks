@@ -92,15 +92,17 @@ export function useGymCheckin(
   // Load user gyms
   useEffect(() => {
     if (!userId || !supabase || !locationEnabled) return
+    let cancelled = false
     const load = async () => {
       const { data } = await supabase
         .from('user_gyms')
         .select('id, name, latitude, longitude, radius_meters, is_primary')
         .eq('user_id', userId)
         .limit(20)
-      if (data) setGyms(data as Gym[])
+      if (!cancelled && data) setGyms(data as Gym[])
     }
     load()
+    return () => { cancelled = true }
   }, [userId, supabase, locationEnabled])
 
   // Detect gym when position changes

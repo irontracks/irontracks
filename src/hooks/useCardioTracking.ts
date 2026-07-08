@@ -2,7 +2,7 @@
 
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { useGeoLocation, type GeoFix, type TrackingStatus } from './useGeoLocation'
-import { totalTrackDistance, avgPaceMinKm, speedKmh, haversineDistance } from '@/utils/geoUtils'
+import { avgPaceMinKm, speedKmh, haversineDistance } from '@/utils/geoUtils'
 import type { GeoTrackPoint } from '@/utils/geoUtils'
 import { decideCardioFilter, estimateCardioCalories } from '@/utils/cardioFilters'
 import {
@@ -160,6 +160,12 @@ export function useCardioTracking({
   const pauseStartRef = useRef<number>(0)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const maxSpeedRef = useRef<number>(0)
+  // Distância acumulada em metros (incremental — não recomputa o array inteiro
+  // a cada fix). Somar por segmento permite PULAR a "ponte" da pausa/recuperação.
+  const distanceRef = useRef<number>(0)
+  // Marca o próximo fix aceito como novo início de trecho: o deslocamento feito
+  // DURANTE a pausa (ou com o app morto) NÃO deve entrar na distância.
+  const justResumedRef = useRef<boolean>(false)
   const startedAtRef = useRef<string>('')
   // Hold the latest full GeoFix (including accuracy) for reading in effects
   // that otherwise only see GeoTrackPoint shape.
@@ -219,21 +225,26 @@ export function useCardioTracking({
     }
 
     const updated = [...prev, newPoint]
-    const totalDist = totalTrackDistance(updated)
+
+    // Segmento desde o último ponto — pulado quando é o 1º fix após retomar/
+    // recuperar (senão o deslocamento da pausa vira distância/velocidade falsa).
+    const isBridge = justResumedRef.current
+    if (isBridge) justResumedRef.current = false
+
+    let seg = 0
+    let currentSpeed = 0
+    if (last && !isBridge) {
+      seg = haversineDistance(last, newPoint)
+      const st = (newPoint.timestamp - last.timestamp) / 1000
+      currentSpeed = st > 0 ? speedKmh(seg, st) : 0
+      if (currentSpeed > maxSpeedRef.current) maxSpeedRef.current = currentSpeed
+    }
+    distanceRef.current += seg
+    const totalDist = distanceRef.current
+
     const elapsed = Math.floor(
       (Date.now() - startTimeRef.current - pausedDurationRef.current) / 1000,
     )
-
-    // Current speed from the freshest segment
-    let currentSpeed = 0
-    if (updated.length >= 2) {
-      const a = updated[updated.length - 1]
-      const b = updated[updated.length - 2]
-      const sd = haversineDistance(b, a)
-      const st = (a.timestamp - b.timestamp) / 1000
-      currentSpeed = st > 0 ? speedKmh(sd, st) : 0
-    }
-    if (currentSpeed > maxSpeedRef.current) maxSpeedRef.current = currentSpeed
 
     setTrackPoints(updated)
     setMetrics({
@@ -252,7 +263,10 @@ export function useCardioTracking({
   const start = useCallback(async () => {
     startTimeRef.current = Date.now()
     pausedDurationRef.current = 0
+    pauseStartRef.current = 0
     maxSpeedRef.current = 0
+    distanceRef.current = 0
+    justResumedRef.current = false
     startedAtRef.current = new Date().toISOString()
     latestFixRef.current = null
     setTrackPoints([])
@@ -263,6 +277,7 @@ export function useCardioTracking({
   }, [startWatching])
 
   const pause = useCallback(() => {
+    if (pauseStartRef.current > 0) return // já pausado — idempotente
     setIsPaused(true)
     pauseStartRef.current = Date.now()
     stopWatching()
@@ -273,7 +288,11 @@ export function useCardioTracking({
   }, [stopWatching])
 
   const resume = useCallback(async () => {
+    if (pauseStartRef.current === 0) return // não estava pausado — idempotente
     pausedDurationRef.current += Date.now() - pauseStartRef.current
+    pauseStartRef.current = 0
+    // Não conta o deslocamento feito durante a pausa como distância percorrida.
+    justResumedRef.current = true
     setIsPaused(false)
     await startWatching()
   }, [startWatching])
@@ -310,6 +329,9 @@ export function useCardioTracking({
     setMetrics(EMPTY_METRICS)
     maxSpeedRef.current = 0
     pausedDurationRef.current = 0
+    pauseStartRef.current = 0
+    distanceRef.current = 0
+    justResumedRef.current = false
     latestFixRef.current = null
   }, [stopWatching])
 
@@ -466,7 +488,12 @@ export function useCardioTracking({
 
     startTimeRef.current = startedAtMs
     pausedDurationRef.current = pausedDurationMs
+    pauseStartRef.current = 0
     maxSpeedRef.current = recoveredMaxSpeed
+    // Continua a distância de onde parou; o próximo fix é "ponte" (o usuário
+    // pode ter se deslocado com o app morto — não conta esse trecho).
+    distanceRef.current = Number(recoveredMetrics?.distanceMeters) || 0
+    justResumedRef.current = true
     startedAtRef.current = recoveredStartedAtIso
 
     setTrackPoints(points)
