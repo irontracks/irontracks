@@ -327,38 +327,19 @@ export function ModalsComplexMethods() {
 
                                 {(() => {
                                         const modal = dropSetModal as UnknownRecord;
-                                        const modalRestSec = Number(modal.restSec ?? 0);
-                                        const safeRestSec = Number.isFinite(modalRestSec) && modalRestSec > 0 ? modalRestSec : 0;
                                         const stagesList = Array.isArray(modal.stages) ? (modal.stages as unknown[]) : [];
                                         return stagesList.map((stage, idx) => {
                                             const st = isObject(stage) ? (stage as UnknownRecord) : ({} as UnknownRecord);
                                             const w = String(st.weight ?? '');
                                             const r = st.reps == null ? '' : String(st.reps);
-                                            const isLast = idx >= stagesList.length - 1;
-                                            const btnKey = `${String(modal.key || '')}-ds-${idx}`;
-                                            const timerDone = safeRestSec > 0 ? isRestDone(btnKey, safeRestSec) : false;
+                                            // Drop set NÃO tem descanso entre as etapas (os drops são feitos
+                                            // em sequência, sem parar) — por isso não há timer/legenda de
+                                            // descanso aqui, diferente dos outros métodos.
                                             return (
                                                 <div key={`stage-${idx}`} className="rounded-xl border border-neutral-800 bg-neutral-950/30 p-3 relative">
                                                     <div className="flex items-center gap-2 mb-2">
                                                         <div className="text-[10px] uppercase tracking-widest font-bold text-neutral-400">Etapa {idx + 1}</div>
                                                     </div>
-                                                    {!isLast && safeRestSec ? (
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => {
-                                                                startTimer(safeRestSec, { kind: 'drop_set', key: modal.key, stageIndex: idx });
-                                                                setRestStartedAt(prev => ({ ...prev, [btnKey]: Date.now() }));
-                                                            }}
-                                                            className={timerDone
-                                                                ? 'absolute top-3 right-3 inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-emerald-500 text-black active:scale-95 transition-transform z-10'
-                                                                : 'absolute top-3 right-3 inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 hover:bg-neutral-800 active:scale-95 transition-transform z-10'
-                                                            }
-                                                            aria-label={timerDone ? 'Descanso concluído' : `Iniciar descanso ${safeRestSec}s`}
-                                                        >
-                                                            {timerDone ? <Check size={14} /> : <Clock size={14} className="text-yellow-500" />}
-                                                            <span className="text-xs font-black">{timerDone ? 'OK' : `${safeRestSec}s`}</span>
-                                                        </button>
-                                                    ) : null}
                                                     <div className="grid grid-cols-2 gap-2">
                                                         <input
                                                             inputMode="decimal"
@@ -394,7 +375,6 @@ export function ModalsComplexMethods() {
                                                             className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500"
                                                         />
                                                     </div>
-                                                    {!isLast && safeRestSec ? <div className="mt-2 text-xs text-neutral-400">Descanso: {safeRestSec}s</div> : null}
                                                 </div>
                                             );
                                         });
