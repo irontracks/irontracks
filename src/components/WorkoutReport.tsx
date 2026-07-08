@@ -383,7 +383,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose,
         );
     };
 
-    const handlePartnerPlan = (participant: unknown) => {
+    const handlePartnerPlan = async (participant: unknown) => {
         try {
             const part = participant && typeof participant === 'object' ? (participant as AnyObj) : null
             if (!part) return;
@@ -404,23 +404,63 @@ const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose,
                     })
                 })
             };
+            const partnerName = String(part?.name || part?.uid || 'Parceiro').trim() || 'Parceiro'
             const partnerUser = {
                 displayName: escapeHtml(part?.name || part?.uid || ''),
                 email: escapeHtml(part?.email || '')
             };
             const html = workoutPlanHtml(workout, partnerUser);
+            const fileName = `Plano_${partnerName.replace(/\s+/g, '_')}_irontracks.html`
+            const title = `Plano de ${partnerName} • IronTracks`
+
+            // iOS WKWebView bloqueia window.open()/print() → o alerta de pop-up.
+            // Preferir o share sheet nativo (mesmo caminho do PDF principal). A
+            // chamada de share é a 1ª operação async, então o user-gesture é
+            // preservado. Sem await antes disso.
+            const canShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function'
+            if (canShare) {
+                try {
+                    const blob = new Blob([html], { type: 'text/html' })
+                    const file = new File([blob], fileName, { type: 'text/html' })
+                    const canShareFiles = typeof (navigator as { canShare?: (data: { files: File[] }) => boolean }).canShare === 'function'
+                        && (navigator as { canShare: (data: { files: File[] }) => boolean }).canShare({ files: [file] })
+                    if (canShareFiles) {
+                        await navigator.share({ files: [file], title })
+                    } else {
+                        const url = URL.createObjectURL(blob)
+                        await navigator.share({ title, url })
+                        URL.revokeObjectURL(url)
+                    }
+                    return
+                } catch (shareErr) {
+                    const msg = shareErr instanceof Error ? shareErr.message : ''
+                    if (msg.toLowerCase().includes('cancel') || msg.toLowerCase().includes('abort')) return
+                    // outro erro: cai pro fallback de desktop
+                }
+            }
+
+            // Desktop: nova aba + diálogo de impressão (Salvar como PDF)
             const blob = new Blob([html], { type: 'text/html' });
             const blobUrl = URL.createObjectURL(blob);
             const win = window.open(blobUrl, '_blank');
-            if (!win) {
+            if (win) {
+                setTimeout(() => {
+                    try { win.focus(); win.print(); } catch { }
+                    setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
+                }, 400);
+            } else {
                 URL.revokeObjectURL(blobUrl);
-                alert('Não foi possível abrir o PDF do parceiro.\nAtive pop-ups para este site e tente novamente.');
-                return;
+                // Último recurso: baixar o HTML do plano
+                const dlBlob = new Blob([html], { type: 'text/html' });
+                const dlUrl = URL.createObjectURL(dlBlob);
+                const a = document.createElement('a');
+                a.href = dlUrl;
+                a.download = fileName;
+                document.body.appendChild(a);
+                a.click();
+                a.remove();
+                URL.revokeObjectURL(dlUrl);
             }
-            setTimeout(() => {
-                try { win.print(); } catch { }
-                setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
-            }, 400);
         } catch (e: unknown) {
             alert('Não foi possível gerar o PDF do parceiro: ' + (getErrorMessage(e)));
         }
