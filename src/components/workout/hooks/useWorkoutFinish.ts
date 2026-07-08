@@ -77,17 +77,22 @@ export function useWorkoutFinish(props: UseWorkoutFinishProps) {
     })
   }
 
-  const finishWorkout = async () => {
+  const finishWorkout = async (elapsedSecondsOverride?: number) => {
     if (!session || !workout) return
     if (finishing) return
 
     const startedAtMs = parseStartedAtMs(session?.startedAt)
-    // Tempo total: guarda contra relógio que voltou atrás (negativo → 0) e limita a
-    // 4h. App esquecido aberto (ou morto e restaurado horas depois) não vira mais um
-    // treino de "6h" no histórico. (A subtração exata da pausa depende do timer e fica
-    // pra um passo futuro; o teto já mata a pior distorção.)
+    // Tempo total salvo. Quando o chamador passa o tempo do CRONÔMETRO exibido
+    // (WorkoutFooter → useWorkoutTimer.elapsedSeconds), o histórico grava o MESMO
+    // número que o usuário viu — que JÁ desconta a pausa. Antes gravava sempre
+    // now - startedAt, ignorando a pausa (timer mostrava 45min, salvava 60min).
+    // Sem override (auto-finish, parceiro), cai no relógio de parede. Guarda
+    // contra negativo e limita a 4h (app morto/esquecido não vira treino de 6h).
     const MAX_WORKOUT_SECONDS = 4 * 60 * 60
-    let elapsedSeconds = startedAtMs > 0 ? Math.floor((Date.now() - startedAtMs) / 1000) : 0
+    const hasOverride = typeof elapsedSecondsOverride === 'number' && Number.isFinite(elapsedSecondsOverride) && elapsedSecondsOverride >= 0
+    let elapsedSeconds = hasOverride
+      ? Math.floor(elapsedSecondsOverride as number)
+      : (startedAtMs > 0 ? Math.floor((Date.now() - startedAtMs) / 1000) : 0)
     if (!Number.isFinite(elapsedSeconds) || elapsedSeconds < 0) elapsedSeconds = 0
     if (elapsedSeconds > MAX_WORKOUT_SECONDS) elapsedSeconds = MAX_WORKOUT_SECONDS
 
