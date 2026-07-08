@@ -97,43 +97,37 @@ export default function GymSettingsSection({ userId, supabase }: GymSettingsSect
 
     setSearchingGyms(true)
     try {
-      // Busca o NOME cru (sem poluir com "gym academia" — o viés de localização +
-      // ordenação por distância já traz a academia certa perto de você).
-      const params = new URLSearchParams({
-        format: 'json',
-        q: query.trim(),
-        limit: '12',
-        addressdetails: '1',
-      })
+      // Chama a rota do servidor: usa Google Places (acha quase qualquer academia)
+      // quando a chave está configurada; senão cai no OpenStreetMap. A chave fica
+      // NO SERVIDOR — nunca exposta aqui. Manda a localização pra enviesar por
+      // proximidade; a ordenação/rótulo de distância continua sendo feita aqui.
+      const params = new URLSearchParams({ q: query.trim() })
       if (position) {
-        // Enviesa pela sua localização (~±0.6° ≈ região metropolitana).
-        const bias = 0.6
-        params.set('viewbox', `${position.longitude - bias},${position.latitude + bias},${position.longitude + bias},${position.latitude - bias}`)
-        params.set('bounded', '0')
+        params.set('lat', String(position.latitude))
+        params.set('lng', String(position.longitude))
       }
 
-      const res = await fetch(`https://nominatim.openstreetmap.org/search?${params.toString()}`, {
-        headers: { 'Accept-Language': 'pt-BR' },
-      })
-      if (!res.ok) throw new Error('Search failed')
-      const data = await res.json()
+      const res = await fetch(`/api/gyms/search?${params.toString()}`, { credentials: 'include' })
+      const json = await res.json().catch(() => null)
+      const raw: unknown[] = json && Array.isArray(json.results) ? json.results : []
 
-      let results: GymSuggestion[] = (Array.isArray(data) ? data : [])
-        .filter((item: Record<string, unknown>) => item.lat && item.lon)
-        .map((item: Record<string, unknown>) => {
-          const lat = parseFloat(String(item.lat))
-          const lon = parseFloat(String(item.lon))
-          const distanceKm = position
+      let results: GymSuggestion[] = raw
+        .map((item) => {
+          const r = item && typeof item === 'object' ? (item as Record<string, unknown>) : {}
+          const lat = Number(r.lat)
+          const lon = Number(r.lon)
+          const distanceKm = position && Number.isFinite(lat) && Number.isFinite(lon)
             ? haversineDistance({ latitude: position.latitude, longitude: position.longitude }, { latitude: lat, longitude: lon }) / 1000
             : null
           return {
-            name: String(item.name || item.display_name || '').split(',')[0].trim(),
-            display: String(item.display_name || '').slice(0, 120),
+            name: String(r.name || '').trim(),
+            display: String(r.display || '').slice(0, 120),
             lat,
             lon,
             distanceKm,
           }
         })
+        .filter((r) => Number.isFinite(r.lat) && Number.isFinite(r.lon))
 
       // Com GPS: prioriza o que está PERTO (a filial certa vem primeiro) e
       // descarta resultados absurdamente longe (outra cidade/país).
