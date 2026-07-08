@@ -9,8 +9,8 @@ import {
   calculateTotalVolume,
 } from '@/utils/report/formatters'
 import { setTopWeightReps, setVolume, isWorkingSet } from '@/utils/report/setVolume'
-import { estimateSessionKcal } from '@/utils/calories/sessionKcal'
-import { distributeKcalByExercise } from '@/utils/calories/distributeKcal'
+import { estimateSessionKcalBreakdown } from '@/utils/calories/sessionKcal'
+import { distributeKcalByExercise, distributeKcalWithFixed } from '@/utils/calories/distributeKcal'
 
 
 const getSetTag = (log: unknown): string | null => {
@@ -87,21 +87,27 @@ export function buildReportData(
     })(),
   } : null
 
-  const caloriesEstimate = (() => {
+  // Modelo unificado: força (densidade de volume) + cardio (MET da modalidade).
+  // O MESMO estimateSessionKcal do painel de nutrição/relatório React — antes o
+  // PDF duplicava a extração inline e ignorava cardio (subestimava esteira/HIT).
+  const kcalBreakdown = estimateSessionKcalBreakdown(sessionObj, {
+    bodyWeightKg: typeof opts.bodyWeightKg === 'number' ? opts.bodyWeightKg : null,
+    biologicalSex: typeof opts.biologicalSex === 'string' ? opts.biologicalSex : null,
+    rpe: typeof opts.rpe === 'number' ? opts.rpe : null,
+  })
+  // Override manual (kcalOverride) ou GPS (bike outdoor) mandam no total; nesse
+  // caso não há breakdown de cardio pra rateio (distribui tudo por volume).
+  const kcalOverrideValue = (() => {
     const ov = Number(kcalOverride)
     if (Number.isFinite(ov) && ov > 0) return Math.round(ov)
     const bikeKcal = Number(outdoorBike?.caloriesKcal)
     if (Number.isFinite(bikeKcal) && bikeKcal > 0) return Math.round(bikeKcal)
-    // Modelo unificado: força (densidade de volume) + cardio (MET da modalidade).
-    // O MESMO estimateSessionKcal do painel de nutrição/relatório React — antes o
-    // PDF duplicava a extração inline e ignorava cardio (subestimava esteira/HIT).
-    const kcal = estimateSessionKcal(sessionObj, {
-      bodyWeightKg: typeof opts.bodyWeightKg === 'number' ? opts.bodyWeightKg : null,
-      biologicalSex: typeof opts.biologicalSex === 'string' ? opts.biologicalSex : null,
-      rpe: typeof opts.rpe === 'number' ? opts.rpe : null,
-    })
-    return kcal > 0 ? kcal : 0
+    return null
   })()
+  const usingModel = kcalOverrideValue === null
+  const caloriesEstimate = usingModel
+    ? (kcalBreakdown.total > 0 ? kcalBreakdown.total : 0)
+    : kcalOverrideValue
 
   const prevLogsMap: Record<string, Array<Record<string, unknown> | null>> = {}
   const prevBaseMap: Record<string, unknown> = {}
@@ -232,17 +238,33 @@ export function buildReportData(
     }
   })
 
-  // Calorias por exercício: rateia o total da sessão (caloriesEstimate) por volume.
-  // Distribui SÓ entre os exercícios visíveis (com série logada) — os sem série são
-  // escondidos no PDF, então não podem receber kcal (senão a soma visível < total).
+  // Calorias por exercício. Distribui SÓ entre os visíveis (com série logada) —
+  // os sem série ficam escondidos no PDF e não recebem kcal.
+  // Com o modelo (sem override): cada CARDIO visível recebe sua kcal-MET exata e
+  // a parte de FORÇA é rateada entre os demais. Com override: rateia tudo por
+  // volume (não há breakdown de cardio). `exercises` é 1:1 com session.exercises
+  // por índice, então cardioPerExerciseKcal[idx] alinha com cada linha.
   if (caloriesEstimate > 0) {
-    const visible = exercises.filter((e) => Array.isArray(e.sets) && e.sets.length > 0)
+    const visible = exercises
+      .map((e, idx) => ({ e, idx }))
+      .filter(({ e }) => Array.isArray(e.sets) && e.sets.length > 0)
     if (visible.length > 0) {
-      const perKcal = distributeKcalByExercise(
-        visible.map((e) => ({ volumeKg: Number(e.volumeKg) || 0 })),
-        caloriesEstimate,
-      )
-      visible.forEach((e, i) => { e.caloriesKcal = perKcal[i] ?? 0 })
+      if (usingModel) {
+        const perKcal = distributeKcalWithFixed(
+          visible.map(({ e, idx }) => ({
+            volumeKg: Number(e.volumeKg) || 0,
+            fixedKcal: kcalBreakdown.cardioPerExerciseKcal[idx] ?? null,
+          })),
+          kcalBreakdown.strengthKcal,
+        )
+        visible.forEach(({ e }, i) => { e.caloriesKcal = perKcal[i] ?? 0 })
+      } else {
+        const perKcal = distributeKcalByExercise(
+          visible.map(({ e }) => ({ volumeKg: Number(e.volumeKg) || 0 })),
+          caloriesEstimate,
+        )
+        visible.forEach(({ e }, i) => { e.caloriesKcal = perKcal[i] ?? 0 })
+      }
     }
   }
 

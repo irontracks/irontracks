@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { distributeKcalByExercise } from '../distributeKcal'
+import { distributeKcalByExercise, distributeKcalWithFixed } from '../distributeKcal'
 
 describe('distributeKcalByExercise', () => {
   it('rateia por tempo de execução quando todos têm', () => {
@@ -48,5 +48,45 @@ describe('distributeKcalByExercise', () => {
 
   it('um exercício leva o total inteiro', () => {
     expect(distributeKcalByExercise([{ volumeKg: 500 }], 273)).toEqual([273])
+  })
+})
+
+describe('distributeKcalWithFixed', () => {
+  it('cardio recebe kcal fixa; força rateia o restante por volume', () => {
+    const out = distributeKcalWithFixed(
+      [
+        { fixedKcal: 94 },                 // cardio
+        { volumeKg: 1000 },                // força
+        { volumeKg: 1000 },                // força
+      ],
+      200, // parte de força
+    )
+    expect(out).toEqual([94, 100, 100])
+    expect(out.reduce((a, b) => a + b, 0)).toBe(294)
+  })
+
+  it('sem fixo, rateia o flexível entre todos (por volume)', () => {
+    const out = distributeKcalWithFixed(
+      [{ volumeKg: 1000 }, { volumeKg: 3000 }],
+      100,
+    )
+    expect(out).toEqual([25, 75])
+  })
+
+  it('só cardio (sem flexível) mantém os valores fixos', () => {
+    expect(distributeKcalWithFixed([{ fixedKcal: 120 }, { fixedKcal: 80 }], 0)).toEqual([120, 80])
+  })
+
+  it('fixo presente mas flexível 0 → demais ficam zerados', () => {
+    expect(distributeKcalWithFixed([{ fixedKcal: 90 }, { volumeKg: 500 }], 0)).toEqual([90, 0])
+  })
+
+  it('rateio flexível fecha exatamente (largest remainder)', () => {
+    const out = distributeKcalWithFixed(
+      [{ fixedKcal: 50 }, { volumeKg: 1 }, { volumeKg: 1 }, { volumeKg: 1 }],
+      100,
+    )
+    expect(out[0]).toBe(50)
+    expect(out[1] + out[2] + out[3]).toBe(100)
   })
 })

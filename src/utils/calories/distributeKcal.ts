@@ -16,6 +16,9 @@
 export interface ExerciseKcalInput {
   volumeKg?: number | null
   executionMinutes?: number | null
+  /** kcal FIXA desta linha (cardio: valor MET exato). Quando presente e > 0, a
+   *  linha recebe exatamente este valor e NÃO entra no rateio flexível. */
+  fixedKcal?: number | null
 }
 
 export function distributeKcalByExercise(exercises: ExerciseKcalInput[], totalKcal: number): number[] {
@@ -47,6 +50,55 @@ export function distributeKcalByExercise(exercises: ExerciseKcalInput[], totalKc
     .sort((a, b) => b.frac - a.frac)
   for (let k = 0; k < byFrac.length && remainder > 0; k++) {
     out[byFrac[k].i] += 1
+    remainder--
+  }
+  return out
+}
+
+/**
+ * Como distributeKcalByExercise, mas honra `fixedKcal` por linha: exercícios com
+ * kcal fixa (cardio, pelo MET da modalidade) recebem exatamente esse valor; o
+ * `flexibleKcal` (a parte de FORÇA) é rateado só entre as linhas sem valor fixo,
+ * por tempo/volume. Assim a tabela mostra o cardio certo sem inflar a força.
+ *
+ * Σ resultado = Σ round(fixedKcal) + round(flexibleKcal em linhas flexíveis).
+ */
+export function distributeKcalWithFixed(exercises: ExerciseKcalInput[], flexibleKcal: number): number[] {
+  const list = Array.isArray(exercises) ? exercises : []
+  const n = list.length
+  if (n === 0) return []
+
+  const out = new Array<number>(n).fill(0)
+  const flexIdx: number[] = []
+  list.forEach((e, i) => {
+    const f = Number(e?.fixedKcal)
+    if (Number.isFinite(f) && f > 0) out[i] = Math.round(f)
+    else flexIdx.push(i)
+  })
+
+  const flexTotal = Number.isFinite(flexibleKcal) && flexibleKcal > 0 ? Math.round(flexibleKcal) : 0
+  if (flexTotal <= 0 || flexIdx.length === 0) return out
+
+  const times = flexIdx.map((i) => (Number.isFinite(Number(list[i]?.executionMinutes)) ? Number(list[i]?.executionMinutes) : 0))
+  const vols = flexIdx.map((i) => (Number.isFinite(Number(list[i]?.volumeKg)) ? Number(list[i]?.volumeKg) : 0))
+
+  let weights: number[]
+  if (times.every((t) => t > 0)) weights = times
+  else if (vols.some((v) => v > 0)) weights = vols
+  else weights = flexIdx.map(() => 1)
+
+  const sumW = weights.reduce((a, b) => a + b, 0)
+  if (sumW <= 0) return out
+
+  const raw = weights.map((w) => (flexTotal * w) / sumW)
+  flexIdx.forEach((idx, k) => { out[idx] = Math.floor(raw[k]) })
+  let remainder = flexTotal - flexIdx.reduce((a, idx) => a + out[idx], 0)
+
+  const byFrac = raw
+    .map((r, k) => ({ idx: flexIdx[k], frac: r - Math.floor(r) }))
+    .sort((a, b) => b.frac - a.frac)
+  for (let k = 0; k < byFrac.length && remainder > 0; k++) {
+    out[byFrac[k].idx] += 1
     remainder--
   }
   return out
