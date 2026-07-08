@@ -59,6 +59,15 @@ EOF
 
 ARCHIVE_PATH="$ARCHIVE_DIR/IronTracks-build-$NEW_BUILD.xcarchive"
 
+# ─── 2b. Alinhar pins do SPM (capacitor-swift-pm) ao Capacitor instalado ────
+# Sem isto, plugins como @revenuecat/purchases-capacitor fixam (exact:) uma
+# versão ANTIGA de capacitor-swift-pm (ex.: 8.0.2) enquanto o Capacitor é 8.4.1,
+# e o archive falha em "Could not resolve package dependencies". O patch-ios.mjs
+# alinha todos os Package.swift à versão instalada e é idempotente. Roda a
+# partir da raiz (lê node_modules por caminho relativo ao cwd).
+echo "==> Alinhando pins do SPM (patch-ios)..."
+( cd "$PROJECT_ROOT" && node scripts/patch-ios.mjs )
+
 # ─── 3. Archive ────────────────────────────────────────────────────────────
 echo "==> Archiving build $NEW_BUILD..."
 cd "$PROJECT_ROOT/ios/App"
