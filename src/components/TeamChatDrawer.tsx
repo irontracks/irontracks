@@ -47,10 +47,14 @@ export function TeamChatDrawer({ myUserId, myPhotoURL, participants }: TeamChatD
     // keep this pure at render time — the orchestrator clears timerTargetTime
     // back to 0/null when rest ends, so this stays in sync without needing a
     // live clock read.
-    const workout = useWorkoutContext() as unknown as { session: Record<string, unknown> | null } | null
+    const workout = useWorkoutContext() as unknown as { session: Record<string, unknown> | null; anyModalOpen?: boolean } | null
     const timerTargetRaw = workout?.session ? (workout.session as Record<string, unknown>)?.timerTargetTime : null
     const timerTargetNum = Number(timerTargetRaw ?? 0)
     const hasRecovery = Number.isFinite(timerTargetNum) && timerTargetNum > 0
+    // Esconde o FAB quando um modal do treino está aberto — senão, durante o
+    // descanso (quando o FAB sobe pra z alto), ele flutua por cima do modal
+    // "Editar exercício" e cobre o botão Salvar.
+    const anyModalOpen = !!workout?.anyModalOpen
 
     const [open, setOpen] = useState(false)
     const [unread, setUnread] = useState(0)
@@ -111,7 +115,7 @@ export function TeamChatDrawer({ myUserId, myPhotoURL, participants }: TeamChatD
             {/* Floating chat button — repositions above the rest-timer bar during
                 recovery so it's never buried by the z-[2100] overlay. Smooth
                 transition on bottom so the jump isn't jarring when rest starts. */}
-            {!open && (
+            {!open && !anyModalOpen && (
                 <button
                     onClick={handleOpen}
                     style={{
