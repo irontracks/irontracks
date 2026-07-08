@@ -85,6 +85,14 @@ export default function ActiveWorkout(props: ActiveWorkoutProps & { controlledBy
     try { const t = new Date(String(rawStartedAt ?? '')).getTime(); return Number.isFinite(t) ? t : 0; } catch { return 0; }
   }, [rawStartedAt]);
 
+  // Timestamp da última atividade persistida — o provider usa pra tratar um gap
+  // longo (app morto/suspenso e restaurado) como pausa, evitando inflar o tempo.
+  const lastActiveAtMs = Number(
+    (session as Record<string, unknown> | null | undefined)?._idbSavedAt
+    ?? (session as Record<string, unknown> | null | undefined)?._savedAt
+    ?? 0,
+  ) || 0;
+
   // Enhanced context injects _exitOnBack and cancelWorkout (direct, no animation)
   const enhancedController = React.useMemo((): WorkoutContextType => {
     const originalOnFinish = controller.onFinish as ((s: unknown, saved: boolean) => void) | undefined;
@@ -221,7 +229,7 @@ export default function ActiveWorkout(props: ActiveWorkoutProps & { controlledBy
   return (
     <WorkoutProvider value={enhancedController}>
      <WorkoutLogsProvider value={logs}>
-     <WorkoutTimerProvider startedAtMs={startedAtMs}>
+     <WorkoutTimerProvider startedAtMs={startedAtMs} lastActiveAtMs={lastActiveAtMs}>
       <motion.div
         initial={{ y: '100%' }}
         animate={{ y: isExiting ? '100%' : 0 }}
