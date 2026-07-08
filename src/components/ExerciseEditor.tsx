@@ -335,6 +335,11 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
                                     )}
 
                                     <div className="mt-4 space-y-3">
+                                        {/* Cardio usa só Tempo/Intensidade (CardioFields). Os campos de
+                                            força não se aplicam e antes duplicavam o dado: Tempo=reps e
+                                            Intensidade=rpe editavam o mesmo valor dos grids abaixo. */}
+                                        {exerciseType !== 'cardio' && (
+                                            <>
                                         {/* Parâmetros primários */}
                                         <div className="grid grid-cols-3 gap-2.5">
                                             <div>
@@ -440,6 +445,8 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
                                                 </select>
                                             </div>
                                         </div>
+                                            </>
+                                        )}
 
                                         {exerciseType === 'cardio' ? (
                                             <CardioFields
