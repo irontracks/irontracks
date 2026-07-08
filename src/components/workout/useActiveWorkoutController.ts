@@ -62,7 +62,16 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
   const logsRef = useRef<Record<string, unknown>>(logs);
   {
     const prev = logsRef.current;
-    const next: Record<string, unknown> = { ...prev };
+    // Reconstrói SÓ com as chaves presentes no estado React (`logs`). Antes
+    // começava de `{...prev}` e nunca descartava as chaves que saíam do estado
+    // (série/exercício removido, edição mid-sessão, remap) — esses "órfãos"
+    // sobreviviam no ref e, como getLog lê do ref, vazavam dado fantasma pra
+    // séries/exercícios reaproveitando o mesmo índice ("exIdx-setIdx"): série
+    // renascia preenchida/feita, RPE de exercício deletado aparecia no de cima.
+    // Cada updateLog chama onUpdateLog → a chave reaparece no `logs` do React no
+    // próximo render, então o merge eager (fromRef) é preservado pras chaves
+    // vivas; só os órfãos são dropados.
+    const next: Record<string, unknown> = {};
     for (const k of Object.keys(logs)) {
       const fromRef = isObject(prev[k]) ? (prev[k] as Record<string, unknown>) : null;
       const fromReact = isObject(logs[k]) ? (logs[k] as Record<string, unknown>) : null;

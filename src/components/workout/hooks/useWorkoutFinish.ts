@@ -166,7 +166,14 @@ export function useWorkoutFinish(props: UseWorkoutFinishProps) {
                 savedId = json?.saved?.id ?? null
                 onlineSuccess = true
               } else {
-                if (resp.status >= 400 && resp.status < 500) {
+                // 401 (sessão expirada), 408 (timeout) e 429 (rate limit) NÃO são
+                // terminais — são transitórios: cair na fila offline (que preserva
+                // o backup e reenvia com a MESMA idempotencyKey). Antes qualquer
+                // 4xx era "validação terminal" → apagava o backup → PERDA do treino
+                // (ex.: token expira no meio de um treino longo). Alinha com o
+                // tratamento da fila offline (408/429 transitórios).
+                const transient = resp.status === 401 || resp.status === 408 || resp.status === 429
+                if (resp.status >= 400 && resp.status < 500 && !transient) {
                   const errText = await resp.text()
                   throw new Error(`Erro de validação: ${errText}`)
                 }

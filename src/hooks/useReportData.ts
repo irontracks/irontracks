@@ -18,7 +18,7 @@ import { getKcalEstimate } from '@/utils/calories/kcalClient'
 import { normalizeExerciseKey, calculateTotalVolume } from '@/utils/report/formatters'
 import { isSetCompleted } from '@/utils/report/setCompletion'
 import { setBestE1rm, isWorkingSet } from '@/utils/report/setVolume'
-import { estimateCaloriesMet, getBodyweightFraction, DEFAULT_BODY_WEIGHT_KG } from '@/utils/calories/metEstimate'
+import { estimateSessionKcal } from '@/utils/calories/sessionKcal'
 import { clampSessionKcal } from '@/utils/calories/cardioKcal'
 import { useCheckins } from './useCheckins'
 import { usePreviousSessionData } from './usePreviousSessionData'
@@ -287,7 +287,6 @@ export const useReportData = ({ session, previousSession, user, settings }: UseR
     [effectivePreviousSession, prevSessionLogs]
   )
   const volumeDelta = prevVolume > 0 ? ((currentVolume - prevVolume) / prevVolume) * 100 : 0
-  const durationInMinutes = (Number(safeSession?.totalTime) || 0) / 60
   const outdoorBike = safeSession?.outdoorBike && typeof safeSession.outdoorBike === 'object' ? (safeSession.outdoorBike as AnyObj) : null
 
   // ── GPS cardio track (from cardio_tracks table, linked by workout_id) ─────
@@ -342,17 +341,6 @@ export const useReportData = ({ session, previousSession, user, settings }: UseR
     return null
   })()
 
-  // Exercise names for complexity factor calculation
-  const sessionExerciseNames = (() => {
-    if (!Array.isArray(safeSession?.exercises)) return null
-    return (safeSession.exercises as unknown[])
-      .map((ex) => {
-        const e = ex && typeof ex === 'object' ? (ex as AnyObj) : null
-        return String(e?.name || '').trim()
-      })
-      .filter(Boolean) as string[]
-  })()
-
   // RPE from post-workout check-in (answers.rpe) — used to scale MET ±15%
   const postCheckinRpe = (() => {
     const pc = postCheckin && typeof postCheckin === 'object' ? (postCheckin as AnyObj) : null
@@ -363,90 +351,20 @@ export const useReportData = ({ session, previousSession, user, settings }: UseR
     return Number.isFinite(n) && n >= 1 && n <= 10 ? n : null
   })()
 
-  // ── Per-exercise volumes for volume-weighted complexity factor ───────────
-  // Handles "done/planned" reps ("8/10"), cluster blocks, and bodyweight exercises.
-  const effectiveBodyWeight = checkinBodyWeightKg ?? DEFAULT_BODY_WEIGHT_KG
-  const exerciseVolumes = useMemo(() => {
-    if (!sessionExerciseNames || sessionExerciseNames.length === 0) return null
-    return sessionExerciseNames.map((exName, exIdx) => {
-      let vol = 0
-      Object.entries(sessionLogs).forEach(([key, log]) => {
-        const parts = key.split('-')
-        if (Number(parts[0]) !== exIdx) return
-        const obj = log && typeof log === 'object' ? (log as AnyObj) : null
-        if (!obj) return
-        // Cluster blocks
-        const cluster = obj.cluster
-        if (cluster && typeof cluster === 'object') {
-          const cObj = cluster as AnyObj
-          const source = Array.isArray(cObj.blocksDetailed) ? cObj.blocksDetailed
-            : Array.isArray(cObj.blocks) ? cObj.blocks : null
-          if (source && source.length > 0) {
-            for (const block of source) {
-              if (!block || typeof block !== 'object') continue
-              const b = block as AnyObj
-              const bw = Number(String(b?.weight ?? '').replace(',', '.'))
-              const brRaw = String(b?.reps ?? '').replace(',', '.').trim()
-              const br = brRaw.includes('/') ? Number(brRaw.split('/')[0].trim()) : Number(brRaw)
-              if (Number.isFinite(bw) && bw > 0 && Number.isFinite(br) && br > 0) vol += bw * br
-            }
-            return
-          }
-        }
-        // Standard set — handle "done/planned" reps like "8/10"
-        let w = Number(String(obj.weight ?? '').replace(',', '.'))
-        const rRaw = String(obj.reps ?? '').replace(',', '.').trim()
-        const r = rRaw.includes('/') ? Number(rRaw.split('/')[0].trim()) : Number(rRaw)
-        // Bodyweight exercise: use equivalent body weight when weight is 0
-        if ((!Number.isFinite(w) || w <= 0) && Number.isFinite(r) && r > 0) {
-          const bwFrac = getBodyweightFraction(exName)
-          if (bwFrac > 0) w = effectiveBodyWeight * bwFrac
-        }
-        if (Number.isFinite(w) && w > 0 && Number.isFinite(r) && r > 0) vol += w * r
-      })
-      return vol
-    })
-  }, [sessionLogs, sessionExerciseNames, effectiveBodyWeight])
-
-  // ── Calories: deterministic useMemo ────────────────────────────────────
-  // Uses MET V9 model with: density, volume, body weight, sex, RPE, cadence, EPOC.
+  // ── Calorias: modelo UNIFICADO (força + cardio) ─────────────────────────
+  // Antes esta tela usava estimateCaloriesMet (SÓ força) — o PDF, a nutrição e o
+  // reportMeta salvo já usavam o modelo força+cardio (estimateSessionKcal). Num
+  // treino com esteira/corrida, a tela mostrava ~150-250 kcal a MENOS que o PDF
+  // exportado logo em seguida. Agora usa a MESMA função dos outros lados.
   const calories = useMemo(() => {
     const bikeKcal = clampSessionKcal(outdoorBike?.caloriesKcal)
     if (bikeKcal > 0) return bikeKcal
-
-    // Prefer explicit exec/rest seconds from session over total duration
-    const execSeconds = Number(safeSession?.executionTotalSeconds ?? safeSession?.execution_total_seconds ?? 0) || 0
-    const restSecondsSession = Number(safeSession?.restTotalSeconds ?? safeSession?.rest_total_seconds ?? 0) || 0
-    const execMinutesOverride = execSeconds > 0 ? execSeconds / 60 : null
-    const restMinutesOverride = restSecondsSession > 0 ? restSecondsSession / 60 : null
-
-    // Biological sex from user settings (improves calorie precision by ±10%)
-    const biologicalSex = String(settings?.biologicalSex ?? 'not_informed') || 'not_informed'
-
-    // Cadence / rep tempo from exercise config (e.g. "2-0-2", "4-1-4")
-    const cadenceNames = Array.isArray(safeSession?.exercises)
-      ? (safeSession.exercises as unknown[])
-          .map((ex) => {
-            const e = ex && typeof ex === 'object' ? (ex as AnyObj) : null
-            return String(e?.cadence || e?.tempo || '').trim()
-          })
-          .filter(Boolean) as string[]
-      : null
-
-    return estimateCaloriesMet(
-      sessionLogs,
-      durationInMinutes,
-      checkinBodyWeightKg,
-      sessionExerciseNames,
-      postCheckinRpe,
-      execMinutesOverride,
-      restMinutesOverride,
-      biologicalSex,
-      exerciseVolumes,
-      Number(safeSession?.startedAt ?? safeSession?.started_at ?? 0) || null,
-      cadenceNames && cadenceNames.length > 0 ? cadenceNames : null,
-    )
-  }, [sessionLogs, durationInMinutes, checkinBodyWeightKg, sessionExerciseNames, exerciseVolumes, postCheckinRpe, outdoorBike, safeSession?.executionTotalSeconds, safeSession?.execution_total_seconds, safeSession?.restTotalSeconds, safeSession?.rest_total_seconds, safeSession?.startedAt, safeSession?.started_at, settings?.biologicalSex, safeSession?.exercises])
+    return estimateSessionKcal(safeSession, {
+      bodyWeightKg: checkinBodyWeightKg,
+      biologicalSex: typeof settings?.biologicalSex === 'string' ? settings.biologicalSex : null,
+      rpe: postCheckinRpe,
+    })
+  }, [safeSession, checkinBodyWeightKg, settings?.biologicalSex, postCheckinRpe, outdoorBike])
 
 
   const reportMeta = safeSession?.reportMeta && typeof safeSession.reportMeta === 'object' ? (safeSession.reportMeta as AnyObj) : null
