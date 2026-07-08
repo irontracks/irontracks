@@ -245,6 +245,11 @@ export async function POST(request: Request) {
           }
         } catch (e) { logError('api:workouts:finish:duplicate-key-lookup', e) }
       } else if (msg.toLowerCase().includes('finish_idempotency_key') && msg.toLowerCase().includes('does not exist')) {
+        // Coluna de idempotência ausente neste ambiente → reinsere SEM a chave
+        // pra não travar a finalização, MAS isso DESLIGA a proteção anti-duplicata.
+        // Loga alto (Sentry via logError) — é schema drift; precisa da migration
+        // 20260708180000_workouts_finish_idempotency_key.sql aplicada.
+        logError('api:workouts:finish:MISSING_IDEMPOTENCY_COLUMN', new Error('finish_idempotency_key ausente — idempotência DESLIGADA, duplicatas possíveis. Aplique a migration.'))
         insertRes = await tryInsert(false)
       }
     }
