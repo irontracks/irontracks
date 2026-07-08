@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, lazy, Suspense } from 'react'
 import { useGeoLocation } from '@/hooks/useGeoLocation'
+import { haversineDistance } from '@/utils/geoUtils'
 import { logError } from '@/lib/logger'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
@@ -33,6 +34,8 @@ interface GymSuggestion {
   display: string
   lat: number
   lon: number
+  /** Distância até o usuário (km), quando o GPS está disponível. */
+  distanceKm?: number | null
 }
 
 export default function GymSettingsSection({ userId, supabase }: GymSettingsSectionProps) {
@@ -94,28 +97,52 @@ export default function GymSettingsSection({ userId, supabase }: GymSettingsSect
 
     setSearchingGyms(true)
     try {
-      // Build Nominatim search with viewbox bias towards user's location
-      let url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(query + ' gym academia')}&limit=5&addressdetails=1`
+      // Busca o NOME cru (sem poluir com "gym academia" — o viés de localização +
+      // ordenação por distância já traz a academia certa perto de você).
+      const params = new URLSearchParams({
+        format: 'json',
+        q: query.trim(),
+        limit: '12',
+        addressdetails: '1',
+      })
       if (position) {
-        // Bias search around user's location (±0.5° ~55km)
-        const bias = 0.5
-        url += `&viewbox=${position.longitude - bias},${position.latitude + bias},${position.longitude + bias},${position.latitude - bias}&bounded=0`
+        // Enviesa pela sua localização (~±0.6° ≈ região metropolitana).
+        const bias = 0.6
+        params.set('viewbox', `${position.longitude - bias},${position.latitude + bias},${position.longitude + bias},${position.latitude - bias}`)
+        params.set('bounded', '0')
       }
 
-      const res = await fetch(url, {
-        headers: { 'User-Agent': 'IronTracks/1.0' },
+      const res = await fetch(`https://nominatim.openstreetmap.org/search?${params.toString()}`, {
+        headers: { 'Accept-Language': 'pt-BR' },
       })
       if (!res.ok) throw new Error('Search failed')
       const data = await res.json()
 
-      const results: GymSuggestion[] = (Array.isArray(data) ? data : [])
+      let results: GymSuggestion[] = (Array.isArray(data) ? data : [])
         .filter((item: Record<string, unknown>) => item.lat && item.lon)
-        .map((item: Record<string, unknown>) => ({
-          name: String(item.name || item.display_name || '').split(',')[0].trim(),
-          display: String(item.display_name || '').slice(0, 120),
-          lat: parseFloat(String(item.lat)),
-          lon: parseFloat(String(item.lon)),
-        }))
+        .map((item: Record<string, unknown>) => {
+          const lat = parseFloat(String(item.lat))
+          const lon = parseFloat(String(item.lon))
+          const distanceKm = position
+            ? haversineDistance({ latitude: position.latitude, longitude: position.longitude }, { latitude: lat, longitude: lon }) / 1000
+            : null
+          return {
+            name: String(item.name || item.display_name || '').split(',')[0].trim(),
+            display: String(item.display_name || '').slice(0, 120),
+            lat,
+            lon,
+            distanceKm,
+          }
+        })
+
+      // Com GPS: prioriza o que está PERTO (a filial certa vem primeiro) e
+      // descarta resultados absurdamente longe (outra cidade/país).
+      if (position) {
+        results = results
+          .filter((r) => r.distanceKm == null || r.distanceKm <= 150)
+          .sort((a, b) => (a.distanceKm ?? Number.MAX_SAFE_INTEGER) - (b.distanceKm ?? Number.MAX_SAFE_INTEGER))
+      }
+      results = results.slice(0, 6)
 
       setSuggestions(results)
       setShowSuggestions(results.length > 0)
@@ -134,8 +161,15 @@ export default function GymSettingsSection({ userId, supabase }: GymSettingsSect
     if (debounceRef.current) clearTimeout(debounceRef.current)
     debounceRef.current = setTimeout(() => {
       searchGyms(value)
-    }, 400)
+    }, 600) // respeita a política do Nominatim (~1 req/s)
   }, [searchGyms])
+
+  // Abre o formulário de adicionar E já pega o GPS, pra a busca por nome poder
+  // enviesar pela sua localização (senão a 1ª busca sai sem posição = global).
+  const handleOpenAddGym = useCallback(() => {
+    setAddingGym(true)
+    void getCurrentPosition().catch(() => { })
+  }, [getCurrentPosition])
 
   // Select a suggestion
   const selectSuggestion = useCallback((suggestion: GymSuggestion) => {
@@ -291,7 +325,7 @@ export default function GymSettingsSection({ userId, supabase }: GymSettingsSect
           <div className="flex items-center justify-between">
             <p className="text-sm font-bold text-white/70">Minhas Academias</p>
             <button
-              onClick={() => setAddingGym(true)}
+              onClick={handleOpenAddGym}
               className="rounded-lg px-3 py-1 text-xs font-medium transition-colors"
               style={{ background: 'rgba(245,158,11,0.15)', color: '#f59e0b' }}
             >
@@ -394,7 +428,14 @@ export default function GymSettingsSection({ userId, supabase }: GymSettingsSect
                         onMouseDown={(e) => { e.preventDefault(); selectSuggestion(s) }}
                         className="w-full text-left px-3 py-2.5 hover:bg-amber-500/10 transition-colors border-b border-white/5 last:border-0"
                       >
-                        <p className="text-sm font-medium text-white">{s.name}</p>
+                        <div className="flex items-center justify-between gap-2">
+                          <p className="text-sm font-medium text-white truncate">{s.name}</p>
+                          {typeof s.distanceKm === 'number' && (
+                            <span className="text-[11px] font-bold text-amber-400 whitespace-nowrap">
+                              {s.distanceKm < 1 ? `${Math.round(s.distanceKm * 1000)} m` : `${s.distanceKm.toFixed(1)} km`}
+                            </span>
+                          )}
+                        </div>
                         <p className="text-xs text-white/30 truncate">{s.display}</p>
                       </button>
                     ))}
