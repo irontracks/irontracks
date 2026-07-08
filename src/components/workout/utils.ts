@@ -262,6 +262,25 @@ export const formatElapsed = (sec: unknown): string => {
   return `${m}:${r < 10 ? '0' : ''}${r}`;
 };
 
+/**
+ * Gap (ms) a tratar como PAUSA quando a sessão é restaurada após o app ficar
+ * morto/suspenso. Retorna o intervalo entre a última atividade persistida
+ * (`lastActiveAtMs`) e agora SE for maior que `longGapMs`; senão 0 (persistência
+ * normal / sessão nova). Evita que o cronômetro infle o tempo ao recuperar
+ * (bug do "treino de 4h" no histórico).
+ */
+export const computeRecoveryPauseMs = (
+  lastActiveAtMs: number,
+  startedAtMs: number,
+  nowMs: number,
+  longGapMs: number,
+): number => {
+  if (!Number.isFinite(lastActiveAtMs) || lastActiveAtMs <= 0) return 0;
+  if (!Number.isFinite(startedAtMs) || startedAtMs <= 0) return 0;
+  const gap = nowMs - lastActiveAtMs;
+  return Number.isFinite(gap) && gap > longGapMs ? gap : 0;
+};
+
 export const estimate1Rm = (weight: unknown, reps: unknown): number | null => {
   const w = Number(weight);
   const r = Number(reps);
