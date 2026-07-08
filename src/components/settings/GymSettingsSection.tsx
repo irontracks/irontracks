@@ -319,23 +319,26 @@ export default function GymSettingsSection({ userId, supabase }: GymSettingsSect
                 {!gym.is_primary && (
                   <button
                     onClick={() => setPrimary(gym.id)}
-                    className="rounded-lg px-2 py-1 text-xs text-white/40 hover:text-amber-400 transition-colors"
+                    className="rounded-lg min-h-[44px] min-w-[44px] flex items-center justify-center text-sm text-white/40 hover:text-amber-400 transition-colors"
                     title="Definir como principal"
+                    aria-label={`Definir ${gym.name} como academia principal`}
                   >
                     ⭐
                   </button>
                 )}
                 <button
                   onClick={() => setQrGym({ id: gym.id, name: gym.name })}
-                  className="rounded-lg px-2 py-1 text-xs text-white/40 hover:text-yellow-400 transition-colors"
+                  className="rounded-lg min-h-[44px] min-w-[44px] flex items-center justify-center text-sm text-white/40 hover:text-yellow-400 transition-colors"
                   title="QR Code de check-in"
+                  aria-label={`QR Code de check-in de ${gym.name}`}
                 >
                   📲
                 </button>
                 <button
                   onClick={() => deleteGym(gym.id)}
-                  className="rounded-lg px-2 py-1 text-xs text-white/40 hover:text-red-400 transition-colors"
+                  className="rounded-lg min-h-[44px] min-w-[44px] flex items-center justify-center text-sm text-white/40 hover:text-red-400 transition-colors"
                   title="Remover"
+                  aria-label={`Remover ${gym.name}`}
                 >
                   🗑
                 </button>

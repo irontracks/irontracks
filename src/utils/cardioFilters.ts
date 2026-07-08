@@ -72,11 +72,15 @@ export function decideCardioFilter(
   }
 
   const segTime = (incoming.timestamp - lastPoint.timestamp) / 1000
-  if (segTime > 0) {
-    const segSpeed = speedKmh(drift, segTime)
-    if (segSpeed > config.maxRealisticSpeedKmh) {
-      return { type: 'reject', reason: 'speed-spike' }
-    }
+  if (segTime <= 0) {
+    // Timestamps iguais ou relógio do device regredindo: não dá pra validar a
+    // velocidade e o ponto já passou do limiar de movimento (drift ≥ mínimo),
+    // então é um salto suspeito — rejeita em vez de aceitar cego.
+    return { type: 'reject', reason: 'speed-spike' }
+  }
+  const segSpeed = speedKmh(drift, segTime)
+  if (segSpeed > config.maxRealisticSpeedKmh) {
+    return { type: 'reject', reason: 'speed-spike' }
   }
 
   return { type: 'accept' }

@@ -10,6 +10,7 @@ import {
 } from '@/utils/report/formatters'
 import { setTopWeightReps, setVolume, isWorkingSet } from '@/utils/report/setVolume'
 import { estimateSessionKcalBreakdown } from '@/utils/calories/sessionKcal'
+import { clampSessionKcal } from '@/utils/calories/cardioKcal'
 import { distributeKcalByExercise, distributeKcalWithFixed } from '@/utils/calories/distributeKcal'
 
 
@@ -100,8 +101,8 @@ export function buildReportData(
   const kcalOverrideValue = (() => {
     const ov = Number(kcalOverride)
     if (Number.isFinite(ov) && ov > 0) return Math.round(ov)
-    const bikeKcal = Number(outdoorBike?.caloriesKcal)
-    if (Number.isFinite(bikeKcal) && bikeKcal > 0) return Math.round(bikeKcal)
+    const bikeKcal = clampSessionKcal(outdoorBike?.caloriesKcal)
+    if (bikeKcal > 0) return bikeKcal
     return null
   })()
   const usingModel = kcalOverrideValue === null

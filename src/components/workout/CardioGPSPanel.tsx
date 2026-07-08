@@ -93,7 +93,7 @@ function CompletionScreen({
   const handleSave = useCallback(async () => {
     setSaving(true)
     try {
-      await fetch(`/api/gps/cardio/${trackId}`, {
+      const resp = await fetch(`/api/gps/cardio/${trackId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -101,10 +101,12 @@ function CompletionScreen({
           perceived_effort: effort,
         }),
       })
-      setSaved(true)
+      // Só marca como salvo se REALMENTE salvou — antes marcava "✓" mesmo em
+      // falha (o catch setava saved=true). A rota em si já foi salva no stop();
+      // aqui é só notas/esforço, então uma falha não bloqueia o fechar.
+      if (resp.ok) setSaved(true)
     } catch {
-      // non-critical
-      setSaved(true)
+      // falha de rede — não marca como salvo; o usuário pode tentar de novo.
     } finally {
       setSaving(false)
     }
@@ -323,7 +325,12 @@ export default function CardioGPSPanel({
 
   const handleStop = useCallback(async () => {
     const result = stop()
-    if (!result) return
+    if (!result) {
+      // Sem nenhum ponto de GPS válido (indoor, permissão negada ou sinal fraco
+      // o tempo todo). Antes a sessão sumia sem aviso — agora avisa.
+      setSaveError('Nenhum ponto de GPS foi registrado — verifique o sinal (uso interno/indoor ou GPS fraco). A sessão não foi salva.')
+      return
+    }
 
     setSaving(true)
     setSaveError(null)
@@ -464,6 +471,17 @@ export default function CardioGPSPanel({
           <span className="text-xs text-white/80">{saveError}</span>
         </div>
       )}
+      {isTracking && (
+        <div
+          className="mb-3 flex items-start gap-2 rounded-xl p-2.5 flex-shrink-0"
+          style={{ background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.25)' }}
+        >
+          <Satellite size={14} className="mt-0.5 flex-shrink-0 text-blue-300" />
+          <span className="text-[11px] text-white/70">
+            Mantenha o app aberto durante a atividade — o GPS pausa em segundo plano (tela bloqueada ou outro app).
+          </span>
+        </div>
+      )}
     </>
   )
 
@@ -530,7 +548,8 @@ export default function CardioGPSPanel({
         <button
           onClick={handleStart}
           disabled={startDisabled}
-          className="flex-1 rounded-xl py-3 text-sm font-bold text-black transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+          aria-label={startDisabled ? 'GPS indisponível' : 'Iniciar sessão de cardio'}
+          className="flex-1 min-h-[44px] rounded-xl py-3 text-sm font-bold text-black transition-all active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
           style={{
             background: startDisabled
               ? 'rgba(107,114,128,0.5)'
@@ -547,7 +566,8 @@ export default function CardioGPSPanel({
         <>
           <button
             onClick={isPaused ? handleResume : pause}
-            className="flex-1 rounded-xl py-3 text-sm font-bold text-black transition-all active:scale-95"
+            aria-label={isPaused ? 'Retomar sessão' : 'Pausar sessão'}
+            className="flex-1 min-h-[44px] rounded-xl py-3 text-sm font-bold text-black transition-all active:scale-95"
             style={{
               background: isPaused
                 ? 'linear-gradient(135deg, #22c55e, #16a34a)'
@@ -559,7 +579,8 @@ export default function CardioGPSPanel({
           <button
             onClick={handleStop}
             disabled={saving}
-            className="rounded-xl border px-5 py-3 text-sm font-bold text-red-400 transition-all active:scale-95 disabled:opacity-50"
+            aria-label="Parar e salvar sessão"
+            className="min-h-[44px] rounded-xl border px-5 py-3 text-sm font-bold text-red-400 transition-all active:scale-95 disabled:opacity-50"
             style={{ borderColor: 'rgba(239,68,68,0.3)' }}
           >
             {saving ? '...' : '⏹ Parar'}
@@ -674,7 +695,9 @@ export default function CardioGPSPanel({
       <button
         type="button"
         onClick={() => setIsOpen((v) => !v)}
-        className="w-full flex items-center justify-between px-4 py-3 text-left"
+        aria-expanded={isOpen}
+        aria-label={isOpen ? 'Recolher painel de cardio' : 'Expandir painel de cardio'}
+        className="w-full min-h-[44px] flex items-center justify-between px-4 py-3 text-left"
       >
         <div className="flex items-center gap-2">
           <span className="text-base">🏃</span>
