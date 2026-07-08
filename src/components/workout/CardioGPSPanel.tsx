@@ -539,6 +539,10 @@ export default function CardioGPSPanel({
           </button>
         ))}
       </div>
+      <p className="mt-2 flex items-start gap-1.5 text-[10px] leading-snug text-white/40">
+        <MapPin size={11} className="mt-0.5 flex-shrink-0" />
+        <span>Rastreamento por GPS (atividades ao ar livre). Para esteira, elíptico ou outro cardio indoor, use o cardio do treino com Tempo e Intensidade — o GPS não registra distância parado.</span>
+      </p>
     </div>
   ) : null
 
