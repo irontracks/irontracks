@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
 import { respondDbError } from '@/utils/api/dbError'
+import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 
 export const dynamic = 'force-dynamic'
 
@@ -31,6 +32,12 @@ const saveTrackSchema = z.object({
 export async function POST(req: Request) {
   const auth = await requireUser()
   if (!auth.ok) return auth.response
+
+  // Rate limit — como as rotas irmãs de GPS. Cada save pode ter até 10k pontos
+  // (JSONB); sem teto seria abuso de storage/DB.
+  const ip = getRequestIp(req)
+  const rl = await checkRateLimitAsync(`gps:cardio:save:${auth.user.id}:${ip}`, 20, 60_000)
+  if (!rl.allowed) return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 })
 
   const body = await req.json().catch(() => null)
   const parsed = saveTrackSchema.safeParse(body)

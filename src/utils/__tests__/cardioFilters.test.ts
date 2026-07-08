@@ -86,13 +86,18 @@ describe('decideCardioFilter', () => {
       expect(decideCardioFilter(ORIGIN, fix, CONFIG).type).toBe('accept')
     })
 
-    it('does not apply speed check when timestamp is identical (division by zero)', () => {
-      // Some devices re-emit the same fix; treat the second as standing-still
-      // rather than an infinite-speed spike.
+    it('rejects a big jump with identical timestamp (unverifiable \u2014 clock stuck/regressed)', () => {
+      // 10m de movimento em 0s: passou do limiar de movimento (5m) mas segTime<=0
+      // impede validar a velocidade \u2192 \u00e9 um salto suspeito, rejeita (antes aceitava
+      // cego, e o deslocamento entrava na dist\u00e2ncia).
       const fix = { ...fixMetersNorth(10, { accuracy: 8 }), timestamp: ORIGIN.timestamp }
-      // 10m of movement in 0s \u2014 movement threshold accepts, but segTime<=0
-      // means we skip speed check entirely. Expect accept.
-      expect(decideCardioFilter(ORIGIN, fix, CONFIG).type).toBe('accept')
+      expect(decideCardioFilter(ORIGIN, fix, CONFIG)).toEqual({ type: 'reject', reason: 'speed-spike' })
+    })
+
+    it('still treats a tiny same-timestamp move as standing-still', () => {
+      // Movimento < limiar continua sendo drift parado (checado ANTES do segTime).
+      const fix = { ...fixMetersNorth(2, { accuracy: 8 }), timestamp: ORIGIN.timestamp }
+      expect(decideCardioFilter(ORIGIN, fix, CONFIG)).toEqual({ type: 'reject', reason: 'standing-still' })
     })
   })
 

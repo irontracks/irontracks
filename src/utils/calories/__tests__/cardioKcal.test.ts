@@ -1,6 +1,22 @@
 import { describe, it, expect } from 'vitest'
-import { estimateCardioKcal, isCardioExercise, metForCardio } from '../cardioKcal'
+import { estimateCardioKcal, isCardioExercise, metForCardio, clampSessionKcal, MAX_SESSION_KCAL } from '../cardioKcal'
 import { estimateSessionKcal, estimateSessionKcalBreakdown } from '../sessionKcal'
+
+describe('clampSessionKcal', () => {
+  it('mantém valores válidos (arredondando)', () => {
+    expect(clampSessionKcal(561.4)).toBe(561)
+  })
+  it('capa no máximo de sanidade (anti-forja do bike outdoor)', () => {
+    expect(clampSessionKcal(999_999)).toBe(MAX_SESSION_KCAL)
+  })
+  it('retorna 0 pra inválidos / não-positivos', () => {
+    expect(clampSessionKcal(0)).toBe(0)
+    expect(clampSessionKcal(-10)).toBe(0)
+    expect(clampSessionKcal(NaN)).toBe(0)
+    expect(clampSessionKcal('abc')).toBe(0)
+    expect(clampSessionKcal(null)).toBe(0)
+  })
+})
 
 describe('isCardioExercise', () => {
   it('detecta por type, method e nome de modalidade', () => {

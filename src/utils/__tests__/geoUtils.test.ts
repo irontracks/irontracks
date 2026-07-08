@@ -30,6 +30,13 @@ describe('geoUtils', () => {
       expect(haversineDistance(pointA, pointA)).toBe(0)
     })
 
+    it('returns a finite value for near-antipodal points (asin clamp, no NaN)', () => {
+      const dist = haversineDistance({ latitude: 0, longitude: 0 }, { latitude: 0, longitude: 180 })
+      expect(Number.isFinite(dist)).toBe(true)
+      // ~meia circunferência da Terra
+      expect(dist).toBeGreaterThan(19_000_000)
+    })
+
     it('calculates short distances (~100m)', () => {
       const dist = haversineDistance(pointA, pointB)
       expect(dist).toBeGreaterThan(90)

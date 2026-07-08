@@ -20,6 +20,8 @@ import {
   getBodyweightFraction,
 } from '@/utils/calories/metEstimate'
 import { checkRateLimitAsync } from '@/utils/rateLimit'
+import { clampSessionKcal } from '@/utils/calories/cardioKcal'
+import { logError } from '@/lib/logger'
 
 const ZodBodySchema = z
   .object({
@@ -124,9 +126,9 @@ export async function POST(request: Request) {
     // Bike activity: use recorded kcal directly
     const outdoorBike = session?.outdoorBike && typeof session.outdoorBike === 'object'
       ? (session.outdoorBike as Record<string, unknown>) : null
-    const bikeKcal = Number(outdoorBike?.caloriesKcal)
-    if (Number.isFinite(bikeKcal) && bikeKcal > 0) {
-      return NextResponse.json({ ok: true, kcal: Math.round(bikeKcal), source: 'bike' })
+    const bikeKcal = clampSessionKcal(outdoorBike?.caloriesKcal)
+    if (bikeKcal > 0) {
+      return NextResponse.json({ ok: true, kcal: bikeKcal, source: 'bike' })
     }
 
     // Resolve target user (for trainer sessions)
@@ -246,7 +248,8 @@ export async function POST(request: Request) {
       weightSource,
     })
   } catch (e: unknown) {
-    const msg = (e as Record<string, unknown>)?.message
-    return NextResponse.json({ ok: false, error: typeof msg === 'string' ? msg : String(e) }, { status: 500 })
+    // Não vaza mensagem interna pro cliente — loga (Sentry) e responde genérico.
+    logError('api:calories:estimate', e)
+    return NextResponse.json({ ok: false, error: 'internal_error' }, { status: 500 })
   }
 }

@@ -19,6 +19,7 @@ import { normalizeExerciseKey, calculateTotalVolume } from '@/utils/report/forma
 import { isSetCompleted } from '@/utils/report/setCompletion'
 import { setBestE1rm, isWorkingSet } from '@/utils/report/setVolume'
 import { estimateCaloriesMet, getBodyweightFraction, DEFAULT_BODY_WEIGHT_KG } from '@/utils/calories/metEstimate'
+import { clampSessionKcal } from '@/utils/calories/cardioKcal'
 import { useCheckins } from './useCheckins'
 import { usePreviousSessionData } from './usePreviousSessionData'
 import { useMuscleTrends } from './useMuscleTrends'
@@ -410,8 +411,8 @@ export const useReportData = ({ session, previousSession, user, settings }: UseR
   // ── Calories: deterministic useMemo ────────────────────────────────────
   // Uses MET V9 model with: density, volume, body weight, sex, RPE, cadence, EPOC.
   const calories = useMemo(() => {
-    const bikeKcal = Number(outdoorBike?.caloriesKcal)
-    if (Number.isFinite(bikeKcal) && bikeKcal > 0) return Math.round(bikeKcal)
+    const bikeKcal = clampSessionKcal(outdoorBike?.caloriesKcal)
+    if (bikeKcal > 0) return bikeKcal
 
     // Prefer explicit exec/rest seconds from session over total duration
     const execSeconds = Number(safeSession?.executionTotalSeconds ?? safeSession?.execution_total_seconds ?? 0) || 0
