@@ -7,7 +7,6 @@ import { isIosNative } from '@/utils/platform'
 import { logError } from '@/lib/logger'
 import { apiAuth } from '@/lib/api'
 import { writeSessionBackup, readSessionBackup, clearSessionBackup } from '@/utils/auth/sessionBackup'
-import { decodeAppleEmailFromToken } from '@/utils/auth/appleToken'
 import { sha256Hex } from '@/utils/auth/appleNonce'
 
 // ─── Capacitor optional imports ───────────────────────────────────────────────
@@ -227,16 +226,16 @@ export function useLoginScreen() {
                 setIsLoading(true)
                 const token = result?.response?.identityToken
                 if (!token) throw new Error('Falha ao obter token da Apple.')
-                // Apple só manda email no objeto da 1ª autorização; em re-login vem vazio.
-                // Caímos para o claim "email" do próprio JWT, que está sempre presente —
-                // assim o pré-cadastro/whitelist abaixo funciona em TODA autorização.
-                const email = String(result?.response?.email || '').trim() || decodeAppleEmailFromToken(token)
                 const givenName = String(result?.response?.givenName || '').trim()
                 const familyName = String(result?.response?.familyName || '').trim()
                 const fullName = `${givenName} ${familyName}`.trim()
-                if (email) {
-                    try { await apiAuth.appleSignInPreflight(email, fullName) } catch { }
-                }
+                // Habilita o Apple ID (mesmo NOVO) a passar pelo trigger de whitelist:
+                // cria uma SOLICITAÇÃO de acesso pendente a partir do próprio token
+                // (autorizado pelo token, sem sessão). Sem isto, um Apple ID novo
+                // falhava no signInWithIdToken abaixo → "sem conta" (rejeição Apple
+                // 2.1a). O acesso segue gated: pendente → /wait-approval (aprovação do
+                // admin), e o Supabase valida a assinatura do token no login.
+                try { await apiAuth.appleRequestAccess(token, fullName) } catch { /* fallback: o signInWithIdToken dá a mensagem final */ }
                 const supabase = createClient()
                 // Nonce CRU pro Supabase — ele hasheia (SHA256) e compara com o claim do
                 // JWT (= SHA256(rawNonce) que a Apple gravou). Vincula o token a ESTA
@@ -244,14 +243,6 @@ export function useLoginScreen() {
                 const { data, error } = await supabase.auth.signInWithIdToken({ provider: 'apple', token, nonce: rawNonce })
                 if (error) throw error
                 const userId = data?.user?.id
-                const userEmail = data?.user?.email?.trim().toLowerCase() || email
-                if (userId) {
-                    const { data: profile } = await supabase.from('profiles').select('id').eq('id', userId).maybeSingle()
-                    if (!profile?.id) {
-                        const checkRes = await apiAuth.appleSignInPreflight(userEmail, '', true).catch(() => ({ ok: false, existed: false }))
-                        if (!checkRes?.existed) { await supabase.auth.signOut(); setShowNoAccountModal(true); setIsLoading(false); return }
-                    }
-                }
                 const session = data?.session
                 if (session?.access_token && session?.refresh_token) {
                     await apiAuth.persistSession(session.access_token, session.refresh_token)
@@ -259,12 +250,20 @@ export function useLoginScreen() {
                     writeSessionBackup(session.access_token, session.refresh_token)
                 }
                 try { localStorage.setItem('it.logged_in', '1') } catch { }
+                // Sem perfil = usuário NOVO/pendente (acabou de solicitar acesso) →
+                // tela de espera, igual ao cadastro por e-mail. Com perfil = aprovado
+                // → dashboard.
+                let hasProfile = false
+                if (userId) {
+                    const { data: profile } = await supabase.from('profiles').select('id').eq('id', userId).maybeSingle()
+                    hasProfile = !!profile?.id
+                }
                 // CRITICAL: Use full page reload instead of client-side navigation.
                 // router.replace causes a soft-nav where the SSR request may not
                 // carry the HTTP-only cookie just set by persistSession, especially
                 // on WKWebView (Capacitor/iPad). This causes the SSR to redirect
                 // back to login → infinite loop → black screen.
-                window.location.replace('/dashboard')
+                window.location.replace(hasProfile ? '/dashboard' : '/wait-approval')
                 return
             }
             setIsLoading(true)
