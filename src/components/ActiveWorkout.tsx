@@ -43,14 +43,6 @@ export default function ActiveWorkout(props: ActiveWorkoutProps & { controlledBy
     exercises: exercises as unknown as ReadonlyArray<Record<string, unknown>>,
     logs: (session?.logs ?? {}) as Record<string, unknown>,
     currentExerciseIdx: controller.currentExerciseIdx ?? 0,
-    // While a rest countdown is active, end the workout Live Activity so the
-    // rest LA (started by RestTimerOverlay) owns the Dynamic Island slot.
-    // `session.timerTargetTime` is set when rest starts and cleared (null/0)
-    // when rest finishes or is dismissed — truthy = rest is on. We avoid
-    // comparing against Date.now() here because that's an impure call during
-    // render (react-hooks/purity); the cleared-on-dismiss flow covers the
-    // natural expiration case within ~500 ms.
-    restActive: Boolean((session as Record<string, unknown> | null)?.timerTargetTime),
   });
 
   // Exit animation — intercept back/finish callbacks to play slide-down before unmounting
