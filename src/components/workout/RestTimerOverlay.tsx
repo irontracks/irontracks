@@ -454,7 +454,16 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
         if (!notifyIdRef.current) return;
 
         const id = notifyIdRef.current;
-        cancelRestNotification(id);
+        // ⚠️ SÓ cancela a notificação local se o app estiver em FOREGROUND.
+        // Quando um treino mantém o processo vivo em background (UIBackgroundModes
+        // inclui `location` — sessão de GPS do treino), este efeito dispara com a
+        // TELA BLOQUEADA no instante em que o timer zera. Cancelar aqui mata a
+        // ÚNICA notificação que acorda a tela / toca o alarme no bloqueado (o
+        // playAlarmSound nativo é só pra foreground). Bloqueado → deixa disparar;
+        // ao voltar pro foreground o onVisible→stopAlarm(true) limpa o resíduo.
+        if (typeof document === 'undefined' || document.visibilityState === 'visible') {
+            cancelRestNotification(id);
+        }
         // Mark as finished — the widget handles count-up natively via timerInterval
         updateRestLiveActivity(id, true, 0, totalSecondsRef.current);
     }, [isFinished]);
