@@ -5,8 +5,8 @@
 -- APNs even when the app is backgrounded or killed.
 --
 -- Token rotation: Apple rotates these periodically over the activity's lifetime,
--- so we upsert on (user_id, kind, activity_id). Stale tokens are pruned by a
--- daily job (TODO: see edge function clean_live_activity_tokens).
+-- so we upsert on (user_id, kind, activity_id). Stale tokens are pruned by the
+-- daily Vercel cron at /api/cron/clean-live-activity-tokens (rows older than 24h).
 
 create table if not exists public.live_activity_push_tokens (
   user_id      uuid        not null references auth.users(id) on delete cascade,
