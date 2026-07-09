@@ -281,7 +281,10 @@ const hasDemo = Boolean(DEMO_EMAIL && DEMO_PASSWORD)
 const demoBlock = hasDemo
     ? `\n\nGUIDELINE 2.1 — Demo account (expired subscription):\nEmail: ${DEMO_EMAIL}\nPassword: ${DEMO_PASSWORD}\nThis account has an expired subscription so you can review the entire purchase flow.`
     : ''
-const REVIEW_NOTES = `GUIDELINE 2.1(a) — Sign in with Apple:
+const REVIEW_NOTES = `ACCOUNT ACCESS FOR REVIEW:
+During your last review you created your own account with Sign in with Apple ("John Apple", ...@privaterelay.appleid.com). That account has already been accepted/approved by a trainer inside the app, so it now has FULL access to the whole experience — student connected to a trainer, workout plans, active workout, reports and the subscription screen. Please sign in with that same Apple ID to review the full app. If you prefer, you can create a fresh account: Sign in with Apple works for both first-time and returning users.
+
+GUIDELINE 2.1(a) — Sign in with Apple:
 Sign in with Apple now works for both first-time and returning users. A prior account-provisioning bug that could show an error on a repeat authorization has been fixed. The app loads its web layer from our servers, so the fix is already live for this build — no new binary is required.${demoBlock}
 
 GUIDELINE 3.1.2(c) — Auto-renewable subscriptions:
