@@ -33,11 +33,6 @@ interface UseWorkoutLiveActivityArgs {
   logs: Record<string, unknown>
   /** Index of the exercise the user is currently focused on. */
   currentExerciseIdx: number
-  /** True while a rest countdown is active. While rest is on, the workout LA
-   *  is ended so the rest LA (started independently by RestTimerOverlay) is
-   *  the only Live Activity in the Dynamic Island. When rest ends, the
-   *  workout LA restarts automatically with the same `workoutStartMs`. */
-  restActive?: boolean
 }
 
 const isObj = (v: unknown): v is Record<string, unknown> =>
@@ -70,7 +65,6 @@ export function useWorkoutLiveActivity({
   exercises,
   logs,
   currentExerciseIdx,
-  restActive = false,
 }: UseWorkoutLiveActivityArgs): void {
   // ── Compute the current snapshot ──────────────────────────────────────────
   const snapshot = useMemo(() => {
@@ -120,31 +114,27 @@ export function useWorkoutLiveActivity({
   const lastUpdateMsRef = useRef(0)
   const pendingUpdateTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
-  // Start exactly once when we have a valid start time. The hook callsite
-  // remounts when entering / leaving ActiveWorkout, so this is the right
-  // scope. The `restActive` dep lets us pause/resume the workout LA so the
-  // rest countdown (started separately by RestTimerOverlay) is the only
-  // Live Activity shown in the Dynamic Island during rest — otherwise iOS
-  // picks one and it's usually the workout total, which the user perceived
-  // as "the rest timer isn't there".
+  // Start exactly once when we have a valid start time and end on unmount.
+  // The hook callsite remounts when entering / leaving ActiveWorkout, so this
+  // is the right scope.
+  //
+  // Previously this effect also depended on `restActive` and tore the LA down
+  // (endWorkoutLiveActivity) every time a rest started, restarting it when
+  // rest ended — meant to hand the Dynamic Island slot to the rest LA. But
+  // ActivityKit has no "resume with the same id" — every restart calls
+  // Activity.request() again, which mints a brand new activity id and push
+  // token. With a rest per set, that meant a fresh activity_id + token row in
+  // `live_activity_push_tokens` every single rest (confirmed in production:
+  // 26 distinct workout-kind activity_id in 24h for one user, 4 within a
+  // single 26-minute session) — DB debris plus a dismiss/re-present flicker
+  // on the lock screen every time rest ended. iOS already surfaces the most
+  // recently started/updated Live Activity in the Dynamic Island on its own
+  // (see the Swift side's own comment on WorkoutLiveActivityAttributes), so
+  // the workout LA no longer needs to get out of the way — it just keeps
+  // running underneath for the whole session.
   useEffect(() => {
     if (!isIosNative()) return
     if (!Number.isFinite(workoutStartMs) || workoutStartMs <= 0) return
-
-    // During rest: hand the Dynamic Island slot over to the rest LA.
-    if (restActive) {
-      if (startedRef.current) {
-        if (pendingUpdateTimerRef.current) {
-          clearTimeout(pendingUpdateTimerRef.current)
-          pendingUpdateTimerRef.current = null
-        }
-        void endWorkoutLiveActivity()
-        startedRef.current = false
-      }
-      return
-    }
-
-    // Rest finished (or never started): make sure the workout LA is up.
     if (startedRef.current) return
     startedRef.current = true
     void startWorkoutLiveActivity({
@@ -163,7 +153,7 @@ export function useWorkoutLiveActivity({
     // Snapshot/workoutName changes flow through the dedicated update effect
     // below — we only re-run this lifecycle for start/end transitions.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [workoutStartMs, restActive])
+  }, [workoutStartMs])
 
   // ── Throttled updates: max 1 per second ───────────────────────────────────
   useEffect(() => {
