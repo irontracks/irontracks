@@ -281,8 +281,11 @@ const hasDemo = Boolean(DEMO_EMAIL && DEMO_PASSWORD)
 const demoBlock = hasDemo
     ? `\n\nGUIDELINE 2.1 — Demo account (expired subscription):\nEmail: ${DEMO_EMAIL}\nPassword: ${DEMO_PASSWORD}\nThis account has an expired subscription so you can review the entire purchase flow.`
     : ''
-const REVIEW_NOTES = `ACCOUNT ACCESS FOR REVIEW:
-During your last review you created your own account with Sign in with Apple ("John Apple", ...@privaterelay.appleid.com). That account has already been accepted/approved by a trainer inside the app, so it now has FULL access to the whole experience — student connected to a trainer, workout plans, active workout, reports and the subscription screen. Please sign in with that same Apple ID to review the full app. If you prefer, you can create a fresh account: Sign in with Apple works for both first-time and returning users.
+const REVIEW_NOTES = `GUIDELINE 2.1 — Demo account (RESPONSE TO "unable to sign in"):
+We re-verified the demo account and it is active and working. We just signed in successfully with the exact credentials registered in App Store Connect below. The account is email-confirmed, approved, and now has full access to all features, including sample workout plans on the dashboard, the active-workout flow, reports and the subscription screen.
+Email: apple.review@irontracks.com.br
+Password: AppleReview2026!
+The credentials are case-sensitive and have no trailing space. If a previous attempt failed, it may have been a temporary rate limit after repeated tries — please wait a minute and try again. Alternatively, "Sign in with Apple" also works for both new and returning users, and any account created that way gets the same full access.
 
 GUIDELINE 2.1(a) — Sign in with Apple:
 Sign in with Apple now works for both first-time and returning users. A prior account-provisioning bug that could show an error on a repeat authorization has been fixed. The app loads its web layer from our servers, so the fix is already live for this build — no new binary is required.${demoBlock}
