@@ -12,7 +12,7 @@ import { Receiver } from '@upstash/qstash'
 import { env } from '@/utils/env'
 import { sendLiveActivityUpdate } from '@/lib/push/apnsLiveActivity'
 import { sendPushToAllPlatforms } from '@/lib/push/sender'
-import { logWarn } from '@/lib/logger'
+import { logError } from '@/lib/logger'
 
 export const dynamic = 'force-dynamic'
 
@@ -70,9 +70,21 @@ export async function POST(req: Request) {
     ])
 
     const okCount = (arr: unknown) => (Array.isArray(arr) ? arr.filter((r) => (r as { ok?: boolean })?.ok).length : 0)
-    const sent = okCount(pushResults) + okCount(laResults)
-    if (!sent) logWarn('rest:fire', `nenhum token atingido p/ user ${userId}`)
-    return NextResponse.json({ ok: true, sent, push: okCount(pushResults), liveActivity: okCount(laResults) })
+    const sentPush = okCount(pushResults)
+    const sentLA = okCount(laResults)
+    // ⚠️ Contadores SEPARADOS de propósito: antes, sentLA>0 (Live Activity ok)
+    // mascarava uma falha real do alerta (sentPush===0, o que de fato acorda a
+    // tela) — o warning nunca disparava porque a SOMA já era > 0. E logWarn é
+    // no-op em produção (src/lib/logger.ts), então mesmo isolado não chegava a
+    // lugar nenhum. Agora vira logError (sempre loga + Sentry) com o motivo
+    // real de cada token que falhou (ex: BadDeviceToken, Unregistered).
+    if (!sentPush) {
+      const reasons = Array.isArray(pushResults)
+        ? pushResults.map((r) => (r as { error?: string })?.error).filter(Boolean).join('; ')
+        : ''
+      logError('rest:fire', new Error(`Alerta de fim de descanso não entregue p/ user ${userId}: ${reasons || 'sem tokens/resultados'}`))
+    }
+    return NextResponse.json({ ok: true, sent: sentPush + sentLA, push: sentPush, liveActivity: sentLA })
   } catch (e: unknown) {
     return NextResponse.json({ ok: false, error: e instanceof Error ? e.message : String(e) }, { status: 500 })
   }
