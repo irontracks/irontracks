@@ -185,6 +185,12 @@ export async function notifyWorkoutFinished(
       followerIds,
       'notifyFriendWorkoutEvents',
     )
+    // Instrumentação temporária: investigando por que seguidores ativos (com a
+    // preferência ligada) não recebem workout_finish no feed social mesmo com
+    // followers existentes. Queremos ver isso no Sentry na próxima ocorrência real.
+    if (!workoutRecipients.length && followerIds.length > 0) {
+      logError('workoutNotifications:workout_finish', new Error(`followers existem (${followerIds.length}) mas nenhum recipient passou o filtro de preferência p/ sender ${userId}`), { followerIds })
+    }
     if (workoutRecipients.length) {
       const summary = buildWorkoutSummary(sessionObj)
       const baseLine = `${name} terminou: ${workoutTitle}`
