@@ -156,7 +156,7 @@ export default function NutritionWorkoutCorrelation() {
       {/* Insight */}
       {stats.workoutWithoutNutrition > 0 && (
         <p className="text-xs text-amber-400/70">
-          ⚡ Em {stats.workoutWithoutNutrition} dias você treinou sem registrar a nutrição — registrar ajuda a otimizar os resultados.
+          ⚡ Em {stats.workoutWithoutNutrition} {stats.workoutWithoutNutrition === 1 ? 'dia' : 'dias'} você treinou sem registrar a nutrição — registrar ajuda a otimizar os resultados.
         </p>
       )}
     </div>
