@@ -96,6 +96,7 @@ async function sendOneApnsPush(
                 'meal_reminder', 'missed_meal',
                 'mentioned_in_chat', 'mentioned_in_comment',
                 'morning_briefing', 'muscle_weekly_insights',
+                'rest_timer',
                 'story_comment', 'story_like', 'story_posted',
                 'team_chat', 'team_invite',
                 'trial_ending', 'vip_welcome',
