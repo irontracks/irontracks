@@ -11,6 +11,7 @@ import {
 import { parseJsonBody } from '@/utils/zod'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
+import { logError } from '@/lib/logger'
 
 export const dynamic = 'force-dynamic'
 
@@ -48,8 +49,20 @@ export async function POST(req: Request) {
     const name = String(me?.display_name || '').trim() || 'Seu amigo'
 
     const followerIds = await listFollowerIdsOf(userId)
-    const recipients = await filterRecipientsByPreference(followerIds, 'notifyFriendWorkoutEvents')
-    if (!recipients.length) return NextResponse.json({ ok: true, sent: 0 })
+    // Chave certa é 'notifyFriendWorkoutStart' (ver NOTIFICATION_TYPE_TO_PREFERENCE em
+    // notifyFollowers.ts) — 'notifyFriendWorkoutEvents' é a de workout_finish. Usar a
+    // errada aqui filtrava por uma preferência que não é a do tipo 'workout_start'.
+    const recipients = await filterRecipientsByPreference(followerIds, 'notifyFriendWorkoutStart')
+    if (!recipients.length) {
+      // Instrumentação temporária: investigando por que followers ativos (com a
+      // preferência ligada) não recebem este evento no feed social. Se followerIds
+      // já vier vazio ou a filtragem por preferência zerar uma lista não-vazia,
+      // queremos ver isso no Sentry na próxima ocorrência real.
+      if (followerIds.length > 0) {
+        logError('social:workout-start', new Error(`followers existem (${followerIds.length}) mas nenhum recipient passou o filtro de preferência p/ user ${userId}`), { followerIds })
+      }
+      return NextResponse.json({ ok: true, sent: 0 })
+    }
 
     const rows = recipients.map((rid) => ({
       user_id: rid,
