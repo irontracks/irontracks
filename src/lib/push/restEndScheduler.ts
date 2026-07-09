@@ -1,5 +1,6 @@
 import { Client } from '@upstash/qstash'
 import { env } from '@/utils/env'
+import { logError } from '@/lib/logger'
 
 /**
  * Agendamento (com atraso) do push de "fim de descanso" via QStash.
@@ -41,7 +42,12 @@ export async function scheduleRestEndPush(
   delaySeconds: number,
 ): Promise<string | null> {
   const c = client()
-  if (!c) return null
+  if (!c) {
+    // Sem isto, um QSTASH_TOKEN ausente desativa TODO o push agendado de fim
+    // de descanso 100% silenciosamente (logWarn é no-op em produção).
+    logError('rest-push', new Error('QSTASH_TOKEN ausente — push agendado de fim de descanso desativado'))
+    return null
+  }
   const delay = Math.max(1, Math.min(900, Math.round(delaySeconds)))
   try {
     const res = await c.publishJSON({
@@ -52,7 +58,8 @@ export async function scheduleRestEndPush(
     })
     const r = Array.isArray(res) ? res[0] : res
     return (r as { messageId?: string } | undefined)?.messageId ?? null
-  } catch {
+  } catch (e) {
+    logError('rest-push', e)
     return null
   }
 }
