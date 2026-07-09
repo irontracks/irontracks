@@ -273,10 +273,14 @@ export default function StudentDashboard(props: Props) {
     // dentro do dashboard) verticalmente em iPhone SE / iPad split-view. Mesmo
     // fix do PR #103 (avatar menu).
     <div className={density === 'compact' ? 'p-4 space-y-3 pb-24 overflow-x-clip' : 'p-4 space-y-4 pb-24 overflow-x-clip'}>
-      {props.profileIncomplete && <ProfileIncompleteBanner settings={props.settings as import('@/schemas/settings').UserSettings | null} onComplete={props.onOpenCompleteProfile} />}
+      {/* !nutritionActive: mesmo motivo do IronTracksAppClientImpl (banners acima
+          do DashboardTabs empurram a barra pra baixo do offset fixo que o
+          NutritionOverlay assume, fazendo a barra "flutuar" por cima do
+          conteúdo de nutrição). */}
+      {props.profileIncomplete && !props.nutritionActive && <ProfileIncompleteBanner settings={props.settings as import('@/schemas/settings').UserSettings | null} onComplete={props.onOpenCompleteProfile} />}
 
       <>
-          {props.view === 'dashboard' && showStoriesBar ? (
+          {props.view === 'dashboard' && showStoriesBar && !props.nutritionActive ? (
             <StoriesBar
               currentUserId={props.currentUserId}
               onMyStoryStateChange={props.onMyStoryStateChange}

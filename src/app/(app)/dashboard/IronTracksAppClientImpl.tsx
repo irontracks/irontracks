@@ -994,9 +994,15 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                         >
                             {(view === 'dashboard' || view === 'assessments' || view === 'community' || view === 'vip') && (
                               <>
-                                {view === 'dashboard' && <WorkoutRecoveryBanner userId={String(user?.id || initialUserObj?.id || '')} />}
-                                {view === 'dashboard' && <RestDayPromptCard userId={String(user?.id || initialUserObj?.id || '')} />}
-                                {view === 'dashboard' && appleHealthEnabled && <HealthWidget data={healthData} />}
+                                {/* !nutritionOpen: o overlay de Nutrição é fixed/full-screen por cima
+                                    do dashboard (view continua 'dashboard' por baixo dele — só
+                                    nutritionOpen muda). Sem essa checagem, estes banners seguem
+                                    renderizando ACIMA do DashboardTabs e empurram a barra pra baixo
+                                    do offset fixo que o NutritionOverlay assume, fazendo a barra
+                                    "flutuar" por cima do conteúdo de nutrição de forma incoerente. */}
+                                {view === 'dashboard' && !nutritionOpen && <WorkoutRecoveryBanner userId={String(user?.id || initialUserObj?.id || '')} />}
+                                {view === 'dashboard' && !nutritionOpen && <RestDayPromptCard userId={String(user?.id || initialUserObj?.id || '')} />}
+                                {view === 'dashboard' && !nutritionOpen && appleHealthEnabled && <HealthWidget data={healthData} />}
                                 <StudentDashboard
                                     workouts={Array.isArray(workouts) ? workouts : []}
                                     profileIncomplete={Boolean(profileIncomplete)}
