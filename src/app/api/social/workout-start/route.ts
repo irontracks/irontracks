@@ -76,7 +76,13 @@ export async function POST(req: Request) {
     }))
 
     const res = await insertNotifications(rows)
-    if (!res.ok) return NextResponse.json({ ok: false, error: res.error || 'failed' }, { status: 400 })
+    if (!res.ok) {
+      // O cliente chama esta rota fire-and-forget (fetch(...).catch(()=>{})) —
+      // sem isto, um erro real de insert nunca chegava a lugar nenhum, nem
+      // como resposta HTTP (que ninguém lê) nem em log.
+      logError('social:workout-start', new Error(res.error || 'insertNotifications falhou'), { userId, recipients: recipients.length })
+      return NextResponse.json({ ok: false, error: res.error || 'failed' }, { status: 400 })
+    }
 
     return NextResponse.json({ ok: true, sent: res.inserted })
   } catch (e: unknown) {
