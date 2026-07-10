@@ -195,7 +195,7 @@ export async function notifyWorkoutFinished(
       const summary = buildWorkoutSummary(sessionObj)
       const baseLine = `${name} terminou: ${workoutTitle}`
       const message = summary ? `${baseLine}\n${summary}` : `${baseLine}.`
-      await insertNotifications(
+      const res = await insertNotifications(
         workoutRecipients.map((rid) => ({
           user_id: rid,
           recipient_id: rid,
@@ -212,6 +212,12 @@ export async function notifyWorkoutFinished(
           },
         })),
       )
+      // insertNotifications() nunca lança em falha de insert — retorna {ok:false,
+      // error}. Nenhum caller deste arquivo checava isso, então um erro real do
+      // Postgres (payload grande demais, JSON inválido, etc.) morria em silêncio.
+      if (!res.ok) {
+        logError('workoutNotifications:workout_finish', new Error(res.error || 'insertNotifications falhou'), { userId, recipients: workoutRecipients.length })
+      }
     }
 
     const streakMilestones = new Set([3, 7, 14, 30, 60, 100])
@@ -239,7 +245,7 @@ export async function notifyWorkoutFinished(
         if (streak > 0 && streakMilestones.has(streak)) {
           const recipients = await filterRecipientsByPreference(followerIds, 'notifyFriendStreaks')
           if (recipients.length) {
-            await insertNotifications(
+            const res = await insertNotifications(
               recipients.map((rid) => ({
                 user_id: rid,
                 recipient_id: rid,
@@ -251,6 +257,7 @@ export async function notifyWorkoutFinished(
                 metadata: { streak, sender_id: userId },
               })),
             )
+            if (!res.ok) logError('workoutNotifications:streak.insert', new Error(res.error || 'insertNotifications falhou'))
           }
         }
       }
@@ -270,7 +277,7 @@ export async function notifyWorkoutFinished(
         if (total > 0 && goalMilestones.has(total)) {
           const recipients = await filterRecipientsByPreference(followerIds, 'notifyFriendGoals')
           if (recipients.length) {
-            await insertNotifications(
+            const res = await insertNotifications(
               recipients.map((rid) => ({
                 user_id: rid,
                 recipient_id: rid,
@@ -282,6 +289,7 @@ export async function notifyWorkoutFinished(
                 metadata: { total_workouts: total, sender_id: userId },
               })),
             )
+            if (!res.ok) logError('workoutNotifications:goal.insert', new Error(res.error || 'insertNotifications falhou'))
           }
         }
       }
@@ -361,7 +369,7 @@ export async function notifyWorkoutFinished(
           if (nearPrs.length) {
             nearPrs.sort((a, b) => a.gap_kg - b.gap_kg)
             const closest = nearPrs[0]
-            await insertNotifications([{
+            const resNearPr = await insertNotifications([{
               user_id: userId,
               recipient_id: userId,
               sender_id: userId,
@@ -371,6 +379,7 @@ export async function notifyWorkoutFinished(
               is_read: false,
               metadata: closest,
             }])
+            if (!resNearPr.ok) logError('workoutNotifications:pr_close.insert', new Error(resNearPr.error || 'insertNotifications falhou'))
           }
 
           prs.sort((a, b) => b.score - a.score)
@@ -379,7 +388,7 @@ export async function notifyWorkoutFinished(
             const recipients = await filterRecipientsByPreference(followerIds, 'notifyFriendPRs')
             if (recipients.length) {
               const summary = top.map((p) => `${p.exercise}: ${p.label} ${p.value}`).join(' • ')
-              await insertNotifications(
+              const resPr = await insertNotifications(
                 recipients.map((rid) => ({
                   user_id: rid,
                   recipient_id: rid,
@@ -391,6 +400,7 @@ export async function notifyWorkoutFinished(
                   metadata: { prs: top, workout_id: workoutId, sender_id: userId },
                 })),
               )
+              if (!resPr.ok) logError('workoutNotifications:friend_pr.insert', new Error(resPr.error || 'insertNotifications falhou'))
             }
           }
         }
@@ -443,7 +453,7 @@ export async function notifyWorkoutFinished(
             const recipients = await filterRecipientsByPreference(followerIds, 'notifyAchievements')
             if (recipients.length) {
               for (const badge of fresh) {
-                await insertNotifications(
+                const resAchievement = await insertNotifications(
                   recipients.map((rid) => ({
                     user_id: rid,
                     recipient_id: rid,
@@ -455,6 +465,7 @@ export async function notifyWorkoutFinished(
                     metadata: { badge_id: badge.id, badge_kind: badge.kind, sender_id: userId },
                   })),
                 )
+                if (!resAchievement.ok) logError('workoutNotifications:achievement.insert', new Error(resAchievement.error || 'insertNotifications falhou'))
               }
             }
           }
@@ -498,7 +509,7 @@ export async function notifyWorkoutFinished(
           if (total >= target) {
             const recipients = await filterRecipientsByPreference(followerIds, 'notifyFriendWeeklyGoal')
             if (recipients.length) {
-              await insertNotifications(
+              const res = await insertNotifications(
                 recipients.map((rid) => ({
                   user_id: rid,
                   recipient_id: rid,
@@ -510,6 +521,7 @@ export async function notifyWorkoutFinished(
                   metadata: { target, total_this_week: total, sender_id: userId },
                 })),
               )
+              if (!res.ok) logError('workoutNotifications:weekly_goal.insert', new Error(res.error || 'insertNotifications falhou'))
             }
           }
         }
@@ -537,7 +549,7 @@ export async function notifyWorkoutFinished(
             if (days >= 3) {
               const recipients = await filterRecipientsByPreference(followerIds, 'notifyFriendComeback')
               if (recipients.length) {
-                await insertNotifications(
+                const res = await insertNotifications(
                   recipients.map((rid) => ({
                     user_id: rid,
                     recipient_id: rid,
@@ -549,6 +561,7 @@ export async function notifyWorkoutFinished(
                     metadata: { days_away: days, sender_id: userId },
                   })),
                 )
+                if (!res.ok) logError('workoutNotifications:comeback.insert', new Error(res.error || 'insertNotifications falhou'))
               }
             }
           }
