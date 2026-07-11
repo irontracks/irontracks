@@ -926,7 +926,11 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                 {/* Side-effects nativos centralizados (push, presence, UTM, intent router, BG refresh) */}
                 <DashboardEffects userId={user?.id} onIntent={handleNativeIntent} />
                     <div className="w-full bg-neutral-900 min-h-screen relative flex flex-col overflow-hidden" suppressHydrationWarning>
-                        <IncomingInviteModal onStartSession={handleStartSession} />
+                        <IncomingInviteModal
+                            onStartSession={handleStartSession}
+                            savedWorkouts={workouts}
+                            onWorkoutSaved={() => { fetchWorkouts().catch(() => {}) }}
+                        />
                         <InviteAcceptedModal />
                         {/* GPS: Auto-detect gym toast */}
                         {view === 'dashboard' && <GymDetectToastWrapper userId={user?.id} onStartWorkout={() => setCreateWizardOpen(true)} />}
