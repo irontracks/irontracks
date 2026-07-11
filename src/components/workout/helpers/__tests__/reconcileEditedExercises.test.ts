@@ -88,6 +88,61 @@ describe('reconcileEditedExercises', () => {
     expect(reconcileEditedExercises(null, null, null).exercises).toEqual([])
     expect(reconcileEditedExercises([], [], {}).logs).toEqual({})
   })
+
+  // Regressão: reduzir o nº de séries pelo editor completo mid-sessão deixava os
+  // logs das séries removidas órfãos (o remap só reescrevia o prefixo do exercício,
+  // nunca o sufixo/índice da série). buildLogVolume (relatório React) somava esses
+  // órfãos → séries/volume inflados e persistidos em notes, divergindo do PDF.
+  describe('poda de logs de séries órfãs (redução de nº de séries)', () => {
+    it('reduzir de 4 pra 3 séries descarta o log da série removida (0-3)', () => {
+      const orig = tagExercisesForEdit([{ name: 'Supino', sets: 4 }])
+      const edited = [{ ...orig[0], sets: 3 }]
+      const logs = { '0-0': { done: true }, '0-1': { done: true }, '0-2': { done: true }, '0-3': { done: true, weight: 100 } }
+      const r = reconcileEditedExercises(orig, edited, logs)
+      expect(r.logs).toEqual({ '0-0': { done: true }, '0-1': { done: true }, '0-2': { done: true } })
+      expect(r.logs['0-3']).toBeUndefined()
+    })
+
+    it('aumentar o nº de séries não poda nada', () => {
+      const orig = tagExercisesForEdit([{ name: 'Supino', sets: 2 }])
+      const edited = [{ ...orig[0], sets: 4 }]
+      const logs = { '0-0': 'a', '0-1': 'b' }
+      expect(reconcileEditedExercises(orig, edited, logs).logs).toEqual({ '0-0': 'a', '0-1': 'b' })
+    })
+
+    it('usa setDetails.length quando maior que o header `sets` pra decidir a poda', () => {
+      const orig = tagExercisesForEdit([{ name: 'Supino', sets: 4 }])
+      const edited = [{ ...orig[0], sets: 1, setDetails: [{}, {}, {}] }] // contagem efetiva = 3
+      const logs = { '0-0': 'a', '0-1': 'b', '0-2': 'c', '0-3': 'd' }
+      expect(reconcileEditedExercises(orig, edited, logs).logs).toEqual({ '0-0': 'a', '0-1': 'b', '0-2': 'c' })
+    })
+
+    it('NÃO poda quando a contagem de séries é desconhecida (exercício sem sets/setDetails)', () => {
+      const orig = tagExercisesForEdit([{ name: 'X' }])
+      const edited = [{ ...orig[0] }]
+      const logs = { '0-0': 'a', '0-1': 'b' }
+      // sem info de range, preserva tudo (não inventa poda)
+      expect(reconcileEditedExercises(orig, edited, logs).logs).toEqual({ '0-0': 'a', '0-1': 'b' })
+    })
+
+    it('poda respeita o remap: série órfã de um exercício reordenado some no índice novo', () => {
+      const orig = tagExercisesForEdit([{ name: 'A', sets: 2 }, { name: 'B', sets: 3 }])
+      const edited = [{ ...orig[1], sets: 2 }, { ...orig[0], sets: 2 }] // troca ordem; B reduz 3→2
+      const logs = { '0-0': 'a0', '0-1': 'a1', '1-0': 'b0', '1-1': 'b1', '1-2': 'b2' }
+      const r = reconcileEditedExercises(orig, edited, logs)
+      // A (old0→new1) mantém 2; B (old1→new0) reduz pra 2 → b2 (índice 2) some
+      expect(r.logs).toEqual({ '1-0': 'a0', '1-1': 'a1', '0-0': 'b0', '0-1': 'b1' })
+      expect(r.logs['0-2']).toBeUndefined()
+    })
+
+    it('não poda sufixos não-numéricos (unilateral L_/R_) — preserva mesmo reduzindo', () => {
+      const orig = tagExercisesForEdit([{ name: 'Uni', sets: 1 }])
+      const edited = [{ ...orig[0], sets: 1 }]
+      const logs = { '0-0': 'x', '0-L_0': 'la', '0-R_0': 'ra' }
+      // sufixos não-numéricos ficam de fora da poda (não sabemos o índice de série)
+      expect(reconcileEditedExercises(orig, edited, logs).logs).toEqual({ '0-0': 'x', '0-L_0': 'la', '0-R_0': 'ra' })
+    })
+  })
 })
 
 describe('remapIndexSet', () => {

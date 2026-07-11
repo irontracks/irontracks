@@ -62,6 +62,17 @@ export function reconcileEditedExercises(
   const remap = new Map<number, number>()
   const usedKeys = new Set<string>()
 
+  // Contagem de séries de cada exercício editado (mesma fórmula do controller:
+  // header `sets` vs. tamanho de setDetails, o MAIOR). Usada pra podar logs de
+  // séries que deixaram de existir ao reduzir o nº de séries no editor. 0 = contagem
+  // desconhecida (exercício sem sets/setDetails) → não poda (não inventa range).
+  const setCountByNewIdx: number[] = edited.map((exRaw) => {
+    const ex: ExRecord = exRaw && typeof exRaw === 'object' ? (exRaw as ExRecord) : {}
+    const header = Math.max(0, Number.parseInt(String(ex.sets ?? '0'), 10) || 0)
+    const sd = Array.isArray(ex.setDetails) ? ex.setDetails : Array.isArray(ex.set_details) ? ex.set_details : []
+    return Math.max(header, sd.length)
+  })
+
   const cleaned: ExRecord[] = edited.map((exRaw, newIdx) => {
     const ex: ExRecord = exRaw && typeof exRaw === 'object' ? { ...exRaw } : {}
     const k = String(ex[EDIT_LOG_KEY] ?? '')
@@ -74,7 +85,9 @@ export function reconcileEditedExercises(
     return ex
   })
 
-  // Remapeia os logs: o prefixo antes do primeiro '-' é o índice do exercício.
+  // Remapeia os logs: o prefixo antes do primeiro '-' é o índice do exercício; o
+  // sufixo é a série. Além de reescrever o prefixo (índice antigo → novo), poda os
+  // logs cujo índice de série já não existe no novo nº de séries do exercício.
   const nextLogs: Record<string, unknown> = {}
   const logObj = logs && typeof logs === 'object' ? (logs as Record<string, unknown>) : {}
   for (const [key, val] of Object.entries(logObj)) {
@@ -83,7 +96,15 @@ export function reconcileEditedExercises(
     const exI = parseInt(key.slice(0, dash), 10)
     if (Number.isNaN(exI)) { nextLogs[key] = val; continue }
     if (!remap.has(exI)) continue // exercício removido → descarta os logs dele
-    nextLogs[`${remap.get(exI)}${key.slice(dash)}`] = val
+    const newExI = remap.get(exI) as number
+    // Poda séries órfãs: só quando o sufixo é um índice de série PURO (numérico) e a
+    // contagem nova é conhecida (>0). Sufixos não-numéricos (ex.: unilateral L_/R_)
+    // ficam de fora — não dá pra inferir o índice com segurança, melhor preservar.
+    const suffix = key.slice(dash + 1)
+    const setI = Number.parseInt(suffix, 10)
+    const setCount = setCountByNewIdx[newExI] ?? 0
+    if (String(setI) === suffix && setCount > 0 && setI >= setCount) continue
+    nextLogs[`${newExI}${key.slice(dash)}`] = val
   }
 
   return { exercises: cleaned, logs: nextLogs, remap }
