@@ -71,6 +71,17 @@ O deploy usa `husky` + `lint-staged` com **zero tolerância a warnings ESLint**.
 2. **ESLint (comando exato):** `node --import tsx ./node_modules/eslint/bin/eslint.js --config eslint.config.mjs <arquivos_editados> --max-warnings 0` — output vazio = limpo. Em worktree, ver Gotchas.
 3. **`npm run test:unit`** se tocou lógica de negócio; **`npm run test:smoke`** se tocou rotas ou APIs.
 
+## Padrão de auditoria (obrigatório fechar com testes)
+Toda auditoria de uma área NÃO está concluída sem verificar a cobertura de testes e **adicionar guards de regressão** — as brechas/bugs achados viram teste, senão voltam. Fluxo padrão:
+1. **Verificar/mapear os testes existentes** da área antes de mexer (o que já cobre, o que não cobre).
+2. **Confirmar cada achado por conta própria** antes de tratar como real (ex.: RLS via SQL no banco, não só leitura de código).
+3. **Corrigir via TDD** onde couber: escrever o teste que FALHA no código atual (prova o bug) → corrigir → verde.
+4. **Travar com teste** no padrão do repo, escolhido por tipo:
+   - **função pura** (import real) — matemática/lógica isolada;
+   - **mock de Supabase** encadeável (modelo `src/utils/__tests__/authRole.test.ts`) — resolução/metering/handlers;
+   - **source-guard** (lê o `.ts` como texto e assegura o padrão, modelo `src/utils/vip/__tests__/appSubscriptionExpiry.test.ts`) — invariantes de query/migration difíceis de exercitar.
+5. **Reportar a contagem antes/depois** de arquivos e casos de teste.
+
 ## Scripts de scan
 `npm run scan:all` roda todos (buttons/secrets/a11y/console/async). **Rodar `npm run scan:secrets` antes de qualquer commit que toque em `.env` ou configs.**
 
