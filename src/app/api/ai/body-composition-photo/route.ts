@@ -15,6 +15,7 @@ import { NextResponse } from 'next/server'
 import type { Part } from '@google/genai'
 import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
+import { canCoachStudent } from '@/utils/auth/studentAccess'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { parseJsonBody, parseJsonWithSchema } from '@/utils/zod'
@@ -119,7 +120,8 @@ export async function POST(req: Request) {
         if (aErr) return respondDbError('ai:body-composition-photo:load', aErr)
         if (!assessment) return NextResponse.json({ ok: false, error: 'not_found' }, { status: 404 })
         const a = assessment as { user_id: string; trainer_id: string | null }
-        if (userId !== a.user_id && userId !== a.trainer_id) {
+        // Gate por VÍNCULO REAL (canCoachStudent), não por a.trainer_id auto-declarável.
+        if (userId !== a.user_id && !(await canCoachStudent({ id: userId, email: auth.user.email }, a.user_id))) {
             return NextResponse.json({ ok: false, error: 'forbidden' }, { status: 403 })
         }
 
