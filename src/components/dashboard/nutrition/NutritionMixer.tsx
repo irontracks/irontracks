@@ -293,6 +293,11 @@ export default function NutritionMixer({
     catch { return new Date().toISOString().slice(0, 10) }
   }, [])
   const isToday = currentDateKey === todayDate
+  // Lançamento manual é permitido em qualquer dia passado (esqueceu de registrar
+  // no dia) — só datas futuras ficam de fora, já que não dá pra ter comido algo
+  // que ainda não aconteceu. DateNavigator já trava navegação pro futuro, isso
+  // aqui é só a segunda camada de defesa.
+  const isFutureDate = currentDateKey > todayDate
 
   // ── Panel toggles ────────────────────────────────────────────────────────
   const [activePanel, setActivePanel] = useState<'none' | 'scanner' | 'library' | 'water'>('none')
@@ -939,9 +944,11 @@ export default function NutritionMixer({
       )}
 
       {/* ══ MEAL INPUT ═══════════════════════════════════════════════════ */}
-      {isToday && (
+      {!isFutureDate && (
         <Card glow="bg-[linear-gradient(180deg,rgba(250,204,21,0.04)_0%,transparent_50%)]" className="p-4">
-          <div className="text-[10px] uppercase tracking-[0.2em] text-neutral-400 font-semibold">Adicionar refeição</div>
+          <div className="text-[10px] uppercase tracking-[0.2em] text-neutral-400 font-semibold">
+            Adicionar refeição{!isToday && ` — ${currentDateKey}`}
+          </div>
           <div className="mt-1 text-xs text-neutral-400">Ex.: 150g frango + arroz branco + salada</div>
           <input
             type="text"
