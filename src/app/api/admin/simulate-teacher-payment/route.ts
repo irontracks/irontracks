@@ -45,6 +45,14 @@ export async function POST(req: Request) {
     const auth = await requireRole(['admin'])
     if (!auth.ok) return auth.response
 
+    // Gate de ambiente: esta rota concede um entitlement de plano REAL sem pagamento.
+    // Em produção só roda com opt-in explícito (ALLOW_SIMULATE_TEACHER_PAYMENT=true) —
+    // sem isso, uma conta admin comprometida (ou uma chamada acidental) ativaria plano
+    // de professor de graça. Em dev/staging (NODE_ENV != production) segue liberado.
+    if (process.env.NODE_ENV === 'production' && process.env.ALLOW_SIMULATE_TEACHER_PAYMENT !== 'true') {
+      return NextResponse.json({ ok: false, error: 'disabled_in_production' }, { status: 403 })
+    }
+
     const parsedBody = await parseJsonBody(req, BodySchema)
     if (parsedBody.response) return parsedBody.response
     const { teacherUserId, planId } = parsedBody.data!
