@@ -92,11 +92,16 @@ export const getOfflineQueueSummary = async ({ userId }: { userId?: string } = {
     const all = await queueGetAll();
     const rawJobs = Array.isArray(all) ? (all as OfflineJob[]) : [];
 
-    // Auto-cleanup: remove failed jobs older than 7 days (global — higiene do device).
+    // Auto-cleanup: remove failed jobs > 7 dias — SÓ os que têm rede de segurança.
+    // finish_workout tem backup em workoutSafetyNet (recupera se apagado); jobs de
+    // NUTRIÇÃO não têm backup nenhum, então auto-deletar apagava lançamento de refeição
+    // silenciosamente (ex.: outage do servidor > backoff + usuário sem abrir o app 7d).
+    // Nutrição failed fica preservada pro usuário reenviar/descartar no OfflineSyncModal.
     const now = Date.now();
     const staleIds: string[] = []
     const survivors = rawJobs.filter((j) => {
-      if (String(j?.status || '') === 'failed' && j?.createdAt) {
+      const hasSafetyNet = String(j?.type || '') === 'finish_workout'
+      if (hasSafetyNet && String(j?.status || '') === 'failed' && j?.createdAt) {
         const age = now - new Date(j.createdAt).getTime()
         if (age > STALE_JOB_MS) { staleIds.push(String(j.id)); return false }
       }
@@ -118,6 +123,7 @@ export const getOfflineQueueSummary = async ({ userId }: { userId?: string } = {
     const pending = jobs.filter((j) => String(j?.status || 'pending') === 'pending').length;
     const failed = jobs.filter((j) => String(j?.status || '') === 'failed').length;
     const due = jobs.filter((j) => {
+      if (String(j?.status || '') === 'failed') return false; // 'failed' nunca é reprocessado → não é "due"
       const next = j?.nextAttemptAt
       return !next || Number(next) <= now
     }).length;
@@ -235,12 +241,6 @@ const runFlushOfflineQueue = async ({ max = 50, force = false }: { max?: number;
       const jobType = String(j.type || '')
       if (jobType === 'finish_workout') {
         await processFinishWorkout(j);
-      } else if (jobType === 'create_workout') {
-        await processCreateWorkout(j);
-      } else if (jobType === 'update_workout') {
-        await processUpdateWorkout(j);
-      } else if (jobType === 'delete_workout') {
-        await processDeleteWorkout(j);
       } else if (jobType === 'nutrition_log_local') {
         await processNutritionLogLocal(j);
       } else if (jobType === 'nutrition_log_ai') {
@@ -252,8 +252,16 @@ const runFlushOfflineQueue = async ({ max = 50, force = false }: { max?: number;
       } else if (jobType === 'nutrition_water') {
         await processNutritionWater(j);
       } else {
-        // Unknown job type — do NOT delete. Log and skip.
-        logWarn('offlineSync: unknown job type, skipping:', j.type, j.id);
+        // Tipo desconhecido (ex.: version skew — build novo enfileira tipo que um build
+        // carregado depois não conhece). NÃO deleta (um reload pode reconhecê-lo), mas
+        // conta tentativas e vira dead-letter (`failed`) após maxAttempts. Antes fazia só
+        // `continue` sem tocar em attempts/nextAttemptAt → ficava 'pending' eterno,
+        // contado no auto-flush, drenando bateria/dados a cada tick de 15s.
+        logWarn('offlineSync: unknown job type:', j.type, j.id);
+        const uAttempts = (Number(j.attempts) || 0) + 1;
+        const uStatus: OfflineJob['status'] = uAttempts >= (Number(j.maxAttempts) || 7) ? 'failed' : 'pending';
+        await queuePut({ ...j, attempts: uAttempts, nextAttemptAt: now + (1000 * 60 * Math.pow(2, uAttempts)), status: uStatus, lastError: `unknown job type: ${String(j.type)}` });
+        errors++;
         continue;
       }
       await queueDelete(String(j.id));
@@ -343,116 +351,6 @@ async function processFinishWorkout(job: OfflineJob) {
     const idk = (payload as Record<string, unknown>)?.idempotencyKey;
     if (typeof idk === 'string' && idk) clearFinishBackupByIdempotencyKey(idk);
   } catch { /* best effort */ }
-}
-
-// ─── CRUD Job Processors ──────────────────────────────────────────────────────
-
-async function processCreateWorkout(job: OfflineJob) {
-  const { payload } = job
-  const response = await fetch('/api/workouts/create', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  })
-  if (!response.ok) {
-    const text = await response.text()
-    // 401 (token expirado no flush) é transitório junto com 408/429 — senão um token
-    // expirado no momento do flush marcaria o job como terminal e perderia o dado.
-    if (response.status >= 400 && response.status < 500 && response.status !== 408 && response.status !== 429 && response.status !== 401) {
-      throw new Error(`Validation error (4xx): ${text}`)
-    }
-    throw new Error(`API error: ${response.status} - ${text}`)
-  }
-}
-
-async function processUpdateWorkout(job: OfflineJob) {
-  const { payload } = job
-  const response = await fetch('/api/workouts/update', {
-    method: 'PUT',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
-  })
-  if (!response.ok) {
-    const text = await response.text()
-    // 401 (token expirado no flush) é transitório junto com 408/429 — senão um token
-    // expirado no momento do flush marcaria o job como terminal e perderia o dado.
-    if (response.status >= 400 && response.status < 500 && response.status !== 408 && response.status !== 429 && response.status !== 401) {
-      throw new Error(`Validation error (4xx): ${text}`)
-    }
-    throw new Error(`API error: ${response.status} - ${text}`)
-  }
-}
-
-async function processDeleteWorkout(job: OfflineJob) {
-  const { payload } = job
-  const workoutId = payload?.workoutId || payload?.id
-  const response = await fetch(`/api/workouts/delete`, {
-    method: 'DELETE',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ workoutId }),
-  })
-  if (!response.ok) {
-    const text = await response.text()
-    // 401 (token expirado no flush) é transitório junto com 408/429 — senão um token
-    // expirado no momento do flush marcaria o job como terminal e perderia o dado.
-    if (response.status >= 400 && response.status < 500 && response.status !== 408 && response.status !== 429 && response.status !== 401) {
-      throw new Error(`Validation error (4xx): ${text}`)
-    }
-    throw new Error(`API error: ${response.status} - ${text}`)
-  }
-}
-
-// ─── CRUD Queue Helpers ───────────────────────────────────────────────────────
-
-export const queueCreateWorkout = async (payload: Record<string, unknown>) => {
-  const id = `create_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-  const job: OfflineJob = {
-    id,
-    type: 'create_workout',
-    createdAt: new Date().toISOString(),
-    payload,
-    details: (payload.title as string) || 'Criar Treino',
-    status: 'pending',
-    attempts: 0,
-    maxAttempts: 5,
-    nextAttemptAt: 0,
-  }
-  await queuePut({ ...job, userId: currentOfflineUserId })
-  return id
-}
-
-export const queueUpdateWorkout = async (payload: Record<string, unknown>) => {
-  const id = `update_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-  const job: OfflineJob = {
-    id,
-    type: 'update_workout',
-    createdAt: new Date().toISOString(),
-    payload,
-    details: (payload.title as string) || 'Atualizar Treino',
-    status: 'pending',
-    attempts: 0,
-    maxAttempts: 5,
-    nextAttemptAt: 0,
-  }
-  await queuePut({ ...job, userId: currentOfflineUserId })
-  return id
-}
-
-export const queueDeleteWorkout = async (payload: Record<string, unknown>) => {
-  const id = `delete_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-  const job: OfflineJob = {
-    id,
-    type: 'delete_workout',
-    createdAt: new Date().toISOString(),
-    payload,
-    details: (payload.title as string) || 'Excluir Treino',
-    status: 'pending',
-    attempts: 0,
-    maxAttempts: 5,
-    nextAttemptAt: 0,
-  }
-  await queuePut({ ...job, userId: currentOfflineUserId })
-  return id
 }
 
 // ─── Nutrition Job Processors ─────────────────────────────────────────────────
