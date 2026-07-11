@@ -70,18 +70,19 @@ afterEach(() => {
   vi.restoreAllMocks()
 })
 
-describe('flushOfflineQueue — ordena por createdAt (create antes do edit)', () => {
+describe('flushOfflineQueue — ordena por createdAt (log antes do edit)', () => {
   it('processa o job mais antigo primeiro mesmo enfileirado por último', async () => {
-    // update foi ENFILEIRADO primeiro no array, mas tem createdAt MAIS RECENTE.
-    // create foi enfileirado depois, mas com createdAt MAIS ANTIGO.
-    // A ordenação por createdAt deve rodar o create (/create) antes do update (/update).
+    // edit foi ENFILEIRADO primeiro no array, mas tem createdAt MAIS RECENTE.
+    // log foi enfileirado depois, mas com createdAt MAIS ANTIGO.
+    // A ordenação por createdAt deve rodar o log (/log-entry) antes do edit (/edit-entry).
     queue = [
       mkJob('edit1', {
-        type: 'update_workout',
+        type: 'nutrition_edit',
+        payload: { entryId: 'e1' },
         createdAt: new Date('2026-01-01T00:00:05Z').toISOString(),
       }),
       mkJob('create1', {
-        type: 'create_workout',
+        type: 'nutrition_log_local',
         createdAt: new Date('2026-01-01T00:00:00Z').toISOString(),
       }),
     ]
@@ -95,8 +96,8 @@ describe('flushOfflineQueue — ordena por createdAt (create antes do edit)', ()
 
     expect(r.processed).toBe(2)
     expect(calledUrls).toHaveLength(2)
-    expect(calledUrls[0]).toContain('/api/workouts/create')
-    expect(calledUrls[1]).toContain('/api/workouts/update')
+    expect(calledUrls[0]).toContain('/api/nutrition/log-entry')
+    expect(calledUrls[1]).toContain('/api/nutrition/edit-entry')
     expect(queue).toHaveLength(0)
   })
 })
@@ -162,9 +163,9 @@ describe('flushOfflineQueue — gating nextAttemptAt (pula jobs agendados pro fu
   })
 })
 
-describe('flushOfflineQueue — tipo desconhecido é pulado sem deletar', () => {
-  it('job de tipo desconhecido não chama fetch, NÃO é deletado e loga warn', async () => {
-    queue = [mkJob('u1', { type: 'tipo_inexistente' })]
+describe('flushOfflineQueue — tipo desconhecido vira dead-letter (não drena)', () => {
+  it('não chama fetch, NÃO deleta, mas conta tentativa + agenda backoff (para de drenar)', async () => {
+    queue = [mkJob('u1', { type: 'tipo_inexistente', attempts: 0, maxAttempts: 5 })]
     const fetchMock = vi.fn(async () => mockRes(200, 'ok'))
     globalThis.fetch = fetchMock as unknown as typeof fetch
 
@@ -172,10 +173,24 @@ describe('flushOfflineQueue — tipo desconhecido é pulado sem deletar', () => 
 
     expect(fetchMock).not.toHaveBeenCalled()
     expect(r.processed).toBe(0)
-    expect(r.errors).toBe(0)
-    // Dado preservado: o job continua na fila (não some silenciosamente).
+    // Dado preservado: o job continua na fila (não some silenciosamente)...
     expect(queue).toHaveLength(1)
     expect(queue[0].id).toBe('u1')
+    // ...mas com tentativa contada + backoff agendado — antes ficava 'pending' eterno
+    // (sem tocar attempts/nextAttemptAt), drenando o auto-flush de 15s pra sempre.
+    expect(Number(queue[0].attempts)).toBe(1)
+    expect(Number(queue[0].nextAttemptAt)).toBeGreaterThan(0)
+    expect(queue[0].status).toBe('pending')
     expect(logWarn).toHaveBeenCalled()
+  })
+
+  it('vira failed (dead-letter) ao atingir maxAttempts', async () => {
+    queue = [mkJob('u2', { type: 'tipo_inexistente', attempts: 4, maxAttempts: 5 })]
+    globalThis.fetch = vi.fn(async () => mockRes(200, 'ok')) as unknown as typeof fetch
+
+    await flushOfflineQueue({ force: true })
+
+    expect(queue).toHaveLength(1)
+    expect(queue[0].status).toBe('failed')
   })
 })
