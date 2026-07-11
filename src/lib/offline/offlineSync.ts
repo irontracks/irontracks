@@ -16,6 +16,9 @@ export interface OfflineJob extends Record<string, unknown> {
   maxAttempts?: number
   nextAttemptAt?: number
   lastError?: string
+  /** Dono do job (uid de quem enfileirou). Carimbado no enqueue; usado no flush pra
+   *  NÃO reenviar job de outro usuário com a sessão atual (device compartilhado). */
+  userId?: string | null
 }
 
 export interface QueueSummary {
@@ -31,6 +34,22 @@ export interface QueueSummary {
 
 export const isOnline = () => {
   return typeof navigator !== 'undefined' && navigator.onLine;
+};
+
+// ─── Dono da fila (device compartilhado) ──────────────────────────────────────
+// A fila é global por device (IndexedDB), mas os jobs são reenviados com o COOKIE da
+// sessão ATUAL, e os endpoints derivam o dono da sessão (auth.uid). Sem carimbar o
+// dono no enqueue e filtrar no flush, num device de academia o job que A criou offline
+// seria reenviado sob a sessão de B → dado de A gravado na conta de B. `setOfflineUser`
+// é chamado pelo useOfflineSync quando a auth resolve.
+let currentOfflineUserId: string | null = null;
+export const setOfflineUser = (uid: string | null | undefined) => {
+  currentOfflineUserId = uid ? (String(uid).trim() || null) : null;
+};
+/** Job "pertence" ao usuário atual quando não tem dono (legado) OU o dono casa. */
+const jobBelongsToCurrentUser = (j: OfflineJob): boolean => {
+  const owner = j?.userId ? String(j.userId).trim() : '';
+  return !owner || owner === (currentOfflineUserId || '');
 };
 
 export const cacheSetWorkouts = async (workouts: unknown, _opts: unknown = null) => {
@@ -53,10 +72,14 @@ export const getPendingCount = async () => {
   try {
     const all = await queueGetAll();
     if (!Array.isArray(all)) return 0;
-    // Conta só jobs ELEGÍVEIS (exclui 'failed'). Antes contava tudo: um job
-    // 'failed' preso deixava o contador > 0 pra sempre e o auto-flush de 15s
-    // disparava eternamente sem fazer nada (dreno de bateria/dados).
-    return all.filter((j) => String((j as OfflineJob)?.status || 'pending') !== 'failed').length;
+    // Conta só jobs ELEGÍVEIS (exclui 'failed') E DO USUÁRIO ATUAL. Antes contava
+    // tudo: um job 'failed' preso deixava o contador > 0 pra sempre e o auto-flush de
+    // 15s disparava eternamente sem fazer nada (dreno). E jobs de OUTRO usuário (device
+    // compartilhado) não podem alimentar o tick de flush de quem está logado agora.
+    return all.filter((j) => {
+      const job = j as OfflineJob;
+      return String(job?.status || 'pending') !== 'failed' && jobBelongsToCurrentUser(job);
+    }).length;
   } catch {
     return 0;
   }
@@ -64,15 +87,15 @@ export const getPendingCount = async () => {
 
 const STALE_JOB_MS = 7 * 24 * 60 * 60 * 1000 // 7 days
 
-export const getOfflineQueueSummary = async ({ userId: _userId }: { userId?: string } = {}) => {
+export const getOfflineQueueSummary = async ({ userId }: { userId?: string } = {}) => {
   try {
     const all = await queueGetAll();
     const rawJobs = Array.isArray(all) ? (all as OfflineJob[]) : [];
 
-    // Auto-cleanup: remove failed jobs older than 7 days
+    // Auto-cleanup: remove failed jobs older than 7 days (global — higiene do device).
     const now = Date.now();
     const staleIds: string[] = []
-    const jobs = rawJobs.filter((j) => {
+    const survivors = rawJobs.filter((j) => {
       if (String(j?.status || '') === 'failed' && j?.createdAt) {
         const age = now - new Date(j.createdAt).getTime()
         if (age > STALE_JOB_MS) { staleIds.push(String(j.id)); return false }
@@ -82,6 +105,14 @@ export const getOfflineQueueSummary = async ({ userId: _userId }: { userId?: str
     for (const id of staleIds) {
       try { await queueDelete(id) } catch { /* best effort */ }
     }
+
+    // Estatísticas/lista escopadas ao usuário atual: num device compartilhado, o
+    // badge e o gate do auto-flush de B não podem incluir os jobs pendentes de A.
+    const scopeUid = (userId ? String(userId).trim() : '') || currentOfflineUserId || '';
+    const jobs = survivors.filter((j) => {
+      const owner = j?.userId ? String(j.userId).trim() : '';
+      return !owner || !scopeUid || owner === scopeUid;
+    })
 
     // Calculate stats
     const pending = jobs.filter((j) => String(j?.status || 'pending') === 'pending').length;
@@ -114,12 +145,17 @@ export const getOfflineQueueSummary = async ({ userId: _userId }: { userId?: str
   }
 };
 
-export const clearOfflineJobs = async ({ userId: _userId }: { userId?: string } = {}) => {
+export const clearOfflineJobs = async ({ userId }: { userId?: string } = {}) => {
   try {
     const all = await queueGetAll();
+    // Só apaga jobs do usuário atual (ou legados sem dono). Num device compartilhado,
+    // B tocar em "descartar" não pode apagar os jobs pendentes de A.
+    const scopeUid = (userId ? String(userId).trim() : '') || currentOfflineUserId || '';
     if (Array.isArray(all)) {
       for (const job of all) {
         const j = job && typeof job === 'object' ? (job as OfflineJob) : ({} as OfflineJob)
+        const owner = j?.userId ? String(j.userId).trim() : '';
+        if (owner && scopeUid && owner !== scopeUid) continue;
         await queueDelete(String(j.id));
       }
     }
@@ -185,6 +221,10 @@ const runFlushOfflineQueue = async ({ max = 50, force = false }: { max?: number;
 
   for (const jobItem of ordered) {
     const j = jobItem && typeof jobItem === 'object' ? (jobItem as OfflineJob) : ({} as OfflineJob)
+    // Device compartilhado: NÃO reenviar job de OUTRO dono com a sessão atual (gravaria
+    // o dado de A na conta de B). Segura o job (não deleta, não queima tentativa) até o
+    // dono voltar a logar neste device. Vale mesmo com force=true.
+    if (!jobBelongsToCurrentUser(j)) continue;
     // Check eligibility
     if (!force) {
       if (j.nextAttemptAt && Number(j.nextAttemptAt) > now) continue;
@@ -269,7 +309,7 @@ export const queueFinishWorkout = async (payload: Record<string, unknown>) => {
     maxAttempts: 5,
     nextAttemptAt: 0
   };
-  await queuePut(job);
+  await queuePut({ ...job, userId: currentOfflineUserId });
   return id;
 };
 
@@ -286,9 +326,10 @@ async function processFinishWorkout(job: OfflineJob) {
 
   if (!response.ok) {
     const status = response.status;
-    // 408 (timeout) e 429 (rate limit) são transitórios → sobem pro backoff (não
-    // terminam o job). Só 4xx de validação/auth é terminal.
-    if (status >= 400 && status < 500 && status !== 408 && status !== 429) {
+    // 408 (timeout), 429 (rate limit) e 401 (token expirado no flush) são TRANSITÓRIOS
+    // → sobem pro backoff (não terminam o job). Marcar 401 como terminal fazia um token
+    // expirado no momento do flush PERDER o treino (o token renova e o retry funciona).
+    if (status >= 400 && status < 500 && status !== 408 && status !== 429 && status !== 401) {
       const text = await response.text();
       throw new Error(`Validation error (4xx): ${text}`);
     }
@@ -315,7 +356,9 @@ async function processCreateWorkout(job: OfflineJob) {
   })
   if (!response.ok) {
     const text = await response.text()
-    if (response.status >= 400 && response.status < 500 && response.status !== 408 && response.status !== 429) {
+    // 401 (token expirado no flush) é transitório junto com 408/429 — senão um token
+    // expirado no momento do flush marcaria o job como terminal e perderia o dado.
+    if (response.status >= 400 && response.status < 500 && response.status !== 408 && response.status !== 429 && response.status !== 401) {
       throw new Error(`Validation error (4xx): ${text}`)
     }
     throw new Error(`API error: ${response.status} - ${text}`)
@@ -331,7 +374,9 @@ async function processUpdateWorkout(job: OfflineJob) {
   })
   if (!response.ok) {
     const text = await response.text()
-    if (response.status >= 400 && response.status < 500 && response.status !== 408 && response.status !== 429) {
+    // 401 (token expirado no flush) é transitório junto com 408/429 — senão um token
+    // expirado no momento do flush marcaria o job como terminal e perderia o dado.
+    if (response.status >= 400 && response.status < 500 && response.status !== 408 && response.status !== 429 && response.status !== 401) {
       throw new Error(`Validation error (4xx): ${text}`)
     }
     throw new Error(`API error: ${response.status} - ${text}`)
@@ -348,7 +393,9 @@ async function processDeleteWorkout(job: OfflineJob) {
   })
   if (!response.ok) {
     const text = await response.text()
-    if (response.status >= 400 && response.status < 500 && response.status !== 408 && response.status !== 429) {
+    // 401 (token expirado no flush) é transitório junto com 408/429 — senão um token
+    // expirado no momento do flush marcaria o job como terminal e perderia o dado.
+    if (response.status >= 400 && response.status < 500 && response.status !== 408 && response.status !== 429 && response.status !== 401) {
       throw new Error(`Validation error (4xx): ${text}`)
     }
     throw new Error(`API error: ${response.status} - ${text}`)
@@ -370,7 +417,7 @@ export const queueCreateWorkout = async (payload: Record<string, unknown>) => {
     maxAttempts: 5,
     nextAttemptAt: 0,
   }
-  await queuePut(job)
+  await queuePut({ ...job, userId: currentOfflineUserId })
   return id
 }
 
@@ -387,7 +434,7 @@ export const queueUpdateWorkout = async (payload: Record<string, unknown>) => {
     maxAttempts: 5,
     nextAttemptAt: 0,
   }
-  await queuePut(job)
+  await queuePut({ ...job, userId: currentOfflineUserId })
   return id
 }
 
@@ -404,7 +451,7 @@ export const queueDeleteWorkout = async (payload: Record<string, unknown>) => {
     maxAttempts: 5,
     nextAttemptAt: 0,
   }
-  await queuePut(job)
+  await queuePut({ ...job, userId: currentOfflineUserId })
   return id
 }
 
@@ -423,7 +470,9 @@ async function postNutritionJob(url: string, payload: unknown) {
   })
   if (!response.ok) {
     const text = await response.text()
-    if (response.status >= 400 && response.status < 500 && response.status !== 408 && response.status !== 429) {
+    // 401 (token expirado no flush) é transitório junto com 408/429 — senão um token
+    // expirado no momento do flush marcaria o job como terminal e perderia o dado.
+    if (response.status >= 400 && response.status < 500 && response.status !== 408 && response.status !== 429 && response.status !== 401) {
       throw new Error(`Validation error (4xx): ${text}`)
     }
     throw new Error(`API error: ${response.status} - ${text}`)
@@ -478,7 +527,7 @@ export const queueNutritionLog = async (
     maxAttempts: 5,
     nextAttemptAt: 0,
   }
-  await queuePut(job)
+  await queuePut({ ...job, userId: currentOfflineUserId })
   return id
 }
 
@@ -495,7 +544,7 @@ export const queueNutritionDelete = async (payload: Record<string, unknown>) => 
     maxAttempts: 5,
     nextAttemptAt: 0,
   }
-  await queuePut(job)
+  await queuePut({ ...job, userId: currentOfflineUserId })
   return id
 }
 
@@ -512,7 +561,7 @@ export const queueNutritionEdit = async (payload: Record<string, unknown>) => {
     maxAttempts: 5,
     nextAttemptAt: 0,
   }
-  await queuePut(job)
+  await queuePut({ ...job, userId: currentOfflineUserId })
   return id
 }
 
@@ -534,7 +583,7 @@ export const queueNutritionWater = async (payload: Record<string, unknown>) => {
     maxAttempts: 5,
     nextAttemptAt: 0,
   }
-  await queuePut(job)
+  await queuePut({ ...job, userId: currentOfflineUserId })
   return id
 }
 
