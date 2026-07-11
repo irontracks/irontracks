@@ -659,9 +659,11 @@ export function buildReportHTML(
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>${workoutTitleSafe} · IronTracks</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700;800;900&display=swap" rel="stylesheet">
+  <!-- Sem fonte externa DE PROPÓSITO: este HTML é aberto offline / no share sheet
+       do iOS / em blob:/file: (mesma razão pela qual as imagens são embutidas em
+       base64). Um <link> de stylesheet externo é render-blocking; num contexto sem
+       rede o viewer trava/renderiza EM BRANCO ("arquivo vem vazio"). A font-family
+       abaixo cai na fonte de sistema — self-contained e sempre renderiza. -->
   <style>
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; color-adjust: exact !important; }
