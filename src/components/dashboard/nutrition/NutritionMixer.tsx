@@ -1163,7 +1163,10 @@ export default function NutritionMixer({
                     setEntries(next); setTotals(sumTotals(next)); cacheDay(next)
                     // Pendente → reescreve o job de lançamento (mesmo id); senão enfileira a edição.
                     if (target?.pending) {
-                      void queueNutritionLog(id, { foodName: draft.food_name, calories: macros.calories, protein: macros.protein, carbs: macros.carbs, fat: macros.fat, items, dateKey: currentDateKey }, false)
+                      // clientId: id é OBRIGATÓRIO — sem ele o /log-entry insere sem dedup
+                      // (índice único parcial user_id+client_id) e um reenvio pós-commit
+                      // DUPLICA a refeição. O id do job pendente já é o clientId original.
+                      void queueNutritionLog(id, { foodName: draft.food_name, calories: macros.calories, protein: macros.protein, carbs: macros.carbs, fat: macros.fat, items, dateKey: currentDateKey, clientId: id }, false)
                     } else {
                       void queueNutritionEdit({ entryId: id, draft: { food_name: draft.food_name, items } })
                     }
