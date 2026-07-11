@@ -83,8 +83,13 @@ export function useTeamBroadcast({
         if (teamBroadcastChannelRef.current) {
             try { supabase.removeChannel(teamBroadcastChannelRef.current) } catch { }
         }
+        // private: true → Realtime Authorization. O broadcast passa a consultar a RLS
+        // de realtime.messages (migration team_logs_broadcast_realtime_authz): só membros
+        // da sessão (host/participante, via can_view_team_session) recebem/enviam eventos
+        // neste tópico. Antes o canal era público: qualquer autenticado que soubesse o
+        // UUID da sessão podia escutar os logs ao vivo e injetar pause/challenge/edit.
         const ch = supabase
-            .channel(`team_logs:${teamSession.id}`, { config: { broadcast: { self: false, ack: true } } })
+            .channel(`team_logs:${teamSession.id}`, { config: { private: true, broadcast: { self: false, ack: true } } })
             .on('broadcast', { event: 'log_update' }, (msg) => {
                 const payload = msg?.payload && typeof msg.payload === 'object' ? msg.payload as Record<string, unknown> : null
                 if (!payload) return
