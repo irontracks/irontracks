@@ -12,6 +12,7 @@ import { useTeamInvites } from './team/useTeamInvites'
 import { useTeamBroadcast } from './team/useTeamBroadcast'
 import { useTeamPresence } from './team/useTeamPresence'
 import type { TeamWorkoutContextValue, TeamWorkoutProviderProps, JoinResult, TeamParticipant } from './team/types'
+import { buildParticipantRecord } from './team/types'
 
 // Re-export types and constants so existing consumers don't break
 export type { SharedLogsMap, SharedLogEntry, ChatMessage, SetChallengePayload, WorkoutEditPayload, ExerciseSharePayload, ExerciseControlUpdate } from './team/types'
@@ -83,6 +84,8 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
         soundOpts,
         notify: notify as (notification: Record<string, unknown>) => void,
         onStartSession,
+        myDisplayNameRef,
+        myPhotoUrlRef,
     })
 
     const presenceHook = useTeamPresence({ user, supabase, teamSession, teamworkV2Enabled })
@@ -134,14 +137,13 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
 
             let sessionId = teamSession?.id ? String(teamSession.id) : '';
             let participants = teamSession?.participants || [];
-            const u = user as { id: string; email?: string | null; displayName?: string; photoURL?: string | null };
             if (!sessionId) {
                 const { data: sess, error } = await supabase
                     .from('team_sessions')
                     .insert({
                         host_uid: user.id,
                         status: 'active',
-                        participants: [{ uid: user.id, name: u.displayName, photo: u.photoURL }],
+                        participants: [buildParticipantRecord(user.id, myDisplayNameRef.current, myPhotoUrlRef.current)],
                         workout_state: { workout_data: workout, join_code: code, join_expires_at: expiresAt }
                     })
                     .select()
@@ -150,7 +152,7 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
                 sessionId = sess?.id ? String(sess.id) : '';
                 participants = Array.isArray(sess?.participants) ? sess.participants : [];
                 if (!sessionId) throw new Error('Falha ao criar sessão');
-                setTeamSession({ id: sessionId, isHost: true, hostName: u.displayName, participants: participants as TeamParticipant[] });
+                setTeamSession({ id: sessionId, isHost: true, hostName: myDisplayNameRef.current || undefined, participants: participants as TeamParticipant[] });
             } else {
                 const { data: existing } = await supabase
                     .from('team_sessions')
@@ -179,16 +181,22 @@ export const TeamWorkoutProvider = ({ children, user, settings, onStartSession }
     const leaveSession = useCallback(async () => {
         try {
             const sid = teamSession?.id ? String(teamSession.id) : '';
-            const u = user as { id: string; email?: string | null; displayName?: string }
             // Broadcast leave event to partners instantly
             const ch = broadcast.teamBroadcastChannelRef.current
             if (ch && user?.id) {
                 try {
-                    ch.send({
-                        type: 'broadcast',
-                        event: 'leave',
-                        payload: { userId: user.id, displayName: u?.displayName || 'Usuário', ts: Date.now() },
-                    })
+                    // Aguarda o flush do broadcast (ack) antes do setTeamSession(null),
+                    // que derruba o canal no cleanup — senão o "leave" saía no mesmo
+                    // tick do removeChannel e o parceiro podia não receber o toast.
+                    // Corta em ~500ms pra não travar a saída se o parceiro está offline.
+                    await Promise.race([
+                        ch.send({
+                            type: 'broadcast',
+                            event: 'leave',
+                            payload: { userId: user.id, displayName: myDisplayNameRef.current || 'Usuário', ts: Date.now() },
+                        }),
+                        new Promise((resolve) => setTimeout(resolve, 500)),
+                    ])
                 } catch { }
             }
             if (!sid) {
