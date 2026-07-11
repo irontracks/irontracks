@@ -24,24 +24,26 @@ export const draftOrderKeys = (draft: unknown): string[] =>
 export const applyExerciseOrder = (exercises: unknown, draft: unknown): unknown[] => {
   const list = safeArray(exercises)
   const ordered: unknown[] = []
-  const used = new Set<string>()
-  const byKey = new Map<string, unknown>(list.map((exercise, index) => [buildExerciseSortKey(exercise, index), exercise]))
+  // Consumo por POSIÇÃO, não por chave: dois exercícios podem ter a MESMA chave
+  // (mesmo id — ex.: após "Duplicar", que faz spread raso e copia o id). Casar por
+  // Map/Set de chave colapsava os duplicados e DROPAVA um exercício (perda de dado
+  // + logs fantasma). Cada item do draft consome a PRIMEIRA posição ainda não usada
+  // cuja chave bate, então todas as ocorrências (referências distintas) sobrevivem.
+  const used = new Array<boolean>(list.length).fill(false)
 
   for (const item of safeArray(draft)) {
     const obj = item && typeof item === 'object' ? (item as Record<string, unknown>) : ({} as Record<string, unknown>)
     const key = String(obj?.key ?? '').trim()
-    if (!key || used.has(key)) continue
-    const exercise = byKey.get(key)
-    if (!exercise) continue
-    ordered.push(exercise)
-    used.add(key)
+    if (!key) continue
+    const matchIdx = list.findIndex((exercise, index) => !used[index] && buildExerciseSortKey(exercise, index) === key)
+    if (matchIdx === -1) continue
+    used[matchIdx] = true
+    ordered.push(list[matchIdx])
   }
 
+  // Exercícios que o draft não referenciou (ex.: draft parcial) vão pro fim, em ordem.
   for (let index = 0; index < list.length; index += 1) {
-    const exercise = list[index]
-    const key = buildExerciseSortKey(exercise, index)
-    if (used.has(key)) continue
-    ordered.push(exercise)
+    if (!used[index]) ordered.push(list[index])
   }
 
   return ordered
