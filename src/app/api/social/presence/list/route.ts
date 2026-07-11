@@ -29,7 +29,21 @@ export async function GET() {
         if (!res.ok) return NextResponse.json({ ok: false, error: 'failed_to_fetch_presence' }, { status: 500 })
 
         const data = await res.json()
-        const result = Array.isArray(data?.result) ? data.result : []
+        const online = (Array.isArray(data?.result) ? data.result : []).map((x: unknown) => String(x || '').trim()).filter(Boolean)
+        if (!online.length) return NextResponse.json({ ok: true, online_users: [] })
+
+        // Filtra server-side: só devolve quem o CHAMADOR segue (accepted). Antes retornava
+        // o sorted set global cru — qualquer autenticado montava "quem está online agora"
+        // de TODA a base (incluindo contas privadas e não-seguidos), de-anonimizável via
+        // profiles_public. O recorte por follow existia só no cliente. Usa auth.supabase
+        // (RLS: a policy de SELECT de social_follows já limita a follower_id = auth.uid()).
+        const { data: follows } = await auth.supabase
+            .from('social_follows')
+            .select('following_id')
+            .eq('follower_id', auth.user.id)
+            .eq('status', 'accepted')
+        const followingSet = new Set((Array.isArray(follows) ? follows : []).map((r) => String((r as { following_id?: string })?.following_id || '').trim()))
+        const result = online.filter((uid: string) => followingSet.has(uid))
 
         return NextResponse.json({ ok: true, online_users: result })
     } catch (e: unknown) {

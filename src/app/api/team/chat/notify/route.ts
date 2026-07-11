@@ -107,9 +107,28 @@ export async function POST(req: Request) {
       (async () => {
         try {
           const mentions = await extractMentions(text)
-          const mentionedIds = Object.values(mentions.userIdsByHandle).filter(
+          const rawMentionedIds = Object.values(mentions.userIdsByHandle).filter(
             (id) => id && id !== senderId,
           )
+          if (!rawMentionedIds.length) return
+
+          // Só notifica menção a quem é PARTICIPANTE da sessão. Sem este gate,
+          // extractMentions resolve @handle globalmente e um membro mencionava qualquer
+          // conta arbitrária, spammando "você foi mencionado no chat" para fora da dupla.
+          const { data: session } = await admin
+            .from('team_sessions')
+            .select('participants')
+            .eq('id', sessionId)
+            .maybeSingle()
+          const participantIds = new Set(
+            (Array.isArray(session?.participants) ? session.participants : [])
+              .map((p: unknown) => {
+                const o = p && typeof p === 'object' ? (p as Record<string, unknown>) : null
+                return String(o?.uid || o?.user_id || o?.id || '').trim()
+              })
+              .filter(Boolean),
+          )
+          const mentionedIds = rawMentionedIds.filter((id) => participantIds.has(id))
           if (!mentionedIds.length) return
 
           const preview = text.length > 80 ? `${text.slice(0, 77)}…` : text
