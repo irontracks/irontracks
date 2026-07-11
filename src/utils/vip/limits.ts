@@ -235,11 +235,18 @@ export async function getVipPlanLimits(supabase: SupabaseClient, userId: string)
   }
 
   // 3. Check App Subscriptions (legacy fallback)
+  // Filtra a expiração por current_period_end assim como o passo 2 faz com
+  // valid_until — sem isto, uma linha presa em status='active' com o período já
+  // vencido concederia VIP para sempre. Aceita current_period_end nulo (assinatura
+  // manual sem período definido), coerente com o valid_until nulo do entitlement.
+  // nowIso vem do servidor (não é input do usuário) — mesmo motivo do passo 2,
+  // não passar por safePg (quebraria os milissegundos e estouraria a query).
   const { data: appSub } = await supabase
     .from('app_subscriptions')
-    .select('id, plan_id, status')
+    .select('id, plan_id, status, current_period_end')
     .eq('user_id', userId)
     .in('status', ['active', 'past_due', 'trialing'])
+    .or(`current_period_end.is.null,current_period_end.gte.${nowIso}`)
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle()
