@@ -25,6 +25,26 @@ export function normalizeParticipant(p: TeamParticipant | null | undefined): {
     }
 }
 
+/**
+ * Monta um participante no formato do banco/RPC ({uid,name,photo}) para a
+ * gravação do HOST ao criar a sessão. O `user` do treino em dupla é
+ * `{id, email}` (sem displayName/photoURL), então antes o host era gravado só
+ * como `{uid}` e aparecia como "Parceiro" sem foto. Nome/foto reais vêm do
+ * perfil (myDisplayNameRef/myPhotoUrlRef no provider).
+ */
+export function buildParticipantRecord(
+    uid: unknown,
+    displayName?: unknown,
+    photoUrl?: unknown,
+): { uid: string; name: string; photo: string | null } {
+    const photo = String(photoUrl ?? '').trim()
+    return {
+        uid: String(uid ?? '').trim(),
+        name: String(displayName ?? '').trim(),
+        photo: photo || null,
+    }
+}
+
 export interface TeamSession {
     id: string
     isHost: boolean

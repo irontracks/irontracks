@@ -12,7 +12,7 @@ import type {
     IncomingInvite,
     AcceptedInviteNotice,
 } from './types'
-import { MAX_TEAM_PARTICIPANTS } from './types'
+import { MAX_TEAM_PARTICIPANTS, buildParticipantRecord } from './types'
 
 interface UseTeamInvitesParams {
     user: { id: string; email?: string | null } | null
@@ -24,6 +24,9 @@ interface UseTeamInvitesParams {
     soundOpts: { enabled: boolean; volume: number }
     notify: (notification: Record<string, unknown>) => void
     onStartSession?: (workout: Record<string, unknown>) => void
+    /** Nome/foto reais do usuário (perfil) — pro host ser gravado corretamente. */
+    myDisplayNameRef: React.MutableRefObject<string>
+    myPhotoUrlRef: React.MutableRefObject<string | null>
 }
 
 export function useTeamInvites({
@@ -36,6 +39,8 @@ export function useTeamInvites({
     soundOpts,
     notify,
     onStartSession: _onStartSession,
+    myDisplayNameRef,
+    myPhotoUrlRef,
 }: UseTeamInvitesParams) {
     const [incomingInvites, setIncomingInvites] = useState<IncomingInvite[]>([])
     const [acceptedInviteNotice, setAcceptedInviteNotice] = useState<AcceptedInviteNotice | null>(null)
@@ -525,8 +530,6 @@ export function useTeamInvites({
             // (ex.: botão de convite no header do treino ativo) — sem isto, um
             // segundo convite criava outra team_session e abandonava o 1º parceiro.
             let sessionId = currentTeamSessionId || (teamSession?.id ? String(teamSession.id) : undefined);
-            const u = user as { id: string; email?: string | null; displayName?: string; photoURL?: string | null };
-
             // Enforce max participants (5)
             const currentParticipants = teamSession?.participants ?? [];
             if (currentParticipants.length >= MAX_TEAM_PARTICIPANTS) {
@@ -539,7 +542,7 @@ export function useTeamInvites({
                     .insert({
                         host_uid: user.id,
                         status: 'active',
-                        participants: [{ uid: user.id, name: u.displayName, photo: u.photoURL }]
+                        participants: [buildParticipantRecord(user.id, myDisplayNameRef.current, myPhotoUrlRef.current)]
                     })
                     .select()
                     .single();
@@ -551,7 +554,7 @@ export function useTeamInvites({
                 setTeamSession({
                     id: sessionId,
                     isHost: true,
-                    hostName: u.displayName,
+                    hostName: myDisplayNameRef.current || undefined,
                     participants: (Array.isArray(session?.participants) ? session.participants : []) as unknown as TeamParticipant[]
                 });
 
