@@ -55,7 +55,7 @@ export const UNLIMITED_LIMITS: VipTierLimits = {
   lab_exams: true
 }
 
-const normalizePlanId = (raw: unknown) => {
+export const normalizePlanId = (raw: unknown) => {
   try {
     const base = String(raw || '')
       .trim()
@@ -70,7 +70,7 @@ const normalizePlanId = (raw: unknown) => {
   }
 }
 
-const applyTierDefaults = (tier: string, limits: VipTierLimits) => {
+export const applyTierDefaults = (tier: string, limits: VipTierLimits) => {
   try {
     const normalized = normalizePlanId(tier)
     if (normalized === 'vip_elite') {
@@ -105,7 +105,7 @@ const capHistory = (value: unknown, max: number) => {
   return Math.min(n, max)
 }
 
-const applyTierCaps = (tier: string, limits: VipTierLimits) => {
+export const applyTierCaps = (tier: string, limits: VipTierLimits) => {
   try {
     const normalized = normalizePlanId(tier)
     if (normalized === 'vip_start') {
