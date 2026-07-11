@@ -3,7 +3,11 @@
 import React, { useEffect, useState } from 'react'
 import Image from 'next/image'
 import { ArrowLeft, ChevronLeft, ChevronRight, Sparkles, Loader2, Wand2, Mic } from 'lucide-react'
-import VoiceWorkoutModal, { type VoiceExerciseDraft } from './VoiceWorkoutModal'
+import dynamic from 'next/dynamic'
+import { type VoiceExerciseDraft } from './VoiceWorkoutModal'
+// Lazy: o VoiceWorkoutModal (854 linhas + deps de áudio/IA) só carrega quando o usuário abre
+// a captura por voz (showVoice) — sai do chunk inicial do Wizard.
+const VoiceWorkoutModal = dynamic(() => import('./VoiceWorkoutModal'), { ssr: false })
 import { useVipCredits } from '@/hooks/useVipCredits'
 import { useFocusTrap } from '@/hooks/useFocusTrap'
 import { getErrorMessage } from '@/utils/errorMessage'
