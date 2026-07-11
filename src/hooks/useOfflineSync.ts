@@ -17,6 +17,7 @@ import {
   getOfflineQueueSummary,
   getPendingCount,
   isOnline,
+  setOfflineUser,
 } from '@/lib/offline/offlineSync';
 import type { SyncState } from '@/types/app';
 
@@ -36,6 +37,13 @@ const DEFAULT_SYNC_STATE: SyncState = {
 
 export function useOfflineSync({ userId, settings }: UseOfflineSyncOptions = {}) {
   const [syncState, setSyncState] = useState<SyncState>(DEFAULT_SYNC_STATE);
+
+  // Informa ao módulo de sync quem é o usuário atual do device — usado pra carimbar o
+  // dono nos jobs e pra o flush NÃO reenviar job de outro usuário (device compartilhado).
+  useEffect(() => { setOfflineUser(userId ?? null); }, [userId]);
+  // Ref do userId pros listeners mount-only (online) poderem checar a identidade atual.
+  const userIdRef = useRef<string | null>(userId ?? null);
+  useEffect(() => { userIdRef.current = userId ?? null; }, [userId]);
 
   const refreshSyncState = useCallback(async () => {
     try {
@@ -94,7 +102,9 @@ export function useOfflineSync({ userId, settings }: UseOfflineSyncOptions = {})
   useEffect(() => {
     refreshRef.current();
     const onChanged = () => refreshRef.current();
-    const onOnline = () => flushRef.current();
+    // Só faz flush ao voltar online se há usuário resolvido — senão o flush dispararia
+    // deslogado (401 → antes marcava terminal) ou com a sessão de outro usuário.
+    const onOnline = () => { if (userIdRef.current) flushRef.current(); };
     const onOffline = () => refreshRef.current();
     try {
       window.addEventListener('irontracks.offlineQueueChanged', onChanged);
