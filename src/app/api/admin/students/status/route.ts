@@ -61,11 +61,12 @@ export async function POST(req: Request) {
     const admin = createAdminClient()
 
     // Resolve the real students row. Supports both real students (AdminUser.id =
-    // students.id) and "pending" profiles (AdminUser.id = "pending_<profile.id>"):
-    // resolveStudentRow strips the prefix, tries id/user_id/email lookups, and
-    // auto-creates the row from profile data when needed (with a guaranteed
-    // non-null `name`, fixing the recurring NOT NULL violation).
-    const studentRow = await resolveStudentRow(admin, { id, email })
+    // students.id) and "pending" profiles (AdminUser.id = "pending_<profile.id>").
+    // autoCreate SÓ para admin: um professor passando o id/email de um profile que NÃO é
+    // aluno dele materializava uma linha `students` órfã ANTES do check de ownership abaixo
+    // (efeito colateral de dados / DoS leve). Para teacher, resolve sem criar → 404 se não
+    // existe; se existe mas é de outro professor, o guard de ownership retorna 403.
+    const studentRow = await resolveStudentRow(admin, { id, email, autoCreate: auth.role === 'admin' })
     if (!studentRow) return NextResponse.json({ ok: false, error: 'student_not_found' }, { status: 404 })
 
     const resolvedId = studentRow.id
