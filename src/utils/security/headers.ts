@@ -37,9 +37,9 @@ export const applySecurityHeaders = (response: NextResponse, nonce: string, isDe
   // 'require-corp' blocks third-party map tiles (CartoDB). The CSP policy
   // already restricts resource loading to whitelisted origins.
 
-  if (!isDev) {
-    response.headers.set('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload')
-  }
+  // HSTS is set in vercel.json (source '/(.*)') so it also covers the /auth/*
+  // routes, which are excluded from this middleware's matcher. Keeping it here too
+  // would emit a duplicate header on the matched routes.
 
   response.headers.set('Content-Security-Policy', buildCspHeader(nonce, isDev))
   return response
