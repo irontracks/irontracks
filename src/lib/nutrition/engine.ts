@@ -40,15 +40,25 @@ export async function trackMeal(userId: string, meal: MealLog, dateKey?: string,
     const foodName = typeof meal.foodName === 'string' ? meal.foodName.trim() : ''
     if (!foodName) throw new Error('nutrition_invalid_meal_food_name')
 
-    const calories = Number(meal.calories)
-    const protein = Number(meal.protein)
-    const carbs = Number(meal.carbs)
-    const fat = Number(meal.fat)
+    let calories = Number(meal.calories)
+    let protein = Number(meal.protein)
+    let carbs = Number(meal.carbs)
+    let fat = Number(meal.fat)
 
     if (!Number.isFinite(calories) || calories < 0) throw new Error('nutrition_invalid_meal_calories')
     if (!Number.isFinite(protein) || protein < 0) throw new Error('nutrition_invalid_meal_protein')
     if (!Number.isFinite(carbs) || carbs < 0) throw new Error('nutrition_invalid_meal_carbs')
     if (!Number.isFinite(fat) || fat < 0) throw new Error('nutrition_invalid_meal_fat')
+
+    // Teto sanitário — mesmos limites da rota /api/nutrition/log-entry. trackMeal é o
+    // funil ÚNICO de escrita (todas as Server Actions e a rota passam por aqui), então
+    // clampar aqui cobre logMealAction/applyGeneratedMealAction/logBarcodeAction de uma
+    // vez. Sem isto, uma action podia gravar macros absurdos (ex.: 1e12) que inflam o
+    // agregado do dia — daily_nutrition_logs não tem CHECK de range no banco.
+    calories = Math.min(6000, calories)
+    protein = Math.min(400, protein)
+    carbs = Math.min(800, carbs)
+    fat = Math.min(300, fat)
 
     if (typeof window !== 'undefined') throw new Error('nutrition_track_meal_server_only')
 
