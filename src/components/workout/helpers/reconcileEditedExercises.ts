@@ -73,6 +73,17 @@ export function reconcileEditedExercises(
     return Math.max(header, sd.length)
   })
 
+  // Cardio não tem registro de série (peso×reps) no mapa de logs — esse mapa é só de
+  // FORÇA (ExerciseCard/set-renderers); cardio usa fluxo próprio (CardioSessionModal).
+  // Se um exercício é/virou cardio (ex.: conversão no editor mid-sessão), qualquer log
+  // "exIdx-setIdx" dele é dado de força obsoleto → descarta tudo, senão vira volume
+  // fantasma no relatório. Detecção ESTRITA (type/method), nunca por nome, pra não
+  // apagar log de um exercício de força chamado "Corrida".
+  const isCardioByNewIdx: boolean[] = edited.map((exRaw) => {
+    const ex: ExRecord = exRaw && typeof exRaw === 'object' ? (exRaw as ExRecord) : {}
+    return String(ex.type ?? '').toLowerCase() === 'cardio' || String(ex.method ?? '').toLowerCase() === 'cardio'
+  })
+
   const cleaned: ExRecord[] = edited.map((exRaw, newIdx) => {
     const ex: ExRecord = exRaw && typeof exRaw === 'object' ? { ...exRaw } : {}
     const k = String(ex[EDIT_LOG_KEY] ?? '')
@@ -97,6 +108,7 @@ export function reconcileEditedExercises(
     if (Number.isNaN(exI)) { nextLogs[key] = val; continue }
     if (!remap.has(exI)) continue // exercício removido → descarta os logs dele
     const newExI = remap.get(exI) as number
+    if (isCardioByNewIdx[newExI]) continue // exercício cardio → sem log de série
     // Poda séries órfãs: só quando o sufixo é um índice de série PURO (numérico) e a
     // contagem nova é conhecida (>0). Sufixos não-numéricos (ex.: unilateral L_/R_)
     // ficam de fora — não dá pra inferir o índice com segurança, melhor preservar.

@@ -143,6 +143,35 @@ describe('reconcileEditedExercises', () => {
       expect(reconcileEditedExercises(orig, edited, logs).logs).toEqual({ '0-0': 'x', '0-L_0': 'la', '0-R_0': 'ra' })
     })
   })
+
+  // O mapa de logs "exIdx-setIdx" é exclusivo de FORÇA (ExerciseCard/set-renderers);
+  // cardio usa fluxo próprio (CardioSessionModal), não grava aí. Ao converter um
+  // exercício de força pra cardio no editor mid-sessão, os logs de força ficavam
+  // (após a poda por contagem, sobrava o "0-0") e eram somados como volume fantasma
+  // de cardio no relatório. Um exercício cardio não deve carregar NENHUM log de série.
+  describe('exercício cardio: descarta todos os logs de série (força obsoleta)', () => {
+    it('converter força→cardio (type=cardio) descarta TODOS os logs, sem resíduo 0-0', () => {
+      const orig = tagExercisesForEdit([{ name: 'Supino', sets: 4 }])
+      const edited = [{ ...orig[0], type: 'cardio', method: 'Cardio', sets: 1, setDetails: [] }]
+      const logs = { '0-0': { weight: 100, reps: 10, done: true }, '0-1': { done: true }, '0-2': { done: true }, '0-3': { done: true } }
+      expect(reconcileEditedExercises(orig, edited, logs).logs).toEqual({})
+    })
+
+    it('detecta cardio por method="Cardio" mesmo sem campo type', () => {
+      const orig = tagExercisesForEdit([{ name: 'Corrida', sets: 3 }])
+      const edited = [{ ...orig[0], method: 'Cardio', sets: 1 }]
+      const logs = { '0-0': 'a', '0-1': 'b', '0-2': 'c' }
+      expect(reconcileEditedExercises(orig, edited, logs).logs).toEqual({})
+    })
+
+    it('não afeta os logs dos exercícios de força vizinhos (só o cardio é limpo)', () => {
+      const orig = tagExercisesForEdit([{ name: 'Supino', sets: 2 }, { name: 'Esteira', sets: 1 }])
+      const edited = [{ ...orig[0], sets: 2 }, { ...orig[1], type: 'cardio', sets: 1 }]
+      const logs = { '0-0': 'a0', '0-1': 'a1', '1-0': { weight: 50 } }
+      // Supino (força) mantém; Esteira (cardio) perde o log de força
+      expect(reconcileEditedExercises(orig, edited, logs).logs).toEqual({ '0-0': 'a0', '0-1': 'a1' })
+    })
+  })
 })
 
 describe('remapIndexSet', () => {
