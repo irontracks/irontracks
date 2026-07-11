@@ -7,17 +7,25 @@ import { useTeamWorkout } from '@/contexts/TeamWorkoutContext';
 import { useDialog } from '@/contexts/DialogContext';
 import type { Workout } from '@/types/app';
 import { getErrorMessage } from '@/utils/errorMessage'
+import { createWorkout } from '@/actions/workout-crud-actions';
+import { isInviteWorkoutAlreadySaved } from '@/utils/inviteWorkoutSave';
+import { logError } from '@/lib/logger';
 
 interface IncomingInviteModalProps {
     onStartSession: (workout: Workout, opts?: { skipConfirm?: boolean }) => void;
+    /** Treinos já salvos do usuário — pra não oferecer salvar um que ele já tem. */
+    savedWorkouts?: unknown[];
+    /** Chamado após salvar com sucesso (o shell reidrata a lista de treinos). */
+    onWorkoutSaved?: () => void;
 }
 
-const IncomingInviteModal = ({ onStartSession }: IncomingInviteModalProps) => {
+const IncomingInviteModal = ({ onStartSession, savedWorkouts, onWorkoutSaved }: IncomingInviteModalProps) => {
     const { alert } = useDialog();
     const { incomingInvites, acceptInvite, rejectInvite } = useTeamWorkout();
 
     const [nowMs, setNowMs] = useState(() => Date.now());
     const [submitting, setSubmitting] = useState(false);
+    const [saveWorkout, setSaveWorkout] = useState(true);
 
     useEffect(() => {
         const tick = () => setNowMs(Date.now());
@@ -41,12 +49,33 @@ const IncomingInviteModal = ({ onStartSession }: IncomingInviteModalProps) => {
     })();
     const shouldShow = Boolean(latestInvite && nowMs && (latestInviteCreatedAtMs ? (nowMs - latestInviteCreatedAtMs) < 7 * 24 * 60 * 60 * 1000 : true));
 
+    // Treino do convite + dedup ("já tenho salvo?") — computados antes do accept.
+    const workoutData = (latestInvite?.workout_data ?? latestInvite?.workout ?? null) as Record<string, unknown> | null;
+    const workoutTitle = workoutData && typeof workoutData === 'object'
+        ? String((workoutData as Record<string, unknown>).title || (workoutData as Record<string, unknown>).name || '')
+        : '';
+    const workoutExercises = workoutData && typeof workoutData === 'object'
+        ? (workoutData as Record<string, unknown>).exercises
+        : null;
+    const exerciseCount = Array.isArray(workoutExercises) ? workoutExercises.length : 0;
+    const hasWorkoutToSave = Boolean(workoutData) && (Boolean(workoutTitle) || exerciseCount > 0);
+    const alreadySaved = hasWorkoutToSave && isInviteWorkoutAlreadySaved(workoutData, savedWorkouts);
+    // A pergunta de salvar só aparece quando há treino E o usuário ainda não o tem.
+    const canOfferSave = hasWorkoutToSave && !alreadySaved;
+
     const handleAccept = async () => {
         if (!latestInvite || submitting) return;
         setSubmitting(true);
         try {
             if (typeof acceptInvite !== 'function') return;
             const workout = await acceptInvite(latestInvite);
+            // Salva o treino na lista do usuário, se ele optou (fire-and-forget — não
+            // atrasa o início da sessão; o start é a ação principal).
+            if (canOfferSave && saveWorkout && workoutData) {
+                void createWorkout(workoutData)
+                    .then((res) => { if (res?.ok && typeof onWorkoutSaved === 'function') onWorkoutSaved(); })
+                    .catch((e) => logError('IncomingInviteModal.saveWorkout', e));
+            }
             // O modal já foi a confirmação ("BORA!") — pula o 2º confirm no start.
             if (workout && typeof onStartSession === 'function') onStartSession(workout as Workout, { skipConfirm: true });
         } catch (e: unknown) {
@@ -70,16 +99,6 @@ const IncomingInviteModal = ({ onStartSession }: IncomingInviteModalProps) => {
     };
 
     if (!shouldShow) return null;
-
-    // Workout metadata from invite
-    const workoutData = latestInvite?.workout_data ?? latestInvite?.workout ?? null
-    const workoutTitle = workoutData && typeof workoutData === 'object'
-        ? String((workoutData as Record<string, unknown>).title || (workoutData as Record<string, unknown>).name || '')
-        : ''
-    const workoutExercises = workoutData && typeof workoutData === 'object'
-        ? (workoutData as Record<string, unknown>).exercises
-        : null
-    const exerciseCount = Array.isArray(workoutExercises) ? workoutExercises.length : 0
 
     const hostName = String(
         latestInvite?.from?.displayName || latestInvite?.from?.display_name ||
@@ -108,7 +127,7 @@ const IncomingInviteModal = ({ onStartSession }: IncomingInviteModalProps) => {
 
                 {/* Workout info card */}
                 {(workoutTitle || exerciseCount > 0) && (
-                    <div className="flex items-center gap-3 bg-neutral-800 rounded-xl px-4 py-3 mb-5 text-left">
+                    <div className="flex items-center gap-3 bg-neutral-800 rounded-xl px-4 py-3 mb-4 text-left">
                         <Dumbbell size={18} className="text-yellow-400 shrink-0" />
                         <div className="min-w-0">
                             {workoutTitle && <p className="text-sm font-bold text-white truncate">{workoutTitle}</p>}
@@ -117,6 +136,21 @@ const IncomingInviteModal = ({ onStartSession }: IncomingInviteModalProps) => {
                             )}
                         </div>
                     </div>
+                )}
+
+                {/* Pergunta: salvar este treino? (some se ele já tiver salvo) */}
+                {canOfferSave && (
+                    <label className="flex items-center gap-3 bg-neutral-800/60 rounded-xl px-4 py-3 mb-5 text-left cursor-pointer select-none">
+                        <input
+                            type="checkbox"
+                            aria-label="Salvar este treino nos meus treinos"
+                            checked={saveWorkout}
+                            onChange={(e) => setSaveWorkout(e.target.checked)}
+                            disabled={submitting}
+                            className="size-4 accent-yellow-500 shrink-0"
+                        />
+                        <span className="text-sm text-neutral-200">Salvar este treino nos meus treinos</span>
+                    </label>
                 )}
 
                 <div className="grid grid-cols-2 gap-3">
