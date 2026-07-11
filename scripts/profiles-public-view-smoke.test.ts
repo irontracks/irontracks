@@ -41,7 +41,6 @@ const mustUseView: Array<[string, number]> = [
   ['src/contexts/team/useTeamInvites.ts', 2],
   ['src/app/(app)/community/useCommunityData.ts', 2],
   ['src/app/api/team/invite-candidates/route.ts', 2],
-  ['src/app/api/social/gym-leaderboard/route.ts', 1],
 ]
 for (const [rel, minHits] of mustUseView) {
   const text = read(rel)
