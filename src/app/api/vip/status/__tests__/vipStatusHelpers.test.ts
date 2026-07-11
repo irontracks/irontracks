@@ -1,82 +1,27 @@
 import { describe, it, expect } from 'vitest'
+import { FREE_LIMITS, UNLIMITED_LIMITS, normalizePlanId } from '@/utils/vip/limits'
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Pure helpers and constants extracted from vip/limits.ts for isolated testing.
+// Guard de sanidade das constantes/normalização que a rota /api/vip/status usa
+// (via getVipPlanLimits). Antes este arquivo re-implementava FREE_LIMITS e
+// normalizePlanId LOCALMENTE, e as cópias tinham dessincronizado do source
+// (FREE_LIMITS.chat_daily=0 vs 5 real; um normalizePlanId de semântica diferente,
+// que "removia caracteres especiais"). Os testes passavam sobre ficção. Agora
+// importam o código real — se o source mudar, o teste acompanha.
 // ─────────────────────────────────────────────────────────────────────────────
 
-type VipTierLimits = {
-  chat_daily: number
-  wizard_weekly: number
-  insights_weekly: number
-  history_days: number | null
-  nutrition_macros: boolean
-  analytics: boolean
-  offline: boolean
-  chef_ai: boolean
-}
-
-const FREE_LIMITS: VipTierLimits = {
-  chat_daily: 0,
-  wizard_weekly: 0,
-  insights_weekly: 0,
-  history_days: 30,
-  nutrition_macros: false,
-  analytics: false,
-  offline: false,
-  chef_ai: false,
-}
-
-const UNLIMITED_LIMITS: VipTierLimits = {
-  chat_daily: 9999,
-  wizard_weekly: 9999,
-  insights_weekly: 9999,
-  history_days: null,
-  nutrition_macros: true,
-  analytics: true,
-  offline: true,
-  chef_ai: true,
-}
-
-const normalizePlanId = (raw: unknown) => {
-  try {
-    const base = String(raw || '')
-      .trim()
-      .toLowerCase()
-      .replace(/\s+/g, '_')
-    if (!base) return null
-    const cleaned = base.replace(/[^a-z0-9_]/g, '')
-    return cleaned || null
-  } catch {
-    return null
-  }
-}
-
-// ─── Tests ───────────────────────────────────────────────────────────────────
-
-describe('VIP Tier Limits constants', () => {
-  it('FREE_LIMITS has all required keys', () => {
-    expect(FREE_LIMITS).toHaveProperty('chat_daily')
-    expect(FREE_LIMITS).toHaveProperty('wizard_weekly')
-    expect(FREE_LIMITS).toHaveProperty('insights_weekly')
-    expect(FREE_LIMITS).toHaveProperty('history_days')
-    expect(FREE_LIMITS).toHaveProperty('nutrition_macros')
-    expect(FREE_LIMITS).toHaveProperty('analytics')
-    expect(FREE_LIMITS).toHaveProperty('offline')
-    expect(FREE_LIMITS).toHaveProperty('chef_ai')
-  })
-
-  it('FREE_LIMITS blocks AI features', () => {
-    expect(FREE_LIMITS.chat_daily).toBe(0)
-    expect(FREE_LIMITS.wizard_weekly).toBe(0)
-    expect(FREE_LIMITS.insights_weekly).toBe(0)
-    expect(FREE_LIMITS.chef_ai).toBe(false)
-  })
-
-  it('FREE_LIMITS limits history to 30 days', () => {
+describe('constantes de limite VIP (reais, usadas pela /api/vip/status)', () => {
+  it('FREE_LIMITS: chat_daily=5, history 30 dias, features de IA/pagas desligadas', () => {
+    expect(FREE_LIMITS.chat_daily).toBe(5)
     expect(FREE_LIMITS.history_days).toBe(30)
+    expect(FREE_LIMITS.nutrition_macros).toBe(false)
+    expect(FREE_LIMITS.analytics).toBe(false)
+    expect(FREE_LIMITS.offline).toBe(false)
+    expect(FREE_LIMITS.chef_ai).toBe(false)
+    expect(FREE_LIMITS.lab_exams).toBe(false)
   })
 
-  it('UNLIMITED_LIMITS allows everything with high quotas', () => {
+  it('UNLIMITED_LIMITS: cotas altas, history ilimitado e todos os booleans (incl. lab_exams) true', () => {
     expect(UNLIMITED_LIMITS.chat_daily).toBeGreaterThan(100)
     expect(UNLIMITED_LIMITS.wizard_weekly).toBeGreaterThan(100)
     expect(UNLIMITED_LIMITS.insights_weekly).toBeGreaterThan(100)
@@ -85,31 +30,32 @@ describe('VIP Tier Limits constants', () => {
     expect(UNLIMITED_LIMITS.analytics).toBe(true)
     expect(UNLIMITED_LIMITS.offline).toBe(true)
     expect(UNLIMITED_LIMITS.chef_ai).toBe(true)
+    expect(UNLIMITED_LIMITS.lab_exams).toBe(true)
+  })
+
+  it('FREE e UNLIMITED têm exatamente o mesmo conjunto de chaves (shape coerente)', () => {
+    expect(Object.keys(FREE_LIMITS).sort()).toEqual(Object.keys(UNLIMITED_LIMITS).sort())
   })
 })
 
-describe('normalizePlanId', () => {
-  it('normalizes a valid plan id', () => {
-    expect(normalizePlanId('vip_monthly')).toBe('vip_monthly')
-    expect(normalizePlanId('VIP_YEARLY')).toBe('vip_yearly')
+describe('normalizePlanId (real) — colapsa sufixos mensais/anuais no tier base', () => {
+  it('normaliza tiers VIP com sufixo de período', () => {
+    expect(normalizePlanId('vip_pro_monthly')).toBe('vip_pro')
+    expect(normalizePlanId('VIP_ELITE_YEARLY')).toBe('vip_elite')
+    expect(normalizePlanId('vip_start_anual')).toBe('vip_start')
   })
 
-  it('replaces spaces with underscores', () => {
-    expect(normalizePlanId('vip  monthly')).toBe('vip_monthly')
-    expect(normalizePlanId('Premium Plan')).toBe('premium_plan')
+  it('normaliza caixa e espaços', () => {
+    expect(normalizePlanId('  Vip Pro  ')).toBe('vip_pro')
   })
 
-  it('removes special characters', () => {
-    expect(normalizePlanId('vip-plan.v2')).toBe('vipplanv2')
+  it('plano não-VIP volta normalizado (não é forçado a null)', () => {
+    expect(normalizePlanId('premium_plan')).toBe('premium_plan')
   })
 
-  it('returns null for empty/null/undefined', () => {
-    expect(normalizePlanId('')).toBeNull()
-    expect(normalizePlanId(null)).toBeNull()
-    expect(normalizePlanId(undefined)).toBeNull()
-  })
-
-  it('handles numeric input', () => {
-    expect(normalizePlanId(42)).toBe('42')
+  it('vazio/null/undefined viram string vazia', () => {
+    expect(normalizePlanId('')).toBe('')
+    expect(normalizePlanId(null)).toBe('')
+    expect(normalizePlanId(undefined)).toBe('')
   })
 })
