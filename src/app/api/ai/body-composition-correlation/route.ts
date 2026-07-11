@@ -13,6 +13,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
+import { canCoachStudent } from '@/utils/auth/studentAccess'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { parseJsonBody, parseJsonWithSchema } from '@/utils/zod'
@@ -75,7 +76,11 @@ export async function POST(req: Request) {
         if (!current) return NextResponse.json({ ok: false, error: 'not_found' }, { status: 404 })
         const cur = current as Record<string, unknown>
         const assessedUserId = String(cur.user_id || '')
-        if (userId !== assessedUserId && userId !== (cur.trainer_id || null)) {
+        // Gate por VÍNCULO REAL (canCoachStudent), não por row.trainer_id auto-declarável:
+        // antes um atacante forjava um body_photo_assessments {user_id: vítima, trainer_id:
+        // self} e esta rota vazava labs/nutrição/perfil da vítima. A RLS agora bloqueia a
+        // forja, e este gate reconfere o vínculo atual (defesa em profundidade).
+        if (userId !== assessedUserId && !(await canCoachStudent({ id: userId, email: auth.user.email }, assessedUserId))) {
             return NextResponse.json({ ok: false, error: 'forbidden' }, { status: 403 })
         }
         if (!cur.analysis) {
