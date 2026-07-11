@@ -67,63 +67,20 @@ scripts/        # Scripts de build e utilitários
 O deploy usa `husky` + `lint-staged` com **zero tolerância a warnings ESLint**. Qualquer warning bloqueia o commit e o deploy falha.
 
 ## Checklist obrigatório antes de declarar qualquer tarefa concluída
+1. **TypeScript:** `npx tsc --noEmit` — zero erros, sem exceção.
+2. **ESLint (comando exato):** `node --import tsx ./node_modules/eslint/bin/eslint.js --config eslint.config.mjs <arquivos_editados> --max-warnings 0` — output vazio = limpo. Em worktree, ver Gotchas.
+3. **`npm run test:unit`** se tocou lógica de negócio; **`npm run test:smoke`** se tocou rotas ou APIs.
 
-### 1. TypeScript
-```bash
-npx tsc --noEmit
-```
-Zero erros. Nenhuma exceção.
+## Scripts de scan
+`npm run scan:all` roda todos (buttons/secrets/a11y/console/async). **Rodar `npm run scan:secrets` antes de qualquer commit que toque em `.env` ou configs.**
 
-### 2. ESLint (comando exato deste projeto)
-```bash
-node --import tsx ./node_modules/eslint/bin/eslint.js --config eslint.config.mjs <arquivos_editados> --max-warnings 0
-```
-Output vazio = limpo. Qualquer output = corrigir antes de continuar.
-
-### 3. Testes unitários (se tocar em lógica de negócio)
-```bash
-npm run test:unit
-```
-
-### 4. Smoke tests (se tocar em rotas ou APIs)
-```bash
-npm run test:smoke
-```
-
-## Scripts de scan — usar proativamente para encontrar problemas
-```bash
-npm run scan:all        # Roda todos os scans abaixo
-npm run scan:buttons    # Botões sem acessibilidade
-npm run scan:secrets    # Secrets/API keys hardcodadas no código
-npm run scan:a11y       # Problemas de acessibilidade
-npm run scan:console    # console.log esquecidos no código
-npm run scan:async      # Padrões async problemáticos
-```
-**Rodar `npm run scan:secrets` antes de qualquer commit que toque em .env ou configurações.**
-
-## Comandos de desenvolvimento
-```bash
-npm run dev             # Dev server (localhost:3000)
-npm run build           # Build de produção
-npm run test:unit       # Testes unitários (Vitest)
-npm run test:coverage   # Cobertura de testes
-npm run test:smoke      # 13 smoke tests críticos
-npm run e2e             # Testes E2E (Playwright)
-npm run e2e:ui          # E2E com interface de debug
-npm run analyze         # Análise de bundle (verificar tamanho)
-npm run deploy          # typecheck + git commit + push → Vercel CI/CD
-```
+## Comandos-chave
+`npm run dev` (localhost:3000) · `npm run build` · `npm run analyze` (bundle) · `npm run deploy` = typecheck + commit + push → Vercel. Demais (`test:coverage`, `e2e`, `e2e:ui`, etc.) no `package.json`.
 
 ## Capacitor (mobile)
-```bash
-npm run cap:sync        # Sincronizar web → iOS + Android (obrigatório após mudanças)
-npm run cap:open        # Abrir Xcode
-npm run cap:open:android # Abrir Android Studio
-```
-- **Após qualquer mudança em plugin nativo**: `npm run cap:sync` obrigatório
-- **Push notifications**: nunca modificar sem testar em device físico real
-- **App ID**: `com.irontracks.app`
-- **Web dir para Capacitor**: `out/` (build estático — `next build` gera este diretório)
+- **Após qualquer mudança em plugin nativo:** `npm run cap:sync` (web → iOS + Android) obrigatório. IDEs: `cap:open` / `cap:open:android`.
+- **Push notifications:** nunca modificar sem testar em device físico real.
+- **App ID:** `com.irontracks.app`. **Web dir do Capacitor:** `out/` (gerado por `next build`).
 
 ## iOS — release pra App Store / TestFlight
 **REGRA FIXA do usuário: SEMPRE subir build pro App Store Connect via terminal, NUNCA abrir Xcode UI pra Archive/Distribute. Faz o claude perder tempão.**
@@ -141,16 +98,8 @@ O script `scripts/ios-release.sh`:
 Em ~10 min depois aparece no TestFlight do iPhone do usuário. Auth reusa a session do Xcode em `Xcode → Settings → Accounts` (uma vez configurado, não pede de novo).
 
 ## Supabase — padrões obrigatórios
-```bash
-# Novas migrations via MCP quando disponível:
-mcp__supabase__apply_migration
-mcp__supabase__list_migrations
-```
-- **Row Level Security obrigatório** em toda tabela nova — sem exceção
-- Usar `supabase-js` v2 (nunca v1)
-- Verificar advisors após migrations: `mcp__supabase__get_advisors`
-- Migrations ficam em `supabase/migrations/` com timestamp no nome
-- Supabase URL: verificar em `.env.local` (nunca hardcodar)
+- Novas migrations via MCP (`mcp__supabase__apply_migration` / `list_migrations`); ficam em `supabase/migrations/` com timestamp. Verificar `mcp__supabase__get_advisors` depois.
+- **Row Level Security obrigatório** em toda tabela nova. `supabase-js` v2 (nunca v1). URL/keys só via `.env.local` (nunca hardcodar).
 
 ## RevenueCat / Apple IAP — zona de máximo cuidado
 - **Nunca modificar** fluxos de purchase/restore sem entender o impacto completo
