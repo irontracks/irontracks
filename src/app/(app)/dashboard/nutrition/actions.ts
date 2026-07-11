@@ -10,6 +10,7 @@ import { sanitizeFoodName } from '@/lib/nutrition/security'
 import { deleteEntryCore, editEntryCore, setWaterCore, resolveDateKey, type MealDraft } from '@/lib/nutrition/mutations'
 import { insertNotifications, shouldThrottleBySenderType } from '@/lib/social/notifyFollowers'
 import { checkVipFeatureAccess } from '@/utils/vip/limits'
+import { checkRateLimitAsync } from '@/utils/rateLimit'
 import { saveLearnedFood } from '@/lib/nutrition/learned-foods'
 import { estimateMacrosFromText } from '@/lib/nutrition/aiEstimate'
 import { logError } from '@/lib/logger'
@@ -27,6 +28,12 @@ async function maybeNotifyDailyGoal(
   dateKey: string,
 ): Promise<void> {
   try {
+    // Só celebra a meta do DIA CORRENTE. Um lançamento retroativo (backdate:
+    // "esqueci de lançar ontem") não pode disparar push "Meta atingida hoje 🎯"
+    // com data passada — o texto é hardcoded "hoje" e a metadata levaria a data
+    // errada. resolveDateKey() sem argumento = hoje (fuso de São Paulo).
+    if (dateKey !== resolveDateKey()) return
+
     const [{ data: goalRow }, { data: logRow }] = await Promise.all([
       supabase.from('nutrition_goals').select('calories, protein').eq('user_id', userId).maybeSingle(),
       supabase.from('daily_nutrition_logs').select('calories, protein').eq('user_id', userId).eq('date', dateKey).maybeSingle(),
@@ -206,7 +213,14 @@ export async function estimateFoodAction(text: string) {
     const userId = data?.user?.id
     if (!userId) throw new Error('nutrition_unauthorized')
 
-    const access = await checkVipFeatureAccess(supabase, userId, 'nutrition_macros')
+    // Server Action = endpoint POST invocável direto. Sem rate-limit + metering,
+    // um loop consome Gemini (pago) ilimitado — a rota irmã /api/ai/nutrition-estimate
+    // já tem os dois. Rate-limit por usuário (Action não recebe `req`/IP).
+    const rl = await checkRateLimitAsync(`ai:estimate-food:${userId}`, 10, 60_000)
+    if (!rl.allowed) return { ok: false, error: 'rate_limited' }
+
+    // { meter: true } consome o teto anti-abuso nutrition_macros (200/dia), igual à rota.
+    const access = await checkVipFeatureAccess(supabase, userId, 'nutrition_macros', { meter: true })
     if (!access.allowed) return { ok: false, error: 'vip_required', upgradeRequired: true }
 
     const out = await estimateMacrosFromText(normalized)
