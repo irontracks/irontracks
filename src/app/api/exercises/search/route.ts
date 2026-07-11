@@ -41,7 +41,11 @@ export async function GET(request: Request) {
 
     const safeQ = safePgLike(q.q)
 
-    const { data, error } = await admin
+    // `exercises` é SILOADA por usuário (RLS exercises_select_silo: só workouts próprios/do
+    // professor). Usa o client user-scoped (RLS) — antes usava admin (bypassa RLS) sem filtro
+    // de user_id, enumerando nome + video_url de exercícios de TODOS os usuários. A
+    // exercise_library (curada/pública) segue no admin logo abaixo.
+    const { data, error } = await supabase
       .from('exercises')
       .select('id, name, video_url')
       .ilike('name', `%${safeQ}%`)
