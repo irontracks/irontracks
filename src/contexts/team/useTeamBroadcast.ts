@@ -57,6 +57,20 @@ export function useTeamBroadcast({
     const soundOptsRef = useRef(soundOpts)
     useEffect(() => { soundOptsRef.current = soundOpts }, [soundOpts])
 
+    // Reset do estado EFÊMERO ao trocar/encerrar a sessão. O provider é montado uma
+    // vez no shell do dashboard e persiste entre sessões — sem isto, `sessionPaused`
+    // (e os pendentes) vazavam da sessão anterior e a NOVA nascia "pausada",
+    // travando o treino até um `resume` que nunca vinha. Também drena
+    // `exerciseControlUpdates` (que só era limpo no handler `exercise_share_end`),
+    // evitando o crescimento sem limite entre sessões.
+    useEffect(() => {
+        setSessionPaused(false)
+        setPendingChallenge(null)
+        setPendingWorkoutEdit(null)
+        setIncomingExerciseShare(null)
+        setExerciseControlUpdates([])
+    }, [teamSession?.id])
+
     useEffect(() => {
         if (!teamSession?.id || !user?.id) {
             setSharedLogs({})
@@ -307,9 +321,13 @@ export function useTeamBroadcast({
             ch.send({ type: 'broadcast', event: 'exercise_share_end', payload: { fromUserId: user.id, fromName: myDisplayNameRef.current || 'Parceiro', ts: Date.now() } })
         } catch (e) { logError('useTeamBroadcast.endExerciseShare', e) }
         setIncomingExerciseShare(null)
+        setExerciseControlUpdates([]) // drena a fila de patches (senão cresce sem limite)
     }, [user?.id, myDisplayNameRef])
 
-    const dismissExerciseShare = useCallback(() => setIncomingExerciseShare(null), [])
+    const dismissExerciseShare = useCallback(() => {
+        setIncomingExerciseShare(null)
+        setExerciseControlUpdates([])
+    }, [])
 
     const sendChatMessage = useCallback((text: string) => {
         if (!user?.id || !teamSession?.id) return
