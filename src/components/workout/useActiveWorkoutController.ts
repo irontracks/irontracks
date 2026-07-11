@@ -17,6 +17,7 @@ import {
   WorkoutExercise,
 } from './types';
 import { isObject, shouldOpenFinishPrompt, buildWorkoutSummary } from './utils';
+import { sessionContextChanged } from './helpers/sessionContextIdentity';
 import {
   getPlanConfig,
   getPlannedSet,
@@ -91,6 +92,17 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
   // a cada render quando session.ui é null/undefined, invalidando o useMemo do return.
   const ui: UnknownRecord = useMemo(() => (session?.ui ?? {}) as UnknownRecord, [session?.ui]);
   const settings = props.settings ?? null;
+
+  // Referência ESTÁVEL de `session` pro `value` do WorkoutProvider. `session` é
+  // recriado a cada tecla (o registro em `session.logs` faz setActiveSession
+  // ({...prev, logs})), mas `logs` já vive no WorkoutLogsProvider. Servir o
+  // `session` cru fazia o useMemo do `value` (lido por ~50 consumidores)
+  // invalidar por keystroke — o cascade que o split de context tenta evitar.
+  // Só trocamos a referência quando um campo != 'logs' muda (id/ui/timerTargetTime/
+  // workout…), então header/footer/FAB seguem recebendo dado fresco.
+  const sessionCtxRef = useRef(session);
+  if (sessionContextChanged(sessionCtxRef.current, session)) sessionCtxRef.current = session;
+  const sessionForContext = sessionCtxRef.current;
 
   // ticker/timerMinimized now live in WorkoutTimerContext (separate provider)
   // This prevents the controller from re-rendering every second.
@@ -561,7 +573,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
   )
 
   const value = useMemo(() => ({
-    session,
+    session: sessionForContext,
     anyModalOpen,
     workout,
     exercises,
@@ -709,7 +721,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     currentExSetsCount,
     currentExDoneSets,
   }), [
-    session, anyModalOpen, workout, exercises, ui, settings,
+    sessionForContext, anyModalOpen, workout, exercises, ui, settings,
     collapsed, setCollapsed, finishing,
     openNotesKeys, setOpenNotesKeys,
     inviteOpen, setInviteOpen,
