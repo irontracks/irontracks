@@ -86,18 +86,44 @@ export async function POST(req: Request) {
       }
     }
 
-    const { data, error } = await auth.supabase
+    // clientId (uuid otimista do compositor) → idempotência: um reenvio manual após
+    // timeout de 30s (o servidor já commitou) NÃO duplica o story. Índice único parcial
+    // (author_id, client_id) — migration social_stories_client_id_idempotency.
+    const rawBody = body && typeof body === 'object' ? (body as Record<string, unknown>) : {}
+    const clientId = (() => {
+      const c = String(rawBody.clientId || rawBody.client_id || '').trim()
+      return c ? c.slice(0, 64) : null
+    })()
+
+    const insertRes = await auth.supabase
       .from('social_stories')
       .insert({
         author_id: auth.user.id,
         media_path: mediaPath,
         caption,
         meta,
+        client_id: clientId,
       })
       .select('id, created_at, expires_at')
       .maybeSingle()
 
-    if (error || !data?.id) return NextResponse.json({ ok: false, error: getErrorMessage(error) || 'failed' }, { status: 400 })
+    let data = insertRes.data
+    if (insertRes.error) {
+      // 23505 = unique_violation: reenvio idempotente do mesmo story (mesmo clientId).
+      // Devolve a linha já criada como sucesso — sem duplicar nem re-enfileirar o
+      // processamento/notificação (que já rodaram na primeira tentativa).
+      if (clientId && (insertRes.error as { code?: string }).code === '23505') {
+        const { data: existing } = await auth.supabase
+          .from('social_stories')
+          .select('id, created_at, expires_at')
+          .eq('author_id', auth.user.id)
+          .eq('client_id', clientId)
+          .maybeSingle()
+        if (existing?.id) return NextResponse.json({ ok: true, data: existing, idempotent: true })
+      }
+      return NextResponse.json({ ok: false, error: getErrorMessage(insertRes.error) || 'failed' }, { status: 400 })
+    }
+    if (!data?.id) return NextResponse.json({ ok: false, error: 'failed' }, { status: 400 })
 
     // Invalidate stories list cache so the new story appears immediately
     try { await cacheDeletePattern('social:stories:list:*') } catch (e) { logWarn('social:stories:create', 'silenced', e) }
