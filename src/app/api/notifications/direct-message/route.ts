@@ -44,13 +44,24 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, skipped: true })
     }
 
-    const safeSenderName = senderName.slice(0, 80)
+    const admin = createAdminClient()
+
+    // Nome do remetente derivado do PERFIL no servidor, não do body. O senderName do
+    // body é controlado pelo cliente → dentro de um canal já aceito, dava pra exibir um
+    // nome forjado no título da notificação/push (spoofing). Fallback pro body só se o
+    // perfil não tiver display_name.
+    const { data: senderProfile } = await admin
+      .from('profiles')
+      .select('display_name')
+      .eq('id', user.id)
+      .maybeSingle()
+    const resolvedSenderName = String(senderProfile?.display_name || '').trim() || senderName
+
+    const safeSenderName = resolvedSenderName.slice(0, 80)
     const safePreview = preview.slice(0, 240)
     if (!safeSenderName || !safePreview) {
       return NextResponse.json({ ok: false, error: 'invalid' }, { status: 400 })
     }
-
-    const admin = createAdminClient()
 
     // Only allow the notification if sender and receiver already share a private
     // channel (i.e. the invite was accepted). Otherwise any authenticated user
