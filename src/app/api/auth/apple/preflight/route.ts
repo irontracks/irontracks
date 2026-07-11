@@ -15,14 +15,22 @@ export async function POST(req: Request) {
     // R2#1: Require authentication — either internal secret or a valid Bearer token
     const admin = createAdminClient()
     let authenticated = false
+    // Fonte da auth: `secret` = server confiável (server-to-server), pode pré-whitelistar
+    // qualquer email; `bearer` = usuário logado, só pode pré-whitelistar o PRÓPRIO email.
+    let viaSecret = false
+    let bearerEmail: string | null = null
 
     if (hasValidInternalSecret(req)) {
       authenticated = true
+      viaSecret = true
     } else {
       const bearer = String(req.headers.get('authorization') || '').replace(/^Bearer\s+/i, '').trim()
       if (bearer) {
         const { data, error } = await admin.auth.getUser(bearer)
-        if (!error && data?.user?.id) authenticated = true
+        if (!error && data?.user?.id) {
+          authenticated = true
+          bearerEmail = String(data.user.email || '').trim().toLowerCase() || null
+        }
       }
     }
 
@@ -37,6 +45,16 @@ export async function POST(req: Request) {
     const email = String(body.email || '').trim().toLowerCase()
     const fullName = String(body.full_name || '').trim()
     if (!email) return NextResponse.json({ ok: false, error: 'missing_email' }, { status: 400 })
+
+    // Um usuário logado (Bearer) só pode pré-whitelistar o PRÓPRIO email. Sem esta
+    // trava, qualquer usuário registrado insere emails arbitrários na whitelist
+    // `students` — a inserção usa o admin client (service role, ignora RLS) e a
+    // whitelist governa o re-login via Apple (`enforce_invite_whitelist`), então
+    // seria um bypass do invite-gating + poluição da tabela. O caminho internal-secret
+    // (confiável) segue livre para pré-cadastrar convidados.
+    if (!viaSecret && (!bearerEmail || email !== bearerEmail)) {
+      return NextResponse.json({ ok: false, error: 'forbidden' }, { status: 403 })
+    }
 
     const { data: existingStudent } = await admin
       .from('students')
