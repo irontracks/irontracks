@@ -234,19 +234,11 @@ const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose,
             const prevForReport = applyCanonicalNamesToSession(prev, canonicalMap);
             const prevLogsForReport = remapPrevLogsByCanonical(prevLogsMap, canonicalMap);
             const prevBaseForReport = remapPrevBaseMsByCanonical(prevBaseMsMap, canonicalMap);
-            let aiToUse: unknown = aiState?.result || (session?.ai && typeof session.ai === 'object' ? session.ai : null) || null;
-            if (!aiToUse) {
-                try {
-                    const res = await generatePostWorkoutInsights({
-                        workoutId: typeof session?.id === 'string' ? session.id : null,
-                        session
-                    });
-                    if (res?.ok && res?.ai) {
-                        aiToUse = res.ai;
-                        setAiState({ loading: false, error: null, result: (res.ai && typeof res.ai === 'object' ? (res.ai as Record<string, unknown>) : null), cached: !!res.saved });
-                    }
-                } catch (e) { logError('component:WorkoutReport.generateAiForPdf', e) }
-            }
+            // Usa SÓ a análise de IA já disponível (cache/estado). NÃO dispara uma
+            // geração nova (Gemini) aqui: era uma chamada lenta/às vezes travada no
+            // meio do save — a barra ficava desabilitada "sem acontecer nada" por
+            // segundos. Quem quer a IA no PDF gera antes pelo botão de IA do relatório.
+            const aiToUse: unknown = aiState?.result || (session?.ai && typeof session.ai === 'object' ? session.ai : null) || null;
             const logoDataUrl = await fetchLogoDataUrl().catch(() => null)
             // Pre-fetch the muscle-map PNGs as base64. The exported HTML is
             // opened in iOS share / file:// blob contexts that can't reach the
@@ -698,8 +690,15 @@ const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose,
                                 onClick={() => setShowExportMenu(v => !v)}
                                 className="min-h-[36px] flex items-center gap-1.5 px-3 bg-neutral-900 hover:bg-neutral-800 text-neutral-100 rounded-xl transition-colors border border-neutral-800"
                             >
-                                <Download size={14} className="text-yellow-500" />
-                                <span className="text-xs font-black">Salvar</span>
+                                {isGenerating ? (
+                                    <svg className="size-3.5 animate-spin text-yellow-500" viewBox="0 0 24 24" fill="none" aria-hidden="true">
+                                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                                        <path className="opacity-90" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.4 0 0 5.4 0 12h4z" />
+                                    </svg>
+                                ) : (
+                                    <Download size={14} className="text-yellow-500" />
+                                )}
+                                <span className="text-xs font-black">{isGenerating ? 'Gerando…' : 'Salvar'}</span>
                             </button>
                             {showExportMenu && (
                                 <div className="absolute right-0 mt-2 w-52 bg-neutral-950 border border-neutral-800 rounded-2xl shadow-2xl overflow-hidden">
