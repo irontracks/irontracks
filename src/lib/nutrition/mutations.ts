@@ -1,5 +1,6 @@
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type { MealItem } from './engine'
+import { logWarn } from '@/lib/logger'
 
 /**
  * Núcleo compartilhado das mutações de nutrição (delete / edit / água) e do
@@ -42,10 +43,8 @@ function sanitizeItems(items: MealItem[]): MealItem[] {
   }))
 }
 
-/** Resolve a data (YYYY-MM-DD) no fuso de São Paulo quando não vier explícita. */
-export function resolveDateKey(dateKey?: string): string {
-  const s = typeof dateKey === 'string' ? dateKey.trim() : ''
-  if (s && /^\d{4}-\d{2}-\d{2}$/.test(s)) return s
+/** Data de HOJE (YYYY-MM-DD) no fuso de São Paulo. */
+function todayKeySaoPaulo(): string {
   try {
     return new Intl.DateTimeFormat('en-CA', {
       timeZone: 'America/Sao_Paulo',
@@ -56,6 +55,22 @@ export function resolveDateKey(dateKey?: string): string {
   } catch {
     return new Date().toISOString().slice(0, 10)
   }
+}
+
+/**
+ * Resolve a data (YYYY-MM-DD) no fuso de São Paulo quando não vier explícita.
+ *
+ * Aceita apenas datas bem-formadas de HOJE ou do PASSADO (feature de backdate:
+ * "esqueci de lançar uma refeição"). Data FUTURA ou formato inválido cai para hoje
+ * — o gate de data futura no cliente é apenas UX; sem esta trava no servidor um
+ * cliente pode gravar em datas absurdas ('9999-12-31') e disparar push de meta para
+ * dias que ainda não aconteceram.
+ */
+export function resolveDateKey(dateKey?: string): string {
+  const today = todayKeySaoPaulo()
+  const s = typeof dateKey === 'string' ? dateKey.trim() : ''
+  if (s && /^\d{4}-\d{2}-\d{2}$/.test(s) && s <= today) return s
+  return today
 }
 
 /** Soma os macros de todas as entries do (user, date). */
@@ -77,6 +92,40 @@ export async function recalcDayTotals(
     carbs: rows.reduce((s, r) => s + (Number((r as Record<string, unknown>)?.carbs) || 0), 0),
     fat: rows.reduce((s, r) => s + (Number((r as Record<string, unknown>)?.fat) || 0), 0),
   }
+}
+
+/**
+ * Recalcula os totais do dia E PERSISTE em `daily_nutrition_logs` (mesmo upsert do
+ * `trackMeal`). Delete/edit PRECISAM disto: sem reescrever o agregado, a linha do
+ * dia fica com o total antigo (inflado) até o próximo `trackMeal`, e é lida como
+ * autoritativa no ring do NutritionOverlay, no PDF, na correlação treino×nutrição e
+ * no contexto da IA. Não inclui `water_ml` no payload → o ON CONFLICT preserva a
+ * água já gravada (mesmo comportamento do `trackMeal`). Falha de upsert é não-fatal
+ * (a entry já foi mutada; o agregado se auto-corrige no próximo mutation).
+ */
+export async function recalcAndPersistDayTotals(
+  supabase: SupabaseClient,
+  userId: string,
+  date: string,
+): Promise<DayTotals> {
+  const totals = await recalcDayTotals(supabase, userId, date)
+  const { error } = await supabase
+    .from('daily_nutrition_logs')
+    .upsert(
+      {
+        user_id: userId,
+        date,
+        calories: Math.round(totals.calories),
+        protein: Math.round(totals.protein),
+        carbs: Math.round(totals.carbs),
+        fat: Math.round(totals.fat),
+      },
+      { onConflict: 'user_id,date' },
+    )
+  if (error) {
+    logWarn('nutrition:mutations', 'daily_nutrition_logs upsert failed', error.message)
+  }
+  return totals
 }
 
 /** Exclui uma entry do usuário e devolve os totais recalculados do dia. */
@@ -104,7 +153,7 @@ export async function deleteEntryCore(
   if (error) throw error
 
   let totals: DayTotals | null = null
-  if (entry?.date) totals = await recalcDayTotals(supabase, userId, String(entry.date))
+  if (entry?.date) totals = await recalcAndPersistDayTotals(supabase, userId, String(entry.date))
   return { totals }
 }
 
@@ -152,7 +201,7 @@ export async function editEntryCore(
   if (error) throw error
 
   let totals: DayTotals | null = null
-  if (updated?.date) totals = await recalcDayTotals(supabase, userId, String(updated.date))
+  if (updated?.date) totals = await recalcAndPersistDayTotals(supabase, userId, String(updated.date))
   return { totals }
 }
 
