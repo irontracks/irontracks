@@ -122,6 +122,10 @@ export function useStoryComposer({
     const [previewTime, setPreviewTime] = useState(0)
     // Fire-and-forget API ref (logging only — does NOT drive the displayed kcal)
     const kcalApiCalledRef = useRef(false)
+    // clientId estável da publicação: gerado na 1ª tentativa e REUSADO nos re-taps
+    // (retry manual após timeout) — o servidor deduplica por (author_id, client_id) e
+    // não duplica o story. Reseta no sucesso, pra a próxima publicação ter chave nova.
+    const publishClientIdRef = useRef<string | null>(null)
 
     useEffect(() => { backgroundUrlRef.current = backgroundUrl }, [backgroundUrl])
 
@@ -723,14 +727,20 @@ export function useStoryComposer({
                 meta = { ...baseMeta, mediaKind: 'image' }
             }
             const createUrl = isIosNative() ? `/api/social/stories/create?media_path=${encodeURIComponent(path)}` : '/api/social/stories/create'
+            // Gera o clientId só na 1ª tentativa; re-taps após timeout reusam o mesmo →
+            // o servidor deduplica e não cria story duplicado.
+            if (!publishClientIdRef.current) {
+                publishClientIdRef.current = (typeof crypto !== 'undefined' && crypto.randomUUID) ? crypto.randomUUID() : `${Date.now()}_${Math.random().toString(36).slice(2)}`
+            }
             const fetchController = new AbortController()
             const fetchTimeout = setTimeout(() => fetchController.abort(), 30_000)
             let createResp: Response
             try {
-                createResp = await fetch(createUrl, { method: 'POST', signal: fetchController.signal, headers: { 'content-type': 'application/json' }, body: JSON.stringify({ mediaPath: path, media_path: path, caption: captionOverride ?? String(metrics?.title || ''), meta }) })
+                createResp = await fetch(createUrl, { method: 'POST', signal: fetchController.signal, headers: { 'content-type': 'application/json' }, body: JSON.stringify({ mediaPath: path, media_path: path, caption: captionOverride ?? String(metrics?.title || ''), meta, clientId: publishClientIdRef.current }) })
             } finally { clearTimeout(fetchTimeout) }
             const createJson = await createResp.json().catch((): null => null)
             if (!createResp.ok || !createJson?.ok) throw new Error(String(createJson?.error || 'Falha ao publicar'))
+            publishClientIdRef.current = null // sucesso → próxima publicação tem chave nova
             setInfo('Publicado no IronTracks!')
             try { window.dispatchEvent(new Event('irontracks:stories:refresh')) } catch { }
             try { window.setTimeout(() => onClose?.(), 1000) } catch { }
