@@ -1,9 +1,17 @@
 import { describe, it, expect } from 'vitest'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import { resolveDateKey, recalcDayTotals, setWaterCore, editEntryCore } from '../mutations'
+import { resolveDateKey, recalcDayTotals, recalcAndPersistDayTotals, setWaterCore, editEntryCore, deleteEntryCore } from '../mutations'
+
+const todayKey = () =>
+  new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'America/Sao_Paulo',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(new Date())
 
 describe('resolveDateKey', () => {
-  it('passa adiante uma data já no formato YYYY-MM-DD', () => {
+  it('passa adiante uma data passada já no formato YYYY-MM-DD', () => {
     expect(resolveDateKey('2026-06-15')).toBe('2026-06-15')
     expect(resolveDateKey('  2026-01-02  ')).toBe('2026-01-02')
   })
@@ -13,6 +21,15 @@ describe('resolveDateKey', () => {
     expect(resolveDateKey(undefined)).toMatch(re)
     expect(resolveDateKey('')).toMatch(re)
     expect(resolveDateKey('15/06/2026')).toMatch(re)
+  })
+
+  it('NÃO aceita data FUTURA — cai pra hoje (trava anti-poluição do backdate)', () => {
+    const today = todayKey()
+    // Data absurda no futuro não pode ser gravada nem disparar push de meta.
+    expect(resolveDateKey('9999-12-31')).toBe(today)
+    expect(resolveDateKey('9999-12-31')).not.toBe('9999-12-31')
+    // Hoje continua aceito.
+    expect(resolveDateKey(today)).toBe(today)
   })
 })
 
@@ -80,6 +97,8 @@ describe('editEntryCore (edição por itens)', () => {
         },
         // usado pelo recalcDayTotals
         select: () => ({ eq: () => ({ eq: () => Promise.resolve({ data: [{ calories: 500, protein: 64, carbs: 44, fat: 6 }] }) }) }),
+        // usado pelo recalcAndPersistDayTotals (persiste o agregado do dia)
+        upsert: () => Promise.resolve({ error: null }),
       }),
     } as unknown as SupabaseClient
 
@@ -110,6 +129,7 @@ describe('editEntryCore (edição por itens)', () => {
           return { eq: () => ({ eq: () => ({ select: () => ({ maybeSingle: () => Promise.resolve({ data: { date: '2026-06-16' } }) }) }) }) }
         },
         select: () => ({ eq: () => ({ eq: () => Promise.resolve({ data: [] }) }) }),
+        upsert: () => Promise.resolve({ error: null }),
       }),
     } as unknown as SupabaseClient
 
@@ -127,11 +147,83 @@ describe('editEntryCore (edição por itens)', () => {
           return { eq: () => ({ eq: () => ({ select: () => ({ maybeSingle: () => Promise.resolve({ data: { date: '2026-06-16' } }) }) }) }) }
         },
         select: () => ({ eq: () => ({ eq: () => Promise.resolve({ data: [] }) }) }),
+        upsert: () => Promise.resolve({ error: null }),
       }),
     } as unknown as SupabaseClient
 
     await editEntryCore(supa, 'u', 'e1', { food_name: 'X', calories: 123, protein: 10, carbs: 20, fat: 5 })
     expect(updatePayload.calories).toBe(123)
     expect('items' in updatePayload).toBe(false)
+  })
+})
+
+/**
+ * Regression BUG 1 (auditoria nutrição): delete/edit PRECISAM reescrever o agregado
+ * `daily_nutrition_logs`. Sem isto, a linha do dia fica com o total antigo (inflado)
+ * até o próximo add, e é lida como autoritativa no ring do Overlay, PDF, correlação
+ * e contexto da IA. Estes testes travam que o upsert do agregado acontece com os
+ * totais RECALCULADOS.
+ */
+describe('recalcAndPersistDayTotals — persiste o agregado do dia', () => {
+  it('faz upsert em daily_nutrition_logs com os totais recalculados (arredondados)', async () => {
+    const upserts: Array<{ table: string; payload: Record<string, unknown> }> = []
+    const supa = {
+      from: (table: string) => ({
+        select: () => ({ eq: () => ({ eq: () => Promise.resolve({ data: [{ calories: 1200.4, protein: 90.6, carbs: 100, fat: 33 }] }) }) }),
+        upsert: (payload: Record<string, unknown>) => { upserts.push({ table, payload }); return Promise.resolve({ error: null }) },
+      }),
+    } as unknown as SupabaseClient
+
+    const totals = await recalcAndPersistDayTotals(supa, 'u', '2026-06-15')
+    expect(totals).toEqual({ calories: 1200.4, protein: 90.6, carbs: 100, fat: 33 })
+    expect(upserts).toHaveLength(1)
+    expect(upserts[0].table).toBe('daily_nutrition_logs')
+    // Arredonda ao persistir (coluna inteira), sem incluir water_ml (preserva no ON CONFLICT).
+    expect(upserts[0].payload).toMatchObject({ user_id: 'u', date: '2026-06-15', calories: 1200, protein: 91, carbs: 100, fat: 33 })
+    expect('water_ml' in upserts[0].payload).toBe(false)
+  })
+
+  it('erro do upsert é NÃO-fatal (a entry já foi mutada; devolve os totais)', async () => {
+    const supa = {
+      from: () => ({
+        select: () => ({ eq: () => ({ eq: () => Promise.resolve({ data: [] }) }) }),
+        upsert: () => Promise.resolve({ error: new Error('boom') }),
+      }),
+    } as unknown as SupabaseClient
+    await expect(recalcAndPersistDayTotals(supa, 'u', '2026-06-15')).resolves.toEqual({ calories: 0, protein: 0, carbs: 0, fat: 0 })
+  })
+})
+
+describe('deleteEntryCore — persiste o agregado após excluir', () => {
+  it('recalcula e faz upsert em daily_nutrition_logs após o delete', async () => {
+    const upserts: Array<{ table: string; payload: Record<string, unknown> }> = []
+    let deleted = false
+    let selectCall = 0
+    const supa = {
+      from: (table: string) => ({
+        // select #1 = lê a data da entry (.maybeSingle); #2 = recalcDayTotals (await direto)
+        select: () => {
+          selectCall++
+          const isEntryLookup = selectCall === 1
+          return {
+            eq: () => ({
+              eq: () =>
+                isEntryLookup
+                  ? { maybeSingle: () => Promise.resolve({ data: { date: '2026-06-15' } }) }
+                  : Promise.resolve({ data: [{ calories: 400, protein: 20, carbs: 30, fat: 10 }] }),
+            }),
+          }
+        },
+        delete: () => ({ eq: () => ({ eq: () => { deleted = true; return Promise.resolve({ error: null }) } }) }),
+        upsert: (payload: Record<string, unknown>) => { upserts.push({ table, payload }); return Promise.resolve({ error: null }) },
+      }),
+    } as unknown as SupabaseClient
+
+    const { totals } = await deleteEntryCore(supa, 'u', 'e1')
+    expect(deleted).toBe(true)
+    expect(totals).toEqual({ calories: 400, protein: 20, carbs: 30, fat: 10 })
+    expect(upserts).toHaveLength(1)
+    expect(upserts[0].table).toBe('daily_nutrition_logs')
+    expect(upserts[0].payload).toMatchObject({ user_id: 'u', date: '2026-06-15', calories: 400 })
   })
 })
