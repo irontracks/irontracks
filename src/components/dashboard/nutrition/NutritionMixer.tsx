@@ -1070,7 +1070,7 @@ export default function NutritionMixer({
                   <button type="button" onClick={() => (window.location.href = '/marketplace')} className="shrink-0 text-[10px] font-bold text-yellow-400 hover:text-yellow-300">VIP Pro →</button>
                 )}
               </div>
-              {String(error).startsWith('Não reconheci:') && !aiUpgrade && (
+              {String(error).startsWith('Não reconheci') && !aiUpgrade && (
                 <button type="button" onClick={estimateWithAi} disabled={aiBusy} className="mt-2 h-11 px-3 rounded-lg bg-white/[0.06] border border-white/[0.08] text-xs font-semibold text-white hover:bg-white/[0.1] disabled:opacity-50 transition">
                   {aiBusy ? 'Estimando...' : '🤖 Estimar com IA'}
                 </button>
