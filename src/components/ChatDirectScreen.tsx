@@ -55,6 +55,18 @@ interface ChatDirectScreenProps {
 
 const CHAT_MEDIA_PREVIEW_SIZE = 800;
 
+/**
+ * Resolve a URL de mídia de uma DM. Mídia do bucket privado chat-media é servida pela rota
+ * autorizada /api/chat/media (signed URL + gate de participação); GIFs/URLs externas (giphy)
+ * passam direto. Sem isto, a mídia ficava em URL pública permanente (qualquer um com o link baixava).
+ */
+const chatMediaSrc = (u: unknown): string => {
+  const s = String(u ?? '').trim();
+  if (!s) return '';
+  if (s.includes('/chat-media/')) return `/api/chat/media?u=${encodeURIComponent(s)}`;
+  return s;
+};
+
 const isRecord = (v: unknown): v is Record<string, unknown> => v !== null && typeof v === 'object' && !Array.isArray(v)
 
 const toMessageRow = (raw: Record<string, unknown>): MessageRow => {
@@ -817,14 +829,15 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
                                             if (payload?.type === 'image')
                                                 return (
                                                     <Image
-                                                        src={String(payload.thumb_url ?? payload.media_url ?? '')}
+                                                        src={chatMediaSrc(payload.thumb_url ?? payload.media_url)}
                                                         alt="imagem"
                                                         width={CHAT_MEDIA_PREVIEW_SIZE}
                                                         height={CHAT_MEDIA_PREVIEW_SIZE}
+                                                        unoptimized
                                                         className="rounded-lg max-h-64 w-full object-cover cursor-pointer"
                                                         onClick={() => {
                                                             try {
-                                                                const url = payload?.media_url ? String(payload.media_url) : '';
+                                                                const url = payload?.media_url ? chatMediaSrc(String(payload.media_url)) : '';
                                                                 if (!url) return;
                                                                 window.open(url, '_blank');
                                                             } catch { }
@@ -832,7 +845,7 @@ const ChatDirectScreen = ({ user, targetUser, otherUserId, otherUserName, otherU
                                                     />
                                                 );
                                             // eslint-disable-next-line jsx-a11y/media-has-caption, jsx-a11y/control-has-associated-label
-                                            if (payload?.type === 'video') return <video src={String(payload.media_url ?? '')} controls playsInline className="rounded-lg max-h-64 w-full" />;
+                                            if (payload?.type === 'video') return <video src={chatMediaSrc(payload.media_url)} controls playsInline className="rounded-lg max-h-64 w-full" />;
                                             if (payload?.type === 'gif')
                                                 return (
                                                     <Image
