@@ -147,9 +147,24 @@ export async function POST(req: Request) {
 
           // Mentioned users — exclude the commenter themselves and the story
           // author (the author already gets the story_comment notification).
-          const mentionedIds = Object.values(mentions.userIdsByHandle).filter(
+          const rawMentionedIds = Object.values(mentions.userIdsByHandle).filter(
             (id) => id && id !== auth.user.id && id !== authorId,
           )
+
+          // Só notifica menção a quem PODE VER o story (segue o autor, accepted). Sem
+          // este gate, extractMentions resolve @handle globalmente e qualquer usuário
+          // (comentando no PRÓPRIO story) spammava "você foi mencionado" para qualquer
+          // conta arbitrária — até ~300 alvos/min (rate-limit × 10 menções/comentário).
+          let mentionedIds: string[] = []
+          if (rawMentionedIds.length && authorId) {
+            const { data: rel } = await admin
+              .from('social_follows')
+              .select('follower_id')
+              .eq('following_id', authorId)
+              .eq('status', 'accepted')
+              .in('follower_id', rawMentionedIds)
+            mentionedIds = (Array.isArray(rel) ? rel : []).map((r) => String((r as { follower_id?: string })?.follower_id || '').trim()).filter(Boolean)
+          }
 
           const rows: Array<Record<string, unknown>> = []
 
