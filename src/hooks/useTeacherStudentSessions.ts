@@ -34,6 +34,13 @@ export function useTeacherStudentSessions(
    * aluno gera UPDATE; sem filtro, todos os alunos triplicam o tráfego.
    */
   studentUserIds?: readonly string[],
+  /**
+   * Sufixo do nome do canal Realtime. Necessário quando DOIS consumidores montam
+   * o hook pro mesmo teacher ao mesmo tempo (ex.: o TeacherControlHost global + o
+   * StudentsTab) — dois canais Supabase com o MESMO tópico podem conflitar. Cada
+   * consumidor passa um sufixo único.
+   */
+  channelSuffix?: string,
 ): ActiveMap {
   const [activeMap, setActiveMap] = useState<ActiveMap>({})
   const channelRef = useRef<RealtimeChannel | null>(null)
@@ -78,7 +85,7 @@ export function useTeacherStudentSessions(
 
     try {
       const ch = supabase
-        .channel(`teacher-student-sessions:${teacherUserId}`)
+        .channel(`teacher-student-sessions:${teacherUserId}${channelSuffix ? `:${channelSuffix}` : ''}`)
         .on(
           'postgres_changes',
           {
@@ -134,7 +141,7 @@ export function useTeacherStudentSessions(
         }
       } catch (e) { logWarn('useTeacherStudentSessions', 'cleanup failed', { error: String(e) }) }
     }
-  }, [supabase, teacherUserId, filterKey])
+  }, [supabase, teacherUserId, filterKey, channelSuffix])
 
   return activeMap
 }
