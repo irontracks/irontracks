@@ -71,7 +71,10 @@ export async function cancelRestEndPush(messageId: string): Promise<boolean> {
   try {
     await c.messages.cancel(messageId)
     return true
-  } catch {
+  } catch (e) {
+    // L4: não engolir silenciosamente — um cancel falho faz o push de fim de descanso
+    // disparar mesmo o usuário já tendo voltado. Vai pro Sentry via logError.
+    logError('rest-push', e instanceof Error ? e : new Error(`Falha ao cancelar push de fim de descanso: ${String(e)}`))
     return false
   }
 }
