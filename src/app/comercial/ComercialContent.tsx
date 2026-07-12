@@ -6,7 +6,10 @@ import Link from 'next/link'
 import { ArrowRight, Globe, Star } from 'lucide-react'
 
 const APPLE = 'https://apps.apple.com/br/app/irontracks/id6758735356'
-const PLAY  = 'https://play.google.com/apps/internaltest/4701049092773956563'
+// Android em teste FECHADO (faixa Alpha) via Grupo do Google com entrada livre.
+// O testador entra no grupo (sem aprovação) e depois abre o opt-in pra virar testador.
+const GROUP = 'https://groups.google.com/g/irontracks-beta'
+const PLAY  = 'https://play.google.com/apps/testing/com.irontracks.app'
 const WEB   = 'https://irontracks.com.br'
 
 // ── Reveal wrapper ──────────────────────────────────────────────────────────
@@ -1011,11 +1014,10 @@ function Footer() {
 // ── ANDROID MODAL ────────────────────────────────────────────────────────────
 function AndroidModal({ onClose }: { onClose: () => void }) {
   const steps = [
-    { n: '1', title: 'Acesse o link pelo seu Android', desc: 'Toque no botão abaixo para abrir a página do teste interno no Google Play.' },
-    { n: '2', title: 'Entre com sua conta Google', desc: 'Se não estiver logado, o Play Store vai pedir para você entrar.' },
-    { n: '3', title: 'Aceite o convite de testador', desc: 'Clique em "Aceitar convite" na página que abrir. Isso te adiciona ao programa de teste.' },
-    { n: '4', title: 'Aguarde 1 a 2 minutos', desc: 'O Google precisa processar a sua entrada. Não feche o Play Store.' },
-    { n: '5', title: 'Instale o IronTracks', desc: 'Após o processamento, o botão de instalar vai aparecer. Toque em "Instalar" e pronto!' },
+    { n: '1', title: 'Entre no grupo de testadores', desc: 'Toque em "Entrar no grupo de testadores" abaixo e clique em "Participar do grupo". É grátis e sem aprovação.' },
+    { n: '2', title: 'Acesse o teste no Google Play', desc: 'Toque em "Acessar o teste", entre com sua conta Google e clique em "Tornar-se testador".' },
+    { n: '3', title: 'Aguarde 1 a 2 minutos', desc: 'O Google precisa processar sua entrada no grupo. Não feche o Play Store.' },
+    { n: '4', title: 'Instale o IronTracks', desc: 'Recarregue a página do teste e toque em "Instalar". Pronto!' },
   ]
 
   return (
@@ -1053,18 +1055,18 @@ function AndroidModal({ onClose }: { onClose: () => void }) {
           </button>
         </div>
 
-        {/* Tag teste interno */}
+        {/* Tag versão beta (teste fechado) */}
         <div style={{
           display: 'inline-flex', alignItems: 'center', gap: 6,
           padding: '5px 12px', borderRadius: 999, marginBottom: 24,
           background: 'rgba(245,184,0,0.08)', border: '1px solid rgba(245,184,0,0.25)',
           fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', color: '#F5B800',
         }}>
-          ⚗ Versão de Teste Interno
+          ⚗ Versão Beta — Teste Fechado
         </div>
 
         <p style={{ color: 'rgba(245,245,245,0.55)', fontSize: 14, lineHeight: 1.6, marginBottom: 28 }}>
-          O IronTracks para Android está em teste. Siga os passos abaixo para instalar:
+          O IronTracks para Android está em teste fechado. Entre no grupo de testadores, acesse o teste e instale:
         </p>
 
         {/* Steps */}
@@ -1087,24 +1089,39 @@ function AndroidModal({ onClose }: { onClose: () => void }) {
           ))}
         </div>
 
-        {/* CTA */}
-        <a
-          href={PLAY}
-          target="_blank"
-          rel="noopener noreferrer"
-          style={{
-            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
-            padding: '15px 24px', borderRadius: 14, textDecoration: 'none',
-            background: 'linear-gradient(135deg, #FFD34D 0%, #F5B800 40%, #FF7A1A 100%)',
-            color: '#000', fontWeight: 700, fontSize: 15, width: '100%',
-          }}
-        >
-          <PlaySvg />
-          Acessar o programa de teste
-        </a>
+        {/* CTA — 2 passos: 1º entrar no grupo, 2º acessar o teste */}
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <a
+            href={GROUP}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+              padding: '15px 24px', borderRadius: 14, textDecoration: 'none',
+              background: 'linear-gradient(135deg, #FFD34D 0%, #F5B800 40%, #FF7A1A 100%)',
+              color: '#000', fontWeight: 700, fontSize: 15, width: '100%',
+            }}
+          >
+            1 · Entrar no grupo de testadores
+          </a>
+          <a
+            href={PLAY}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+              padding: '15px 24px', borderRadius: 14, textDecoration: 'none',
+              background: 'transparent', border: '1px solid rgba(245,184,0,0.4)',
+              color: '#F5B800', fontWeight: 700, fontSize: 15, width: '100%',
+            }}
+          >
+            <PlaySvg />
+            2 · Acessar o teste no Google Play
+          </a>
+        </div>
 
         <p style={{ textAlign: 'center', fontSize: 12, color: 'rgba(245,245,245,0.25)', marginTop: 14 }}>
-          Toque fora para fechar
+          Já é testador? Toque no botão 2 para instalar direto. Toque fora para fechar.
         </p>
       </div>
     </div>
