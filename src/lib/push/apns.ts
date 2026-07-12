@@ -15,6 +15,7 @@ import * as http2 from 'http2'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { logInfo, logError, logWarn } from '@/lib/logger'
 import { env } from '@/utils/env'
+import { isSilentApnsPush, buildApnsAps } from '@/lib/push/helpers/apnsPayload'
 import { getApnsConfig, getJwt } from '@/lib/push/apnsJwt'
 
 // ─── Conversation/Sender stable defaults ────────────────────────────────────
@@ -55,7 +56,11 @@ function withConversationDefaults(
         e.conversation_id = `feed-${e.sender_id}`
     }
 
-    e.__badge = badge
+    // H2: só preenche o badge default quando o caller NÃO passou __badge. Antes era `=`
+    // incondicional, que sobrescrevia o __badge:0 do clear-badge (endpoint que ZERA o badge)
+    // pelo default recalculado (?? 1) -> o "ghost badge" virava 1 permanente. `??=` preserva
+    // o 0 explícito (0 não é nullish).
+    e.__badge ??= badge
     return e
 }
 
@@ -112,26 +117,15 @@ async function sendOneApnsPush(
             const rawImageUrl = String(extra?.image_url ?? extra?.attachment_url ?? '').trim()
             const hasRichImage = rawImageUrl.length > 0 && /^https:\/\//i.test(rawImageUrl)
 
+            // H2/M1: aps montado em helper puro (testável). Silencioso (clear-badge) →
+            // content-available no aps (não alert/sound) + push-type=background abaixo.
+            const isSilent = isSilentApnsPush(title, body, extra)
+            const aps = buildApnsAps(title, body, extra, { notifType, wakesScreen, hasRichImage })
+
             const apnsPayload = JSON.stringify({
-                aps: {
-                    alert: { title, body },
-                    sound: 'default',
-                    badge: (extra?.__badge as number | undefined) ?? 1,
-                    // time-sensitive bypasses iOS Focus Mode and wakes the screen.
-                    // passive is for silent/low-priority. active for social events.
-                    'interruption-level': (() => {
-                        const passive = ['story_like', 'workout_like', 'pr_achieved']
-                        return passive.includes(notifType) ? 'active' : 'time-sensitive'
-                    })(),
-                    // Wake the NSE for either Communication upgrade or rich-image attachment.
-                    ...(wakesScreen || hasRichImage ? { 'mutable-content': 1 } : {}),
-                    // Notificação com botões: a briefing matinal ("vai treinar hoje?")
-                    // usa a categoria REST_DAY_PROMPT pra iOS mostrar Vou treinar /
-                    // Vou descansar (Opção A: ao tocar, abre o app e salva a resposta).
-                    ...(notifType === 'morning_briefing' ? { category: 'REST_DAY_PROMPT' } : {}),
-                },
-                // Spread extra but omit the internal __badge key used only for the aps.badge field
-                ...Object.fromEntries(Object.entries(extra ?? {}).filter(([k]) => k !== '__badge')),
+                aps,
+                // Spread extra mas omite __badge (só p/ aps.badge) e content-available (agora no aps)
+                ...Object.fromEntries(Object.entries(extra ?? {}).filter(([k]) => k !== '__badge' && k !== 'content-available')),
             })
 
             // Xcode debug builds use development provisioning profile → sandbox tokens
@@ -153,8 +147,10 @@ async function sendOneApnsPush(
                 ':path': `/3/device/${token}`,
                 'authorization': `bearer ${jwt}`,
                 'apns-topic': cfg.bundleId,
-                'apns-push-type': 'alert',
-                'apns-priority': '10',
+                // M1: background push (silencioso) exige push-type=background + priority=5;
+                // alert normal continua alert/priority=10.
+                'apns-push-type': isSilent ? 'background' : 'alert',
+                'apns-priority': isSilent ? '5' : '10',
                 // 0 = discard immediately if device offline (breaks delivery in gyms).
                 // Time-critical types: 10 min TTL. Social/informational: 1 hour.
                 'apns-expiration': (() => {
