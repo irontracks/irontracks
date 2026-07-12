@@ -12,19 +12,18 @@ import { createAdminClient } from '@/utils/supabase/admin'
 import { sendPushToAllPlatforms } from '@/lib/push/sender'
 import { insertNotifications, shouldThrottleBySenderType } from '@/lib/social/notifyFollowers'
 import { getErrorMessage } from '@/utils/errorMessage'
-import { env } from '@/utils/env'
+import { isCronAuthorized } from '@/utils/cron/auth'
 import { logError } from '@/lib/logger'
 
 export const dynamic = 'force-dynamic'
 
 export async function POST(req: Request) {
   try {
-    const cronSecret = env.security.cronSecret
-    if (cronSecret) {
-      const auth = req.headers.get('authorization')
-      if (auth !== `Bearer ${cronSecret}`) {
-        return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
-      }
+    // Fail-closed + tempo constante (isCronAuthorized): se CRON_SECRET não estiver setada,
+    // NEGA (antes o check ficava dentro de `if (cronSecret)` = endpoint público se a env
+    // sumisse). Aceita Bearer CRON_SECRET ou x-internal-secret, igual às outras crons.
+    if (!isCronAuthorized(req)) {
+      return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
     }
 
     const now = new Date()
