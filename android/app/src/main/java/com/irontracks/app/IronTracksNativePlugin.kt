@@ -30,6 +30,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.fragment.app.FragmentActivity
+import com.getcapacitor.JSArray
 import com.getcapacitor.JSObject
 import com.getcapacitor.Plugin
 import com.getcapacitor.PluginCall
@@ -90,6 +91,50 @@ class IronTracksNativePlugin : Plugin(), SensorEventListener {
         } catch (e: Exception) {
             call.resolve(JSObject().put("ok", false))
         }
+    }
+
+    // ─── Cardio GPS (foreground service + FusedLocationProvider) ───────────────
+    //
+    // Paridade com o iOS: startCardioLocation liga o CardioLocationService (foreground
+    // service tipo location) que bufferiza posições; o JS drena o buffer no timer/resume.
+
+    @PluginMethod
+    fun startCardioLocation(call: PluginCall) {
+        try {
+            ContextCompat.startForegroundService(context, Intent(context, CardioLocationService::class.java))
+            call.resolve(JSObject().put("ok", true).put("authorization", "granted"))
+        } catch (e: Exception) {
+            call.resolve(JSObject().put("ok", false).put("error", e.message ?: "start_failed"))
+        }
+    }
+
+    @PluginMethod
+    fun stopCardioLocation(call: PluginCall) {
+        try {
+            context.stopService(Intent(context, CardioLocationService::class.java))
+        } catch (e: Exception) { /* best effort */ }
+        call.resolve(JSObject().put("points", cardioFixesToJSArray(CardioLocationService.drain())))
+    }
+
+    @PluginMethod
+    fun drainCardioLocations(call: PluginCall) {
+        call.resolve(JSObject().put("points", cardioFixesToJSArray(CardioLocationService.drain())))
+    }
+
+    private fun cardioFixesToJSArray(fixes: List<CardioLocationService.Fix>): JSArray {
+        val arr = JSArray()
+        for (f in fixes) {
+            val o = JSObject()
+            o.put("lat", f.lat)
+            o.put("lng", f.lng)
+            o.put("accuracy", f.accuracy)
+            o.put("altitude", f.altitude)
+            o.put("speed", f.speed)
+            o.put("heading", f.heading)
+            o.put("timestamp", f.timestamp)
+            arr.put(o)
+        }
+        return arr
     }
 
     // ─── Notifications ───────────────────────────────────────────────────────

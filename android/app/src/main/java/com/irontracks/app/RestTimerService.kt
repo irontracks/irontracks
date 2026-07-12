@@ -169,11 +169,14 @@ class RestTimerService : Service() {
 
     private fun startForegroundCompat(notification: Notification) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-            // Android 14+ requires explicit foregroundServiceType at start.
+            // Android 14+ exige o foregroundServiceType explícito no start. Usamos
+            // SPECIAL_USE (bate com o manifest) — o tipo "health" exigia permissão de
+            // sensor em runtime (BODY_SENSORS/ACTIVITY_RECOGNITION) e lançava
+            // SecurityException, matando a notificação do cronômetro no Android 14+.
             startForeground(
                 NOTIF_ID_FOREGROUND,
                 notification,
-                ServiceInfo.FOREGROUND_SERVICE_TYPE_HEALTH
+                ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE
             )
         } else {
             startForeground(NOTIF_ID_FOREGROUND, notification)

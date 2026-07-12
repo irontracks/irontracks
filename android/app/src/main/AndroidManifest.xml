@@ -2,7 +2,7 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <application
-        android:allowBackup="true"
+        android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
@@ -34,12 +34,27 @@
             </intent-filter>
         </receiver>
 
-        <!-- Rest timer foreground service (Android 8+). Exempt from Doze/Standby so
-             rest timers fire precisely even when the screen is off mid-workout. -->
+        <!-- Rest timer foreground service (Android 8+): só mantém a notificação de
+             contagem visível. O disparo real do fim do descanso é sempre agendado via
+             AlarmManager.setExactAndAllowWhileIdle (não depende do sucesso do FGS).
+             Tipo "specialUse" (não "health") porque health exige permissão de sensor em
+             runtime no Android 14+ e o startForeground lançava SecurityException. -->
         <service
             android:name=".RestTimerService"
             android:exported="false"
-            android:foregroundServiceType="health" />
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="rest_timer_countdown" />
+        </service>
+
+        <!-- Cardio GPS foreground service: mantém o FusedLocationProvider entregando
+             posições em background (tela bloqueada/celular no bolso) durante a corrida,
+             espelhando o CLLocationManager em background do iOS. -->
+        <service
+            android:name=".CardioLocationService"
+            android:exported="false"
+            android:foregroundServiceType="location" />
 
         <provider
             android:name="androidx.core.content.FileProvider"
@@ -59,6 +74,15 @@
         <meta-data android:name="io.sentry.traces.sample-rate" android:value="0.1" />
         <meta-data android:name="io.sentry.send-default-pii" android:value="false" />
         <meta-data android:name="io.sentry.auto-init" android:value="true" />
+
+        <!-- Ícone monocromático da notificação push (FCM). Sem isto o Android 8+ mostra
+             um quadrado branco (o launcher opaco vira silhueta alpha). -->
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_icon"
+            android:resource="@drawable/ic_stat_notify" />
+        <meta-data
+            android:name="com.google.firebase.messaging.default_notification_color"
+            android:resource="@color/notification_accent" />
     </application>
 
     <!-- Permissions -->
@@ -70,20 +94,26 @@
     <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
     <uses-permission android:name="android.permission.USE_BIOMETRIC" />
 
-    <!-- Foreground Service for rest timer (Android 8+). FOREGROUND_SERVICE_HEALTH
-         requires API 34+; the service type "health" matches the fitness use case
-         and avoids the stricter media/location categories. -->
+    <!-- Câmera + microfone: a WebView usa getUserMedia para o scanner de código de
+         barras (nutrição), a entrada por voz e captura de mídia. Sem declarar aqui, o
+         SO auto-nega SEM diálogo e getUserMedia falha (features mortas no Android).
+         O iOS declara NSCameraUsageDescription/NSMicrophoneUsageDescription. -->
+    <uses-permission android:name="android.permission.CAMERA" />
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.MODIFY_AUDIO_SETTINGS" />
+
+    <!-- Foreground services: rest timer (specialUse) e cardio GPS (location). -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_HEALTH" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="28" />
 
-    <!-- Location (GPS): required for Cardio route tracking and gym check-in
-         via @capacitor/geolocation. Without these, requestPermissions() on
-         Android silently returns denied and GPS never starts — which is
-         exactly the bug that was preventing Cardio GPS from working on
-         Android. -->
+    <!-- Location (GPS): rota do cardio + check-in de academia. ACCESS_BACKGROUND_LOCATION
+         permite o foreground service continuar recebendo posições com a tela bloqueada
+         (paridade com UIBackgroundModes=location do iOS). -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
 </manifest>
 
