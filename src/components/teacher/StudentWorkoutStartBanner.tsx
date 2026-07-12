@@ -1,8 +1,8 @@
 'use client'
 
-import { useCallback, useMemo, useState } from 'react'
+import { useCallback, useState } from 'react'
+import type { SupabaseClient } from '@supabase/supabase-js'
 import { Gamepad2, X, Loader2 } from 'lucide-react'
-import { createClient } from '@/utils/supabase/client'
 import { useStudentWorkoutStartAlerts } from '@/hooks/useStudentWorkoutStartAlerts'
 import { logError } from '@/lib/logger'
 
@@ -10,9 +10,12 @@ import { logError } from '@/lib/logger'
  * Banner no dashboard do professor: aparece em tempo real quando um aluno dele inicia um
  * treino, com o botão "Assumir" (dispara o request de controle — o aluno ainda precisa
  * aceitar). Some sozinho quando a sessão do aluno acaba (DELETE) ou ao dispensar.
+ *
+ * Recebe o cliente supabase COMPARTILHADO do dashboard (não cria um novo) — um cliente
+ * fresco pode conectar o socket do realtime antes de ter o token de auth e a RLS bloqueia
+ * a entrega dos eventos.
  */
-export default function StudentWorkoutStartBanner({ teacherUserId }: { teacherUserId?: string }) {
-  const supabase = useMemo(() => createClient(), [])
+export default function StudentWorkoutStartBanner({ teacherUserId, supabase }: { teacherUserId?: string; supabase: SupabaseClient | null }) {
   const { alerts, dismiss } = useStudentWorkoutStartAlerts(supabase, teacherUserId)
   const [busy, setBusy] = useState<string | null>(null)
   const [requested, setRequested] = useState<Record<string, boolean>>({})
