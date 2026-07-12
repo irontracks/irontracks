@@ -1202,6 +1202,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                         onEditWorkout={() => handleOpenActiveWorkoutEditor()}
                                         onAddExercise={() => handleOpenActiveWorkoutEditor({ addExercise: true })}
                                         controlledByName={controlNotice.controlStatus === 'active' ? controlNotice.controlledByName : null}
+                                        onRevokeControl={controlNotice.reject}
                                     />
                                 </SectionErrorBoundary>
                             )}
