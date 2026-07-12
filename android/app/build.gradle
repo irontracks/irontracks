@@ -28,7 +28,9 @@ android {
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
         versionCode 8
-        versionName "1.6.1"
+        // versionName alinhado com a linha do iOS (MARKETING_VERSION). Bumpar à mão
+        // aqui num release novo (o android-release.sh só bumpa o versionCode).
+        versionName "1.14.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         // SENTRY_DSN is injected into AndroidManifest via manifestPlaceholders.
         // Pass via -PSENTRY_DSN=... on the CLI or set in ~/.gradle/gradle.properties.
