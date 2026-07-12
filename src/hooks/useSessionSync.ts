@@ -156,6 +156,16 @@ export function useSessionSync({
     const activeSessionRef = useRef(activeSession)
     useEffect(() => { activeSessionRef.current = activeSession }, [activeSession])
 
+    // Guarda o `startedAt` do treino cujo "clean-slate" de START já foi aplicado.
+    // Um treino recém-iniciado (template) NÃO tem `_savedAt`; se sobrou uma linha
+    // antiga na tabela (zombie — o treino anterior não foi deletado no fim), o upsert
+    // com onConflict:user_id vira UPDATE e PRESERVA controlled_by/control_status: o
+    // professor fica "assumido pra sempre" e, por ser UPDATE (não INSERT), o banner
+    // do professor não dispara no treino novo. Por isso, no PRIMEIRO write de um start
+    // do zero, deletamos a linha antiga antes do upsert → INSERT limpo, sem controle
+    // herdado. Restaurações (têm `_savedAt`) nunca passam por aqui.
+    const startCleanSlateForRef = useRef<string>('')
+
     const notifyMigrationWarning = useCallback(() => {
         if (serverSessionSyncWarnedRef.current) return
         serverSessionSyncWarnedRef.current = true
@@ -421,6 +431,21 @@ export function useSessionSync({
                 const startedAtMs = typeof startedAtRaw === 'number' ? startedAtRaw : new Date(startedAtRaw || 0).getTime()
                 if (!Number.isFinite(startedAtMs) || startedAtMs <= 0) return
                 if (!activeSession?.workout) return
+
+                // Clean-slate no START do zero: se a sessão nunca foi persistida (sem
+                // `_savedAt`) e ainda não limpamos esta startedAt, apaga qualquer linha
+                // antiga do usuário antes do upsert. Isso zera controle herdado de um
+                // zombie e força um INSERT (o banner do professor volta a disparar).
+                // Feito no máx. 1x por startedAt (ref) e nunca em restauração (tem _savedAt).
+                const startedKey = String(startedAtMs)
+                const alreadyPersisted = Boolean((activeSession as Record<string, unknown>)?._savedAt)
+                if (!alreadyPersisted && startCleanSlateForRef.current !== startedKey) {
+                    startCleanSlateForRef.current = startedKey
+                    try {
+                        await supabase.from('active_workout_sessions').delete().eq('user_id', uid)
+                    } catch (e) { logWarn('useSessionSync', 'start clean-slate delete failed', { error: String(e) }) }
+                    if (serverSessionSyncRef.current.lastKey !== key) return
+                }
 
                 const savedAt = Date.now()
                 const state = { ...(activeSession || {}), _savedAt: savedAt, _deviceId: DEVICE_ID }
