@@ -47,7 +47,11 @@ const verifyWebhook = (opts: { secret: string; xSignature: string; xRequestId: s
 
   const manifest = `id:${opts.dataId};request-id:${opts.xRequestId};ts:${ts};`
   const hashed = crypto.createHmac('sha256', opts.secret).update(manifest).digest('hex')
-  return hashed.toLowerCase() === v1.toLowerCase()
+  // Comparação em tempo constante (igual ao webhook Asaas) — evita o timing-attack teórico
+  // do === puro sobre o HMAC. Buffers hex; length mismatch (v1 malformado) => false.
+  const a = Buffer.from(hashed.toLowerCase(), 'hex')
+  const b = Buffer.from(String(v1 || '').toLowerCase(), 'hex')
+  return a.length > 0 && a.length === b.length && crypto.timingSafeEqual(a, b)
 }
 
 const mapSubscriptionStatus = (status: string) => {
