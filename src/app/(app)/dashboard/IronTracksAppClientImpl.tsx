@@ -936,7 +936,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                         {/* GPS: Auto-detect gym toast */}
                         {view === 'dashboard' && <GymDetectToastWrapper userId={user?.id} onStartWorkout={() => setCreateWizardOpen(true)} />}
                         {/* Professor: banner em tempo real quando um aluno inicia treino (assumir controle) */}
-                        {isCoach && view === 'dashboard' && <StudentWorkoutStartBanner teacherUserId={user?.id ? String(user.id) : undefined} />}
+                        {isCoach && view === 'dashboard' && <StudentWorkoutStartBanner teacherUserId={user?.id ? String(user.id) : undefined} supabase={supabase} />}
                         <GuidedTour
                             open={Boolean(tourOpen)}
                             steps={getTourSteps({
