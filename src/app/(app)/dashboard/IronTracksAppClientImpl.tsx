@@ -10,6 +10,7 @@ import LoadingScreen from '@/components/LoadingScreen';
 import CommunityLoading from '@/app/(app)/community/loading';
 const ActiveWorkout = dynamic(() => import('@/components/ActiveWorkout'), { ssr: false });
 const RestTimerOverlay = dynamic(() => import('@/components/workout/RestTimerOverlay'), { ssr: false });
+const TeacherControlHost = dynamic(() => import('@/components/teacher/TeacherControlHost'), { ssr: false });
 const IncomingInviteModal = dynamic(() => import('@/components/IncomingInviteModal'), { ssr: false, loading: () => null });
 const InviteAcceptedModal = dynamic(() => import('@/components/InviteAcceptedModal'), { ssr: false, loading: () => null });
 import { DashboardHeader } from './DashboardHeader';
@@ -926,6 +927,9 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
             >
                 {/* Side-effects nativos centralizados (push, presence, UTM, intent router, BG refresh) */}
                 <DashboardEffects userId={user?.id} onIntent={handleNativeIntent} />
+                {/* Professor: host GLOBAL do controle de treino — abre o modal quando o aluno
+                    aceita, em QUALQUER tela (antes só abria na aba de alunos). */}
+                {isCoach && <TeacherControlHost teacherUserId={user?.id ? String(user.id) : undefined} supabase={supabase} />}
                     <div className="w-full bg-neutral-900 min-h-screen relative flex flex-col overflow-hidden" suppressHydrationWarning>
                         <IncomingInviteModal
                             onStartSession={handleStartSession}

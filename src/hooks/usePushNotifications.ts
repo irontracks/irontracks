@@ -160,6 +160,19 @@ export function usePushNotifications(userId?: string | null) {
                 return
               }
 
+              // Professor tocou no push "Controle aceito!" — abre o controle do treino
+              // do aluno. Fallback pro caso do realtime ter perdido a transição enquanto
+              // o app estava em background. Evento consumido pelo TeacherControlHost
+              // (string literal p/ não acoplar o bundle do host a este hook).
+              if (type === 'teacher_control_accepted') {
+                const studentId = data ? String(data.studentId ?? data.student_id ?? '').trim() : ''
+                window.dispatchEvent(new CustomEvent('irontracks:push:navigate', { detail: { link: '/dashboard', type } }))
+                if (studentId) {
+                  window.dispatchEvent(new CustomEvent('irontracks:teacher-control:open', { detail: { userId: studentId } }))
+                }
+                return
+              }
+
               if (link || type) {
                 // Dedupe: iOS WKWebView pode re-entregar o mesmo action durante
                 // cold-launch + warm-launch. Se o mesmo action ID chegou nos
