@@ -103,6 +103,10 @@ type IronTracksNativePlugin = {
   checkGeofenceStatus: () => Promise<{ active: boolean; authorization: string; gymName: string }>
   requestAlwaysLocationPermission: () => Promise<{ status: string }>
   addListener(eventName: 'gymGeofenceEntered', listenerFunc: (data: { gymName: string }) => void): Promise<PluginListenerHandle>
+  // Cardio GPS — continuous background location (run/bike tracking)
+  startCardioLocation: () => Promise<{ ok: boolean; authorization?: string }>
+  stopCardioLocation: () => Promise<{ points: NativeCardioFix[] }>
+  drainCardioLocations: () => Promise<{ points: NativeCardioFix[] }>
   // BGTaskScheduler — schedule next refresh / sync windows
   scheduleBackgroundTasks: () => Promise<{ ok: boolean }>
   addListener(eventName: 'backgroundRefresh', listenerFunc: (data: { kind: 'refresh' | 'sync' }) => void): Promise<PluginListenerHandle>
@@ -140,6 +144,22 @@ type IronTracksNativePlugin = {
 export type HapticStyle =
   | 'light' | 'medium' | 'heavy' | 'rigid' | 'soft'
   | 'success' | 'warning' | 'error' | 'selection'
+
+/** A single GPS fix as delivered by the native cardio location manager. */
+export interface NativeCardioFix {
+  lat: number
+  lng: number
+  /** Horizontal accuracy in meters (lower is better). */
+  accuracy: number
+  /** Altitude in meters. */
+  altitude: number
+  /** Speed in m/s (-1 when unavailable). */
+  speed: number
+  /** Course/heading in degrees (-1 when unavailable). */
+  heading: number
+  /** Unix ms the fix was produced. */
+  timestamp: number
+}
 
 // ─── Web / fallback implementation ───────────────────────────────────────────
 
@@ -193,6 +213,9 @@ const webFallback: IronTracksNativePlugin = {
   stopGymGeofence: async () => ({ ok: false }),
   checkGeofenceStatus: async () => ({ active: false, authorization: 'denied', gymName: '' }),
   requestAlwaysLocationPermission: async () => ({ status: 'denied' }),
+  startCardioLocation: async () => ({ ok: false }),
+  stopCardioLocation: async () => ({ points: [] }),
+  drainCardioLocations: async () => ({ points: [] }),
   scheduleBackgroundTasks: async () => ({ ok: false }),
   getLiveActivityPushTokens: async () => ({ tokens: [] }),
   kvGet: async () => ({ value: null, exists: false }),
@@ -240,6 +263,47 @@ export const openAppSettings = async () => {
     return await Native.openAppSettings()
   } catch {
     return { ok: false }
+  }
+}
+
+// ─── Cardio GPS (continuous background location — iOS native only) ────────────
+//
+// O plugin nativo (CLLocationManager + background updates + buffer) só existe no
+// iOS. No Android/web, estas funções são no-op e o cardio cai no fallback
+// @capacitor/geolocation (useGeoLocation), preservando o comportamento atual.
+
+/** True quando o tracker nativo de cardio está disponível (iOS nativo). */
+export const isNativeCardioLocationAvailable = (): boolean => isIosNative()
+
+/** Inicia o tracking nativo (background). Resolve ok:false se indisponível/negado. */
+export const startNativeCardioLocation = async (): Promise<{ ok: boolean; authorization?: string }> => {
+  try {
+    if (!isIosNative()) return { ok: false }
+    return await Native.startCardioLocation()
+  } catch {
+    return { ok: false }
+  }
+}
+
+/** Para o tracking nativo e devolve os pontos ainda em buffer. */
+export const stopNativeCardioLocation = async (): Promise<NativeCardioFix[]> => {
+  try {
+    if (!isIosNative()) return []
+    const res = await Native.stopCardioLocation()
+    return Array.isArray(res?.points) ? res.points : []
+  } catch {
+    return []
+  }
+}
+
+/** Drena (retorna + limpa) os fixes bufferizados nativamente desde a última chamada. */
+export const drainNativeCardioLocations = async (): Promise<NativeCardioFix[]> => {
+  try {
+    if (!isIosNative()) return []
+    const res = await Native.drainCardioLocations()
+    return Array.isArray(res?.points) ? res.points : []
+  } catch {
+    return []
   }
 }
 
