@@ -3,6 +3,7 @@
 import React, { useMemo, useState, useEffect } from 'react';
 import { ArrowDown, CheckCircle2, ChevronDown, ChevronUp, Dumbbell, Link, Loader2, Pencil, Play, Plus, Share2, Trash2, Trophy } from 'lucide-react';
 import { useWorkoutContext, useWorkoutLogs } from './WorkoutContext';
+import { pickExerciseLogSlice, shallowEqualByRef } from './helpers/exerciseLogSlice';
 import {
   NormalSet,
   RestPauseSet,
@@ -41,8 +42,11 @@ function useSafeTeamWorkout() {
 
 type GroupPos = 'first' | 'middle' | 'last';
 
-function ExerciseCardInner({ ex, exIdx, groupPos }: { ex: WorkoutExercise; exIdx: number; groupPos?: GroupPos }) {
-  const logs = useWorkoutLogs();
+function ExerciseCardInner({ ex, exIdx, groupPos, logsSlice }: { ex: WorkoutExercise; exIdx: number; groupPos?: GroupPos; logsSlice: Record<string, Record<string, unknown>> }) {
+  // Só as entradas de log DESTE exercício (passadas pelo wrapper connected, com referência
+  // estável). Assim o card só re-renderiza quando as próprias séries mudam — não a cada
+  // tecla em qualquer outro exercício. Ver helpers/exerciseLogSlice.ts.
+  const logs = logsSlice;
   const {
     workout,
     collapsed,
@@ -615,5 +619,32 @@ function ExerciseCardInner({ ex, exIdx, groupPos }: { ex: WorkoutExercise; exIdx
   );
 }
 
-const ExerciseCard = React.memo(ExerciseCardInner);
+// Comparador do memo: re-renderiza o card pesado só quando ex/exIdx/groupPos mudam OU o slice
+// de logs DESTE exercício muda (shallow por referência). Assim uma tecla em outro exercício
+// (que gera um slice novo mas shallow-igual aqui) NÃO re-renderiza este card.
+function arePropsEqual(
+  prev: { ex: WorkoutExercise; exIdx: number; groupPos?: GroupPos; logsSlice: Record<string, Record<string, unknown>> },
+  next: { ex: WorkoutExercise; exIdx: number; groupPos?: GroupPos; logsSlice: Record<string, Record<string, unknown>> },
+): boolean {
+  return (
+    prev.ex === next.ex &&
+    prev.exIdx === next.exIdx &&
+    prev.groupPos === next.groupPos &&
+    shallowEqualByRef(prev.logsSlice, next.logsSlice)
+  );
+}
+
+const ExerciseCardMemo = React.memo(ExerciseCardInner, arePropsEqual);
+
+// Wrapper "connected": ISOLA a assinatura do context de logs. Ele re-renderiza a cada tecla
+// (é barato — só extrai o slice), mas o card pesado (ExerciseCardMemo) só re-renderiza quando
+// o slice DESTE exercício muda (via arePropsEqual). Antes, o ExerciseCardInner chamava
+// useWorkoutLogs() direto e o React.memo era inútil (context não respeita memo) -> todos os
+// cards re-renderizavam a cada tecla. Os 4 call sites (lista, partner overlay, 2× teacher)
+// seguem renderizando <ExerciseCard> sem mudança — o wrapper cuida dos logs internamente.
+function ExerciseCard({ ex, exIdx, groupPos }: { ex: WorkoutExercise; exIdx: number; groupPos?: GroupPos }) {
+  const logs = useWorkoutLogs() as Record<string, Record<string, unknown>>;
+  const logsSlice = pickExerciseLogSlice(logs, exIdx) as Record<string, Record<string, unknown>>;
+  return <ExerciseCardMemo ex={ex} exIdx={exIdx} groupPos={groupPos} logsSlice={logsSlice} />;
+}
 export default ExerciseCard;
