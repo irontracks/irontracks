@@ -17,7 +17,7 @@ import {
 } from 'lucide-react'
 import type { ParsedExercise } from '@/app/api/ai/parse-exercise-voice/route'
 import { requestVoicePermissions, openAppSettings, startNativeSpeechRecognition, stopNativeSpeechRecognition } from '@/utils/native/irontracksNative'
-import { isIosNative } from '@/utils/platform'
+import { isIosNative, isNativePlatform } from '@/utils/platform'
 import { useFocusTrap } from '@/hooks/useFocusTrap'
 import { useBackHandler } from '@/hooks/useBackHandler'
 
@@ -326,9 +326,11 @@ export default function VoiceWorkoutModal({
 
   // Opens the app's settings page so the user can re-enable mic / speech recognition
   const openDeviceSettings = useCallback(() => {
-    // On iOS native, use the Capacitor plugin that calls UIApplication.openSettingsURLString.
-    // On web / Android, fall back to the system URL scheme.
-    if (isIosNative()) {
+    // Em QUALQUER nativo (iOS ou Android) usa a ponte openAppSettings() — o plugin
+    // Kotlin abre Settings.ACTION_APPLICATION_DETAILS_SETTINGS. O esquema 'app-settings:'
+    // é exclusivo do iOS e era no-op no Android (usuário não conseguia reabilitar a
+    // permissão negada). Só cai no esquema de URL no WEB.
+    if (isNativePlatform()) {
       void openAppSettings()
     } else {
       window.open('app-settings:', '_system')
