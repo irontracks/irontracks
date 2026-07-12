@@ -147,13 +147,20 @@ export default function CommunityClient({ embedded }: { embedded?: boolean }) {
 function CommunityClientInner({ embedded }: { embedded?: boolean }) {
   const router = useRouter()
   const { notify } = useInAppNotifications()
+  // Erros de follow/cancel/unfollow do hook viram toast não-bloqueante (antes eram
+  // window.alert cru, que trava a main thread). Estável p/ não recriar os callbacks do hook.
+  const notifyError = useCallback((text: string) => {
+    const msg = String(text || '').trim()
+    if (!msg) return
+    notify({ text: msg, senderName: 'Comunidade', displayName: 'Comunidade', photoURL: undefined, type: 'info' })
+  }, [notify])
   const {
     supabase, userId, loading, profiles, follows, followRequests, loadError,
     busyId, busyRequestId,
     feedItems, feedLoading, feedError, feedHasMore, feedLoadedRef, loadFeed,
     onlineFriends, onlineFriendProfiles,
     respondFollowRequest, cancelFollowRequest, follow, unfollow,
-  } = useCommunityData()
+  } = useCommunityData(notifyError)
   const userSettingsApi = useUserSettings(userId)
   const [communitySettingsOpen, setCommunitySettingsOpen] = useState(false)
   const [query, setQuery] = useState('')
@@ -381,9 +388,9 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
                   onClick={async () => {
                     try {
                       const res = await userSettingsApi.save()
-                      if (!res?.ok) { if (typeof window !== 'undefined') window.alert(String(res?.error || 'Falha ao salvar')); return }
+                      if (!res?.ok) { notifyError(String(res?.error || 'Falha ao salvar')); return }
                       setCommunitySettingsOpen(false)
-                    } catch (e) { if (typeof window !== 'undefined') window.alert(e instanceof Error ? e.message : String(e)) }
+                    } catch (e) { notifyError(e instanceof Error ? e.message : String(e)) }
                   }}
                   className="flex-1 py-3 rounded-xl font-black text-sm text-black transition-all disabled:opacity-50 active:scale-[0.98]"
                   style={{ background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 60%, #b45309 100%)', boxShadow: '0 4px 16px rgba(234,179,8,0.3)' }}

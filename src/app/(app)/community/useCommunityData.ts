@@ -37,7 +37,7 @@ export type FeedItem = {
 // Hook
 // ────────────────────────────────────────────────────────────────
 
-export function useCommunityData() {
+export function useCommunityData(notifyError?: (msg: string) => void) {
   const supabase = useMemo(() => createClient(), [])
   const [userId, setUserId] = useState<string>('')
   const [loading, setLoading] = useState(true)
@@ -278,13 +278,13 @@ export function useCommunityData() {
         const raw = String(data?.error || 'Falha ao responder')
         const lower = raw.toLowerCase()
         const msg = lower.includes('schema cache') || lower.includes('could not find the table') || lower.includes('social_follows') ? 'O Social System não está aplicado no Supabase (tabela social_follows ausente).' : lower.includes('replica identity') ? 'Falha ao atualizar a solicitação. Rode as migrations.' : raw
-        if (typeof window !== 'undefined') window.alert(msg)
+        notifyError?.(msg)
         return
       }
       setFollowRequests((prev) => prev.filter((r) => r.follower_id !== fid))
-    } catch (e) { if (typeof window !== 'undefined') window.alert(e instanceof Error ? e.message : String(e)) }
+    } catch (e) { notifyError?.(e instanceof Error ? e.message : String(e)) }
     finally { setBusyRequestId('') }
-  }, [userId, busyRequestId])
+  }, [userId, busyRequestId, notifyError])
 
   const cancelFollowRequest = useCallback(async (profileId: string) => {
     const pid = String(profileId || '').trim()
@@ -293,14 +293,14 @@ export function useCommunityData() {
     try {
       const res = await fetch('/api/social/follow/cancel', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ following_id: pid }) })
       const data = await res.json().catch((): null => null)
-      if (!data?.ok) { const raw = String(data?.error || 'Falha ao cancelar'); if (typeof window !== 'undefined') window.alert(raw); return }
+      if (!data?.ok) { const raw = String(data?.error || 'Falha ao cancelar'); notifyError?.(raw); return }
       const status = String(data?.status || '').trim().toLowerCase()
       const already = data?.already === true
       if (!already || status !== 'accepted') setFollows((prev) => { const next = new Map(prev); next.delete(pid); return next })
       try { await loadAll(userId) } catch { }
-    } catch (e) { if (typeof window !== 'undefined') window.alert(e instanceof Error ? e.message : String(e)) }
+    } catch (e) { notifyError?.(e instanceof Error ? e.message : String(e)) }
     finally { setBusyId('') }
-  }, [userId, busyId, loadAll])
+  }, [userId, busyId, loadAll, notifyError])
 
   const follow = useCallback(async (profileId: string, showMessage: (msg: string) => void) => {
     const pid = String(profileId || '').trim()
@@ -334,9 +334,9 @@ export function useCommunityData() {
       const { error } = await supabase.from('social_follows').delete().eq('follower_id', userId).eq('following_id', pid)
       if (error) throw error
       try { await supabase.from('notifications').delete().eq('user_id', userId).eq('sender_id', pid) } catch { }
-    } catch (e) { setFollows(rollback); if (typeof window !== 'undefined') window.alert(e instanceof Error ? e.message : String(e)) }
+    } catch (e) { setFollows(rollback); notifyError?.(e instanceof Error ? e.message : String(e)) }
     finally { setBusyId('') }
-  }, [userId, busyId, follows, supabase])
+  }, [userId, busyId, follows, supabase, notifyError])
 
   return {
     supabase,
