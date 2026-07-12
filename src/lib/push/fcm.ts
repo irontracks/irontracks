@@ -143,6 +143,16 @@ async function sendOneFcmPush(
             /* keep raw */
         }
 
+        // H1 (auditoria push): remove token DEFINITIVAMENTE morto (FCM confirma inexistente),
+        // espelhando o APNs. Só dispara em 404/NOT_FOUND/UNREGISTERED — NUNCA em auth/
+        // rate-limit/5xx/payload, pra jamais apagar um token VIVO. Ver isDeadFcmToken + testes.
+        if (isDeadFcmToken(res.status, errBody)) {
+            const admin = createAdminClient()
+            Promise.resolve(admin.from('device_push_tokens').delete().eq('token', token))
+                .then(() => logWarn('fcm', `[FCM] Removed stale token: ${token.slice(0, 8)}...`))
+                .catch((delErr) => logError('fcm', '[FCM] Failed to remove stale token', delErr))
+        }
+
         logWarn('fcm', `[FCM] Push failed: ${reason} — token=${token.slice(0, 8)}...`)
         return { ok: false, error: reason }
     } catch (e) {
@@ -150,6 +160,35 @@ async function sendOneFcmPush(
         logError('fcm', '[FCM] Unexpected error in sendOneFcmPush', msg)
         return { ok: false, error: msg }
     }
+}
+
+/**
+ * H1 (auditoria push): decide se um erro do FCM v1 significa token DEFINITIVAMENTE morto
+ * (deve sair de device_push_tokens) vs. erro transitório/nosso (NÃO remover).
+ *
+ * Remove SÓ quando o Google confirma que o token não existe mais:
+ *   - HTTP 404 (messages:send só devolve 404 pra token inexistente),
+ *   - error.status === 'NOT_FOUND' | 'UNREGISTERED',
+ *   - error.details[].errorCode === 'UNREGISTERED'.
+ * NÃO remove em 401/403 (auth nossa), 429 (rate limit), 5xx (transitório) nem
+ * INVALID_ARGUMENT/400 (payload ambíguo) — assim um token VIVO nunca é apagado.
+ */
+export function isDeadFcmToken(status: number, errBody: string): boolean {
+    if (status === 404) return true
+    try {
+        const json = JSON.parse(errBody) as { error?: { status?: unknown; details?: unknown } }
+        const err = json?.error
+        const statusStr = String(err?.status ?? '')
+        if (statusStr === 'NOT_FOUND' || statusStr === 'UNREGISTERED') return true
+        const details = Array.isArray(err?.details) ? err.details : []
+        for (const d of details) {
+            const code = String((d as { errorCode?: unknown })?.errorCode ?? '')
+            if (code === 'UNREGISTERED') return true
+        }
+    } catch {
+        /* body não-JSON: sem sinal definitivo → não remove */
+    }
+    return false
 }
 
 // ─── Public API ─────────────────────────────────────────────────────────────
