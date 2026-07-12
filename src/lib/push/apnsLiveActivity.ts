@@ -21,7 +21,8 @@
 import * as http2 from 'http2'
 import { getApnsConfig, getJwt, type ApnsConfig } from '@/lib/push/apnsJwt'
 import { createAdminClient } from '@/utils/supabase/admin'
-import { logInfo, logWarn, logError } from '@/lib/logger'
+import { logInfo, logError } from '@/lib/logger'
+import { env } from '@/utils/env'
 
 export type LiveActivityKind = 'rest' | 'workout'
 export type LiveActivityEvent = 'update' | 'end'
@@ -89,7 +90,9 @@ async function sendOneLiveActivity<K extends LiveActivityKind>(
 
       const payload = JSON.stringify({ aps })
 
-      const isProduction = !!(process.env.APNS_PRODUCTION === 'true')
+      // M2: usa env.apns.production (com .trim()) igual ao push normal (apns.ts) — leitura
+      // crua de process.env.APNS_PRODUCTION causava drift sandbox/prod se houvesse espaço.
+      const isProduction = env.apns.production
       const host = isProduction
         ? 'https://api.push.apple.com'
         : 'https://api.sandbox.push.apple.com'
@@ -132,7 +135,7 @@ async function sendOneLiveActivity<K extends LiveActivityKind>(
             if (reason === 'BadDeviceToken' || reason === 'Unregistered') {
               const admin = createAdminClient()
               Promise.resolve(admin.from('live_activity_push_tokens').delete().eq('token', args.token))
-                .catch(() => { /* best-effort */ })
+                .catch((delErr) => logError('apns-la', '[APNs LA] Failed to remove stale token', delErr))
             }
             safeResolve({ ok: false, error: String(reason) })
           }
@@ -165,7 +168,7 @@ export async function sendLiveActivityUpdate<K extends LiveActivityKind>(args: {
 }): Promise<Array<{ token: string; ok: boolean; error?: string }>> {
   const cfg = getApnsConfig()
   if (!cfg) {
-    logWarn('apns-la', '[APNs LA] Missing config — set APNS_KEY_ID/APNS_TEAM_ID/APNS_KEY_P8')
+    logError('apns-la', '[APNs LA] Missing config — set APNS_KEY_ID/APNS_TEAM_ID/APNS_KEY_P8')
     return []
   }
   if (!args.userId || !args.kind || !args.event) return []

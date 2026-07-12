@@ -192,7 +192,7 @@ async function sendOneApnsPush(
                                 admin.from('device_push_tokens').delete().eq('token', token)
                             )
                                 .then(() => logWarn('apns', `[APNs] Removed stale token: ${token.slice(0, 8)}...`))
-                                .catch(() => { /* best-effort */ })
+                                .catch((delErr) => logError('apns', '[APNs] Failed to remove stale token', delErr))
                         }
 
                         resolve({ ok: false, error: reason })
@@ -239,7 +239,7 @@ export async function sendPushToUsers(
         // delivery should use sendPushToAllPlatforms from @/lib/push/sender.
         const cfg = getApnsConfig()
         if (!cfg) {
-            logWarn('apns', '[APNs] sendPushToUsers: APNs config missing — set APNS_KEY_ID, APNS_TEAM_ID, APNS_KEY_P8 in Vercel env vars')
+            logError('apns', '[APNs] sendPushToUsers: APNs config missing — set APNS_KEY_ID, APNS_TEAM_ID, APNS_KEY_P8 in Vercel env vars')
             return results
         }
 
