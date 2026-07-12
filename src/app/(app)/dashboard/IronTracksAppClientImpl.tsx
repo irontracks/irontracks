@@ -45,6 +45,7 @@ import { getTourSteps } from '@/utils/tourSteps'
 const OfflineSyncModal = dynamic(() => import('@/components/OfflineSyncModal'), { ssr: false })
 const WorkoutRecoveryBanner = dynamic(() => import('@/components/WorkoutRecoveryBanner'), { ssr: false, loading: () => null })
 const RestDayPromptCard = dynamic(() => import('@/components/dashboard/RestDayPromptCard'), { ssr: false, loading: () => null })
+const StudentWorkoutStartBanner = dynamic(() => import('@/components/teacher/StudentWorkoutStartBanner'), { ssr: false, loading: () => null })
 const StudentControlConsent = dynamic(
     () => import('@/components/teacher/StudentControlConsent').then(m => ({ default: m.StudentControlConsent })),
     { ssr: false, loading: () => null },
@@ -934,6 +935,8 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                         <InviteAcceptedModal />
                         {/* GPS: Auto-detect gym toast */}
                         {view === 'dashboard' && <GymDetectToastWrapper userId={user?.id} onStartWorkout={() => setCreateWizardOpen(true)} />}
+                        {/* Professor: banner em tempo real quando um aluno inicia treino (assumir controle) */}
+                        {isCoach && view === 'dashboard' && <StudentWorkoutStartBanner teacherUserId={user?.id ? String(user.id) : undefined} />}
                         <GuidedTour
                             open={Boolean(tourOpen)}
                             steps={getTourSteps({

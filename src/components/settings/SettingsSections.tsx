@@ -570,6 +570,7 @@ export function SettingsNotificationsSection({ draft, setValue, iosNotifStatus, 
     // Per-type toggles (in-app row + push)
     const notifyDirectMessages = Boolean(draft?.notifyDirectMessages ?? true)
     const notifyAppointments = Boolean(draft?.notifyAppointments ?? true)
+    const notifyStudentWorkoutStart = Boolean(draft?.notifyStudentWorkoutStart ?? true)
     const notifyBroadcasts = Boolean(draft?.notifyBroadcasts ?? true)
     const notifySocialFollows = Boolean(draft?.notifySocialFollows ?? true)
     const notifyFollowAccepted = Boolean(draft?.notifyFollowAccepted ?? true)
@@ -662,6 +663,13 @@ export function SettingsNotificationsSection({ draft, setValue, iosNotifStatus, 
                         checked={notifyAppointments}
                         disabled={!pushNotificationsEnabled}
                         onChange={() => setValue('notifyAppointments', !notifyAppointments)}
+                    />
+                    <NotifRow
+                        title="Aluno iniciou treino (professor)"
+                        description="Avisa você quando um aluno seu começa um treino, pra assumir o controle."
+                        checked={notifyStudentWorkoutStart}
+                        disabled={!pushNotificationsEnabled}
+                        onChange={() => setValue('notifyStudentWorkoutStart', !notifyStudentWorkoutStart)}
                     />
                     <NotifRow
                         title="Avisos do IronTracks"
