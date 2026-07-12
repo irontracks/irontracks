@@ -12,6 +12,13 @@ import {
 } from '@/lib/offline/cardioPersistence'
 import { logWarn } from '@/lib/logger'
 import { isIosNative, isAndroidNative } from '@/utils/platform'
+import {
+  isNativeCardioLocationAvailable,
+  startNativeCardioLocation,
+  stopNativeCardioLocation,
+  drainNativeCardioLocations,
+  type NativeCardioFix,
+} from '@/utils/native/irontracksNative'
 
 interface CardioMetrics {
   /** Total distance in meters. */
@@ -79,12 +86,12 @@ interface UseCardioTrackingResult {
   start: () => Promise<void>
   pause: () => void
   resume: () => Promise<void>
-  stop: () => {
+  stop: () => Promise<{
     metrics: CardioMetrics
     points: GeoTrackPoint[]
     startedAt: string
     finishedAt: string
-  } | null
+  } | null>
   reset: () => void
   /**
    * Snapshot of a previously-persisted cardio session found on mount.
@@ -108,6 +115,20 @@ const EMPTY_METRICS: CardioMetrics = {
   maxSpeedKmh: 0,
   caloriesEstimated: 0,
   accuracyMeters: null,
+}
+
+/** Convert a native cardio fix (buffered by CLLocationManager) into a GeoFix. */
+function mapNativeFix(p: NativeCardioFix): GeoFix {
+  return {
+    latitude: p.lat,
+    longitude: p.lng,
+    // accuracy negativa/NaN vira 99 (será rejeitada pelo gate de precisão).
+    accuracyMeters: Number.isFinite(p.accuracy) && p.accuracy >= 0 ? p.accuracy : 99,
+    altitudeMeters: Number.isFinite(p.altitude) ? p.altitude : null,
+    speedMps: Number.isFinite(p.speed) && p.speed >= 0 ? p.speed : null,
+    headingDeg: Number.isFinite(p.heading) && p.heading >= 0 ? p.heading : null,
+    timestamp: Number(p.timestamp) > 0 ? Number(p.timestamp) : Date.now(),
+  }
 }
 
 /** Convert a GeoFix into a GeoTrackPoint (trims fields we don't persist). */
@@ -175,6 +196,15 @@ export function useCardioTracking({
   const trackPointsRef = useRef<GeoTrackPoint[]>([])
   useEffect(() => { trackPointsRef.current = trackPoints }, [trackPoints])
 
+  // ── Native background GPS (iOS) ────────────────────────────────────────────
+  // Quando disponível, o cardio usa o CLLocationManager nativo (background +
+  // buffer) em vez do @capacitor/geolocation. `usingNativeRef` diz qual caminho
+  // está ativo; o timer drena o buffer nativo; `drainNativeRef` dá acesso à
+  // função de drenagem pros listeners de lifecycle sem re-bind.
+  const usingNativeRef = useRef(false)
+  const nativeDrainTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const drainNativeRef = useRef<(() => Promise<void>) | null>(null)
+
   // ── Timer: advance elapsed + recompute pace/calories every second ────────
   useEffect(() => {
     if (!isTracking || isPaused) return
@@ -197,56 +227,61 @@ export function useCardioTracking({
     }
   }, [isTracking, isPaused, bodyWeightKg])
 
-  // ── Position pipeline: filter + append + recompute ──────────────────────
-  // Antes: setMetrics era chamado DENTRO do updater do setTrackPoints — anti-pattern.
-  // Em StrictMode dupla execução, setMetrics rodaria 2x. Agora a lógica é puramente
-  // computacional fora dos setStates: lê trackPoints via ref, decide, e chama
-  // os 2 setStates em sequência.
-  useEffect(() => {
-    if (!isTracking || isPaused || !position) return
-    latestFixRef.current = position
+  // ── Ingest pipeline: filtra + acumula + recomputa ────────────────────────
+  // Processa 1 fix (web: `position`) OU um LOTE (nativo: buffer drenado no resume).
+  // Percorre os fixes em ordem, aplica o filtro por segmento e faz UM setState no
+  // fim. Escreve nos refs (distance/maxSpeed/trackPoints) de forma síncrona pra
+  // que stop() leia o total correto mesmo logo após um drain assíncrono.
+  const ingestFixes = useCallback((fixes: GeoFix[]) => {
+    if (!fixes.length) return
 
-    const newPoint = toTrackPoint(position)
-    const incoming = { ...newPoint, accuracyMeters: position.accuracyMeters }
+    let points = trackPointsRef.current
+    let appended = 0
+    let lastAccuracy: number | null = null
+    let currentSpeed = 0
 
-    const prev = trackPointsRef.current
-    const last = prev.length > 0 ? prev[prev.length - 1] : null
-    const decision = decideCardioFilter(last, incoming, {
-      maxAccuracyMeters,
-      minMovementMeters,
-      maxRealisticSpeedKmh,
-    })
+    for (const fix of fixes) {
+      latestFixRef.current = fix
+      const newPoint = toTrackPoint(fix)
+      const incoming = { ...newPoint, accuracyMeters: fix.accuracyMeters }
+      const last = points.length > 0 ? points[points.length - 1] : null
+      const decision = decideCardioFilter(last, incoming, {
+        maxAccuracyMeters,
+        minMovementMeters,
+        maxRealisticSpeedKmh,
+      })
+      lastAccuracy = fix.accuracyMeters
+      if (decision.type === 'reject') continue
 
-    if (decision.type === 'reject') {
-      // Keep the accuracy visible so the UI can show signal quality and
-      // "searching for GPS" while we wait for a good fix.
-      setMetrics((p) => ({ ...p, accuracyMeters: position.accuracyMeters }))
+      // 1º fix após retomar/recuperar é "ponte": não conta o deslocamento da pausa.
+      const isBridge = justResumedRef.current
+      if (isBridge) justResumedRef.current = false
+
+      if (last && !isBridge) {
+        const seg = haversineDistance(last, newPoint)
+        const st = (newPoint.timestamp - last.timestamp) / 1000
+        const spd = st > 0 ? speedKmh(seg, st) : 0
+        currentSpeed = spd
+        if (spd > maxSpeedRef.current) maxSpeedRef.current = spd
+        distanceRef.current += seg
+      }
+      points = [...points, newPoint]
+      appended++
+    }
+
+    if (appended === 0) {
+      // Todos rejeitados — ainda mostra a precisão pra UI sinalizar qualidade/GPS fraco.
+      if (lastAccuracy != null) setMetrics((p) => ({ ...p, accuracyMeters: lastAccuracy }))
       return
     }
 
-    const updated = [...prev, newPoint]
-
-    // Segmento desde o último ponto — pulado quando é o 1º fix após retomar/
-    // recuperar (senão o deslocamento da pausa vira distância/velocidade falsa).
-    const isBridge = justResumedRef.current
-    if (isBridge) justResumedRef.current = false
-
-    let seg = 0
-    let currentSpeed = 0
-    if (last && !isBridge) {
-      seg = haversineDistance(last, newPoint)
-      const st = (newPoint.timestamp - last.timestamp) / 1000
-      currentSpeed = st > 0 ? speedKmh(seg, st) : 0
-      if (currentSpeed > maxSpeedRef.current) maxSpeedRef.current = currentSpeed
-    }
-    distanceRef.current += seg
+    trackPointsRef.current = points
     const totalDist = distanceRef.current
-
     const elapsed = Math.floor(
       (Date.now() - startTimeRef.current - pausedDurationRef.current) / 1000,
     )
 
-    setTrackPoints(updated)
+    setTrackPoints(points)
     setMetrics({
       distanceMeters: totalDist,
       durationSeconds: elapsed,
@@ -254,9 +289,92 @@ export function useCardioTracking({
       currentSpeedKmh: Math.round(currentSpeed * 10) / 10,
       maxSpeedKmh: Math.round(maxSpeedRef.current * 10) / 10,
       caloriesEstimated: estimateCardioCalories(totalDist, elapsed, bodyWeightKg),
-      accuracyMeters: position.accuracyMeters,
+      accuracyMeters: lastAccuracy,
     })
-  }, [position, isTracking, isPaused, bodyWeightKg, maxAccuracyMeters, minMovementMeters, maxRealisticSpeedKmh])
+  }, [bodyWeightKg, maxAccuracyMeters, minMovementMeters, maxRealisticSpeedKmh])
+
+  // Web path: cada `position` novo entra no pipeline (no-op quando o path nativo
+  // está ativo, pois startWatching não é chamado e position fica null).
+  useEffect(() => {
+    if (!isTracking || isPaused || !position) return
+    ingestFixes([position])
+  }, [position, isTracking, isPaused, ingestFixes])
+
+  // ── Native drain: buffer nativo → pipeline ───────────────────────────────
+  const drainNative = useCallback(async () => {
+    if (!usingNativeRef.current) return
+    let raw: NativeCardioFix[] = []
+    try { raw = await drainNativeCardioLocations() } catch { return }
+    if (!raw.length) return
+    ingestFixes(raw.map(mapNativeFix))
+  }, [ingestFixes])
+  useEffect(() => { drainNativeRef.current = drainNative }, [drainNative])
+
+  // Drena o buffer nativo IMEDIATAMENTE quando o app volta ao foreground — os
+  // pontos capturados enquanto o WebView estava suspenso (tela bloqueada/bolso)
+  // entram no pipeline na hora, sem esperar o timer de 2s. Também para o tracking
+  // nativo no unmount (fechar a tela por gesto) pra não deixar GPS/bateria ligados.
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const onResume = () => { void drainNativeRef.current?.() }
+    const onVisibility = () => { if (document.visibilityState === 'visible') onResume() }
+    document.addEventListener('visibilitychange', onVisibility)
+    window.addEventListener('pageshow', onResume)
+
+    let capHandle: { remove: () => void } | null = null
+    let capCancelled = false
+    if (isIosNative()) {
+      import('@capacitor/app').then(({ App }) => {
+        if (capCancelled) return
+        App.addListener('appStateChange', (state: { isActive?: boolean }) => {
+          if (state?.isActive) onResume()
+        })
+          .then((h) => { if (capCancelled) { h.remove(); return } capHandle = h })
+          .catch((e) => logWarn('useCardioTracking.nativeResume', 'listener add failed', e))
+      }).catch((e) => logWarn('useCardioTracking.nativeResume', 'import failed', e))
+    }
+
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibility)
+      window.removeEventListener('pageshow', onResume)
+      capCancelled = true
+      capHandle?.remove()
+      // Unmount: garante que o GPS nativo não fique ligado se a tela foi fechada
+      // sem passar por stop()/reset() (ex.: gesto de voltar).
+      if (nativeDrainTimerRef.current) {
+        clearInterval(nativeDrainTimerRef.current)
+        nativeDrainTimerRef.current = null
+      }
+      if (usingNativeRef.current) {
+        usingNativeRef.current = false
+        void stopNativeCardioLocation()
+      }
+    }
+  }, [])
+
+  const startNative = useCallback(async (): Promise<boolean> => {
+    const res = await startNativeCardioLocation()
+    if (!res.ok) return false
+    usingNativeRef.current = true
+    if (nativeDrainTimerRef.current) clearInterval(nativeDrainTimerRef.current)
+    // Drena a cada 2s enquanto o app está em foreground (o timer congela em
+    // background junto com o JS; o buffer nativo continua enchendo e é drenado no
+    // resume). 2s é folgado pra corrida e barato.
+    nativeDrainTimerRef.current = setInterval(() => { void drainNative() }, 2000)
+    return true
+  }, [drainNative])
+
+  const stopNative = useCallback(async () => {
+    if (!usingNativeRef.current) return
+    usingNativeRef.current = false
+    if (nativeDrainTimerRef.current) {
+      clearInterval(nativeDrainTimerRef.current)
+      nativeDrainTimerRef.current = null
+    }
+    let raw: NativeCardioFix[] = []
+    try { raw = await stopNativeCardioLocation() } catch { /* best effort */ }
+    if (raw.length) ingestFixes(raw.map(mapNativeFix))
+  }, [ingestFixes])
 
   // ── Public API ──────────────────────────────────────────────────────────
 
@@ -273,19 +391,22 @@ export function useCardioTracking({
     setMetrics(EMPTY_METRICS)
     setIsTracking(true)
     setIsPaused(false)
+    // Nativo primeiro (background real). Se indisponível/negado, cai no web watch —
+    // que também surfaça o erro de permissão pra UI.
+    if (isNativeCardioLocationAvailable() && (await startNative())) return
     await startWatching()
-  }, [startWatching])
+  }, [startWatching, startNative])
 
   const pause = useCallback(() => {
     if (pauseStartRef.current > 0) return // já pausado — idempotente
     setIsPaused(true)
     pauseStartRef.current = Date.now()
-    stopWatching()
+    if (usingNativeRef.current) { void stopNative() } else { stopWatching() }
     if (timerRef.current) {
       clearInterval(timerRef.current)
       timerRef.current = null
     }
-  }, [stopWatching])
+  }, [stopWatching, stopNative])
 
   const resume = useCallback(async () => {
     if (pauseStartRef.current === 0) return // não estava pausado — idempotente
@@ -294,11 +415,15 @@ export function useCardioTracking({
     // Não conta o deslocamento feito durante a pausa como distância percorrida.
     justResumedRef.current = true
     setIsPaused(false)
+    if (isNativeCardioLocationAvailable() && (await startNative())) return
     await startWatching()
-  }, [startWatching])
+  }, [startWatching, startNative])
 
-  const stop = useCallback(() => {
-    stopWatching()
+  const stop = useCallback(async () => {
+    // Nativo: para + drena o buffer final ANTES de montar o resultado (senão os
+    // últimos segundos de pontos ficam de fora). O resultado é computado dos REFS
+    // (não do state), pois o drain é assíncrono e o setState não reflete na hora.
+    if (usingNativeRef.current) { await stopNative() } else { stopWatching() }
     if (timerRef.current) {
       clearInterval(timerRef.current)
       timerRef.current = null
@@ -306,19 +431,33 @@ export function useCardioTracking({
     setIsTracking(false)
     setIsPaused(false)
 
-    if (trackPoints.length === 0) return null
+    const points = trackPointsRef.current
+    if (points.length === 0) return null
 
+    const totalDist = distanceRef.current
+    const elapsed = Math.floor(
+      (Date.now() - startTimeRef.current - pausedDurationRef.current) / 1000,
+    )
+    const finalMetrics: CardioMetrics = {
+      distanceMeters: totalDist,
+      durationSeconds: elapsed,
+      paceMinKm: avgPaceMinKm(totalDist, elapsed),
+      currentSpeedKmh: 0,
+      maxSpeedKmh: Math.round(maxSpeedRef.current * 10) / 10,
+      caloriesEstimated: estimateCardioCalories(totalDist, elapsed, bodyWeightKg),
+      accuracyMeters: latestFixRef.current?.accuracyMeters ?? null,
+    }
     const finishedAt = new Date().toISOString()
     return {
-      metrics: { ...metrics },
-      points: [...trackPoints],
+      metrics: finalMetrics,
+      points: [...points],
       startedAt: startedAtRef.current,
       finishedAt,
     }
-  }, [stopWatching, metrics, trackPoints])
+  }, [stopWatching, stopNative, bodyWeightKg])
 
   const reset = useCallback(() => {
-    stopWatching()
+    if (usingNativeRef.current) { void stopNative() } else { stopWatching() }
     if (timerRef.current) {
       clearInterval(timerRef.current)
       timerRef.current = null
@@ -333,7 +472,7 @@ export function useCardioTracking({
     distanceRef.current = 0
     justResumedRef.current = false
     latestFixRef.current = null
-  }, [stopWatching])
+  }, [stopWatching, stopNative])
 
   // ── Persistence: dual-write to IDB so a kill mid-run doesn't lose data ──
   //
@@ -501,8 +640,9 @@ export function useCardioTracking({
     setIsTracking(true)
     setIsPaused(false)
     setRecoveredCardio(null)
+    if (isNativeCardioLocationAvailable() && (await startNative())) return
     await startWatching()
-  }, [recoveredCardio, startWatching])
+  }, [recoveredCardio, startWatching, startNative])
 
   const discardRecoveredCardio = useCallback(async () => {
     if (userId) await clearPersistedCardio(userId)

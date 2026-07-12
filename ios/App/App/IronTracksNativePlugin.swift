@@ -93,6 +93,12 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin, CLLocationMana
         CAPPluginMethod(name: "stopGymGeofence", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "checkGeofenceStatus", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "requestAlwaysLocationPermission", returnType: CAPPluginReturnPromise),
+        // Cardio GPS — continuous background location for run/bike tracking.
+        // CLLocationManager nativo (background updates + buffer) resolve o congelamento
+        // do @capacitor/geolocation quando o WebView é suspenso (tela bloqueada/bolso).
+        CAPPluginMethod(name: "startCardioLocation", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "stopCardioLocation", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "drainCardioLocations", returnType: CAPPluginReturnPromise),
         // BGTaskScheduler — schedule next opportunistic refresh / sync
         CAPPluginMethod(name: "scheduleBackgroundTasks", returnType: CAPPluginReturnPromise),
         // App Shortcuts — push the user's recent workouts so AppEntity.suggestedEntities()
@@ -137,6 +143,26 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin, CLLocationMana
     private var pendingAlwaysAuthCall: CAPPluginCall?
     /// Throttle: don't fire more than one geofence notification per N seconds.
     private var lastGeofenceFireMs: Double = 0
+
+    // ── Cardio GPS state (continuous background tracking) ────────────────────
+    /// DEDICATED manager (separate from the geofence one) so cardio's aggressive
+    /// settings (best accuracy, background updates, no distance filter) never
+    /// touch the geofence region monitoring. Distinguished in didUpdateLocations
+    /// by `manager === cardioLocationManager`.
+    private lazy var cardioLocationManager: CLLocationManager = {
+        let m = CLLocationManager()
+        m.delegate = self
+        return m
+    }()
+    /// True between startCardioLocation and stopCardioLocation.
+    private var cardioActive = false
+    /// Fixes captured natively, waiting for JS to drain. The native layer keeps
+    /// receiving them even while the WebView JS is suspended (background mode),
+    /// so nothing is lost — JS drains the backlog on resume.
+    private var cardioBuffer: [[String: Any]] = []
+    /// Serialises buffer access between the CLLocationManager delegate (main) and
+    /// the Capacitor call threads (drain/stop).
+    private let cardioQueue = DispatchQueue(label: "com.irontracks.cardioLocation")
 
     // ── Live Activity push tokens (captured at start, updated on rotation) ───
     /// Keyed by activity-kind so JS can correlate when sending to the backend.
@@ -1253,6 +1279,106 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin, CLLocationMana
             "regionId": region?.identifier ?? "",
             "error": error.localizedDescription,
         ])
+    }
+
+    // ─── Cardio GPS — continuous background location ─────────────────────────
+    //
+    // O @capacitor/geolocation entrega posição via callback JS: quando o iOS
+    // suspende o WebView (tela bloqueada, celular no bolso), o callback para e a
+    // distância congela. Aqui o CLLocationManager nativo mantém `startUpdatingLocation`
+    // rodando em background (UIBackgroundModes: location + allowsBackgroundLocationUpdates),
+    // BUFFERIZA os fixes nativamente e o JS drena o backlog no resume — nada se perde.
+
+    private func cardioAuthString(_ status: CLAuthorizationStatus) -> String {
+        switch status {
+        case .authorizedAlways:    return "authorizedAlways"
+        case .authorizedWhenInUse: return "authorizedWhenInUse"
+        case .denied:              return "denied"
+        case .restricted:          return "restricted"
+        case .notDetermined:       return "notDetermined"
+        @unknown default:          return "unknown"
+        }
+    }
+
+    @objc func startCardioLocation(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            let mgr = self.cardioLocationManager
+            let status = mgr.authorizationStatus
+            if status == .denied || status == .restricted {
+                call.resolve(["ok": false, "authorization": self.cardioAuthString(status)])
+                return
+            }
+            if status == .notDetermined {
+                // WhenInUse basta pra background updates quando o modo 'location' está
+                // declarado no Info.plist e as updates começam em foreground (é o caso).
+                mgr.requestWhenInUseAuthorization()
+            }
+            mgr.desiredAccuracy = kCLLocationAccuracyBest
+            mgr.distanceFilter = kCLDistanceFilterNone
+            mgr.activityType = .fitness
+            mgr.pausesLocationUpdatesAutomatically = false
+            // Só ativa background updates se o modo estiver declarado — senão o iOS
+            // lança exceção. O Info.plist do IronTracks tem UIBackgroundModes: location.
+            mgr.allowsBackgroundLocationUpdates = true
+            if #available(iOS 11.0, *) {
+                mgr.showsBackgroundLocationIndicator = true
+            }
+            self.cardioQueue.sync { self.cardioBuffer.removeAll() }
+            self.cardioActive = true
+            mgr.startUpdatingLocation()
+            call.resolve(["ok": true, "authorization": self.cardioAuthString(mgr.authorizationStatus)])
+        }
+    }
+
+    @objc func stopCardioLocation(_ call: CAPPluginCall) {
+        DispatchQueue.main.async {
+            self.cardioActive = false
+            self.cardioLocationManager.stopUpdatingLocation()
+            self.cardioLocationManager.allowsBackgroundLocationUpdates = false
+            let remaining: [[String: Any]] = self.cardioQueue.sync {
+                let b = self.cardioBuffer
+                self.cardioBuffer.removeAll()
+                return b
+            }
+            call.resolve(["points": remaining])
+        }
+    }
+
+    @objc func drainCardioLocations(_ call: CAPPluginCall) {
+        let drained: [[String: Any]] = cardioQueue.sync {
+            let b = self.cardioBuffer
+            self.cardioBuffer.removeAll()
+            return b
+        }
+        call.resolve(["points": drained])
+    }
+
+    public func locationManager(_ manager: CLLocationManager, didUpdateLocations locations: [CLLocation]) {
+        // Só o manager do cardio — o geofence não chama startUpdatingLocation.
+        guard manager == cardioLocationManager, cardioActive else { return }
+        var toAppend: [[String: Any]] = []
+        for loc in locations {
+            // Precisão negativa = fix inválido; descarta.
+            if loc.horizontalAccuracy < 0 { continue }
+            toAppend.append([
+                "lat": loc.coordinate.latitude,
+                "lng": loc.coordinate.longitude,
+                "accuracy": loc.horizontalAccuracy,
+                "altitude": loc.altitude,
+                "speed": loc.speed,       // m/s (-1 se indisponível)
+                "heading": loc.course,    // graus (-1 se indisponível)
+                "timestamp": loc.timestamp.timeIntervalSince1970 * 1000,
+            ])
+        }
+        if toAppend.isEmpty { return }
+        cardioQueue.sync {
+            cardioBuffer.append(contentsOf: toAppend)
+            // Teto de segurança: uma corrida de 2h a 1Hz ~ 7200 pontos. 12000 dá folga
+            // e evita crescimento ilimitado se o JS parar de drenar.
+            if cardioBuffer.count > 12000 {
+                cardioBuffer.removeFirst(cardioBuffer.count - 12000)
+            }
+        }
     }
 
     // ─── BGTaskScheduler — schedule next refresh / sync (Feature 15) ─────────
