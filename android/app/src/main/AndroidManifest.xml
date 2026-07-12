@@ -109,11 +109,13 @@
     <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
         android:maxSdkVersion="28" />
 
-    <!-- Location (GPS): rota do cardio + check-in de academia. ACCESS_BACKGROUND_LOCATION
-         permite o foreground service continuar recebendo posições com a tela bloqueada
-         (paridade com UIBackgroundModes=location do iOS). -->
+    <!-- Location (GPS): rota do cardio + check-in de academia. NÃO usamos
+         ACCESS_BACKGROUND_LOCATION de propósito: o CardioLocationService é um foreground
+         service (type location) iniciado com o app em PRIMEIRO PLANO (o usuário toca
+         "iniciar corrida"), e nesse caso o FGS continua recebendo GPS em background sem
+         essa permissão. Declará-la dispararia a revisão de política de background location
+         do Google e bloquearia o release (403 no commit) sem ganho pro caso de uso. -->
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
 </manifest>
 
