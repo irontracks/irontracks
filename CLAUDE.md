@@ -173,3 +173,6 @@ Não é preciso pedir confirmação a cada PR — esta regra é a confirmação 
 - Mudança em `middleware.ts`, fluxos de auth, schemas do banco com migration, ou pagamentos (RevenueCat/IAP)
 - CI vermelho ou flaky — investigar primeiro, não tentar contornar com `--no-verify` ou retry cego
 - PR com revisões humanas pendentes não resolvidas
+
+## Notas de dados (evitar re-exploração cara do banco)
+- **Histórico de treino / evolução de carga**: os pesos por série de sessões concluídas NÃO estão em `sets`/`exercises` (vazias p/ concluídos) — ficam no JSON de `workouts.notes`, no objeto `logs` ("exIdx-setIdx" → weight/reps/rpe). Mapa completo + SQL pronto + user IDs + project_id em **`docs/DATA_MAP_workout_history.md`**. Ler esse arquivo antes de consultar o banco sobre treino/carga.
