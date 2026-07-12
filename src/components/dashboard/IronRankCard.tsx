@@ -6,6 +6,7 @@ import NextImage from 'next/image'
 import { Crown, X, ChevronRight, Trophy, TrendingUp, ChevronDown, Zap, Star } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useFocusTrap } from '@/hooks/useFocusTrap'
+import { useBackHandler } from '@/hooks/useBackHandler'
 import { getIronRankLeaderboard, getLatestWorkoutPrs } from '@/actions/workout-actions'
 import BadgesInline, { type Badge } from './BadgesInline'
 import { getErrorMessage } from '@/utils/errorMessage'
@@ -170,6 +171,9 @@ const IronRankCard = memo(function IronRankCard({
         try { window.addEventListener('keydown', h) } catch { }
         return () => { try { window.removeEventListener('keydown', h) } catch { } }
     }, [rankOpen])
+
+    // Botão Voltar do Android fecha o overlay (antes navegava pra fora do dashboard).
+    useBackHandler(rankOpen, () => setRankOpen(false))
 
     // ── Derived ────────────────────────────────────────────────────────────────
 

@@ -173,6 +173,31 @@ export function usePushNotifications(userId?: string | null) {
                 return
               }
 
+              // Professor tocou no CORPO do push "aluno iniciou o treino" (sem o botão).
+              // No Android o FCM não renderiza o botão de categoria iOS, então o tap
+              // entrega actionId 'tap' e o ramo ASSUME_CONTROL acima nunca é atingido —
+              // aqui tratamos o tap simples igual ao botão: dispara o request de controle
+              // e abre o dashboard. Também cobre o iOS quando o usuário toca no corpo.
+              if (type === 'student_workout_start') {
+                const studentId = data ? String(data.studentId ?? data.student_id ?? '').trim() : ''
+                if (studentId) {
+                  void fetch(`/api/teacher/control/${studentId}`, {
+                    method: 'POST',
+                    headers: { 'content-type': 'application/json' },
+                    body: JSON.stringify({ action: 'request' }),
+                  }).catch(() => { })
+                }
+                window.dispatchEvent(new CustomEvent('irontracks:push:navigate', { detail: { link: '/dashboard', type } }))
+                return
+              }
+
+              // Push matinal (morning_briefing): no Android não há botões "Vou treinar/
+              // Vou descansar"; o tap ao menos leva pra nutrição, onde a pergunta é feita.
+              if (type === 'morning_briefing') {
+                window.dispatchEvent(new CustomEvent('irontracks:push:navigate', { detail: { link: '/dashboard/nutrition', type } }))
+                return
+              }
+
               if (link || type) {
                 // Dedupe: iOS WKWebView pode re-entregar o mesmo action durante
                 // cold-launch + warm-launch. Se o mesmo action ID chegou nos
