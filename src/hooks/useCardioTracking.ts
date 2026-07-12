@@ -270,9 +270,15 @@ export function useCardioTracking({
       if (last && !isBridge) {
         const seg = haversineDistance(last, newPoint)
         const st = (newPoint.timestamp - last.timestamp) / 1000
-        const spd = st > 0 ? speedKmh(seg, st) : 0
+        // Velocidade: prefere a do DISPOSITIVO (Doppler — CLLocationManager.speed),
+        // que não tem os spikes da velocidade derivada de posição (ex.: "Max 45 km/h"
+        // numa caminhada por um pulo de GPS). Fallback: computa do segmento (web).
+        const deviceKmh = fix.speedMps != null && fix.speedMps >= 0 ? fix.speedMps * 3.6 : null
+        const spd = deviceKmh != null ? deviceKmh : (st > 0 ? speedKmh(seg, st) : 0)
         currentSpeed = spd
-        if (spd > maxSpeedRef.current) maxSpeedRef.current = spd
+        // Só conta como máx. se for plausível (< maxRealisticSpeedKmh) — blinda o
+        // display contra qualquer pico residual.
+        if (spd > maxSpeedRef.current && spd <= maxRealisticSpeedKmh) maxSpeedRef.current = spd
         distanceRef.current += seg
       }
       points = [...points, newPoint]
