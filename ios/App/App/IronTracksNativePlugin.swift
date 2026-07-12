@@ -403,7 +403,22 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin, CLLocationMana
             options: []
         )
 
-        UNUserNotificationCenter.current().setNotificationCategories([restCategory, restDayCategory])
+        // Categoria "aluno iniciou o treino" (só professor): botão "Assumir treino".
+        // .foreground abre o app; o JS (usePushNotifications) dispara o request de controle
+        // usando o studentId do payload. O push carrega category=TEACHER_ASSUME_CONTROL.
+        let assumeControlAction = UNNotificationAction(
+            identifier: "ASSUME_CONTROL",
+            title: "Assumir treino",
+            options: [.foreground]
+        )
+        let assumeControlCategory = UNNotificationCategory(
+            identifier: "TEACHER_ASSUME_CONTROL",
+            actions: [assumeControlAction],
+            intentIdentifiers: [],
+            options: []
+        )
+
+        UNUserNotificationCenter.current().setNotificationCategories([restCategory, restDayCategory, assumeControlCategory])
         call.resolve()
     }
 

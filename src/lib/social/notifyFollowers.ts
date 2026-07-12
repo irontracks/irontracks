@@ -29,6 +29,9 @@ export const NOTIFICATION_TYPE_TO_PREFERENCE: Record<string, string> = {
   workout_finish: 'notifyFriendWorkoutEvents',
   workout_finished: 'notifyFriendWorkoutEvents',
   workout_start: 'notifyFriendWorkoutStart',
+  // Professor: push "aluno iniciou o treino" (enviado via sendPushToAllPlatforms com
+  // preferenceKey explícito; mapeado aqui também pra manter o invariante toggle<->tipo).
+  student_workout_start: 'notifyStudentWorkoutStart',
   friend_comeback: 'notifyFriendComeback',
   friend_achievement: 'notifyAchievements',
   friend_weekly_goal: 'notifyFriendWeeklyGoal',

@@ -9,6 +9,7 @@ import {
   shouldThrottleBySenderType,
 } from '@/lib/social/notifyFollowers'
 import { parseJsonBody } from '@/utils/zod'
+import { sendPushToAllPlatforms } from '@/lib/push/sender'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { logError } from '@/lib/logger'
@@ -47,6 +48,29 @@ export async function POST(req: Request) {
     const admin = createAdminClient()
     const { data: me } = await admin.from('profiles').select('display_name').eq('id', userId).maybeSingle()
     const name = String(me?.display_name || '').trim() || 'Seu amigo'
+
+    // Avisa o(s) professor(es) do aluno que ele iniciou o treino, pra poderem ASSUMIR o
+    // controle. Independente do social (roda mesmo se o aluno não tem followers). O throttle
+    // acima (workout_start, 3min) já evita spam por restart. sendPushToAllPlatforms filtra
+    // por notifyStudentWorkoutStart (default ligado) + master switch de cada professor.
+    try {
+      const { data: links } = await admin.from('students').select('teacher_id').eq('user_id', userId)
+      const teacherIds = Array.from(new Set(
+        (Array.isArray(links) ? links : [])
+          .map((l) => String(l?.teacher_id || '').trim())
+          .filter((t) => t && t !== userId),
+      ))
+      if (teacherIds.length) {
+        const studentName = String(me?.display_name || '').trim() || 'Seu aluno'
+        await sendPushToAllPlatforms(
+          teacherIds,
+          `${studentName} iniciou o treino`,
+          `Toque para assumir o treino de ${studentName}.`,
+          { type: 'student_workout_start', studentId: userId, studentName, workoutTitle },
+          { preferenceKey: 'notifyStudentWorkoutStart' },
+        )
+      }
+    } catch (e) { logError('social:workout-start:teacher-notify', e) }
 
     const followerIds = await listFollowerIdsOf(userId)
     // Chave certa é 'notifyFriendWorkoutStart' (ver NOTIFICATION_TYPE_TO_PREFERENCE em

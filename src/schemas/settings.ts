@@ -62,6 +62,8 @@ export const UserSettingsSchema = z
     notifyFriendWeeklyGoal: z.boolean().default(true),
     notifyStoryPosted: z.boolean().default(true),
     notifyStoryLikes: z.boolean().default(true),
+    // Professor: avisar quando um aluno dele inicia um treino (pra poder assumir o controle).
+    notifyStudentWorkoutStart: z.boolean().default(true),
     notifyStoryReactions: z.boolean().default(true),
     notifyStoryComments: z.boolean().default(true),
     notifyMentions: z.boolean().default(true),
