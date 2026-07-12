@@ -116,6 +116,16 @@ describe('geoUtils', () => {
       // 5 min 59,6 s → arredonda pra 6:00, não "5:60"
       expect(formatPace(5 + 59.6 / 60)).toBe('6:00')
     })
+
+    it('mostra --:-- pra pace absurdo (parado, distância ~0)', () => {
+      // Bug do print: parado 10 min com 5m de drift → 1885:36/km. Acima de 60 min/km
+      // (< 1 km/h) não é ritmo real — esconde o valor sem sentido.
+      expect(formatPace(1885.6)).toBe('--:--')
+      expect(formatPace(61)).toBe('--:--')
+      // Caminhada lenta legítima (12 min/km) continua aparecendo.
+      expect(formatPace(12)).toBe('12:00')
+      expect(formatPace(60)).toBe('60:00')
+    })
   })
 
   describe('formatDistance', () => {

@@ -56,6 +56,14 @@ describe('cardio GPS nativo — invariantes de background (TS)', () => {
     // Loop por segmento sobre o array — é o que preserva a distância do gap.
     expect(hookSrc).toMatch(/for \(const fix of fixes\)/)
   })
+
+  it('surfaça status/hasReliableFix pelo path ATIVO (não trava em "Buscando GPS")', () => {
+    // No nativo o useGeoLocation fica dormente; a UI travava em "Buscando GPS...".
+    expect(hookSrc).toContain('isBackgroundTracking')
+    expect(hookSrc).toContain('effectiveGpsStatus')
+    // hasReliableFix precisa considerar o path nativo (metrics.accuracyMeters).
+    expect(hookSrc).toMatch(/usingNativeGps[\s\S]*metrics\.accuracyMeters/)
+  })
 })
 
 describe('cardio GPS nativo — invariantes do plugin (Swift)', () => {

@@ -83,6 +83,11 @@ interface UseCardioTrackingResult {
    * maxAccuracyMeters — i.e., we're getting usable points.
    */
   hasReliableFix: boolean
+  /**
+   * True when the native background tracker is active (iOS). Nesse modo o GPS
+   * NÃO pausa em segundo plano — a UI deve esconder o aviso "mantenha o app aberto".
+   */
+  isBackgroundTracking: boolean
   start: () => Promise<void>
   pause: () => void
   resume: () => Promise<void>
@@ -204,6 +209,11 @@ export function useCardioTracking({
   const usingNativeRef = useRef(false)
   const nativeDrainTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const drainNativeRef = useRef<(() => Promise<void>) | null>(null)
+  // Espelho em STATE do path nativo — o ref não dispara re-render, mas a UI precisa
+  // saber que está no nativo pra: (a) surfaçar gpsStatus/hasReliableFix pelo caminho
+  // certo (o useGeoLocation fica dormente no nativo), (b) esconder o aviso de "GPS
+  // pausa em segundo plano" (falso no nativo).
+  const [usingNativeGps, setUsingNativeGps] = useState(false)
 
   // ── Timer: advance elapsed + recompute pace/calories every second ────────
   useEffect(() => {
@@ -356,6 +366,7 @@ export function useCardioTracking({
     const res = await startNativeCardioLocation()
     if (!res.ok) return false
     usingNativeRef.current = true
+    setUsingNativeGps(true)
     if (nativeDrainTimerRef.current) clearInterval(nativeDrainTimerRef.current)
     // Drena a cada 2s enquanto o app está em foreground (o timer congela em
     // background junto com o JS; o buffer nativo continua enchendo e é drenado no
@@ -367,6 +378,7 @@ export function useCardioTracking({
   const stopNative = useCallback(async () => {
     if (!usingNativeRef.current) return
     usingNativeRef.current = false
+    setUsingNativeGps(false)
     if (nativeDrainTimerRef.current) {
       clearInterval(nativeDrainTimerRef.current)
       nativeDrainTimerRef.current = null
@@ -653,17 +665,26 @@ export function useCardioTracking({
     if (userId) await clearPersistedCardio(userId)
   }, [userId])
 
-  const hasReliableFix =
-    !!position && position.accuracyMeters <= maxAccuracyMeters
+  // No path nativo o useGeoLocation fica dormente (position/status não atualizam) —
+  // a precisão vem de metrics.accuracyMeters (setado pelo drain). Surfaça o status
+  // pelo caminho ATIVO pra UI não travar em "Buscando GPS...".
+  const hasReliableFix = usingNativeGps
+    ? (metrics.accuracyMeters != null && metrics.accuracyMeters <= maxAccuracyMeters)
+    : (!!position && position.accuracyMeters <= maxAccuracyMeters)
+
+  const effectiveGpsStatus: TrackingStatus = usingNativeGps
+    ? (isTracking ? (metrics.accuracyMeters != null ? 'watching' : 'acquiring') : 'idle')
+    : gpsStatus
 
   return {
     isTracking,
     isPaused,
     metrics,
     trackPoints,
-    gpsStatus,
+    gpsStatus: effectiveGpsStatus,
     gpsError,
     hasReliableFix,
+    isBackgroundTracking: usingNativeGps,
     start,
     pause,
     resume,
