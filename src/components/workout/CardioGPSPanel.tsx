@@ -324,7 +324,7 @@ export default function CardioGPSPanel({
   const handleResume = useCallback(() => { void resume() }, [resume])
 
   const handleStop = useCallback(async () => {
-    const result = stop()
+    const result = await stop()
     if (!result) {
       // Sem nenhum ponto de GPS válido (indoor, permissão negada ou sinal fraco
       // o tempo todo). Antes a sessão sumia sem aviso — agora avisa.
