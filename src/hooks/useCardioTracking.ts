@@ -339,7 +339,7 @@ export function useCardioTracking({
 
     let capHandle: { remove: () => void } | null = null
     let capCancelled = false
-    if (isIosNative()) {
+    if (isIosNative() || isAndroidNative()) {
       import('@capacitor/app').then(({ App }) => {
         if (capCancelled) return
         App.addListener('appStateChange', (state: { isActive?: boolean }) => {

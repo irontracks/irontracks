@@ -266,19 +266,19 @@ export const openAppSettings = async () => {
   }
 }
 
-// ─── Cardio GPS (continuous background location — iOS native only) ────────────
+// ─── Cardio GPS (continuous background location — iOS + Android native) ───────
 //
-// O plugin nativo (CLLocationManager + background updates + buffer) só existe no
-// iOS. No Android/web, estas funções são no-op e o cardio cai no fallback
-// @capacitor/geolocation (useGeoLocation), preservando o comportamento atual.
+// iOS: CLLocationManager em background (IronTracksNativePlugin.swift).
+// Android: CardioLocationService (foreground service + FusedLocationProvider).
+// No web, estas funções são no-op e o cardio cai no fallback @capacitor/geolocation.
 
-/** True quando o tracker nativo de cardio está disponível (iOS nativo). */
-export const isNativeCardioLocationAvailable = (): boolean => isIosNative()
+/** True quando o tracker nativo de cardio está disponível (iOS ou Android nativo). */
+export const isNativeCardioLocationAvailable = (): boolean => isNativePlatform()
 
 /** Inicia o tracking nativo (background). Resolve ok:false se indisponível/negado. */
 export const startNativeCardioLocation = async (): Promise<{ ok: boolean; authorization?: string }> => {
   try {
-    if (!isIosNative()) return { ok: false }
+    if (!isNativePlatform()) return { ok: false }
     return await Native.startCardioLocation()
   } catch {
     return { ok: false }
@@ -288,7 +288,7 @@ export const startNativeCardioLocation = async (): Promise<{ ok: boolean; author
 /** Para o tracking nativo e devolve os pontos ainda em buffer. */
 export const stopNativeCardioLocation = async (): Promise<NativeCardioFix[]> => {
   try {
-    if (!isIosNative()) return []
+    if (!isNativePlatform()) return []
     const res = await Native.stopCardioLocation()
     return Array.isArray(res?.points) ? res.points : []
   } catch {
@@ -299,7 +299,7 @@ export const stopNativeCardioLocation = async (): Promise<NativeCardioFix[]> => 
 /** Drena (retorna + limpa) os fixes bufferizados nativamente desde a última chamada. */
 export const drainNativeCardioLocations = async (): Promise<NativeCardioFix[]> => {
   try {
-    if (!isIosNative()) return []
+    if (!isNativePlatform()) return []
     const res = await Native.drainCardioLocations()
     return Array.isArray(res?.points) ? res.points : []
   } catch {

@@ -85,6 +85,10 @@ dependencies {
     // present and the google-services plugin is applied above.
     implementation platform('com.google.firebase:firebase-bom:33.7.0')
     implementation 'com.google.firebase:firebase-messaging-ktx'
+
+    // FusedLocationProvider — usado pelo CardioLocationService (GPS de cardio em
+    // background, paridade com o CLLocationManager do iOS).
+    implementation 'com.google.android.gms:play-services-location:21.3.0'
 }
 
 apply from: 'capacitor.build.gradle'
