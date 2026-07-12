@@ -34,18 +34,40 @@ export function useStudentWorkoutStartAlerts(
     let channel: RealtimeChannel | null = null
 
     try {
+      // UM ÚNICO binding event:'*' (o realtime-js do Supabase pode registrar só o 1º de
+      // múltiplos postgres_changes no mesmo canal — com dois bindings o DELETE não disparava
+      // e o banner ficava "pra sempre"). Aqui trato INSERT/UPDATE/DELETE no mesmo callback,
+      // igual o useTeacherStudentSessions (que funciona).
       channel = supabase
         .channel(`teacher-start-alerts:${teacherUserId}`)
         .on(
           'postgres_changes',
-          { event: 'INSERT', schema: 'public', table: 'active_workout_sessions' },
+          { event: '*', schema: 'public', table: 'active_workout_sessions' },
           (payload: Record<string, unknown>) => {
             if (!mounted) return
+            const ev = String(payload?.eventType ?? '').toUpperCase()
+
+            // Sessão apagada (aluno OU professor finalizou/cancelou) → tira o alerta.
+            if (ev === 'DELETE') {
+              const old = (payload?.old as Record<string, unknown> | null) ?? null
+              const uid = String(old?.user_id ?? '').trim()
+              if (uid) setAlerts((prev) => prev.filter((a) => a.userId !== uid))
+              return
+            }
+
             const row = (payload?.new as Record<string, unknown> | null) ?? null
             const uid = String(row?.user_id ?? '').trim()
             if (!uid || uid === teacherUserId) return
-            // Já sob controle (ex.: sessão recriada durante controle) — não alerta.
-            if (String(row?.control_status ?? '') === 'active') return
+
+            // Controle já ativo (aluno aceitou) → não precisa mais do alerta.
+            if (String(row?.control_status ?? '') === 'active') {
+              setAlerts((prev) => prev.filter((a) => a.userId !== uid))
+              return
+            }
+
+            // Só o INSERT vira alerta novo (início do treino). UPDATE que não zerou o controle
+            // não faz nada aqui (evita re-alertar a cada save do aluno).
+            if (ev !== 'INSERT') return
 
             void (async () => {
               let name = 'Seu aluno'
@@ -61,16 +83,6 @@ export function useStudentWorkoutStartAlerts(
               if (!mounted) return
               setAlerts((prev) => (prev.some((a) => a.userId === uid) ? prev : [...prev, { userId: uid, name, at: Date.now() }]))
             })()
-          },
-        )
-        .on(
-          'postgres_changes',
-          { event: 'DELETE', schema: 'public', table: 'active_workout_sessions' },
-          (payload: Record<string, unknown>) => {
-            if (!mounted) return
-            const old = (payload?.old as Record<string, unknown> | null) ?? null
-            const uid = String(old?.user_id ?? '').trim()
-            if (uid) setAlerts((prev) => prev.filter((a) => a.userId !== uid))
           },
         )
         .subscribe()
