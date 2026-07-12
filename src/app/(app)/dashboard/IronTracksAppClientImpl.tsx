@@ -935,8 +935,6 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                         <InviteAcceptedModal />
                         {/* GPS: Auto-detect gym toast */}
                         {view === 'dashboard' && <GymDetectToastWrapper userId={user?.id} onStartWorkout={() => setCreateWizardOpen(true)} />}
-                        {/* Professor: banner em tempo real quando um aluno inicia treino (assumir controle) */}
-                        {isCoach && view === 'dashboard' && <StudentWorkoutStartBanner teacherUserId={user?.id ? String(user.id) : undefined} supabase={supabase} />}
                         <GuidedTour
                             open={Boolean(tourOpen)}
                             steps={getTourSteps({
@@ -1007,6 +1005,8 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                     renderizando ACIMA do DashboardTabs e empurram a barra pra baixo
                                     do offset fixo que o NutritionOverlay assume, fazendo a barra
                                     "flutuar" por cima do conteúdo de nutrição de forma incoerente. */}
+                                {/* Professor: banner em tempo real quando um aluno inicia treino (assumir controle) */}
+                                {view === 'dashboard' && !nutritionOpen && isCoach && <StudentWorkoutStartBanner teacherUserId={user?.id ? String(user.id) : undefined} supabase={supabase} />}
                                 {view === 'dashboard' && !nutritionOpen && <WorkoutRecoveryBanner userId={String(user?.id || initialUserObj?.id || '')} />}
                                 {view === 'dashboard' && !nutritionOpen && <RestDayPromptCard userId={String(user?.id || initialUserObj?.id || '')} />}
                                 {view === 'dashboard' && !nutritionOpen && appleHealthEnabled && <HealthWidget data={healthData} />}
