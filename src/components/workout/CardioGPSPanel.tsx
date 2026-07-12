@@ -289,6 +289,7 @@ export default function CardioGPSPanel({
     gpsStatus,
     gpsError,
     hasReliableFix,
+    isBackgroundTracking,
     start,
     pause,
     resume,
@@ -471,7 +472,18 @@ export default function CardioGPSPanel({
           <span className="text-xs text-white/80">{saveError}</span>
         </div>
       )}
-      {isTracking && (
+      {isTracking && isBackgroundTracking && (
+        <div
+          className="mb-3 flex items-start gap-2 rounded-xl p-2.5 flex-shrink-0"
+          style={{ background: 'rgba(34,197,94,0.08)', border: '1px solid rgba(34,197,94,0.25)' }}
+        >
+          <Satellite size={14} className="mt-0.5 flex-shrink-0 text-green-300" />
+          <span className="text-[11px] text-white/70">
+            Rastreando em segundo plano — pode bloquear a tela ou trocar de app que o GPS continua contando.
+          </span>
+        </div>
+      )}
+      {isTracking && !isBackgroundTracking && (
         <div
           className="mb-3 flex items-start gap-2 rounded-xl p-2.5 flex-shrink-0"
           style={{ background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.25)' }}
