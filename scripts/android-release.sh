@@ -20,6 +20,26 @@ PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 GRADLE_FILE="$PROJECT_ROOT/android/app/build.gradle"
 ARTIFACT_DIR="$PROJECT_ROOT/android/app/build/outputs/bundle/release"
 
+# ─── 0. JAVA_HOME (JDK 17) ───────────────────────────────────────────────────
+# O Android Gradle Plugin não roda no JDK padrão do sistema quando é muito novo
+# (ex.: Java 25). Fixa o JDK 17 se o atual não for 17.x.
+if ! java -version 2>&1 | grep -q '"17'; then
+    if JDK17="$(/usr/libexec/java_home -v 17 2>/dev/null)"; then
+        export JAVA_HOME="$JDK17"
+        echo "==> JAVA_HOME → $JAVA_HOME (JDK 17)"
+    else
+        echo "❌ JDK 17 não encontrado (o AGP não roda no Java atual). Instale o Temurin 17."
+        exit 1
+    fi
+fi
+
+# ─── 0b. Guard: google-services.json (senão o AAB sai sem FCM/push) ──────────
+if [ ! -f "$PROJECT_ROOT/android/app/google-services.json" ]; then
+    echo "❌ android/app/google-services.json ausente — o AAB sairia SEM push (FCM)."
+    echo "   Copie o arquivo do Firebase antes de gerar o release."
+    exit 1
+fi
+
 # ─── Parse args ─────────────────────────────────────────────────────────────
 SUBMIT=false
 FORCED_VERSION=""
@@ -41,9 +61,13 @@ fi
 echo "==> Bumping versionCode: $CURRENT_CODE → $NEW_CODE"
 sed -i '' "s/versionCode $CURRENT_CODE/versionCode $NEW_CODE/g" "$GRADLE_FILE"
 
-# ─── 2. Sync web build ──────────────────────────────────────────────────────
-echo "==> Syncing Capacitor (web → android)..."
+# ─── 2. Build web + sync ────────────────────────────────────────────────────
+# npm run build gera out/ (webDir do Capacitor). Sem isto, o cap sync aborta em
+# checkout limpo com "Could not find the web assets directory: ./out".
+echo "==> Building web (next build → out/)..."
 cd "$PROJECT_ROOT"
+npm run build
+echo "==> Syncing Capacitor (web → android)..."
 npm run cap:sync:android
 
 # ─── 3. Gradle bundleRelease ────────────────────────────────────────────────
@@ -61,9 +85,13 @@ echo "✅ AAB gerado: $AAB_PATH ($SIZE)"
 
 # ─── 4. Submit (opcional) ───────────────────────────────────────────────────
 if [ "$SUBMIT" = true ]; then
-    echo "==> Subindo pro Play Console (Internal Testing)..."
+    # Faixa FECHADA (Alpha) — é onde os testadores entram via Grupo do Google pelo
+    # opt-in da /comercial. A faixa 'internal' usa lista de e-mails à parte e NÃO
+    # entrega a esses testadores. Sobrescreva com ANDROID_TRACK se precisar.
+    TRACK="${ANDROID_TRACK:-alpha}"
+    echo "==> Subindo pro Play Console (track: $TRACK)..."
     cd "$PROJECT_ROOT"
-    node scripts/android-submit.mjs --aab "$AAB_PATH" --track internal
+    node scripts/android-submit.mjs --aab "$AAB_PATH" --track "$TRACK"
 else
     echo ""
     echo "📦 Próximos passos:"
