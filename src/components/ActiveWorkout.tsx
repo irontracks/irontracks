@@ -24,7 +24,7 @@ const TeamChatDrawer = dynamic(
   { ssr: false }
 );
 
-export default function ActiveWorkout(props: ActiveWorkoutProps & { controlledByName?: string | null }) {
+export default function ActiveWorkout(props: ActiveWorkoutProps & { controlledByName?: string | null; onRevokeControl?: () => void | Promise<void> }) {
   const { value: controller, logs } = useActiveWorkoutController(props);
   const { session, workout, exercises } = controller;
 
@@ -237,11 +237,23 @@ export default function ActiveWorkout(props: ActiveWorkoutProps & { controlledBy
         <div className="flex-1 overflow-y-auto overflow-x-hidden">
           {/* Teacher control badge — subtle indicator when a teacher is controlling */}
           {props.controlledByName && (
-            <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-2 flex items-center gap-2 text-sm">
-              <Gamepad2 size={13} className="text-amber-400 shrink-0" />
-              <span className="text-amber-300 font-bold text-xs">
-                Prof. <strong className="text-amber-200">{props.controlledByName}</strong> no controle
+            <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-2 flex items-center justify-between gap-2 text-sm">
+              <span className="text-amber-300 font-bold text-xs flex items-center gap-2 min-w-0">
+                <Gamepad2 size={13} className="text-amber-400 shrink-0" />
+                <span className="truncate">Prof. <strong className="text-amber-200">{props.controlledByName}</strong> no controle</span>
               </span>
+              {/* Consentimento revogável: o aluno pode retirar o controle a qualquer momento
+                  (o backend aceita reject em qualquer status). Antes só dava pra sair encerrando
+                  o treino. */}
+              {props.onRevokeControl && (
+                <button
+                  type="button"
+                  onClick={() => { void props.onRevokeControl?.() }}
+                  className="text-[11px] font-black bg-amber-500 text-black px-3 py-1 rounded-lg hover:bg-amber-400 transition-colors shrink-0 active:scale-95"
+                >
+                  Retirar controle
+                </button>
+              )}
             </div>
           )}
 
