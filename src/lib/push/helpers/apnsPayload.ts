@@ -33,5 +33,8 @@ export function buildApnsAps(
     'interruption-level': passive.includes(opts.notifType) ? 'active' : 'time-sensitive',
     ...(opts.wakesScreen || opts.hasRichImage ? { 'mutable-content': 1 } : {}),
     ...(opts.notifType === 'morning_briefing' ? { category: 'REST_DAY_PROMPT' } : {}),
+    // Push "aluno iniciou o treino": categoria com a ação nativa "Assumir treino"
+    // (registrada no IronTracksNativePlugin.swift). Sem o build nativo, o tap ainda abre o app.
+    ...(opts.notifType === 'student_workout_start' ? { category: 'TEACHER_ASSUME_CONTROL' } : {}),
   }
 }

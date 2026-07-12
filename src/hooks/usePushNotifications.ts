@@ -144,6 +144,22 @@ export function usePushNotifications(userId?: string | null) {
               const type = data ? String(data.type || '').trim() : ''
               const senderId = data ? String(data.sender_id || '').trim() : ''
               const senderName = data ? String(data.sender_name || '').trim() : ''
+
+              // Ação "Assumir treino" (botão do push quando um aluno inicia — só professor).
+              // Dispara o request de controle com o studentId do payload e abre o app.
+              if (tappedAction === 'ASSUME_CONTROL') {
+                const studentId = data ? String(data.studentId ?? data.student_id ?? '').trim() : ''
+                if (studentId) {
+                  void fetch(`/api/teacher/control/${studentId}`, {
+                    method: 'POST',
+                    headers: { 'content-type': 'application/json' },
+                    body: JSON.stringify({ action: 'request' }),
+                  }).catch(() => { })
+                  window.dispatchEvent(new CustomEvent('irontracks:push:navigate', { detail: { link: '/dashboard', type: 'student_workout_start' } }))
+                }
+                return
+              }
+
               if (link || type) {
                 // Dedupe: iOS WKWebView pode re-entregar o mesmo action durante
                 // cold-launch + warm-launch. Se o mesmo action ID chegou nos
