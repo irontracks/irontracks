@@ -169,7 +169,7 @@ export async function sendFcmToUsers(
     try {
         const cfg = getFcmConfig()
         if (!cfg) {
-            logWarn(
+            logError(
                 'fcm',
                 '[FCM] sendFcmToUsers: config missing — set FCM_PROJECT_ID, FCM_CLIENT_EMAIL, FCM_PRIVATE_KEY in env vars'
             )
