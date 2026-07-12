@@ -11,8 +11,11 @@ export const dynamic = 'force-dynamic'
 
 const isEnabled = () => env.features.executionVideo
 
+// Os callers (useAdminStudentOps/useAdminStudentDetail2) mandam ?student_user_id=.
+// O schema exigia student_id -> zod falhava sempre (400) e a listagem de vídeos do aluno
+// pro professor ficava morta. Alinhado ao param real.
 const QuerySchema = z.object({
-  student_id: z.string().uuid('student_id inválido'),
+  student_user_id: z.string().uuid('student_user_id inválido'),
 })
 
 export async function GET(req: Request) {
@@ -25,7 +28,7 @@ export async function GET(req: Request) {
     const { data: q, response } = parseSearchParams(req, QuerySchema)
     if (response) return response
 
-    const studentUserId = String(q?.student_id || '').trim()
+    const studentUserId = String(q?.student_user_id || '').trim()
     if (!studentUserId) return jsonError(400, 'student_user_id_required')
 
     const admin = createAdminClient()
