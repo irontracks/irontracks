@@ -36,6 +36,18 @@ describe('setVolume', () => {
     expect(setVolume({ L_weight: '15', L_reps: '10' })).toBe(150)
   })
 
+  it('drop-set: soma cada etapa (não peso do topo × total)', () => {
+    // Saver grava topo weight=última(mais leve)/reps=total → topo×total SUBESTIMA.
+    const log = { weight: '20', reps: '18', drop_set: { stages: [{ weight: '30', reps: '10' }, { weight: '20', reps: '8' }] } }
+    expect(setVolume(log)).toBe(460) // 30×10 + 20×8, não 20×18=360
+  })
+
+  it('stripping: soma cada etapa (mesma estrutura do drop-set)', () => {
+    // Saver grava topo weight=primeira(mais pesada)/reps=total → topo×total SUPERESTIMA.
+    const log = { weight: '100', reps: '18', stripping: { stages: [{ weight: '100', reps: '8' }, { weight: '80', reps: '6' }, { weight: '60', reps: '4' }] } }
+    expect(setVolume(log)).toBe(1520) // 100×8 + 80×6 + 60×4, não 100×18=1800
+  })
+
   it('cluster tem prioridade e soma os blocks', () => {
     const log = { cluster: { blocks: [{ weight: '50', reps: '5' }, { weight: '50', reps: '5' }] } }
     expect(setVolume(log)).toBe(500)
@@ -126,6 +138,15 @@ describe('setBestE1rm — fonte única do Δ1RM (dia + histórico)', () => {
     }
     // 30×(1+10/30) = 40, não 20×(1+18/30) = 32
     expect(setBestE1rm(log)).toBe(40)
+  })
+
+  it('stripping: melhor etapa (a mais pesada), não o topo inflado (PR falso)', () => {
+    const log = {
+      weight: '100', reps: '18', // topo = primeira etapa × total (enganoso)
+      stripping: { stages: [{ weight: '100', reps: '8' }, { weight: '80', reps: '6' }, { weight: '60', reps: '4' }] },
+    }
+    // epley(100,8) = 126,667, não epley(100,18) = 160
+    expect(setBestE1rm(log)).toBeCloseTo(126.667, 2)
   })
 
   it('cluster: melhor bloco (blocksDetailed), não lastWeight×total', () => {

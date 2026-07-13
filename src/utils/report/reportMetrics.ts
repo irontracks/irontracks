@@ -75,9 +75,16 @@ const buildLogVolume = (logs: UnknownRecord, exerciseIndex: number) => {
       return
     }
 
-    // ── Drop-set: sum each stage's volume; use first-stage (main) weight as avg ──
+    // ── Drop-set / Stripping: sum each stage's volume; first-stage (main) weight as avg ──
+    // Mesma estrutura `stages: [{weight,reps}]`. Sem tratar stripping, o topo
+    // (peso da 1ª etapa, a mais pesada, × total de reps) inflava volume e 1RM.
     const dropSet = isObject(value.drop_set) ? (value.drop_set as UnknownRecord) : null
-    const dropStages = dropSet && Array.isArray(dropSet.stages) ? (dropSet.stages as unknown[]) : []
+    const stripping = isObject(value.stripping) ? (value.stripping as UnknownRecord) : null
+    const dropStages = dropSet && Array.isArray(dropSet.stages)
+      ? (dropSet.stages as unknown[])
+      : stripping && Array.isArray(stripping.stages)
+        ? (stripping.stages as unknown[])
+        : []
     if (dropStages.length > 0) {
       let dropVol = 0
       let totalReps = 0
