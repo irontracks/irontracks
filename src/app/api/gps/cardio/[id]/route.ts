@@ -14,6 +14,29 @@ const patchSchema = z.object({
   activity_type: z.enum(VALID_ACTIVITY_TYPES).optional(),
 })
 
+// GET /api/gps/cardio/[id] — fetch a single track (owner-only) with its route,
+// usado pra gerar o Story compartilhável de uma corrida antiga no histórico.
+export async function GET(
+  _req: Request,
+  { params }: { params: Promise<{ id: string }> },
+) {
+  const auth = await requireUser()
+  if (!auth.ok) return auth.response
+
+  const { id } = await params
+  if (!id) return NextResponse.json({ ok: false, error: 'Missing id' }, { status: 400 })
+
+  const { data, error } = await auth.supabase
+    .from('cardio_tracks')
+    .select('id, activity_type, distance_meters, duration_seconds, avg_pace_min_km, max_speed_kmh, calories_estimated, route, started_at')
+    .eq('id', id)
+    .eq('user_id', auth.user.id) // RLS guard — só o dono lê a própria rota
+    .single()
+
+  if (error) return respondDbError('gps:cardio:get', error)
+  return NextResponse.json({ ok: true, track: data })
+}
+
 // PATCH /api/gps/cardio/[id] — update notes / perceived_effort / activity_type
 export async function PATCH(
   req: Request,
