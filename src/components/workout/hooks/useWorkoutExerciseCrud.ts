@@ -5,6 +5,7 @@ import { isObject } from '../utils';
 
 import { parseTrainingNumber } from '@/utils/trainingNumber';
 import { editedSetDetails, stripMethodBlobs } from '../helpers/editedSetDetails';
+import { canonicalEditorMethod } from '../helpers/editorMethod';
 import { applyExerciseOrder, buildExerciseDraft, draftOrderKeys } from '@/lib/workoutReorder';
 import {
   tagExercisesForEdit,
@@ -200,7 +201,9 @@ export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
       const setsCount = Math.max(setsHeader, Array.isArray(sdArrRaw) ? sdArrRaw.length : 0) || 1;
       const restTimeNum = parseTrainingNumber(ex?.restTime ?? ex?.rest_time);
       const restTime = typeof restTimeNum === 'number' && Number.isFinite(restTimeNum) && restTimeNum > 0 ? restTimeNum : DEFAULT_EXTRA_EXERCISE_REST_TIME_S;
-      const method = String(ex?.method || 'Normal').trim() || 'Normal';
+      // Normaliza a grafia pro valor do dropdown (ex.: "Drop-Set" → "Drop-set"),
+      // senão o <select> não casa e mostra "Normal" (e salvar perderia o método).
+      const method = canonicalEditorMethod(ex?.method);
       const isUnilateral = !!(ex?.isUnilateral ?? (ex as Record<string, unknown>)?.is_unilateral);
       const sideRestTimeNum = parseTrainingNumber((ex as Record<string, unknown>)?.sideRestTime ?? (ex as Record<string, unknown>)?.side_rest_time);
       const sideRestTime = typeof sideRestTimeNum === 'number' && sideRestTimeNum > 0 ? String(sideRestTimeNum) : '';
