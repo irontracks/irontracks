@@ -23,6 +23,7 @@ import {
 import { HelpHint } from '@/components/ui/HelpHint';
 import { HELP_TERMS } from '@/utils/help/terms';
 import { parseTrainingNumber } from '@/utils/trainingNumber';
+import { setTopWeightReps } from '@/utils/report/setVolume';
 import { isObject, isClusterConfig, isRestPauseConfig } from './utils';
 import { WorkoutExercise, UnknownRecord } from './types';
 import { isPlank } from '@/utils/exerciseTracking';
@@ -144,7 +145,9 @@ function ExerciseCardInner({ ex, exIdx, groupPos, logsSlice }: { ex: WorkoutExer
         const log = logsObj[`${exIdx}-${i}`];
         // Ignora séries de AQUECIMENTO: um aquecimento pesado não é recorde.
         if (log?.set_type === 'warmup' || log?.is_warmup === true) continue;
-        const w = Number(log?.weight ?? log?.total_weight ?? 0);
+        // setTopWeightReps trata unilateral (L_/R_) — sem isto, exercícios
+        // unilaterais (que salvam só em L_weight/R_weight) nunca acendiam o badge PR.
+        const w = setTopWeightReps(log as Record<string, unknown>).weight || Number(log?.weight ?? log?.total_weight ?? 0);
         if (w > sessionMax) sessionMax = w;
       }
       return sessionMax > 0 && sessionMax > histTopWeight;
