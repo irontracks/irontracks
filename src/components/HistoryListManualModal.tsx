@@ -99,9 +99,9 @@ export function HistoryListManualModal({
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="history-manual-title"
-                // Ancorado no topo + altura capada em coluna flex: evita o loop de subir/descer
-                // quando o teclado do iOS encolhe o WebView (mesmo fix do HistoryListEditModal).
-                className="w-full max-w-2xl max-h-[calc(100dvh-2rem)] flex flex-col rounded-2xl border shadow-2xl overflow-hidden relative"
+                // Ancorado no topo + altura via max-h-full (NÃO dvh — o dvh oscila com o
+                // teclado no iOS). Mesmo fix do HistoryListEditModal.
+                className="w-full max-w-2xl max-h-full flex flex-col rounded-2xl border shadow-2xl overflow-hidden relative"
                 style={{
                     background: 'linear-gradient(160deg, rgba(20,18,10,0.98) 0%, rgba(10,10,10,0.99) 40%)',
                     borderColor: 'rgba(234,179,8,0.12)',

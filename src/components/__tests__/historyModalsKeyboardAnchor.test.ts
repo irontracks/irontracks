@@ -21,9 +21,11 @@ describe('Modais de histórico — âncora anti-loop do teclado (iOS)', () => {
       expect(src).not.toContain('items-center justify-center p-4')
     })
 
-    it(`${file}: dialog usa coluna flex com altura capada`, () => {
+    it(`${file}: dialog usa coluna flex com altura capada estável (sem dvh)`, () => {
       expect(src).toContain('flex flex-col')
-      expect(src).toContain('max-h-[calc(100dvh-2rem)]')
+      expect(src).toContain('max-h-full')
+      // dvh oscila com o teclado no iOS — não pode voltar.
+      expect(src).not.toContain('100dvh')
     })
 
     it(`${file}: miolo rola em flex-1 (não max-h-[70vh])`, () => {
