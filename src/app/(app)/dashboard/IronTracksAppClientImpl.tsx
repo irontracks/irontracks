@@ -1215,8 +1215,12 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                             )}
 
                             {editActiveOpen && view === 'active' && editActiveDraft && (
+                                // z-[2200]: ACIMA da barra inferior do descanso (RestTimerOverlay,
+                                // z-2100) e do flash (z-2000). Senão, se um descanso está rolando, a
+                                // barra START/AUTO fica POR CIMA do editor e cobre o "+ Adicionar
+                                // Exercício" no rodapé.
                                 <div
-                                    className="fixed inset-0 z-[1400] bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 md:p-6 pt-safe"
+                                    className="fixed inset-0 z-[2200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-3 md:p-6 pt-safe"
                                     onClick={() => handleCloseActiveWorkoutEditor()}
                                 >
                                     <div
