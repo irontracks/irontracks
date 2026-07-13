@@ -74,10 +74,13 @@ export function HistoryListEditModal({
                 aria-modal="true"
                 aria-labelledby="history-edit-title"
                 // Ancorado no topo (items-start) + altura capada em coluna flex: ao abrir o
-                // teclado no iOS o WebView encolhe (Capacitor resize 'native'); com o modal
-                // CENTRALIZADO isso recentralizava a cada frame → loop de subir/descer. No topo
-                // a posição não depende da altura do viewport (não oscila); só o miolo rola.
-                className="w-full max-w-2xl max-h-[calc(100dvh-2rem)] flex flex-col rounded-2xl border shadow-2xl overflow-hidden relative"
+                // teclado no iOS o WebView encolhe; com o modal CENTRALIZADO isso recentralizava
+                // a cada frame → loop de subir/descer. No topo a posição não depende do viewport.
+                // ALTURA via max-h-full (relativa ao overlay fixo inset-0), NÃO dvh: o `dvh`
+                // oscila rápido no iOS com o teclado aberto (o browser fica recalculando o
+                // dynamic viewport) — era o "subindo/descendo muito rápido". O overlay já
+                // desconta o teclado (inset-0 = área do WebView), então full é estável.
+                className="w-full max-w-2xl max-h-full flex flex-col rounded-2xl border shadow-2xl overflow-hidden relative"
                 style={{
                     background: 'linear-gradient(160deg, rgba(20,18,10,0.98) 0%, rgba(10,10,10,0.99) 40%)',
                     borderColor: 'rgba(234,179,8,0.12)',
