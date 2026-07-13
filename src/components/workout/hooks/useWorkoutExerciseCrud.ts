@@ -4,7 +4,7 @@ import type { UnknownRecord, WorkoutExercise, WorkoutSetDetail } from '../types'
 import { isObject } from '../utils';
 
 import { parseTrainingNumber } from '@/utils/trainingNumber';
-import { editedSetDetails } from '../helpers/editedSetDetails';
+import { editedSetDetails, stripMethodBlobs } from '../helpers/editedSetDetails';
 import { applyExerciseOrder, buildExerciseDraft, draftOrderKeys } from '@/lib/workoutReorder';
 import {
   tagExercisesForEdit,
@@ -273,6 +273,14 @@ export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
           try {
             delete nextLogs[`${idx}-${i}`];
           } catch { }
+        }
+      }
+      // Troca de método: tira os blobs de método já EXECUTADOS dos logs sobreviventes
+      // (senão o método antigo persiste no render mesmo após uma série feita).
+      if (method !== prevMethod) {
+        for (let i = 0; i < desiredSets; i += 1) {
+          const lk = `${idx}-${i}`;
+          if (lk in nextLogs) nextLogs[lk] = stripMethodBlobs(nextLogs[lk]);
         }
       }
 

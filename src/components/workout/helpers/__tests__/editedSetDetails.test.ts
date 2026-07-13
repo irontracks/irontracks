@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { editedSetDetails, advancedConfigOf } from '../editedSetDetails'
+import { editedSetDetails, advancedConfigOf, stripMethodBlobs } from '../editedSetDetails'
 
 const dropCfg = [{ weight: '30', reps: 10 }, { weight: '20', reps: 8 }]
 
@@ -34,6 +34,34 @@ describe('editedSetDetails — troca de método limpa config fantasma', () => {
     expect(out[0].weight).toBe(80)
     expect(out[0].reps).toBe('8')
     expect(out[0].advanced_config).toBe(null)
+  })
+})
+
+describe('stripMethodBlobs — troca de método limpa o log executado', () => {
+  it('remove os blobs de método mas preserva weight/reps/done/set_type', () => {
+    const log = {
+      weight: '80', reps: '8', done: true, set_type: 'working',
+      fst7: { blocks: [1, 2, 3] }, drop_set: { stages: [] }, cluster: {}, per_set_method: 'Cluster',
+    }
+    const out = stripMethodBlobs(log) as Record<string, unknown>
+    expect(out.weight).toBe('80')
+    expect(out.reps).toBe('8')
+    expect(out.done).toBe(true)
+    expect(out.set_type).toBe('working')
+    expect('fst7' in out).toBe(false)
+    expect('drop_set' in out).toBe(false)
+    expect('cluster' in out).toBe(false)
+    expect('per_set_method' in out).toBe(false)
+  })
+
+  it('log sem blob volta igual (mesma referência)', () => {
+    const log = { weight: '80', reps: '8', done: true }
+    expect(stripMethodBlobs(log)).toBe(log)
+  })
+
+  it('não-objeto volta como veio', () => {
+    expect(stripMethodBlobs(null)).toBe(null)
+    expect(stripMethodBlobs('x')).toBe('x')
   })
 })
 
