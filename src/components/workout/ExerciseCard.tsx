@@ -228,10 +228,13 @@ function ExerciseCardInner({ ex, exIdx, groupPos, logsSlice }: { ex: WorkoutExer
       );
     }
 
-    // Drop-Set: array config or saved drop stages
+    // Drop-Set: array config, estágios salvos, OU o método do exercício = "Drop-set"
+    // (o dropdown grava method='Drop-set' SEM criar advanced_config; sem esta terceira
+    // condição, escolher "Drop-set" no editor caía silenciosamente em NormalSet).
     const dropSet = isObject(log.drop_set) ? (log.drop_set as UnknownRecord) : null;
     const dropStages: unknown[] = dropSet && Array.isArray(dropSet.stages) ? (dropSet.stages as unknown[]) : [];
-    if (Array.isArray(rawCfg) || dropStages.length > 0) {
+    const isDropByMethod = /^drop-?set$/i.test(method);
+    if (Array.isArray(rawCfg) || dropStages.length > 0 || isDropByMethod) {
       return <DropSetSet key={key} ex={ex} exIdx={exIdx} setIdx={setIdx} />;
     }
 
