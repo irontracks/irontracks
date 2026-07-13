@@ -5,6 +5,7 @@ import { ArrowLeft } from 'lucide-react';
 import ExerciseEditor from '@/components/ExerciseEditor';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
 import { useBackHandler } from '@/hooks/useBackHandler';
+import { useBodyScrollLock } from '@/hooks/useBodyScrollLock';
 import { type SupabaseClient } from '@supabase/supabase-js';
 
 export interface ManualExercise {
@@ -81,6 +82,9 @@ export function HistoryListManualModal({
     // WCAG 2.4.3 Focus Order + 2.1.2 No Keyboard Trap
     const focusTrapRef = useFocusTrap(true, onClose);
     useBackHandler(true, onClose);
+    // Congela o body (mesmo motivo do EditModal): evita o WebView arrastar o
+    // modal ao abrir o teclado no iOS.
+    useBodyScrollLock(true);
     return (
         <div
             role="button"

@@ -3,6 +3,7 @@
 import React from 'react';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
 import { useBackHandler } from '@/hooks/useBackHandler';
+import { useBodyScrollLock } from '@/hooks/useBodyScrollLock';
 
 export interface ManualExercise {
     name: string;
@@ -55,6 +56,9 @@ export function HistoryListEditModal({
     // WCAG 2.4.3 Focus Order + 2.1.2 No Keyboard Trap
     const focusTrapRef = useFocusTrap(true, onClose);
     useBackHandler(true, onClose);
+    // Congela o body: sem isto o WKWebView rola a página pra revelar o input
+    // focado e arrasta o modal (jitter subindo/descendo no iOS).
+    useBodyScrollLock(true);
     return (
         <div
             role="button"
