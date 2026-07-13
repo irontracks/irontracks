@@ -91,6 +91,8 @@ export async function POST(req: Request) {
       '',
       'Formato JSON:',
       '{ "exercises": [{ "name": string, "sets": number|null, "reps": number|null, "weightKg": number|null, "cadence": string|null, "restSeconds": number|null, "rpe": number|null, "method": string|null, "notes": string|null }] }',
+      '"method" vale pra TODAS as séries. Se a pessoa disser a técnica só numa série',
+      '(ex.: "drop na última"), deixe "method": "Normal" e ponha isso em "notes".',
       '',
       `Entrada: "${sanitized}"`,
     ].join('\n')
