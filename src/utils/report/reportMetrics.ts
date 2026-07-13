@@ -1,6 +1,6 @@
 
 import type { UnknownRecord } from '@/types/app'
-import { setVolume, setTopWeightReps, setBestE1rm } from './setVolume'
+import { setVolume, setTopWeightReps, setBestE1rm, waveVolume } from './setVolume'
 import { estimateSessionKcalBreakdown } from '@/utils/calories/sessionKcal'
 import { distributeKcalWithFixed } from '@/utils/calories/distributeKcal'
 
@@ -102,6 +102,26 @@ const buildLogVolume = (logs: UnknownRecord, exerciseIndex: number) => {
       if (totalReps > 0) reps += totalReps
       if (dropVol > 0) volume += dropVol
       if (firstWeight !== null) { weightSum += firstWeight; weightCount += 1 }
+      sets += 1
+      return
+    }
+
+    // ── Wave (onda): soma peso×reps de cada tier (peso próprio por intensidade,
+    //    retrocompat com peso base único). Sem isso, o topo (peso base × total)
+    //    subestima/superestima quando as cargas variam entre tiers. ──
+    const wave = isObject(value.wave) ? (value.wave as UnknownRecord) : null
+    const waveList = wave && Array.isArray(wave.waves) ? (wave.waves as unknown[]) : []
+    if (waveList.length > 0) {
+      const wv = waveVolume(wave)
+      if (wv > 0) volume += wv
+      let waveReps = 0
+      for (const w of waveList) {
+        if (!isObject(w)) continue
+        waveReps += toNumber((w as UnknownRecord).heavy) + toNumber((w as UnknownRecord).medium) + toNumber((w as UnknownRecord).ultra)
+      }
+      if (waveReps > 0) reps += waveReps
+      const bestW = toNumber(wave?.heavyWeight) || toNumber(wave?.weight)
+      if (bestW > 0) { weightSum += bestW; weightCount += 1 }
       sets += 1
       return
     }

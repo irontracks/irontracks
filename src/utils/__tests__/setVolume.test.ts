@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { setVolume, setTopWeightReps, parseWeightValue, parseRepsValue, isWorkingSet, epley1rm, setBestE1rm } from '@/utils/report/setVolume'
+import { setVolume, setTopWeightReps, parseWeightValue, parseRepsValue, isWorkingSet, epley1rm, setBestE1rm, waveVolume } from '@/utils/report/setVolume'
 
 describe('parseWeightValue / parseRepsValue', () => {
   it('trata vírgula decimal e inválidos', () => {
@@ -53,10 +53,32 @@ describe('setVolume', () => {
     expect(setVolume(log)).toBe(500)
   })
 
+  it('wave (peso único, retrocompat): peso base × total de reps dos tiers', () => {
+    const log = { weight: '100', reps: '25', wave: { weight: '100', waves: [{ heavy: 5, medium: 8, ultra: 12 }] } }
+    expect(setVolume(log)).toBe(2500) // 100×(5+8+12)
+  })
+
+  it('wave loading progressivo: peso por tier', () => {
+    const log = { weight: '110', reps: '25', wave: { heavyWeight: '110', mediumWeight: '100', ultraWeight: '90', waves: [{ heavy: 5, medium: 8, ultra: 12 }] } }
+    expect(setVolume(log)).toBe(2430) // 110×5 + 100×8 + 90×12
+  })
+
   it('logs vazios/ inválidos → 0', () => {
     expect(setVolume(null)).toBe(0)
     expect(setVolume({})).toBe(0)
     expect(setVolume({ weight: '0', reps: '0' })).toBe(0)
+  })
+})
+
+describe('waveVolume', () => {
+  it('duas ondas, peso por tier', () => {
+    const wave = { heavyWeight: '100', mediumWeight: '80', ultraWeight: '60', waves: [{ heavy: 3, medium: 5, ultra: 8 }, { heavy: 2, medium: 4, ultra: 6 }] }
+    // onda1: 300+400+480=1180 ; onda2: 200+320+360=880 → 2060
+    expect(waveVolume(wave)).toBe(2060)
+  })
+  it('sem ondas → 0', () => {
+    expect(waveVolume({ weight: '100' })).toBe(0)
+    expect(waveVolume(null)).toBe(0)
   })
 })
 
@@ -156,6 +178,15 @@ describe('setBestE1rm — fonte única do Δ1RM (dia + histórico)', () => {
     }
     // 100×(1+5/30) = 116,67, não 80×(1+15/30) = 120
     expect(setBestE1rm(log)).toBeCloseTo(116.667, 2)
+  })
+
+  it('wave: melhor tier (peso próprio), não o peso base × total', () => {
+    const log = {
+      weight: '110', reps: '25',
+      wave: { heavyWeight: '110', mediumWeight: '100', ultraWeight: '90', waves: [{ heavy: 5, medium: 8, ultra: 12 }] },
+    }
+    // melhor = epley(110,5) = 110×(1+5/30) = 128,33
+    expect(setBestE1rm(log)).toBeCloseTo(128.333, 2)
   })
 
   it('1 rep não infla (peso puro)', () => {

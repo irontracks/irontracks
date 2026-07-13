@@ -78,13 +78,36 @@ export const stagesVolume = (stages: unknown[]): number => {
   return vol
 }
 
-/** Volume de UMA série: cluster → estágios (drop/stripping) → unilateral → normal. */
+/**
+ * Volume de um WAVE LOADING (onda). Cada onda tem 3 tiers (pesado/médio/ultra),
+ * cada um com peso e reps próprios. Retrocompat: tier sem peso usa o `weight`
+ * base do log (modelo antigo, peso único). Volume = Σ ondas Σ tiers (peso×reps).
+ */
+export const waveVolume = (wave: unknown): number => {
+  if (!isRec(wave)) return 0
+  const waves = Array.isArray(wave.waves) ? wave.waves : null
+  if (!waves || waves.length === 0) return 0
+  const base = parseWeightValue(wave.weight)
+  const hw = parseWeightValue(wave.heavyWeight) || base
+  const mw = parseWeightValue(wave.mediumWeight) || base
+  const uw = parseWeightValue(wave.ultraWeight) || base
+  let vol = 0
+  for (const w of waves) {
+    if (!isRec(w)) continue
+    vol += hw * parseRepsValue(w.heavy) + mw * parseRepsValue(w.medium) + uw * parseRepsValue(w.ultra)
+  }
+  return vol
+}
+
+/** Volume de UMA série: cluster → estágios (drop/stripping) → wave → unilateral → normal. */
 export const setVolume = (log: unknown): number => {
   if (!isRec(log)) return 0
   const cv = clusterVolume(log.cluster)
   if (cv > 0) return cv
   const stages = getStageArray(log)
   if (stages) { const sv = stagesVolume(stages); if (sv > 0) return sv }
+  const wv = waveVolume(log.wave)
+  if (wv > 0) return wv
   const lv = parseWeightValue(log.L_weight) * parseRepsValue(log.L_reps)
   const rv = parseWeightValue(log.R_weight) * parseRepsValue(log.R_reps)
   if (lv > 0 || rv > 0) return lv + rv
@@ -144,6 +167,19 @@ export const setBestE1rm = (log: unknown): number => {
   const stages = getStageArray(log)
   if (stages && stages.length > 0) {
     for (const s of stages) if (isRec(s)) bump(parseWeightValue(s.weight), parseRepsValue(s.reps))
+    if (best > 0) return best
+  }
+  // wave: melhor tier (peso próprio × reps), retrocompat com peso base único
+  const wave = isRec(log.wave) ? log.wave : null
+  const waveList = wave && Array.isArray(wave.waves) ? wave.waves : null
+  if (waveList && waveList.length > 0) {
+    const base = parseWeightValue(wave!.weight)
+    const hw = parseWeightValue(wave!.heavyWeight) || base
+    const mw = parseWeightValue(wave!.mediumWeight) || base
+    const uw = parseWeightValue(wave!.ultraWeight) || base
+    for (const w of waveList) if (isRec(w)) {
+      bump(hw, parseRepsValue(w.heavy)); bump(mw, parseRepsValue(w.medium)); bump(uw, parseRepsValue(w.ultra))
+    }
     if (best > 0) return best
   }
   // cluster: melhor bloco (blocksDetailed tem o peso próprio de cada bloco)
