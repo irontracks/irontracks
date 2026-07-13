@@ -525,18 +525,21 @@ export function ModalsComplexMethods() {
                             </div>
                             <div className="p-4 space-y-3 flex-1 overflow-y-auto custom-scrollbar">
                                 {waveModal.error ? <div className="rounded-xl border border-yellow-500/20 bg-yellow-500/10 p-3 text-sm text-neutral-200">{String(waveModal.error)}</div> : null}
-                                <div className="grid grid-cols-2 gap-3">
-                                    <div className="space-y-1">
-                                        <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Peso base (kg)</div>
-                                        <input inputMode="decimal" value={String(waveModal.weight ?? '')} onChange={(e) => setWaveModal((prev) => prev && typeof prev === 'object' ? { ...prev, weight: e?.target?.value ?? '', error: '' } : prev)} placeholder={watermarkPlaceholder(waveSug, 'weight', 'Ex: 80')} className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500" />
+                                {/* Cargas por intensidade (wave loading = carga progressiva). */}
+                                <div className="space-y-1">
+                                    <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Cargas (kg)</div>
+                                    <div className="grid grid-cols-3 gap-2">
+                                        <input inputMode="decimal" aria-label="Peso pesado (kg)" value={String(waveModal.heavyWeight ?? waveModal.weight ?? '')} onChange={(e) => setWaveModal((prev) => prev && typeof prev === 'object' ? { ...prev, heavyWeight: e?.target?.value ?? '', error: '' } : prev)} placeholder="Pesado" className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500" />
+                                        <input inputMode="decimal" aria-label="Peso médio (kg)" value={String(waveModal.mediumWeight ?? '')} onChange={(e) => setWaveModal((prev) => prev && typeof prev === 'object' ? { ...prev, mediumWeight: e?.target?.value ?? '', error: '' } : prev)} placeholder="Médio" className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500" />
+                                        <input inputMode="decimal" aria-label="Peso ultra leve (kg)" value={String(waveModal.ultraWeight ?? '')} onChange={(e) => setWaveModal((prev) => prev && typeof prev === 'object' ? { ...prev, ultraWeight: e?.target?.value ?? '', error: '' } : prev)} placeholder="Ultra leve" className="w-full bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-[16px] text-white outline-none focus:ring-1 ring-yellow-500" />
                                     </div>
-                                    <div className="space-y-1">
-                                        <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Nº de ondas</div>
-                                        <div className="flex gap-2">
-                                            {[1, 2, 3].map((n) => (
-                                                <button key={n} type="button" onClick={() => setWaveModal((prev) => { if (!prev || typeof prev !== 'object') return prev; const cur = Array.isArray(prev.waves) ? (prev.waves as unknown[]) : []; const next = cur.length < n ? [...cur, ...Array.from({ length: n - cur.length }).map(() => ({ heavy: 3, medium: 5, ultra: 2 }))] : cur.slice(0, n); return { ...prev, waves: next }; })} className={`flex-1 min-h-[36px] rounded-lg text-xs font-black border transition-colors ${waves.length === n ? 'bg-yellow-500 text-black border-yellow-500' : 'bg-neutral-800 border-neutral-700 text-neutral-300 hover:bg-neutral-700'}`}>{n}</button>
-                                            ))}
-                                        </div>
+                                </div>
+                                <div className="space-y-1">
+                                    <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Nº de ondas</div>
+                                    <div className="flex gap-2">
+                                        {[1, 2, 3].map((n) => (
+                                            <button key={n} type="button" onClick={() => setWaveModal((prev) => { if (!prev || typeof prev !== 'object') return prev; const cur = Array.isArray(prev.waves) ? (prev.waves as unknown[]) : []; const next = cur.length < n ? [...cur, ...Array.from({ length: n - cur.length }).map(() => ({ heavy: 3, medium: 5, ultra: 2 }))] : cur.slice(0, n); return { ...prev, waves: next }; })} className={`flex-1 min-h-[36px] rounded-lg text-xs font-black border transition-colors ${waves.length === n ? 'bg-yellow-500 text-black border-yellow-500' : 'bg-neutral-800 border-neutral-700 text-neutral-300 hover:bg-neutral-700'}`}>{n}</button>
+                                        ))}
                                     </div>
                                 </div>
                                 {waves.map((w, idx) => (
