@@ -86,7 +86,7 @@ export function HistoryListManualModal({
             role="button"
             tabIndex={-1}
             aria-label="Fechar modal"
-            className="fixed inset-0 z-[70] bg-black/85 backdrop-blur-md flex items-center justify-center p-4"
+            className="fixed inset-0 z-[70] bg-black/85 backdrop-blur-md flex items-start justify-center p-4"
             onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
             onKeyDown={(e) => { if (e.key === 'Escape') onClose(); }}
         >
@@ -95,7 +95,9 @@ export function HistoryListManualModal({
                 role="dialog"
                 aria-modal="true"
                 aria-labelledby="history-manual-title"
-                className="w-full max-w-2xl rounded-2xl border shadow-2xl overflow-hidden relative"
+                // Ancorado no topo + altura capada em coluna flex: evita o loop de subir/descer
+                // quando o teclado do iOS encolhe o WebView (mesmo fix do HistoryListEditModal).
+                className="w-full max-w-2xl max-h-[calc(100dvh-2rem)] flex flex-col rounded-2xl border shadow-2xl overflow-hidden relative"
                 style={{
                     background: 'linear-gradient(160deg, rgba(20,18,10,0.98) 0%, rgba(10,10,10,0.99) 40%)',
                     borderColor: 'rgba(234,179,8,0.12)',
@@ -136,7 +138,7 @@ export function HistoryListManualModal({
                     </div>
                 </div>
 
-                <div className="p-4 space-y-3 max-h-[70vh] overflow-y-auto">
+                <div className="p-4 space-y-3 flex-1 min-h-0 overflow-y-auto overscroll-contain">
                     <div>
                         <div className="text-[10px] uppercase font-bold text-neutral-400">Data e Hora</div>
                         <input
