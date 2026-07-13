@@ -5,6 +5,10 @@ import { AlertTriangle, ChevronDown, ChevronUp, MapPin, Satellite } from 'lucide
 import { useCardioTracking } from '@/hooks/useCardioTracking'
 import { formatDistance, formatPace } from '@/utils/geoUtils'
 import RouteMapLeaflet from './RouteMapLeaflet'
+import dynamic from 'next/dynamic'
+import { cardioToContent } from '@/components/stories/cardioStory'
+
+const CardioStoryComposer = dynamic(() => import('@/components/CardioStoryComposer'), { ssr: false })
 
 interface CardioGPSPanelProps {
   /** If provided, links the track to a workout */
@@ -73,6 +77,7 @@ interface CompletionScreenProps {
   caloriesEstimated: number
   onReset: () => void
   onClose?: () => void
+  onShareStory?: () => void
 }
 
 function CompletionScreen({
@@ -83,6 +88,7 @@ function CompletionScreen({
   caloriesEstimated,
   onReset,
   onClose,
+  onShareStory,
 }: CompletionScreenProps) {
   const [effort, setEffort] = useState<number | null>(null)
   const [notes, setNotes] = useState('')
@@ -228,6 +234,16 @@ function CompletionScreen({
         >
           {saving ? 'Salvando...' : saved ? '✓ Fechar' : 'Salvar e Fechar'}
         </button>
+        {onShareStory && (
+          <button
+            type="button"
+            onClick={onShareStory}
+            className="w-full rounded-2xl py-3.5 text-sm font-black text-black transition-all active:scale-95"
+            style={{ background: 'linear-gradient(135deg, #eab308, #f59e0b)' }}
+          >
+            📸 Compartilhar Story
+          </button>
+        )}
         <button
           type="button"
           onClick={onReset}
@@ -308,8 +324,11 @@ export default function CardioGPSPanel({
     durationSeconds: number
     paceMinKm: number | null
     caloriesEstimated: number
+    maxSpeedKmh: number | null
   } | null>(null)
+  const [savedRoute, setSavedRoute] = useState<Array<{ lat: number; lng: number }>>([])
   const [activityType, setActivityType] = useState('running')
+  const [storyOpen, setStoryOpen] = useState(false)
 
   // Accordion state — only used when NOT in standalone mode
   const [isOpen, setIsOpen] = useState(false)
@@ -365,7 +384,10 @@ export default function CardioGPSPanel({
           durationSeconds: result.metrics.durationSeconds,
           paceMinKm: result.metrics.paceMinKm,
           caloriesEstimated: result.metrics.caloriesEstimated,
+          maxSpeedKmh: result.metrics.maxSpeedKmh ?? null,
         })
+        // Guarda a rota pro Story compartilhável (desenha o traçado no canvas).
+        setSavedRoute(result.points.map((p) => ({ lat: p.latitude, lng: p.longitude })))
         // Server save succeeded — clear the IDB zombie so recovery on next
         // mount doesn't offer to resume a run that already lives in the DB.
         await finalizePersistedCardio()
@@ -631,6 +653,23 @@ export default function CardioGPSPanel({
           }
         `}</style>
 
+        {/* Story compartilhável do cardio (overlay fixed, z alto) */}
+        {savedMetrics && (
+          <CardioStoryComposer
+            open={storyOpen}
+            onClose={() => setStoryOpen(false)}
+            content={cardioToContent({
+              activityType,
+              distanceMeters: savedMetrics.distanceMeters,
+              durationSeconds: savedMetrics.durationSeconds,
+              paceMinKm: savedMetrics.paceMinKm,
+              caloriesEstimated: savedMetrics.caloriesEstimated,
+              maxSpeedKmh: savedMetrics.maxSpeedKmh,
+              route: savedRoute,
+            })}
+          />
+        )}
+
         {/* Completion screen — scrollable */}
         {savedTrackId && savedMetrics ? (
           <div className="flex-1 overflow-y-auto">
@@ -642,6 +681,7 @@ export default function CardioGPSPanel({
               caloriesEstimated={savedMetrics.caloriesEstimated}
               onReset={handleReset}
               onClose={onRequestClose}
+              onShareStory={savedRoute.length >= 2 ? () => setStoryOpen(true) : undefined}
             />
           </div>
         ) : (
