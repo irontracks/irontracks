@@ -40,7 +40,7 @@ export default function CardioStoryComposer({ open, content, onClose }: CardioSt
   const title = activityLabel(content.activityType)
 
   const draw = useCallback(
-    (args: { ctx: CanvasRenderingContext2D; canvasW: number; canvasH: number; backgroundImage: HTMLImageElement | null; transparentBg?: boolean; skipClear?: boolean; template: import('@/components/stories/storyTemplates').StoryTemplate }) =>
+    (args: { ctx: CanvasRenderingContext2D; canvasW: number; canvasH: number; backgroundImage: HTMLImageElement | null; transparentBg?: boolean; skipClear?: boolean; template: import('@/components/stories/storyTemplates').StoryTemplate; workoutTransform?: { scale: number; offsetX: number; offsetY: number } }) =>
       drawCardioStory({ ...args, content }),
     [content],
   )
@@ -62,6 +62,8 @@ export default function CardioStoryComposer({ open, content, onClose }: CardioSt
     template, setTemplate,
     saveImageUrl, setSaveImageUrl,
     showTrimmer, videoDuration, trimRange, setTrimRange, previewTime,
+    workoutTransform, nudgeWorkoutScale, resetWorkoutTransform,
+    onWorkoutTouchStart, onWorkoutTouchMove, onWorkoutTouchEnd, onWorkoutWheel,
     loadMedia, shareImage, postToIronTracks,
   } = useStoryComposer({
     open,
@@ -85,8 +87,8 @@ export default function CardioStoryComposer({ open, content, onClose }: CardioSt
     if (!canvas) return
     const ctx = canvas.getContext('2d')
     if (!ctx) return
-    drawCardioStory({ ctx, canvasW: CANVAS_W, canvasH: CANVAS_H, backgroundImage, content, transparentBg: isVideo, template })
-  }, [open, backgroundImage, isVideo, content, template])
+    drawCardioStory({ ctx, canvasW: CANVAS_W, canvasH: CANVAS_H, backgroundImage, content, transparentBg: isVideo, template, workoutTransform })
+  }, [open, backgroundImage, isVideo, content, template, workoutTransform])
 
   if (!open) return null
 
@@ -151,7 +153,46 @@ export default function CardioStoryComposer({ open, content, onClose }: CardioSt
                         <div className="absolute top-0 bottom-0 w-px bg-yellow-400/20" style={{ right: `${(SAFE_SIDE / CANVAS_W) * 100}%` }} />
                       </div>
                     )}
+
+                    {/* Pinça (2 dedos) = zoom · arrasto (1 dedo) = mover o card (sem foto) */}
+                    {!isVideo && (
+                      <div
+                        className="absolute inset-0 z-20 touch-none select-none cursor-grab active:cursor-grabbing"
+                        onTouchStart={(e) => onWorkoutTouchStart({ touches: Array.from(e.touches) })}
+                        onTouchMove={(e) => onWorkoutTouchMove({ touches: Array.from(e.touches) }, previewRef.current?.getBoundingClientRect() ?? null)}
+                        onTouchEnd={onWorkoutTouchEnd}
+                        onTouchCancel={onWorkoutTouchEnd}
+                        onWheel={(e) => onWorkoutWheel(e.deltaY)}
+                      >
+                        <div className="absolute top-2 left-1/2 -translate-x-1/2 pointer-events-none px-2.5 py-1 rounded-full bg-black/55 backdrop-blur border border-white/15 text-[9px] font-black uppercase tracking-widest text-white/80 whitespace-nowrap">
+                          Pinça: zoom · Arraste: mover
+                        </div>
+                      </div>
+                    )}
                   </div>
+
+                  {/* Controles de zoom precisos (+/− e Reset) */}
+                  {!isVideo && (
+                    <div className="w-full max-w-[300px] sm:max-w-[340px] flex items-center gap-2">
+                      <button
+                        type="button" onClick={() => nudgeWorkoutScale(-0.05)} disabled={busy}
+                        aria-label="Diminuir zoom"
+                        className="w-12 h-11 rounded-xl bg-neutral-900 border border-neutral-800 text-white text-xl font-black hover:bg-neutral-800 disabled:opacity-50 transition-colors active:scale-95"
+                      >−</button>
+                      <div className="flex-1 h-11 rounded-xl bg-neutral-900/60 border border-neutral-800 flex items-center justify-center text-xs font-black tabular-nums text-yellow-500">
+                        {Math.round(workoutTransform.scale * 100)}%
+                      </div>
+                      <button
+                        type="button" onClick={() => nudgeWorkoutScale(0.05)} disabled={busy}
+                        aria-label="Aumentar zoom"
+                        className="w-12 h-11 rounded-xl bg-neutral-900 border border-neutral-800 text-white text-xl font-black hover:bg-neutral-800 disabled:opacity-50 transition-colors active:scale-95"
+                      >+</button>
+                      <button
+                        type="button" onClick={resetWorkoutTransform} disabled={busy}
+                        className="h-11 px-4 rounded-xl bg-neutral-900 border border-neutral-800 text-neutral-300 text-[11px] font-bold uppercase tracking-wider hover:bg-neutral-800 hover:text-white disabled:opacity-50 transition-colors active:scale-95"
+                      >Reset</button>
+                    </div>
+                  )}
 
                   {/* Upload de foto de fundo (opcional) */}
                   <div className="w-full max-w-[300px] sm:max-w-[340px] flex items-center gap-3">
