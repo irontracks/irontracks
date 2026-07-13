@@ -5,6 +5,7 @@ import { createClient } from '@/utils/supabase/client'
 import { z } from 'zod'
 import { WorkoutRowSchema, ExerciseRowSchema, SetRowSchema } from '@/schemas/database'
 import { AdvancedConfig } from '@/types/app'
+import { applyNotesMethodToSetDetails } from '@/utils/training/notesMethodParser'
 import { getErrorMessage } from '@/utils/errorMessage'
 import type { DashboardWorkout, DashboardExercise, DashboardSetDetail } from '@/types/dashboard'
 
@@ -273,6 +274,28 @@ export function usePeriodizedWorkouts({ view, workoutsTab }: UsePeriodizedWorkou
         const rpeValues = setDetails.map((s) => s.rpe).filter((v): v is number => typeof v === 'number' && Number.isFinite(v))
         const defaultRpe = isCardio ? 5 : 8
         const rpeHeader = rpeValues.length > 0 ? (Number(rpeValues[0]) || defaultRpe) : defaultRpe
+
+        // Liga método por série a partir das notas (paridade com mapWorkoutRow).
+        // Shape da periodização usa `advancedConfig` (camelCase) + `isWarmup`.
+        const setDetailsWithMethods = (isCardio
+          ? setDetails
+          : applyNotesMethodToSetDetails(
+              setDetails as unknown as Record<string, unknown>[],
+              e.notes,
+              setsCount,
+              {
+                configKey: 'advancedConfig',
+                makeDefault: (index, config) => ({
+                  set_number: index + 1,
+                  reps: null,
+                  rpe: null,
+                  weight: null,
+                  isWarmup: false,
+                  advancedConfig: (config as AdvancedConfig | AdvancedConfig[] | null) ?? null,
+                }),
+              },
+            )) as unknown as DashboardSetDetail[]
+
         return {
           id: e.id,
           name: e.name,
@@ -284,7 +307,7 @@ export function usePeriodizedWorkouts({ view, workoutsTab }: UsePeriodizedWorkou
           sets: setsCount,
           reps: repsHeader,
           rpe: rpeHeader,
-          setDetails,
+          setDetails: setDetailsWithMethods,
         } satisfies DashboardExercise
       })
 
