@@ -117,6 +117,8 @@ export const UserSettingsSchema = z
     storyTemplate: z.string().default('classic'),
     /** Último template escolhido no composer de Story de nutrição. */
     nutritionStoryTemplate: z.string().default('fresh'),
+    /** Último template escolhido no composer de Story de cardio de rua. */
+    cardioStoryTemplate: z.string().default('fresh'),
   })
   .passthrough()
 
