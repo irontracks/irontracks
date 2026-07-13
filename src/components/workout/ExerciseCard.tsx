@@ -27,6 +27,7 @@ import { isObject, isClusterConfig, isRestPauseConfig } from './utils';
 import { WorkoutExercise, UnknownRecord } from './types';
 import { isPlank } from '@/utils/exerciseTracking';
 import { PlankSetInput } from './PlankSetInput';
+import { CardioSetInput } from './CardioSetInput';
 import ExecutionVideoCapture from '@/components/ExecutionVideoCapture';
 import { logError, logInfo } from '@/lib/logger'
 import { useTeamWorkout } from '@/contexts/TeamWorkoutContext'
@@ -182,6 +183,12 @@ function ExerciseCardInner({ ex, exIdx, groupPos, logsSlice }: { ex: WorkoutExer
     // Isometric exercises (Prancha/Plank) use time-based input instead of reps
     if (isPlank(String(ex?.name ?? ''))) {
       return <PlankSetInput key={key} ex={ex as UnknownRecord} exIdx={exIdx} setIdx={setIdx} setsCount={setsCount} />;
+    }
+
+    // Cardio (method === 'Cardio'): tempo + intensidade (+ inclinação na esteira)
+    // com botão START da contagem regressiva, em vez de PESO/REPS/RPE.
+    if (method.toLowerCase() === 'cardio') {
+      return <CardioSetInput key={key} ex={ex as UnknownRecord} exIdx={exIdx} setIdx={setIdx} setsCount={setsCount} />;
     }
 
     // Per-set method override — takes precedence over all automatic detection

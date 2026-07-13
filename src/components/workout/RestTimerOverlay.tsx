@@ -51,7 +51,10 @@ interface RestTimerOverlayProps {
 
 const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context, onFinish, onStart, onClose: _onClose, settings, autoStartEnabled: _autoStartEnabled, onToggleAutoStart: _onToggleAutoStart, workoutStartMs }) => {
     const isPlankMode = context?.kind === 'plank'
-    const finishedLabel = isPlankMode ? 'Tempo concluído!' : 'Descanso finalizado'
+    const isCardioMode = context?.kind === 'cardio'
+    // Timer de exercício (prancha/cardio) conta o tempo DO exercício, não o descanso.
+    const isExerciseTimer = isPlankMode || isCardioMode
+    const finishedLabel = isExerciseTimer ? 'Tempo concluído!' : 'Descanso finalizado'
 
     const [timeLeft, setTimeLeft] = useState(0);
     const [isFinished, setIsFinished] = useState(false);
@@ -731,7 +734,7 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
                                     letterSpacing: '0.02em',
                                 }}
                             >
-                                {isOvertime ? 'extra' : isSideRest ? 'lado' : isTransition ? 'troca' : (isPlankMode ? 'prancha' : 'desc')}
+                                {isOvertime ? 'extra' : isSideRest ? 'lado' : isTransition ? 'troca' : isCardioMode ? 'cardio' : (isPlankMode ? 'prancha' : 'desc')}
                             </span>
                         </div>
                     </div>
