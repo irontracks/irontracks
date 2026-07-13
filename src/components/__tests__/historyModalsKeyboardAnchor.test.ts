@@ -30,5 +30,9 @@ describe('Modais de histórico — âncora anti-loop do teclado (iOS)', () => {
       expect(src).toContain('flex-1 min-h-0 overflow-y-auto')
       expect(src).not.toContain('max-h-[70vh]')
     })
+
+    it(`${file}: trava o scroll do body (anti-jitter do teclado iOS)`, () => {
+      expect(src).toContain('useBodyScrollLock(true)')
+    })
   }
 })
