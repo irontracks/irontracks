@@ -218,6 +218,14 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
     const setNutritionOpen = useModalStore((s) => s.setNutritionOpen)
     const quickViewWorkout = useModalStore((s) => s.quickViewWorkout) as ActiveSession | null
     const setQuickViewWorkout = useModalStore((s) => s.setQuickViewWorkout) as (v: ActiveSession | null) => void
+    // A overlay de Nutrição é local do dashboard (fixed/z-25, não é rota). Ao navegar
+    // pra qualquer outra view (ex.: Histórico pelo menu), ela precisa fechar — senão
+    // fica POR CIMA da nova view (bug: Histórico não abria, a nutrição ficava sobreposta).
+    useEffect(() => {
+        if (view !== 'dashboard' && nutritionOpen) {
+            setNutritionOpen(false)
+        }
+    }, [view, nutritionOpen, setNutritionOpen])
     const [reportData, setReportData] = useState({ current: null, previous: null });
     const mainScrollRef = useRef<HTMLDivElement | null>(null);
     const [reportBackView, setReportBackView] = useState('dashboard');
@@ -1145,7 +1153,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                 </div>
                             )}
 
-                            {nutritionOpen ? (
+                            {nutritionOpen && view === 'dashboard' ? (
                                 <NutritionOverlay
                                     onClose={() => setNutritionOpen(false)}
                                     canViewMacros={!!(vipStatus?.limits as Record<string, unknown> | undefined)?.nutrition_macros}
