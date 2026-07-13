@@ -435,6 +435,7 @@ export const drawStory = ({
     transparentBg = false,
     skipClear = false,
     template = DEFAULT_STORY_TEMPLATE,
+    workoutTransform,
 }: {
     ctx: CanvasRenderingContext2D;
     canvasW: number;
@@ -446,6 +447,8 @@ export const drawStory = ({
     transparentBg?: boolean;
     skipClear?: boolean;
     template?: StoryTemplate;
+    /** Zoom/reposicionamento do card no layout 'workout' (pinça + arrasto). */
+    workoutTransform?: { scale: number; offsetX: number; offsetY: number };
 }) => {
     // Atalhos do template (cores/fontes/card). A GEOMETRIA segue literal abaixo —
     // o template só troca cor/peso/itálico/acento, nunca posições/tamanhos.
@@ -635,6 +638,21 @@ export const drawStory = ({
     if (layoutId === 'workout') {
         const rows = Array.isArray(metrics?.exercises) ? metrics.exercises : [];
 
+        // Zoom/reposicionamento do card (pinça + arrasto). Pivô no centro do canvas
+        // pra o zoom crescer/encolher "no lugar". O fundo (foto) NÃO é afetado —
+        // só o conteúdo do card.
+        const wt = workoutTransform ?? { scale: 1, offsetX: 0, offsetY: 0 };
+        const wtApplied = wt.scale !== 1 || wt.offsetX !== 0 || wt.offsetY !== 0;
+        if (wtApplied) {
+            ctx.save();
+            ctx.translate(wt.offsetX, wt.offsetY);
+            const pivotX = canvasW / 2;
+            const pivotY = canvasH / 2;
+            ctx.translate(pivotX, pivotY);
+            ctx.scale(wt.scale, wt.scale);
+            ctx.translate(-pivotX, -pivotY);
+        }
+
         // Brand
         ctx.textBaseline = 'top';
         const bY = SAFE_TOP + 14;
@@ -762,6 +780,7 @@ export const drawStory = ({
 
         ctx.textAlign = 'left';
         ctx.letterSpacing = '0px';
+        if (wtApplied) ctx.restore();
         return;
     }
 
@@ -952,3 +971,48 @@ export const drawStory = ({
         ctx.restore();
     })();
 };
+
+// ── Zoom/reposição do card no layout 'workout' (funções puras, testáveis) ─────
+export const WORKOUT_MIN_SCALE = 0.4
+export const WORKOUT_MAX_SCALE = 3
+
+export const clampWorkoutScale = (s: number): number =>
+    Math.min(WORKOUT_MAX_SCALE, Math.max(WORKOUT_MIN_SCALE, Number.isFinite(s) ? s : 1))
+
+export const clampWorkoutOffset = (o: number): number =>
+    Math.min(CANVAS_W, Math.max(-CANVAS_W, Number.isFinite(o) ? o : 0))
+
+export type WorkoutGestureStart = {
+    startOffsetX: number
+    startOffsetY: number
+    startScale: number
+    startDist: number
+    startMidX: number
+    startMidY: number
+    startX: number
+    startY: number
+}
+
+/** Pinça: escala pela razão de distância entre os dedos + pan pelo ponto médio. */
+export const pinchToWorkoutTransform = (
+    g: WorkoutGestureStart,
+    curDist: number,
+    midX: number,
+    midY: number,
+    factor: number,
+): { scale: number; offsetX: number; offsetY: number } => ({
+    scale: clampWorkoutScale(g.startScale * (curDist / (g.startDist || 1))),
+    offsetX: clampWorkoutOffset(g.startOffsetX + (midX - g.startMidX) * factor),
+    offsetY: clampWorkoutOffset(g.startOffsetY + (midY - g.startMidY) * factor),
+})
+
+/** Arrasto de 1 dedo: só move (offset), mantém a escala. */
+export const panToWorkoutOffset = (
+    g: WorkoutGestureStart,
+    x: number,
+    y: number,
+    factor: number,
+): { offsetX: number; offsetY: number } => ({
+    offsetX: clampWorkoutOffset(g.startOffsetX + (x - g.startX) * factor),
+    offsetY: clampWorkoutOffset(g.startOffsetY + (y - g.startY) * factor),
+})

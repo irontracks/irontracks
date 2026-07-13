@@ -56,6 +56,8 @@ export default function StoryComposer({ open, session, onClose, calories }: Stor
     draggingKey, saveImageUrl, setSaveImageUrl,
     showTrimmer, setShowTrimmer, videoDuration, trimRange, setTrimRange, previewTime,
     metrics: rawMetrics,
+    workoutTransform, nudgeWorkoutScale, resetWorkoutTransform,
+    onWorkoutTouchStart, onWorkoutTouchMove, onWorkoutTouchEnd, onWorkoutWheel,
     loadMedia, onSelectLayout,
     onPiecePointerDown, onPiecePointerMove, onPiecePointerUp,
     onGroupPointerDown, onGroupPointerMove, onGroupPointerUp,
@@ -80,11 +82,11 @@ export default function StoryComposer({ open, session, onClose, calories }: Stor
     const ctx = canvas.getContext('2d')
     if (!ctx) return
     let raf = 0
-    const draw = () => drawStory({ ctx, canvasW: CANVAS_W, canvasH: CANVAS_H, backgroundImage, metrics, layout, livePositions, transparentBg: mediaKind === 'video', template })
+    const draw = () => drawStory({ ctx, canvasW: CANVAS_W, canvasH: CANVAS_H, backgroundImage, metrics, layout, livePositions, transparentBg: mediaKind === 'video', template, workoutTransform })
     if (isExporting) { draw(); return }
     if (layout === 'live' && draggingKey) { raf = requestAnimationFrame(draw) } else { draw() }
     return () => cancelAnimationFrame(raf)
-  }, [open, backgroundImage, layout, livePositions, mediaKind, metrics, draggingKey, isExporting, template])
+  }, [open, backgroundImage, layout, livePositions, mediaKind, metrics, draggingKey, isExporting, template, workoutTransform])
 
   const livePieces = React.useMemo(() => [
     { key: 'brand', label: 'IRONTRACKS' },
@@ -219,7 +221,46 @@ export default function StoryComposer({ open, session, onClose, calories }: Stor
                       </div>
                     )}
 
+                    {/* Layout TREINO: pinça (2 dedos) pra zoom + arrasto (1 dedo) pra mover o card */}
+                    {layout === 'workout' && (
+                      <div
+                        className="absolute inset-0 z-20 touch-none select-none cursor-grab active:cursor-grabbing"
+                        onTouchStart={(e) => onWorkoutTouchStart({ touches: Array.from(e.touches) })}
+                        onTouchMove={(e) => onWorkoutTouchMove({ touches: Array.from(e.touches) }, previewRef.current?.getBoundingClientRect() ?? null)}
+                        onTouchEnd={onWorkoutTouchEnd}
+                        onTouchCancel={onWorkoutTouchEnd}
+                        onWheel={(e) => onWorkoutWheel(e.deltaY)}
+                      >
+                        <div className="absolute top-2 left-1/2 -translate-x-1/2 pointer-events-none px-2.5 py-1 rounded-full bg-black/55 backdrop-blur border border-white/15 text-[9px] font-black uppercase tracking-widest text-white/80 whitespace-nowrap">
+                          Pinça: zoom · Arraste: mover
+                        </div>
+                      </div>
+                    )}
+
                   </div>
+
+                  {/* Controles de zoom (layout TREINO) — precisos via +/− */}
+                  {layout === 'workout' && (
+                    <div className="w-full max-w-[300px] sm:max-w-[340px] flex items-center gap-2">
+                      <button
+                        type="button" onClick={() => nudgeWorkoutScale(-0.05)} disabled={busy}
+                        aria-label="Diminuir zoom"
+                        className="w-12 h-11 rounded-xl bg-neutral-900 border border-neutral-800 text-white text-xl font-black hover:bg-neutral-800 disabled:opacity-50 transition-colors active:scale-95"
+                      >−</button>
+                      <div className="flex-1 h-11 rounded-xl bg-neutral-900/60 border border-neutral-800 flex items-center justify-center text-xs font-black tabular-nums text-yellow-500">
+                        {Math.round(workoutTransform.scale * 100)}%
+                      </div>
+                      <button
+                        type="button" onClick={() => nudgeWorkoutScale(0.05)} disabled={busy}
+                        aria-label="Aumentar zoom"
+                        className="w-12 h-11 rounded-xl bg-neutral-900 border border-neutral-800 text-white text-xl font-black hover:bg-neutral-800 disabled:opacity-50 transition-colors active:scale-95"
+                      >+</button>
+                      <button
+                        type="button" onClick={resetWorkoutTransform} disabled={busy}
+                        className="h-11 px-4 rounded-xl bg-neutral-900 border border-neutral-800 text-neutral-300 text-[11px] font-bold uppercase tracking-wider hover:bg-neutral-800 hover:text-white disabled:opacity-50 transition-colors active:scale-95"
+                      >Reset</button>
+                    </div>
+                  )}
 
                   {/* Media Controls */}
                   <div className="w-full max-w-[300px] sm:max-w-[340px] flex items-center gap-3">

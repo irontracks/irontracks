@@ -23,6 +23,9 @@ import {
     CANVAS_H,
     DEFAULT_LIVE_POSITIONS,
     DEFAULT_GROUP_POSITIONS,
+    clampWorkoutScale,
+    pinchToWorkoutTransform,
+    panToWorkoutOffset,
     isIOSUserAgent,
     parseExt,
     extFromMime,
@@ -115,6 +118,14 @@ export function useStoryComposer({
     const userTouchedTemplateRef = useRef(false)
     const [livePositions, setLivePositions] = useState<LivePositions>(DEFAULT_LIVE_POSITIONS)
     const [draggingKey, setDraggingKey] = useState<string | null>(null)
+    // Zoom + reposição do card no layout 'workout' (pinça 2 dedos + arrasto 1 dedo).
+    const [workoutTransform, setWorkoutTransform] = useState({ scale: 1, offsetX: 0, offsetY: 0 })
+    const workoutGestureRef = useRef<{
+        mode: 'none' | 'pan' | 'pinch'
+        startX: number; startY: number
+        startOffsetX: number; startOffsetY: number
+        startScale: number; startDist: number; startMidX: number; startMidY: number
+    }>({ mode: 'none', startX: 0, startY: 0, startOffsetX: 0, startOffsetY: 0, startScale: 1, startDist: 0, startMidX: 0, startMidY: 0 })
     const [saveImageUrl, setSaveImageUrl] = useState<string | null>(null)
     const [showTrimmer, setShowTrimmer] = useState(false)
     const [videoDuration, setVideoDuration] = useState(0)
@@ -302,6 +313,8 @@ export function useStoryComposer({
         setShowSafeGuide(true)
         setLivePositions(DEFAULT_LIVE_POSITIONS)
         setDraggingKey(null)
+        setWorkoutTransform({ scale: 1, offsetX: 0, offsetY: 0 })
+        workoutGestureRef.current.mode = 'none'
         dragRef.current = { key: null, pointerId: null, startX: 0, startY: 0, startPos: { x: 0, y: 0 } }
         if (!isClose) {
             setShowTrimmer(false)
@@ -489,6 +502,9 @@ export function useStoryComposer({
             const safeNext = safeString(nextLayout) || 'bottom-row'
             setLayout(safeNext)
             setDraggingKey(null)
+            // Zerar zoom/reposição ao trocar de layout (cada layout começa neutro).
+            setWorkoutTransform({ scale: 1, offsetX: 0, offsetY: 0 })
+            workoutGestureRef.current.mode = 'none'
             dragRef.current = { key: null, pointerId: null, startX: 0, startY: 0, startPos: { x: 0, y: 0 } }
             // Entering Grupo always resets positions to its Normal-like default —
             // the whole point of Grupo is "drag the bottom-row arrangement around
@@ -500,6 +516,74 @@ export function useStoryComposer({
         } catch { setLayout('bottom-row') }
     }, [livePositions])
 
+    // ── Zoom/reposição do card no layout 'workout' ─────────────────────────────
+    // Matemática (clamp/pinça/pan) em funções puras testáveis no storyComposerUtils.
+    // Passo pequeno = zoom PRECISO nos botões +/−.
+    const nudgeWorkoutScale = useCallback((delta: number) => {
+        setWorkoutTransform((prev) => ({ ...prev, scale: clampWorkoutScale(Number((prev.scale + delta).toFixed(3))) }))
+    }, [])
+    const resetWorkoutTransform = useCallback(() => {
+        setWorkoutTransform({ scale: 1, offsetX: 0, offsetY: 0 })
+        workoutGestureRef.current.mode = 'none'
+    }, [])
+
+    // Fator px-tela → px-canvas (o canvas 720 é exibido em rect.width).
+    const canvasFactor = (rect: DOMRect | null) => (rect && rect.width > 0 ? CANVAS_W / rect.width : 1)
+
+    const onWorkoutTouchStart = useCallback((e: { touches: Array<{ clientX: number; clientY: number }> | ReadonlyArray<{ clientX: number; clientY: number }> }) => {
+        const t = e.touches
+        setWorkoutTransform((cur) => {
+            if (t.length >= 2) {
+                const dx = t[0].clientX - t[1].clientX
+                const dy = t[0].clientY - t[1].clientY
+                workoutGestureRef.current = {
+                    mode: 'pinch',
+                    startX: 0, startY: 0,
+                    startOffsetX: cur.offsetX, startOffsetY: cur.offsetY,
+                    startScale: cur.scale,
+                    startDist: Math.hypot(dx, dy) || 1,
+                    startMidX: (t[0].clientX + t[1].clientX) / 2,
+                    startMidY: (t[0].clientY + t[1].clientY) / 2,
+                }
+            } else if (t.length === 1) {
+                workoutGestureRef.current = {
+                    mode: 'pan',
+                    startX: t[0].clientX, startY: t[0].clientY,
+                    startOffsetX: cur.offsetX, startOffsetY: cur.offsetY,
+                    startScale: cur.scale, startDist: 0, startMidX: 0, startMidY: 0,
+                }
+            }
+            return cur
+        })
+    }, [])
+
+    const onWorkoutTouchMove = useCallback((e: { touches: Array<{ clientX: number; clientY: number }> | ReadonlyArray<{ clientX: number; clientY: number }> }, rect: DOMRect | null) => {
+        const g = workoutGestureRef.current
+        if (g.mode === 'none') return
+        const t = e.touches
+        const factor = canvasFactor(rect)
+        if (g.mode === 'pinch' && t.length >= 2) {
+            const dx = t[0].clientX - t[1].clientX
+            const dy = t[0].clientY - t[1].clientY
+            const dist = Math.hypot(dx, dy) || 1
+            const midX = (t[0].clientX + t[1].clientX) / 2
+            const midY = (t[0].clientY + t[1].clientY) / 2
+            setWorkoutTransform(pinchToWorkoutTransform(g, dist, midX, midY, factor))
+        } else if (g.mode === 'pan' && t.length >= 1) {
+            const { offsetX, offsetY } = panToWorkoutOffset(g, t[0].clientX, t[0].clientY, factor)
+            setWorkoutTransform((cur) => ({ ...cur, offsetX, offsetY }))
+        }
+    }, [])
+
+    const onWorkoutTouchEnd = useCallback(() => {
+        workoutGestureRef.current.mode = 'none'
+    }, [])
+
+    // Desktop: roda do mouse dá zoom preciso.
+    const onWorkoutWheel = useCallback((deltaY: number) => {
+        nudgeWorkoutScale(deltaY < 0 ? 0.05 : -0.05)
+    }, [nudgeWorkoutScale])
+
     // Canvas helpers
     // Desenha o overlay no ctx: renderer injetado (ex.: nutrição) ou o drawStory
     // de treino (default). Centraliza o branch dos 3 call-sites de render.
@@ -510,7 +594,7 @@ export function useStoryComposer({
         if (draw) {
             draw({ ctx, canvasW: CANVAS_W, canvasH: CANVAS_H, backgroundImage: opts.backgroundImage, transparentBg: opts.transparentBg, skipClear: opts.skipClear, template })
         } else {
-            drawStory({ ctx, canvasW: CANVAS_W, canvasH: CANVAS_H, backgroundImage: opts.backgroundImage, metrics, layout, livePositions, transparentBg: opts.transparentBg, skipClear: opts.skipClear, template })
+            drawStory({ ctx, canvasW: CANVAS_W, canvasH: CANVAS_H, backgroundImage: opts.backgroundImage, metrics, layout, livePositions, transparentBg: opts.transparentBg, skipClear: opts.skipClear, template, workoutTransform })
         }
     }
 
@@ -762,6 +846,9 @@ export function useStoryComposer({
         draggingKey, saveImageUrl, setSaveImageUrl,
         showTrimmer, setShowTrimmer, videoDuration, trimRange, setTrimRange, previewTime, setPreviewTime,
         metrics,
+        // workout zoom/reposição
+        workoutTransform, nudgeWorkoutScale, resetWorkoutTransform,
+        onWorkoutTouchStart, onWorkoutTouchMove, onWorkoutTouchEnd, onWorkoutWheel,
         // handlers
         loadMedia, onSelectLayout,
         onPiecePointerDown, onPiecePointerMove, onPiecePointerUp,
