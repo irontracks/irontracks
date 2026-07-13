@@ -4,6 +4,7 @@ import type { UnknownRecord, WorkoutExercise, WorkoutSetDetail } from '../types'
 import { isObject } from '../utils';
 
 import { parseTrainingNumber } from '@/utils/trainingNumber';
+import { editedSetDetails } from '../helpers/editedSetDetails';
 import { applyExerciseOrder, buildExerciseDraft, draftOrderKeys } from '@/lib/workoutReorder';
 import {
   tagExercisesForEdit,
@@ -249,18 +250,10 @@ export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
       const sdArr = Array.isArray(sdArrRaw) ? [...sdArrRaw] : [];
       const previousSetsCount = Math.max(setsHeader, sdArr.length);
 
-      const nextSetDetails: WorkoutSetDetail[] = [];
-      for (let i = 0; i < desiredSets; i += 1) {
-        const current = sdArr[i];
-        const currentObj = current && typeof current === 'object' ? (current as UnknownRecord) : null;
-        const setNumber = i + 1;
-        if (currentObj) {
-          const nextSetNumber = Number(currentObj.set_number ?? currentObj.setNumber ?? setNumber) || setNumber;
-          nextSetDetails.push({ ...currentObj, set_number: nextSetNumber });
-        } else {
-          nextSetDetails.push({ set_number: setNumber, weight: null, reps: '', rpe: null, notes: null, is_warmup: false, advanced_config: null });
-        }
-      }
+      // Troca de método limpa a config antiga (mata o método fantasma); série nova
+      // com método inalterado herda o advanced_config. Ver helpers/editedSetDetails.
+      const prevMethod = String(exRaw?.method || 'Normal').trim() || 'Normal';
+      const nextSetDetails = editedSetDetails(sdArr, desiredSets, method !== prevMethod) as WorkoutSetDetail[];
 
       nextExercises[idx] = {
         ...exRaw,
