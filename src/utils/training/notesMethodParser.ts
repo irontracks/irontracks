@@ -260,11 +260,21 @@ export function parseExerciseNotesToSetOverrides({ notes, setsCount }: SetOverri
 
 type SetDetailLike = Record<string, unknown>
 
+interface ApplyNotesOptions {
+  /** Chave de leitura/escrita do config na série. Default: `advanced_config`
+   *  (mapWorkoutRow). A periodização VIP usa `advancedConfig` (camelCase). */
+  configKey?: string
+  /** Constrói um setDetail default quando a série-alvo não existe no array
+   *  (plano salvo só com a contagem, sem rows em `sets`). Default = shape do
+   *  mapWorkoutRow. A periodização passa o próprio (isWarmup/advancedConfig). */
+  makeDefault?: (index: number, config: unknown) => SetDetailLike
+}
+
 /**
  * Aplica, de forma NÃO-DESTRUTIVA, os overrides de método por série derivados das
  * notas do exercício sobre o array `setDetails`. Regras:
- *  - Só preenche `advanced_config` numa série onde ele ainda está ausente
- *    (null/undefined). Config vinda do banco/editor NUNCA é sobrescrita.
+ *  - Só preenche o config numa série onde ele ainda está ausente (null/undefined).
+ *    Config vindo do banco/editor NUNCA é sobrescrito.
  *  - Se a série-alvo não existe no `setDetails` (ex.: plano de IA salvo só com a
  *    contagem, sem rows em `sets`), cria um setDetail default carregando o config.
  *  - Sem override aplicável → retorna o MESMO array (referência estável).
@@ -277,7 +287,21 @@ export function applyNotesMethodToSetDetails(
   setDetails: SetDetailLike[],
   notes: unknown,
   setsCount: number,
+  options: ApplyNotesOptions = {},
 ): SetDetailLike[] {
+  const configKey = options.configKey ?? 'advanced_config'
+  const makeDefault =
+    options.makeDefault ??
+    ((index: number, config: unknown): SetDetailLike => ({
+      set_number: index + 1,
+      reps: null,
+      rpe: null,
+      weight: null,
+      is_warmup: false,
+      set_type: 'working',
+      [configKey]: config,
+    }))
+
   const base = Array.isArray(setDetails) ? setDetails : []
   const effectiveCount = Math.max(0, Math.floor(Number(setsCount) || 0)) || base.length
   if (!effectiveCount) return base
@@ -292,23 +316,15 @@ export function applyNotesMethodToSetDetails(
     const existing = base[i]
     const ov = overrides[i] || null
     if (existing) {
-      const cfg = existing.advanced_config
+      const cfg = existing[configKey]
       if (ov && (cfg === null || cfg === undefined)) {
-        out.push({ ...existing, advanced_config: ov.advanced_config })
+        out.push({ ...existing, [configKey]: ov.advanced_config })
         changed = true
       } else {
         out.push(existing)
       }
     } else {
-      out.push({
-        set_number: i + 1,
-        reps: null,
-        rpe: null,
-        weight: null,
-        is_warmup: false,
-        set_type: 'working',
-        advanced_config: ov ? ov.advanced_config : null,
-      })
+      out.push(makeDefault(i, ov ? ov.advanced_config : null))
       changed = true
     }
   }
