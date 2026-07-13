@@ -157,4 +157,28 @@ describe('applyNotesMethodToSetDetails', () => {
     const sets = mkSets(3)
     expect(applyNotesMethodToSetDetails(sets, null, 3)).toBe(sets)
   })
+
+  it('configKey/makeDefault customizados (shape da periodização VIP)', () => {
+    const sets = [
+      { set_number: 1, reps: '10', rpe: 8, weight: 80, isWarmup: false, advancedConfig: null },
+      { set_number: 2, reps: '10', rpe: 8, weight: 80, isWarmup: false, advancedConfig: null },
+    ]
+    const out = applyNotesMethodToSetDetails(sets, 'DROP na última: 10 > 8 > 6', 2, {
+      configKey: 'advancedConfig',
+      makeDefault: (i, cfg) => ({ set_number: i + 1, reps: null, rpe: null, weight: null, isWarmup: false, advancedConfig: cfg }),
+    })
+    // escreve na chave camelCase, não cria advanced_config snake_case
+    expect(Array.isArray(out[1].advancedConfig)).toBe(true)
+    expect(out[1].advanced_config).toBeUndefined()
+  })
+
+  it('configKey: não sobrescreve advancedConfig já existente', () => {
+    const cfg = { total_reps: 15, cluster_size: 5, intra_rest_sec: 15 }
+    const sets = [
+      { set_number: 1, reps: '10', isWarmup: false, advancedConfig: null },
+      { set_number: 2, reps: '10', isWarmup: false, advancedConfig: cfg },
+    ]
+    const out = applyNotesMethodToSetDetails(sets, 'DROP na última: 10 > 8', 2, { configKey: 'advancedConfig' })
+    expect(out[1].advancedConfig).toBe(cfg)
+  })
 })
