@@ -12,6 +12,7 @@ import type { Workout as EditorWorkout } from '@/components/ExerciseEditor/types
 const ExerciseEditor = dynamic(() => import('@/components/ExerciseEditor'), { ssr: false });
 import { parseTrainingNumber } from '@/utils/trainingNumber';
 import { moveDraftItem } from '@/lib/workoutReorder';
+import { isNonStandardEditorMethod } from './helpers/editorMethod';
 import { useWorkoutContext } from './WorkoutContext';
 import {
   buildBlocksByCount,
@@ -546,6 +547,11 @@ export default function Modals() {
                   <option value="Cluster">Cluster</option>
                   <option value="Bi-Set">Bi-Set</option>
                   <option value="Cardio">Cardio</option>
+                  {/* Método avançado configurado por modal (FST-7, Sistema 21, Onda…):
+                      aparece como opção pra não sumir do <select> (e não ser perdido ao salvar). */}
+                  {isNonStandardEditorMethod(editExerciseDraft?.method) && (
+                    <option value={String(editExerciseDraft?.method ?? '')}>{String(editExerciseDraft?.method ?? '')}</option>
+                  )}
                 </select>
               </div>
 
