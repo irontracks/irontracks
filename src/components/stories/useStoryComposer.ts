@@ -52,6 +52,8 @@ export type StoryRenderer = (args: {
     transparentBg?: boolean
     skipClear?: boolean
     template: StoryTemplate
+    /** Zoom/reposição do card (pinça + arrasto) — mesmo do layout 'workout'. */
+    workoutTransform?: { scale: number; offsetX: number; offsetY: number }
 }) => void
 
 interface UseStoryComposerOptions {
@@ -592,7 +594,7 @@ export function useStoryComposer({
         opts: { backgroundImage: HTMLImageElement | null; transparentBg?: boolean; skipClear?: boolean },
     ) => {
         if (draw) {
-            draw({ ctx, canvasW: CANVAS_W, canvasH: CANVAS_H, backgroundImage: opts.backgroundImage, transparentBg: opts.transparentBg, skipClear: opts.skipClear, template })
+            draw({ ctx, canvasW: CANVAS_W, canvasH: CANVAS_H, backgroundImage: opts.backgroundImage, transparentBg: opts.transparentBg, skipClear: opts.skipClear, template, workoutTransform })
         } else {
             drawStory({ ctx, canvasW: CANVAS_W, canvasH: CANVAS_H, backgroundImage: opts.backgroundImage, metrics, layout, livePositions, transparentBg: opts.transparentBg, skipClear: opts.skipClear, template, workoutTransform })
         }
