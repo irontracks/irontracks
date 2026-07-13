@@ -8,6 +8,30 @@ export const advancedConfigOf = (sd: unknown): unknown =>
   isObj(sd) ? (sd.advanced_config ?? sd.advancedConfig ?? null) : null
 
 /**
+ * Chaves de dados EXECUTADOS de método num log de série. Ao trocar o método do
+ * exercício, precisam sair — senão o método antigo persiste no render/relatório
+ * mesmo depois de já ter feito uma série (ex.: log.fst7 renderiza FST-7 após a
+ * troca pra Normal). `per_set_method` (override por série) também sai, pra a troca
+ * do método do exercício ser um reset limpo.
+ */
+export const METHOD_LOG_BLOB_KEYS = [
+  'drop_set', 'stripping', 'cluster', 'fst7', 'heavy_duty', 'ponto_zero',
+  'forced_reps', 'negative_reps', 'partial_reps', 'sistema21', 'wave', 'rest_pause',
+  'per_set_method',
+] as const
+
+/** Remove os blobs de método de um log, preservando weight/reps/done/set_type. */
+export const stripMethodBlobs = (log: unknown): unknown => {
+  if (!isObj(log)) return log
+  let changed = false
+  const out: UnknownRecord = { ...log }
+  for (const k of METHOD_LOG_BLOB_KEYS) {
+    if (k in out) { delete out[k]; changed = true }
+  }
+  return changed ? out : log
+}
+
+/**
  * Reconstrói os setDetails ao editar um exercício mid-sessão, tratando dois bugs
  * da auditoria de métodos avançados:
  *
