@@ -51,11 +51,40 @@ export const clusterVolume = (cluster: unknown): number => {
   return vol
 }
 
-/** Volume de UMA série: cluster → unilateral (L+R) → normal (peso×reps). */
+/**
+ * Estágios de um DROP-SET ou STRIPPING. São mecanicamente idênticos (reduzir a
+ * carga em etapas, `stages: [{weight,reps}]`), só mudam a chave onde o saver
+ * grava. Ambos precisam somar etapa a etapa — senão o topo (drop-set grava a
+ * etapa mais leve × total → subestima; stripping grava a mais pesada × total →
+ * superestima) distorce volume e 1RM. Ver auditoria de métodos avançados.
+ */
+export const getStageArray = (log: Record<string, unknown>): unknown[] | null => {
+  const drop = isRec(log.drop_set) ? log.drop_set : null
+  if (drop && Array.isArray(drop.stages) && drop.stages.length > 0) return drop.stages
+  const strip = isRec(log.stripping) ? log.stripping : null
+  if (strip && Array.isArray(strip.stages) && strip.stages.length > 0) return strip.stages
+  return null
+}
+
+/** Volume de estágios (drop-set/stripping): soma peso×reps de cada etapa. */
+export const stagesVolume = (stages: unknown[]): number => {
+  let vol = 0
+  for (const s of stages) {
+    if (!isRec(s)) continue
+    const w = parseWeightValue(s.weight)
+    const r = parseRepsValue(s.reps)
+    if (w > 0 && r > 0) vol += w * r
+  }
+  return vol
+}
+
+/** Volume de UMA série: cluster → estágios (drop/stripping) → unilateral → normal. */
 export const setVolume = (log: unknown): number => {
   if (!isRec(log)) return 0
   const cv = clusterVolume(log.cluster)
   if (cv > 0) return cv
+  const stages = getStageArray(log)
+  if (stages) { const sv = stagesVolume(stages); if (sv > 0) return sv }
   const lv = parseWeightValue(log.L_weight) * parseRepsValue(log.L_reps)
   const rv = parseWeightValue(log.R_weight) * parseRepsValue(log.R_reps)
   if (lv > 0 || rv > 0) return lv + rv
@@ -110,9 +139,9 @@ export const setBestE1rm = (log: unknown): number => {
   if (!isRec(log)) return 0
   let best = 0
   const bump = (w: number, r: number) => { const e = epley1rm(w, r); if (e > best) best = e }
-  // dropset: melhor etapa (o topo grava a etapa mais leve × total de reps → enganoso)
-  const drop = isRec(log.drop_set) ? log.drop_set : null
-  const stages = drop && Array.isArray(drop.stages) ? drop.stages : null
+  // dropset/stripping: melhor etapa (o topo grava a etapa mais leve/pesada × total
+  // de reps → enganoso nos dois). Mesma estrutura `stages: [{weight,reps}]`.
+  const stages = getStageArray(log)
   if (stages && stages.length > 0) {
     for (const s of stages) if (isRec(s)) bump(parseWeightValue(s.weight), parseRepsValue(s.reps))
     if (best > 0) return best
