@@ -11,16 +11,27 @@ import { useEffect, useRef, useCallback } from 'react'
  * - Escape key calls onClose (if provided)
  * - Restores focus to previously focused element on close
  */
+const FOCUSABLE_SELECTOR =
+    'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
+
 export function useFocusTrap(isOpen: boolean, onClose?: () => void) {
     const containerRef = useRef<HTMLDivElement>(null)
     const previousFocusRef = useRef<Element | null>(null)
+    // onClose num ref: assim o handler de teclado não precisa ser recriado quando
+    // o pai passa um onClose inline (referência nova a cada render). Sem isto, o
+    // efeito de auto-foco re-rodava a cada tecla e o foco PULAVA de volta pro
+    // primeiro campo — bug do "cada número digitado pula pra caixa de nome".
+    const onCloseRef = useRef(onClose)
+    useEffect(() => {
+        onCloseRef.current = onClose
+    })
 
     const handleKeyDown = useCallback((e: KeyboardEvent) => {
         // Escape → close
-        if (e.key === 'Escape' && onClose) {
+        if (e.key === 'Escape' && onCloseRef.current) {
             e.preventDefault()
             e.stopPropagation()
-            onClose()
+            onCloseRef.current()
             return
         }
 
@@ -28,9 +39,7 @@ export function useFocusTrap(isOpen: boolean, onClose?: () => void) {
         const container = containerRef.current
         if (!container) return
 
-        const focusable = container.querySelectorAll<HTMLElement>(
-            'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
-        )
+        const focusable = container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)
         if (!focusable.length) return
 
         const first = focusable[0]
@@ -47,33 +56,38 @@ export function useFocusTrap(isOpen: boolean, onClose?: () => void) {
                 first.focus()
             }
         }
-    }, [onClose])
+    }, [])
 
+    // Auto-foco + restauração: SÓ quando abre/fecha (deps [isOpen]). NÃO pode
+    // depender de handleKeyDown/onClose, senão re-roda a cada render e rouba o
+    // foco do campo que o usuário está digitando.
     useEffect(() => {
         if (!isOpen) return
 
-        // Save currently focused element to restore later
+        // Guarda o elemento focado pra restaurar depois
         previousFocusRef.current = document.activeElement
 
         const container = containerRef.current
         if (!container) return
 
-        // Auto-focus first focusable element
-        const focusable = container.querySelectorAll<HTMLElement>(
-            'button:not([disabled]), [href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])'
-        )
+        const focusable = container.querySelectorAll<HTMLElement>(FOCUSABLE_SELECTOR)
         if (focusable.length) {
             requestAnimationFrame(() => focusable[0]?.focus())
         }
 
-        document.addEventListener('keydown', handleKeyDown)
         return () => {
-            document.removeEventListener('keydown', handleKeyDown)
-            // Restore focus to the element that was focused before the modal opened
+            // Restaura o foco pro elemento que estava focado antes do modal abrir
             if (previousFocusRef.current instanceof HTMLElement) {
                 previousFocusRef.current.focus()
             }
         }
+    }, [isOpen])
+
+    // Listener de Tab/Escape em efeito separado (handleKeyDown é estável agora).
+    useEffect(() => {
+        if (!isOpen) return
+        document.addEventListener('keydown', handleKeyDown)
+        return () => document.removeEventListener('keydown', handleKeyDown)
     }, [isOpen, handleKeyDown])
 
     return containerRef
