@@ -2,7 +2,7 @@
 
 import type { SocialNotificationType } from '@/types/social'
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { createClient } from '@/utils/supabase/client';
 import { useUserSettings } from '@/hooks/useUserSettings';
 import { logError } from '@/lib/logger'
@@ -93,6 +93,15 @@ const DEDUP_WINDOW_MS = 500
 
 export function InAppNotificationsProvider(props: InAppNotificationsProviderProps) {
   const router = useRouter();
+  const pathname = usePathname();
+  // Durante um treino ATIVO, os toasts sociais/feed (PR de aluno, "voltou aos
+  // treinos", etc.) cobriam a tela do treino. "Foco no treino": suprime tudo
+  // exceto erros/avisos funcionais enquanto em /dashboard/active. Ref (não dep do
+  // notify) pra manter o notify estável no context value.
+  const suppressFeedRef = useRef(false);
+  useEffect(() => {
+    suppressFeedRef.current = !!pathname && pathname.startsWith('/dashboard/active');
+  }, [pathname]);
   const supabase = useMemo(() => {
     try {
       return createClient();
@@ -139,6 +148,11 @@ export function InAppNotificationsProvider(props: InAppNotificationsProviderProp
   const notify = useCallback((payload: ToastPayload) => {
     const normalized = normalizeToast(payload);
     if (!normalized) return;
+    // Foco no treino: em treino ativo, só passam erros/avisos (problemas
+    // funcionais). Social/feed/success são suprimidos pra não cobrir a série.
+    if (suppressFeedRef.current && normalized.type !== 'error' && normalized.type !== 'warning') {
+      return;
+    }
     // Dedup: skip if same message within DEDUP_WINDOW_MS
     const key = normalized.id ? `id:${normalized.id}` : `t:${normalized.type}|m:${normalized.text}`;
     const now = Date.now();
