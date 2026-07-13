@@ -78,7 +78,7 @@ const WaveSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: numbe
             <div className="w-10 text-xs font-mono text-neutral-400">#{setIdx + 1}</div>
             <button
               type="button"
-              onClick={() => setWaveModal({ key, weight: savedWeight, waves: defaultWaves, rpe: String(waveData?.rpe ?? log.rpe ?? ''), error: '' })}
+              onClick={() => setWaveModal({ key, weight: savedWeight, heavyWeight: String(waveData?.heavyWeight ?? savedWeight ?? ''), mediumWeight: String(waveData?.mediumWeight ?? ''), ultraWeight: String(waveData?.ultraWeight ?? ''), waves: defaultWaves, rpe: String(waveData?.rpe ?? log.rpe ?? ''), error: '' })}
               className="w-24 bg-black/30 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white outline-none hover:border-yellow-500/60 hover:text-yellow-500 transition-colors inline-flex items-center justify-center gap-2"
             >
               <Pencil size={14} />
