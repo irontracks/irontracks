@@ -604,14 +604,29 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin, CLLocationMana
                         targetSeconds: capturedSeconds,
                         isFinished: true
                     )
-                    // Keep the finished state visible for 5 minutes
+                    // Mostra o estado "Hora de Treinar!" por uma janela curta (staleDate) —
+                    // depois a Live Activity é DISPENSADA (abaixo), não fica pendurada.
                     let finishedContent = ActivityContent(
                         state: finishedState,
-                        staleDate: Date().addingTimeInterval(300)
+                        staleDate: Date().addingTimeInterval(120)
                     )
                     for activity in Activity<RestTimerAttributes>.activities
                         where activity.attributes.timerID == capturedId {
                         await activity.update(finishedContent)
+                    }
+
+                    // Auto-dispensa: depois de uma folga curta, encerra a Live Activity do
+                    // descanso pra ela NÃO ficar congelada/travada na Dynamic Island e no
+                    // Lock Screen (o bug: aos ~5 min ela virava "stale" e congelava lá pra
+                    // sempre). Se o usuário iniciar a próxima série, endRestLiveActivity já
+                    // cancela esta task antes. Como é Task.sleep (wall-clock), isso também
+                    // dispara ao voltar do background: o app suspenso resume a task e limpa
+                    // a atividade em vez de deixá-la pendurada.
+                    try? await Task.sleep(nanoseconds: 90 * 1_000_000_000)
+                    guard !Task.isCancelled else { return }
+                    for activity in Activity<RestTimerAttributes>.activities
+                        where activity.attributes.timerID == capturedId {
+                        await activity.end(dismissalPolicy: .immediate)
                     }
                 }
             }
