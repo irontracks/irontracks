@@ -92,8 +92,11 @@ export function HistoryListEditModal({
                     <h3 id="history-edit-title" className="text-xs font-black uppercase tracking-[0.2em] text-yellow-500/80">Editar Histórico</h3>
                 </div>
 
-                <div className="p-4 space-y-3 flex-1 min-h-0 overflow-y-auto overscroll-contain">
-                    <div className="grid grid-cols-2 gap-2">
+                {/* Scroll só no eixo vertical: overflow-x-hidden mata o arrasto lateral
+                    (o overflow-y:auto fazia o x virar 'auto' por spec) e overscroll-none
+                    corta o rubber-band pra além do topo/fim. */}
+                <div className="p-4 space-y-3 flex-1 min-h-0 overflow-y-auto overflow-x-hidden overscroll-none">
+                    <div className="grid grid-cols-2 gap-2 [&>*]:min-w-0">
                         <div>
                             <div className="text-[10px] uppercase font-bold text-neutral-400">Título</div>
                             <input
@@ -147,7 +150,7 @@ export function HistoryListEditModal({
                             // não tem id estável (são derivados do session.exercises legado).
                             <div key={`${ex?.name || 'ex'}-${idx}`} className="p-3 rounded-xl border space-y-2" style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'rgba(255,255,255,0.06)' }}>
                                 <p className="text-sm font-bold text-white">{ex.name}</p>
-                                <div className="grid grid-cols-4 gap-2">
+                                <div className="grid grid-cols-4 gap-2 [&>*]:min-w-0">
                                     <div>
                                         <div className="text-[10px] text-neutral-400">Sets</div>
                                         <input
@@ -192,7 +195,7 @@ export function HistoryListEditModal({
                                 </div>
                                 <div>
                                     <div className="text-[10px] text-neutral-400">Pesos por série (kg)</div>
-                                    <div className="grid grid-cols-4 gap-2">
+                                    <div className="grid grid-cols-4 gap-2 [&>*]:min-w-0">
                                         {Array.from({ length: Number(ex.sets) || 0 }).map((_, sIdx) => (
                                             <input
                                                 key={sIdx}
@@ -208,7 +211,7 @@ export function HistoryListEditModal({
                                 </div>
                                 <div>
                                     <div className="text-[10px] text-neutral-400">Reps por série</div>
-                                    <div className="grid grid-cols-4 gap-2">
+                                    <div className="grid grid-cols-4 gap-2 [&>*]:min-w-0">
                                         {Array.from({ length: Number(ex.sets) || 0 }).map((_, sIdx) => (
                                             <input
                                                 key={sIdx}

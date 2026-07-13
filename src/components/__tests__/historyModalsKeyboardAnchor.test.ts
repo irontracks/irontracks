@@ -33,6 +33,15 @@ describe('Modais de histórico — âncora anti-loop do teclado (iOS)', () => {
       expect(src).not.toContain('max-h-[70vh]')
     })
 
+    it(`${file}: scroll só no eixo vertical (sem arrasto lateral / rubber-band)`, () => {
+      expect(src).toContain('overflow-x-hidden')
+      expect(src).toContain('overscroll-none')
+    })
+
+    it(`${file}: grids deixam os filhos encolher (min-w-0 evita overflow horizontal)`, () => {
+      expect(src).toContain('[&>*]:min-w-0')
+    })
+
     it(`${file}: trava o scroll do body (anti-jitter do teclado iOS)`, () => {
       expect(src).toContain('useBodyScrollLock(true)')
     })
