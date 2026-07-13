@@ -14,12 +14,35 @@ import { clampSessionKcal } from '@/utils/calories/cardioKcal'
 import { distributeKcalByExercise, distributeKcalWithFixed } from '@/utils/calories/distributeKcal'
 
 
-const getSetTag = (log: unknown): string | null => {
+// Rótulo do método de uma série no relatório/PDF. Reconhece TODOS os métodos
+// (pelos blobs EXECUTADOS do log + override por série + config planejada), não só
+// os 4 antigos — senão a maioria virava "Método" genérico ou nada.
+export const getSetTag = (log: unknown): string | null => {
   if (!isRecord(log)) return null
   const rawType = (log.set_type ?? log.setType) as string | null | undefined
   if (rawType === 'warmup') return 'Aquecimento'
   if (rawType === 'feeler') return 'Reconhecimento'
   if (!rawType && (log.is_warmup ?? log.isWarmup)) return 'Aquecimento'
+
+  // Override por série (maior precedência), se não for Normal.
+  const psm = String(log.per_set_method ?? '').trim()
+  if (psm && psm.toLowerCase() !== 'normal') return psm
+
+  // Blobs de método EXECUTADO (a verdade do que foi feito na série).
+  if (isRecord(log.drop_set)) return 'Drop-set'
+  if (isRecord(log.stripping)) return 'Stripping'
+  if (isRecord(log.cluster)) return 'Cluster'
+  if (isRecord(log.rest_pause)) return 'Rest-pause'
+  if (isRecord(log.fst7)) return 'FST-7'
+  if (isRecord(log.heavy_duty)) return 'Heavy Duty'
+  if (isRecord(log.ponto_zero)) return 'Ponto Zero'
+  if (isRecord(log.forced_reps)) return 'Rep. Forçadas'
+  if (isRecord(log.negative_reps)) return 'Rep. Negativas'
+  if (isRecord(log.partial_reps)) return 'Rep. Parciais'
+  if (isRecord(log.sistema21)) return 'Sistema 21'
+  if (isRecord(log.wave)) return 'Onda'
+
+  // Config PLANEJADA (série ainda não executada).
   const cfg = log.advanced_config ?? log.advancedConfig
   const cfgObj = isRecord(cfg) ? cfg : null
   const cfgType = cfgObj ? (cfgObj.type ?? cfgObj.kind ?? cfgObj.mode) : null
