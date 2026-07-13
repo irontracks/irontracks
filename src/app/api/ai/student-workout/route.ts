@@ -129,6 +129,13 @@ export async function POST(req: Request) {
       '  "notes": string (orientações gerais)',
       '}',
       '',
+      'REGRA DO "method": ele vale pra TODAS as séries do exercício. Só use um método',
+      'avançado (Drop-set, Rest-Pause, Cluster, Bi-Set…) ali quando ele se aplica a',
+      'TODA série. Para uma técnica em séries ESPECÍFICAS (ex.: drop só na última,',
+      'rest-pause na 3ª), use "method": "Normal" e explique na nota (ex.: "DROP-SET na',
+      'última série: até a falha, reduz ~20%, continua") — o aluno aplica na série.',
+      'NUNCA marque o exercício inteiro como Drop-set quando a intenção é só uma série.',
+      '',
       'Dados do aluno:',
       JSON.stringify({
         profile: profile || {},
