@@ -4,7 +4,7 @@
  */
 import { stripDiacritics } from '@/utils/normalizeExerciseName'
 import { isRecord } from '@/utils/guards'
-import { setVolume } from './setVolume'
+import { setVolume, isWorkingSet } from './setVolume'
 
 // ─── Type guard (re-export da fonte única em utils/guards) ────────────────────
 export { isRecord }
@@ -75,16 +75,10 @@ export const normalizeExerciseKey = (v: unknown): string => {
 
 // ── Volume calculation ──────────────────────────────────────────────────────
 
-/**
- * Whether a logged set should contribute to volume / PR / progression stats.
- * Returns false for warmup or feeler ("reconhecimento") sets.
- */
-const isWorkingSet = (log: Record<string, unknown>): boolean => {
-    const raw = (log.set_type ?? log.setType) as string | null | undefined
-    if (raw === 'warmup' || raw === 'feeler') return false
-    if (raw === 'working') return true
-    return !(log.is_warmup ?? log.isWarmup)
-}
+// `isWorkingSet` vem de setVolume.ts (fonte única). Antes existia uma cópia local
+// aqui que NÃO checava `done` — então o volume do Story e do relatório React
+// contava séries não-concluídas, divergindo do histórico e do PDF (que já usavam
+// a de setVolume). Mesmo treino, número diferente. Unificado.
 
 export const calculateTotalVolume = (logs: unknown): number => {
     try {
