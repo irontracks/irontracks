@@ -9,6 +9,7 @@ import {
   calculateTotalVolume,
 } from '@/utils/report/formatters'
 import { setTopWeightReps, setVolume, isWorkingSet } from '@/utils/report/setVolume'
+import { resolveReportSetsCount } from '@/utils/report/resolveSetsCount'
 import { estimateSessionKcalBreakdown } from '@/utils/calories/sessionKcal'
 import { clampSessionKcal } from '@/utils/calories/cardioKcal'
 import { distributeKcalByExercise, distributeKcalWithFixed } from '@/utils/calories/distributeKcal'
@@ -173,7 +174,9 @@ export function buildReportData(
   const exercisesArray: unknown[] = Array.isArray(sessionObj?.exercises) ? (sessionObj.exercises as unknown[]) : []
   const exercises = exercisesArray.map((ex, exIdx) => {
     const exObj = isRecord(ex) ? ex : {}
-    const setsPlanned = parseInt(String(exObj?.sets || 0), 10)
+    // Conta robusta (mesma do relatório React): unilateral/legado guarda a config
+    // em setDetails/logs e não em `sets` → iterar só por `sets` zerava a tabela.
+    const setsPlanned = resolveReportSetsCount(exObj, exIdx, sessionLogs)
     const exKey = normalizeExerciseKey(exObj?.name)
     const prevLogs = prevLogsMap[exKey] || []
     const baseMs = prevBaseMap[exKey]
