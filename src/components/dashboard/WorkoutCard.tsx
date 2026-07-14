@@ -18,6 +18,8 @@ interface WorkoutCardProps {
   idx: number
   density: 'compact' | 'comfortable'
   isPeriodized: boolean
+  /** Treino cujo dia (prefixo do título: "SEG · …") bate com hoje. */
+  isToday?: boolean
   onQuickView: (w: DashboardWorkout) => void
   onStartSession: (w: DashboardWorkout) => MaybePromise<void | boolean>
   onRestoreWorkout?: (w: DashboardWorkout) => MaybePromise<void>
@@ -49,6 +51,7 @@ function WorkoutCardInner({
   idx,
   density,
   isPeriodized,
+  isToday = false,
   onQuickView,
   onStartSession,
   onRestoreWorkout,
@@ -68,6 +71,7 @@ function WorkoutCardInner({
 
   const accent = accentColors[idx % accentColors.length]
   const isActive = false // FUTURE: connect to active session state
+  const showToday = isToday && !w?.archived_at
   const workoutKey = String(w?.id || idx)
   const isBusy = !!pendingAction
 
@@ -147,6 +151,7 @@ function WorkoutCardInner({
         `bg-gradient-to-r ${accent.gradient} via-neutral-800/80 to-neutral-800`,
         accent.border,
         isActive ? 'ring-2 ring-green-500/60' : '',
+        showToday ? 'ring-1 ring-yellow-400/60 shadow-[0_0_24px_rgba(234,179,8,0.18)]' : '',
         density === 'compact' ? 'p-3' : 'p-4',
       ].join(' ')}
       onClick={handleClick}
@@ -158,6 +163,11 @@ function WorkoutCardInner({
             <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
             <span className="relative inline-flex rounded-full h-3 w-3 bg-green-500" />
           </div>
+        )}
+        {showToday && (
+          <span className="inline-flex items-center gap-1.5 mb-1.5 px-2 py-0.5 rounded-full bg-yellow-400 text-black text-[10px] font-black uppercase tracking-wider shadow-[0_0_12px_rgba(234,179,8,0.5)]">
+            <span className="w-1.5 h-1.5 rounded-full bg-black/70 animate-pulse" /> HOJE
+          </span>
         )}
         <h3 className="font-black text-white text-base uppercase mb-0.5 pr-28 leading-tight line-clamp-2">{String(w?.title || 'Treino')}</h3>
         {/* WCAG 1.4.3 AA — neutral-500 sobre dark falha contraste 4.5:1 */}
@@ -244,6 +254,7 @@ export const WorkoutCard = React.memo(WorkoutCardInner, (a, b) =>
   a.idx === b.idx &&
   a.density === b.density &&
   a.isPeriodized === b.isPeriodized &&
+  a.isToday === b.isToday &&
   a.onQuickView === b.onQuickView &&
   a.onStartSession === b.onStartSession &&
   a.onRestoreWorkout === b.onRestoreWorkout &&
