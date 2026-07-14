@@ -133,6 +133,8 @@ const ACHIEVEMENT_BADGES: AchievementBadge[] = [
   { id: 'vol_100k', label: '100.000kg levantados', kind: 'volume', unlocked: (s) => s.totalVolumeKg >= 100_000 },
   { id: 'vol_500k', label: '500.000kg levantados', kind: 'volume', unlocked: (s) => s.totalVolumeKg >= 500_000 },
   { id: 'vol_1m', label: '1.000.000kg levantados', kind: 'volume', unlocked: (s) => s.totalVolumeKg >= 1_000_000 },
+  { id: 'vol_2m', label: '2.000.000kg levantados', kind: 'volume', unlocked: (s) => s.totalVolumeKg >= 2_000_000 },
+  { id: 'vol_5m', label: '5.000.000kg levantados', kind: 'volume', unlocked: (s) => s.totalVolumeKg >= 5_000_000 },
 ]
 
 // ─── Main export ──────────────────────────────────────────────────────────────
