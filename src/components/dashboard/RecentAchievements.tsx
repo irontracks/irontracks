@@ -5,6 +5,7 @@ import { Trophy, TrendingUp, X, ChevronDown, Zap, Flame, Dumbbell, Star } from '
 import { getLatestWorkoutPrs } from '@/actions/workout-actions'
 import BadgesInline, { type Badge } from './BadgesInline'
 import { logError } from '@/lib/logger'
+import { showPrMetric } from '@/utils/report/prMetricVisibility'
 
 type PrData = {
   exercise: string
@@ -235,9 +236,9 @@ const RecentAchievements = memo(function RecentAchievements({ userId, badges, sh
                           <span className="text-xs font-bold text-neutral-200 truncate flex-1">{pr.exercise}</span>
                           <div className="flex items-center gap-2 shrink-0">
                             {/* Cardio/bodyweight (peso e vol = 0) não mostra "0kg" — só a métrica real */}
-                            {(Number(pr.weight) > 0 || pr.improved?.weight) && <MetricBadge label="PESO" value={`${formatNum(pr.weight)}kg`} highlight={!!pr.improved?.weight} />}
-                            {(Number(pr.reps) > 0 || pr.improved?.reps) && <MetricBadge label="REPS" value={formatNum(pr.reps, 0)} highlight={!!pr.improved?.reps} />}
-                            {(Number(pr.volume) > 0 || pr.improved?.volume) && <MetricBadge label="VOL" value={`${formatNum(Math.round(pr.volume), 0)}kg`} highlight={!!pr.improved?.volume} />}
+                            {showPrMetric(pr.weight, pr.improved?.weight) && <MetricBadge label="PESO" value={`${formatNum(pr.weight)}kg`} highlight={!!pr.improved?.weight} />}
+                            {showPrMetric(pr.reps, pr.improved?.reps) && <MetricBadge label="REPS" value={formatNum(pr.reps, 0)} highlight={!!pr.improved?.reps} />}
+                            {showPrMetric(pr.volume, pr.improved?.volume) && <MetricBadge label="VOL" value={`${formatNum(Math.round(pr.volume), 0)}kg`} highlight={!!pr.improved?.volume} />}
                           </div>
                         </div>
                       )
