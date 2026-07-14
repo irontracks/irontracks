@@ -9,7 +9,7 @@
 import { z } from 'zod'
 import { env } from '@/utils/env'
 import { getGeminiModel } from '@/utils/ai/gemini'
-import { parseJsonWithSchema } from '@/utils/zod'
+import { extractJsonFromModelText } from '@/utils/ai/extractJson'
 import { sanitizeAiInput, sanitizeFoodName } from '@/lib/nutrition/security'
 
 export interface EstimatedMacros {
@@ -30,18 +30,6 @@ const OutputSchema = z
   })
   .strict()
 
-const safeJsonParse = (raw: unknown) => parseJsonWithSchema(raw, z.unknown())
-
-export const extractJsonFromModelText = (text: string) => {
-  const cleaned = String(text || '').trim()
-  if (!cleaned) return null
-  const direct = safeJsonParse(cleaned)
-  if (direct) return direct
-  const start = cleaned.indexOf('{')
-  const end = cleaned.lastIndexOf('}')
-  if (start === -1 || end === -1 || end <= start) return null
-  return safeJsonParse(cleaned.slice(start, end + 1))
-}
 
 /** Monta o prompt do nutricionista; null quando o texto é curto demais. */
 export function buildEstimatePrompt(text: string): string | null {
