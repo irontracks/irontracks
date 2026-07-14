@@ -121,14 +121,17 @@ export default function MuscleBalanceCard() {
                     className="absolute left-0 top-0 h-full rounded-full transition-all"
                     style={{
                       width: `${pctA}%`,
-                      background: !im.balanced && im.setsA > im.setsB ? '#f59e0b' : '#22c55e',
+                      // Verde = par equilibrado; âmbar = qualquer desequilíbrio (atenção),
+                      // independente de qual lado domina.
+                      background: !im.balanced ? '#f59e0b' : '#22c55e',
                     }}
                   />
                   {/* Center marker */}
                   <div className="absolute left-1/2 top-0 h-full w-px" style={{ background: 'rgba(255,255,255,0.2)' }} />
+                  {/* Números = séries (unidade no cabeçalho "Mais treinados (séries)") */}
                   <div className="absolute inset-0 flex items-center justify-between px-2 text-[9px] font-black">
-                    <span style={{ color: pctA > 30 ? '#000' : 'rgba(255,255,255,0.4)' }}>{im.setsA}s</span>
-                    <span style={{ color: pctB > 30 ? '#000' : 'rgba(255,255,255,0.4)' }}>{im.setsB}s</span>
+                    <span style={{ color: pctA > 30 ? '#000' : 'rgba(255,255,255,0.4)' }}>{im.setsA}</span>
+                    <span style={{ color: pctB > 30 ? '#000' : 'rgba(255,255,255,0.4)' }}>{im.setsB}</span>
                   </div>
                 </div>
                 {!im.balanced && (
@@ -153,7 +156,7 @@ export default function MuscleBalanceCard() {
                     className="px-2 py-0.5 rounded-full text-[10px] font-bold"
                     style={{ background: 'rgba(234,179,8,0.1)', color: '#f59e0b', border: '1px solid rgba(234,179,8,0.2)' }}
                   >
-                    {MUSCLE_LABELS[m.id] || m.id} {m.sets}s
+                    {MUSCLE_LABELS[m.id] || m.id} {m.sets}
                   </span>
                 ))}
               </div>
