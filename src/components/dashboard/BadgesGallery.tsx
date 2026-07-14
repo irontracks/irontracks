@@ -7,6 +7,7 @@ import { getIronRankLeaderboard } from '@/actions/workout-actions'
 import BadgesInline, { type Badge } from './BadgesInline'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { useFocusTrap } from '@/hooks/useFocusTrap'
+import { getIronRankProgress } from '@/utils/gamification/ironRank'
 
 type Props = {
   badges: Badge[]
@@ -20,34 +21,8 @@ type Props = {
 const BadgesGallery = memo(function BadgesGallery({ badges, currentStreak, totalVolumeKg, currentUserId, showIronRank = true, showBadges = true }: Props) {
   const safeBadges = Array.isArray(badges) ? badges : []
 
-  // Level based on total volume lifted
-  const getLevel = (vol: number) => {
-    if (vol < 5000) return 1
-    if (vol < 20000) return 2
-    if (vol < 50000) return 3
-    if (vol < 100000) return 4
-    if (vol < 250000) return 5
-    if (vol < 500000) return 6
-    if (vol < 1000000) return 7
-    return 8
-  }
-
-  const level = getLevel(totalVolumeKg)
-  const nextLevelVol = [5000, 20000, 50000, 100000, 250000, 500000, 1000000, 10000000][level - 1] || 10000000
-  const prevLevelVol = [0, 5000, 20000, 50000, 100000, 250000, 500000, 1000000][level - 1] || 0
-  const progressPercent = Math.min(100, Math.max(0, ((totalVolumeKg - prevLevelVol) / (nextLevelVol - prevLevelVol)) * 100))
-
-  const levelNames = [
-    'Iniciante das Ferros',
-    'Soldado de Aço',
-    'Guerreiro de Ferro',
-    'Cavaleiro Blindado',
-    'Titã da Força',
-    'Senhor das Barras',
-    'Mestre Supremo',
-    'Lenda Imortal',
-  ]
-  const levelName = levelNames[(level - 1) % levelNames.length]
+  // Iron Rank (fonte única em utils/gamification/ironRank.ts)
+  const { level, name: levelName, nextVol: nextLevelVol, progress: progressPercent } = getIronRankProgress(totalVolumeKg)
 
   const [rankOpen, setRankOpen] = useState(false)
   const [rankLoading, setRankLoading] = useState(false)
