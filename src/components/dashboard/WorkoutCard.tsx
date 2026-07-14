@@ -20,6 +20,8 @@ interface WorkoutCardProps {
   isPeriodized: boolean
   /** Treino cujo dia (prefixo do título: "SEG · …") bate com hoje. */
   isToday?: boolean
+  /** Card com o CTA em destaque (sólido dourado). Os demais ficam outline. */
+  emphasizeCta?: boolean
   onQuickView: (w: DashboardWorkout) => void
   onStartSession: (w: DashboardWorkout) => MaybePromise<void | boolean>
   onRestoreWorkout?: (w: DashboardWorkout) => MaybePromise<void>
@@ -52,6 +54,7 @@ function WorkoutCardInner({
   density,
   isPeriodized,
   isToday = false,
+  emphasizeCta = false,
   onQuickView,
   onStartSession,
   onRestoreWorkout,
@@ -72,6 +75,7 @@ function WorkoutCardInner({
   const accent = accentColors[idx % accentColors.length]
   const isActive = false // FUTURE: connect to active session state
   const showToday = isToday && !w?.archived_at
+  const solidCta = emphasizeCta && !w?.archived_at
   const workoutKey = String(w?.id || idx)
   const isBusy = !!pendingAction
 
@@ -185,7 +189,12 @@ function WorkoutCardInner({
             onClick={handleStart}
             data-tour="workout-start"
             disabled={isBusy || (Boolean(w?.archived_at) && typeof onRestoreWorkout !== 'function')}
-            className="relative z-30 flex-1 py-2.5 rounded-xl flex items-center justify-center gap-2 text-yellow-400 hover:text-yellow-300 font-black text-sm transition-all border border-yellow-500/40 hover:border-yellow-500/70 active:scale-95 touch-manipulation disabled:opacity-60 btn-gold-animated !text-black"
+            className={[
+              'relative z-30 flex-1 py-2.5 rounded-xl flex items-center justify-center gap-2 font-black text-sm transition-all active:scale-95 touch-manipulation disabled:opacity-60',
+              solidCta
+                ? 'btn-gold-animated !text-black border border-yellow-500/40'
+                : 'text-yellow-400 hover:text-yellow-300 border border-yellow-500/40 hover:border-yellow-500/70 hover:bg-yellow-500/5',
+            ].join(' ')}
           >
             {w?.archived_at ? (
               isActionBusy('restore') ? (
@@ -255,6 +264,7 @@ export const WorkoutCard = React.memo(WorkoutCardInner, (a, b) =>
   a.density === b.density &&
   a.isPeriodized === b.isPeriodized &&
   a.isToday === b.isToday &&
+  a.emphasizeCta === b.emphasizeCta &&
   a.onQuickView === b.onQuickView &&
   a.onStartSession === b.onStartSession &&
   a.onRestoreWorkout === b.onRestoreWorkout &&

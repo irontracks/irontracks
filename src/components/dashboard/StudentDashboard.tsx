@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import Image from 'next/image'
 
-import { Plus, Loader2, Sparkles, Crown, Zap, Activity } from 'lucide-react'
+import { Plus, Loader2, Sparkles, Crown, Zap, Activity, Archive, ListOrdered, Wrench } from 'lucide-react'
 const MuscleBalanceCard = dynamic(() => import('@/components/MuscleBalanceCard'), { ssr: false })
 import { EmptyState } from '@/components/ui/EmptyState'
 
@@ -24,7 +24,7 @@ import { trackUserEvent } from '@/lib/telemetry/userActivity'
 import { EditWorkoutListModal, type EditWorkoutListItem } from './EditWorkoutListModal'
 import { WorkoutToolsPanel } from './WorkoutToolsPanel'
 import { WorkoutCard } from './WorkoutCard'
-import { isWorkoutToday } from '@/utils/workout/workoutDay'
+import { isWorkoutToday, pickEmphasizedWorkoutIndex } from '@/utils/workout/workoutDay'
 import { usePeriodizedWorkouts, isPeriodizedWorkout } from '@/hooks/usePeriodizedWorkouts'
 import type { UnknownRecord } from '@/types/app'
 import dynamic from 'next/dynamic'
@@ -179,6 +179,14 @@ export default function StudentDashboard(props: Props) {
     () => (showArchived ? workoutsForTab : workoutsForTab.filter((w) => !w?.archived_at)),
     [showArchived, workoutsForTab],
   )
+
+  // Índice do card com CTA sólido (dourado). Só um card por vez chama a ação —
+  // o treino de HOJE; se nenhum bate com hoje, o primeiro da lista mantém a
+  // âncora visual. Os demais ficam com CTA outline (reduz a "parede" de botões).
+  const emphasizedCtaIdx = useMemo(() => {
+    if (workoutsTab === 'periodized') return -1
+    return pickEmphasizedWorkoutIndex(visibleWorkouts.map((w) => w?.title))
+  }, [workoutsTab, visibleWorkouts])
 
   useEffect(() => {
     isMountedRef.current = true
@@ -543,7 +551,7 @@ export default function StudentDashboard(props: Props) {
                           : 'flex-1 min-h-[40px] px-3 py-2 bg-neutral-900 border border-neutral-700 text-neutral-400 rounded-xl font-bold text-[11px] uppercase tracking-wider hover:border-neutral-600 hover:text-neutral-300'
                       }
                     >
-                      {showArchived ? `Arquivados (${archivedCount})` : `Arquivados (${archivedCount})`}
+                      <span className="inline-flex items-center gap-1.5"><Archive size={13} /> Arquivados ({archivedCount})</span>
                     </button>
                   ) : null}
                   <button
@@ -562,7 +570,7 @@ export default function StudentDashboard(props: Props) {
                     }}
                     className="flex-1 min-h-[40px] px-3 py-2 bg-neutral-800 border border-neutral-700 text-neutral-300 rounded-xl font-bold text-[11px] uppercase tracking-wider hover:bg-neutral-700 text-center"
                   >
-                    Organizar
+                    <span className="inline-flex items-center gap-1.5"><ListOrdered size={13} /> Organizar</span>
                   </button>
                   <div className="relative flex-1">
                     <button
@@ -570,7 +578,7 @@ export default function StudentDashboard(props: Props) {
                       className="w-full min-h-[40px] px-3 py-2 bg-neutral-800 border border-neutral-700 text-neutral-300 rounded-xl font-bold text-[11px] uppercase tracking-wider hover:bg-neutral-700 text-center"
                       aria-expanded={toolsOpen}
                     >
-                      Ferramentas
+                      <span className="inline-flex items-center gap-1.5"><Wrench size={13} /> Ferramentas</span>
                     </button>
                     {toolsOpen && (
                       <WorkoutToolsPanel
@@ -635,6 +643,7 @@ export default function StudentDashboard(props: Props) {
                     density={density}
                     isPeriodized={workoutsTab === 'periodized'}
                     isToday={workoutsTab !== 'periodized' && isWorkoutToday(w?.title)}
+                    emphasizeCta={idx === emphasizedCtaIdx}
                     onQuickView={props.onQuickView}
                     onStartSession={props.onStartSession}
                     onRestoreWorkout={props.onRestoreWorkout}
