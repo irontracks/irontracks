@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { getKcalEstimate } from '@/utils/calories/kcalClient'
 import { estimateCaloriesMet } from '@/utils/calories/metEstimate'
-import { setTopWeightReps } from '@/utils/report/setVolume'
+import { setTopWeightReps, setVolume, isWorkingSet } from '@/utils/report/setVolume'
 import { isSetCompleted } from '@/utils/report/setCompletion'
 import { VideoCompositor } from '@/lib/video/VideoCompositor'
 import { composeStoryVideoOnIos, cancelNativeStoryCompose } from '@/utils/native/videoComposer'
@@ -206,18 +206,16 @@ export function useStoryComposer({
             }).filter(Boolean) as string[]
             : null
 
-        // Volume per exercise: sum(w × r) for all sets — logs keyed "exerciseIdx-setIdx"
+        // Volume por exercício — FONTE ÚNICA (setVolume + isWorkingSet). Antes somava
+        // `w × r` do TOPO do log: subcontava drop-set (etapas), zerava unilateral
+        // (L_/R_) e contava aquecimento. Logs com chave "exerciseIdx-setIdx".
         const exerciseVolumes = exerciseNames && exerciseNames.length > 0
             ? exerciseNames.map((_, exIdx) => {
                 let vol = 0
                 Object.entries(logs).forEach(([key, log]) => {
-                    const parts = key.split('-')
-                    if (Number(parts[0]) !== exIdx) return
-                    const obj = log && typeof log === 'object' ? (log as Record<string, unknown>) : null
-                    if (!obj) return
-                    const w = Number(String(obj.weight ?? '').replace(',', '.'))
-                    const r = Number(String(obj.reps ?? '').replace(',', '.'))
-                    if (w > 0 && r > 0) vol += w * r
+                    if (Number(key.split('-')[0]) !== exIdx) return
+                    if (!isWorkingSet(log)) return
+                    vol += setVolume(log)
                 })
                 return vol
             })
