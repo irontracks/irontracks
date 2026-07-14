@@ -11,6 +11,7 @@ import { getIronRankLeaderboard, getLatestWorkoutPrs } from '@/actions/workout-a
 import BadgesInline, { type Badge } from './BadgesInline'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { logError } from '@/lib/logger'
+import { getIronRankProgress } from '@/utils/gamification/ironRank'
 
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -36,21 +37,7 @@ type Props = {
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function getLevel(vol: number) {
-    if (vol < 5000) return 1; if (vol < 20000) return 2; if (vol < 50000) return 3
-    if (vol < 100000) return 4; if (vol < 250000) return 5; if (vol < 500000) return 6
-    if (vol < 1000000) return 7; return 8
-}
-
-const LEVEL_NAMES = [
-    'Iniciante das Ferros', 'Soldado de Aço', 'Guerreiro de Ferro', 'Cavaleiro Blindado',
-    'Titã da Força', 'Senhor das Barras', 'Mestre Supremo', 'Lenda Imortal',
-]
-
-const LEVEL_THRESHOLDS = [5000, 20000, 50000, 100000, 250000, 500000, 1000000, 10000000]
-const LEVEL_PREV = [0, 5000, 20000, 50000, 100000, 250000, 500000, 1000000]
-
-// 3D rank emblem config per level
+// 3D rank emblem config per level (níveis 9–12 = prestígio; ver ironRank.ts)
 const RANK_EMBLEMS: Record<number, { src: string; glow: string }> = {
     1: { src: '/rank-1.png', glow: 'rgba(180,83,9,0.5)' },
     2: { src: '/rank-2.png', glow: 'rgba(100,116,139,0.5)' },
@@ -60,6 +47,10 @@ const RANK_EMBLEMS: Record<number, { src: string; glow: string }> = {
     6: { src: '/rank-6.png', glow: 'rgba(245,158,11,0.6)' },
     7: { src: '/rank-7.png', glow: 'rgba(226,232,240,0.55)' },
     8: { src: '/rank-8.png', glow: 'rgba(147,197,253,0.65)' },
+    9: { src: '/rank-9.png', glow: 'rgba(217,119,6,0.6)' },    // Titã Colossal
+    10: { src: '/rank-10.png', glow: 'rgba(226,232,240,0.6)' }, // Divindade de Ferro
+    11: { src: '/rank-11.png', glow: 'rgba(250,204,21,0.65)' }, // Soberano do Olimpo
+    12: { src: '/rank-12.png', glow: 'rgba(191,219,254,0.72)' }, // Deus Absoluto
 }
 
 function countImprovements(pr: PrData) {
@@ -87,12 +78,8 @@ const IronRankCard = memo(function IronRankCard({
     const safeBadges = Array.isArray(badges) ? badges : []
     const safeUserId = typeof currentUserId === 'string' ? currentUserId : ''
 
-    // Iron Rank
-    const level = getLevel(totalVolumeKg)
-    const nextVol = LEVEL_THRESHOLDS[level - 1] || 10000000
-    const prevVol = LEVEL_PREV[level - 1] || 0
-    const progress = Math.min(100, Math.max(0, ((totalVolumeKg - prevVol) / (nextVol - prevVol)) * 100))
-    const levelName = LEVEL_NAMES[(level - 1) % LEVEL_NAMES.length]
+    // Iron Rank (fonte única em utils/gamification/ironRank.ts)
+    const { level, name: levelName, nextVol, progress } = getIronRankProgress(totalVolumeKg)
 
     // Rank modal
     const [rankOpen, setRankOpen] = useState(false)
