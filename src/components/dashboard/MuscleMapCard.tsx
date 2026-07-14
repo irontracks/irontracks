@@ -3,7 +3,7 @@
 import React, { memo, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronDown, Crown, Loader2, Sparkles, Wand2 } from 'lucide-react'
 import BodyMapSvg from '@/components/muscle-map/BodyMapSvg'
-import { MUSCLE_BY_ID, MUSCLE_GROUPS, type MuscleId } from '@/utils/muscleMapConfig'
+import { MUSCLE_BY_ID, type MuscleId } from '@/utils/muscleMapConfig'
 import { getMuscleMapDay, getMuscleMapWeek } from '@/actions/workout-actions'
 import { translateAiError } from '@/utils/ai/clientErrors'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -285,7 +285,7 @@ const MuscleMapCard = memo(function MuscleMapCard(props: Props) {
         ? 'IA falhou'
         : aiStatus === 'missing_api_key'
           ? 'Sem IA (config)'
-          : 'IA sob demanda'
+          : '' // default ("sob demanda") é ruído no header → não exibe
 
   const weakMuscles = useMemo(() => {
     const muscles = state.data?.muscles && typeof state.data.muscles === 'object' ? state.data.muscles : {}
@@ -523,26 +523,18 @@ const MuscleMapCard = memo(function MuscleMapCard(props: Props) {
                     setSelected((prev) => (prev === id ? null : id))
                   }}
                 />
-                <div className="mt-3 grid grid-cols-5 gap-1.5 text-[9px] leading-none font-black uppercase tracking-widest">
-                  <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-1.5 text-center">
-                    <div className="text-neutral-400">Nenhum</div>
-                    <div className="h-2 rounded-full mt-1 bg-neutral-700/40" />
-                  </div>
-                  <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-1.5 text-center">
-                    <div className="text-yellow-500/80">Baixo</div>
-                    <div className="h-2 rounded-full mt-1 bg-gradient-to-r from-yellow-500/60 to-yellow-400" />
-                  </div>
-                  <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-1.5 text-center">
-                    <div className="text-amber-400/80">Na meta</div>
-                    <div className="h-2 rounded-full mt-1 bg-gradient-to-r from-amber-500/70 to-amber-400" />
-                  </div>
-                  <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-1.5 text-center">
-                    <div className="text-orange-400/80">Alto</div>
-                    <div className="h-2 rounded-full mt-1 bg-gradient-to-r from-orange-500/70 to-orange-400" />
-                  </div>
-                  <div className="rounded-xl border border-neutral-800 bg-neutral-950 p-1.5 text-center">
-                    <div className="text-red-400/80">Acima</div>
-                    <div className="h-2 rounded-full mt-1 bg-gradient-to-r from-red-600/80 to-red-400" />
+                {/* Legenda de intensidade (escala contínua — não é filtro) */}
+                <div className="mt-3" aria-hidden>
+                  <div
+                    className="h-2 rounded-full"
+                    style={{ background: 'linear-gradient(90deg, #3f3f46 0%, #3f3f46 12%, #eab308 34%, #f59e0b 56%, #fb923c 78%, #ef4444 100%)' }}
+                  />
+                  <div className="mt-1 flex justify-between text-[8px] leading-none font-black uppercase tracking-wider">
+                    <span className="text-neutral-500">Nenhum</span>
+                    <span className="text-yellow-500/80">Baixo</span>
+                    <span className="text-amber-400/80">Na meta</span>
+                    <span className="text-orange-400/80">Alto</span>
+                    <span className="text-red-400/80">Acima</span>
                   </div>
                 </div>
               </motion.div>
@@ -560,7 +552,7 @@ const MuscleMapCard = memo(function MuscleMapCard(props: Props) {
                     <div className="mt-3">
                       <div className="flex items-center justify-between gap-3">
                         <div className="text-white font-black">{String(selectedInfo.label ?? "")}</div>
-                        <div className="text-xs font-black text-neutral-300">{selectedInfo.sets.toLocaleString('pt-BR')} sets</div>
+                        <div className="text-xs font-black text-neutral-300">{selectedInfo.sets.toLocaleString('pt-BR')} séries</div>
                       </div>
                       <div className="mt-2 h-2">
                         <svg className="w-full h-2" viewBox="0 0 100 8" preserveAspectRatio="none">
@@ -576,7 +568,7 @@ const MuscleMapCard = memo(function MuscleMapCard(props: Props) {
                         </svg>
                       </div>
                       <div className="mt-2 text-xs text-neutral-400">
-                        Meta sugerida: {String(selectedInfo.minSets ?? "")}–{String(selectedInfo.maxSets ?? "")} sets/semana
+                        Meta sugerida: {String(selectedInfo.minSets ?? "")}–{String(selectedInfo.maxSets ?? "")} séries/semana
                       </div>
 
                       {isWeekPayload(state.data) && state.data.topExercisesByMuscle?.[selectedInfo.id]?.length ? (
@@ -586,7 +578,7 @@ const MuscleMapCard = memo(function MuscleMapCard(props: Props) {
                             {state.data.topExercisesByMuscle[selectedInfo.id].slice(0, 4).map((x, idx) => (
                               <div key={`${x.name}-${idx}`} className="rounded-xl border border-neutral-800 bg-black px-3 py-2">
                                 <div className="text-xs font-bold text-neutral-200 truncate">{x.name}</div>
-                                <div className="text-[11px] text-neutral-400">{Number(x.setsEq || 0).toLocaleString('pt-BR')} sets eq.</div>
+                                <div className="text-[11px] text-neutral-400">{Number(x.setsEq || 0).toLocaleString('pt-BR')} séries eq.</div>
                               </div>
                             ))}
                           </div>
@@ -660,67 +652,57 @@ const MuscleMapCard = memo(function MuscleMapCard(props: Props) {
 
                 {Number(state.data?.diagnostics?.estimatedSetsUsed || 0) > 0 ? (
                   <div className="mt-1 text-xs text-neutral-400">
-                    Estimativa aplicada: {Number(state.data?.diagnostics?.estimatedSetsUsed || 0).toLocaleString('pt-BR')} set(s).
+                    Estimativa aplicada: {Number(state.data?.diagnostics?.estimatedSetsUsed || 0).toLocaleString('pt-BR')} série(s).
                   </div>
                 ) : null}
 
                 <div className="bg-neutral-950 rounded-2xl border border-neutral-800 p-4">
                   <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Top músculos</div>
-                  <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
-                    {(isWeekPayload(state.data) ? state.data.topMuscles : [])
-                      .filter((x) => x && x.id && (state.data?.muscles?.[x.id]?.view || '') === view)
+                  {(() => {
+                    const topItems = (isWeekPayload(state.data) ? state.data.topMuscles : [])
+                      .filter((x) => x && x.id && (state.data?.muscles?.[x.id]?.view || '') === view && Number(x.sets || 0) > 0)
                       .slice(0, 6)
-                      .map((m) => (
-                        <button
-                          key={m.id}
-                          type="button"
-                          aria-label={`Selecionar ${m.label}`}
-                          onClick={() => setSelected(m.id as Parameters<typeof setSelected>[0])}
-                          className="rounded-xl border border-neutral-800 bg-black p-3 text-left hover:bg-neutral-950 transition-colors"
-                        >
-                          <div className="flex items-center justify-between gap-2">
-                            <div className="text-sm font-black text-neutral-100">{m.label}</div>
-                            <div className="text-xs font-black text-neutral-400">{Number(m.sets || 0).toLocaleString('pt-BR')}</div>
-                          </div>
-                          <div className="mt-2 h-2">
-                            <svg className="w-full h-2" viewBox="0 0 100 8" preserveAspectRatio="none">
-                              <rect x="0" y="0" width="100" height="8" rx="4" fill="#27272a" />
-                              <rect
-                                x="0"
-                                y="0"
-                                width={Math.min(100, Math.max(0, Number(state.data?.muscles?.[m.id]?.ratio || 0) * 100))}
-                                height="8"
-                                rx="4"
-                                fill={state.data?.muscles?.[m.id]?.color || '#1f2937'}
-                              />
-                            </svg>
-                          </div>
-                        </button>
-                      ))}
-                  </div>
+                    if (!topItems.length) {
+                      return (
+                        <div className="mt-3 text-xs text-neutral-400">
+                          Treine grupos musculares nesta {period === 'day' ? 'data' : 'semana'} para ver seu ranking aqui.
+                        </div>
+                      )
+                    }
+                    return (
+                      <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
+                        {topItems.map((m) => (
+                          <button
+                            key={m.id}
+                            type="button"
+                            aria-label={`Selecionar ${m.label}`}
+                            onClick={() => setSelected(m.id as Parameters<typeof setSelected>[0])}
+                            className="rounded-xl border border-neutral-800 bg-black p-3 text-left hover:bg-neutral-950 transition-colors"
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="text-sm font-black text-neutral-100">{m.label}</div>
+                              <div className="text-xs font-black text-neutral-400">{Number(m.sets || 0).toLocaleString('pt-BR')}</div>
+                            </div>
+                            <div className="mt-2 h-2">
+                              <svg className="w-full h-2" viewBox="0 0 100 8" preserveAspectRatio="none">
+                                <rect x="0" y="0" width="100" height="8" rx="4" fill="#27272a" />
+                                <rect
+                                  x="0"
+                                  y="0"
+                                  width={Math.min(100, Math.max(0, Number(state.data?.muscles?.[m.id]?.ratio || 0) * 100))}
+                                  height="8"
+                                  rx="4"
+                                  fill={state.data?.muscles?.[m.id]?.color || '#1f2937'}
+                                />
+                              </svg>
+                            </div>
+                          </button>
+                        ))}
+                      </div>
+                    )
+                  })()}
                 </div>
               </motion.div>
-            </div>
-
-            <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2">
-              {MUSCLE_GROUPS.filter((m) => m.view === view)
-                .slice(0, 8)
-                .map((m) => (
-                  <button
-                    key={m.id}
-                    type="button"
-                    onClick={() => setSelected(m.id)}
-                    className="rounded-xl border border-neutral-800 bg-black px-3 py-2 text-left hover:bg-neutral-950 transition-colors"
-                  >
-                    <div className="text-[11px] font-black uppercase tracking-widest text-neutral-400">{m.label}</div>
-                    <div className="mt-1 flex items-center justify-between gap-2">
-                      <div className="text-sm font-black text-neutral-100">{Number(state.data?.muscles?.[m.id]?.sets || 0).toLocaleString('pt-BR')}</div>
-                      <svg className="w-3 h-3" viewBox="0 0 12 12" style={{ animation: 'aurora-pulse 2.5s ease-in-out infinite' }}>
-                        <circle cx="6" cy="6" r="6" fill={state.data?.muscles?.[m.id]?.color || '#111827'} />
-                      </svg>
-                    </div>
-                  </button>
-                ))}
             </div>
           </motion.div >
         )
