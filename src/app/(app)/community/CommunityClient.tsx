@@ -158,7 +158,7 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
     supabase, userId, loading, profiles, follows, followRequests, loadError,
     busyId, busyRequestId,
     feedItems, feedLoading, feedError, feedHasMore, feedLoadedRef, loadFeed,
-    onlineFriends, onlineFriendProfiles,
+    trainingNowIds, trainingNowProfiles,
     respondFollowRequest, cancelFollowRequest, follow, unfollow,
   } = useCommunityData(notifyError)
   const userSettingsApi = useUserSettings(userId)
@@ -422,8 +422,8 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
             {/* ── FEED TAB ── */}
             {activeTab === 'feed' && (
               <>
-                {/* Treinando Agora */}
-                {onlineFriends.length > 0 && (
+                {/* Treinando Agora — quem tem sessão de treino ABERTA (não "app aberto") */}
+                {trainingNowIds.length > 0 && (
                   <GoldGradientBorder>
                     <div className="px-4 py-3 flex items-center gap-3">
                       <div className="relative flex-shrink-0">
@@ -436,12 +436,12 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
                       <div className="flex-1 min-w-0">
                         <div className="text-xs font-black uppercase tracking-widest text-green-400">Treinando Agora</div>
                         <div className="text-[11px] text-neutral-400 truncate">
-                          {onlineFriendProfiles.slice(0, 3).map((p) => safeString(p.display_name).split(' ')[0]).join(', ')}
-                          {onlineFriends.length > 3 && ` +${onlineFriends.length - 3}`}
+                          {trainingNowProfiles.slice(0, 3).map((p) => safeString(p.display_name).split(' ')[0]).join(', ')}
+                          {trainingNowIds.length > 3 && ` +${trainingNowIds.length - 3}`}
                         </div>
                       </div>
                       <div className="flex -space-x-2">
-                        {onlineFriendProfiles.slice(0, 4).map((p) => (
+                        {trainingNowProfiles.slice(0, 4).map((p) => (
                           <Avatar key={p.id} photo={p.photo_url} name={safeString(p.display_name)} size={28} />
                         ))}
                       </div>
