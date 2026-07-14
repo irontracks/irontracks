@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useMemo, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import {
   ArrowLeft, Save, Download, Trash2, RotateCcw, LogOut, ShieldAlert,
   Layers, Mail, MessageCircle, ChevronRight, ExternalLink,
@@ -80,7 +80,6 @@ export default function SettingsModal(props: SettingsModalProps) {
   const [iosDiag, setIosDiag] = useState<Record<string, unknown> | null>(null)
   const [iosDiagBusy, setIosDiagBusy] = useState(false)
   const [iosLiveTestId, setIosLiveTestId] = useState<string>('')
-  const [healthKitGranted, setHealthKitGranted] = useState(false)
   const [healthKitBusy, setHealthKitBusy] = useState(false)
   const [exportingData, setExportingData] = useState(false)
   const [deletingAccount, setDeletingAccount] = useState(false)
@@ -90,6 +89,22 @@ export default function SettingsModal(props: SettingsModalProps) {
     if (!key) return
     setDraft((prev) => ({ ...(isObject(prev) ? prev : {}), [key]: value }))
   }
+
+  // O "Conectado" do Apple Health é DERIVADO do consentimento persistido, não um
+  // state efêmero: antes era `useState(false)`, então ao fechar e reabrir o modal
+  // o badge voltava pra "Não conectado" mesmo com o sync salvo e funcionando.
+  // (O HealthKit não expõe status de autorização de LEITURA por privacidade — o
+  // consentimento salvo é a única fonte de verdade que temos no cliente.)
+  const healthKitGranted = Boolean(draft?.appleHealthSync)
+
+  // Ressincroniza o rascunho com as settings salvas a cada abertura. O modal não
+  // desmonta ao fechar (retorna null), então o `useState(() => base)` congelava o
+  // primeiro valor visto — inclusive o `{}` de antes das settings carregarem.
+  const wasOpenRef = useRef(false)
+  useEffect(() => {
+    if (isOpen && !wasOpenRef.current) setDraft(base)
+    wasOpenRef.current = isOpen
+  }, [isOpen, base])
 
   const userRole = String(props?.userRole || '')
   const canSeeExperimental = userRole === 'admin' || userRole === 'teacher'
@@ -193,17 +208,14 @@ export default function SettingsModal(props: SettingsModalProps) {
     try {
       setHealthKitBusy(true)
       const res = await requestHealthKitPermission()
-      const granted = !!res?.granted
-      setHealthKitGranted(granted)
-      if (granted) {
-        // Persist the user's consent so useHealthKit knows to fetch data
+      if (res?.granted) {
+        // Persiste o consentimento (é o que o useHealthKit lê pra buscar dados) e
+        // espelha no draft — senão um "Salvar" posterior gravaria o draft antigo
+        // (appleHealthSync=false) por cima, desligando o sync recém-concedido.
         await props?.patchSettings?.({ appleHealthSync: true }).catch(() => { })
-        // Também espelha no draft local — senão um "Salvar" posterior gravaria
-        // o draft antigo (appleHealthSync=false) por cima, desligando o sync
-        // que acabou de ser concedido.
         setValue('appleHealthSync', true)
       }
-    } catch (e) { logError('component:SettingsModal.requestHealthKit', e); setHealthKitGranted(false) } finally { setHealthKitBusy(false) }
+    } catch (e) { logError('component:SettingsModal.requestHealthKit', e) } finally { setHealthKitBusy(false) }
   }
 
   const handleOpenAppSettings = async () => {
@@ -332,7 +344,7 @@ export default function SettingsModal(props: SettingsModalProps) {
               <div className="mt-3 flex flex-wrap gap-2">
                 <button type="button" onClick={async () => { try { await triggerHaptic('success'); alert('Ok', 'Haptic') } catch { alert('Falhou', 'Haptic') } }} className="px-3 py-2 rounded-xl bg-yellow-500 text-black font-black">Testar Haptic</button>
                 <button type="button" onClick={async () => { try { const res = await authenticateWithBiometrics('Confirmar Face ID / Touch ID'); alert(res?.success ? 'Ok' : String(res?.error || 'Falhou'), 'Biometria') } catch { alert('Falhou', 'Biometria') } }} className="px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black">Testar Biometria</button>
-                <button type="button" onClick={async () => { try { const res = await requestHealthKitPermission(); setHealthKitGranted(!!res?.granted); alert(res?.granted ? 'Permissão ok' : String(res?.error || 'Negado'), 'HealthKit') } catch { alert('Falhou', 'HealthKit') } }} className="px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black">HK (debug)</button>
+                <button type="button" onClick={async () => { try { await handleRequestHealthKitPermission(); alert('Permissão solicitada — veja o status no card do Apple Health', 'HealthKit') } catch { alert('Falhou', 'HealthKit') } }} className="px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black">HK (debug)</button>
                 <button type="button" onClick={async () => { try { const id = iosLiveTestId || `diagnostic-${Date.now()}`; await startRestLiveActivity(id, 60, 'Diagnóstico'); setIosLiveTestId(id); alert('Iniciada (60s)', 'Live Activity') } catch { alert('Falhou', 'Live Activity') } }} className="px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black">Testar Live Activity</button>
                 <button type="button" disabled={!iosLiveTestId} onClick={async () => { try { await endRestLiveActivity(iosLiveTestId); setIosLiveTestId(''); alert('Encerrada', 'Live Activity') } catch { alert('Falhou', 'Live Activity') } }} className="px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black disabled:opacity-60">Encerrar Live Activity</button>
               </div>
