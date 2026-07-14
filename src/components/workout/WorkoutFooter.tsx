@@ -6,6 +6,7 @@ import { useWorkoutContext } from './WorkoutContext';
 import { useWorkoutTimer } from './WorkoutTimerContext';
 import { useTeamWorkout } from '@/contexts/TeamWorkoutContext';
 import { logError, logWarn } from '@/lib/logger';
+import { useKeyboardOpen } from '@/hooks/useKeyboardInset';
 
 export default function WorkoutFooter() {
   const {
@@ -73,8 +74,15 @@ export default function WorkoutFooter() {
     return { recoveryRingPct: pct, recoveryRingColor: color }
   }, [hasRecovery, plannedRestSec, recoverySeconds])
 
+  // Com o teclado aberto, esta barra (fixed bottom-0) fica ATRÁS dele e a barra de
+  // acessórios do iOS a corta ao meio — "vazando" meia barra na tela. Enquanto o
+  // usuário digita peso/reps ela não é necessária, então some (display:none, sem
+  // desmontar o componente). A barra do descanso (RestTimerOverlay) já se levanta
+  // acima do teclado por conta própria.
+  const keyboardOpen = useKeyboardOpen()
+
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 bg-neutral-950/95 backdrop-blur border-t border-neutral-800 px-4 md:px-6 py-3 pb-safe">
+    <div className={`fixed bottom-0 left-0 right-0 z-50 bg-neutral-950/95 backdrop-blur border-t border-neutral-800 px-4 md:px-6 py-3 pb-safe ${keyboardOpen ? 'hidden' : ''}`}>
       <div className="max-w-6xl mx-auto flex items-center justify-between gap-2">
         {/* Cancel button — uses cancelWorkout (bypasses triggerExit) */}
         <button
