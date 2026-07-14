@@ -4,6 +4,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { playTimerFinishSound, playTick } from '@/lib/sounds';
 import { isNativePlatform } from '@/utils/platform';
+import { useKeyboardInset } from '@/hooks/useKeyboardInset';
 import { addWidgetStartSetListener, cancelRestNotification, checkPendingWidgetAction, endRestLiveActivity, requestNativeNotifications, scheduleRestNotification, startRestLiveActivity, stopAlarmSound, triggerHaptic, updateRestLiveActivity } from '@/utils/native/irontracksNative';
 import { scheduleRestEndPush as scheduleRestEndPushApi, cancelRestEndPush as cancelRestEndPushApi } from '@/lib/workout/restEndPush';
 
@@ -69,28 +70,9 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
     // levantamos a barra exatamente essa altura — funciona tanto se o WebView
     // redimensiona quanto se não (inset 0 vs >0, auto-corrige). Padroniza:
     // a barra fica SEMPRE acima do teclado.
-    const [kbInset, setKbInset] = useState(0);
-    useEffect(() => {
-        const vv = typeof window !== 'undefined' ? window.visualViewport : null;
-        if (!vv) return;
-        const update = () => {
-            // Altura do teclado = layout viewport − viewport visível. NÃO subtrair
-            // vv.offsetTop: quando o iOS rola pra revelar o input, offsetTop fica
-            // > 0 e zerava o inset (barra colava atrás do teclado). offsetTop é o
-            // scroll do visual viewport, não a altura do teclado.
-            const inset = Math.max(0, window.innerHeight - vv.height);
-            setKbInset(inset > 1 ? inset : 0);
-        };
-        update();
-        vv.addEventListener('resize', update);
-        vv.addEventListener('scroll', update);
-        window.addEventListener('resize', update);
-        return () => {
-            vv.removeEventListener('resize', update);
-            vv.removeEventListener('scroll', update);
-            window.removeEventListener('resize', update);
-        };
-    }, []);
+    // Fonte única: useKeyboardInset (mesma medição, agora compartilhada com o
+    // WorkoutFooter, que sofria do mesmo problema).
+    const kbInset = useKeyboardInset();
     // Flash dismiss: tapping the green "BORA!" flash hides ONLY the flash,
     // keeping the bottom bar (timer + START + AUTO) visible. Lets the user
     // peek at the upcoming sets in the workout list below WITHOUT pressing
