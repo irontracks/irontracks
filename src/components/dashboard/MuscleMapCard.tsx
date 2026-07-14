@@ -302,7 +302,7 @@ const MuscleMapCard = memo(function MuscleMapCard(props: Props) {
       .filter((m) => Number.isFinite(m.minSets) && m.minSets > 0 && m.sets < m.minSets)
       .slice(0, 2)
     if (!deficits.length) return
-    const lines = deficits.map((m) => `- ${m.label}: ${m.sets.toLocaleString('pt-BR')} sets (meta ${m.minSets}–${Number((state.data?.muscles?.[m.id] as Record<string, unknown>)?.maxSets || 0)})`)
+    const lines = deficits.map((m) => `- ${m.label}: ${m.sets.toLocaleString('pt-BR')} séries (meta ${m.minSets}–${Number((state.data?.muscles?.[m.id] as Record<string, unknown>)?.maxSets || 0)})`)
     const constraints = [
       'FOCO (equilíbrio muscular):',
       ...lines,
