@@ -6,6 +6,7 @@ import React from 'react';
 import dynamic from 'next/dynamic';
 import { ArrowDown, ArrowUp, Check, Clock, GripVertical, Loader2, Save, X } from 'lucide-react';
 import { Reorder, useDragControls } from 'framer-motion';
+import { CheckinScale } from './CheckinScale';
 
 import type { Workout as EditorWorkout } from '@/components/ExerciseEditor/types';
 
@@ -169,7 +170,7 @@ export default function Modals() {
           <div className="bg-neutral-900 w-full max-w-md rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
               <div className="min-w-0">
-                <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Check-in</div>
+                <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Check-out</div>
                 <div className="text-white font-black text-lg truncate">Pós-treino</div>
                 <div className="text-xs text-neutral-400 truncate">{String(workout?.title || 'Treino')}</div>
               </div>
@@ -187,60 +188,37 @@ export default function Modals() {
                 <X size={18} />
               </button>
             </div>
-            <div className="p-4 space-y-4">
-              <div className="space-y-2">
-                <div className="text-xs font-black uppercase tracking-widest text-neutral-400" id="checkin-rpe-label">Esforço (RPE 1–10)</div>
-                <select
-                  aria-labelledby="checkin-rpe-label"
-                  value={String(postCheckinDraft?.rpe ?? '')}
-                  onChange={(e) => setPostCheckinDraft((prev) => ({ ...prev, rpe: String(e.target.value || '') }))}
-                  className="w-full min-h-[44px] bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-2 text-[16px] text-white"
-                >
-                  <option value="">Não informar</option>
-                  {Array.from({ length: 10 }).map((_, i) => (
-                    <option key={i + 1} value={String(i + 1)}>
-                      {i + 1}
-                    </option>
-                  ))}
-                </select>
-              </div>
+            {/* Corpo rolável: com as escalas em grade o conteúdo pode passar da tela em
+                aparelhos menores — sem isto o "Continuar" ficaria inalcançável. */}
+            <div className="p-4 space-y-4 max-h-[60vh] overflow-y-auto">
+              {/* As 3 escalas usam o MESMO padrão (botão de 1 toque, 44px). RPE e Dor
+                  eram <select> — 2+ toques numa tela em que o usuário está suado e
+                  com pressa. O "Limpar" preserva o "não informar" (campo opcional). */}
+              <CheckinScale
+                label="Esforço (RPE 1–10)"
+                hint="10 = falha total · 8 ≈ 2 reps na reserva · 5 = tranquilo. Isso alimenta as sugestões de carga."
+                values={[1, 2, 3, 4, 5, 6, 7, 8, 9, 10]}
+                gridCols="grid-cols-5"
+                value={String(postCheckinDraft?.rpe ?? '')}
+                onChange={(v) => setPostCheckinDraft((prev) => ({ ...prev, rpe: v }))}
+              />
 
-              <div className="space-y-2">
-                <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Satisfação (1–5)</div>
-                <div className="grid grid-cols-5 gap-2">
-                  {[1, 2, 3, 4, 5].map((n) => (
-                    <button
-                      key={n}
-                      type="button"
-                      onClick={() => setPostCheckinDraft((prev) => ({ ...prev, satisfaction: String(n) }))}
-                      className={
-                        String(postCheckinDraft?.satisfaction || '') === String(n)
-                          ? 'min-h-[44px] rounded-xl bg-yellow-500 text-black font-black'
-                          : 'min-h-[44px] rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black hover:bg-neutral-800'
-                      }
-                    >
-                      {n}
-                    </button>
-                  ))}
-                </div>
-              </div>
+              <CheckinScale
+                label="Satisfação (1–5)"
+                values={[1, 2, 3, 4, 5]}
+                gridCols="grid-cols-5"
+                value={String(postCheckinDraft?.satisfaction ?? '')}
+                onChange={(v) => setPostCheckinDraft((prev) => ({ ...prev, satisfaction: v }))}
+              />
 
-              <div className="space-y-2">
-                <div className="text-xs font-black uppercase tracking-widest text-neutral-400" id="checkin-soreness-label">Dor / Soreness (0–10)</div>
-                <select
-                  aria-labelledby="checkin-soreness-label"
-                  value={String(postCheckinDraft?.soreness ?? '')}
-                  onChange={(e) => setPostCheckinDraft((prev) => ({ ...prev, soreness: String(e.target.value || '') }))}
-                  className="w-full min-h-[44px] bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-2 text-[16px] text-white"
-                >
-                  <option value="">Não informar</option>
-                  {Array.from({ length: 11 }).map((_, i) => (
-                    <option key={i} value={String(i)}>
-                      {i}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <CheckinScale
+                label="Dor muscular (0–10)"
+                hint="Dor/desconforto agora. 0 = nenhuma."
+                values={[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]}
+                gridCols="grid-cols-6"
+                value={String(postCheckinDraft?.soreness ?? '')}
+                onChange={(v) => setPostCheckinDraft((prev) => ({ ...prev, soreness: v }))}
+              />
 
               <div className="space-y-2">
                 <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Observações (opcional)</div>

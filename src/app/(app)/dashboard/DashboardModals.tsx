@@ -10,6 +10,10 @@ import type { ActiveWorkoutSession } from '@/types/app'
 import { getLatestWhatsNew } from '@/content/whatsNew'
 import { getErrorMessage } from '@/utils/errorMessage'
 
+/** Peso em pt-BR (vírgula decimal): 96.85 → "96,85". */
+const formatKgPtBr = (kg: number): string =>
+    Number(kg).toLocaleString('pt-BR', { maximumFractionDigits: 2 })
+
 const NotificationCenter = dynamic(() => import('@/components/NotificationCenter'), { ssr: false })
 const SettingsModal = dynamic(() => import('@/components/SettingsModal'), { ssr: false })
 const ProgressPhotos = dynamic(() => import('@/components/ProgressPhotos'), { ssr: false })
@@ -199,6 +203,21 @@ export default function DashboardModals(props: DashboardModalsProps) {
             return isFinite(val) && val > 0 ? val : null
         } catch { return null }
     })()
+
+    // Valor exibido no campo de peso do check-in: o que o usuário digitou ou, se ainda
+    // não mexeu, o peso do perfil PRÉ-PREENCHIDO (um toque em "Continuar" já confirma
+    // e registra o peso do dia — antes o campo nem aparecia pra quem tinha peso).
+    const preCheckinWeightValue = (() => {
+        const draftWeight = String((preCheckinDraft as Record<string, unknown>)?.weight ?? '').trim()
+        if (draftWeight) return draftWeight
+        return profileBodyWeightKg ? String(profileBodyWeightKg) : ''
+    })()
+
+    // Peso efetivo salvo ao continuar (o digitado ou o do perfil confirmado).
+    const preCheckinResolvedDraft = () => ({
+        ...(preCheckinDraft || {}),
+        weight: preCheckinWeightValue,
+    })
 
     return (
         <>
@@ -615,8 +634,8 @@ export default function DashboardModals(props: DashboardModalsProps) {
                     <div className="bg-neutral-900 w-full max-w-md rounded-2xl border border-neutral-800 shadow-2xl overflow-hidden" onClick={(e) => e.stopPropagation()}>
                         <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
                             <div className="min-w-0">
-                                <div className="text-xs font-bold uppercase tracking-widest text-yellow-500">Check-in</div>
-                                <div className="text-white font-bold text-lg truncate">Pré-treino</div>
+                                <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Check-in</div>
+                                <div className="text-white font-black text-lg truncate">Pré-treino</div>
                                 <div className="text-xs text-neutral-400 truncate">{String(preCheckinWorkout?.title || preCheckinWorkout?.name || 'Treino')}</div>
                             </div>
                             <button
@@ -627,40 +646,45 @@ export default function DashboardModals(props: DashboardModalsProps) {
                                     preCheckinResolveRef.current = null
                                     if (typeof r === 'function') r(null)
                                 }}
-                                className="w-9 h-9 rounded-full bg-neutral-800 hover:bg-neutral-700 flex items-center justify-center text-neutral-400 hover:text-white transition-colors"
+                                className="w-11 h-11 rounded-xl bg-neutral-800 border border-neutral-700 hover:bg-neutral-700 flex items-center justify-center text-neutral-200 transition-colors"
                                 aria-label="Fechar"
                             ><X size={18} /></button>
                         </div>
-                        <div className="p-5 space-y-6">
-                            {/* Weight field — only show when profile doesn't have a weight set */}
-                            {!profileBodyWeightKg ? (
-                                <div>
-                                    <label className="block text-xs font-bold uppercase text-neutral-500 mb-2">Peso (kg)</label>
-                                    <input
-                                        type="number"
-                                        step="0.1"
-                                        placeholder="Ex: 85.0"
-                                        value={String((preCheckinDraft as Record<string, unknown>)?.weight ?? '')}
-                                        onChange={(e) => setPreCheckinDraft({ ...(preCheckinDraft || {}), weight: e.target.value })}
-                                        className="w-full bg-neutral-800 border border-neutral-700 rounded-xl px-4 py-3 text-white focus:outline-none focus:border-yellow-500"
-                                    />
-                                    <p className="mt-1.5 text-[11px] text-yellow-500/70 leading-snug">
-                                        ⚡ Preencher melhora a precisão do gasto calórico no relatório final.
-                                    </p>
-                                </div>
-                            ) : (
-                                <div className="flex items-center gap-3 px-4 py-3 bg-green-500/10 border border-green-500/20 rounded-xl">
-                                    <div className="w-7 h-7 rounded-full bg-green-500/20 flex items-center justify-center flex-shrink-0">
-                                        <span className="text-green-400 text-sm">✓</span>
-                                    </div>
-                                    <div>
-                                        <p className="text-xs font-semibold text-green-300">Peso do perfil: {profileBodyWeightKg} kg</p>
-                                        <p className="text-[11px] text-green-400/60">Gasto calórico calculado automaticamente</p>
-                                    </div>
-                                </div>
-                            )}
+                        {/* Corpo rolável — garante que o "Continuar" nunca fique fora da tela. */}
+                        <div className="p-5 space-y-6 max-h-[60vh] overflow-y-auto">
+                            {/* Peso de hoje — SEMPRE editável.
+                                Antes: quem já tinha peso no perfil via só um card read-only e NUNCA
+                                conseguia atualizar aqui. Consequência: o gasto calórico seguia sendo
+                                calculado com um peso desatualizado, e a tendência de peso (o dado mais
+                                valioso de um check-in) se perdia. Agora vem pré-preenchido com o do
+                                perfil: um toque pra confirmar, ou ajuste se pesou hoje. */}
                             <div>
-                                <label className="block text-xs font-bold uppercase text-neutral-500 mb-2">Como se sente?</label>
+                                <label htmlFor="precheckin-weight" className="block text-xs font-black uppercase tracking-widest text-neutral-400 mb-2">
+                                    Peso de hoje (kg)
+                                </label>
+                                <input
+                                    id="precheckin-weight"
+                                    type="number"
+                                    inputMode="decimal"
+                                    step="0.1"
+                                    placeholder={profileBodyWeightKg ? String(profileBodyWeightKg) : 'Ex: 85,0'}
+                                    value={preCheckinWeightValue}
+                                    onChange={(e) => setPreCheckinDraft({ ...(preCheckinDraft || {}), weight: e.target.value })}
+                                    className="w-full min-h-[44px] bg-neutral-800 border border-neutral-700 rounded-xl px-4 py-3 text-[16px] text-white focus:outline-none focus:border-yellow-500"
+                                />
+                                <p className="mt-1.5 text-[11px] text-neutral-500 leading-snug">
+                                    {profileBodyWeightKg ? (
+                                        <>
+                                            Do seu perfil: <span className="font-bold text-neutral-300">{formatKgPtBr(profileBodyWeightKg)} kg</span>.
+                                            {' '}Ajuste se pesou hoje — melhora o gasto calórico e registra sua evolução.
+                                        </>
+                                    ) : (
+                                        <>⚡ Preencher melhora a precisão do gasto calórico no relatório final.</>
+                                    )}
+                                </p>
+                            </div>
+                            <div>
+                                <label className="block text-xs font-black uppercase tracking-widest text-neutral-400 mb-2">Como se sente?</label>
                                 <div className="flex gap-2">
                                     {[
                                         { value: 'great', label: '💪 Ótimo', color: 'bg-green-500/20 border-green-500/40 text-green-300' },
@@ -671,13 +695,14 @@ export default function DashboardModals(props: DashboardModalsProps) {
                                             key={opt.value}
                                             type="button"
                                             onClick={() => setPreCheckinDraft({ ...(preCheckinDraft || {}), mood: opt.value })}
-                                            className={`flex-1 py-3 rounded-xl border text-sm font-bold transition-colors ${(preCheckinDraft as Record<string, unknown>)?.mood === opt.value ? opt.color : 'bg-neutral-800 border-neutral-700 text-neutral-400'}`}
+                                            aria-pressed={(preCheckinDraft as Record<string, unknown>)?.mood === opt.value}
+                                            className={`flex-1 min-h-[44px] py-3 rounded-xl border text-sm font-bold transition-colors ${(preCheckinDraft as Record<string, unknown>)?.mood === opt.value ? opt.color : 'bg-neutral-800 border-neutral-700 text-neutral-400'}`}
                                         >{opt.label}</button>
                                     ))}
                                 </div>
                             </div>
                             <div>
-                                <label className="block text-xs font-bold uppercase text-neutral-500 mb-2">Notas (opcional)</label>
+                                <label className="block text-xs font-black uppercase tracking-widest text-neutral-400 mb-2">Notas (opcional)</label>
                                 <textarea
                                     placeholder="Ex: Dor leve no ombro direito"
                                     value={String((preCheckinDraft as Record<string, unknown>)?.notes ?? '')}
@@ -695,7 +720,7 @@ export default function DashboardModals(props: DashboardModalsProps) {
                                     preCheckinResolveRef.current = null
                                     if (typeof r === 'function') r(null)
                                 }}
-                                className="flex-1 p-3 bg-neutral-800 rounded-xl font-bold text-neutral-300"
+                                className="flex-1 min-h-[44px] p-3 bg-neutral-800 border border-neutral-700 rounded-xl font-bold text-neutral-200 hover:bg-neutral-700"
                             >Pular</button>
                             <button
                                 type="button"
@@ -703,9 +728,11 @@ export default function DashboardModals(props: DashboardModalsProps) {
                                     setPreCheckinOpen(false)
                                     const r = preCheckinResolveRef.current
                                     preCheckinResolveRef.current = null
-                                    if (typeof r === 'function') r(preCheckinDraft)
+                                    // Salva o peso CONFIRMADO (digitado ou o do perfil pré-preenchido) —
+                                    // sem isto, quem só confirma não registraria o peso do dia.
+                                    if (typeof r === 'function') r(preCheckinResolvedDraft())
                                 }}
-                                className="flex-1 p-3 bg-yellow-500 rounded-xl font-black text-black"
+                                className="flex-1 min-h-[44px] p-3 bg-yellow-500 rounded-xl font-black text-black"
                             >Continuar</button>
                         </div>
                     </div>
