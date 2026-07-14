@@ -9,9 +9,23 @@ export type Badge = {
   kind: string
 }
 
+// Medalhas de volume com TIERS distintos (bronze → diamante) — antes todas
+// usavam a mesma /badge-volume.png e ficavam idênticas.
+const VOLUME_BADGE_IMAGES: Record<string, { src: string; glow: string }> = {
+  vol_5k: { src: '/badge-vol-5k.png', glow: 'rgba(180,83,9,0.38)' },     // bronze
+  vol_20k: { src: '/badge-vol-20k.png', glow: 'rgba(120,120,130,0.35)' }, // aço
+  vol_50k: { src: '/badge-vol-50k.png', glow: 'rgba(203,213,225,0.38)' }, // prata
+  vol_100k: { src: '/badge-vol-100k.png', glow: 'rgba(234,179,8,0.4)' },  // ouro
+  vol_500k: { src: '/badge-vol-500k.png', glow: 'rgba(226,232,240,0.42)' }, // platina
+  vol_1m: { src: '/badge-vol-1m.png', glow: 'rgba(96,165,250,0.45)' },    // safira
+  vol_2m: { src: '/badge-vol-2m.png', glow: 'rgba(248,113,113,0.45)' },   // rubi
+  vol_5m: { src: '/badge-vol-5m.png', glow: 'rgba(191,219,254,0.55)' },   // diamante
+}
+
 const getBadgeImage = (id: string, kind: string): { src: string; glow: string } => {
   if (kind === 'streak') return { src: '/badge-streak.png', glow: 'rgba(249,115,22,0.35)' }
-  if (kind === 'volume') return { src: '/badge-volume.png', glow: 'rgba(148,163,184,0.35)' }
+  if (VOLUME_BADGE_IMAGES[id]) return VOLUME_BADGE_IMAGES[id]
+  if (kind === 'volume') return { src: '/badge-volume.png', glow: 'rgba(148,163,184,0.35)' } // fallback legado
   if (id === 'first_workout') return { src: '/badge-first.png', glow: 'rgba(180,83,9,0.35)' }
   return { src: '/badge-trophy.png', glow: 'rgba(234,179,8,0.35)' }
 }
