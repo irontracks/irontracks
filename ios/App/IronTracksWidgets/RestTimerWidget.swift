@@ -7,6 +7,9 @@ import SwiftUI
 // without requiring per-second JS updates.
 @available(iOS 16.1, *)
 private struct TimerCountdownText: View {
+    /// Início do descanso (FIXO). Usado como lowerBound do range de countdown para
+    /// ele NUNCA ficar inválido (ver body).
+    let startDate: Date
     let endDate: Date
     let isFinished: Bool
     let font: Font
@@ -14,11 +17,9 @@ private struct TimerCountdownText: View {
 
     var body: some View {
         // Self-healing: se o endDate JÁ PASSOU, trata como finalizado mesmo que a flag
-        // isFinished não tenha sido atualizada. Quando o app fica suspenso muito tempo
-        // em background (ex: esperando o equipamento liberar), o auto-finish nativo
-        // (Task.sleep) não roda e isFinished fica false; aí Date() > endDate tornava o
-        // range `Date()...endDate` INVÁLIDO (início > fim), e o iOS renderizava um
-        // spinner travado. Derivar de endDate evita isso sem depender do background.
+        // isFinished não tenha sido atualizada (o app suspenso pode não ter rodado o
+        // auto-finish). Combinado com staleDate = endDate no plugin, o iOS re-renderiza
+        // no fim do descanso e cai aqui sozinho — sem depender de update do app.
         if isFinished || endDate <= Date() {
             // Count UP from when the timer ended (shows overtime: +0:01, +0:02, …)
             Text(timerInterval: endDate...Date.distantFuture, countsDown: false)
@@ -26,13 +27,23 @@ private struct TimerCountdownText: View {
                 .foregroundColor(.green)
                 .monospacedDigit()
         } else {
-            // Count DOWN to endDate — the system ticks this every second
-            Text(timerInterval: Date()...endDate, countsDown: true)
+            // Count DOWN to endDate. IMPORTANTE: o lowerBound é o startDate FIXO (não
+            // Date()). Se usasse Date() e um re-render ocorresse com Date() > endDate, o
+            // range `Date()...endDate` ficaria INVÁLIDO (início > fim) e o iOS desenhava
+            // um SPINNER travado. Com startDate fixo (< endDate), o range é sempre válido;
+            // após o fim o sistema clampa em 0:00 limpo (e a auto-cura acima assume).
+            Text(timerInterval: startDate...endDate, countsDown: true)
                 .font(font)
                 .foregroundColor(color)
                 .monospacedDigit()
         }
     }
+}
+
+// Início do descanso a partir do estado (endDate - duração). Fixo por construção.
+@available(iOS 16.1, *)
+private func restStartDate(_ state: RestTimerAttributes.ContentState) -> Date {
+    state.endDate.addingTimeInterval(-Double(max(1, state.targetSeconds)))
 }
 
 @available(iOS 16.1, *)
@@ -51,6 +62,7 @@ struct RestTimerLiveActivity: Widget {
                 }
                 DynamicIslandExpandedRegion(.trailing) {
                     TimerCountdownText(
+                        startDate: restStartDate(context.state),
                         endDate: context.state.endDate,
                         isFinished: context.state.isFinished,
                         font: .title2.bold(),
@@ -67,10 +79,11 @@ struct RestTimerLiveActivity: Widget {
                 DynamicIslandExpandedRegion(.bottom) {
                     // Progress bar: system-driven via timerInterval — animates every second
                     // without JS updates, same mechanism as Text(timerInterval:)
-                    let startDate = context.state.endDate.addingTimeInterval(
-                        -Double(max(1, context.state.targetSeconds))
-                    )
-                    if context.state.isFinished {
+                    let startDate = restStartDate(context.state)
+                    // Deriva de endDate (não só da flag): quando o descanso acaba mas o
+                    // app suspenso não atualizou isFinished, a barra de timerInterval com
+                    // range no passado virava spinner. Aqui mostra a barra cheia estática.
+                    if context.state.isFinished || context.state.endDate <= Date() {
                         ProgressView(value: 1.0, total: 1.0)
                             .tint(.green)
                             .padding(.horizontal, 8)
@@ -92,6 +105,7 @@ struct RestTimerLiveActivity: Widget {
             } compactTrailing: {
                 // Compact — right side pill (most visible spot)
                 TimerCountdownText(
+                    startDate: restStartDate(context.state),
                     endDate: context.state.endDate,
                     isFinished: context.state.isFinished,
                     font: .caption.bold(),
@@ -100,7 +114,7 @@ struct RestTimerLiveActivity: Widget {
                 .frame(minWidth: 38)
             } minimal: {
                 // Minimal — tiny dot on secondary island
-                Image(systemName: context.state.isFinished ? "checkmark.circle.fill" : "timer")
+                Image(systemName: (context.state.isFinished || context.state.endDate <= Date()) ? "checkmark.circle.fill" : "timer")
                     .foregroundColor(.green)
             }
             .keylineTint(.green)
@@ -295,6 +309,7 @@ struct LockScreenBannerView: View {
 
                 // Rest countdown / count-up
                 TimerCountdownText(
+                    startDate: restStartDate(context.state),
                     endDate: context.state.endDate,
                     isFinished: finished,
                     font: .system(.title2, design: .rounded).bold(),
