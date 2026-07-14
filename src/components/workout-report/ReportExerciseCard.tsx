@@ -1,7 +1,8 @@
 'use client'
 import React from 'react'
-import { setTopWeightReps } from '@/utils/report/setVolume'
+import { setTopWeightReps, setBestE1rm, setVolume } from '@/utils/report/setVolume'
 import { resolveReportSetsCount } from '@/utils/report/resolveSetsCount'
+import { formatSetStages } from '@/utils/report/formatStages'
 
 type AnyObj = Record<string, unknown>
 
@@ -13,16 +14,10 @@ interface ReportExerciseCardProps {
     baseMs: unknown
 }
 
-// ─── Epley 1RM estimate ───────────────────────────────────────────────────────
-// Formula: e1RM = weight × (1 + reps / 30)
-// Returns null when weight or reps are invalid/zero
-function epley1RM(weight: number, reps: number): number | null {
-    if (!Number.isFinite(weight) || weight <= 0) return null
-    if (!Number.isFinite(reps) || reps <= 0) return null
-    // For 1 rep, the 1RM equals the weight itself
-    if (reps === 1) return weight
-    return weight * (1 + reps / 30)
-}
+// O Epley LOCAL foi removido: ele era aplicado ao topo do log e, no drop-set, o
+// topo guarda a etapa MAIS LEVE × TOTAL de reps → 1RM inflado/sem sentido
+// (57→36kg virava Epley(36,30)=72kg). Agora usamos setBestE1rm (fonte única em
+// setVolume.ts), que pega a MELHOR etapa do drop, o melhor bloco do cluster, etc.
 
 // Parse weight/reps safely from a log object.
 // setTopWeightReps pega o lado (L/R) dos exercícios unilaterais — antes lia só
@@ -44,8 +39,12 @@ type ProgressionResult = {
 function computeProgression(logObj: AnyObj, prevObj: AnyObj | null): ProgressionResult {
     const no: ProgressionResult = { text: '—', rowClass: '', isPr: false, e1rmText: null }
     const { w: cw, r: cr } = parseWR(logObj)
-    const curVolume = cw > 0 && cr > 0 ? cw * cr : 0
-    const curE1rm = epley1RM(cw, cr)
+    // FONTE ÚNICA (setBestE1rm/setVolume): trata drop-set, cluster, wave e unilateral.
+    // Antes usava Epley(topo do log) — no drop, o topo guarda a etapa MAIS LEVE ×
+    // TOTAL de reps, então "57kg→36kg (12+18)" virava Epley(36,30)=72kg, um número
+    // sem sentido físico que ainda gerava uma "evolução" negativa falsa.
+    const curVolume = setVolume(logObj)
+    const curE1rm = setBestE1rm(logObj) || null
 
     // Build 1RM display text
     const e1rmText = curE1rm != null ? `${curE1rm.toFixed(1)} kg` : null
@@ -53,8 +52,8 @@ function computeProgression(logObj: AnyObj, prevObj: AnyObj | null): Progression
     if (!prevObj) return { ...no, e1rmText }
 
     const { w: pw, r: pr } = parseWR(prevObj)
-    const prevVolume = pw > 0 && pr > 0 ? pw * pr : 0
-    const prevE1rm = epley1RM(pw, pr)
+    const prevVolume = setVolume(prevObj)
+    const prevE1rm = setBestE1rm(prevObj) || null
 
     const hasCurrentData = cw > 0 || cr > 0
     const hasPrevData = pw > 0 || pr > 0
@@ -154,16 +153,16 @@ export const ReportExerciseCard = ({ exercise, exIdx, sessionLogs, prevLogs, bas
     // Conta robusta (sets ausente em unilateral/legado zerava a tabela). Ver helper.
     const setsCount = resolveReportSetsCount(obj, exIdx, sessionLogs)
 
-    // Calculate best e1RM for this exercise across all sets (for PR badge)
+    // Calculate best e1RM for this exercise across all sets (for PR badge).
+    // setBestE1rm = fonte única (melhor ETAPA no drop, melhor bloco no cluster, etc).
     const bestE1rm = (() => {
         let best = 0
         for (let sIdx = 0; sIdx < setsCount; sIdx++) {
             const key = `${exIdx}-${sIdx}`
             const log = sessionLogs[key]
             if (!log || typeof log !== 'object') continue
-            const { w, r } = parseWR(log as AnyObj)
-            const e1rm = epley1RM(w, r)
-            if (e1rm != null && e1rm > best) best = e1rm
+            const e1rm = setBestE1rm(log)
+            if (e1rm > best) best = e1rm
         }
         return best > 0 ? best : null
     })()
@@ -190,9 +189,8 @@ export const ReportExerciseCard = ({ exercise, exIdx, sessionLogs, prevLogs, bas
             const key = `${exIdx}-${sIdx}`
             const log = sessionLogs[key]
             if (!log || typeof log !== 'object') continue
-            const { w, r } = parseWR(log as AnyObj)
-            const e1rm = epley1RM(w, r)
-            if (e1rm != null && e1rm > bestVal) { bestVal = e1rm; bestIdx = sIdx }
+            const e1rm = setBestE1rm(log)
+            if (e1rm > bestVal) { bestVal = e1rm; bestIdx = sIdx }
         }
         return bestIdx
     })()
@@ -253,6 +251,8 @@ export const ReportExerciseCard = ({ exercise, exIdx, sessionLogs, prevLogs, bas
                         // sumia porque weight/reps do topo vêm vazios nesses exercícios.
                         const { w: dispW, r: dispR } = parseWR(logObj)
                         if (dispW <= 0 && dispR <= 0) return null
+                        // Etapas do drop-set/stripping (null em série normal)
+                        const stages = formatSetStages(logObj)
 
                         const { text: progressionText, rowClass, isPr, e1rmText } = computeProgression(logObj, prevLog)
 
@@ -268,11 +268,18 @@ export const ReportExerciseCard = ({ exercise, exIdx, sessionLogs, prevLogs, bas
                                             )}
                                         </div>
                                     </td>
+                                    {/* Drop-set/stripping: mostra as ETAPAS (ex.: "57 → 36 kg" / "12 → 18").
+                                        O topo do log guarda só a última etapa + a soma das reps, o que
+                                        escondia o drop inteiro. */}
                                     <td className="py-2 text-center font-semibold text-sm">
-                                        {logObj.weight != null && String(logObj.weight) !== '' ? `${String(logObj.weight)} kg` : dispW > 0 ? `${dispW} kg` : '—'}
+                                        {stages
+                                            ? <span className="whitespace-nowrap">{stages.weights} kg</span>
+                                            : logObj.weight != null && String(logObj.weight) !== '' ? `${String(logObj.weight)} kg` : dispW > 0 ? `${dispW} kg` : '—'}
                                     </td>
                                     <td className="py-2 text-center font-mono text-sm">
-                                        {logObj.reps != null && String(logObj.reps) !== '' ? String(logObj.reps) : dispR > 0 ? String(dispR) : '—'}
+                                        {stages
+                                            ? <span className="whitespace-nowrap">{stages.reps}</span>
+                                            : logObj.reps != null && String(logObj.reps) !== '' ? String(logObj.reps) : dispR > 0 ? String(dispR) : '—'}
                                     </td>
                                     <td className="py-2 text-center text-[11px] font-mono text-amber-300">
                                         {e1rmText ?? '—'}
