@@ -114,7 +114,7 @@ export const DashboardTabs = memo(({
                 >
                   {renderIndicator(active)}
                   {renderIcon(Icon, active)}
-                  <span className="max-w-full truncate text-[9px] sm:text-xs leading-none">{label}</span>
+                  <span className="max-w-full truncate text-[9px] sm:text-xs leading-tight py-px">{label}</span>
                 </button>
               )
             })}
@@ -130,7 +130,7 @@ export const DashboardTabs = memo(({
                 >
                   {renderIndicator(active)}
                   {renderIcon(Users, active)}
-                  <span className="max-w-full truncate text-[9px] sm:text-xs leading-none">Comunidade</span>
+                  <span className="max-w-full truncate text-[9px] sm:text-xs leading-tight py-px">Comunidade</span>
                 </button>
               )
             })()}
@@ -145,7 +145,7 @@ export const DashboardTabs = memo(({
               >
                 {renderIndicator(!!nutritionActive)}
                 {renderIcon(Apple, !!nutritionActive)}
-                <span className="max-w-full truncate text-[9px] sm:text-xs leading-none">Nutrição</span>
+                <span className="max-w-full truncate text-[9px] sm:text-xs leading-tight py-px">Nutrição</span>
               </button>
             )}
 
@@ -160,7 +160,7 @@ export const DashboardTabs = memo(({
                 >
                   {renderIndicator(active)}
                   {renderIcon(Crown, active)}
-                  <span className="max-w-full truncate text-[9px] sm:text-xs leading-none">{vipLabel}{vipLocked ? ' 🔒' : ''}</span>
+                  <span className="max-w-full truncate text-[9px] sm:text-xs leading-tight py-px">{vipLabel}{vipLocked ? ' 🔒' : ''}</span>
                 </button>
               )
             })()}

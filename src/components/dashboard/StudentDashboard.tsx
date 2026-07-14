@@ -24,6 +24,7 @@ import { trackUserEvent } from '@/lib/telemetry/userActivity'
 import { EditWorkoutListModal, type EditWorkoutListItem } from './EditWorkoutListModal'
 import { WorkoutToolsPanel } from './WorkoutToolsPanel'
 import { WorkoutCard } from './WorkoutCard'
+import { isWorkoutToday } from '@/utils/workout/workoutDay'
 import { usePeriodizedWorkouts, isPeriodizedWorkout } from '@/hooks/usePeriodizedWorkouts'
 import type { UnknownRecord } from '@/types/app'
 import dynamic from 'next/dynamic'
@@ -633,6 +634,7 @@ export default function StudentDashboard(props: Props) {
                     idx={idx}
                     density={density}
                     isPeriodized={workoutsTab === 'periodized'}
+                    isToday={workoutsTab !== 'periodized' && isWorkoutToday(w?.title)}
                     onQuickView={props.onQuickView}
                     onStartSession={props.onStartSession}
                     onRestoreWorkout={props.onRestoreWorkout}
