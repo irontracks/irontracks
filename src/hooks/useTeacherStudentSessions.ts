@@ -13,6 +13,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { SupabaseClient, RealtimeChannel } from '@supabase/supabase-js'
 import { logError, logWarn } from '@/lib/logger'
+import { isSessionFresh } from '@/utils/social/activeSession'
 
 export interface StudentActiveSession {
   startedAt: string
@@ -71,6 +72,10 @@ export function useTeacherStudentSessions(
 
         const map: ActiveMap = {}
         for (const row of data) {
+          // A linha só é deletada no finish/discard — quem fechou o app no meio do
+          // treino fica pra sempre. Sem este corte, o badge "Treinando agora" do
+          // professor acendia pra aluno que parou de treinar meses atrás.
+          if (!isSessionFresh(row.updated_at)) continue
           map[String(row.user_id)] = {
             startedAt: String(row.started_at ?? ''),
             updatedAt: String(row.updated_at ?? ''),
