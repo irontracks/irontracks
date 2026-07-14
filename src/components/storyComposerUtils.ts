@@ -6,6 +6,7 @@
  */
 
 import { safeString } from '@/utils/guards'
+import { calculateTotalVolume as canonicalCalculateTotalVolume } from '@/utils/report/formatters'
 import { estimateCaloriesMet, MET_LIGHT, DEFAULT_BODY_WEIGHT_KG } from '@/utils/calories/metEstimate'
 import { type StoryTemplate, DEFAULT_STORY_TEMPLATE, storyFont } from '@/components/stories/storyTemplates'
 
@@ -192,44 +193,22 @@ export const formatDuration = (totalSeconds: unknown): string => {
     return `${m}min`;
 };
 
-export const calculateTotalVolume = (logs: Record<string, unknown>): number => {
-    try {
-        let total = 0;
-        Object.values(logs).forEach((log: unknown) => {
-            const l = log && typeof log === 'object' ? (log as Record<string, unknown>) : {};
-
-            // Cluster: each block may have different weight × reps
-            const cluster = l?.cluster;
-            if (cluster && typeof cluster === 'object') {
-                const c = cluster as Record<string, unknown>;
-                const source = Array.isArray(c.blocksDetailed) ? c.blocksDetailed
-                    : Array.isArray(c.blocks) ? c.blocks : null;
-                if (source && source.length > 0) {
-                    for (const block of source) {
-                        if (!block || typeof block !== 'object') continue;
-                        const b = block as Record<string, unknown>;
-                        const bw = Number(String(b?.weight ?? '').replace(',', '.'));
-                        const brRaw = String(b?.reps ?? '').replace(',', '.');
-                        const br = brRaw.includes('/') ? Number(brRaw.split('/')[0].trim()) : Number(brRaw);
-                        if (Number.isFinite(bw) && bw > 0 && Number.isFinite(br) && br > 0) total += bw * br;
-                    }
-                    return;
-                }
-            }
-
-            // Standard set — handle "8/10" done/planned format
-            const w = Number(String(l?.weight ?? '').replace(',', '.'));
-            const rRaw = String(l?.reps ?? '').replace(',', '.');
-            const r = rRaw.includes('/') ? Number(rRaw.split('/')[0].trim()) : Number(rRaw);
-            if (Number.isFinite(w) && w > 0 && Number.isFinite(r) && r > 0) {
-                total += w * r;
-            }
-        });
-        return total;
-    } catch {
-        return 0;
-    }
-};
+/**
+ * Volume total do Story — DELEGA à fonte única (utils/report/formatters →
+ * setVolume + isWorkingSet).
+ *
+ * A implementação local era naive: tratava cluster, mas depois caía em
+ * `weight × reps` do TOPO do log. Isso (a) SUBCONTAVA drop-set/stripping — as
+ * etapas (ex.: 57kg→36kg) viravam "36 × total de reps" —, (b) zerava exercícios
+ * UNILATERAIS (que só gravam L_/R_) e (c) não filtrava aquecimento. Resultado: o
+ * Story mostrava um volume MENOR que o do relatório/histórico pro MESMO treino
+ * (caso real: 18.856 kg no Story vs 19.696 kg reais — 840 kg a menos só do drop).
+ *
+ * `parseRepsValue` da fonte única já trata o formato "feito/planejado" ("8/10" → 8),
+ * então nada se perde na delegação.
+ */
+export const calculateTotalVolume = (logs: Record<string, unknown>): number =>
+    canonicalCalculateTotalVolume(logs);
 
 
 export const computeKcal = ({
