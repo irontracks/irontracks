@@ -568,9 +568,12 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin, CLLocationMana
                     isFinished: false
                 )
                 do {
-                    // staleDate = 5 minutes after timer ends — generous window so the
-                    // finished state remains visible even if the app is slow to update.
-                    let staleDate = endDate.addingTimeInterval(300)
+                    // staleDate = endDate (o INSTANTE em que o descanso acaba). Isso força
+                    // o iOS a RE-RENDERIZAR a Live Activity exatamente nesse momento —
+                    // e aí a auto-cura do widget (endDate <= Date() → "Hora de Treinar")
+                    // assume SOZINHA, sem depender do Task.sleep abaixo (que não roda com o
+                    // app suspenso/tela bloqueada — era a causa do atraso de ~30s / "não muda").
+                    let staleDate = endDate
                     let content = ActivityContent(state: state, staleDate: staleDate)
                     // pushType: .token = ask APNs to issue a push token so the backend
                     // can update this activity remotely (used by Feature 11).
@@ -657,10 +660,12 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin, CLLocationMana
                 targetSeconds: targetSeconds,
                 isFinished: isFinished
             )
-            // When finished: keep visible for 5 min. When running: end of timer + 5 min.
+            // Rodando: staleDate = endDate → o iOS re-renderiza no fim (mesmo com +30s) e
+            // a auto-cura do widget vira "Hora de Treinar" sozinha, sem depender de update.
+            // Finalizado: janela curta visível antes do auto-dismiss.
             let staleDate = isFinished
-                ? Date().addingTimeInterval(300)
-                : endDate.addingTimeInterval(300)
+                ? Date().addingTimeInterval(120)
+                : endDate
             let content = ActivityContent(state: state, staleDate: staleDate)
             Task {
                 for activity in Activity<RestTimerAttributes>.activities
