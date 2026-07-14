@@ -27,7 +27,8 @@ export function workoutPlanHtml(workout: WorkoutData, user: UserData) {
   const owner = user?.displayName || user?.email || ''
 
   const rows = exs.map((ex: WorkoutExercise, idx: number) => {
-    const sets = Number(ex?.sets || 0)
+    // Fallback p/ setDetails: unilateral/legado às vezes guarda a contagem lá, não em `sets`.
+    const sets = Number(ex?.sets || 0) || (Array.isArray((ex as { setDetails?: unknown[] })?.setDetails) ? (ex as { setDetails: unknown[] }).setDetails.length : 0)
     const reps = ex?.reps || '-'
     const method = ex?.method || 'Normal'
     const cadence = ex?.cadence || '-'
