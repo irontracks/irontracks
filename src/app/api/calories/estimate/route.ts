@@ -21,6 +21,7 @@ import {
 } from '@/utils/calories/metEstimate'
 import { checkRateLimitAsync } from '@/utils/rateLimit'
 import { clampSessionKcal } from '@/utils/calories/cardioKcal'
+import { setVolume, isWorkingSet } from '@/utils/report/setVolume'
 import { logError } from '@/lib/logger'
 
 const ZodBodySchema = z
@@ -69,19 +70,20 @@ const calculateClusterVolume = (cluster: unknown): number => {
   return vol
 }
 
+/**
+ * Volume total p/ a estimativa de calorias — FONTE ÚNICA (setVolume + isWorkingSet).
+ *
+ * A versão anterior tratava cluster, mas depois caía em `weight × reps` do TOPO do
+ * log: SUBCONTAVA drop-set/stripping (as etapas viravam "último peso × total de
+ * reps"), zerava exercícios UNILATERAIS (só gravam L_/R_) e contava aquecimento.
+ * Como o volume alimenta o MET, as calorias saíam subestimadas nesses treinos.
+ */
 const calculateTotalVolume = (logs: Record<string, unknown>) => {
   try {
     let volume = 0
     Object.values(logs).forEach((log: unknown) => {
-      if (!log || typeof log !== 'object') return
-      const row = log as Record<string, unknown>
-      // Cluster: each block may have different weight
-      const clusterVol = calculateClusterVolume(row.cluster)
-      if (clusterVol > 0) { volume += clusterVol; return }
-      // Standard set
-      const w = parseWeightValue(row.weight)
-      const r = parseRepsValue(row.reps)
-      if (w > 0 && r > 0) volume += w * r
+      if (!isWorkingSet(log)) return
+      volume += setVolume(log)
     })
     return volume
   } catch { return 0 }
