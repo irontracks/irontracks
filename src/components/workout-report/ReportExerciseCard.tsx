@@ -1,6 +1,7 @@
 'use client'
 import React from 'react'
 import { setTopWeightReps } from '@/utils/report/setVolume'
+import { resolveReportSetsCount } from '@/utils/report/resolveSetsCount'
 
 type AnyObj = Record<string, unknown>
 
@@ -65,11 +66,16 @@ function computeProgression(logObj: AnyObj, prevObj: AnyObj | null): Progression
         const deltaPct = prevE1rm > 0 ? (delta1rm / prevE1rm) * 100 : 0
         if (Math.abs(delta1rm) >= 0.1) {
             if (delta1rm > 0) {
-                const isPr = delta1rm > 0
+                // Base fraca/primeiro registro pesado faz o 1RM "dobrar" e gera
+                // "+280kg 1RM (+100%)" — números sem sentido físico. Nesses saltos
+                // (>=2×) mostramos "novo patamar" em vez de inflar a métrica.
+                const bigJump = prevE1rm > 0 && curE1rm != null && curE1rm >= prevE1rm * 2
                 return {
-                    text: `+${delta1rm.toFixed(1)} kg 1RM (${deltaPct > 0 ? '+' : ''}${deltaPct.toFixed(1)}%)`,
+                    text: bigJump
+                        ? '↑ novo patamar'
+                        : `+${delta1rm.toFixed(1)} kg 1RM (${deltaPct > 0 ? '+' : ''}${deltaPct.toFixed(1)}%)`,
                     rowClass: 'bg-green-500/15 text-green-200 font-bold',
-                    isPr,
+                    isPr: true,
                     e1rmText,
                 }
             } else {
@@ -145,7 +151,8 @@ export const ReportExerciseCard = ({ exercise, exIdx, sessionLogs, prevLogs, bas
         }
     })()
 
-    const setsCount = Number(obj?.sets ?? 0) || 0
+    // Conta robusta (sets ausente em unilateral/legado zerava a tabela). Ver helper.
+    const setsCount = resolveReportSetsCount(obj, exIdx, sessionLogs)
 
     // Calculate best e1RM for this exercise across all sets (for PR badge)
     const bestE1rm = (() => {
@@ -192,17 +199,20 @@ export const ReportExerciseCard = ({ exercise, exIdx, sessionLogs, prevLogs, bas
 
     return (
         <div className="break-inside-avoid">
-            <div className="flex justify-between items-end mb-2 border-b-2 border-neutral-800 pb-2">
-                <h3 className="text-xl font-bold uppercase flex items-center gap-2 min-w-0 flex-1 truncate">
-                    <span className="bg-black text-white w-6 h-6 flex items-center justify-center rounded text-xs">{exIdx + 1}</span>
-                    {exName || '—'}
+            {/* Título em linha própria (quebra em vez de truncar — antes "Cadeira
+                Abdutora" e "Cadeira Adutora" viravam ambas "CAD..."). Metadados
+                abaixo em flex-wrap (o "Cad:" não corta mais na borda). */}
+            <div className="mb-2 border-b-2 border-neutral-800 pb-2">
+                <h3 className="text-lg sm:text-xl font-bold uppercase flex items-start gap-2 flex-wrap leading-tight">
+                    <span className="bg-black text-white w-6 h-6 flex items-center justify-center rounded text-xs shrink-0">{exIdx + 1}</span>
+                    <span className="break-words min-w-0">{exName || '—'}</span>
                     {prCount > 0 && (
-                        <span className="text-xs font-black bg-yellow-500/20 text-yellow-400 border border-yellow-500/40 px-1.5 py-0.5 rounded-lg tracking-wide">
+                        <span className="text-xs font-black bg-yellow-500/20 text-yellow-400 border border-yellow-500/40 px-1.5 py-0.5 rounded-lg tracking-wide shrink-0">
                             🏆 {prCount > 1 ? `${prCount} PRs` : 'PR'}
                         </span>
                     )}
                 </h3>
-                <div className="flex gap-3 text-xs font-mono text-neutral-400 shrink-0">
+                <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-xs font-mono text-neutral-400">
                     {baseText && <span>Base: <span className="font-bold text-neutral-100">{baseText}</span></span>}
                     {bestE1rm != null && (
                         <span>1RM est: <span className="font-bold text-amber-300">{bestE1rm.toFixed(1)} kg</span></span>
@@ -215,7 +225,10 @@ export const ReportExerciseCard = ({ exercise, exIdx, sessionLogs, prevLogs, bas
                         const r = obj?.rpe as unknown
                         return r != null && String(r).trim() ? <span>RPE: <span className="font-bold text-neutral-100">{String(r)}</span></span> : null
                     })()}
-                    <span>Cad: <span className="font-bold text-neutral-100">{String((obj?.cadence ?? '-') as string)}</span></span>
+                    {(() => {
+                        const c = String((obj?.cadence ?? '') as string).trim()
+                        return c ? <span>Cad: <span className="font-bold text-neutral-100">{c}</span></span> : null
+                    })()}
                 </div>
             </div>
             <table className="w-full text-sm">
@@ -249,12 +262,9 @@ export const ReportExerciseCard = ({ exercise, exIdx, sessionLogs, prevLogs, bas
                                     <td className="py-2 font-mono text-neutral-400 text-xs">
                                         <div className="flex items-center gap-1">
                                             #{sIdx + 1}
-                                            {isPr && <span className="text-yellow-400">★</span>}
-                                            {sIdx === bestSetIdx && !isPr && (
-                                                <span className="text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1 rounded font-black">Melhor</span>
-                                            )}
-                                            {sIdx === bestSetIdx && isPr && (
-                                                <span className="text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1 rounded font-black">Melhor</span>
+                                            {isPr && <span className="text-yellow-400" title="Recorde pessoal">★</span>}
+                                            {sIdx === bestSetIdx && (
+                                                <span className="text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1 rounded font-black" title="Melhor série (maior 1RM estimado)">Melhor</span>
                                             )}
                                         </div>
                                     </td>

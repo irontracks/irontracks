@@ -772,7 +772,7 @@ const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose,
                             onClick={() => { setShowExportMenu(false); setShowStoryPrompt(false); setShowStory(true); }}
                             className="min-h-[36px] bg-yellow-500 hover:bg-yellow-400 text-black px-3 rounded-xl font-black shadow-lg inline-flex items-center gap-1.5"
                         >
-                            <span className="text-xs uppercase tracking-widest">Storie</span>
+                            <span className="text-xs uppercase tracking-widest">Story</span>
                         </button>
                         <button
                             type="button"
@@ -932,6 +932,12 @@ const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose,
                     {exercisesList.length === 0 && (
                         <div className="text-neutral-300 p-4 bg-neutral-900/60 rounded-lg border border-neutral-800">
                             Nenhum dado de exercício registrado para este treino.
+                        </div>
+                    )}
+                    {exercisesList.length > 0 && (
+                        <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-neutral-400">
+                            <span className="flex items-center gap-1"><span className="text-yellow-400">★</span> recorde pessoal (PR)</span>
+                            <span className="flex items-center gap-1"><span className="text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1 rounded font-black">Melhor</span> melhor série (maior 1RM est.)</span>
                         </div>
                     )}
                     {exercisesList.map((ex, exIdx) => {

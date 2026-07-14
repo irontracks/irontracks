@@ -48,7 +48,7 @@ export function ReportHighlightsPanel({
                 <div className="text-[10px] text-amber-300 font-black">★ {allTimePrCount} recorde{allTimePrCount > 1 ? 's' : ''} histórico{allTimePrCount > 1 ? 's' : ''}!</div>
               )}
               {detectedPrs[0] && (
-                <div className="text-[10px] text-yellow-200 opacity-80 truncate">
+                <div className="text-[10px] text-yellow-200 opacity-80 line-clamp-2 leading-tight">
                   {detectedPrs[0].isAllTimePr ? '★ ' : ''}{detectedPrs[0].exerciseName}: {detectedPrs[0].e1rm.toFixed(1)} kg 1RM
                 </div>
               )}
@@ -61,7 +61,7 @@ export function ReportHighlightsPanel({
             : 'bg-red-500/10 border-red-500/30'
             }`}>
             <div className={`text-2xl font-black ${volumeDeltaAbs > 0 ? 'text-green-400' : 'text-red-400'}`}>
-              {volumeDeltaAbs > 0 ? '+' : ''}{volumeDeltaAbs.toLocaleString('pt-BR')} kg
+              {volumeDeltaAbs > 0 ? '+' : ''}{Math.round(volumeDeltaAbs).toLocaleString('pt-BR')} kg
             </div>
             <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Volume vs anterior</div>
             {Math.abs(volumeDelta) > 0 && (
@@ -73,7 +73,7 @@ export function ReportHighlightsPanel({
         )}
         {currentVolume > 0 && (
           <div className="bg-neutral-800/60 border border-neutral-700/60 rounded-xl p-3 flex flex-col gap-1">
-            <div className="text-2xl font-black text-white">{currentVolume.toLocaleString('pt-BR')} kg</div>
+            <div className="text-2xl font-black text-white">{Math.round(currentVolume).toLocaleString('pt-BR')} kg</div>
             <div className="text-[10px] font-black uppercase tracking-widest text-neutral-400">Volume total</div>
           </div>
         )}
