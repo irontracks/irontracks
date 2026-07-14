@@ -226,6 +226,26 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
             setNutritionOpen(false)
         }
     }, [view, nutritionOpen, setNutritionOpen])
+    // Abrir a Nutrição precisa VOLTAR pro dashboard antes — ela só renderiza lá
+    // (gate acima). Antes os call-sites faziam só `setNutritionOpen(true)`: em
+    // qualquer outra aba (Avaliações, Comunidade, VIP) o efeito acima fechava a
+    // nutrição no mesmo tick e o clique não fazia absolutamente nada.
+    //
+    // Não dá pra só `setView('dashboard'); setNutritionOpen(true)`: `view` é
+    // DERIVADA do pathname e `setView` é um `router.push` — a view só vira
+    // 'dashboard' num render posterior, e até lá o efeito acima fecharia de novo.
+    // Então guardamos a intenção e abrimos quando a navegação aterrissar.
+    const pendingNutritionRef = useRef(false)
+    const openNutrition = useCallback(() => {
+        if (view === 'dashboard') { setNutritionOpen(true); return }
+        pendingNutritionRef.current = true
+        setView('dashboard')
+    }, [view, setView, setNutritionOpen])
+    useEffect(() => {
+        if (view !== 'dashboard' || !pendingNutritionRef.current) return
+        pendingNutritionRef.current = false
+        setNutritionOpen(true)
+    }, [view, setNutritionOpen])
     const [reportData, setReportData] = useState({ current: null, previous: null });
     const mainScrollRef = useRef<HTMLDivElement | null>(null);
     const [reportBackView, setReportBackView] = useState('dashboard');
@@ -1031,6 +1051,9 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                         // Close the nutrition overlay before switching views — it's a
                                         // full-screen overlay, so leaving it open would hide the tab the
                                         // user just clicked AND keep the Nutrição indicator stuck on.
+                                        // Também desarma a intenção pendente: clicar Nutrição e trocar de
+                                        // aba antes da navegação aterrissar não pode abrir a nutrição depois.
+                                        pendingNutritionRef.current = false
                                         setNutritionOpen(false)
                                         setView(next)
                                     }}
@@ -1061,7 +1084,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                                     const sid = isRecord(s) ? String((s as Record<string, unknown>).id ?? 'active') : 'active'
                                                     router.push(`/dashboard/report/${encodeURIComponent(sid)}`)
                                                 }}
-                                                onOpenNutrition={() => setNutritionOpen(true)}
+                                                onOpenNutrition={openNutrition}
                                             />
                                     }
                                     vipLabel="VIP"
@@ -1069,7 +1092,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                     vipEnabled={!hideVipOnIos}
                                     showNutritionTab={!!vipAccess?.hasVip}
                                     nutritionActive={nutritionOpen}
-                                    onOpenNutrition={() => setNutritionOpen(true)}
+                                    onOpenNutrition={openNutrition}
                                     settings={userSettingsApi?.settings ?? null}
                                     onCreateWorkout={handleCreateWorkout}
                                     onExpressWorkout={() => setExpressWorkoutOpen(true)}
