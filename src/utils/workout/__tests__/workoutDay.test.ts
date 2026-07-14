@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { parseWorkoutDay, isWorkoutToday } from '@/utils/workout/workoutDay'
+import { parseWorkoutDay, isWorkoutToday, pickEmphasizedWorkoutIndex } from '@/utils/workout/workoutDay'
 
 describe('parseWorkoutDay', () => {
   it('lê abreviações no formato do app ("SEG · LOWER B")', () => {
@@ -48,5 +48,27 @@ describe('isWorkoutToday', () => {
 
   it('título sem dia nunca é hoje', () => {
     expect(isWorkoutToday('Treino A', segunda)).toBe(false)
+  })
+})
+
+describe('pickEmphasizedWorkoutIndex', () => {
+  const segunda = new Date(2026, 6, 13, 10, 0, 0) // segunda-feira
+
+  it('destaca o índice do treino de hoje', () => {
+    const titles = ['DOM · Descanso', 'SEG · Lower', 'TER · Upper']
+    expect(pickEmphasizedWorkoutIndex(titles, segunda)).toBe(1)
+  })
+
+  it('sem treino de hoje → primeiro card (âncora)', () => {
+    const titles = ['TER · Upper', 'QUA · Pump']
+    expect(pickEmphasizedWorkoutIndex(titles, segunda)).toBe(0)
+  })
+
+  it('títulos sem dia → primeiro card', () => {
+    expect(pickEmphasizedWorkoutIndex(['Peito', 'Costas'], segunda)).toBe(0)
+  })
+
+  it('lista vazia → -1', () => {
+    expect(pickEmphasizedWorkoutIndex([], segunda)).toBe(-1)
   })
 })

@@ -38,3 +38,14 @@ export function isWorkoutToday(title: unknown, now: Date = new Date()): boolean 
   if (day === null) return false
   return day === now.getDay()
 }
+
+/**
+ * Índice do treino que deve receber o CTA em destaque (sólido) numa lista: o de
+ * hoje; se nenhum bate com hoje, o primeiro (âncora visual). -1 se a lista é
+ * vazia. Recebe os títulos na ordem exibida.
+ */
+export function pickEmphasizedWorkoutIndex(titles: unknown[], now: Date = new Date()): number {
+  if (!Array.isArray(titles) || titles.length === 0) return -1
+  const todayIdx = titles.findIndex((t) => isWorkoutToday(t, now))
+  return todayIdx >= 0 ? todayIdx : 0
+}
