@@ -11,6 +11,7 @@ import { safeGemini, handleGeminiError } from '@/utils/ai/handleGeminiError'
 import { getGeminiModel } from '@/utils/ai/gemini'
 import { buildUserContextBlock } from '@/utils/ai/userContext'
 import { respondDbError } from '@/utils/api/dbError'
+import { setVolume, isWorkingSet } from '@/utils/report/setVolume'
 
 export const dynamic = 'force-dynamic'
 
@@ -107,35 +108,27 @@ const computeMetrics = (session: Record<string, unknown>) => {
       exNameByIdx.set(idx, name)
     })
 
-    const parseNum = (v: unknown) => {
-      const raw = String(v ?? '').replace(',', '.')
-      const n = Number(raw)
-      return Number.isFinite(n) ? n : 0
-    }
-
     let totalVolume = 0
     let setsDone = 0
     const volumeByExIdx = new Map<number, number>()
     const exercisesWithLogs = new Set<number>()
 
+    // Fonte ÚNICA (mesma do volume exibido no relatório): setVolume trata
+    // unilateral (L_/R_), cluster e dropset; isWorkingSet filtra aquecimento/feeler
+    // e exige série feita. Antes somava só weight×reps do topo → volume subestimado
+    // (ex.: 17.650 vs 30.195 reais) e o Coach IA reportava número divergente.
     Object.entries(logs).forEach(([k, log]) => {
       if (!log || typeof log !== 'object') return
       const parts = String(k || '').split('-')
       const exIdx = Number(parts[0])
       if (!Number.isFinite(exIdx)) return
-      const w = parseNum((log as Record<string, unknown>)?.weight)
-      const r = parseNum((log as Record<string, unknown>)?.reps)
-      const hasNumbers = w > 0 && r > 0
-      const done = Boolean((log as Record<string, unknown>)?.done) || hasNumbers
-      if (!done) return
+      if (!isWorkingSet(log)) return
       exercisesWithLogs.add(exIdx)
       setsDone += 1
-      if (hasNumbers) {
-        const vol = w * r
-        if (Number.isFinite(vol) && vol > 0) {
-          totalVolume += vol
-          volumeByExIdx.set(exIdx, (volumeByExIdx.get(exIdx) || 0) + vol)
-        }
+      const vol = setVolume(log)
+      if (Number.isFinite(vol) && vol > 0) {
+        totalVolume += vol
+        volumeByExIdx.set(exIdx, (volumeByExIdx.get(exIdx) || 0) + vol)
       }
     })
 
@@ -316,11 +309,15 @@ export async function POST(req: Request) {
     const painContext = extractPainContext(sessionObj)
     const hasPainData = painContext.trim().length > 0
 
-    const userCtx = await buildUserContextBlock(supabase, userId, ['profile', 'nutrition', 'labs'])
+    // Privacidade: NÃO injeta 'labs' (exames: LDL/HDL/testosterona…). Este relatório
+    // é compartilhável (Storie/Card/PDF) — não deve ingerir nem ecoar o painel médico
+    // do usuário. Coaching baseado em exames fica nas superfícies de saúde dedicadas.
+    const userCtx = await buildUserContextBlock(supabase, userId, ['profile', 'nutrition'])
 
     const prompt = [
       `${userCtx ? userCtx + '\n\n' : ''}Você é um coach de musculação e um analista de performance do app IronTracks.`,
-      'Personalize pelo CONTEXTO DO USUÁRIO acima (objetivo, avaliação, exames, treino, nutrição).',
+      'Personalize pelo CONTEXTO DO USUÁRIO acima (objetivo, avaliação, treino, nutrição).',
+      'NÃO cite exames de sangue nem marcadores clínicos (colesterol, testosterona, etc.), mesmo que apareçam em algum lugar — este relatório pode ser compartilhado.',
       'Gere insights pós-treino com base na sessão atual (e na sessão anterior, se houver).',
       '',
       'Retorne APENAS um JSON válido (sem markdown, sem texto extra) com esta estrutura:',
