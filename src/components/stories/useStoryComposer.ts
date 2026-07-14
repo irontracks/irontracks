@@ -122,6 +122,11 @@ export function useStoryComposer({
     const [draggingKey, setDraggingKey] = useState<string | null>(null)
     // Zoom + reposição do card no layout 'workout' (pinça 2 dedos + arrasto 1 dedo).
     const [workoutTransform, setWorkoutTransform] = useState({ scale: 1, offsetX: 0, offsetY: 0 })
+    // Espelho em ref: o render de EXPORT (renderComposite) lê daqui, para não ficar
+    // preso no closure velho dos useCallback de export (bug: salvava sempre no
+    // tamanho padrão, ignorando o zoom que o usuário deixou).
+    const workoutTransformRef = useRef(workoutTransform)
+    useEffect(() => { workoutTransformRef.current = workoutTransform }, [workoutTransform])
     const workoutGestureRef = useRef<{
         mode: 'none' | 'pan' | 'pinch'
         startX: number; startY: number
@@ -589,14 +594,23 @@ export function useStoryComposer({
     // Canvas helpers
     // Desenha o overlay no ctx: renderer injetado (ex.: nutrição) ou o drawStory
     // de treino (default). Centraliza o branch dos 3 call-sites de render.
+    //
+    // ⚠️ Lê o transform pelo REF, não pelo state. Os callbacks de export
+    // (shareImage / postStory) são useCallback com deps enxutas (+ eslint-disable),
+    // então CONGELAVAM o closure e exportavam sempre com o transform INICIAL
+    // (scale 1, offset 0): o usuário dava zoom, e o Story salvava no tamanho padrão.
+    // Pôr `workoutTransform` nas deps recriaria os callbacks a CADA frame da pinça
+    // (o transform muda em todo touchmove) — o ref resolve sem esse custo e é
+    // imune a stale closure.
     const renderComposite = (
         ctx: CanvasRenderingContext2D,
         opts: { backgroundImage: HTMLImageElement | null; transparentBg?: boolean; skipClear?: boolean },
     ) => {
+        const wt = workoutTransformRef.current
         if (draw) {
-            draw({ ctx, canvasW: CANVAS_W, canvasH: CANVAS_H, backgroundImage: opts.backgroundImage, transparentBg: opts.transparentBg, skipClear: opts.skipClear, template, workoutTransform })
+            draw({ ctx, canvasW: CANVAS_W, canvasH: CANVAS_H, backgroundImage: opts.backgroundImage, transparentBg: opts.transparentBg, skipClear: opts.skipClear, template, workoutTransform: wt })
         } else {
-            drawStory({ ctx, canvasW: CANVAS_W, canvasH: CANVAS_H, backgroundImage: opts.backgroundImage, metrics, layout, livePositions, transparentBg: opts.transparentBg, skipClear: opts.skipClear, template, workoutTransform })
+            drawStory({ ctx, canvasW: CANVAS_W, canvasH: CANVAS_H, backgroundImage: opts.backgroundImage, metrics, layout, livePositions, transparentBg: opts.transparentBg, skipClear: opts.skipClear, template, workoutTransform: wt })
         }
     }
 
