@@ -20,6 +20,7 @@ import {
     calculateExerciseDuration,
 } from '@/utils/pacing'
 import { mapWorkoutRow } from '@/utils/mapWorkoutRow'
+import { parseCheckinWeightKg, shouldSyncProfileWeight } from '@/utils/checkin/bodyWeightSync'
 
 const isRecord = (v: unknown): v is Record<string, unknown> =>
     v !== null && typeof v === 'object' && !Array.isArray(v)
@@ -41,6 +42,8 @@ interface UseWorkoutCrudOptions {
     alert: (msg: string, title?: string) => Promise<unknown>
     confirm: (msg: string, title?: string) => Promise<boolean>
     requestPreWorkoutCheckin: (workout: unknown) => Promise<unknown>
+    /** Persiste um subconjunto das settings (usado pra sincronizar o peso do check-in). */
+    patchSettings?: (patch: Record<string, unknown>) => Promise<void>
     resolveExerciseVideos: (exercises: unknown) => Promise<{ exercises: Array<Record<string, unknown>>; updates: Array<Record<string, unknown>> }>
     persistExerciseVideoUrls: (updates: unknown) => void
     normalizeWorkoutForEditor: (raw: unknown) => Record<string, unknown>
@@ -84,6 +87,7 @@ export function useWorkoutCrud({
     alert,
     confirm,
     requestPreWorkoutCheckin,
+    patchSettings,
     resolveExerciseVideos,
     persistExerciseVideoUrls,
     normalizeWorkoutForEditor,
@@ -175,6 +179,16 @@ export function useWorkoutCrud({
                         },
                     })
                     if (checkinError) throw checkinError
+
+                    // O peso do check-in é o peso de HOJE — vira o peso do perfil.
+                    // Antes ele morria dentro de `workout_checkins.answers`, e como o
+                    // cálculo de kcal prioriza o perfil sobre o check-in (sessionKcal:
+                    // "profile (opts) first"), o valor recém-digitado era IGNORADO na
+                    // estimativa de calorias. Sincronizar conserta os dois.
+                    const checkinWeight = parseCheckinWeightKg(pre.weight)
+                    if (shouldSyncProfileWeight(checkinWeight, (userSettings as Record<string, unknown> | null)?.bodyWeightKg)) {
+                        await patchSettings?.({ bodyWeightKg: checkinWeight })
+                    }
                 }
             }
         } catch (e) {
@@ -245,6 +259,7 @@ export function useWorkoutCrud({
         activeSession?.workout,
         alert,
         confirm,
+        patchSettings,
         persistExerciseVideoUrls,
         requestPreWorkoutCheckin,
         resolveExerciseVideos,
