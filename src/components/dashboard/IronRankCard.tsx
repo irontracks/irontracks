@@ -390,9 +390,10 @@ const IronRankCard = memo(function IronRankCard({
                                                             <TrendingUp size={11} className={improved ? 'text-green-400 shrink-0' : 'text-neutral-700 shrink-0'} />
                                                             <span className="text-xs font-bold text-neutral-200 truncate flex-1">{pr.exercise}</span>
                                                             <div className="flex items-center gap-2 shrink-0">
-                                                                <MetricBadge label="PESO" value={`${fmt(pr.weight)}kg`} highlight={!!pr.improved?.weight} />
-                                                                <MetricBadge label="REPS" value={fmt(pr.reps, 0)} highlight={!!pr.improved?.reps} />
-                                                                <MetricBadge label="VOL" value={`${fmt(Math.round(pr.volume), 0)}kg`} highlight={!!pr.improved?.volume} />
+                                                                {/* Cardio/bodyweight (peso e vol = 0) não mostra "0kg" — só a métrica real */}
+                                                                {(Number(pr.weight) > 0 || pr.improved?.weight) && <MetricBadge label="PESO" value={`${fmt(pr.weight)}kg`} highlight={!!pr.improved?.weight} />}
+                                                                {(Number(pr.reps) > 0 || pr.improved?.reps) && <MetricBadge label="REPS" value={fmt(pr.reps, 0)} highlight={!!pr.improved?.reps} />}
+                                                                {(Number(pr.volume) > 0 || pr.improved?.volume) && <MetricBadge label="VOL" value={`${fmt(Math.round(pr.volume), 0)}kg`} highlight={!!pr.improved?.volume} />}
                                                             </div>
                                                         </motion.div>
                                                     )
