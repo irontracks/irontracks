@@ -138,7 +138,7 @@ export default function WeeklyMuscleSummary({ onBack }: { onBack: () => void }) 
                       <div className="flex items-baseline justify-between gap-2 mb-1.5">
                         <span className="text-sm font-bold text-white truncate">{m.label}</span>
                         <span className="text-xs font-mono tabular-nums shrink-0 text-neutral-300">
-                          {m.sets.toFixed(1).replace(/\.0$/, '')}{m.meta > 0 && <span className="text-neutral-500"> / {m.meta} sets</span>}
+                          {m.sets.toFixed(1).replace(/\.0$/, '')}{m.meta > 0 && <span className="text-neutral-500"> / {m.meta} séries</span>}
                         </span>
                       </div>
                       <div className="h-2 rounded-full overflow-hidden bg-neutral-800">

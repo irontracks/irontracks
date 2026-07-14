@@ -246,6 +246,8 @@ export async function computeWorkoutStreakAndStats(): Promise<ActionResult<Recor
         if (totalVolumeKg >= 100000) badges.push({ id: 'vol_100k', label: '100.000kg levantados', kind: 'volume' })
         if (totalVolumeKg >= 500000) badges.push({ id: 'vol_500k', label: '500.000kg levantados', kind: 'volume' })
         if (totalVolumeKg >= 1000000) badges.push({ id: 'vol_1m', label: '1.000.000kg levantados', kind: 'volume' })
+        if (totalVolumeKg >= 2000000) badges.push({ id: 'vol_2m', label: '2.000.000kg levantados', kind: 'volume' })
+        if (totalVolumeKg >= 5000000) badges.push({ id: 'vol_5m', label: '5.000.000kg levantados', kind: 'volume' })
 
         // Count unique session days in the current week (Mon–Sun)
         const todayMs = Date.now()
