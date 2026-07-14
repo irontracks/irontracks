@@ -578,6 +578,13 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
     const userSettingsForCrud = userSettingsApi?.settings && typeof userSettingsApi.settings === 'object'
         ? (userSettingsApi.settings as Record<string, unknown>)
         : null
+    // Grava um subconjunto das settings de imediato (o peso informado no check-in
+    // vira o peso do perfil — ver utils/checkin/bodyWeightSync).
+    const settingsSaveFn = userSettingsApi?.save
+    const patchUserSettings = useCallback(async (patch: Record<string, unknown>) => {
+        if (!settingsSaveFn || !userSettingsForCrud) return
+        await settingsSaveFn({ ...userSettingsForCrud, ...patch } as never).catch(() => { })
+    }, [settingsSaveFn, userSettingsForCrud])
     const {
         handleStartSession,
         handleFinishSession,
@@ -608,6 +615,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         alert,
         confirm,
         requestPreWorkoutCheckin,
+        patchSettings: patchUserSettings,
         resolveExerciseVideos,
         persistExerciseVideoUrls,
         normalizeWorkoutForEditor,
