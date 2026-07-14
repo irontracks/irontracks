@@ -27,9 +27,6 @@ import {
     pinchToWorkoutTransform,
     panToWorkoutOffset,
     isIOSUserAgent,
-    parseExt,
-    extFromMime,
-    guessMediaKind,
     formatDatePt,
     calculateTotalVolume,
     fitCover,
@@ -37,6 +34,7 @@ import {
     computeLiveSizes,
     drawStory,
 } from '../storyComposerUtils'
+import { parseExt, extFromMime, guessMediaKind } from '@/utils/mediaUtils'
 import {
     type StoryTemplate,
     STORY_TEMPLATES,

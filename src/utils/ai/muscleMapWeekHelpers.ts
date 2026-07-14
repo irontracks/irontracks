@@ -5,29 +5,16 @@
  * to reduce its complexity and improve testability.
  */
 
-import { z } from 'zod'
-import { parseJsonWithSchema } from '@/utils/zod'
 import { normalizeExerciseName } from '@/utils/normalizeExerciseName'
 import { resolveCanonicalExerciseName } from '@/utils/exerciseCanonical'
 import { MUSCLE_GROUPS } from '@/utils/muscleMapConfig'
+// Fonte única (re-exportada pra não quebrar quem importa daqui).
+export { extractJsonFromModelText } from '@/utils/ai/extractJson'
 
 // ────────────────────────────────────────────────────────────────────────────
 // Primitives
 // ────────────────────────────────────────────────────────────────────────────
 export const toStr = (v: unknown): string => String(v || '').trim()
-
-const safeJsonParse = (raw: unknown) => parseJsonWithSchema(raw, z.unknown())
-
-export const extractJsonFromModelText = (text: string) => {
-  const cleaned = String(text || '').trim()
-  if (!cleaned) return null
-  const direct = safeJsonParse(cleaned)
-  if (direct) return direct
-  const start = cleaned.indexOf('{')
-  const end = cleaned.lastIndexOf('}')
-  if (start === -1 || end === -1 || end <= start) return null
-  return safeJsonParse(cleaned.slice(start, end + 1))
-}
 
 // ────────────────────────────────────────────────────────────────────────────
 // Muscle ID normalization

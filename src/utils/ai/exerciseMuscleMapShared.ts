@@ -6,25 +6,12 @@
  * duplicado byte-a-byte (parse do JSON do modelo + normalização dos itens +
  * schema do prompt).
  */
-import { z } from 'zod'
-import { parseJsonWithSchema } from '@/utils/zod'
 import { isRecord } from '@/utils/guards'
 import { resolveCanonicalExerciseName } from '@/utils/exerciseCanonical'
 import { normalizeExerciseName } from '@/utils/normalizeExerciseName'
 import { MUSCLE_GROUPS } from '@/utils/muscleMapConfig'
-
-export const safeJsonParse = (raw: string) => parseJsonWithSchema(raw, z.unknown())
-
-export const extractJsonFromModelText = (text: string) => {
-  const cleaned = String(text || '').trim()
-  if (!cleaned) return null
-  const direct = safeJsonParse(cleaned)
-  if (direct) return direct
-  const start = cleaned.indexOf('{')
-  const end = cleaned.lastIndexOf('}')
-  if (start === -1 || end === -1 || end <= start) return null
-  return safeJsonParse(cleaned.slice(start, end + 1))
-}
+// Fonte única (re-exportada pra não quebrar quem importa daqui).
+export { safeJsonParse, extractJsonFromModelText } from '@/utils/ai/extractJson'
 
 const toStr = (v: unknown) => String(v || '').trim()
 
