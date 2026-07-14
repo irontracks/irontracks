@@ -5,6 +5,7 @@ import { ArrowLeft, Save } from 'lucide-react'
 import { Reorder } from 'framer-motion'
 import { SortableWorkoutItem } from './SortableWorkoutItem'
 import { useFocusTrap } from '@/hooks/useFocusTrap'
+import { reassignWorkoutDaysByOrder } from '@/utils/workout/reassignDaysByOrder'
 
 export type EditWorkoutListItem = {
   id: string
@@ -32,6 +33,13 @@ export function EditWorkoutListModal({
     if (!savingListEdits) onClose()
   }, [savingListEdits, onClose])
   const focusTrapRef = useFocusTrap(true, handleEscape)
+
+  // Arrastar reescreve o dia no título seguindo a nova ordem (a ordem manda). O
+  // ajuste é aplicado no RASCUNHO, não no save — o usuário vê o dia mudar na hora
+  // e ainda pode cancelar. Editar o título à mão continua livre.
+  const handleReorder = useCallback((next: EditWorkoutListItem[]) => {
+    setEditListDraft(reassignWorkoutDaysByOrder(next))
+  }, [setEditListDraft])
 
   return (
     <div
@@ -69,6 +77,7 @@ export function EditWorkoutListModal({
             <div className="text-xs font-black uppercase tracking-widest text-yellow-500">Treinos</div>
             <div id="edit-list-title" className="text-white font-black text-lg truncate">Organizar</div>
             <div className="text-xs text-neutral-400">Arraste para reordenar e edite os títulos.</div>
+            <div className="text-[11px] text-yellow-500/80 mt-0.5">Os dias (SEG, TER…) acompanham a ordem.</div>
           </div>
           <button
             type="button"
@@ -87,7 +96,7 @@ export function EditWorkoutListModal({
           {editListDraft.length === 0 ? (
             <div className="text-sm text-neutral-400">Nenhum treino para organizar.</div>
           ) : (
-            <Reorder.Group axis="y" values={editListDraft} onReorder={setEditListDraft} className="space-y-2">
+            <Reorder.Group axis="y" values={editListDraft} onReorder={handleReorder} className="space-y-2">
               {editListDraft.map((it, idx) => (
                 <SortableWorkoutItem
                   key={it.id}
