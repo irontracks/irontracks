@@ -10,6 +10,7 @@ import {
 } from '@/utils/report/formatters'
 import { setTopWeightReps, setVolume, isWorkingSet } from '@/utils/report/setVolume'
 import { resolveReportSetsCount } from '@/utils/report/resolveSetsCount'
+import { formatSetStages } from '@/utils/report/formatStages'
 import { estimateSessionKcalBreakdown } from '@/utils/calories/sessionKcal'
 import { clampSessionKcal } from '@/utils/calories/cardioKcal'
 import { distributeKcalByExercise, distributeKcalWithFixed } from '@/utils/calories/distributeKcal'
@@ -239,10 +240,13 @@ export function buildReportData(
       const noteRaw = log.notes ?? log.note ?? log.observation ?? null
       const note = noteRaw != null ? String(noteRaw).trim() || null : null
       const tag = getSetTag(log)
+      // Drop-set/stripping: exibe as ETAPAS ("57 → 36"). O topo do log guarda só a
+      // última etapa (a mais leve) + a soma das reps, escondendo o drop inteiro.
+      const stages = formatSetStages(log)
       sets.push({
         index: sIdx + 1,
-        weight: log.weight ?? (cw > 0 ? cw : null),
-        reps: log.reps ?? (cr > 0 ? cr : null),
+        weight: stages ? stages.weights : (log.weight ?? (cw > 0 ? cw : null)),
+        reps: stages ? stages.reps : (log.reps ?? (cr > 0 ? cr : null)),
         cadence: exObj?.cadence ?? null,
         tag,
         note,
