@@ -140,34 +140,6 @@ export const pickFirstSupportedMime = (candidates: string[]): string => {
     }
 };
 
-export const parseExt = (rawName: string): string => {
-    const n = safeString(rawName).toLowerCase();
-    const i = n.lastIndexOf('.');
-    if (i < 0) return '';
-    const ext = n.slice(i);
-    return ['.jpeg', '.jpg', '.png', '.mp4', '.mov', '.webm'].includes(ext) ? ext : '';
-};
-
-export const extFromMime = (mime: string): string => {
-    const t = safeString(mime).toLowerCase();
-    if (t === 'image/png') return '.png';
-    if (t === 'image/jpeg') return '.jpg';
-    if (t === 'video/mp4') return '.mp4';
-    if (t === 'video/quicktime') return '.mov';
-    if (t === 'video/webm') return '.webm';
-    return '';
-};
-
-export const guessMediaKind = (mime: string, ext: string): 'video' | 'image' | 'unknown' => {
-    const t = safeString(mime).toLowerCase();
-    if (t.startsWith('video/')) return 'video';
-    if (t.startsWith('image/')) return 'image';
-    const e = safeString(ext).toLowerCase();
-    if (['.mp4', '.mov', '.webm'].includes(e)) return 'video';
-    if (['.jpg', '.jpeg', '.png'].includes(e)) return 'image';
-    return 'unknown';
-};
-
 export const formatDatePt = (v: unknown): string => {
     try {
         if (!v) return '';
