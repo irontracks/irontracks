@@ -57,9 +57,11 @@ export function useCommunityData(notifyError?: (msg: string) => void) {
   const [feedHasMore, setFeedHasMore] = useState(true)
   const feedLoadedRef = useRef(false)
 
-  // ── Presence state ──
-  const [onlineFriends, setOnlineFriends] = useState<string[]>([])
-  const [onlineFriendProfiles, setOnlineFriendProfiles] = useState<ProfileRow[]>([])
+  // ── "Treinando agora" ──
+  // Fonte = sessão de treino REALMENTE aberta (`active_workout_sessions`), não
+  // presença de app aberto. Ver /api/social/training-now.
+  const [trainingNowIds, setTrainingNowIds] = useState<string[]>([])
+  const [trainingNowProfiles, setTrainingNowProfiles] = useState<ProfileRow[]>([])
 
   // ── Auth ──
   useEffect(() => {
@@ -242,29 +244,29 @@ export function useCommunityData(notifyError?: (msg: string) => void) {
     finally { setFeedLoading(false) }
   }, [userId, feedCursor])
 
-  // ── Load presence ──
+  // ── Load "treinando agora" ──
+  // A rota já devolve só quem o chamador segue E tem sessão de treino aberta e
+  // fresca — o recorte por follow/frescor é server-side, não dá pra fazer no
+  // cliente (a RLS de active_workout_sessions não entrega a linha do amigo).
   useEffect(() => {
     if (!userId) return
     let mounted = true
-    const loadPresence = async () => {
+    const loadTrainingNow = async () => {
       try {
-        const res = await fetch('/api/social/presence/list')
+        const res = await fetch('/api/social/training-now')
         const data = await res.json().catch(() => null)
         if (!mounted || !data?.ok) return
-        const onlineIds = Array.isArray(data.online_users) ? data.online_users.map((id: unknown) => String(id)) : []
-        const followingIds = Array.from(follows.entries())
-          .filter(([, f]) => f.status === 'accepted')
-          .map(([id]) => id)
-        const friendsOnline = onlineIds.filter((id: string) => followingIds.includes(id) && id !== userId)
-        setOnlineFriends(friendsOnline)
-        const profs = friendsOnline.map((id: string) => profiles.find((p) => p.id === id)).filter(Boolean) as ProfileRow[]
-        setOnlineFriendProfiles(profs)
+        const ids = (Array.isArray(data.training) ? data.training : [])
+          .map((r: unknown) => String((r as { user_id?: string })?.user_id || '').trim())
+          .filter((id: string) => id && id !== userId)
+        setTrainingNowIds(ids)
+        setTrainingNowProfiles(ids.map((id: string) => profiles.find((p) => p.id === id)).filter(Boolean) as ProfileRow[])
       } catch { }
     }
-    loadPresence()
-    const interval = setInterval(loadPresence, 30_000)
+    loadTrainingNow()
+    const interval = setInterval(loadTrainingNow, 30_000)
     return () => { mounted = false; clearInterval(interval) }
-  }, [userId, follows, profiles])
+  }, [userId, profiles])
 
   // ── Actions ──
   const respondFollowRequest = useCallback(async (followerId: string, decision: 'accept' | 'deny') => {
@@ -355,9 +357,9 @@ export function useCommunityData(notifyError?: (msg: string) => void) {
     feedHasMore,
     feedLoadedRef,
     loadFeed,
-    // Presence
-    onlineFriends,
-    onlineFriendProfiles,
+    // Treinando agora (sessão de treino aberta — não "app aberto")
+    trainingNowIds,
+    trainingNowProfiles,
     // Actions
     respondFollowRequest,
     cancelFollowRequest,
