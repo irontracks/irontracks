@@ -1,40 +1,14 @@
 
 import type { UnknownRecord } from '@/types/app'
 import { estimateCaloriesMet } from '@/utils/calories/metEstimate'
-import { setVolume } from '@/utils/report/setVolume'
-
-type WorkoutLogEntry = {
-  weight?: unknown
-  reps?: unknown
-}
-
-type LogsMap = Record<string, WorkoutLogEntry>
-
-export const calculateTotalVolume = (logs: unknown) => {
-  try {
-    const safeLogs = logs && typeof logs === 'object' ? (logs as LogsMap) : {}
-    let volume = 0
-    Object.values(safeLogs).forEach((log) => {
-      if (!log || typeof log !== 'object') return
-      // setVolume trata cluster + unilateral (L+R) + série normal.
-      volume += setVolume(log)
-    })
-    return volume
-  } catch {
-    return 0
-  }
-}
-
 
 // ── B: improved fallback — same MET model as the local estimate ───────────────
 export const computeFallbackKcal = ({
   session,
-  volume: _volume,
   weightKg,
   biologicalSex,
 }: {
   session: unknown
-  volume: number
   weightKg?: number | null
   biologicalSex?: string | null
 }) => {
@@ -102,10 +76,8 @@ export const getKcalEstimate = async ({
 }) => {
   try {
     const s = session && typeof session === 'object' ? (session as UnknownRecord) : {}
-    const logs = s.logs && typeof s.logs === 'object' ? (s.logs as LogsMap) : {}
-    const volume = calculateTotalVolume(logs)
     const preCheckinWeightKg = extractPreCheckinWeight(s)
-    const fallback = computeFallbackKcal({ session: s, volume, weightKg: preCheckinWeightKg, biologicalSex })
+    const fallback = computeFallbackKcal({ session: s, weightKg: preCheckinWeightKg, biologicalSex })
 
     const resp = await fetch('/api/calories/estimate', {
       method: 'POST',
@@ -126,9 +98,7 @@ export const getKcalEstimate = async ({
     return Math.round(kcal)
   } catch {
     const s = session && typeof session === 'object' ? (session as UnknownRecord) : {}
-    const logs = s.logs && typeof s.logs === 'object' ? (s.logs as LogsMap) : {}
-    const volume = calculateTotalVolume(logs)
     const preCheckinWeightKg = extractPreCheckinWeight(s)
-    return computeFallbackKcal({ session: s, volume, weightKg: preCheckinWeightKg, biologicalSex })
+    return computeFallbackKcal({ session: s, weightKg: preCheckinWeightKg, biologicalSex })
   }
 }
