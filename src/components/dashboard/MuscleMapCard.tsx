@@ -9,6 +9,7 @@ import { translateAiError } from '@/utils/ai/clientErrors'
 import { motion, AnimatePresence } from 'framer-motion'
 import { parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
+import { pluralize } from '@/utils/format/plural'
 
 type ApiMuscle = {
   label: string
@@ -336,7 +337,7 @@ const MuscleMapCard = memo(function MuscleMapCard(props: Props) {
             <div className="text-white font-black text-lg truncate">{weekLabel}</div>
             <div className="text-xs text-neutral-400 flex flex-wrap items-center gap-2">
               <span>
-                {state.data ? `${state.data.workoutsCount} treino(s) ${period === 'day' ? 'no dia' : 'na semana'}` : 'Análise por músculo'}
+                {state.data ? `${pluralize(state.data.workoutsCount, 'treino')} ${period === 'day' ? 'no dia' : 'na semana'}` : 'Análise por músculo'}
               </span>
               {autoSync.lastAt ? (
                 <>

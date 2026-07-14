@@ -4,6 +4,8 @@ import React, { useState, useRef, useCallback } from 'react'
 import { Share2, Pencil, Trash2, Loader2, Undo2 } from 'lucide-react'
 import type { DashboardWorkout } from '@/types/dashboard'
 import { isPeriodizedWorkoutFullyLoaded } from '@/hooks/usePeriodizedWorkouts'
+import { pluralize } from '@/utils/format/plural'
+import { estimateWorkoutMinutes, countTotalSets } from '@/utils/workout/estimateDuration'
 
 // ────────────────────────────────────────────────────────────────
 // Types
@@ -76,6 +78,15 @@ function WorkoutCardInner({
   const isActive = false // FUTURE: connect to active session state
   const showToday = isToday && !w?.archived_at
   const solidCta = emphasizeCta && !w?.archived_at
+
+  // Meta do card (#5): exercícios sempre; duração/séries quando os exercícios já
+  // estão hidratados (periodizados só-com-contagem não têm → ficam ocultos).
+  const exercisesArr = Array.isArray(w?.exercises) ? w.exercises : []
+  const exercisesCount = Number.isFinite(Number(w?.exercises_count))
+    ? Math.max(0, Math.floor(Number(w.exercises_count)))
+    : exercisesArr.length
+  const estMinutes = estimateWorkoutMinutes(exercisesArr)
+  const totalSets = countTotalSets(exercisesArr)
   const workoutKey = String(w?.id || idx)
   const isBusy = !!pendingAction
 
@@ -173,10 +184,12 @@ function WorkoutCardInner({
             <span className="w-1.5 h-1.5 rounded-full bg-black/70 animate-pulse" /> HOJE
           </span>
         )}
-        <h3 className="font-black text-white text-base uppercase mb-0.5 pr-28 leading-tight line-clamp-2">{String(w?.title || 'Treino')}</h3>
+        <h3 className="font-black text-white text-base uppercase mb-0.5 pr-40 leading-tight line-clamp-2">{String(w?.title || 'Treino')}</h3>
         {/* WCAG 1.4.3 AA — neutral-500 sobre dark falha contraste 4.5:1 */}
-        <p className="text-[11px] text-neutral-400 font-mono mb-3">
-          {(Number.isFinite(Number(w?.exercises_count)) ? Math.max(0, Math.floor(Number(w.exercises_count))) : Array.isArray(w?.exercises) ? w.exercises.length : 0)} exercícios
+        <p className="text-[11px] text-neutral-400 font-mono mb-3 flex flex-wrap items-center gap-x-1.5 pr-40">
+          <span>{pluralize(exercisesCount, 'exercício')}</span>
+          {estMinutes > 0 && (<><span className="text-neutral-600" aria-hidden>·</span><span>~{estMinutes} min</span></>)}
+          {totalSets > 0 && (<><span className="text-neutral-600" aria-hidden>·</span><span>{pluralize(totalSets, 'série', 'séries')}</span></>)}
         </p>
         {w?.archived_at ? (
           <div className="inline-flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-neutral-300 bg-neutral-900/60 border border-neutral-700 px-2 py-1 rounded-lg mb-2">
@@ -232,21 +245,21 @@ function WorkoutCardInner({
         <button
           onClick={async (e) => { e.stopPropagation(); await runAction('share', () => onShareWorkout(w)) }}
           disabled={isBusy}
-          className="p-2 hover:bg-black/50 rounded text-neutral-400 hover:text-white disabled:opacity-60"
+          className="w-11 h-11 flex items-center justify-center shrink-0 hover:bg-black/50 rounded text-neutral-400 hover:text-white disabled:opacity-60"
         >
           {isActionBusy('share') ? <Loader2 size={14} className="text-yellow-500 animate-spin" /> : <Share2 size={14} />}
         </button>
         <button
           onClick={async (e) => { e.stopPropagation(); await runAction('edit', () => onEditWorkout(w)) }}
           disabled={isBusy}
-          className="p-2 hover:bg-black/50 rounded text-neutral-400 hover:text-white disabled:opacity-60"
+          className="w-11 h-11 flex items-center justify-center shrink-0 hover:bg-black/50 rounded text-neutral-400 hover:text-white disabled:opacity-60"
         >
           {isActionBusy('edit') ? <Loader2 size={14} className="text-yellow-500 animate-spin" /> : <Pencil size={14} />}
         </button>
         <button
           onClick={async (e) => { e.stopPropagation(); await runAction('delete', () => onDeleteWorkout(w?.id, w?.title)) }}
           disabled={isBusy}
-          className="p-2 hover:bg-black/50 rounded text-neutral-400 hover:text-red-400 disabled:opacity-60"
+          className="w-11 h-11 flex items-center justify-center shrink-0 hover:bg-black/50 rounded text-neutral-400 hover:text-red-400 disabled:opacity-60"
         >
           {isActionBusy('delete') ? <Loader2 size={14} className="text-yellow-500 animate-spin" /> : <Trash2 size={14} />}
         </button>
