@@ -1,12 +1,8 @@
 
 import type { UnknownRecord } from '@/types/app'
-export const FEATURE_KEYS = {
-  offlineSyncV2: 'featureOfflineSyncV2',
-}
+export const FEATURE_KEYS: Record<string, string> = {}
 
-export const FEATURE_META = {
-  offlineSyncV2: { key: FEATURE_KEYS.offlineSyncV2, owner: 'core', review_at: '2026-03-31' },
-}
+export const FEATURE_META: Record<string, { key: string; owner: string; review_at: string }> = {}
 
 
 const isObject = (v: unknown): v is UnknownRecord => Boolean(v && typeof v === 'object' && !Array.isArray(v))

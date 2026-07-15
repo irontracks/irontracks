@@ -31,7 +31,6 @@ interface DashboardHeaderProps {
     hideVipOnIos: boolean
     vipAccess: VipAccess | null
     syncState: SyncState | null
-    userSettings: Record<string, unknown> | null
     isHeaderVisible: boolean
     coachPending: boolean
     onGoHome: () => void
@@ -46,7 +45,6 @@ interface DashboardHeaderProps {
     onOpenTour: () => void
     onOpenProfile: () => void
     onLogout: () => void
-    onOfflineSyncOpen: () => void
     onAcceptCoach: () => Promise<void>
     onAddStory?: () => void        // ← triggers story creator from header long-press
 }
@@ -69,30 +67,21 @@ function TeacherPlanSection() {
 
 export function DashboardHeader({
     isCoach, user, hasUnreadChat, hasUnreadNotification, hasActiveStory,
-    hideVipOnIos, vipAccess, syncState, userSettings,
+    hideVipOnIos, vipAccess, syncState,
     isHeaderVisible, coachPending,
     onGoHome, onOpenVip, onOpenAdmin, onOpenChatList,
     onOpenHistory, onOpenNotifications, onOpenSchedule, onOpenWallet,
-    onOpenSettings, onOpenTour, onOpenProfile, onLogout, onOfflineSyncOpen, onAcceptCoach,
+    onOpenSettings, onOpenTour, onOpenProfile, onLogout, onAcceptCoach,
     onAddStory,
 }: DashboardHeaderProps) {
     if (!isHeaderVisible) return null
 
     const pending = Number(syncState?.pending || 0)
-    const failed = Number(syncState?.failed || 0)
     const online = syncState?.online !== false
-    const offlineSyncV2Enabled = userSettings?.featuresKillSwitch !== true && userSettings?.featureOfflineSyncV2 === true
 
     const syncBadge = (() => {
         if (!online) {
             return <div className="hidden sm:inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-red-500/10 border border-red-500/30 text-red-300 text-xs font-black uppercase tracking-widest">Offline</div>;
-        }
-        if (offlineSyncV2Enabled && (pending > 0 || failed > 0)) {
-            return (
-                <button type="button" onClick={onOfflineSyncOpen} className="hidden sm:inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-yellow-500/10 border border-yellow-500/30 text-yellow-300 text-xs font-black uppercase tracking-widest hover:bg-yellow-500/15" title="Abrir central de pendências">
-                    {syncState?.syncing ? 'Sincronizando' : 'Pendentes'}: {pending}{failed > 0 ? ` • Falhas: ${failed}` : ''}
-                </button>
-            )
         }
         if (pending > 0) {
             return <div className="hidden sm:inline-flex items-center gap-2 px-3 py-2 rounded-xl bg-yellow-500/10 border border-yellow-500/30 text-yellow-300 text-xs font-black uppercase tracking-widest">{syncState?.syncing ? 'Sincronizando' : 'Pendentes'}: {pending}</div>;

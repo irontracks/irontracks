@@ -6,7 +6,6 @@
  * Exposes `syncState`, `pendingCount`, and manual `flush()`.
  *
  * @param userId   - Current user ID
- * @param settings - Feature flag settings to check if offline mode is enabled
  * @returns `{ syncState, pendingCount, flush, lastSyncAt }`
  */
 'use client';
@@ -14,7 +13,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
 import {
   flushOfflineQueue,
-  getOfflineQueueSummary,
   getPendingCount,
   isOnline,
   setOfflineUser,
@@ -23,8 +21,6 @@ import type { SyncState } from '@/types/app';
 
 interface UseOfflineSyncOptions {
   userId?: string | null;
-  /** Settings object to check feature flags */
-  settings?: Record<string, unknown> | null;
 }
 
 const DEFAULT_SYNC_STATE: SyncState = {
@@ -35,7 +31,7 @@ const DEFAULT_SYNC_STATE: SyncState = {
   due: 0,
 };
 
-export function useOfflineSync({ userId, settings }: UseOfflineSyncOptions = {}) {
+export function useOfflineSync({ userId }: UseOfflineSyncOptions = {}) {
   const [syncState, setSyncState] = useState<SyncState>(DEFAULT_SYNC_STATE);
 
   // Informa ao módulo de sync quem é o usuário atual do device — usado pra carimbar o
@@ -48,29 +44,12 @@ export function useOfflineSync({ userId, settings }: UseOfflineSyncOptions = {})
   const refreshSyncState = useCallback(async () => {
     try {
       const online = isOnline();
-      const offlineSyncV2Enabled =
-        settings?.featuresKillSwitch !== true && settings?.featureOfflineSyncV2 === true;
-
-      if (offlineSyncV2Enabled) {
-        const sum = await getOfflineQueueSummary({ userId: userId ?? undefined });
-        if (sum?.ok) {
-          setSyncState((prev) => ({
-            ...prev,
-            online: sum.online !== false,
-            pending: Number(sum.pending || 0),
-            failed: Number(sum.failed || 0),
-            due: Number(sum.due || 0),
-          }));
-          return;
-        }
-      }
-
       const pending = await getPendingCount();
       setSyncState((prev) => ({ ...prev, online, pending, failed: 0, due: 0 }));
     } catch {
       setSyncState((prev) => ({ ...prev, online: isOnline() }));
     }
-  }, [userId, settings]);
+  }, []);
 
   const flushingRef = useRef(false)
 
