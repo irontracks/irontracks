@@ -18,8 +18,8 @@ private struct TimerCountdownText: View {
     var body: some View {
         // Self-healing: se o endDate JÁ PASSOU, trata como finalizado mesmo que a flag
         // isFinished não tenha sido atualizada (o app suspenso pode não ter rodado o
-        // auto-finish). Combinado com staleDate = endDate no plugin, o iOS re-renderiza
-        // no fim do descanso e cai aqui sozinho — sem depender de update do app.
+        // auto-finish). O push do servidor no fim do descanso força o update; esta
+        // auto-cura é a rede de segurança caso o push não chegue.
         if isFinished || endDate <= Date() {
             // Count UP from when the timer ended (shows overtime: +0:01, +0:02, …)
             Text(timerInterval: endDate...Date.distantFuture, countsDown: false)
