@@ -6,15 +6,6 @@ const path = require('node:path')
 const repoRoot = path.join(__dirname, '..')
 const read = (rel: string) => fs.readFileSync(path.join(repoRoot, rel), 'utf8')
 
-// M1 — team/invite/notify só dispara push com convite pendente real
-const notify = read('src/app/api/team/invite/notify/route.ts')
-assert.ok(/from\('invites'\)/.test(notify), 'invite/notify deve consultar a tabela invites')
-assert.ok(/eq\('from_uid'/.test(notify) && /eq\('to_uid'/.test(notify) && /eq\('status',\s*'pending'\)/.test(notify), 'invite/notify deve validar convite pendente from_uid->to_uid')
-assert.ok(/invite_not_found/.test(notify) && /status:\s*404/.test(notify), 'invite/notify deve retornar 404 quando não há convite')
-const inviteIdx = notify.indexOf("from('invites')")
-const pushIdx = notify.indexOf('sendPushToAllPlatforms([targetUserId]')
-assert.ok(inviteIdx > -1 && pushIdx > -1 && inviteIdx < pushIdx, 'invite/notify deve validar o convite ANTES de disparar o push')
-
 // M3 — push/register rejeita token de outro usuário
 const register = read('src/app/api/push/register/route.ts')
 assert.ok(/token_owned_by_another_user/.test(register) && /status:\s*409/.test(register), 'push/register deve rejeitar (409) token de outro user')

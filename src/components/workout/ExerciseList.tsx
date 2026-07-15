@@ -4,12 +4,6 @@ import React from 'react';
 import { useWorkoutContext, useWorkoutLogs } from './WorkoutContext';
 import ExerciseCard from './ExerciseCard';
 import { buildExerciseGroups } from '@/lib/workoutGroups';
-import dynamic from 'next/dynamic';
-
-const TeamProgressPanel = dynamic(
-  () => import('@/components/TeamProgressPanel').then(m => ({ default: m.TeamProgressPanel })),
-  { ssr: false }
-);
 
 function setsCountOf(ex: unknown): number {
   if (!ex || typeof ex !== 'object') return 0;
@@ -158,9 +152,6 @@ export default function ExerciseList() {
 
   return (
     <div ref={containerRef} className="flex-1 w-full max-w-6xl mx-auto py-4 space-y-4" style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 160px)' }}>
-      {/* Team progress panel — inline accordion, scrolls with content (no floating overlay) */}
-      <TeamProgressPanel exercises={exerciseList} />
-
       <div className="px-4 md:px-6 space-y-4">
         {exerciseList.length === 0 ? (
           <div className="rounded-xl bg-neutral-800 border border-neutral-700 p-6 text-neutral-300">Sem exercícios neste treino.</div>

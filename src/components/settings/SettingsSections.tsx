@@ -388,9 +388,7 @@ interface SettingsSoundSectionProps extends SettingsSectionProps {
 export function SettingsSoundSection({ draft, setValue, canSeeExperimental }: SettingsSoundSectionProps) {
     const enableSounds = Boolean(draft?.enableSounds ?? true)
     const soundVolume = Math.max(0, Math.min(100, Number(draft?.soundVolume ?? 100) || 0))
-    const allowTeamInvites = Boolean(draft?.allowTeamInvites ?? true)
     const featuresKillSwitch = Boolean(draft?.featuresKillSwitch ?? false)
-    const featureTeamworkV2 = Boolean(draft?.featureTeamworkV2 ?? false)
     const featureOfflineSyncV2 = Boolean(draft?.featureOfflineSyncV2 ?? false)
     return (
         <SectionCard>
@@ -407,20 +405,12 @@ export function SettingsSoundSection({ draft, setValue, canSeeExperimental }: Se
                         <div className="font-mono text-xs font-bold text-neutral-200 w-10 text-right">{soundVolume}%</div>
                     </div>
                 </div>
-                <div className="flex items-center justify-between gap-3">
-                    <div><div className="text-sm font-bold text-white">Convites de Treino em Equipe</div><div className="text-xs text-neutral-400">Permite receber convites no modal &quot;BORA!&quot;.</div></div>
-                    <ToggleSwitch checked={allowTeamInvites} onChange={() => setValue('allowTeamInvites', !allowTeamInvites)} />
-                </div>
                 {canSeeExperimental && (
                     <div className="mt-4 rounded-xl border border-neutral-700 bg-neutral-900/40 p-4">
                         <div className="text-xs font-black uppercase tracking-widest text-neutral-400 mb-3">Experimentais</div>
                         <div className="flex items-center justify-between gap-3">
                             <div><div className="text-sm font-bold text-white">Kill Switch</div><div className="text-xs text-neutral-400">Desativa recursos em teste neste usuário.</div></div>
                             <ToggleSwitch checked={featuresKillSwitch} onChange={() => setValue('featuresKillSwitch', !featuresKillSwitch)} />
-                        </div>
-                        <div className="mt-3 flex items-center justify-between gap-3">
-                            <div><div className="text-sm font-bold text-white">Treino em Equipe V2</div><div className="text-xs text-neutral-400">Link/QR, presença e saída segura da sessão.</div></div>
-                            <ToggleSwitch checked={featureTeamworkV2} onChange={() => setValue('featureTeamworkV2', !featureTeamworkV2)} disabled={featuresKillSwitch} />
                         </div>
                         <div className="mt-3 flex items-center justify-between gap-3">
                             <div><div className="text-sm font-bold text-white">Offline Sync V2</div><div className="text-xs text-neutral-400">Fila com backoff, limites e central de pendências.</div></div>

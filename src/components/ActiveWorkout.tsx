@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Pause, Pencil, Gamepad2 } from 'lucide-react';
+import { Gamepad2 } from 'lucide-react';
 import { BackButton } from '@/components/ui/BackButton';
 import { useActiveWorkoutController } from './workout/useActiveWorkoutController';
 import { WorkoutProvider, WorkoutLogsProvider } from './workout/WorkoutContext';
@@ -17,12 +17,6 @@ import { ActiveWorkoutProps } from './workout/types';
 import { logError } from '@/lib/logger';
 import dynamic from 'next/dynamic';
 const CardioGPSPanel = dynamic(() => import('@/components/workout/CardioGPSPanel'), { ssr: false });
-import { useTeamWorkout } from '@/contexts/TeamWorkoutContext';
-
-const TeamChatDrawer = dynamic(
-  () => import('@/components/TeamChatDrawer').then(m => ({ default: m.TeamChatDrawer })),
-  { ssr: false }
-);
 
 export default function ActiveWorkout(props: ActiveWorkoutProps & { controlledByName?: string | null; onRevokeControl?: () => void | Promise<void> }) {
   const { value: controller, logs } = useActiveWorkoutController(props);
@@ -50,12 +44,6 @@ export default function ActiveWorkout(props: ActiveWorkoutProps & { controlledBy
   const exitTimerRef = React.useRef<ReturnType<typeof setTimeout> | null>(null);
   React.useEffect(() => () => { if (exitTimerRef.current) clearTimeout(exitTimerRef.current); }, []);
 
-  // Ao finalizar OU cancelar o treino, sai da sessão de dupla (se houver): o RPC
-  // encerra a sessão (host) ou remove o participante, e o parceiro recebe o
-  // broadcast de "leave". Sem isto a team_session ficava 'active' pra sempre e o
-  // parceiro achava que o outro ainda treinava. Mantido em ref pra ser chamado
-  // do enhancedController (declarado antes do teamCtx).
-  const endTeamSessionRef = React.useRef<() => void>(() => {});
   const triggerExit = React.useCallback((cb: () => void) => {
     if (exitTimerRef.current) return; // already exiting — prevent double-tap
     setIsExiting(true);
@@ -91,7 +79,7 @@ export default function ActiveWorkout(props: ActiveWorkoutProps & { controlledBy
     return {
       ...controller,
       onFinish: originalOnFinish
-        ? (s: unknown, saved: boolean) => triggerExit(() => { try { endTeamSessionRef.current?.(); } catch { } originalOnFinish(s, saved); })
+        ? (s: unknown, saved: boolean) => triggerExit(() => { originalOnFinish(s, saved); })
         : originalOnFinish,
       // cancelWorkout bypasses triggerExit entirely — the cancel flow must
       // NEVER be blocked by a stale exitTimerRef from a previous Finalizar
@@ -102,7 +90,6 @@ export default function ActiveWorkout(props: ActiveWorkoutProps & { controlledBy
             // Clear any pending exit animation so it doesn't interfere
             if (exitTimerRef.current) { clearTimeout(exitTimerRef.current); exitTimerRef.current = null; }
             setIsExiting(true);
-            try { endTeamSessionRef.current?.(); } catch { }
             setTimeout(() => {
               try { originalOnFinish(null, false); } catch (e) { logError('ActiveWorkout.cancelWorkout', e); }
             }, 100);
@@ -111,93 +98,6 @@ export default function ActiveWorkout(props: ActiveWorkoutProps & { controlledBy
       ...(props.onBack ? { _exitOnBack: () => triggerExit(props.onBack!) } : {}),
     };
   }, [controller, props.onBack, triggerExit]);
-
-  // Team context for chat, pause banner and workout edit sync
-  const teamCtx = useTeamWorkout() as unknown as {
-    teamSession: { id: string; participants?: unknown[] } | null
-    leaveSession: () => Promise<void>
-    sessionPaused: boolean
-    pauseSession: () => void
-    resumeSession: () => void
-    chatMessages: unknown[]
-    sendChatMessage: (text: string) => void
-    pendingWorkoutEdit: { id: string; fromName: string; workout: Record<string, unknown> } | null
-    dismissWorkoutEdit: () => void
-  }
-
-  // Mantém o ref de encerramento apontando pro leaveSession atual (só age se
-  // houver sessão de dupla). Chamado no finish/cancel via enhancedController.
-  React.useEffect(() => {
-    endTeamSessionRef.current = () => {
-      try {
-        if (teamCtx.teamSession?.id && typeof teamCtx.leaveSession === 'function') void teamCtx.leaveSession();
-      } catch { /* silent */ }
-    };
-  }, [teamCtx]);
-
-  // Carimba os participantes da dupla em session.ui.teamMeta — o payload de
-  // finalização lê daqui pra gravar o treino como "em dupla" (senão vira "solo"
-  // no histórico e o relatório não mostra parceiros). Roda uma vez por mudança
-  // na contagem de participantes; preserva o restante do ui (preCheckin etc.).
-  const teamParticipants = teamCtx.teamSession?.participants
-  React.useEffect(() => {
-    const parts = Array.isArray(teamParticipants) ? teamParticipants : []
-    if (!teamCtx.teamSession?.id || parts.length === 0) return
-    if (typeof props.onUpdateSession !== 'function') return
-    const currentUi = (session as { ui?: Record<string, unknown> } | null)?.ui
-    const uiObj = currentUi && typeof currentUi === 'object' ? currentUi : {}
-    const existing = uiObj.teamMeta as { participants?: unknown[] } | undefined
-    const existingCount = existing && Array.isArray(existing.participants) ? existing.participants.length : -1
-    if (existingCount === parts.length) return
-    props.onUpdateSession({ ui: { ...uiObj, teamMeta: { participants: parts } } })
-  }, [teamParticipants, teamCtx.teamSession?.id, session, props])
-
-  // Accept incoming workout edit from a teammate.
-  // Instead of replacing the entire workout (which erases B's exercises),
-  // we do a smart merge: keep all of B's current exercises and append
-  // any NEW exercises from A that don't already exist in B's list.
-  const handleAcceptWorkoutEdit = React.useCallback(() => {
-    const edit = teamCtx.pendingWorkoutEdit
-    if (!edit?.workout || !props.onUpdateSession) return
-    try {
-      const incomingExercises: Array<Record<string, unknown>> = Array.isArray(
-        (edit.workout as Record<string, unknown>).exercises
-      )
-        ? (edit.workout as Record<string, unknown>).exercises as Array<Record<string, unknown>>
-        : []
-
-      // Current exercises of this user (B)
-      const currentWorkout = props.session?.workout as Record<string, unknown> | null | undefined
-      const currentExercises: Array<Record<string, unknown>> = Array.isArray(
-        (currentWorkout as Record<string, unknown> | null)?.exercises
-      )
-        ? (currentWorkout as Record<string, unknown>).exercises as Array<Record<string, unknown>>
-        : []
-
-      const normalise = (s: unknown) => String(s ?? '').toLowerCase().trim()
-      const existingNames = new Set(currentExercises.map(ex => normalise(ex.name)))
-
-      // Only add exercises that B doesn't already have
-      const newExercises = incomingExercises.filter(
-        ex => !existingNames.has(normalise(ex.name))
-      )
-
-      if (newExercises.length === 0) {
-        // No new exercises — nothing to merge; just dismiss
-        teamCtx.dismissWorkoutEdit()
-        return
-      }
-
-      // Merge: B's exercises first, then new ones from A
-      const mergedWorkout = {
-        ...(currentWorkout ?? {}),
-        exercises: [...currentExercises, ...newExercises],
-      }
-
-      props.onUpdateSession({ workout: mergedWorkout })
-    } catch { }
-    teamCtx.dismissWorkoutEdit()
-  }, [teamCtx, props])
 
 
   if (!session || !workout) {
@@ -212,11 +112,6 @@ export default function ActiveWorkout(props: ActiveWorkoutProps & { controlledBy
       </div>
     );
   }
-
-  const panelExercises = Array.isArray(exercises) ? exercises as Array<{ name?: string }> : [];
-  void panelExercises;
-  const inTeamSession = !!teamCtx.teamSession?.id;
-  const pendingEdit = teamCtx.pendingWorkoutEdit;
 
   return (
     <WorkoutProvider value={enhancedController}>
@@ -257,45 +152,6 @@ export default function ActiveWorkout(props: ActiveWorkoutProps & { controlledBy
             </div>
           )}
 
-          {/* Pause banner — shown when a partner paused the session */}
-          {inTeamSession && teamCtx.sessionPaused && (
-            <div className="bg-yellow-500/15 border-b border-yellow-500/30 px-4 py-2 flex items-center justify-between text-sm">
-              <span className="text-yellow-300 font-bold flex items-center gap-1.5"><Pause size={13} className="shrink-0" /> Parceiro pausou o treino</span>
-              <button
-                onClick={() => teamCtx.resumeSession()}
-                className="text-[11px] font-black bg-yellow-500 text-black px-3 py-1 rounded-lg hover:bg-yellow-400 transition-colors"
-              >
-                Retomar
-              </button>
-            </div>
-          )}
-
-          {/* Workout edit sync banner — shown when a teammate edited the workout (hidden while paused) */}
-          {inTeamSession && pendingEdit && !teamCtx.sessionPaused && (
-            <div className="bg-amber-500/15 border-b border-amber-500/30 px-4 py-2.5 flex items-center justify-between gap-2 text-sm">
-              <div className="flex items-center gap-2 min-w-0">
-                <Pencil size={14} className="text-amber-300 shrink-0" />
-                <span className="text-amber-200 font-semibold truncate">
-                  <strong className="text-amber-100">{pendingEdit.fromName}</strong> editou o treino
-                </span>
-              </div>
-              <div className="flex items-center gap-1.5 flex-shrink-0">
-                <button
-                  onClick={handleAcceptWorkoutEdit}
-                  className="text-[11px] font-black bg-amber-500 text-white px-3 py-1.5 rounded-lg hover:bg-amber-400 transition-colors"
-                >
-                  Aceitar
-                </button>
-                <button
-                  onClick={() => teamCtx.dismissWorkoutEdit()}
-                  className="text-[11px] font-black bg-neutral-700 text-neutral-300 px-3 py-1.5 rounded-lg hover:bg-neutral-600 transition-colors"
-                >
-                  Ignorar
-                </button>
-              </div>
-            </div>
-          )}
-
           {/* GPS Cardio Tracking Panel */}
           <CardioGPSPanel
             workoutId={props.session?.workout?.id}
@@ -306,14 +162,6 @@ export default function ActiveWorkout(props: ActiveWorkoutProps & { controlledBy
 
         <WorkoutFooter />
         <Modals />
-
-        {inTeamSession && (
-          <TeamChatDrawer
-            myUserId={String(props.settings?.userId ?? props.session?.userId ?? '')}
-            myDisplayName={String(props.settings?.displayName ?? '')}
-            myPhotoURL={null}
-          />
-        )}
       </motion.div>
      </WorkoutTimerProvider>
      </WorkoutLogsProvider>

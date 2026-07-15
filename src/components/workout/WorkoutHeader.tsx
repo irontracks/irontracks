@@ -1,9 +1,8 @@
 'use client';
 
 import React from 'react';
-import { Clock, GripVertical, MoreHorizontal, Plus, UserPlus } from 'lucide-react';
+import { Clock, GripVertical, MoreHorizontal, Plus } from 'lucide-react';
 import { BackButton } from '@/components/ui/BackButton';
-import InviteManager from '@/components/InviteManager';
 import { useWorkoutContext } from './WorkoutContext';
 import { useWorkoutTimer } from './WorkoutTimerContext';
 import HeartRateMonitor from './HeartRateMonitor';
@@ -12,12 +11,8 @@ export default function WorkoutHeader() {
   const {
     workout,
     exercises,
-    inviteOpen,
-    setInviteOpen,
     openFullEditor,
     openOrganizeModal,
-    sendInvite,
-    alert,
     completedSets,
     totalSets,
     progressPct,
@@ -98,15 +93,6 @@ export default function WorkoutHeader() {
                       <GripVertical size={15} />
                       Organizar
                     </button>
-                    <div className="h-px bg-neutral-800" />
-                    <button
-                      type="button"
-                      onClick={() => { setInviteOpen(true); setOverflowOpen(false); }}
-                      className="w-full flex items-center gap-3 px-4 py-3 text-sm font-black text-left text-yellow-400 hover:bg-neutral-800 transition-colors"
-                    >
-                      <UserPlus size={15} />
-                      Convidar
-                    </button>
                   </div>
                 )}
               </div>
@@ -184,22 +170,6 @@ export default function WorkoutHeader() {
           )}
         </div>
       )}
-
-      <InviteManager
-        isOpen={inviteOpen}
-        onClose={() => setInviteOpen(false)}
-        onInvite={async (targetUser: unknown) => {
-          try {
-            const payloadWorkout = workout && typeof workout === 'object'
-              ? { ...workout, exercises: Array.isArray(workout?.exercises) ? workout.exercises : [] }
-              : { title: 'Treino', exercises: [] };
-            await sendInvite(targetUser, payloadWorkout);
-          } catch (e: unknown) {
-            const msg = isRecord(e) && typeof e.message === 'string' ? e.message : String(e || '');
-            await alert('Falha ao enviar convite: ' + msg);
-          }
-        }}
-      />
     </>
   );
 }

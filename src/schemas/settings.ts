@@ -37,7 +37,6 @@ export const UserSettingsSchema = z
     whatsNewRemindId: z.string().default(''),
     whatsNewRemindUntil: z.number().default(0),
     enableSounds: z.boolean().default(true),
-    allowTeamInvites: z.boolean().default(true),
     allowSocialFollows: z.boolean().default(true),
     allowDirectMessages: z.boolean().default(true),
     // ── Notificações (push + in-app) ──────────────────────────────────────
@@ -99,7 +98,6 @@ export const UserSettingsSchema = z
     autoRestTimerWhenMissing: z.boolean().default(false),
     programTitleStartDay: z.enum(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']).default('monday'),
     featuresKillSwitch: z.boolean().default(false),
-    featureTeamworkV2: z.boolean().default(false),
     featureOfflineSyncV2: z.boolean().default(false),
     requireBiometricsOnStartup: z.boolean().default(false),
     // ── Integrations ──────────────────────────────────────────────────────────
