@@ -568,7 +568,6 @@ export function SettingsNotificationsSection({ draft, setValue, iosNotifStatus, 
     const notifyDailyGoal = Boolean(draft?.notifyDailyGoal ?? true)
     const notifyMissedMeal = Boolean(draft?.notifyMissedMeal ?? false)
     const notifyChallenges = Boolean(draft?.notifyChallenges ?? true)
-    const notifyTeamInvites = Boolean(draft?.notifyTeamInvites ?? true)
     const notifyMealReminders = Boolean(draft?.notifyMealReminders ?? true)
     const notifyWorkoutReminders = Boolean(draft?.notifyWorkoutReminders ?? true)
 
@@ -616,13 +615,6 @@ export function SettingsNotificationsSection({ draft, setValue, iosNotifStatus, 
                         checked={notifyDirectMessages}
                         disabled={!pushNotificationsEnabled}
                         onChange={() => setValue('notifyDirectMessages', !notifyDirectMessages)}
-                    />
-                    <NotifRow
-                        title="Convite de treino em grupo"
-                        description="Alguém te chamou para treinar junto."
-                        checked={notifyTeamInvites}
-                        disabled={!pushNotificationsEnabled}
-                        onChange={() => setValue('notifyTeamInvites', !notifyTeamInvites)}
                     />
                     <NotifRow
                         title="Agenda / professor"
