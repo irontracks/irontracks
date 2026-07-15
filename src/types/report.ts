@@ -26,7 +26,6 @@ export interface SessionData {
     cardioGps?: CardioGpsData | null
     preCheckin?: CheckinData | null
     postCheckin?: CheckinData | null
-    teamMeta?: TeamMeta | null
     student_id?: string
     studentId?: string
     [key: string]: unknown
@@ -161,19 +160,6 @@ export interface CheckinData {
 }
 
 // ─── Team ────────────────────────────────────────────────────────────────────
-
-export interface TeamMeta {
-    participants?: TeamParticipant[]
-    [key: string]: unknown
-}
-
-export interface TeamParticipant {
-    uid?: string
-    id?: string
-    name?: string
-    email?: string
-    [key: string]: unknown
-}
 
 // ─── Report build output ─────────────────────────────────────────────────────
 

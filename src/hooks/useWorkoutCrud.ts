@@ -56,7 +56,7 @@ interface UseWorkoutCrudOptions {
 }
 
 interface UseWorkoutCrudReturn {
-    handleStartSession: (workout: unknown, opts?: { skipConfirm?: boolean }) => Promise<void>
+    handleStartSession: (workout: unknown) => Promise<void>
     handleFinishSession: (sessionData: unknown, showReport?: boolean) => Promise<void>
     handleCreateWorkout: () => void
     handleEditWorkout: (workout: unknown) => Promise<void>
@@ -99,7 +99,7 @@ export function useWorkoutCrud({
     setEditActiveOpen,
 }: UseWorkoutCrudOptions): UseWorkoutCrudReturn {
 
-    const handleStartSession = useCallback(async (workout: unknown, opts?: { skipConfirm?: boolean }) => {
+    const handleStartSession = useCallback(async (workout: unknown) => {
         const workoutObj = workout && typeof workout === 'object'
             ? (workout as Record<string, unknown>)
             : ({} as Record<string, unknown>)
@@ -114,8 +114,8 @@ export function useWorkoutCrud({
             return
         }
 
-        // Já treinando? Confirma antes de descartar (ex.: aceitar convite no meio de
-        // outro treino sobrescrevia a sessão em andamento sem aviso). Sempre pergunta.
+        // Já treinando? Confirma antes de descartar — iniciar outro treino
+        // sobrescreveria a sessão em andamento sem aviso.
         if (activeSession?.workout) {
             const trocar = await confirm(
                 'Você já está treinando. Iniciar este treino vai descartar o treino atual em andamento. Continuar?',
@@ -133,10 +133,7 @@ export function useWorkoutCrud({
             )
         )
         const workoutTitle = String(workoutObj?.title || workoutObj?.name || 'Treino')
-        // Vindo de convite, o IncomingInviteModal já é a confirmação ("BORA!") —
-        // pular o 2º confirm evita deixar o convidado preso na sessão se ele recusar
-        // aqui depois de já ter aceitado.
-        if (!opts?.skipConfirm) {
+        {
             const ok = await confirm(
                 `Iniciar "${workoutTitle}"? Primeiro exercício: ~${exMin} min. Estimado total: ~${totalMin} min.`,
                 'Iniciar Treino'

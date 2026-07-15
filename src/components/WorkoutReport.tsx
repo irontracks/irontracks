@@ -6,13 +6,11 @@ import { Download, ArrowLeft, FileText, Code, Share2, Save } from 'lucide-react'
 import { buildReportHTML } from '@/utils/report/buildHtml';
 import { fetchLogoDataUrl } from '@/utils/report/fetchLogoDataUrl';
 import { fetchMuscleMapAssets } from '@/utils/report/fetchMuscleMapAssets';
-import { workoutPlanHtml } from '@/utils/report/templates';
 import { generatePostWorkoutInsights, applyProgressionToNextTemplate } from '@/actions/workout-actions';
 import { useVipCredits } from '@/hooks/useVipCredits';
 import { useBackHandler } from '@/hooks/useBackHandler';
 import { logError } from '@/lib/logger'
 import { getErrorMessage } from '@/utils/errorMessage'
-import { escapeHtml } from '@/utils/escapeHtml'
 import { translateAiError } from '@/utils/ai/clientErrors'
 import {
     formatDate as sharedFormatDate,
@@ -25,7 +23,6 @@ import { ReportExerciseCard } from '@/components/workout-report/ReportExerciseCa
 import { ReportHighlightsPanel } from '@/components/workout-report/ReportHighlightsPanel'
 import { ReportExerciseTable } from '@/components/workout-report/ReportExerciseTable'
 import { distributeKcalByExercise } from '@/utils/calories/distributeKcal'
-import { ReportTeamSection } from '@/components/workout-report/ReportTeamSection'
 import { ReportTimePanel } from '@/components/workout-report/ReportTimePanel'
 
 /** Skeleton placeholder for lazy-loaded report sections */
@@ -366,89 +363,6 @@ const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose,
         );
     };
 
-    const handlePartnerPlan = async (participant: unknown) => {
-        try {
-            const part = participant && typeof participant === 'object' ? (participant as AnyObj) : null
-            if (!part) return;
-            const exercises = Array.isArray(session?.exercises) ? (session.exercises as unknown[]) : [];
-            const workout = {
-                title: escapeHtml(session?.workoutTitle || 'Treino'),
-                exercises: exercises.map((ex: unknown) => {
-                    const e = ex && typeof ex === 'object' ? (ex as AnyObj) : ({} as AnyObj)
-                    return ({
-                        name: escapeHtml(e?.name),
-                        sets: Number(e?.sets) || 0,
-                        reps: escapeHtml(e?.reps),
-                        rpe: escapeHtml(e?.rpe),
-                        cadence: escapeHtml(e?.cadence),
-                        restTime: escapeHtml(e?.restTime),
-                        method: escapeHtml(e?.method),
-                        notes: escapeHtml(e?.notes)
-                    })
-                })
-            };
-            const partnerName = String(part?.name || part?.uid || 'Parceiro').trim() || 'Parceiro'
-            const partnerUser = {
-                displayName: escapeHtml(part?.name || part?.uid || ''),
-                email: escapeHtml(part?.email || '')
-            };
-            const html = workoutPlanHtml(workout, partnerUser);
-            const fileName = `Plano_${partnerName.replace(/\s+/g, '_')}_irontracks.html`
-            const title = `Plano de ${partnerName} • IronTracks`
-
-            // iOS WKWebView bloqueia window.open()/print() → o alerta de pop-up.
-            // Preferir o share sheet nativo (mesmo caminho do PDF principal). A
-            // chamada de share é a 1ª operação async, então o user-gesture é
-            // preservado. Sem await antes disso.
-            const canShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function'
-            if (canShare) {
-                try {
-                    const blob = new Blob([html], { type: 'text/html' })
-                    const file = new File([blob], fileName, { type: 'text/html' })
-                    const canShareFiles = typeof (navigator as { canShare?: (data: { files: File[] }) => boolean }).canShare === 'function'
-                        && (navigator as { canShare: (data: { files: File[] }) => boolean }).canShare({ files: [file] })
-                    if (canShareFiles) {
-                        await navigator.share({ files: [file], title })
-                    } else {
-                        const url = URL.createObjectURL(blob)
-                        await navigator.share({ title, url })
-                        URL.revokeObjectURL(url)
-                    }
-                    return
-                } catch (shareErr) {
-                    const msg = shareErr instanceof Error ? shareErr.message : ''
-                    if (msg.toLowerCase().includes('cancel') || msg.toLowerCase().includes('abort')) return
-                    // outro erro: cai pro fallback de desktop
-                }
-            }
-
-            // Desktop: nova aba + diálogo de impressão (Salvar como PDF)
-            const blob = new Blob([html], { type: 'text/html' });
-            const blobUrl = URL.createObjectURL(blob);
-            const win = window.open(blobUrl, '_blank');
-            if (win) {
-                setTimeout(() => {
-                    try { win.focus(); win.print(); } catch { }
-                    setTimeout(() => URL.revokeObjectURL(blobUrl), 60_000);
-                }, 400);
-            } else {
-                URL.revokeObjectURL(blobUrl);
-                // Último recurso: baixar o HTML do plano
-                const dlBlob = new Blob([html], { type: 'text/html' });
-                const dlUrl = URL.createObjectURL(dlBlob);
-                const a = document.createElement('a');
-                a.href = dlUrl;
-                a.download = fileName;
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
-                URL.revokeObjectURL(dlUrl);
-            }
-        } catch (e: unknown) {
-            alert('Não foi possível gerar o PDF do parceiro: ' + (getErrorMessage(e)));
-        }
-    };
-
     const closePreview = () => {
         try { if (pdfUrl) URL.revokeObjectURL(pdfUrl); } catch { }
         setPdfUrl(null);
@@ -524,17 +438,6 @@ const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose,
         }
     };
 
-    const teamMeta = safeSession?.teamMeta && typeof safeSession.teamMeta === 'object' ? (safeSession.teamMeta as AnyObj) : null;
-    const rawParticipants = teamMeta && Array.isArray(teamMeta.participants) ? (teamMeta.participants as unknown[]) : [];
-    const currentUserId = user?.id || user?.uid || null;
-    const partners = rawParticipants.filter((p: unknown) => {
-        const part = p && typeof p === 'object' ? (p as AnyObj) : ({} as AnyObj)
-        const uid = part && (part.uid || part.id || null);
-        if (!uid || !currentUserId) return true;
-        return uid !== currentUserId;
-    });
-
-    const isTeamSession = partners.length > 0;
     const exercisesList = Array.isArray(safeSession?.exercises) ? (safeSession.exercises as unknown[]) : [];
     const preCheckin = (() => {
         const local = session?.preCheckin && typeof session.preCheckin === 'object' ? (session.preCheckin as AnyObj) : null;
@@ -901,12 +804,6 @@ const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose,
                     onApplyProgression={handleApplyProgression}
 
                     renderAiRating={renderAiRating}
-                />
-
-                <ReportTeamSection
-                    isTeamSession={isTeamSession}
-                    partners={partners}
-                    onPartnerPlan={handlePartnerPlan}
                 />
 
                 <ReportSummaryCards

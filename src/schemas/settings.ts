@@ -79,7 +79,6 @@ export const UserSettingsSchema = z
     notifyDailyGoal: z.boolean().default(true),
     notifyMissedMeal: z.boolean().default(false),
     notifyChallenges: z.boolean().default(true),
-    notifyTeamInvites: z.boolean().default(true),
     notifyMealReminders: z.boolean().default(true),
     notifyWorkoutReminders: z.boolean().default(true),
     soundVolume: z.number().min(0).max(100).default(100),
