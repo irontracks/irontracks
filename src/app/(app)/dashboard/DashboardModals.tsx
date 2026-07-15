@@ -22,9 +22,6 @@ const WhatsNewModal = dynamic(() => import('@/components/WhatsNewModal'), { ssr:
 const MothersDayModal = dynamic(() => import('@/components/MothersDayModal'), { ssr: false })
 const OfflineSyncModal = dynamic(() => import('@/components/OfflineSyncModal'), { ssr: false })
 const WelcomeFloatingWindow = dynamic(() => import('@/components/WelcomeFloatingWindow'), { ssr: false })
-const PartnerExerciseOverlay = dynamic(() => import('@/components/workout/PartnerExerciseOverlay'), { ssr: false })
-
-import { useTeamWorkout } from '@/contexts/TeamWorkoutContext'
 
 // Helper
 const isRecord = (v: unknown): v is Record<string, unknown> =>
@@ -171,13 +168,6 @@ export default function DashboardModals(props: DashboardModalsProps) {
     }, [activeSession])
     // Use local ticker for display; fall back to prop for backward compat
     const effectiveTicker = localTicker || sessionTicker
-
-    // Partner exercise share — use hook directly since we're inside TeamWorkoutProvider
-    let teamWorkoutCtx: ReturnType<typeof useTeamWorkout> | null = null
-    try {
-        // eslint-disable-next-line react-hooks/rules-of-hooks
-        teamWorkoutCtx = useTeamWorkout()
-    } catch { /* not inside TeamWorkoutProvider */ }
 
     const settings = userSettingsApi && typeof userSettingsApi === 'object'
         ? (userSettingsApi as Record<string, unknown>).settings ?? null
@@ -540,20 +530,6 @@ export default function DashboardModals(props: DashboardModalsProps) {
                         return ms > 0 ? ms : 0
                     })()}
                 />
-            )}
-
-            {/* Partner Exercise Control Overlay — key por share.id reinicializa o
-                estado a cada novo exercício compartilhado; error boundary evita que
-                uma falha do overlay derrube o app inteiro. */}
-            {teamWorkoutCtx?.incomingExerciseShare && (
-                <SectionErrorBoundary section="Modo Spotter" onReset={() => teamWorkoutCtx.endExerciseShare()}>
-                    <PartnerExerciseOverlay
-                        key={String(teamWorkoutCtx.incomingExerciseShare.id ?? '')}
-                        share={teamWorkoutCtx.incomingExerciseShare}
-                        onSendUpdate={teamWorkoutCtx.sendExerciseControlUpdate}
-                        onEnd={teamWorkoutCtx.endExerciseShare}
-                    />
-                </SectionErrorBoundary>
             )}
 
             {/* Session Floating Bar */}

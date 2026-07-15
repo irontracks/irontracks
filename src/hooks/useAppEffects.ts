@@ -178,8 +178,6 @@ export function useAppEffects({
     schedule(2500, () => { void import('@/components/dashboard/WorkoutWizardModal') })
     schedule(3500, () => { void import('@/components/HistoryList') })
     schedule(4500, () => { void import('@/components/ActiveWorkout') })
-    schedule(5500, () => { void import('@/components/IncomingInviteModal') })
-    schedule(6500, () => { void import('@/components/InviteAcceptedModal') })
 
     return () => {
       timeoutHandles.forEach((t) => clearTimeout(t))

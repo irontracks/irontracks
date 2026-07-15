@@ -2,17 +2,15 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
 import {
-    Bell, Check, X, Users, MessageSquare, Trophy, Dumbbell,
+    Bell, X, MessageSquare, Trophy, Dumbbell,
     Trash2, Sparkles, Activity, Heart, Star,
     UserPlus, Calendar, Utensils, Swords, Flame, Target,
     Camera, Megaphone
 } from 'lucide-react';
-import { useTeamWorkout } from '@/contexts/TeamWorkoutContext';
 import { useDialog } from '@/contexts/DialogContext';
 import { createClient } from '@/utils/supabase/client';
 import { RealtimeChannel } from '@supabase/supabase-js';
 import { logError } from '@/lib/logger'
-import { getErrorMessage } from '@/utils/errorMessage'
 import type { AppNotification } from '@/types/social'
 
 type NotificationItem = AppNotification & { data?: Record<string, unknown> };
@@ -37,14 +35,6 @@ type TypeConfig = {
 };
 
 const TYPE_CONFIG: Record<string, TypeConfig> = {
-    invite: {
-        icon: <Users size={15} />, bg: 'from-amber-500/20 to-amber-600/10',
-        border: 'border-amber-500/30', dot: 'bg-amber-400', label: 'Convite',
-    },
-    team_invite: {
-        icon: <Users size={15} />, bg: 'from-amber-500/20 to-amber-600/10',
-        border: 'border-amber-500/30', dot: 'bg-amber-400', label: 'Convite',
-    },
     friend_pr: {
         icon: <Trophy size={15} />, bg: 'from-yellow-500/20 to-amber-600/10',
         border: 'border-yellow-500/30', dot: 'bg-yellow-400', label: 'PR',
@@ -169,12 +159,11 @@ function IconBubble({ children, bg, border }: { children: React.ReactNode; bg: s
 
 // ─── Main component ────────────────────────────────────────────────────────────
 
-const NotificationCenter = ({ onStartSession, user, initialOpen, embedded, open: externalOpen }: NotificationCenterProps) => {
-    const { alert, confirm } = useDialog();
+const NotificationCenter = ({ user, initialOpen, embedded, open: externalOpen }: NotificationCenterProps) => {
+    const { confirm } = useDialog();
     const [isOpen, setIsOpen] = useState(() => !!initialOpen);
     // In embedded mode, use the externally-controlled `open` prop (showNotifCenter from parent)
     const effectiveOpen = embedded ? !!externalOpen : isOpen;
-    const { incomingInvites, acceptInvite, rejectInvite } = useTeamWorkout();
     const [systemNotifications, setSystemNotifications] = useState<NotificationItem[]>([]);
     const [clearing, setClearing] = useState(false);
     const safeUserId = user?.id ? String(user.id) : '';
@@ -271,21 +260,6 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded, open:
         }
     };
 
-    const handleAccept = async (item: { data?: unknown;[key: string]: unknown }) => {
-        setIsOpen(false);
-        try {
-            const invite = item?.data ?? item?.metadata ?? null;
-            if (!invite) return;
-            const inv = invite as Record<string, unknown>;
-            if (typeof acceptInvite === 'function') await acceptInvite(invite as Parameters<typeof acceptInvite>[0]);
-            if (inv.workout && typeof onStartSession === 'function') onStartSession(inv.workout);
-        } catch (e) { await alert("Erro ao aceitar: " + getErrorMessage(e)); }
-    };
-
-    const handleReject = async (item: { id?: unknown;[key: string]: unknown }) => {
-        try { if (typeof rejectInvite === 'function') await rejectInvite(item?.id as string); } catch (e) { logError('component:NotificationCenter.rejectInvite', e); return; }
-    };
-
     // ─── Data assembly ────────────────────────────────────────────────────────
     const formatTime = (isoString?: string) => {
         if (!isoString) return 'Agora';
@@ -297,7 +271,6 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded, open:
         return new Date(isoString).toLocaleDateString();
     };
 
-    const safeIncomingInvites = Array.isArray(incomingInvites) ? incomingInvites.filter(Boolean) : [];
     // Preserve server-emitted types verbatim — the TYPE_CONFIG map (plus
     // TYPE_ALIASES for legacy renames) picks the right icon and color.
     const safeSystem = Array.isArray(systemNotifications) ? systemNotifications.map(n => ({
@@ -305,14 +278,6 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded, open:
     })) : [];
 
     const allNotifications = [
-        ...safeIncomingInvites.map((inv, idx) => {
-            const safeFrom = inv?.from && typeof inv.from === 'object' ? (inv.from as Record<string, unknown>) : null;
-            const fromName = String(safeFrom?.displayName ?? safeFrom?.display_name ?? inv?.from_display_name ?? inv?.fromName ?? '').trim() || 'Alguém';
-            const safeWorkout = inv?.workout && typeof inv.workout === 'object' ? (inv.workout as Record<string, unknown>) : null;
-            const workoutTitle = String(safeWorkout?.title ?? safeWorkout?.name ?? 'Treino');
-            const ts = (() => { const raw = inv?.created_at ?? inv?.createdAt ?? null; if (typeof raw === 'number') return Number.isFinite(raw) ? raw : 0; if (typeof raw === 'string') { const ms = Date.parse(raw); return Number.isFinite(ms) ? ms : 0; } return 0; })();
-            return { id: inv?.id ?? inv?.invite_id ?? `invite_${idx}`, type: 'invite', title: `Convite de ${fromName}`, message: `Chamou você para treinar: ${workoutTitle}`, timeAgo: 'Agora', data: inv, timestamp: ts, read: false };
-        }),
         ...safeSystem.map(n => ({
             id: n.id, type: n.type || 'default', title: n.title,
             message: String(n.message || (n as unknown as Record<string, unknown>).body || ''),
@@ -376,34 +341,14 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded, open:
                                     </div>
                                 </div>
 
-                                {/* Invite actions */}
-                                {item.type === 'invite' && item.data && (
-                                    <div className="flex gap-2 mt-3">
-                                        <button
-                                            onClick={() => handleAccept(item)}
-                                            className="flex-1 bg-emerald-500 hover:bg-emerald-400 active:scale-95 text-white text-xs font-black py-2 rounded-xl flex items-center justify-center gap-1.5 transition-all shadow-lg shadow-emerald-900/30"
-                                        >
-                                            <Check size={12} /> Aceitar
-                                        </button>
-                                        <button
-                                            onClick={() => handleReject(item)}
-                                            className="flex-1 bg-neutral-800 hover:bg-neutral-700 active:scale-95 text-neutral-300 text-xs font-black py-2 rounded-xl flex items-center justify-center gap-1.5 transition-all border border-neutral-700"
-                                        >
-                                            <X size={12} /> Recusar
-                                        </button>
-                                    </div>
-                                )}
-
                                 {/* Delete button */}
-                                {item.type !== 'invite' && (
-                                    <button
-                                        onClick={(e) => handleDelete(String(item.id ?? ""), e)}
-                                        className="absolute top-3 right-3 min-h-[44px] min-w-[44px] flex items-center justify-center opacity-60 group-hover:opacity-100 text-neutral-400 hover:text-red-400 transition-all rounded-lg hover:bg-red-500/10"
-                                        aria-label="Remover notificação"
-                                    >
-                                        <Trash2 size={13} />
-                                    </button>
-                                )}
+                                <button
+                                    onClick={(e) => handleDelete(String(item.id ?? ""), e)}
+                                    className="absolute top-3 right-3 min-h-[44px] min-w-[44px] flex items-center justify-center opacity-60 group-hover:opacity-100 text-neutral-400 hover:text-red-400 transition-all rounded-lg hover:bg-red-500/10"
+                                    aria-label="Remover notificação"
+                                >
+                                    <Trash2 size={13} />
+                                </button>
                             </div>
                         );
                     })}
@@ -499,7 +444,7 @@ const NotificationCenter = ({ onStartSession, user, initialOpen, embedded, open:
                                 <div className="px-4 py-2.5 border-t border-white/5 flex items-center justify-between">
                                     <span className="text-[10px] text-neutral-400 font-medium">{allNotifications.length} notificaç{allNotifications.length > 1 ? 'ões' : 'ão'}</span>
                                     <div className="flex gap-1">
-                                        {['default', 'invite', 'pr', 'workout_finished'].map((t) => (
+                                        {['default', 'pr', 'workout_finished'].map((t) => (
                                             <div key={t} className={`w-1.5 h-1.5 rounded-full ${getTypeConfig(t).dot} opacity-40`} />
                                         ))}
                                     </div>

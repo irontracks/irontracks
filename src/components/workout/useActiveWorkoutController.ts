@@ -9,7 +9,6 @@ import { useWorkoutExerciseCrud } from './hooks/useWorkoutExerciseCrud';
 import { useWorkoutFinish } from './hooks/useWorkoutFinish';
 import { useWorkoutMethodSavers } from './hooks/useWorkoutMethodSavers';
 import { useDialog } from '@/contexts/DialogContext';
-import { useTeamWorkout } from '@/contexts/TeamWorkoutContext';
 import {
   ActiveWorkoutProps,
   UnknownRecord,
@@ -30,18 +29,6 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
   const { alert, confirm } = useDialog();
   // Bridge DialogContext alert (Promise<boolean>) to Promise<void> for child hooks
   const alertVoid = useCallback(async (msg: string, title?: string): Promise<void> => { await alert(msg, title); }, [alert]);
-  const teamWorkout = useTeamWorkout() as unknown as {
-    sendInvite: (targetUser: unknown, workout: UnknownRecord) => Promise<unknown>
-    broadcastMyLog: (exIdx: number, sIdx: number, weight: string, reps: string) => void
-    broadcastWorkoutEdit: (workout: UnknownRecord) => void
-    teamSession: { id: string; isHost: boolean; participants: unknown[] } | null
-    sharedLogs: Record<string, Record<string, { exIdx: number; sIdx: number; weight: string; reps: string; ts: number }>>
-    exerciseControlUpdates: Array<{ fromUserId: string; exerciseIdx: number; setIdx: number; patch: Record<string, unknown>; ts: number }>
-  };
-  const sendInvite = teamWorkout.sendInvite;
-  const broadcastMyLog = teamWorkout.broadcastMyLog
-  const broadcastWorkoutEdit = teamWorkout.broadcastWorkoutEdit
-  const teamSession = teamWorkout.teamSession
   const session = props.session;
   const workout = session?.workout ?? null;
   const workoutExercises = workout?.exercises;
@@ -116,7 +103,6 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
   const {
     collapsed, setCollapsed,
     openNotesKeys, setOpenNotesKeys,
-    inviteOpen, setInviteOpen,
     linkedWeightExercises, setLinkedWeightExercises,
     currentExerciseIdx, setCurrentExerciseIdx,
     finishing, setFinishing,
@@ -208,11 +194,6 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
             propsRef.current.onUpdateLog(linkedKey, linkedMerged);
             logsRef.current = { ...logsRef.current, [linkedKey]: linkedMerged };
           }
-          // Broadcast linked weight update for first set only
-          try {
-            const w = String(patchObj.weight ?? '')
-            if (broadcastMyLog && w) broadcastMyLog(exIdx, 0, w, String(patchObj.reps ?? getLog(`${exIdx}-0`)?.reps ?? ''))
-          } catch (e) { logError('hook:useActiveWorkoutController.broadcastLinked', e) }
           return;
         }
       }
@@ -227,18 +208,8 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
       // second call to read a stale `prev` that's missing the first
       // call's fields (e.g., weight typed just before pressing OK).
       logsRef.current = { ...logsRef.current, [key]: merged };
-
-      // Broadcast log update to team partners
-      try {
-        if (broadcastMyLog && Number.isFinite(exIdx) && Number.isFinite(sIdx)) {
-          const merged = { ...prev, ...patchObj }
-          const w = String(merged.weight ?? '')
-          const r = String(merged.reps ?? '')
-          if (w || r) broadcastMyLog(exIdx, sIdx, w, r)
-        }
-      } catch (e) { logError('hook:useActiveWorkoutController.broadcastLog', e) }
     } catch (e) { logError('hook:useActiveWorkoutController.updateLog', e) }
-  }, [exercises, linkedWeightExercises, broadcastMyLog, getLog]);
+  }, [exercises, linkedWeightExercises, getLog]);
 
   // ── Set type (working / warmup / feeler) ─────────────────────────────────
   // Writes to the active log so the change is part of the session payload on
@@ -248,31 +219,6 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     const key = `${exIdx}-${setIdx}`;
     updateLog(key, { set_type: type, is_warmup: type === 'warmup' });
   }, [updateLog]);
-
-  // ── Apply partner exercise control updates ───────────────────────────────
-  const exerciseControlUpdates = teamWorkout.exerciseControlUpdates
-  // Dedup POR SÉRIE (exIdx-setIdx), não por um ts global: o spotter emite vários
-  // patches num mesmo tick (ex.: um por série num drop-set) com o mesmo Date.now()
-  // em ms — com um ts único, só o 1º era aplicado e os demais sumiam.
-  const lastAppliedTsByKey = useRef<Record<string, number>>({})
-  useEffect(() => {
-    if (!exerciseControlUpdates?.length) return
-    for (const update of exerciseControlUpdates) {
-      const key = `${update.exerciseIdx}-${update.setIdx}`
-      if (update.ts <= (lastAppliedTsByKey.current[key] ?? 0)) continue
-      lastAppliedTsByKey.current[key] = update.ts
-      try {
-        const prev = getLog(key)
-        const merged = { ...prev, ...update.patch }
-        if (typeof propsRef.current?.onUpdateLog === 'function') {
-          propsRef.current.onUpdateLog(key, merged)
-        }
-        // Atualiza a "memória rápida" (logsRef) na hora: sem isso, uma ação local logo
-        // em seguida lia o logsRef velho e sobrescrevia a mudança do parceiro/professor.
-        logsRef.current = { ...logsRef.current, [key]: merged }
-      } catch (e) { logError('hook:useActiveWorkoutController.applyPartnerUpdate', e) }
-    }
-  }, [exerciseControlUpdates, getLog])
 
 
   // ── Deload + report history (extracted to useWorkoutDeload) ──────────────
@@ -403,20 +349,6 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     deleteConfirmIdx, setDeleteConfirmIdx,
     onUpdateSession: (updatedWorkout: UnknownRecord) => {
       props.onUpdateSession?.(updatedWorkout);
-      if (teamSession?.id && typeof broadcastWorkoutEdit === 'function') {
-        // Small delay to allow state to settle before serialising
-        setTimeout(() => {
-          try {
-            // updatedWorkout is a session patch: { workout: { exercises: [...] } }
-            // broadcastWorkoutEdit must receive the raw workout object so that
-            // handleAcceptWorkoutEdit on the receiver can read .exercises directly
-            const rawWorkout = (typeof updatedWorkout.workout === 'object' && updatedWorkout.workout !== null)
-              ? updatedWorkout.workout as UnknownRecord
-              : updatedWorkout;
-            broadcastWorkoutEdit(rawWorkout);
-          } catch { }
-        }, 300);
-      }
     },
     alert: alertVoid, confirm,
   });
@@ -566,7 +498,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
   // o botão Salvar do "Editar exercício".
   const anyModalOpen = !!(
     editExerciseOpen || addExerciseOpen || organizeOpen || fullEditorOpen ||
-    postCheckinOpen || inviteOpen ||
+    postCheckinOpen ||
     deloadModal || clusterModal || restPauseModal || dropSetModal || strippingModal ||
     fst7Modal || heavyDutyModal || pontoZeroModal || forcedRepsModal ||
     negativeRepsModal || partialRepsModal || sistema21Modal || waveModal || groupMethodModal
@@ -584,8 +516,6 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     finishing,
     openNotesKeys,
     setOpenNotesKeys,
-    inviteOpen,
-    setInviteOpen,
     addExerciseOpen,
     setAddExerciseOpen,
     addExerciseDraft,
@@ -713,7 +643,6 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     HELP_TERMS,
     currentExercise,
     onFinish: props.onFinish,
-    sendInvite,
     completedSets,
     totalSets,
     progressPct,
@@ -724,7 +653,6 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     sessionForContext, anyModalOpen, workout, exercises, ui, settings,
     collapsed, setCollapsed, finishing,
     openNotesKeys, setOpenNotesKeys,
-    inviteOpen, setInviteOpen,
     addExerciseOpen, setAddExerciseOpen, addExerciseDraft, setAddExerciseDraft,
     fullEditorOpen, fullEditorWorkout,
     organizeOpen, setOrganizeOpen, organizeDraft, setOrganizeDraft,
@@ -771,7 +699,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     saveSistema21Modal, saveWaveModal, saveGroupMethodModal,
     applyDeloadToExercise, updateDeloadModalFromPercent, updateDeloadModalFromWeight,
     toggleNotes, alert, confirm,
-    currentExercise, props.onFinish, sendInvite,
+    currentExercise, props.onFinish,
     completedSets, totalSets, progressPct, remainingSets,
     currentExSetsCount, currentExDoneSets,
   ]);
