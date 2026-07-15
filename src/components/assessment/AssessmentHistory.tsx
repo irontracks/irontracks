@@ -17,6 +17,7 @@ import { Calendar, TrendingUp } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { AssessmentForm } from '@/components/assessment/AssessmentForm';
 import QuickBIAModal from '@/components/assessment/QuickBIAModal';
+import { WeightTrendCard } from '@/components/assessment/WeightTrendCard';
 import { DialogProvider } from '@/contexts/DialogContext';
 import GlobalDialog from '@/components/GlobalDialog';
 import { AssessmentHeader } from '@/components/assessment/AssessmentHeader';
@@ -221,6 +222,9 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
               )}
             </div>
           </div>
+
+          {/* Tendência de Peso (avaliações + check-ins de treino) */}
+          <WeightTrendCard studentId={studentId ?? null} />
 
           {/* Body Fat % */}
           <div
