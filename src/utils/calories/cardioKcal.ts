@@ -16,12 +16,12 @@
  * duas vezes) e soma o resultado deste módulo.
  */
 import { DEFAULT_BODY_WEIGHT_KG, getSexMultiplier } from './metEstimate'
+// "É cardio?" agora é fonte única (antes havia uma cópia com set fechado aqui).
+import { isCardioExercise } from '@/utils/exercise/isCardio'
+export { isCardioExercise }
 
 const isRecord = (v: unknown): v is Record<string, unknown> =>
   !!v && typeof v === 'object' && !Array.isArray(v)
-
-/** Modalidades reconhecidas (bate com CARDIO_OPTIONS do editor). */
-const CARDIO_OPTIONS = ['Escada', 'Esteira', 'Bicicleta', 'Bike Outdoor', 'Corrida', 'Caminhada', 'Elíptico'] as const
 
 const norm = (s: unknown): string =>
   String(s || '')
@@ -29,8 +29,6 @@ const norm = (s: unknown): string =>
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '')
     .trim()
-
-const CARDIO_OPTION_KEYS = new Set(CARDIO_OPTIONS.map((o) => norm(o)))
 
 /**
  * MET base por modalidade (Compendium 2011, esforço moderado). A intensidade
@@ -59,14 +57,6 @@ export const clampSessionKcal = (v: unknown): number => {
   return Math.min(MAX_SESSION_KCAL, Math.round(n))
 }
 
-/** True se o exercício é cardio (por type, method ou nome de modalidade). */
-export const isCardioExercise = (ex: unknown): boolean => {
-  const e = isRecord(ex) ? ex : null
-  if (!e) return false
-  if (norm(e.type) === 'cardio') return true
-  if (norm(e.method) === 'cardio') return true
-  return CARDIO_OPTION_KEYS.has(norm(e.name))
-}
 
 /**
  * Fator de intensidade a partir do RPE (1-10). RPE 5 = neutro (×1.0);
