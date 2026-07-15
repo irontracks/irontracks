@@ -3,6 +3,7 @@ import React from 'react'
 import { setTopWeightReps, setBestE1rm, setVolume } from '@/utils/report/setVolume'
 import { resolveReportSetsCount } from '@/utils/report/resolveSetsCount'
 import { formatSetStages } from '@/utils/report/formatStages'
+import { isCardioExercise, getCardioSummary } from '@/utils/report/cardioSummary'
 
 type AnyObj = Record<string, unknown>
 
@@ -137,6 +138,9 @@ function computeProgression(logObj: AnyObj, prevObj: AnyObj | null): Progression
 export const ReportExerciseCard = ({ exercise, exIdx, sessionLogs, prevLogs, baseMs }: ReportExerciseCardProps) => {
     const obj = exercise
     const exName = String(obj?.name || '').trim()
+    // Cardio (esteira/bike/…) não tem carga/reps/1RM — renderiza tempo/velocidade
+    // em vez da tabela de musculação (senão vira "Cad: 2020", "1RM est: —").
+    const isCardio = isCardioExercise(obj)
     const baseText = (() => {
         try {
             const bms = Number(baseMs)
@@ -204,7 +208,7 @@ export const ReportExerciseCard = ({ exercise, exIdx, sessionLogs, prevLogs, bas
                 <h3 className="text-lg sm:text-xl font-bold uppercase flex items-start gap-2 flex-wrap leading-tight">
                     <span className="bg-black text-white w-6 h-6 flex items-center justify-center rounded text-xs shrink-0">{exIdx + 1}</span>
                     <span className="break-words min-w-0">{exName || '—'}</span>
-                    {prCount > 0 && (
+                    {!isCardio && prCount > 0 && (
                         <span className="text-xs font-black bg-yellow-500/20 text-yellow-400 border border-yellow-500/40 px-1.5 py-0.5 rounded-lg tracking-wide shrink-0">
                             🏆 {prCount > 1 ? `${prCount} PRs` : 'PR'}
                         </span>
@@ -212,7 +216,7 @@ export const ReportExerciseCard = ({ exercise, exIdx, sessionLogs, prevLogs, bas
                 </h3>
                 <div className="mt-1.5 flex flex-wrap gap-x-3 gap-y-1 text-xs font-mono text-neutral-400">
                     {baseText && <span>Base: <span className="font-bold text-neutral-100">{baseText}</span></span>}
-                    {bestE1rm != null && (
+                    {!isCardio && bestE1rm != null && (
                         <span>1RM est: <span className="font-bold text-amber-300">{bestE1rm.toFixed(1)} kg</span></span>
                     )}
                     {(() => {
@@ -221,14 +225,47 @@ export const ReportExerciseCard = ({ exercise, exIdx, sessionLogs, prevLogs, bas
                     })()}
                     {(() => {
                         const r = obj?.rpe as unknown
-                        return r != null && String(r).trim() ? <span>RPE: <span className="font-bold text-neutral-100">{String(r)}</span></span> : null
+                        return r != null && String(r).trim() ? <span>{isCardio ? 'Intensidade' : 'RPE'}: <span className="font-bold text-neutral-100">{String(r)}</span></span> : null
                     })()}
-                    {(() => {
+                    {/* "Cad" (cadência) é conceito de musculação — nunca em cardio (era o "Cad: 2020"). */}
+                    {!isCardio && (() => {
                         const c = String((obj?.cadence ?? '') as string).trim()
                         return c ? <span>Cad: <span className="font-bold text-neutral-100">{c}</span></span> : null
                     })()}
                 </div>
             </div>
+            {isCardio ? (
+                (() => {
+                    // Pega o log da 1ª série de cardio com dado (tempo/velocidade/…).
+                    let summary = getCardioSummary(obj, null)
+                    for (let sIdx = 0; sIdx < Math.max(1, setsCount); sIdx++) {
+                        const lg = sessionLogs[`${exIdx}-${sIdx}`]
+                        if (lg && typeof lg === 'object') { summary = getCardioSummary(obj, lg); break }
+                    }
+                    const items: Array<{ label: string; value: string }> = []
+                    if (summary.timeMin != null) items.push({ label: 'Tempo', value: `${summary.timeMin} min` })
+                    if (summary.speedKmh) items.push({ label: 'Velocidade', value: `${summary.speedKmh} km/h` })
+                    if (summary.inclinePct) items.push({ label: 'Inclinação', value: `${summary.inclinePct}%` })
+                    if (summary.resistance) items.push({ label: 'Resistência', value: summary.resistance })
+                    if (summary.heartRate) items.push({ label: 'FC', value: `${summary.heartRate} bpm` })
+                    if (summary.isHIT && summary.hitWorkSec != null && summary.hitRestSec != null) {
+                        items.push({ label: 'HIT', value: `${summary.hitWorkSec}s / ${summary.hitRestSec}s${summary.hitRounds != null ? ` × ${summary.hitRounds}` : ''}` })
+                    }
+                    if (items.length === 0) {
+                        return <div className="py-3 text-sm text-neutral-500">Cardio concluído.</div>
+                    }
+                    return (
+                        <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 py-1">
+                            {items.map((it) => (
+                                <div key={it.label} className="rounded-lg bg-neutral-900/60 border border-neutral-800 px-3 py-2">
+                                    <div className="text-[10px] uppercase tracking-widest text-neutral-400 font-black">{it.label}</div>
+                                    <div className="text-base font-bold text-neutral-100 mt-0.5">{it.value}</div>
+                                </div>
+                            ))}
+                        </div>
+                    )
+                })()
+            ) : (
             <table className="w-full text-sm">
                 <thead>
                     <tr className="text-[10px] uppercase tracking-widest text-neutral-400 border-b border-neutral-800">
@@ -306,6 +343,7 @@ export const ReportExerciseCard = ({ exercise, exIdx, sessionLogs, prevLogs, bas
                     })}
                 </tbody>
             </table>
+            )}
         </div>
     )
 }
