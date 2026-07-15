@@ -391,7 +391,6 @@ export function SettingsSoundSection({ draft, setValue, canSeeExperimental }: Se
     const allowTeamInvites = Boolean(draft?.allowTeamInvites ?? true)
     const featuresKillSwitch = Boolean(draft?.featuresKillSwitch ?? false)
     const featureTeamworkV2 = Boolean(draft?.featureTeamworkV2 ?? false)
-    const featureStoriesV2 = Boolean(draft?.featureStoriesV2 ?? false)
     const featureOfflineSyncV2 = Boolean(draft?.featureOfflineSyncV2 ?? false)
     return (
         <SectionCard>
@@ -422,10 +421,6 @@ export function SettingsSoundSection({ draft, setValue, canSeeExperimental }: Se
                         <div className="mt-3 flex items-center justify-between gap-3">
                             <div><div className="text-sm font-bold text-white">Treino em Equipe V2</div><div className="text-xs text-neutral-400">Link/QR, presença e saída segura da sessão.</div></div>
                             <ToggleSwitch checked={featureTeamworkV2} onChange={() => setValue('featureTeamworkV2', !featureTeamworkV2)} disabled={featuresKillSwitch} />
-                        </div>
-                        <div className="mt-3 flex items-center justify-between gap-3">
-                            <div><div className="text-sm font-bold text-white">Stories/Relatórios V2</div><div className="text-xs text-neutral-400">CTA pós-treino e melhorias de compartilhamento.</div></div>
-                            <ToggleSwitch checked={featureStoriesV2} onChange={() => setValue('featureStoriesV2', !featureStoriesV2)} disabled={featuresKillSwitch} />
                         </div>
                         <div className="mt-3 flex items-center justify-between gap-3">
                             <div><div className="text-sm font-bold text-white">Offline Sync V2</div><div className="text-xs text-neutral-400">Fila com backoff, limites e central de pendências.</div></div>
