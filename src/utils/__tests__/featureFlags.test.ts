@@ -38,7 +38,7 @@ describe('isKillSwitchOn', () => {
 // isFeatureEnabled
 // ────────────────────────────────────────────────────────────────────────────
 describe('isFeatureEnabled', () => {
-  const key = FEATURE_KEYS.teamworkV2
+  const key = FEATURE_KEYS.offlineSyncV2
 
   describe('user settings only', () => {
     it('returns true when flag is true in settings', () => {

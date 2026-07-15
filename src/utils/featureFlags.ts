@@ -1,12 +1,10 @@
 
 import type { UnknownRecord } from '@/types/app'
 export const FEATURE_KEYS = {
-  teamworkV2: 'featureTeamworkV2',
   offlineSyncV2: 'featureOfflineSyncV2',
 }
 
 export const FEATURE_META = {
-  teamworkV2: { key: FEATURE_KEYS.teamworkV2, owner: 'core', review_at: '2026-03-31' },
   offlineSyncV2: { key: FEATURE_KEYS.offlineSyncV2, owner: 'core', review_at: '2026-03-31' },
 }
 
