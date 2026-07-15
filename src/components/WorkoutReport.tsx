@@ -10,7 +10,6 @@ import { workoutPlanHtml } from '@/utils/report/templates';
 import { generatePostWorkoutInsights, applyProgressionToNextTemplate } from '@/actions/workout-actions';
 import { useVipCredits } from '@/hooks/useVipCredits';
 import { useBackHandler } from '@/hooks/useBackHandler';
-import { FEATURE_KEYS, isFeatureEnabled } from '@/utils/featureFlags';
 import { logError } from '@/lib/logger'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { escapeHtml } from '@/utils/escapeHtml'
@@ -96,8 +95,6 @@ const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose,
     const [sharing, setSharing] = useState(false);
     const [savingTemplate, setSavingTemplate] = useState(false);
     const [templateSaved, setTemplateSaved] = useState(false);
-    const storiesV2Enabled = useMemo(() => isFeatureEnabled(settings, FEATURE_KEYS.storiesV2), [settings]);
-    const [_showStoryPrompt, setShowStoryPrompt] = useState(false);
 
     const { credits } = useVipCredits();
     const _formatLimit = (limit: number | null | undefined) => (limit == null ? '∞' : limit > 1000 ? '∞' : `${limit}`)
@@ -150,12 +147,6 @@ const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose,
         if (raw === 'male' || raw === 'masculino') return 'male';
         return 'not_informed';
     })();
-
-    useEffect(() => {
-        if (!storiesV2Enabled) { setShowStoryPrompt(false); return; }
-        if (!session) { setShowStoryPrompt(false); return; }
-        setShowStoryPrompt(true);
-    }, [storiesV2Enabled, session]);
 
     // Use shared formatters
     const formatDate = sharedFormatDate;
@@ -769,14 +760,14 @@ const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose,
                         </div>
                         <button
                             type="button"
-                            onClick={() => { setShowExportMenu(false); setShowStoryPrompt(false); setShowStory(true); }}
+                            onClick={() => { setShowExportMenu(false); setShowStory(true); }}
                             className="min-h-[36px] bg-yellow-500 hover:bg-yellow-400 text-black px-3 rounded-xl font-black shadow-lg inline-flex items-center gap-1.5"
                         >
                             <span className="text-xs uppercase tracking-widest">Story</span>
                         </button>
                         <button
                             type="button"
-                            onClick={() => { setShowExportMenu(false); setShowStoryPrompt(false); setShowShareCard(true); }}
+                            onClick={() => { setShowExportMenu(false); setShowShareCard(true); }}
                             className="min-h-[36px] bg-neutral-800 hover:bg-neutral-700 text-white px-3 rounded-xl font-black inline-flex items-center gap-1.5 border border-neutral-700"
                         >
                             <Share2 size={14} className="text-yellow-500" />
