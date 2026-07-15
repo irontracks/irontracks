@@ -499,8 +499,7 @@ export async function exportAllData(): Promise<AdminResult & { data?: unknown }>
         const { data: assessments } = await adminDb.from('assessments').select('*').limit(2000)
         const { data: notifications } = await adminDb.from('notifications').select('*').limit(5000)
         // chat_channels + messages removed — dead system deleted in 20260419200000
-        const { data: invites } = await adminDb.from('invites').select('*').limit(1000)
-        const { data: team_sessions } = await adminDb.from('team_sessions').select('*').limit(1000)
+        // invites + team_sessions removed — TeamworkV2 aposentado, tabelas dropadas
 
         const { data: workouts } = await adminDb
             .from('workouts')
@@ -515,8 +514,6 @@ export async function exportAllData(): Promise<AdminResult & { data?: unknown }>
             students: students || [],
             assessments: assessments || [],
             notifications: notifications || [],
-            invites: invites || [],
-            team_sessions: team_sessions || [],
             workouts: (Array.isArray(workouts) ? workouts : []).map((w: Record<string, unknown>) => ({
                 id: w?.id,
                 user_id: w?.user_id ?? null,
@@ -569,20 +566,10 @@ export async function importAllData(json: Record<string, unknown>): Promise<Admi
         const students = toRows(json?.students)
         const assessments = toRows(json?.assessments)
         const notifications = toRows(json?.notifications)
-        const invites = toRows(json?.invites)
-        const team_sessions = toRows(json?.team_sessions)
         const workouts = Array.isArray(json?.workouts) ? (json.workouts as AnyRow[]) : []
 
         const totalRecords = profiles.length + teachers.length + students.length + assessments.length + workouts.length
         if (totalRecords === 0) return { error: 'Nenhum dado válido encontrado no arquivo de importação.' }
-
-        if (team_sessions.length) {
-            const batchSize = 500
-            for (let i = 0; i < team_sessions.length; i += batchSize) {
-                const batch = team_sessions.slice(i, i + batchSize)
-                await adminDb.from('team_sessions').upsert(batch, { onConflict: 'id' })
-            }
-        }
 
         if (profiles.length) {
             const batchSize = 500
@@ -772,13 +759,6 @@ export async function importAllData(json: Record<string, unknown>): Promise<Admi
             }
         }
 
-        if (invites.length) {
-            const batchSize = 500
-            for (let i = 0; i < invites.length; i += batchSize) {
-                const batch = invites.slice(i, i + batchSize)
-                await adminDb.from('invites').upsert(batch, { onConflict: 'id' })
-            }
-        }
 
         return { success: true }
     } catch (e) {
