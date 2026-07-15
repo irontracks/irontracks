@@ -346,7 +346,6 @@ export function useAdminActions({
                 try { await supabase.from('user_settings').delete().eq('user_id', tUserId); } catch (e) { logError('useAdminActions.deleteUserSettings', e) }
                 try { await supabase.from('notifications').delete().eq('user_id', tUserId); } catch (e) { logError('useAdminActions.deleteNotifications', e) }
                 try { await supabase.from('messages').delete().eq('user_id', tUserId); } catch (e) { logError('useAdminActions.deleteMessages', e) }
-                try { await supabase.from('invites').delete().or(`from_uid.eq.${safePg(tUserId)},to_uid.eq.${safePg(tUserId)}`); } catch (e) { logError('useAdminActions.deleteInvites', e) }
 
                 // DMs
                 try {
