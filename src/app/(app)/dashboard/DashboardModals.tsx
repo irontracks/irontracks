@@ -20,7 +20,6 @@ const ProgressPhotos = dynamic(() => import('@/components/ProgressPhotos'), { ss
 const RestTimerOverlay = dynamic(() => import('@/components/workout/RestTimerOverlay'), { ssr: false })
 const WhatsNewModal = dynamic(() => import('@/components/WhatsNewModal'), { ssr: false })
 const MothersDayModal = dynamic(() => import('@/components/MothersDayModal'), { ssr: false })
-const OfflineSyncModal = dynamic(() => import('@/components/OfflineSyncModal'), { ssr: false })
 const WelcomeFloatingWindow = dynamic(() => import('@/components/WelcomeFloatingWindow'), { ssr: false })
 
 // Helper
@@ -106,10 +105,6 @@ export interface DashboardModalsProps {
     setSettingsOpen: (v: boolean) => void
     userSettingsApi: Record<string, unknown> | null
 
-    // Offline Sync
-    offlineSyncOpen: boolean
-    setOfflineSyncOpen: (v: boolean) => void
-
     // Open student
     openStudent: unknown
     setOpenStudent: (v: unknown) => void
@@ -145,7 +140,7 @@ export default function DashboardModals(props: DashboardModalsProps) {
         setPendingUpdate, closeWhatsNew, mothersDayOpen, closeMothersDay,
         preCheckinOpen, setPreCheckinOpen, preCheckinWorkout,
         preCheckinDraft, setPreCheckinDraft, preCheckinResolveRef, settingsOpen, setSettingsOpen,
-        userSettingsApi, offlineSyncOpen, setOfflineSyncOpen,
+        userSettingsApi,
         openStudent, setOpenStudent, showExportModal, setShowExportModal, exportWorkout,
         handleExportPdf, handleExportJson, vipAccess, openVipView, alert,
         showProgressPhotos, setShowProgressPhotos,
@@ -768,13 +763,6 @@ export default function DashboardModals(props: DashboardModalsProps) {
             {showProgressPhotos && (
                 <ProgressPhotos onClose={() => setShowProgressPhotos(false)} />
             )}
-
-            {/* Offline Sync */}
-            <OfflineSyncModal
-                open={offlineSyncOpen}
-                onClose={() => setOfflineSyncOpen(false)}
-                userId={user?.id as string | undefined}
-            />
 
             {/* Welcome */}
             <WelcomeFloatingWindow user={user as AdminUser} onClose={() => { }} />
