@@ -129,3 +129,6 @@ knowledge-base/
 
 # Changelog automático gerado por hook local do Claude Code
 CLAUDE_CHANGES.md
+
+# Codex config local — contém secrets reais (GCP/GitHub/Supabase PAT), nunca commitar
+.codex/
