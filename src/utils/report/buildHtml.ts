@@ -11,6 +11,7 @@ import {
 import { setTopWeightReps, setVolume, isWorkingSet } from '@/utils/report/setVolume'
 import { resolveReportSetsCount } from '@/utils/report/resolveSetsCount'
 import { formatSetStages } from '@/utils/report/formatStages'
+import { isCardioExercise, getCardioSummary, type CardioSummary } from '@/utils/report/cardioSummary'
 import { estimateSessionKcalBreakdown } from '@/utils/calories/sessionKcal'
 import { clampSessionKcal } from '@/utils/calories/cardioKcal'
 import { distributeKcalByExercise, distributeKcalWithFixed } from '@/utils/calories/distributeKcal'
@@ -256,6 +257,18 @@ export function buildReportData(
 
     const showProgression = sets.some((s) => !!s?.progression)
 
+    // Cardio: pega o resumo (tempo/velocidade/…) do 1º log com dado — a tabela de
+    // carga/reps não se aplica (e o log moderno de cardio nem tem weight/reps).
+    const isCardio = isCardioExercise(exObj)
+    let cardio: CardioSummary | null = null
+    if (isCardio) {
+      cardio = getCardioSummary(exObj, null)
+      for (let sIdx = 0; sIdx < Math.max(1, setsPlanned); sIdx++) {
+        const lg = sessionLogs[`${exIdx}-${sIdx}`]
+        if (isRecord(lg)) { cardio = getCardioSummary(exObj, lg); break }
+      }
+    }
+
     return {
       name: String(exObj?.name || '').trim(),
       method: exObj?.method && exObj.method !== 'Normal' ? String(exObj.method) : null,
@@ -265,6 +278,8 @@ export function buildReportData(
       showProgression,
       volumeKg: exVolume,
       caloriesKcal: 0,
+      isCardio,
+      cardio,
       sets,
     }
   })
@@ -589,9 +604,32 @@ export function buildReportHTML(
   })()
 
   // ─── Exercises ────────────────────────────────────────────────────────────────
+  // Cardio: métricas (tempo/velocidade/…) em vez da tabela de carga/reps.
+  const cardioBlockHtml = (c: CardioSummary | null): string => {
+    const items: Array<[string, string]> = []
+    if (c) {
+      if (c.timeMin != null) items.push(['Tempo', `${c.timeMin} min`])
+      if (c.speedKmh) items.push(['Velocidade', `${escapeHtml(c.speedKmh)} km/h`])
+      if (c.inclinePct) items.push(['Inclinação', `${escapeHtml(c.inclinePct)}%`])
+      if (c.resistance) items.push(['Resistência', escapeHtml(c.resistance)])
+      if (c.heartRate) items.push(['FC', `${escapeHtml(c.heartRate)} bpm`])
+      if (c.isHIT && c.hitWorkSec != null && c.hitRestSec != null) {
+        items.push(['HIT', `${c.hitWorkSec}s / ${c.hitRestSec}s${c.hitRounds != null ? ` &times; ${c.hitRounds}` : ''}`])
+      }
+    }
+    if (!items.length) return `<div style="padding:8px 0;color:#a3a3a3;font-size:13px">Cardio concluído.</div>`
+    const cells = items.map(([label, value]) =>
+      `<div style="background:#171717;border:1px solid #262626;border-radius:8px;padding:8px 12px">
+        <div style="font-size:10px;text-transform:uppercase;letter-spacing:1.5px;color:#a3a3a3;font-weight:800">${label}</div>
+        <div style="font-size:15px;font-weight:700;color:#f5f5f5;margin-top:2px">${value}</div>
+      </div>`).join('')
+    return `<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:4px 0">${cells}</div>`
+  }
+
   const exercisesHtml = (Array.isArray(reportData?.exercises) ? reportData.exercises : []).map((ex, exIdx) => {
     const sets = Array.isArray(ex?.sets) ? ex.sets : []
-    if (!sets.length) return ''
+    const isCardio = !!(ex as { isCardio?: unknown })?.isCardio
+    if (!sets.length && !isCardio) return ''
     const showProgression = !!ex?.showProgression
     const baseText = ex?.baseLabel ? String(ex.baseLabel) : ''
     const method = ex?.method ? String(ex.method) : ''
@@ -647,6 +685,7 @@ export function buildReportHTML(
             ${kcal > 0 ? `<span class="meta-pill" style="color:#fbbf24">~${escapeHtml(kcal.toLocaleString('pt-BR'))} kcal</span>` : ''}
           </div>
         </div>
+        ${isCardio ? cardioBlockHtml((ex as { cardio?: CardioSummary | null })?.cardio ?? null) : `
         <div class="table-wrap">
           <table>
             <thead>
@@ -659,7 +698,7 @@ export function buildReportHTML(
             </thead>
             <tbody>${rows}</tbody>
           </table>
-        </div>
+        </div>`}
       </div>`
   }).filter(Boolean).join('')
 
