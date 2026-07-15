@@ -106,8 +106,6 @@ export default function SettingsModal(props: SettingsModalProps) {
     wasOpenRef.current = isOpen
   }, [isOpen, base])
 
-  const userRole = String(props?.userRole || '')
-  const canSeeExperimental = userRole === 'admin' || userRole === 'teacher'
   const canSave = isOpen && !saving
   const focusTrapRef = useFocusTrap(isOpen, props?.onClose)
   useBackHandler(isOpen, () => props?.onClose?.())
@@ -282,7 +280,7 @@ export default function SettingsModal(props: SettingsModalProps) {
           <SettingsAppModeSection draft={draft} setValue={setValue} setModulesModalOpen={setModulesModalOpen} />
           <SettingsToolsSection draft={draft} setValue={setValue} onOpenWhatsNew={props?.onOpenWhatsNew} onOpenProgressPhotos={props?.onOpenProgressPhotos} />
           <SettingsWorkoutSection draft={draft} setValue={setValue} />
-          <SettingsSoundSection draft={draft} setValue={setValue} canSeeExperimental={canSeeExperimental} />
+          <SettingsSoundSection draft={draft} setValue={setValue} />
           <SettingsNotificationsSection
             draft={draft} setValue={setValue}
             iosNotifStatus={iosNotifStatus} iosNotifBusy={iosNotifBusy}

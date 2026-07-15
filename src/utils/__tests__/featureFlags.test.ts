@@ -3,7 +3,6 @@ import {
   isKillSwitchOn,
   isFeatureEnabled,
   listFeatureFlags,
-  FEATURE_KEYS,
 } from '@/utils/featureFlags'
 
 // ────────────────────────────────────────────────────────────────────────────
@@ -38,7 +37,7 @@ describe('isKillSwitchOn', () => {
 // isFeatureEnabled
 // ────────────────────────────────────────────────────────────────────────────
 describe('isFeatureEnabled', () => {
-  const key = FEATURE_KEYS.offlineSyncV2
+  const key = 'anyFlag'
 
   describe('user settings only', () => {
     it('returns true when flag is true in settings', () => {
@@ -93,27 +92,7 @@ describe('isFeatureEnabled', () => {
 // listFeatureFlags
 // ────────────────────────────────────────────────────────────────────────────
 describe('listFeatureFlags', () => {
-  it('returns a non-empty array', () => {
-    const flags = listFeatureFlags()
-    expect(flags.length).toBeGreaterThan(0)
-  })
-
-  it('each flag has name, key, owner, review_at', () => {
-    const flags = listFeatureFlags()
-    for (const f of flags) {
-      expect(f).toHaveProperty('name')
-      expect(f).toHaveProperty('key')
-      expect(f).toHaveProperty('owner')
-      expect(f).toHaveProperty('review_at')
-      expect(typeof f.key).toBe('string')
-    }
-  })
-
-  it('flags match FEATURE_KEYS values', () => {
-    const flags = listFeatureFlags()
-    const keys = flags.map(f => f.key)
-    for (const v of Object.values(FEATURE_KEYS)) {
-      expect(keys).toContain(v)
-    }
+  it('returns an empty array (no feature flags currently defined)', () => {
+    expect(listFeatureFlags()).toEqual([])
   })
 })

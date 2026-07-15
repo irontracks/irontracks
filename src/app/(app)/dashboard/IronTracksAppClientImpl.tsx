@@ -41,7 +41,6 @@ const WhatsNewModal = dynamic(() => import('@/components/WhatsNewModal'), { ssr:
 const GuidedTour = dynamic(() => import('@/components/onboarding/GuidedTour'), { ssr: false })
 const NutritionOverlay = dynamic(() => import('@/components/dashboard/nutrition/NutritionOverlay'), { ssr: false })
 import { getTourSteps } from '@/utils/tourSteps'
-const OfflineSyncModal = dynamic(() => import('@/components/OfflineSyncModal'), { ssr: false })
 const WorkoutRecoveryBanner = dynamic(() => import('@/components/WorkoutRecoveryBanner'), { ssr: false, loading: () => null })
 const RestDayPromptCard = dynamic(() => import('@/components/dashboard/RestDayPromptCard'), { ssr: false, loading: () => null })
 const StudentWorkoutStartBanner = dynamic(() => import('@/components/teacher/StudentWorkoutStartBanner'), { ssr: false, loading: () => null })
@@ -364,12 +363,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
     // Offline sync state — extracted to useOfflineSync hook
     const { syncState, setSyncState, refreshSyncState, runFlushQueue } = useOfflineSync({
         userId: user?.id,
-        settings: userSettingsApi?.settings && typeof userSettingsApi.settings === 'object'
-            ? (userSettingsApi.settings as Record<string, unknown>)
-            : null,
     })
-    const offlineSyncOpen = useModalStore((s) => s.offlineSyncOpen)
-    const setOfflineSyncOpen = useModalStore((s) => s.setOfflineSyncOpen)
     const showProgressPhotos = useModalStore((s) => s.showProgressPhotos)
     const setShowProgressPhotos = useModalStore((s) => s.setShowProgressPhotos)
 
@@ -997,7 +991,6 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                             hideVipOnIos={hideVipOnIos}
                             vipAccess={vipAccess as { hasVip?: boolean } | null}
                             syncState={syncState as { pending?: number; failed?: number; online?: boolean; syncing?: boolean } | null}
-                            userSettings={userSettingsApi?.settings && typeof userSettingsApi.settings === 'object' ? (userSettingsApi.settings as Record<string, unknown>) : null}
                             isHeaderVisible={isHeaderVisible}
                             coachPending={coachPending}
                             onGoHome={() => setView('dashboard')}
@@ -1012,7 +1005,6 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                             onOpenTour={handleOpenTour}
                             onOpenProfile={handleOpenProfile}
                             onLogout={handleLogout}
-                            onOfflineSyncOpen={() => setOfflineSyncOpen(true)}
                             onAcceptCoach={handleAcceptCoach}
                         />
 
@@ -1445,8 +1437,6 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                             settingsOpen={settingsOpen}
                             setSettingsOpen={setSettingsOpen}
                             userSettingsApi={userSettingsApi as Record<string, unknown> | null}
-                            offlineSyncOpen={offlineSyncOpen}
-                            setOfflineSyncOpen={setOfflineSyncOpen}
                             openStudent={openStudent}
                             setOpenStudent={setOpenStudent as (v: unknown) => void}
                             showExportModal={showExportModal}

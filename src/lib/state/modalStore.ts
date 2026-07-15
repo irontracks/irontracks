@@ -45,9 +45,6 @@ interface ModalStoreState {
   showNotifCenter: boolean
   setShowNotifCenter: (v: boolean) => void
 
-  offlineSyncOpen: boolean
-  setOfflineSyncOpen: (v: boolean) => void
-
   showProgressPhotos: boolean
   setShowProgressPhotos: (v: boolean) => void
 
@@ -82,9 +79,6 @@ export const useModalStore = create<ModalStoreState>((set) => ({
 
   showNotifCenter: false,
   setShowNotifCenter: (v) => set({ showNotifCenter: v }),
-
-  offlineSyncOpen: false,
-  setOfflineSyncOpen: (v) => set({ offlineSyncOpen: v }),
 
   showProgressPhotos: false,
   setShowProgressPhotos: (v) => set({ showProgressPhotos: v }),
