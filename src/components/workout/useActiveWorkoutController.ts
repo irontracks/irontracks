@@ -176,21 +176,44 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
         }
       }
 
-      // If weight changes and this exercise has linked weights enabled, update all sets
-      if (linkedWeightExercises.has(exIdx) && 'weight' in patchObj) {
+      // If a WEIGHT changes and this exercise has linked weights enabled, replicate
+      // it to all sets. Cobre flat (`weight`) E unilateral (`L_weight`/`R_weight`).
+      // Antes só olhava `weight`, então unilateral — que grava L_weight/R_weight —
+      // NUNCA sincronizava (o LADO R ficava vazio ao digitar o LADO L).
+      //
+      // Unilateral: o lado digitado replica pra ESSE lado em todas as séries, e o
+      // OUTRO lado é auto-preenchido com o mesmo valor SÓ onde está vazio. Assim o
+      // 1º peso preenche os dois lados (caso comum: mesma carga), mas editar um lado
+      // depois não apaga o outro (permite cargas diferentes em L e R).
+      const typedSide: 'L_weight' | 'R_weight' | null =
+        'L_weight' in patchObj ? 'L_weight' : 'R_weight' in patchObj ? 'R_weight' : null;
+      const typedWeight = 'weight' in patchObj ? patchObj.weight
+        : typedSide ? (patchObj as Record<string, unknown>)[typedSide]
+          : undefined;
+      if (linkedWeightExercises.has(exIdx) && typedWeight !== undefined) {
         const ex = exercises[exIdx];
         if (ex) {
           const setsHeader = Math.max(0, Number.parseInt(String(ex?.sets ?? '0'), 10) || 0);
           const sdArr: unknown[] = Array.isArray(ex?.setDetails) ? (ex.setDetails as unknown[]) : Array.isArray(ex?.set_details) ? (ex.set_details as unknown[]) : [];
           const setsCount = Math.max(setsHeader, Array.isArray(sdArr) ? sdArr.length : 0);
+          const otherSide = typedSide === 'L_weight' ? 'R_weight' : 'L_weight';
 
           for (let setIdx = 0; setIdx < setsCount; setIdx++) {
             const linkedKey = `${exIdx}-${setIdx}`;
             const prev = getLog(linkedKey);
-            // A série ATUAL recebe o patch COMPLETO (done/reps/set_type/etc); as demais
-            // recebem só o peso. Antes o early-return propagava o peso e DESCARTAVA o
-            // resto do que foi digitado na série atual (a série nem marcava como feita).
-            const linkedMerged = setIdx === sIdx ? { ...prev, ...patchObj } : { ...prev, weight: patchObj.weight };
+            // Peso a propagar nesta série: o lado digitado sempre; o outro lado só se
+            // estiver vazio (não clobbera uma carga diferente já registrada).
+            const weightPatch: Record<string, unknown> = typedSide
+              ? { [typedSide]: typedWeight }
+              : { weight: typedWeight };
+            if (typedSide) {
+              const otherVal = (prev as Record<string, unknown> | null)?.[otherSide];
+              if (otherVal == null || String(otherVal).trim() === '') weightPatch[otherSide] = typedWeight;
+            }
+            // A série ATUAL recebe o patch COMPLETO (done/reps/set_type/etc) por cima
+            // do peso; as demais recebem só o peso. Antes o early-return propagava o
+            // peso e DESCARTAVA o resto do que foi digitado na série atual.
+            const linkedMerged = setIdx === sIdx ? { ...prev, ...weightPatch, ...patchObj } : { ...prev, ...weightPatch };
             propsRef.current.onUpdateLog(linkedKey, linkedMerged);
             logsRef.current = { ...logsRef.current, [linkedKey]: linkedMerged };
           }

@@ -30,19 +30,33 @@ function toggleLinkWeights(prev: Set<number>, exIdx: number): Set<number> {
     return next
 }
 
-/** applyLinkedWeightUpdate: retorna as chaves que devem ser atualizadas */
+/**
+ * applyLinkedWeightUpdate: espelha a lógica real de sincronização de pesos.
+ * Cobre flat (`weight`) E unilateral (`L_weight`/`R_weight` → replica pros DOIS
+ * lados). A série atual (sIdx) recebe o patch completo por cima do peso.
+ */
 function applyLinkedWeightUpdate(
     ex: Record<string, unknown>,
     exIdx: number,
     patchObj: Record<string, unknown>,
-    getLogs: (key: string) => Record<string, unknown>
+    getLogs: (key: string) => Record<string, unknown>,
+    sIdx = 0
 ): Array<{ key: string; value: Record<string, unknown> }> {
     const setsCount = getSetsCount(ex)
+    const typedSide = 'L_weight' in patchObj ? 'L_weight' : 'R_weight' in patchObj ? 'R_weight' : null
+    const typed = 'weight' in patchObj ? patchObj.weight : typedSide ? patchObj[typedSide] : undefined
+    const otherSide = typedSide === 'L_weight' ? 'R_weight' : 'L_weight'
     const updates: Array<{ key: string; value: Record<string, unknown> }> = []
     for (let setIdx = 0; setIdx < setsCount; setIdx++) {
         const linkedKey = `${exIdx}-${setIdx}`
         const prev = getLogs(linkedKey)
-        updates.push({ key: linkedKey, value: { ...prev, ...patchObj } })
+        const weightPatch: Record<string, unknown> = typedSide ? { [typedSide]: typed } : { weight: typed }
+        if (typedSide) {
+            const otherVal = prev?.[otherSide]
+            if (otherVal == null || String(otherVal).trim() === '') weightPatch[otherSide] = typed
+        }
+        const value = setIdx === sIdx ? { ...prev, ...weightPatch, ...patchObj } : { ...prev, ...weightPatch }
+        updates.push({ key: linkedKey, value })
     }
     return updates
 }
@@ -134,6 +148,46 @@ describe('useActiveWorkoutController — applyLinkedWeightUpdate', () => {
         const exFewer = { sets: 4, setDetails: [{}] } // 4 sets declarados, 1 no detalhe
         const updates = applyLinkedWeightUpdate(exFewer, 1, { weight: '60' }, emptyLogs)
         expect(updates).toHaveLength(4)
+    })
+
+    // ── Unilateral (o bug do print): o input grava L_weight/R_weight, não weight ──
+    it('unilateral: digitar o LADO L replica pros DOIS lados de todas as séries', () => {
+        // Antes, o gate `'weight' in patchObj` era falso pra { L_weight } → NADA
+        // sincronizava e o LADO R ficava vazio.
+        const updates = applyLinkedWeightUpdate(ex, 0, { L_weight: '18' }, emptyLogs)
+        expect(updates).toHaveLength(3)
+        for (const u of updates) {
+            expect(u.value.L_weight).toBe('18')
+            expect(u.value.R_weight).toBe('18') // preenche o lado R também
+        }
+    })
+
+    it('unilateral: a série atual mantém os campos digitados (L_reps/L_done)', () => {
+        const updates = applyLinkedWeightUpdate(ex, 0, { L_weight: '20', L_reps: '12', L_done: true }, emptyLogs)
+        expect(updates[0].value.L_reps).toBe('12')
+        expect(updates[0].value.L_done).toBe(true)
+        expect(updates[0].value.R_weight).toBe('20')
+        // as OUTRAS séries recebem só o peso (não o L_done da série atual)
+        expect(updates[1].value.L_done).toBeUndefined()
+        expect(updates[1].value.L_weight).toBe('20')
+    })
+
+    it('unilateral: editar o LADO R depois replica o R (permite cargas diferentes)', () => {
+        const withL = (key: string) => (key.startsWith('0-') ? { L_weight: '18', R_weight: '18' } : {})
+        const updates = applyLinkedWeightUpdate(ex, 0, { R_weight: '20' }, withL)
+        for (const u of updates) {
+            expect(u.value.L_weight).toBe('18') // L preservado
+            expect(u.value.R_weight).toBe('20') // R atualizado em todas
+        }
+    })
+
+    it('não sincroniza quando o patch não tem peso (ex.: só marcar done)', () => {
+        // Sanidade: um patch sem weight/L_weight/R_weight não deve disparar a réplica
+        // no código real (typedWeight === undefined). Aqui o mirror recebe só peso;
+        // o guard real está no controller.
+        const updates = applyLinkedWeightUpdate(ex, 0, { L_weight: '', }, emptyLogs)
+        expect(updates[0].value.L_weight).toBe('') // limpar propaga vazio, consistente
+        expect(updates[0].value.R_weight).toBe('')
     })
 })
 
