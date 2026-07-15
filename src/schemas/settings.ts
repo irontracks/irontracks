@@ -96,7 +96,6 @@ export const UserSettingsSchema = z
     restTimerDefaultSeconds: z.number().default(90),
     autoRestTimerWhenMissing: z.boolean().default(false),
     programTitleStartDay: z.enum(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']).default('monday'),
-    featuresKillSwitch: z.boolean().default(false),
     requireBiometricsOnStartup: z.boolean().default(false),
     // ── Integrations ──────────────────────────────────────────────────────────
     appleHealthSync: z.boolean().default(false),
