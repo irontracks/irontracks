@@ -534,6 +534,9 @@ export function SettingsNotificationsSection({ draft, setValue, iosNotifStatus, 
     // Master switch: disables ALL push (lock-screen) notifications.
     // In-app bell list still populates so the user can review events later.
     const pushNotificationsEnabled = Boolean(draft?.pushNotificationsEnabled ?? true)
+    const quietHoursEnabled = Boolean(draft?.quietHoursEnabled ?? false)
+    const quietHoursStart = Number.isFinite(Number(draft?.quietHoursStart)) ? Number(draft?.quietHoursStart) : 22
+    const quietHoursEnd = Number.isFinite(Number(draft?.quietHoursEnd)) ? Number(draft?.quietHoursEnd) : 7
     // Per-type toggles (in-app row + push)
     const notifyDirectMessages = Boolean(draft?.notifyDirectMessages ?? true)
     const notifyAppointments = Boolean(draft?.notifyAppointments ?? true)
@@ -593,6 +596,24 @@ export function SettingsNotificationsSection({ draft, setValue, iosNotifStatus, 
                         />
                     </div>
                 </div>
+
+                {/* Não perturbar — janela de silêncio (horário de Brasília) */}
+                <div className="flex items-center justify-between gap-3">
+                    <div className="flex-1 min-w-0"><div className="text-sm font-bold text-white">Não perturbar</div><div className="text-xs text-neutral-400">Silencia os pushes numa faixa de horário. O sino do app continua listando tudo.</div></div>
+                    <ToggleSwitch checked={quietHoursEnabled} onChange={() => setValue('quietHoursEnabled', !quietHoursEnabled)} />
+                </div>
+                {quietHoursEnabled && (
+                    <div className="flex items-center gap-3 pl-1">
+                        <div className="text-xs text-neutral-400">Das</div>
+                        <select value={quietHoursStart} onChange={(e) => setValue('quietHoursStart', Number(e.target.value))} className="bg-neutral-900 border border-neutral-700 rounded-lg px-2 py-1.5 text-sm text-white min-h-[36px]" aria-label="Início do não perturbar">
+                            {Array.from({ length: 24 }).map((_, h) => <option key={h} value={h}>{String(h).padStart(2, '0')}h</option>)}
+                        </select>
+                        <div className="text-xs text-neutral-400">às</div>
+                        <select value={quietHoursEnd} onChange={(e) => setValue('quietHoursEnd', Number(e.target.value))} className="bg-neutral-900 border border-neutral-700 rounded-lg px-2 py-1.5 text-sm text-white min-h-[36px]" aria-label="Fim do não perturbar">
+                            {Array.from({ length: 24 }).map((_, h) => <option key={h} value={h}>{String(h).padStart(2, '0')}h</option>)}
+                        </select>
+                    </div>
+                )}
 
                 <div className="flex items-center justify-between gap-3">
                     <div><div className="text-sm font-bold text-white">Toasts no app</div><div className="text-xs text-neutral-400">Mensagens rápidas no topo da tela.</div></div>

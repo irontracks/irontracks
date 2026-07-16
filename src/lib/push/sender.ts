@@ -20,6 +20,7 @@ import { sendPushToUsers as sendApns } from './apns'
 import { sendFcmToUsers } from './fcm'
 import { logInfo, logWarn } from '@/lib/logger'
 import { createAdminClient } from '@/utils/supabase/admin'
+import { isUserInQuietHours } from '@/lib/push/quietHours'
 
 export type PushResult = { token: string; ok: boolean; error?: string; platform: 'ios' | 'android' }
 
@@ -79,6 +80,10 @@ async function filterUserIdsForPush(
             if (!prefs) return true
 
             if (!options.bypassMasterSwitch && prefs.pushNotificationsEnabled === false) return false
+
+            // "Não perturbar": pula o push na janela de silêncio (in-app segue).
+            // Bypassed (crítico: cobrança/segurança) ignora a janela.
+            if (!options.bypassMasterSwitch && isUserInQuietHours(prefs)) return false
 
             if (options.preferenceKey) {
                 const raw = prefs[options.preferenceKey]
