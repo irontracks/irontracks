@@ -41,13 +41,16 @@ describe('frescor da sessão de treino', () => {
 describe('"Treinando agora" não pode voltar a usar presença de app aberto (guard)', () => {
   const read = (p: string) => readFileSync(resolve(process.cwd(), p), 'utf8')
 
-  it('a Comunidade consome a sessão de treino, não o online_users do Redis', () => {
-    // Bug: o card era montado com /api/social/presence/list — o sorted set que só
-    // registra "abriu o app". O iOS desperta o WebView em background, então amigo
-    // aparecia "TREINANDO AGORA" às 5h da manhã sem treino nenhum.
+  it('"Treinando Agora" usa a sessão de treino real, não presença de app aberto', () => {
+    // Bug original: o card "TREINANDO AGORA" era montado com presence/list (só "abriu
+    // o app"), então amigo aparecia treinando às 5h. `trainingNowIds` DEVE vir de
+    // /api/social/training-now (sessão real). presence/list agora é permitido, mas
+    // SÓ pra o indicador de "online" (onlineIds) — nunca pra trainingNowIds.
     const hook = read('src/app/(app)/community/useCommunityData.ts')
-    expect(hook).not.toContain('/api/social/presence/list')
     expect(hook).toContain('/api/social/training-now')
+    expect(hook).toMatch(/trainingRes\.training/) // trainingNowIds vem da sessão real
+    // setTrainingNowIds não pode ser alimentado por online_users/presença
+    expect(hook).not.toMatch(/setTrainingNowIds\([^)]*online/i)
   })
 
   it('a rota corta por frescor do updated_at e só devolve quem o chamador segue', () => {
