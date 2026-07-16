@@ -566,9 +566,7 @@ export function SettingsNotificationsSection({ draft, setValue, iosNotifStatus, 
     const notifyTrialEnding = Boolean(draft?.notifyTrialEnding ?? true)
     const notifyBillingIssue = Boolean(draft?.notifyBillingIssue ?? true)
     const notifyDailyGoal = Boolean(draft?.notifyDailyGoal ?? true)
-    const notifyMissedMeal = Boolean(draft?.notifyMissedMeal ?? false)
     const notifyChallenges = Boolean(draft?.notifyChallenges ?? true)
-    const notifyMealReminders = Boolean(draft?.notifyMealReminders ?? true)
 
     return (
         <SectionCard>
@@ -859,20 +857,9 @@ export function SettingsNotificationsSection({ draft, setValue, iosNotifStatus, 
                 {/* ── Lembretes ─────────────────────────────────────────────── */}
                 <div className="pt-3 border-t border-neutral-700/60 space-y-3">
                     <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Lembretes</div>
-                    <NotifRow
-                        title="Refeições"
-                        description="Horários de refeição configurados na nutrição."
-                        checked={notifyMealReminders}
-                        disabled={!pushNotificationsEnabled}
-                        onChange={() => setValue('notifyMealReminders', !notifyMealReminders)}
-                    />
-                    <NotifRow
-                        title="Refeição esquecida"
-                        description="Avisa 30min depois se você não registrou. Desligado por padrão."
-                        checked={notifyMissedMeal}
-                        disabled={!pushNotificationsEnabled}
-                        onChange={() => setValue('notifyMissedMeal', !notifyMissedMeal)}
-                    />
+                    {/* "Refeições" e "Refeição esquecida" removidos até religar o driver
+                        (a rota nutrition/reminders/trigger precisa de cron a cada minuto —
+                        Supabase pg_cron; a infra atual é diária). A rota fica dormente. */}
                     <NotifRow
                         title="Meta diária atingida"
                         description="Quando você bate a meta de calorias ou proteína do dia."
