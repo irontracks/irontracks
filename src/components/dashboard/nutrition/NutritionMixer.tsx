@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState, useTransition, useCallback } from
 import { logMealAction, logBarcodeAction, updateWaterAction, deleteMealAction, editMealAction, resolveFoodItemsAction, estimateFoodAction } from '@/app/(app)/dashboard/nutrition/actions'
 import type { MealLog } from '@/lib/nutrition/engine'
 import { analyzeMeal } from '@/lib/nutrition/parser'
+import { projectMeal, type MacroKey } from '@/lib/nutrition/chatProjection'
 import { useIsIosNative } from '@/hooks/useIsIosNative'
 import { createClient } from '@/utils/supabase/client'
 import { getErrorMessage } from '@/utils/errorMessage'
@@ -19,6 +20,13 @@ import {
 import { mealToContent, dayToContent, type NutritionStoryContent } from '@/components/stories/nutritionStory'
 
 // ── Lazy sub-components ────────────────────────────────────────────────────────
+/** Macros exibidos na projeção do preview. Calorias saem à parte (têm linha própria). */
+const PREVIEW_MACROS: ReadonlyArray<{ key: MacroKey; label: string }> = [
+  { key: 'protein', label: 'P' },
+  { key: 'carbs', label: 'C' },
+  { key: 'fat', label: 'G' },
+]
+
 const NutritionDayScore = dynamic(() => import('./NutritionDayScore'), { ssr: false })
 const NutritionEntryCard = dynamic(() => import('./NutritionEntryCard'), { ssr: false })
 const WaterTracker = dynamic(() => import('./WaterTracker'), { ssr: false })
@@ -413,16 +421,13 @@ export default function NutritionMixer({
     }
   }, [input, effectiveCustomFoods])
 
-  // Impacto da simulação na meta de calorias do dia (consumido + preview).
-  const previewImpact = useMemo(() => {
+  // Impacto da simulação nas metas do dia (consumido + preview), nos QUATRO macros.
+  // A conta vive em projectMeal (puro, testado) — a mesma função que o chat de nutrição
+  // usa pra responder "se eu comer X, pra quanto vai?". Um cálculo, dois lugares.
+  const previewProjection = useMemo(() => {
     if (!mealPreview || mealPreview.items.length === 0) return null
-    const consumed = safeNumber(totals?.calories)
-    const add = mealPreview.meal.calories
-    const goal = safeGoals.calories
-    const projected = consumed + add
-    const left = goal - projected
-    return { add, projected, goal, left, over: goal > 0 && projected > goal }
-  }, [mealPreview, totals?.calories, safeGoals.calories])
+    return projectMeal(totals, safeGoals, mealPreview.meal)
+  }, [mealPreview, totals, safeGoals])
 
   // ── Effects ──────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -1001,11 +1006,31 @@ export default function NutritionMixer({
                     Total: P {mealPreview.meal.protein} · C {mealPreview.meal.carbs} · G {mealPreview.meal.fat} g
                   </div>
 
-                  {previewImpact && previewImpact.goal > 0 && (
-                    <div className={`mt-1 text-xs font-medium ${previewImpact.over ? 'text-red-300' : 'text-emerald-300'}`}>
-                      {previewImpact.over
-                        ? `Passa a meta em ${Math.abs(previewImpact.left)} kcal (${previewImpact.projected}/${previewImpact.goal})`
-                        : `Sobram ${previewImpact.left} kcal na meta (${previewImpact.projected}/${previewImpact.goal})`}
+                  {previewProjection && previewProjection.calories.remaining !== null && (
+                    <div className={`mt-1 text-xs font-medium ${previewProjection.calories.over ? 'text-red-300' : 'text-emerald-300'}`}>
+                      {previewProjection.calories.over
+                        ? `Passa a meta em ${Math.abs(previewProjection.calories.remaining)} kcal (${previewProjection.calories.projected}/${previewProjection.calories.goal})`
+                        : `Sobram ${previewProjection.calories.remaining} kcal na meta (${previewProjection.calories.projected}/${previewProjection.calories.goal})`}
+                    </div>
+                  )}
+
+                  {/* Onde os macros FICAM se lançar. Antes só as kcal eram projetadas —
+                      dava pra caber na meta de calorias e estourar a gordura sem aviso. */}
+                  {previewProjection && (
+                    <div className="mt-1 flex flex-wrap gap-x-3 gap-y-0.5 text-[11px] text-neutral-400">
+                      {PREVIEW_MACROS.map(({ key, label }) => {
+                        const m = previewProjection[key]
+                        if (m.remaining === null) return null
+                        return (
+                          <span key={key}>
+                            {label}{' '}
+                            <span className={m.over ? 'font-semibold text-red-300' : 'font-semibold text-neutral-200'}>
+                              {m.projected}
+                            </span>
+                            /{m.goal}g
+                          </span>
+                        )
+                      })}
                     </div>
                   )}
                 </>
