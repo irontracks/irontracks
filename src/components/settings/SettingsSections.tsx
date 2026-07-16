@@ -214,7 +214,7 @@ export function SettingsWorkoutNamesSection({ draft, setValue }: SettingsSection
                 <div className="flex items-center justify-between gap-3">
                     <div>
                         <div className="text-sm font-bold text-white">Dia inicial do programa</div>
-                        <div className="text-xs text-neutral-400">Define como &quot;A - ... (SEGUNDA)&quot; começa no Wizard.</div>
+                        <div className="text-xs text-neutral-400">Dia da semana associado ao primeiro treino do programa (A).</div>
 
                     </div>
                     <select value={programTitleStartDay} onChange={(e) => setValue('programTitleStartDay', e.target.value)} className="bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white">
@@ -278,7 +278,7 @@ export function SettingsAppModeSection({ draft, setValue, setModulesModalOpen }:
                     <div className="flex items-center justify-between gap-3">
                         <div>
                             <div className="text-sm font-bold text-white">Check-in pós-treino</div>
-                            <div className="text-xs text-neutral-400">Pergunta RPE/satisfação ao finalizar.</div>
+                            <div className="text-xs text-neutral-400">Pergunta o esforço percebido (RPE) e a satisfação ao finalizar.</div>
                         </div>
                         <ToggleSwitch checked={promptPostWorkoutCheckin} onChange={() => setValue('promptPostWorkoutCheckin', !promptPostWorkoutCheckin)} />
                     </div>
@@ -381,13 +381,13 @@ export function SettingsWorkoutSection({ draft, setValue }: SettingsSectionProps
     )
 }
 
-// ── Som e Convites ───────────────────────────────────────────────────────────
+// ── Som ──────────────────────────────────────────────────────────────────────
 export function SettingsSoundSection({ draft, setValue }: SettingsSectionProps) {
     const enableSounds = Boolean(draft?.enableSounds ?? true)
     const soundVolume = Math.max(0, Math.min(100, Number(draft?.soundVolume ?? 100) || 0))
     return (
         <SectionCard>
-            <SectionHeader icon={Volume2} label="Som e Convites" color="#eab308" />
+            <SectionHeader icon={Volume2} label="Som" color="#eab308" />
             <div className="space-y-3">
                 <div className="flex items-center justify-between gap-3">
                     <div><div className="text-sm font-bold text-white">Sons do App</div><div className="text-xs text-neutral-400">Notificações e feedback sonoro.</div></div>
@@ -459,7 +459,7 @@ export function SettingsTimerSection({ draft, setValue }: SettingsSectionProps) 
                     </select>
                 </div>
                 <div className="flex items-center justify-between gap-3">
-                    <div><div className="text-sm font-bold text-white">Tick nos últimos 5s</div><div className="text-xs text-neutral-400">Ajuda no ritmo em cluster.</div></div>
+                    <div><div className="text-sm font-bold text-white">Tick nos últimos 5s</div><div className="text-xs text-neutral-400">Emite um tique nos 5s finais do descanso, pra ajudar no ritmo.</div></div>
                     <ToggleSwitch checked={restTimerTickCountdown} onChange={() => setValue('restTimerTickCountdown', !restTimerTickCountdown)} />
                 </div>
             </div>
@@ -475,7 +475,7 @@ export function SettingsPrivacySection({ draft, setValue }: SettingsSectionProps
             <SectionHeader icon={Lock} label="Privacidade" color="#ef4444" />
             <div className="space-y-3">
                 <div className="flex items-center justify-between gap-3">
-                    <div><div className="text-sm font-bold text-white">Mensagens diretas</div><div className="text-xs text-neutral-400">Permite iniciar e receber conversas diretas.</div></div>
+                    <div><div className="text-sm font-bold text-white">Receber mensagens diretas</div><div className="text-xs text-neutral-400">Permite que outros iniciem conversas diretas com você.</div></div>
                     <ToggleSwitch checked={allowDirectMessages} onChange={() => setValue('allowDirectMessages', !allowDirectMessages)} />
                 </div>
             </div>
@@ -602,16 +602,16 @@ export function SettingsNotificationsSection({ draft, setValue, iosNotifStatus, 
                     <ToggleSwitch checked={inAppToasts} onChange={() => setValue('inAppToasts', !inAppToasts)} />
                 </div>
                 <div className="flex items-center justify-between gap-3">
-                    <div><div className="text-sm font-bold text-white">Pedir permissão automaticamente</div><div className="text-xs text-neutral-400">Evita prompt do navegador ao iniciar treino.</div></div>
+                    <div><div className="text-sm font-bold text-white">Pedir permissão automaticamente</div><div className="text-xs text-neutral-400">Solicita a permissão de notificações ao entrar, em vez de no meio do treino.</div></div>
                     <ToggleSwitch checked={notificationPermissionPrompt} onChange={() => setValue('notificationPermissionPrompt', !notificationPermissionPrompt)} />
                 </div>
 
                 {/* ── Conversas e eventos diretos ──────────────────────────── */}
                 <div className="pt-3 border-t border-neutral-700/60 space-y-3">
-                    <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Mensagens e convites</div>
+                    <div className="text-xs font-black uppercase tracking-widest text-neutral-400">Mensagens e avisos</div>
                     <NotifRow
-                        title="Mensagem direta"
-                        description="DMs recebidas de outros usuários."
+                        title="Notificar mensagem recebida"
+                        description="Aviso quando chega uma mensagem direta."
                         checked={notifyDirectMessages}
                         disabled={!pushNotificationsEnabled}
                         onChange={() => setValue('notifyDirectMessages', !notifyDirectMessages)}
@@ -838,7 +838,7 @@ export function SettingsNotificationsSection({ draft, setValue, iosNotifStatus, 
                     />
                     <NotifRow
                         title="Menções (@)"
-                        description="Avisa quando alguém te menciona em comentários ou no chat de team."
+                        description="Avisa quando alguém te menciona em um comentário."
                         checked={notifyMentions}
                         disabled={!pushNotificationsEnabled}
                         onChange={() => setValue('notifyMentions', !notifyMentions)}

@@ -96,6 +96,10 @@ export const UserSettingsSchema = z
     restTimerDefaultSeconds: z.number().default(90),
     autoRestTimerWhenMissing: z.boolean().default(false),
     programTitleStartDay: z.enum(['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']).default('monday'),
+    // Ajuste de meta calórica em dias de descanso (consumido por nutrition/page + NutritionOverlay).
+    // Antes só sobrevivia via .passthrough() — sem entrada no schema, o default/reset não o conheciam.
+    // Default ON: os consumidores tratam ausente como ligado (`!== false`).
+    restDayAdjustEnabled: z.boolean().default(true),
     requireBiometricsOnStartup: z.boolean().default(false),
     // ── Integrations ──────────────────────────────────────────────────────────
     appleHealthSync: z.boolean().default(false),
