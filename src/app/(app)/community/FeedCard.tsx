@@ -84,9 +84,12 @@ const defaultConfig = {
 export default function FeedCard({
   item,
   onProfileClick,
+  presence,
 }: {
   item: FeedItem
   onProfileClick?: (userId: string) => void
+  /** Presença do autor: 'training' (treinando agora) > 'online' (app aberto) > null. */
+  presence?: 'training' | 'online' | null
 }) {
   const cfg = typeConfig[item.type] || defaultConfig
   const name = item.senderName || 'Usuário'
@@ -124,6 +127,19 @@ export default function FeedCard({
         >
           {cfg.emoji}
         </div>
+        {/* Presença: treinando (verde pulsante) > online (verde) */}
+        {presence && (
+          <span
+            className="absolute -top-0.5 -right-0.5 w-3 h-3 rounded-full"
+            title={presence === 'training' ? 'Treinando agora' : 'Online'}
+            style={{
+              background: '#22c55e',
+              border: '1.5px solid #0a0a0a',
+              boxShadow: presence === 'training' ? '0 0 6px #22c55e' : 'none',
+              animation: presence === 'training' ? 'pulse 2s infinite' : 'none',
+            }}
+          />
+        )}
       </button>
 
       {/* Content */}
