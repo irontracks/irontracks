@@ -252,8 +252,8 @@ export function SettingsAppModeSection({ draft, setValue, setModulesModalOpen }:
                     <select value={uiMode} onChange={(e) => {
                         const next = String(e.target.value || 'beginner')
                         setValue('uiMode', next)
-                        if (next === 'beginner') { setValue('moduleSocial', true); setValue('moduleCommunity', true); setValue('moduleMarketplace', true) }
-                        else if (next === 'intermediate') { setValue('moduleSocial', true); setValue('moduleCommunity', false); setValue('moduleMarketplace', false) }
+                        if (next === 'beginner') { setValue('moduleSocial', true); setValue('moduleCommunity', true) }
+                        else if (next === 'intermediate') { setValue('moduleSocial', true); setValue('moduleCommunity', false) }
                     }} className="bg-neutral-900 border border-neutral-700 rounded-xl px-3 py-2 text-sm text-white">
                         <option value="beginner">Iniciante</option>
                         <option value="intermediate">Intermediário</option>
@@ -263,7 +263,7 @@ export function SettingsAppModeSection({ draft, setValue, setModulesModalOpen }:
                 <div className="flex items-center justify-between gap-3">
                     <div>
                         <div className="text-sm font-bold text-white">Módulos opcionais</div>
-                        <div className="text-xs text-neutral-400">Ative/desative Social, Comunidade e Marketplace.</div>
+                        <div className="text-xs text-neutral-400">Ative/desative Social e Comunidade.</div>
                     </div>
                     <button type="button" onClick={() => setModulesModalOpen(true)} className="px-3 py-2 rounded-xl bg-neutral-900 border border-neutral-700 text-neutral-200 font-black hover:bg-neutral-800">Gerenciar</button>
                 </div>
@@ -569,7 +569,6 @@ export function SettingsNotificationsSection({ draft, setValue, iosNotifStatus, 
     const notifyMissedMeal = Boolean(draft?.notifyMissedMeal ?? false)
     const notifyChallenges = Boolean(draft?.notifyChallenges ?? true)
     const notifyMealReminders = Boolean(draft?.notifyMealReminders ?? true)
-    const notifyWorkoutReminders = Boolean(draft?.notifyWorkoutReminders ?? true)
 
     return (
         <SectionCard>
@@ -880,13 +879,6 @@ export function SettingsNotificationsSection({ draft, setValue, iosNotifStatus, 
                         checked={notifyDailyGoal}
                         disabled={!pushNotificationsEnabled}
                         onChange={() => setValue('notifyDailyGoal', !notifyDailyGoal)}
-                    />
-                    <NotifRow
-                        title="Treino"
-                        description="Lembretes para não perder um dia de treino."
-                        checked={notifyWorkoutReminders}
-                        disabled={!pushNotificationsEnabled}
-                        onChange={() => setValue('notifyWorkoutReminders', !notifyWorkoutReminders)}
                     />
                 </div>
 
@@ -1251,7 +1243,6 @@ interface SettingsModulesModalProps extends SettingsSectionProps {
 export function SettingsModulesModal({ draft, setValue, isOpen, onClose }: SettingsModulesModalProps) {
     const moduleSocial = Boolean(draft?.moduleSocial ?? true)
     const moduleCommunity = Boolean(draft?.moduleCommunity ?? true)
-    const moduleMarketplace = Boolean(draft?.moduleMarketplace ?? true)
     if (!isOpen) return null
     return (
         // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions
@@ -1271,13 +1262,9 @@ export function SettingsModulesModal({ draft, setValue, isOpen, onClose }: Setti
                         <div><div className="text-sm font-bold text-white">Comunidade</div><div className="text-xs text-neutral-400">Lista e interações de comunidade.</div></div>
                         <ToggleSwitch checked={moduleCommunity} onChange={() => setValue('moduleCommunity', !moduleCommunity)} />
                     </div>
-                    <div className="flex items-center justify-between gap-3">
-                        <div><div className="text-sm font-bold text-white">Marketplace</div><div className="text-xs text-neutral-400">Planos e assinaturas de professores.</div></div>
-                        <ToggleSwitch checked={moduleMarketplace} onChange={() => setValue('moduleMarketplace', !moduleMarketplace)} />
-                    </div>
                 </div>
                 <div className="p-4 border-t border-neutral-800 flex items-center justify-between gap-2">
-                    <button type="button" onClick={() => { setValue('moduleSocial', true); setValue('moduleCommunity', true); setValue('moduleMarketplace', true) }} className="px-4 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 font-bold hover:bg-neutral-700 inline-flex items-center gap-2">
+                    <button type="button" onClick={() => { setValue('moduleSocial', true); setValue('moduleCommunity', true) }} className="px-4 py-3 rounded-xl bg-neutral-800 border border-neutral-700 text-neutral-200 font-bold hover:bg-neutral-700 inline-flex items-center gap-2">
                         <RotateCcw size={16} className="text-yellow-500" /> Restaurar
                     </button>
                     <button type="button" onClick={onClose} className="px-4 py-3 rounded-xl bg-yellow-500 text-black font-black hover:bg-yellow-400 inline-flex items-center gap-2">Ok</button>

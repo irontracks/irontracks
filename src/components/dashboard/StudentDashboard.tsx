@@ -75,7 +75,6 @@ type Props = {
     uiMode?: string
     moduleSocial?: boolean
     moduleCommunity?: boolean
-    moduleMarketplace?: boolean
     showStoriesBar?: boolean
     showNewRecordsCard?: boolean
     showIronRank?: boolean
