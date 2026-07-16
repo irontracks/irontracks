@@ -544,7 +544,6 @@ export function SettingsNotificationsSection({ draft, setValue, iosNotifStatus, 
     const notifyBroadcasts = Boolean(draft?.notifyBroadcasts ?? true)
     const notifySocialFollows = Boolean(draft?.notifySocialFollows ?? true)
     const notifyFollowAccepted = Boolean(draft?.notifyFollowAccepted ?? true)
-    const notifyFriendOnline = Boolean(draft?.notifyFriendOnline ?? true)
     const notifyFriendWorkoutEvents = Boolean(draft?.notifyFriendWorkoutEvents ?? true)
     const notifyFriendWorkoutStart = Boolean(draft?.notifyFriendWorkoutStart ?? true)
     const notifyFriendPRs = Boolean(draft?.notifyFriendPRs ?? true)
@@ -678,13 +677,9 @@ export function SettingsNotificationsSection({ draft, setValue, iosNotifStatus, 
                         disabled={!pushNotificationsEnabled}
                         onChange={() => setValue('notifyFollowAccepted', !notifyFollowAccepted)}
                     />
-                    <NotifRow
-                        title="Amigo online"
-                        description="Quando um seguido abre o app."
-                        checked={notifyFriendOnline}
-                        disabled={!pushNotificationsEnabled}
-                        onChange={() => setValue('notifyFriendOnline', !notifyFriendOnline)}
-                    />
+                    {/* "Amigo online" saiu da lista de push: notifyFriendOnline agora
+                        controla o indicador VISUAL de presença no feed da Comunidade
+                        (não gera notificação). O toggle vive no painel da Comunidade. */}
                     <NotifRow
                         title="Amigo começou treino"
                         description="Quando um seguido inicia um treino agora."

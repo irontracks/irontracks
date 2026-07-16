@@ -61,6 +61,10 @@ export function useCommunityData(notifyError?: (msg: string) => void) {
   // Fonte = sessão de treino REALMENTE aberta (`active_workout_sessions`), não
   // presença de app aberto. Ver /api/social/training-now.
   const [trainingNowIds, setTrainingNowIds] = useState<string[]>([])
+  // Online = app aberto nos últimos ~5min (presence/list, já recortado por follow
+  // no servidor). É um indicador VISUAL no app — não gera push (o "friend_online"
+  // como push foi removido por spam). "Treinando" tem prioridade sobre "online".
+  const [onlineIds, setOnlineIds] = useState<string[]>([])
   const [trainingNowProfiles, setTrainingNowProfiles] = useState<ProfileRow[]>([])
 
   // ── Auth ──
@@ -251,20 +255,30 @@ export function useCommunityData(notifyError?: (msg: string) => void) {
   useEffect(() => {
     if (!userId) return
     let mounted = true
-    const loadTrainingNow = async () => {
+    const loadPresence = async () => {
       try {
-        const res = await fetch('/api/social/training-now')
-        const data = await res.json().catch(() => null)
-        if (!mounted || !data?.ok) return
-        const ids = (Array.isArray(data.training) ? data.training : [])
-          .map((r: unknown) => String((r as { user_id?: string })?.user_id || '').trim())
-          .filter((id: string) => id && id !== userId)
-        setTrainingNowIds(ids)
-        setTrainingNowProfiles(ids.map((id: string) => profiles.find((p) => p.id === id)).filter(Boolean) as ProfileRow[])
+        const [trainingRes, onlineRes] = await Promise.all([
+          fetch('/api/social/training-now').then((r) => r.json()).catch(() => null),
+          fetch('/api/social/presence/list').then((r) => r.json()).catch(() => null),
+        ])
+        if (!mounted) return
+        if (trainingRes?.ok) {
+          const ids = (Array.isArray(trainingRes.training) ? trainingRes.training : [])
+            .map((r: unknown) => String((r as { user_id?: string })?.user_id || '').trim())
+            .filter((id: string) => id && id !== userId)
+          setTrainingNowIds(ids)
+          setTrainingNowProfiles(ids.map((id: string) => profiles.find((p) => p.id === id)).filter(Boolean) as ProfileRow[])
+        }
+        if (onlineRes?.ok) {
+          const ids = (Array.isArray(onlineRes.online_users) ? onlineRes.online_users : [])
+            .map((v: unknown) => String(v || '').trim())
+            .filter((id: string) => id && id !== userId)
+          setOnlineIds(ids)
+        }
       } catch { }
     }
-    loadTrainingNow()
-    const interval = setInterval(loadTrainingNow, 30_000)
+    loadPresence()
+    const interval = setInterval(loadPresence, 30_000)
     return () => { mounted = false; clearInterval(interval) }
   }, [userId, profiles])
 
@@ -360,6 +374,7 @@ export function useCommunityData(notifyError?: (msg: string) => void) {
     // Treinando agora (sessão de treino aberta — não "app aberto")
     trainingNowIds,
     trainingNowProfiles,
+    onlineIds,
     // Actions
     respondFollowRequest,
     cancelFollowRequest,

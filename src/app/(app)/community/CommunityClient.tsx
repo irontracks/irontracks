@@ -158,10 +158,21 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
     supabase, userId, loading, profiles, follows, followRequests, loadError,
     busyId, busyRequestId,
     feedItems, feedLoading, feedError, feedHasMore, feedLoadedRef, loadFeed,
-    trainingNowIds, trainingNowProfiles,
+    trainingNowIds, trainingNowProfiles, onlineIds,
     respondFollowRequest, cancelFollowRequest, follow, unfollow,
   } = useCommunityData(notifyError)
   const userSettingsApi = useUserSettings(userId)
+  // Presença dos amigos no feed (bolinha verde) — gated pela preferência do usuário
+  // (notifyFriendOnline). Treinando tem prioridade sobre online.
+  const showPresence = Boolean((userSettingsApi?.settings as Record<string, unknown>)?.notifyFriendOnline ?? true)
+  const trainingSet = useMemo(() => new Set(trainingNowIds), [trainingNowIds])
+  const onlineSet = useMemo(() => new Set(onlineIds), [onlineIds])
+  const presenceOf = useCallback((uid: string): 'training' | 'online' | null => {
+    if (!showPresence || !uid) return null
+    if (trainingSet.has(uid)) return 'training'
+    if (onlineSet.has(uid)) return 'online'
+    return null
+  }, [showPresence, trainingSet, onlineSet])
   const [communitySettingsOpen, setCommunitySettingsOpen] = useState(false)
   const [query, setQuery] = useState('')
 
@@ -364,7 +375,7 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
               <div className="px-5 py-3 max-h-[60vh] overflow-y-auto">
                 <ToggleButton userSettingsApi={userSettingsApi} settingKey="allowSocialFollows" label="Permitir convites para seguir" description="Se desligar, ninguém consegue solicitar para te seguir." />
                 <ToggleButton userSettingsApi={userSettingsApi} settingKey="notifySocialFollows" label="Notificações sociais" description="Solicitações de seguir e confirmações." />
-                <ToggleButton userSettingsApi={userSettingsApi} settingKey="notifyFriendOnline" label="Amigo entrou no app" description="Avisos de presença." />
+                <ToggleButton userSettingsApi={userSettingsApi} settingKey="notifyFriendOnline" label="Mostrar amigos online" description="Bolinha verde no feed em quem está online ou treinando agora. Não gera notificação." />
                 <ToggleButton userSettingsApi={userSettingsApi} settingKey="notifyFriendWorkoutEvents" label="Atividades de treino do amigo" description="Início/fim/criação/edição de treino." />
                 <ToggleButton userSettingsApi={userSettingsApi} settingKey="notifyFriendPRs" label="PRs do amigo" description="Avisos quando bater recorde pessoal." />
                 <ToggleButton userSettingsApi={userSettingsApi} settingKey="notifyFriendStreaks" label="Streak do amigo" description="Avisos de sequência de dias treinando." />
@@ -483,7 +494,7 @@ function CommunityClientInner({ embedded }: { embedded?: boolean }) {
                   <GoldGradientBorder>
                     <div>
                       {(feedItems as unknown as FeedItem[]).map((item) => (
-                        <FeedCard key={item.id} item={item} onProfileClick={(id) => setProfileModalUserId(id)} />
+                        <FeedCard key={item.id} item={item} presence={presenceOf(String((item as { senderId?: string }).senderId || ''))} onProfileClick={(id) => setProfileModalUserId(id)} />
                       ))}
                       {feedHasMore && (
                         <button
