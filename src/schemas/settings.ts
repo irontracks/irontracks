@@ -43,6 +43,11 @@ export const UserSettingsSchema = z
     // any type. In-app notifications still appear (the user may want to see
     // them on the bell menu without being interrupted on the lock screen).
     pushNotificationsEnabled: z.boolean().default(true),
+    // "Não perturbar": nenhum push na janela [start, end) em horário de Brasília
+    // (as notificações in-app seguem). Pushes críticos (cobrança/segurança) ignoram.
+    quietHoursEnabled: z.boolean().default(false),
+    quietHoursStart: z.number().int().min(0).max(23).default(22),
+    quietHoursEnd: z.number().int().min(0).max(23).default(7),
     // Per-type toggles — apply to both in-app notifications and pushes
     notifyDirectMessages: z.boolean().default(true),
     notifyAppointments: z.boolean().default(true),
