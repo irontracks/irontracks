@@ -74,6 +74,10 @@ export default function SettingsModal(props: SettingsModalProps) {
   const [userEmail, setUserEmail] = useState('')
   const [userId, setUserId] = useState('')
   const [userPhotoURL, setUserPhotoURL] = useState<string | null>(null)
+  // Admin de verdade (lido de profiles.role, igual ao laAdmin da seção de push) —
+  // gateia o painel "Diagnóstico iOS" e seus botões de debug, que antes vazavam
+  // pra todo usuário iOS.
+  const [isAdmin, setIsAdmin] = useState(false)
   const [iosNotifStatus, setIosNotifStatus] = useState<string>('unknown')
   const [iosTimeSensitiveStatus, setIosTimeSensitiveStatus] = useState<string | undefined>(undefined)
   const [iosNotifBusy, setIosNotifBusy] = useState(false)
@@ -176,9 +180,10 @@ export default function SettingsModal(props: SettingsModalProps) {
       setUserEmail(String(data?.user?.email || ''))
       setUserId(uid)
       if (uid) {
-        supabase.from('profiles').select('photo_url').eq('id', uid).maybeSingle()
+        supabase.from('profiles').select('photo_url, role').eq('id', uid).maybeSingle()
           .then(({ data: profile }) => {
             setUserPhotoURL(String(profile?.photo_url || data?.user?.user_metadata?.avatar_url || '') || null)
+            setIsAdmin(String((profile as { role?: string } | null)?.role || '').toLowerCase() === 'admin')
           })
       }
     })
@@ -309,8 +314,8 @@ export default function SettingsModal(props: SettingsModalProps) {
           )}
           {iosNative && <SettingsSecuritySection draft={draft} setValue={setValue} />}
 
-          {/* iOS Diagnostics */}
-          {iosNative && (
+          {/* iOS Diagnostics — só admin (painel de debug: versão/plugins/permissões + testes) */}
+          {iosNative && isAdmin && (
             <div className="rounded-xl p-4" style={{ background: 'rgba(255,255,255,0.03)', border: '1px solid rgba(255,255,255,0.07)' }}>
               <div className="flex items-center justify-between gap-3 mb-3">
                 <div>
