@@ -3,6 +3,7 @@
 /* eslint-disable jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions, jsx-a11y/control-has-associated-label */
 
 import React from 'react';
+import { createPortal } from 'react-dom';
 import dynamic from 'next/dynamic';
 import { ArrowDown, ArrowUp, Check, Clock, GripVertical, Loader2, Save, X } from 'lucide-react';
 import { Reorder, useDragControls } from 'framer-motion';
@@ -157,9 +158,18 @@ export default function Modals() {
         </div>
       )}
 
-      {postCheckinOpen && (
+      {/* Check-out pós-treino — PORTAL pro document.body, de propósito.
+          O <ActiveWorkout> é um `fixed inset-0 z-[50]`: position + z-index != auto
+          já criam um CONTEXTO DE EMPILHAMENTO, então TODO z-index daqui de dentro é
+          refém do 50 do pai. Contra a barra do descanso (RestTimerOverlay, z-[2100],
+          renderizada no DashboardModals = raiz), a disputa real era 2100 vs 50 → a
+          barra ganhava e cobria o "Pular"/"Continuar" de quem finalizou treinando
+          com um descanso rolando. Subir o z-[1200] NÃO resolvia. O portal tira o
+          modal do contexto do pai; o z-[2300] é o que vence a barra na raiz (mesmo
+          motivo do z-[2200] do editor em IronTracksAppClientImpl). */}
+      {postCheckinOpen && typeof document !== 'undefined' && createPortal(
         <div
-          className="fixed inset-0 z-[1200] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe"
+          className="fixed inset-0 z-[2300] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4 pt-safe pb-safe"
           onClick={() => {
             setPostCheckinOpen(false);
             const r = postCheckinResolveRef.current;
@@ -258,7 +268,8 @@ export default function Modals() {
               </button>
             </div>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
 
       {deloadModal && (
