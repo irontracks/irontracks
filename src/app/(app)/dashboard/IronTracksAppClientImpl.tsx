@@ -566,6 +566,15 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         handleJsonUpload,
     } = useWorkoutExport({ user, workouts, fetchWorkouts, alert: appHandlers.alertVoid, confirm })
 
+    // JANELA PÓS-FINISH — marcado pelo handleFinishSession. O finish limpa o
+    // activeSession na hora, mas navega pro relatório com router.push (ASSÍNCRONO):
+    // até a rota commitar, view ainda é 'active' e activeSession já é null. Isso NÃO
+    // é "restaurando sessão" — é a navegação em voo. 30s é folgado de propósito (a
+    // rota costuma commitar em <1s); se travar além disso, o cap volta a valer.
+    const FINISH_NAV_GRACE_MS = 30_000
+    const justFinishedAtRef = useRef(0)
+    const isFinishNavPending = useCallback(() => Date.now() - justFinishedAtRef.current < FINISH_NAV_GRACE_MS, [])
+
     // CRUD de treinos — extraído para useWorkoutCrud
     const userSettingsForCrud = userSettingsApi?.settings && typeof userSettingsApi.settings === 'object'
         ? (userSettingsApi.settings as Record<string, unknown>)
@@ -603,6 +612,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         setReportData: setReportData as (data: unknown) => void,
         setReportBackView,
         suppressForeignFinishToastUntilRef,
+        justFinishedAtRef,
         fetchWorkouts,
         alert,
         confirm,
@@ -833,14 +843,24 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
             setSessionRestoringExpired(false)
             return
         }
+        // Pós-finish: NÃO sequestrar a navegação pro relatório (ver isFinishNavPending).
+        if (isFinishNavPending()) return
         const t = setTimeout(() => {
             setSessionRestoringExpired(true)
             setView('dashboard') // navegar imediatamente, não esperar o safety net
         }, 5000)
         return () => clearTimeout(t)
-    }, [view, activeSession, setView])
+    }, [view, activeSession, setView, isFinishNavPending])
 
-    const isSessionRestoring = view === 'active' && !activeSession && !sessionRestoringExpired
+    // JANELA PÓS-FINISH — o finish limpa activeSession na hora, mas navega pro
+    // relatório com `setView` = router.push (ASSÍNCRONO). Até a rota commitar,
+    // `view` ainda é 'active' e activeSession já é null: isso NÃO é "restaurando
+    // sessão", é só a navegação em voo. Sem esta marca, o guard abaixo mostrava o
+    // LoadingScreen, o cap de 5s disparava setView('dashboard') (jogando o usuário
+    // de volta no dashboard) e, com o LoadingScreen seguindo montado, aos 8s vinha
+    // a tela "Não foi possível carregar o app". Intermitente: só quando a rota do
+    // relatório demorava a commitar.
+    const isSessionRestoring = view === 'active' && !activeSession && !sessionRestoringExpired && !isFinishNavPending()
     const isAppLoading = isSessionRestoring || (view !== 'active' && !activeSession && (
         (authLoading && !hasCachedWorkouts) || (!user?.id && !hasCachedWorkouts) || !isDashboardReady
     ));
