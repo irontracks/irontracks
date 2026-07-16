@@ -58,7 +58,6 @@ export const NOTIFICATION_TYPE_TO_PREFERENCE: Record<string, string> = {
   challenge_accepted: 'notifyChallenges',
   challenge_declined: 'notifyChallenges',
   meal_reminder: 'notifyMealReminders',
-  workout_reminder: 'notifyWorkoutReminders',
 }
 
 /** Given a notification type, return the preference key that gates it, or null. */
