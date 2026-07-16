@@ -179,9 +179,19 @@ struct WorkoutLiveActivity: Widget {
                     .padding(.bottom, 4)
                 }
             } compactLeading: {
-                Image(systemName: "figure.strengthtraining.traditional")
-                    .foregroundColor(.orange)
-                    .font(.caption.bold())
+                // Descanso ATIVO → countdown decrescente (verde) do OUTRO lado; senão o
+                // ícone do treino. O elapsed (count-up) segue no compactTrailing.
+                if let restEnd = context.state.restEndDate, restEnd > Date() {
+                    Text(timerInterval: Date()...restEnd, countsDown: true)
+                        .font(.caption.bold())
+                        .monospacedDigit()
+                        .foregroundColor(.green)
+                        .frame(minWidth: 40)
+                } else {
+                    Image(systemName: "figure.strengthtraining.traditional")
+                        .foregroundColor(.orange)
+                        .font(.caption.bold())
+                }
             } compactTrailing: {
                 Text(timerInterval: context.attributes.workoutStartDate...Date.distantFuture, countsDown: false)
                     .font(.caption.bold())

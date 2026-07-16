@@ -40,6 +40,10 @@ struct WorkoutLiveActivityAttributes: ActivityAttributes {
         var totalSetsCompleted: Int
         /// Total volume in kg accumulated this session (sum of weight × reps)
         var totalVolumeKg: Double
+        /// Quando um descanso está ATIVO, o instante em que ele acaba — dirige o
+        /// countdown decrescente no compact/expanded da ilha do treino. nil = sem
+        /// descanso (mostra o ícone). Optional pra decodificar estados antigos.
+        var restEndDate: Date?
     }
 
     /// Static workout title (e.g. "Treino A — Peito + Tríceps")

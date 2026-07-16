@@ -93,6 +93,7 @@ type IronTracksNativePlugin = {
     totalSetsCompleted?: number
     totalVolumeKg?: number
   }) => Promise<void>
+  updateWorkoutRestCountdown: (opts: { restEndMs: number }) => Promise<void>
   endWorkoutLiveActivity: () => Promise<void>
   // App Intents (Siri shortcuts) — pending action triggered by Siri/Shortcuts
   checkPendingIntentAction: () => Promise<{ action: string }>
@@ -207,6 +208,7 @@ const webFallback: IronTracksNativePlugin = {
   getSleepData: async () => ({ totalMinutes: 0, asleepMinutes: 0, inBedMinutes: 0, startMs: 0, endMs: 0 }),
   startWorkoutLiveActivity: async () => ({ activityId: '' }),
   updateWorkoutLiveActivity: async () => { },
+  updateWorkoutRestCountdown: async () => { },
   endWorkoutLiveActivity: async () => { },
   checkPendingIntentAction: async () => ({ action: '' }),
   startGymGeofence: async () => ({ ok: false }),
@@ -486,6 +488,15 @@ export const updateWorkoutLiveActivity = async (
       totalSetsCompleted: Math.max(0, Math.round(Number(patch.totalSetsCompleted) || 0)),
       totalVolumeKg: Math.max(0, Number(patch.totalVolumeKg) || 0),
     })
+  } catch { /* swallow */ }
+}
+
+/** Liga/desliga o countdown de descanso na ilha do TREINO (compact leading).
+ *  restEndMs = timestamp epoch (ms) do fim do descanso; 0 limpa. No-op na web. */
+export const updateWorkoutRestCountdown = async (restEndMs: number): Promise<void> => {
+  try {
+    if (!isIosNative()) return
+    await Native.updateWorkoutRestCountdown({ restEndMs: Math.max(0, Number(restEndMs) || 0) })
   } catch { /* swallow */ }
 }
 
