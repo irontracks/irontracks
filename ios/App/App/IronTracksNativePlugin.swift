@@ -85,6 +85,7 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin, CLLocationMana
         // Workout Live Activity (session-level — exercise / set / volume / elapsed)
         CAPPluginMethod(name: "startWorkoutLiveActivity", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "updateWorkoutLiveActivity", returnType: CAPPluginReturnPromise),
+        CAPPluginMethod(name: "updateWorkoutRestCountdown", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "endWorkoutLiveActivity", returnType: CAPPluginReturnPromise),
         // App Intents (Siri shortcuts) — read pending action triggered by intent
         CAPPluginMethod(name: "checkPendingIntentAction", returnType: CAPPluginReturnPromise),
@@ -748,7 +749,8 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin, CLLocationMana
                     currentSetIndex: setIndex,
                     totalSetsForExercise: setsForEx,
                     totalSetsCompleted: setsCompleted,
-                    totalVolumeKg: totalVolumeKg
+                    totalVolumeKg: totalVolumeKg,
+                    restEndDate: nil
                 )
                 // staleDate = 12 h after start (safety cap; far longer than any workout)
                 let staleDate = startDate.addingTimeInterval(12 * 3600)
@@ -780,18 +782,50 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin, CLLocationMana
             let setsCompleted = call.getInt("totalSetsCompleted") ?? 0
             let totalVolumeKg = call.getDouble("totalVolumeKg") ?? 0.0
 
+            // PRESERVA o restEndDate atual: o snapshot do treino (exercício/série/volume)
+            // não pode apagar o countdown de descanso em andamento. Quem mexe no descanso
+            // é o updateWorkoutRestCountdown.
+            let currentRestEnd = Activity<WorkoutLiveActivityAttributes>.activities.first?.content.state.restEndDate
             let state = WorkoutLiveActivityAttributes.ContentState(
                 currentExerciseName: exerciseName,
                 currentSetIndex: setIndex,
                 totalSetsForExercise: setsForEx,
                 totalSetsCompleted: setsCompleted,
-                totalVolumeKg: totalVolumeKg
+                totalVolumeKg: totalVolumeKg,
+                restEndDate: currentRestEnd
             )
             let staleDate = Date().addingTimeInterval(12 * 3600)
             let content = ActivityContent(state: state, staleDate: staleDate)
             Task {
                 for activity in Activity<WorkoutLiveActivityAttributes>.activities {
                     await activity.update(content)
+                }
+            }
+            call.resolve()
+        } else {
+            call.resolve()
+        }
+    }
+
+    // Liga/desliga o countdown de descanso na ilha do TREINO. Só mexe no restEndDate,
+    // PRESERVANDO os campos de progresso (exercício/série/volume) do estado atual —
+    // senão zeraria o treino. restEndMs=0 → limpa (volta o ícone).
+    @objc func updateWorkoutRestCountdown(_ call: CAPPluginCall) {
+        if #available(iOS 16.2, *) {
+            let restEndMs = call.getDouble("restEndMs") ?? 0
+            let restEnd: Date? = restEndMs > 0 ? Date(timeIntervalSince1970: restEndMs / 1000.0) : nil
+            Task {
+                for activity in Activity<WorkoutLiveActivityAttributes>.activities {
+                    let cur = activity.content.state
+                    let next = WorkoutLiveActivityAttributes.ContentState(
+                        currentExerciseName: cur.currentExerciseName,
+                        currentSetIndex: cur.currentSetIndex,
+                        totalSetsForExercise: cur.totalSetsForExercise,
+                        totalSetsCompleted: cur.totalSetsCompleted,
+                        totalVolumeKg: cur.totalVolumeKg,
+                        restEndDate: restEnd
+                    )
+                    await activity.update(ActivityContent(state: next, staleDate: Date().addingTimeInterval(12 * 3600)))
                 }
             }
             call.resolve()

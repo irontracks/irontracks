@@ -5,7 +5,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { playTimerFinishSound, playTick } from '@/lib/sounds';
 import { isNativePlatform } from '@/utils/platform';
 import { useKeyboardInset } from '@/hooks/useKeyboardInset';
-import { addWidgetStartSetListener, cancelRestNotification, checkPendingWidgetAction, endRestLiveActivity, requestNativeNotifications, scheduleRestNotification, startRestLiveActivity, stopAlarmSound, triggerHaptic, updateRestLiveActivity } from '@/utils/native/irontracksNative';
+import { addWidgetStartSetListener, cancelRestNotification, checkPendingWidgetAction, endRestLiveActivity, requestNativeNotifications, scheduleRestNotification, startRestLiveActivity, stopAlarmSound, triggerHaptic, updateRestLiveActivity, updateWorkoutRestCountdown } from '@/utils/native/irontracksNative';
 import { scheduleRestEndPush as scheduleRestEndPushApi, cancelRestEndPush as cancelRestEndPushApi } from '@/lib/workout/restEndPush';
 
 interface RestTimerContext {
@@ -380,6 +380,8 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
                 }).catch(() => { });
             }
             startRestLiveActivity(id, seconds, liveTitle, workoutStartMs);
+            // Espelha o countdown na ilha do TREINO (do outro lado do elapsed).
+            updateWorkoutRestCountdown(targetTime);
             // Guarda os dados deste descanso p/ um eventual agendamento no
             // background. Cancela qualquer agendamento de um descanso anterior.
             if (restPushScheduleIdRef.current) {
@@ -427,6 +429,7 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
                 cancelRestNotification(notifyIdRef.current);
                 endRestLiveActivity(notifyIdRef.current);
             }
+            updateWorkoutRestCountdown(0); // limpa o countdown na ilha do treino
             stopAlarm(false);
         };
     // ★ ONLY depend on targetTime + context identity — not on settings
@@ -546,6 +549,7 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
             setDismissed(true);
             try {
                 if (notifyIdRef.current) endRestLiveActivity(notifyIdRef.current);
+                updateWorkoutRestCountdown(0);
                 stopAlarm(true);
                 const fn = onStartRef.current ?? onFinishRef.current;
                 if (typeof fn === 'function') fn(contextRef.current);
@@ -589,6 +593,7 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
             if (notifyIdRef.current) {
                 endRestLiveActivity(notifyIdRef.current);
             }
+            updateWorkoutRestCountdown(0);
             stopAlarm(true);
             if (typeof onStart === 'function') onStart(context);
             else if (typeof onFinish === 'function') onFinish(context);
