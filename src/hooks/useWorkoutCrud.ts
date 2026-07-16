@@ -38,6 +38,10 @@ interface UseWorkoutCrudOptions {
     setReportData: (data: unknown) => void
     setReportBackView: (v: string) => void
     suppressForeignFinishToastUntilRef: React.MutableRefObject<number>
+    /** Carimba o instante do finish — o dashboard usa pra não confundir a janela de
+     *  navegação pro relatório (view='active' + activeSession=null) com "restaurando
+     *  sessão" e jogar o usuário de volta no dashboard. */
+    justFinishedAtRef?: React.MutableRefObject<number>
     fetchWorkouts: () => Promise<void>
     alert: (msg: string, title?: string) => Promise<unknown>
     confirm: (msg: string, title?: string) => Promise<boolean>
@@ -83,6 +87,7 @@ export function useWorkoutCrud({
     setReportData,
     setReportBackView,
     suppressForeignFinishToastUntilRef,
+    justFinishedAtRef,
     fetchWorkouts,
     alert,
     confirm,
@@ -268,6 +273,10 @@ export function useWorkoutCrud({
 
     const handleFinishSession = useCallback(async (sessionData: unknown, showReport?: boolean) => {
         suppressForeignFinishToastUntilRef.current = Date.now() + 8000
+        // Abre a janela pós-finish ANTES de limpar a sessão: entre o setActiveSession(null)
+        // e a rota do relatório commitar, view ainda é 'active' sem sessão — sem esta marca
+        // o dashboard trata como "restaurando" e joga o usuário de volta pro dashboard.
+        if (justFinishedAtRef) justFinishedAtRef.current = Date.now()
         try {
             if (user?.id) {
                 localStorage.removeItem(`irontracks.activeSession.v2.${user.id}`)
@@ -282,7 +291,7 @@ export function useWorkoutCrud({
         setReportBackView('dashboard')
         setReportData({ current: sessionData, previous: null })
         setView('report')
-    }, [setActiveSession, setReportBackView, setReportData, setView, suppressForeignFinishToastUntilRef, user?.id])
+    }, [setActiveSession, setReportBackView, setReportData, setView, suppressForeignFinishToastUntilRef, justFinishedAtRef, user?.id])
 
     const handleCreateWorkout = useCallback(() => {
         setCreateWizardOpen(true)
