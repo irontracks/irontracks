@@ -27,6 +27,13 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
     }
 
+    // Ferramenta de diagnóstico — só admin (defense-in-depth; a UI já esconde de
+    // não-admin, mas a rota não pode confiar só nisso).
+    const { data: me } = await supabase.from('profiles').select('role').eq('id', user.id).maybeSingle()
+    if (String((me as { role?: string } | null)?.role || '').toLowerCase() !== 'admin') {
+      return NextResponse.json({ ok: false, error: 'forbidden' }, { status: 403 })
+    }
+
     const parsed = await parseJsonBody(request, BodySchema)
     const body = parsed.data ?? {}
     const kindStr = String(body?.kind ?? 'workout').toLowerCase()
