@@ -89,7 +89,9 @@ export const foodDatabase: Record<string, FoodItem> = {
   'melancia': { kcal: 30, p: 0.6, c: 8, f: 0.2, approx: { fatia: 200 } },
   'abacaxi': { kcal: 50, p: 0.5, c: 13, f: 0.1, approx: { fatia: 80, rodela: 80 } },
   'mamao': { kcal: 43, p: 0.5, c: 11, f: 0.3, approx: { fatia: 100 } },
-  'abacate': { kcal: 160, p: 2, c: 9, f: 15, approx: { colher: 30 } },
+  // `unidade` = o abacate INTEIRO (~200g de polpa). Sem isto, "1 abacate" caía na
+  // única unidade declarada (colher, 30g) e virava 48 kcal — um abacate tem ~320.
+  'abacate': { kcal: 160, p: 2, c: 9, f: 15, approx: { colher: 30, unidade: 200 } },
   'acai': { kcal: 58, p: 0.8, c: 6, f: 3.5, approx: { copo: 200 } },
   'kiwi': { kcal: 61, p: 1.1, c: 15, f: 0.5, approx: { unidade: 76 } },
   'pera': { kcal: 57, p: 0.4, c: 15, f: 0.1, approx: { unidade: 180 } },
