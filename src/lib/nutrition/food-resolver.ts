@@ -4,12 +4,12 @@ import type { MealLog } from './engine'
 import { analyzeMeal, type ParsedMealItem } from './parser'
 import { loadTacoFoods } from './sources/taco-source'
 import { searchOffByText } from './sources/off-source'
-import { loadLearnedFoods } from './learned-foods'
+import { loadMealMemo, bumpMealMemoUsage } from './learned-foods'
 
 type ResolveResult = {
   meal: MealLog
   items: ParsedMealItem[]
-  source: 'local' | 'taco_or_learned' | 'off'
+  source: 'local' | 'memo' | 'taco_or_learned' | 'off'
 }
 
 /**
@@ -64,11 +64,13 @@ async function loadCustomFoods(
 }
 
 /**
- * Attempt to resolve a free-text meal description using:
- *   Phase 1: hardcoded base + TACO + learned foods (all in-process / Supabase)
- *   Phase 2: Open Food Facts cache + API (only if Phase 1 fails)
+ * Resolve uma refeição em texto livre:
+ *   1a.  base curada local (latência zero)
+ *   1a½. memo — este texto EXATO já foi estimado pela IA antes
+ *   1b.  TACO + alimentos do usuário
+ *   2.   Open Food Facts (cache + API), só se o resto falhar
  *
- * Returns null if resolution fails — caller should fall back to Gemini.
+ * Devolve null quando nada resolve — o chamador cai pro Gemini.
  */
 export async function resolveFood(
   supabase: SupabaseClient,
@@ -81,13 +83,34 @@ export async function resolveFood(
     return { meal: a1.meal, items: a1.items, source: 'local' }
   }
 
-  // ── Phase 1b: augment with TACO + learned + custom foods (parallel) ─────────
-  const [tacoFoods, learned, customFoods] = await Promise.all([
+  // ── Phase 1a½: memo — esta refeição EXATA já foi estimada pela IA antes ─────
+  // Depois da base curada de propósito: o memo nasce de um texto que a base NÃO
+  // reconheceu, então nunca deveria disputar com ela. Devolve os totais direto, sem
+  // multiplicar por grama nenhuma — o memo É uma refeição, não um alimento por 100g
+  // (ver o cabeçalho de learned-foods.ts).
+  const memo = await loadMealMemo(supabase, userId, text)
+  if (memo) {
+    void bumpMealMemoUsage(supabase, userId, memo.foodKey)
+    return {
+      meal: { foodName: memo.foodName, calories: memo.calories, protein: memo.protein, carbs: memo.carbs, fat: memo.fat },
+      items: [{
+        label: memo.foodName,
+        grams: 0, // o memo é a refeição inteira; não há peso por unidade a assumir
+        calories: memo.calories,
+        protein: memo.protein,
+        carbs: memo.carbs,
+        fat: memo.fat,
+      }],
+      source: 'memo',
+    }
+  }
+
+  // ── Phase 1b: augment with TACO + custom foods (parallel) ───────────────────
+  const [tacoFoods, customFoods] = await Promise.all([
     loadTacoFoods(supabase),
-    loadLearnedFoods(supabase, userId),
     loadCustomFoods(supabase, userId),
   ])
-  const phase1ExtraFoods = expandFoodKeys({ ...tacoFoods, ...learned, ...customFoods })
+  const phase1ExtraFoods = expandFoodKeys({ ...tacoFoods, ...customFoods })
 
   const a2 = analyzeMeal(text, phase1ExtraFoods)
   if (a2.unknownLines.length === 0 && a2.items.length > 0) {

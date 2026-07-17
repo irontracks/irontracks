@@ -11,7 +11,7 @@ import { deleteEntryCore, editEntryCore, setWaterCore, resolveDateKey, type Meal
 import { insertNotifications, shouldThrottleBySenderType } from '@/lib/social/notifyFollowers'
 import { checkVipFeatureAccess } from '@/utils/vip/limits'
 import { checkRateLimitAsync } from '@/utils/rateLimit'
-import { saveLearnedFood } from '@/lib/nutrition/learned-foods'
+import { saveMealMemo } from '@/lib/nutrition/learned-foods'
 import { estimateMacrosFromText } from '@/lib/nutrition/aiEstimate'
 import { logError } from '@/lib/logger'
 import { waitUntil } from '@vercel/functions'
@@ -228,7 +228,7 @@ export async function estimateFoodAction(text: string) {
 
     // Auto-learn: próxima vez o parser local reconhece sem IA.
     try {
-      await saveLearnedFood(supabase, userId, normalized, out.foodName, out.calories, out.protein, out.carbs, out.fat)
+      await saveMealMemo(supabase, userId, normalized, out.foodName, out.calories, out.protein, out.carbs, out.fat)
     } catch { /* não-fatal */ }
 
     const item = {
