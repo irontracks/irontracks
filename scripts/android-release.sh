@@ -5,7 +5,7 @@
 # Uso:
 #   bash scripts/android-release.sh           # bump auto (versionCode atual + 1)
 #   bash scripts/android-release.sh 25        # força versionCode = 25
-#   bash scripts/android-release.sh --submit  # bump + build + sobe pro Play Console Internal
+#   bash scripts/android-release.sh --submit  # bump + build + sobe pro teste fechado Alpha
 #
 # Pré-requisitos:
 #   • Java 17+ (Temurin recomendado)
@@ -95,7 +95,7 @@ if [ "$SUBMIT" = true ]; then
 else
     echo ""
     echo "📦 Próximos passos:"
-    echo "   • Pra subir pro Play Console manual: abra Play Console → Internal Testing → upload AAB"
+    echo "   • Pra subir manualmente: Play Console → Teste fechado → Alpha → criar versão"
     echo "   • Pra automatizar: rode 'bash scripts/android-release.sh --submit'"
     echo "     (precisa de service account JSON em ~/.googlecloud/service-accounts/)"
 fi
