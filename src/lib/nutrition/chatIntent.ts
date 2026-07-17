@@ -32,12 +32,20 @@ const SIMULATE_PATTERNS: readonly RegExp[] = [
  */
 const NOISE_PATTERNS: readonly RegExp[] = [
   /\b(?:agora|hoje|ainda|mesmo|j[áa]|depois|mais\s+tarde|de\s+noite|hoje\s+[àa]\s+noite)\b/gi,
+  // "como ficará/ficam/fica meus números", "como fico" — futuro e presente. O
+  // "ficará" (futuro) escapava e virava nome de refeição no diário.
+  /\bcomo\s+(?:fic|vai|v[ãa]o|est).*$/i,
   // "que" no meio é fala corrente: "pra quanto QUE vai minhas calorias".
-  /\b(?:pra|para)\s+quanto\s+(?:que\s+)?(?:vai|v[ãa]o|fica|ficam|fico).*$/i,
-  /\bquanto\s+(?:que\s+)?(?:fica|ficam|vai|v[ãa]o|fico)\b.*$/i,
-  /\b(?:minhas?|meus?)\s+(?:calorias?|macros?|prote[íi]na).*$/i,
+  // fica(?:m|r[áa])? cobre fica/ficam/ficará numa passada — alternância separada
+  // com \b falhava em "ficaRÁ" (casava "fica" e o boundary quebrava).
+  // Sem \b DEPOIS do verbo: "ficará" termina em "á", que o \b do JS (ASCII) trata
+  // como não-palavra, então o boundary falhava e a cauda não era cortada.
+  /\b(?:pra|para)\s+quanto\s+(?:que\s+)?(?:vai|v[ãa]o|fico|fica(?:m|r[áa])?).*$/i,
+  /\bquanto\s+(?:que\s+)?(?:vai|v[ãa]o|fico|fica(?:m|r[áa])?).*$/i,
+  /\b(?:minhas?|meus?)\s+(?:calorias?|macros?|n[úu]meros?|prote[íi]na).*$/i,
   /\bcabe\s+na\s+(?:minha\s+)?meta\b.*$/i,
-  /\be\s+os\s+macros\b.*$/i,
+  // "e os macros?", "e os meus números?" — cauda de pergunta com conector.
+  /\be\s+os\s+(?:meus\s+)?(?:macros?|n[úu]meros?)\b.*$/i,
 ]
 
 export interface SimulateIntent {
@@ -63,7 +71,10 @@ export function cleanFoodText(raw: string): string {
   for (const re of NOISE_PATTERNS) out = out.replace(re, ' ')
   return out
     .replace(/[?!.,;:]+\s*$/g, '')
-    .replace(/\s*\b(?:e|com|mais)\s*$/i, '')
+    // Conector solto no fim. "e os" como unidade PRIMEIRO: quando outro padrão come
+    // "meus números" e sobra "arroz e os", isto limpa o "e os" inteiro em vez de
+    // deixar o "os" órfão.
+    .replace(/[\s,]*\b(?:e\s+os|com|mais|e|os)\s*$/i, '')
     .replace(/\s+/g, ' ')
     .trim()
 }

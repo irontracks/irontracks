@@ -89,6 +89,20 @@ describe('precisão — as fronteiras de confiança', () => {
   })
 })
 
+describe('nome da refeição — nunca a pergunta crua', () => {
+  it('captura o foodName LIMPO que a IA devolve, em vez de descartá-lo', () => {
+    // Bug reportado: "...30g de doce de leite da tirol, como ficará meus numero"
+    // virou food_name no diário. A IA dava um nome limpo e a rota jogava fora.
+    expect(route).toContain('aiFoodName = String(e.foodName')
+    expect(route).toContain('const displayName = (aiFoodName || foodText)')
+  })
+
+  it('o sim leva foodName; o label do item NÃO é mais o foodText cru', () => {
+    expect(flat).toContain('foodName: displayName')
+    expect(flat).toContain('label: displayName')
+  })
+})
+
 describe('escrita — esta rota não grava nada', () => {
   it('não chama trackMeal nem insert (lançar é decisão do usuário, na fase 4)', () => {
     expect(route).not.toContain('trackMeal')
