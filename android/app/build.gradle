@@ -27,7 +27,7 @@ android {
         applicationId "com.irontracks.app"
         minSdkVersion rootProject.ext.minSdkVersion
         targetSdkVersion rootProject.ext.targetSdkVersion
-        versionCode 11
+        versionCode 12
         // versionName alinhado com a linha do iOS (MARKETING_VERSION). Bumpar à mão
         // aqui num release novo (o android-release.sh só bumpa o versionCode).
         versionName "1.14.0"
