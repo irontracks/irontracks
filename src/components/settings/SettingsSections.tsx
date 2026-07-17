@@ -541,6 +541,7 @@ export function SettingsNotificationsSection({ draft, setValue, iosNotifStatus, 
     const notifyDirectMessages = Boolean(draft?.notifyDirectMessages ?? true)
     const notifyAppointments = Boolean(draft?.notifyAppointments ?? true)
     const notifyStudentWorkoutStart = Boolean(draft?.notifyStudentWorkoutStart ?? true)
+    const notifyWorkoutAssigned = Boolean(draft?.notifyWorkoutAssigned ?? true)
     const notifyBroadcasts = Boolean(draft?.notifyBroadcasts ?? true)
     const notifySocialFollows = Boolean(draft?.notifySocialFollows ?? true)
     const notifyFollowAccepted = Boolean(draft?.notifyFollowAccepted ?? true)
@@ -646,6 +647,13 @@ export function SettingsNotificationsSection({ draft, setValue, iosNotifStatus, 
                         checked={notifyStudentWorkoutStart}
                         disabled={!pushNotificationsEnabled}
                         onChange={() => setValue('notifyStudentWorkoutStart', !notifyStudentWorkoutStart)}
+                    />
+                    <NotifRow
+                        title="Treino novo do professor"
+                        description="Avisa você quando seu professor monta ou envia um treino novo."
+                        checked={notifyWorkoutAssigned}
+                        disabled={!pushNotificationsEnabled}
+                        onChange={() => setValue('notifyWorkoutAssigned', !notifyWorkoutAssigned)}
                     />
                     <NotifRow
                         title="Avisos do IronTracks"

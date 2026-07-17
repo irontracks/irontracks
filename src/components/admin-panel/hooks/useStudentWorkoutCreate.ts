@@ -6,6 +6,7 @@ import type { AdminUser } from '@/types/admin'
 import type { UnknownRecord } from '@/types/app'
 import { apiAi } from '@/lib/api'
 import { saveTeacherWorkout } from '@/lib/workout/teacherWorkoutPayload'
+import { notifyStudentWorkoutAssigned } from '@/lib/notifications/workoutAssignedClient'
 import { useDialog } from '@/contexts/DialogContext'
 import type { WorkoutWizardAnswers, WorkoutDraft } from '@/components/dashboard/WorkoutWizardModal'
 
@@ -169,6 +170,8 @@ export function useStudentWorkoutCreate({
                 if (res.ok) saved++
             }
             await refreshStudentWorkouts()
+            // Notifica o aluno UMA vez (não uma por dia do programa) se algo foi salvo.
+            if (saved > 0) void notifyStudentWorkoutAssigned(targetUserId)
             await alert(`${saved} treino(s) salvo(s) para o aluno!`, 'Sucesso')
         },
         [alert, selectedStudent, saveWorkoutDraftToStudent, refreshStudentWorkouts]

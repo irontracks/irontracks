@@ -7,6 +7,7 @@ import { workoutPlanHtml } from '@/utils/report/templates';
 import { escapeHtml } from '@/utils/escapeHtml';
 import { logWarn } from '@/lib/logger';
 import { saveTeacherWorkout } from '@/lib/workout/teacherWorkoutPayload';
+import { notifyStudentWorkoutAssigned } from '@/lib/notifications/workoutAssignedClient';
 import React from 'react';
 import { useStudentWorkoutCreate } from './useStudentWorkoutCreate';
 
@@ -150,6 +151,7 @@ export const useAdminTemplateOps = ({
                 exercises: template.exercises,
             });
             if (!res.ok) throw new Error(res.error || 'Falha ao enviar treino');
+            void notifyStudentWorkoutAssigned(String(targetUserId), String(template?.name || ''));
             let refreshed: UnknownRecord[] = [];
             const { data } = await supabase
                 .from('workouts')

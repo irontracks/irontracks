@@ -12,6 +12,7 @@ import { z } from 'zod';
 import { normalizeWorkoutTitle } from '@/utils/workoutTitle';
 import { updateWorkout } from '@/actions/workout-actions';
 import { saveTeacherWorkout } from '@/lib/workout/teacherWorkoutPayload';
+import { notifyStudentWorkoutAssigned } from '@/lib/notifications/workoutAssignedClient';
 import dynamic from 'next/dynamic';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
 
@@ -449,6 +450,7 @@ export const StudentDetailPanel: React.FC = () => {
                                                     exercises: data.exercises,
                                                 });
                                                 if (!res.ok) throw new Error(res.error || 'Falha ao salvar treino');
+                                                void notifyStudentWorkoutAssigned(targetUserId, data.title || 'Novo Treino');
                                             }
                                             const { data: refreshed } = await supabase
                                                 .from('workouts')
