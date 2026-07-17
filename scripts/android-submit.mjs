@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * IronTracks — Submit latest AAB to Google Play Internal Testing (no UI).
+ * IronTracks — Submit latest AAB to Google Play Closed Testing Alpha (no UI).
  *
  * Espelho do scripts/ios-submit.mjs, mas pra Android via Google Play Developer API v3.
  *
@@ -8,13 +8,13 @@
  *   1. Autentica via service account JSON (JWT → access_token OAuth2)
  *   2. Cria um Edit em applications/{package}/edits
  *   3. Faz upload do AAB via uploadType=media
- *   4. Atribui a versão ao track (default: internal)
+ *   4. Atribui a versão ao track (default: alpha)
  *   5. Commit do edit
  *
  * Uso:
  *   node scripts/android-submit.mjs                                 # último AAB em build/outputs
  *   node scripts/android-submit.mjs --aab path/to/app-release.aab
- *   node scripts/android-submit.mjs --track production              # default: internal
+ *   node scripts/android-submit.mjs --track production              # default: alpha
  *   node scripts/android-submit.mjs --dry-run
  *
  * Setup obrigatório (uma vez):
@@ -46,7 +46,7 @@ const SA_PATH = process.env.GOOGLE_PLAY_SERVICE_ACCOUNT
 const args = process.argv.slice(2)
 let dryRun = false
 let aabPath = null
-let track = 'internal'
+let track = 'alpha'
 
 for (let i = 0; i < args.length; i++) {
     const a = args[i]
@@ -189,7 +189,6 @@ console.log('  ✅ Edit commitado')
 
 console.log('')
 console.log(`✅ AAB versionCode ${bundle.versionCode} enviado pro Play Console (track=${track}).`)
-if (track === 'internal') {
-    console.log('   Vai aparecer pra testers internos em ~10 min.')
-    console.log('   Pra promover pra Open Testing/Production, use o Play Console UI.')
+if (track === 'alpha') {
+    console.log('   Vai aparecer para os testadores do grupo da faixa Alpha em alguns minutos.')
 }

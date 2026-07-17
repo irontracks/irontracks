@@ -10,6 +10,7 @@ const APPLE = 'https://apps.apple.com/br/app/irontracks/id6758735356'
 // O testador entra no grupo (sem aprovação) e depois abre o opt-in pra virar testador.
 const GROUP = 'https://groups.google.com/g/irontracks-beta'
 const PLAY  = 'https://play.google.com/apps/testing/com.irontracks.app'
+const PLAY_STORE = 'https://play.google.com/store/apps/details?id=com.irontracks.app'
 const WEB   = 'https://irontracks.com.br'
 
 // ── Reveal wrapper ──────────────────────────────────────────────────────────
@@ -1013,43 +1014,75 @@ function Footer() {
 // ── PAGE ROOT ────────────────────────────────────────────────────────────────
 // ── ANDROID MODAL ────────────────────────────────────────────────────────────
 function AndroidModal({ onClose }: { onClose: () => void }) {
+  useEffect(() => {
+    const bodyOverflow = document.body.style.overflow
+    const rootOverflow = document.documentElement.style.overflow
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') onClose()
+    }
+
+    document.body.style.overflow = 'hidden'
+    document.documentElement.style.overflow = 'hidden'
+    window.addEventListener('keydown', handleKeyDown)
+
+    return () => {
+      document.body.style.overflow = bodyOverflow
+      document.documentElement.style.overflow = rootOverflow
+      window.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [onClose])
+
   const steps = [
     { n: '1', title: 'Entre no grupo de testadores', desc: 'Toque em "Entrar no grupo de testadores" abaixo e clique em "Participar do grupo". É grátis e sem aprovação.' },
     { n: '2', title: 'Acesse o teste no Google Play', desc: 'Toque em "Acessar o teste", entre com sua conta Google e clique em "Tornar-se testador".' },
-    { n: '3', title: 'Aguarde 1 a 2 minutos', desc: 'O Google precisa processar sua entrada no grupo. Não feche o Play Store.' },
-    { n: '4', title: 'Instale o IronTracks', desc: 'Recarregue a página do teste e toque em "Instalar". Pronto!' },
+    { n: '3', title: 'Aguarde 1 a 2 minutos', desc: 'O Google precisa processar sua entrada no grupo antes de liberar a instalação.' },
+    { n: '4', title: 'Instale o IronTracks', desc: 'Toque em "Abrir na Play Store" abaixo e depois em "Instalar". Pronto!' },
   ]
 
   return (
     <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="android-modal-title"
+      data-testid="android-download-overlay"
       onClick={onClose}
       style={{
         position: 'fixed', inset: 0, zIndex: 9999,
         background: 'rgba(0,0,0,0.82)', backdropFilter: 'blur(8px)',
-        display: 'flex', alignItems: 'center', justifyContent: 'center',
-        padding: '20px',
+        display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+        overflowY: 'auto', overscrollBehavior: 'contain', WebkitOverflowScrolling: 'touch',
+        padding: 'max(12px, env(safe-area-inset-top)) 12px max(12px, env(safe-area-inset-bottom))',
       }}
     >
       <div
+        data-testid="android-download-panel"
         onClick={e => e.stopPropagation()}
         style={{
-          background: '#111', borderRadius: 24, padding: '36px 32px',
-          maxWidth: 480, width: '100%',
+          background: '#111', borderRadius: 24,
+          padding: 'clamp(20px, 6vw, 36px) clamp(18px, 5vw, 32px)',
+          maxWidth: 480, width: '100%', maxHeight: 'calc(100dvh - 24px)',
+          margin: 'auto 0', overflowY: 'auto', overscrollBehavior: 'contain', boxSizing: 'border-box',
           border: '1px solid rgba(245,184,0,0.2)',
           boxShadow: '0 0 80px rgba(245,184,0,0.08)',
         }}
       >
         {/* Header */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 28 }}>
+        <div style={{
+          position: 'sticky', top: 0, zIndex: 1,
+          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          paddingBottom: 16, marginBottom: 12, background: '#111',
+        }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <PlaySvg />
-            <span style={{ fontFamily: '"Space Grotesk", sans-serif', fontWeight: 700, fontSize: 18 }}>
+            <span id="android-modal-title" style={{ fontFamily: '"Space Grotesk", sans-serif', fontWeight: 700, fontSize: 18 }}>
               Baixar para Android
             </span>
           </div>
           <button
+            type="button"
+            aria-label="Fechar"
             onClick={onClose}
-            style={{ background: 'none', border: 'none', color: 'rgba(245,245,245,0.4)', cursor: 'pointer', fontSize: 22, lineHeight: 1, padding: 4 }}
+            style={{ background: 'none', border: 'none', color: 'rgba(245,245,245,0.4)', cursor: 'pointer', fontSize: 22, lineHeight: 1, padding: 4, flexShrink: 0 }}
           >
             ×
           </button>
@@ -1118,10 +1151,24 @@ function AndroidModal({ onClose }: { onClose: () => void }) {
             <PlaySvg />
             2 · Acessar o teste no Google Play
           </a>
+          <a
+            href={PLAY_STORE}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10,
+              padding: '15px 24px', borderRadius: 14, textDecoration: 'none',
+              background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.14)',
+              color: '#f5f5f5', fontWeight: 700, fontSize: 15, width: '100%',
+            }}
+          >
+            <PlaySvg />
+            3 · Abrir na Play Store
+          </a>
         </div>
 
         <p style={{ textAlign: 'center', fontSize: 12, color: 'rgba(245,245,245,0.25)', marginTop: 14 }}>
-          Já é testador? Toque no botão 2 para instalar direto. Toque fora para fechar.
+          Já é testador? Toque no botão 3 para instalar direto. Toque fora para fechar.
         </p>
       </div>
     </div>
