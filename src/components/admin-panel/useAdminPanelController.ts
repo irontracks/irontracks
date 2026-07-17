@@ -147,6 +147,8 @@ export const useAdminPanelController = ({ user, onClose: _onClose }: AdminPanelP
         openEditTemplate,
         handleSaveTemplate,
         handleAddTemplateToStudent,
+        applyManyTemplate, setApplyManyTemplate,
+        handleApplyTemplateToStudents,
         handleExportPdf,
         handleExportJson,
         // Student workout create
@@ -551,6 +553,8 @@ export const useAdminPanelController = ({ user, onClose: _onClose }: AdminPanelP
 
         // Student handlers
         handleAddTemplateToStudent,
+        applyManyTemplate, setApplyManyTemplate,
+        handleApplyTemplateToStudents,
         handleEditStudent,
         handleSaveStudentEdit,
         handleSaveTemplate,
