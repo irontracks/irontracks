@@ -759,6 +759,10 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
     useEffect(() => {
         const onPushNavigate = (e: Event) => {
             const detail = (e as CustomEvent<{ type?: string; senderId?: string; senderName?: string }>).detail;
+            // Aluno tocou no push "treino novo do professor" → leva pra lista de treinos
+            // (view 'dashboard'). Sem este branch, o tap só navegaria se o app abrisse no
+            // dashboard por default; com ele, funciona mesmo já aberto em outra view.
+            if (detail?.type === 'workout_assigned') { setView('dashboard'); return; }
             if (detail?.type !== 'message') return;
             const senderId = String(detail?.senderId || '').trim();
             if (!senderId) return;
