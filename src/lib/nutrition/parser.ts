@@ -149,12 +149,42 @@ export function analyzeMeal(text: string, extraFoods?: Record<string, FoodItem>)
   const unknownLines: string[] = []
   const items: ParsedMealItem[] = []
 
+  // Fora do loop: a lista não muda entre as linhas e era reconstruída a cada uma.
+  const allFoodEntries = buildFoodEntries(extraFoods)
+
+  // Primeira linha FÍSICA (antes dos splits de item). Ver isTitleLine.
+  const firstPhysicalLine = (rawText.split('\n')[0] || '').trim()
+
+  /**
+   * A primeira linha é o NOME da refeição ("Almoço", "Café da manhã")?
+   *
+   * Antes bastava "index 0, sem dígito, tem mais linhas" — e isso perdia comida em
+   * SILÊNCIO: o split de " e "/vírgula/"+" também produz "linhas", então
+   * "ovo e banana" virava nome="ovo" e o ovo era descartado sem virar nem
+   * unknownLine. Por isso "200g de frango e 100g de arroz" funcionava (tem dígito,
+   * escapava da heurística) e "ovo e banana" não.
+   *
+   * Duas condições agora:
+   *  1. Tem que ser a primeira linha FÍSICA inteira — se veio de um separador de
+   *     item, não é título, é comida.
+   *  2. Não pode ser um alimento conhecido. Comparação EXATA de propósito: o match
+   *     de alimento é por substring, e "café da manhã" contém "café" — com
+   *     substring, o nome da refeição viraria 200g de café.
+   */
+  const isTitleLine = (index: number, rawLine: string): boolean => {
+    if (index !== 0 || lines.length < 2) return false
+    if (rawLine !== firstPhysicalLine) return false
+    if (/\d/.test(rawLine)) return false
+    const normalized = normalizeFoodText(rawLine)
+    return !allFoodEntries.some((e) => e.normalizedKey === normalized)
+  }
+
   for (let index = 0; index < lines.length; index += 1) {
     const line = lines[index]
     const rawLine = (line || '').trim()
     if (!rawLine) continue
 
-    if (index === 0 && lines.length > 1 && !/\d/.test(rawLine)) {
+    if (isTitleLine(index, rawLine)) {
       mealName = rawLine
       continue
     }
@@ -227,7 +257,6 @@ export function analyzeMeal(text: string, extraFoods?: Record<string, FoodItem>)
       continue
     }
 
-    const allFoodEntries = buildFoodEntries(extraFoods)
     let matchedItem: FoodItem | null = null
     let dbKeyMatched = ''
     for (const entry of allFoodEntries) {
