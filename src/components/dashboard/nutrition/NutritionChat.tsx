@@ -10,7 +10,7 @@
  */
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { Loader2, Send, Sparkles, X } from 'lucide-react'
+import { Loader2, Plus, Send, Sparkles, X } from 'lucide-react'
 import { applyChatSimulationAction } from '@/app/(app)/dashboard/nutrition/actions'
 import { getErrorMessage } from '@/utils/errorMessage'
 import NutritionSimulationCard, { type Simulation } from './NutritionSimulationCard'
@@ -21,6 +21,8 @@ interface ChatMessage {
   role: 'user' | 'assistant'
   text: string
   sim?: Simulation | null
+  /** Alimentos sugeridos, tocáveis: viram uma pergunta "se eu comer X". */
+  suggestions?: string[]
   /** Erro de rede/servidor — some no reenvio, não polui a conversa como resposta. */
   failed?: boolean
 }
@@ -137,7 +139,13 @@ export default function NutritionChat({
 
         setMessages((prev) => [
           ...prev,
-          { id: `a-${Date.now()}`, role: 'assistant', text: String(body.reply || ''), sim: body.sim ?? null },
+          {
+            id: `a-${Date.now()}`,
+            role: 'assistant',
+            text: String(body.reply || ''),
+            sim: body.sim ?? null,
+            suggestions: Array.isArray(body.suggestions) ? body.suggestions.slice(0, 3) : [],
+          },
         ])
       } catch (e) {
         setMessages((prev) => [
@@ -232,6 +240,27 @@ export default function NutritionChat({
                       logged={loggedIds.has(m.id)}
                       onLog={() => logSim(m.id, m.sim as Simulation)}
                     />
+                  )}
+
+                  {/* Sugestões tocáveis. Tocar NÃO lança: manda "se eu comer X",
+                      que cai no atalho determinístico e devolve o card com o
+                      impacto exato. O usuário vê o número ANTES de decidir —
+                      sugestão → simulação → lançamento, sem atalho cego. */}
+                  {!!m.suggestions?.length && (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {m.suggestions.map((s) => (
+                        <button
+                          key={s}
+                          type="button"
+                          disabled={sending}
+                          onClick={() => send(`se eu comer ${s}`)}
+                          className="inline-flex items-center gap-1.5 rounded-full border border-yellow-500/25 bg-yellow-500/[0.06] px-3 py-1.5 text-xs font-semibold text-yellow-300 transition hover:bg-yellow-500/15 disabled:opacity-40"
+                        >
+                          <Plus size={12} />
+                          {s}
+                        </button>
+                      ))}
+                    </div>
                   )}
                 </div>
               )}

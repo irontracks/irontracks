@@ -70,7 +70,7 @@ export function buildIntentPrompt(
     `PERGUNTA: ${question}`,
     '',
     'Responda SÓ com JSON, sem markdown:',
-    '{"intent":"simulate"|"answer"|"refuse","foodQuery":string|null,"reply":string|null}',
+    '{"intent":"simulate"|"answer"|"refuse","foodQuery":string|null,"reply":string|null,"suggestions":string[]|null}',
     '',
     '- "simulate": ele quer saber o impacto de comer algo ("se eu comer X", "cabe uma pizza?").',
     '  Em foodQuery ponha SÓ quantidade + alimento (ex.: "5 ovos cozidos", "200g de frango").',
@@ -78,6 +78,12 @@ export function buildIntentPrompt(
     '- "answer": dá pra responder com os números do contexto (hoje, histórico, sugestão do que comer).',
     '  Escreva em reply. foodQuery = null.',
     '- "refuse": não é sobre a nutrição dele. Explique em reply, em uma frase. foodQuery = null.',
+    '',
+    'SUGGESTIONS (só em "answer"): quando você sugerir o que comer, repita cada alimento',
+    'sugerido em suggestions, com QUANTIDADE + ALIMENTO e nada mais — ex.: ["3 ovos",',
+    '"150g de frango", "1 scoop de whey"]. Máximo 3. Prefira o que ele já come (a lista do',
+    'contexto). Eles viram botões: ao tocar, o app calcula o impacto exato. Por isso NÃO',
+    'ponha macro nem caloria dentro deles. Se a resposta não sugere comida, suggestions = null.',
     '',
     ...RULES,
   ]
@@ -90,6 +96,14 @@ const IntentSchema = z
     intent: z.enum(['simulate', 'answer', 'refuse']),
     foodQuery: z.string().max(200).nullable().optional(),
     reply: z.string().max(2000).nullable().optional(),
+    // Só TEXTO de alimento — nunca macro. Ao tocar, a sugestão vira uma pergunta
+    // "se eu comer X" que passa pelo atalho + cascata determinística, então o
+    // número que o usuário vê continua não vindo do modelo.
+    //
+    // Sem .max() aqui de propósito: no Zod, .max(3) REJEITA o objeto inteiro se
+    // vierem 4 — e o usuário perderia a resposta boa junto com o excesso. O corte
+    // pra 3 é feito abaixo. Liberal no que aceita, como o .strip() dos extras.
+    suggestions: z.array(z.string().max(60)).nullable().optional(),
   })
   .strip()
 
@@ -97,6 +111,8 @@ export interface ParsedIntent {
   intent: 'simulate' | 'answer' | 'refuse'
   foodQuery: string | null
   reply: string | null
+  /** Alimentos sugeridos, tocáveis. Vazio quando a resposta não é de sugestão. */
+  suggestions: string[]
 }
 
 /** Devolve null quando o modelo não produziu JSON utilizável — quem chama decide o fallback. */
@@ -114,10 +130,21 @@ export function parseIntentOutput(rawText: string): ParsedIntent | null {
   if (intent === 'simulate' && !foodQuery) return null
   if (intent !== 'simulate' && !reply) return null
 
+  // Sugestão só faz sentido em 'answer' — em 'refuse' seria contraditório, e em
+  // 'simulate' o card já responde.
+  const suggestions =
+    intent === 'answer'
+      ? (parsed.data.suggestions ?? [])
+          .map((s) => String(s ?? '').trim())
+          .filter((s) => s.length >= 2)
+          .slice(0, 3)
+      : []
+
   return {
     intent,
     foodQuery: foodQuery || null,
     reply: reply || null,
+    suggestions,
   }
 }
 
