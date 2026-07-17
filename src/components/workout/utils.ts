@@ -2,8 +2,7 @@
 import { UnknownRecord, ReportHistory, ReportHistoryItem } from './types';
 import { parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
-import { setVolume, setTopWeightReps } from '@/utils/report/setVolume'
-import { isSetCompleted } from '@/utils/report/setCompletion'
+import { setVolume, setTopWeightReps, isWorkingSet } from '@/utils/report/setVolume'
 
 export const DELOAD_HISTORY_KEY = 'irontracks.deload.history.v1';
 export const DELOAD_AUDIT_KEY = 'irontracks.deload.audit.v1';
@@ -307,9 +306,14 @@ export const shouldOpenFinishPrompt = (params: {
 
 /**
  * Resumo textual do treino pro prompt de finalização — por exercício: séries
- * concluídas + volume (peso×reps), com flag "sem carga" quando uma série foi
- * marcada feita sem peso/reps registrados. Puro/testável. Exercícios sem
- * nenhuma série feita não entram.
+ * VÁLIDAS + volume (peso×reps), com flag "sem carga" quando uma série foi marcada
+ * feita sem peso/reps registrados. Puro/testável. Exercícios sem nenhuma série
+ * válida não entram.
+ *
+ * "Válida" = isWorkingSet: feita E não é aquecimento/feeler — a MESMA regra do
+ * relatório (reportMetrics.ts:53-56). Antes usava isSetCompleted, que só olha "foi
+ * feita", então um treino com aquecimento marcado mostrava um volume aqui e outro,
+ * menor, no relatório logo em seguida.
  */
 export const buildWorkoutSummary = (
   exercises: unknown,
@@ -332,7 +336,10 @@ export const buildWorkoutSummary = (
     for (const [key, val] of Object.entries(logMap)) {
       if (!key.startsWith(`${i}-`)) continue; // séries do exercício i (chave "i-s")
       const log = isObject(val) ? val : {};
-      if (!isSetCompleted(log)) continue;
+      // isWorkingSet, não isSetCompleted: aquecimento/feeler NÃO contam. O
+      // relatório já os pula (reportMetrics.ts:53-56), e com regras diferentes o
+      // modal mostrava um volume e o relatório, segundos depois, mostrava outro.
+      if (!isWorkingSet(log)) continue;
       done += 1;
       const v = setVolume(log); // trata cluster + unilateral (L+R) + normal
       const { weight: w, reps: r } = setTopWeightReps(log);

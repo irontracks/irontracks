@@ -390,3 +390,75 @@ describe('buildWorkoutSummary', () => {
         expect(r.text).not.toContain('sem carga')
     })
 })
+
+// ─────────────────────────────────────────────────────────────────────────────
+// buildWorkoutSummary × aquecimento
+//
+// O modal de "Treino concluído" e o RELATÓRIO contavam séries por regras
+// diferentes: reportMetrics.ts:53-56 pula warmup/feeler ("they don't count toward
+// exercise stats") e o resumo usava isSetCompleted, que só olha "foi feita".
+// Resultado: num treino com aquecimento marcado, o modal mostrava um volume e o
+// relatório — segundos depois — mostrava outro, menor. Em produção: 10 usuários
+// com 48 séries de aquecimento + 41 com a flag is_warmup.
+// ─────────────────────────────────────────────────────────────────────────────
+describe('buildWorkoutSummary — aquecimento não conta (mesma regra do relatório)', () => {
+    const exs = [{ name: 'Supino reto' }]
+
+    it('série de aquecimento não entra no volume nem na contagem', () => {
+        const logs = {
+            '0-0': { done: true, set_type: 'warmup', weight: '40', reps: '10' }, // 400
+            '0-1': { done: true, weight: '100', reps: '10' }, // 1000
+            '0-2': { done: true, weight: '100', reps: '10' }, // 1000
+        }
+        const r = buildWorkoutSummary(exs, logs)
+        expect(r.sets).toBe(2) // era 3
+        expect(r.volume).toBe(2000) // era 2400
+        expect(r.text).toContain('2 séries')
+    })
+
+    it('feeler também não conta', () => {
+        const r = buildWorkoutSummary(exs, {
+            '0-0': { done: true, set_type: 'feeler', weight: '60', reps: '5' },
+            '0-1': { done: true, weight: '100', reps: '10' },
+        })
+        expect(r.sets).toBe(1)
+        expect(r.volume).toBe(1000)
+    })
+
+    it('a flag legada is_warmup (sem set_type) também', () => {
+        const r = buildWorkoutSummary(exs, {
+            '0-0': { done: true, is_warmup: true, weight: '40', reps: '10' },
+            '0-1': { done: true, weight: '100', reps: '10' },
+        })
+        expect(r.sets).toBe(1)
+        expect(r.volume).toBe(1000)
+    })
+
+    it('exercício SÓ de aquecimento some do resumo (não fica "0 séries")', () => {
+        const r = buildWorkoutSummary(exs, {
+            '0-0': { done: true, set_type: 'warmup', weight: '40', reps: '10' },
+        })
+        expect(r.exercises).toBe(0)
+        expect(r.text).toBe('')
+    })
+
+    it('set_type normal continua contando', () => {
+        const r = buildWorkoutSummary(exs, {
+            '0-0': { done: true, set_type: 'normal', weight: '100', reps: '10' },
+        })
+        expect(r.sets).toBe(1)
+        expect(r.volume).toBe(1000)
+    })
+
+    it('drop-set segue somando os estágios (o caso do peck deck, 3.616 kg)', () => {
+        // Verificado no banco: o topo do log ("43kg × 24") é RESUMO; a verdade são
+        // os estágios. 70×12 + 43×12 = 1356, ×2, + 70×8 + 43×8 = 904 → 3616.
+        const r = buildWorkoutSummary([{ name: 'Peck deck' }], {
+            '0-0': { done: true, weight: '43', reps: '24', drop_set: { stages: [{ weight: '70', reps: 12 }, { weight: '43', reps: 12 }] } },
+            '0-1': { done: true, weight: '43', reps: '24', drop_set: { stages: [{ weight: '70', reps: 12 }, { weight: '43', reps: 12 }] } },
+            '0-2': { done: true, weight: '43', reps: '16', drop_set: { stages: [{ weight: '70', reps: 8 }, { weight: '43', reps: 8 }] } },
+        })
+        expect(r.sets).toBe(3)
+        expect(r.volume).toBe(3616)
+    })
+})
