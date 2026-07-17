@@ -1,6 +1,7 @@
 'use client'
 
 import { memo, useState } from 'react'
+import { macroCaloriePercents } from '@/lib/nutrition/macroSplit'
 
 type MealItemView = { label: string; grams: number; calories: number; protein: number; carbs: number; fat: number }
 
@@ -78,10 +79,10 @@ function NutritionEntryCard({
   onDelete,
   onStory,
 }: NutritionEntryCardProps) {
-  const totalMacroG = item.protein + item.carbs + item.fat
-  const proteinPct = totalMacroG > 0 ? Math.round((item.protein / totalMacroG) * 100) : 0
-  const carbsPct = totalMacroG > 0 ? Math.round((item.carbs / totalMacroG) * 100) : 0
-  const fatPct = totalMacroG > 0 ? 100 - proteinPct - carbsPct : 0
+  // % de CALORIAS (Atwater 4/4/9), não % de gramas. Ver macroSplit.ts — a divisão
+  // por grama fazia um almoço P70/C69/G42 mostrar "23% gordura" quando 40% das
+  // calorias dele são gordura.
+  const { protein: proteinPct, carbs: carbsPct, fat: fatPct } = macroCaloriePercents(item)
 
   // Estado local do "adicionar alimento" no editor.
   const [addText, setAddText] = useState('')
