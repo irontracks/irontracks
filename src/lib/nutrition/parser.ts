@@ -60,19 +60,43 @@ function escapeRegex(text: string): string {
  * (o `s?`), mas "macarrao" não casa 'maca' — depois de "maca" vem "r", não "s" nem
  * espaço.
  */
-function matchesWholeWord(foodName: string, key: string): boolean {
-  if (!key) return false
+function buildKeyPattern(key: string): string {
   // Plural OPCIONAL em cada palavra, não só na última: o usuário escreve
   // "3 claraS de ovo" e a chave é 'clara de ovo'. Com o -s só no fim, isso não
   // casava a clara e casava 'ovo' — ovo inteiro, 4,5×. Mesmo caso de
   // "castanhaS de caju".
-  const pattern = key
+  return key
     .split(/\s+/)
     .filter(Boolean)
     .map((word) => `${escapeRegex(word)}s?`)
     .join('\\s+')
+}
+
+function matchesWholeWord(foodName: string, key: string): boolean {
+  if (!key) return false
+  const pattern = buildKeyPattern(key)
   if (!pattern) return false
   return new RegExp(`(^|\\s)${pattern}(\\s|$)`).test(foodName)
+}
+
+/**
+ * A chave é a CABEÇA do nome — o prato em si, não um ingrediente citado depois?
+ *
+ * Em português o substantivo principal vem primeiro: "esfirra de frango com
+ * requeijão" é uma ESFIRRA; "frango com alho" é FRANGO. O parser elegia a maior
+ * chave que aparecesse em QUALQUER lugar da frase, e aí o prato perdia pro
+ * ingrediente mais bem-nomeado:
+ *   "1 esfirra de frango com requeijao" → 'requeijao'(9) ganhava de 'esfirra'(7)
+ *                                       → 15g de requeijão = 39 kcal (real: 224)
+ *   "1 torta de banana"                 → 'banana' → 71 kcal
+ *   "1 sanduiche com bacon"             → 'bacon'  → 81 kcal
+ * A cabeça agora tem prioridade absoluta sobre qualquer match no meio.
+ */
+function matchesAtHead(foodName: string, key: string): boolean {
+  if (!key) return false
+  const pattern = buildKeyPattern(key)
+  if (!pattern) return false
+  return new RegExp(`^${pattern}(\\s|$)`).test(foodName)
 }
 
 function buildFoodEntries(extraFoods?: Record<string, FoodItem>) {
@@ -306,15 +330,27 @@ export function analyzeMeal(text: string, extraFoods?: Record<string, FoodItem>)
       continue
     }
 
+    // A CABEÇA do nome vence qualquer match no meio; entre iguais, a chave maior.
+    // Sem a prioridade da cabeça, "1 esfirra de frango com requeijao" elegia
+    // 'requeijao' (a maior chave da frase) e virava 15g de requeijão = 39 kcal,
+    // sendo que 'esfirra' está na base e daria 224. O fallback pro match-em-
+    // qualquer-lugar fica: quando a cabeça é desconhecida ("arroz com frango"),
+    // reconhecer o ingrediente ainda é melhor que não reconhecer nada.
     let matchedItem: FoodItem | null = null
     let dbKeyMatched = ''
+    let matchedAtHead = false
     for (const entry of allFoodEntries) {
       if (!entry.normalizedKey) continue
-      if (matchesWholeWord(foodName, entry.normalizedKey)) {
-        if (!dbKeyMatched || entry.normalizedKeyLength > dbKeyMatched.length) {
-          dbKeyMatched = entry.normalizedKey
-          matchedItem = entry.item
-        }
+      const atHead = matchesAtHead(foodName, entry.normalizedKey)
+      if (!atHead && !matchesWholeWord(foodName, entry.normalizedKey)) continue
+
+      const beatsCurrent = !matchedItem
+        || (atHead && !matchedAtHead)
+        || (atHead === matchedAtHead && entry.normalizedKeyLength > dbKeyMatched.length)
+      if (beatsCurrent) {
+        dbKeyMatched = entry.normalizedKey
+        matchedItem = entry.item
+        matchedAtHead = atHead
       }
     }
 
