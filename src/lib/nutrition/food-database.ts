@@ -143,7 +143,9 @@ export const foodDatabase: Record<string, FoodItem> = {
   'coxinha': { kcal: 268, p: 10, c: 26, f: 14, approx: { unidade: 80 } },
   'empada': { kcal: 320, p: 8, c: 25, f: 21, approx: { unidade: 60 } },
   'esfirra': { kcal: 280, p: 10, c: 30, f: 13, approx: { unidade: 80 } },
-  'pizza': { kcal: 266, p: 11, c: 33, f: 10, approx: { fatia: 120 } },
+  // `unidade` = a pizza INTEIRA (~800 g, grande/35 cm, 8 fatias). Sem isto, "uma pizza
+  // grande" caía na porção (1 fatia) e o app respondia "cabe!" pra 2128 kcal.
+  'pizza': { kcal: 266, p: 11, c: 33, f: 10, approx: { fatia: 120, unidade: 800 } },
   'hamburguer': { kcal: 295, p: 17, c: 24, f: 14, approx: { unidade: 200 } },
   'sopa': { kcal: 40, p: 2, c: 6, f: 1, approx: { prato: 300, concha: 150 } },
   'salada': { kcal: 20, p: 1.5, c: 3, f: 0.3, approx: { prato: 150 } },
