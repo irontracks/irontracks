@@ -306,6 +306,7 @@ export async function applyGeneratedMealAction(
 export async function applyChatSimulationAction(
   sim: {
     foodText: string
+    foodName?: string
     items: Array<{ label: string; grams: number; calories: number; protein: number; carbs: number; fat: number }>
   },
   dateKey?: string,
@@ -334,7 +335,8 @@ export async function applyChatSimulationAction(
     // aqui: o trackMeal grava a refeição crua e arredonda o total do dia (uma única
     // passada), que é o que a projeção do card replicou. Ver chatProjection.ts.
     const mealLog = {
-      foodName: sanitizeFoodName(String(sim?.foodText ?? '')).slice(0, 120) || 'Refeição',
+      // Nome LIMPO (sim.foodName vem da IA); jamais a pergunta crua do sim.foodText.
+      foodName: sanitizeFoodName(String(sim?.foodName || sim?.foodText || '')).slice(0, 120) || 'Refeição',
       calories: items.reduce((s, i) => s + i.calories, 0),
       protein: items.reduce((s, i) => s + i.protein, 0),
       carbs: items.reduce((s, i) => s + i.carbs, 0),
