@@ -28,6 +28,22 @@ function firstNonEmpty(...vals: unknown[]): string {
     return ''
 }
 
+/**
+ * Resolve o texto do exercício que vai pra coluna `notes`.
+ *
+ * O AdminWorkoutEditor tem UM campo de texto livre — o "COACH" (`coachNotes`) — e não expõe
+ * `notes`. Então, quando o exercício vem do editor, `coachNotes` é a fonte da verdade
+ * MESMO quando vazio: o professor limpar o campo tem que APAGAR a nota. Distinguir
+ * "definido-porém-vazio" (limpou → apaga) de "ausente" (template do banco, que traz `notes`
+ * mas nunca `coachNotes` → preserva) é o que evita a nota ressuscitar no save. Um
+ * firstNonEmpty(coachNotes, notes) trataria '' como ausente e reviveria a nota antiga.
+ */
+function resolveExerciseNotes(ex: UnknownRecord): string {
+    const coach = ex.coachNotes
+    if (coach !== undefined && coach !== null) return String(coach).trim()
+    return String(ex.notes ?? '').trim()
+}
+
 /** Uma linha de `sets` no formato que a RPC lê (mesmas chaves de useExerciseEditorLogic). */
 export interface TeacherSetPayload {
     weight: unknown
@@ -95,7 +111,7 @@ export function buildTeacherExercisesPayload(exercises: unknown): TeacherExercis
             }
             return {
                 name: firstNonEmpty(ex.name),
-                notes: firstNonEmpty(ex.coachNotes, ex.notes),
+                notes: resolveExerciseNotes(ex),
                 video_url: (firstNonEmpty(ex.videoUrl, ex.video_url) || null),
                 rest_time: (ex.restTime ?? ex.rest_time) ?? null,
                 cadence: ex.cadence ?? null,

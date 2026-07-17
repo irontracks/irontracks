@@ -7,6 +7,7 @@ import { sendPushToAllPlatforms as sendPushToUsers } from '@/lib/push/sender'
 import { waitUntil } from '@vercel/functions'
 import { respondDbError } from '@/utils/api/dbError'
 import { canCoachStudent } from '@/utils/auth/studentAccess'
+import { logError } from '@/lib/logger'
 
 export const dynamic = 'force-dynamic'
 
@@ -82,6 +83,9 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ ok: true, notified: true })
   } catch (e: unknown) {
-    return NextResponse.json({ ok: false, error: (e as { message?: string })?.message ?? String(e) }, { status: 500 })
+    // Não devolver a mensagem crua: um erro de infra (ex.: service-role ausente) vazaria
+    // detalhe interno pro cliente. Loga pro Sentry e responde genérico.
+    logError('notifications:workout-assigned', e)
+    return NextResponse.json({ ok: false, error: 'internal_error' }, { status: 500 })
   }
 }

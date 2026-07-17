@@ -46,9 +46,18 @@ describe('buildTeacherExercisesPayload', () => {
     expect(ex.notes).toBe('segura 1s no topo')
   })
 
-  it('coachNotes vazio → cai em notes', () => {
+  it('coachNotes DEFINIDO-porém-vazio APAGA a nota (professor limpou o campo COACH)', () => {
+    // Regressão achada na revisão: o editor duplica ex.notes em notes+coachNotes; limpar o
+    // campo COACH tem que apagar a nota, não ressuscitar a antiga do campo escondido.
+    const [vazio] = buildTeacherExercisesPayload([{ name: 'Rosca', sets: 2, coachNotes: '', notes: 'Segura 2s embaixo' }])
+    expect(vazio.notes).toBe('')
+    const [espacos] = buildTeacherExercisesPayload([{ name: 'Rosca', sets: 2, coachNotes: '   ', notes: 'Segura 2s embaixo' }])
+    expect(espacos.notes).toBe('')
+  })
+
+  it('SEM coachNotes (template do banco) preserva notes', () => {
     const [ex] = buildTeacherExercisesPayload([
-      { name: 'Rosca', sets: 2, coachNotes: '   ', notes: 'controlar a fase excêntrica' },
+      { name: 'Rosca', sets: [{ reps: '10', set_number: 1 }], notes: 'controlar a fase excêntrica' },
     ])
     expect(ex.notes).toBe('controlar a fase excêntrica')
   })
