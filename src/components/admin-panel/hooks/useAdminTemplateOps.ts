@@ -32,6 +32,8 @@ export const useAdminTemplateOps = ({
 
     // ─── Template/Workout State ───────────────────────────────────────────────
     const [editingTemplate, setEditingTemplate] = useState<AdminWorkoutTemplate | null>(null);
+    // Template escolhido pra aplicar a VÁRIOS alunos (null = modal fechado).
+    const [applyManyTemplate, setApplyManyTemplate] = useState<UnknownRecord | null>(null);
     const [editingStudentWorkout, setEditingStudentWorkoutInternal] = useState<UnknownRecord | null>(null);
     const setEditingStudentWorkout = useCallback((w: UnknownRecord | null) => setEditingStudentWorkoutInternal(w), []);
     const [viewWorkout, setViewWorkout] = useState<UnknownRecord | null>(null);
@@ -173,6 +175,44 @@ export const useAdminTemplateOps = ({
         }
     }, [alert, confirm, selectedStudent, supabase, user, setStudentWorkouts, setSyncedWorkouts]);
 
+    // Aplica um template a VÁRIOS alunos de uma vez. Cada aluno é uma gravação
+    // independente e atômica (saveTeacherWorkout → RPC), então uma falha num aluno não
+    // corrompe os outros — acumulamos ok/falhas. Notifica cada aluno que gravou com
+    // sucesso. O refresh cobre só a view do aluno atualmente aberto (refreshStudentWorkouts
+    // usa selectedStudent) — se ele estiver entre os alvos, a lista dele atualiza.
+    const refreshStudentWorkouts = studentWorkoutCreate.refreshStudentWorkouts;
+    const handleApplyTemplateToStudents = useCallback(async (template: UnknownRecord, studentUserIds: string[]) => {
+        const ids = Array.from(new Set((Array.isArray(studentUserIds) ? studentUserIds : [])
+            .map((s) => String(s || '').trim())
+            .filter(Boolean)));
+        if (!ids.length) { await alert('Selecione ao menos um aluno.'); return; }
+        const title = String(template?.name || 'Treino');
+        let ok = 0;
+        const failed: string[] = [];
+        for (const ownerUserId of ids) {
+            const res = await saveTeacherWorkout(supabase, {
+                ownerUserId,
+                authorUserId: String(user?.id || ''),
+                title,
+                notes: String(template?.notes || ''),
+                exercises: template.exercises,
+            });
+            if (res.ok) {
+                ok += 1;
+                void notifyStudentWorkoutAssigned(ownerUserId, title);
+            } else {
+                failed.push(ownerUserId);
+            }
+        }
+        try { await refreshStudentWorkouts?.(); } catch { /* view refresh é best-effort */ }
+        setApplyManyTemplate(null);
+        if (failed.length === 0) {
+            await alert(`Treino "${title}" aplicado a ${ok} aluno${ok === 1 ? '' : 's'}.`, 'Sucesso');
+        } else {
+            await alert(`Aplicado a ${ok} aluno${ok === 1 ? '' : 's'}. ${failed.length} não recebeu(ram) — tente de novo.`, ok ? 'Parcial' : 'Erro');
+        }
+    }, [alert, supabase, user, refreshStudentWorkouts]);
+
     // ─── Export Handlers ──────────────────────────────────────────────────────
     const handleExportPdf = useCallback(async () => {
         try {
@@ -276,6 +316,9 @@ export const useAdminTemplateOps = ({
         viewWorkout, setViewWorkout,
         // Utility
         getSetsCount,
+        // Apply-to-many state + handler
+        applyManyTemplate, setApplyManyTemplate,
+        handleApplyTemplateToStudents,
         // Handlers
         openEditWorkout,
         openEditTemplate,
