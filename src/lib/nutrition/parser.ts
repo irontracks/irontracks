@@ -22,11 +22,6 @@ const normalizedFoodEntries = Object.entries(foodDatabase).map(([key, item]) => 
 })
 
 /**
- * Build the combined food entries list, merging the static database
- * with optional extra foods (e.g. AI-learned foods from Supabase).
- * Extra foods are checked AFTER static entries, so static always wins.
- */
-/**
  * Tira o conector "de" que SOBRA depois de remover a quantidade:
  * "2 fatias de pão" → (remove "2 fatias") → " de pão" → "pão".
  *
@@ -49,16 +44,10 @@ function escapeRegex(text: string): string {
 }
 
 /**
- * A chave aparece no texto como PALAVRA inteira (aceitando plural em -s)?
- *
- * O match era `foodName.includes(key)`, e substring cru deixava alimento curto roubar
- * o longo — silenciosamente:
- *   "macarrao"  contém "maca"      → macarrão virava MAÇÃ (78 kcal)
- *   "macaxeira" contém "maca"      → idem
- *   "uva passa" contém "uva"       → (aqui a maior-chave-vence salvava)
- * A borda de palavra mata isso sem quebrar plural: "ovos cozidos" ainda casa 'ovo'
- * (o `s?`), mas "macarrao" não casa 'maca' — depois de "maca" vem "r", não "s" nem
- * espaço.
+ * Regex da chave, exigindo PALAVRA inteira. O match era `foodName.includes(key)`, e
+ * substring cru deixava alimento curto roubar o longo: "macarrao" contém "maca", e
+ * macarrão virava MAÇÃ (78 kcal). Depois de "maca" vem "r", não "s" nem espaço —
+ * a borda de palavra mata isso sem quebrar plural.
  */
 function buildKeyPattern(key: string): string {
   // Plural OPCIONAL em cada palavra, não só na última: o usuário escreve
@@ -70,13 +59,6 @@ function buildKeyPattern(key: string): string {
     .filter(Boolean)
     .map((word) => `${escapeRegex(word)}s?`)
     .join('\\s+')
-}
-
-function matchesWholeWord(foodName: string, key: string): boolean {
-  if (!key) return false
-  const pattern = buildKeyPattern(key)
-  if (!pattern) return false
-  return new RegExp(`(^|\\s)${pattern}(\\s|$)`).test(foodName)
 }
 
 /**
@@ -99,6 +81,12 @@ function matchesAtHead(foodName: string, key: string): boolean {
   return new RegExp(`^${pattern}(\\s|$)`).test(foodName)
 }
 
+/**
+ * Lista de alimentos: a base estática + os extras (TACO/customizados do usuário).
+ * Não há precedência por origem — quem vence é a maior chave que casa na CABEÇA do
+ * nome (ver o loop do match). O comentário antigo aqui dizia "static always wins",
+ * o que nunca foi verdade.
+ */
 function buildFoodEntries(extraFoods?: Record<string, FoodItem>) {
   if (!extraFoods || Object.keys(extraFoods).length === 0) return normalizedFoodEntries
   const extras = Object.entries(extraFoods).map(([key, item]) => {
@@ -330,27 +318,26 @@ export function analyzeMeal(text: string, extraFoods?: Record<string, FoodItem>)
       continue
     }
 
-    // A CABEÇA do nome vence qualquer match no meio; entre iguais, a chave maior.
-    // Sem a prioridade da cabeça, "1 esfirra de frango com requeijao" elegia
-    // 'requeijao' (a maior chave da frase) e virava 15g de requeijão = 39 kcal,
-    // sendo que 'esfirra' está na base e daria 224. O fallback pro match-em-
-    // qualquer-lugar fica: quando a cabeça é desconhecida ("arroz com frango"),
-    // reconhecer o ingrediente ainda é melhor que não reconhecer nada.
+    // SÓ a cabeça do nome. Entre as que casam na cabeça, a chave maior vence.
+    //
+    // Não há fallback pra "casou em algum lugar da frase", e isso é deliberado: era
+    // ele que fazia o INGREDIENTE ganhar do PRATO, sempre em silêncio —
+    //   "1 esfirra de frango com requeijao" → 15g de requeijão  = 39 kcal (real 224)
+    //   "1 sanduiche com bacon"             → 15g de bacon      = 81 kcal
+    //   "1 torta de banana"                 → uma banana        = 71 kcal
+    // Um número plausível e errado é pior que não reconhecer: ninguém confere o que
+    // parece certo. Sem cabeça conhecida, a linha vira unknownLine e a cascata
+    // resolve com quem sabe mais — TACO (590 alimentos com alias curto) e, no fim,
+    // a IA, que lê a frase inteira ("de banana", "com requeijão") e acerta onde uma
+    // tabela estática não tem como.
     let matchedItem: FoodItem | null = null
     let dbKeyMatched = ''
-    let matchedAtHead = false
     for (const entry of allFoodEntries) {
       if (!entry.normalizedKey) continue
-      const atHead = matchesAtHead(foodName, entry.normalizedKey)
-      if (!atHead && !matchesWholeWord(foodName, entry.normalizedKey)) continue
-
-      const beatsCurrent = !matchedItem
-        || (atHead && !matchedAtHead)
-        || (atHead === matchedAtHead && entry.normalizedKeyLength > dbKeyMatched.length)
-      if (beatsCurrent) {
+      if (!matchesAtHead(foodName, entry.normalizedKey)) continue
+      if (!matchedItem || entry.normalizedKeyLength > dbKeyMatched.length) {
         dbKeyMatched = entry.normalizedKey
         matchedItem = entry.item
-        matchedAtHead = atHead
       }
     }
 
