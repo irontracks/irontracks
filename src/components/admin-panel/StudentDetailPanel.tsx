@@ -11,6 +11,7 @@ import { parseJsonWithSchema } from '@/utils/zod';
 import { z } from 'zod';
 import { normalizeWorkoutTitle } from '@/utils/workoutTitle';
 import { updateWorkout } from '@/actions/workout-actions';
+import { saveTeacherWorkout } from '@/lib/workout/teacherWorkoutPayload';
 import dynamic from 'next/dynamic';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
 
@@ -438,24 +439,16 @@ export const StudentDetailPanel: React.FC = () => {
                                             if (editingStudentWorkout.id) {
                                                 await updateWorkout(String(editingStudentWorkout.id || ''), data);
                                             } else {
-                                                const { data: nw } = await supabase
-                                                    .from('workouts')
-                                                    .insert({ user_id: targetUserId, name: data.title || 'Novo Treino', notes: '', created_by: user.id, is_template: true })
-                                                    .select()
-                                                    .single();
-                                                const toInsert = (Array.isArray(data.exercises) ? data.exercises : []).map((e) => ({
-                                                    workout_id: nw.id,
-                                                    name: e.name || '',
-                                                    sets: getSetsCount(e?.sets) || 4,
-                                                    reps: e.reps ?? '10',
-                                                    rpe: e.rpe ?? 8,
-                                                    cadence: e.cadence || '2020',
-                                                    rest_time: e.restTime ?? e.rest_time ?? 60,
-                                                    method: e.method || 'Normal',
-                                                    video_url: e.videoUrl || e.video_url || '',
-                                                    notes: e.notes || ''
-                                                }));
-                                                if (toInsert.length) await supabase.from('exercises').insert(toInsert);
+                                                // Grava via RPC save_workout_atomic (mesma do editor do aluno):
+                                                // exercícios viram linhas na tabela `sets`. Insert direto em
+                                                // `exercises` quebrava (colunas sets/reps/rpe não existem).
+                                                const res = await saveTeacherWorkout(supabase, {
+                                                    ownerUserId: targetUserId,
+                                                    authorUserId: String(user.id),
+                                                    title: data.title || 'Novo Treino',
+                                                    exercises: data.exercises,
+                                                });
+                                                if (!res.ok) throw new Error(res.error || 'Falha ao salvar treino');
                                             }
                                             const { data: refreshed } = await supabase
                                                 .from('workouts')
