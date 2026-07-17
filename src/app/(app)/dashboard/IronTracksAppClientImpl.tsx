@@ -12,6 +12,7 @@ const ActiveWorkout = dynamic(() => import('@/components/ActiveWorkout'), { ssr:
 const RestTimerOverlay = dynamic(() => import('@/components/workout/RestTimerOverlay'), { ssr: false });
 const TeacherControlHost = dynamic(() => import('@/components/teacher/TeacherControlHost'), { ssr: false });
 import { DashboardHeader } from './DashboardHeader';
+import { pathnameToView, viewToPath } from './viewPath';
 
 // Heavy components — loaded only when needed
 const CardioGPSPanel = dynamic(() => import('@/components/workout/CardioGPSPanel'), { ssr: false })
@@ -112,42 +113,6 @@ const appId = 'irontracks-production';
 // pra view name pra preservar a renderização condicional existente. Quando o
 // pathname não corresponde a nenhuma sub-rota conhecida, retornamos 'dashboard'
 // (homepage default).
-function pathnameToView(pathname: string | null): string {
-    if (!pathname) return 'dashboard'
-    if (pathname === '/dashboard' || pathname === '/dashboard/') return 'dashboard'
-    if (pathname.startsWith('/dashboard/history')) return 'history'
-    if (pathname.startsWith('/dashboard/active')) return 'active'
-    if (pathname.startsWith('/dashboard/report/weekly')) return 'weeklySummary'
-    if (pathname.startsWith('/dashboard/report')) return 'report'
-    if (pathname.startsWith('/dashboard/chat/') && pathname.length > '/dashboard/chat/'.length) return 'directChat'
-    if (pathname === '/dashboard/chat' || pathname === '/dashboard/chat/') return 'chatList'
-    if (pathname.startsWith('/dashboard/profile')) return 'profile'
-    if (pathname.startsWith('/dashboard/admin')) return 'admin'
-    if (pathname.startsWith('/dashboard/community')) return 'community'
-    if (pathname.startsWith('/dashboard/assessments')) return 'assessments'
-    if (pathname.startsWith('/dashboard/vip')) return 'vip'
-    if (pathname.startsWith('/dashboard/edit')) return 'edit'
-    return 'dashboard'
-}
-
-function viewToPath(view: string): string {
-    switch (view) {
-        case 'dashboard': return '/dashboard'
-        case 'history': return '/dashboard/history'
-        case 'active': return '/dashboard/active'
-        case 'report': return '/dashboard/report/active'
-        case 'chatList': return '/dashboard/chat'
-        case 'directChat': return '/dashboard/chat/_'
-        case 'profile': return '/dashboard/profile'
-        case 'admin': return '/dashboard/admin'
-        case 'community': return '/dashboard/community'
-        case 'assessments': return '/dashboard/assessments'
-        case 'vip': return '/dashboard/vip'
-        case 'edit': return '/dashboard/edit'
-        default: return '/dashboard'
-    }
-}
-
 function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initialUser?: unknown; initialProfile?: unknown; initialWorkouts?: unknown }) {
     const { confirm, alert } = useDialog();
     const initialUserObj = initialUser && typeof initialUser === 'object' ? (initialUser as Record<string, unknown>) : null
