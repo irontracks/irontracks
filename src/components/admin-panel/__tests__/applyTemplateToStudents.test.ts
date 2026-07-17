@@ -49,3 +49,17 @@ describe('seletor multi-aluno só oferece alunos aptos', () => {
     expect(tab).toMatch(/ApplyWorkoutToStudentsModal/)
   })
 })
+
+describe('biblioteca de treinos (TemplatesTab) aplica a vários sem entrar num aluno', () => {
+  const tab = stripComments(readFileSync('src/components/admin-panel/TemplatesTab.tsx', 'utf8'))
+
+  it('cada card abre o seletor de alunos (setApplyManyTemplate)', () => {
+    expect(tab).toMatch(/setApplyManyTemplate\(/)
+    expect(tab).toMatch(/Aplicar a alunos/)
+  })
+
+  it('monta o modal filtrando alunos aptos', () => {
+    expect(tab).toMatch(/ApplyWorkoutToStudentsModal/)
+    expect(tab).toMatch(/eligibleStudentsForApply\(usersList,\s*user\?\.id\)/)
+  })
+})

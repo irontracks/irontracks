@@ -1,8 +1,11 @@
 import React from 'react';
-import { Search, Plus, Edit, Trash2, BookOpen } from 'lucide-react';
+import { Search, Plus, Edit, Trash2, BookOpen, Users } from 'lucide-react';
 import { useAdminPanel } from './AdminPanelContext';
 import { AdminWorkoutTemplate } from '@/types/admin';
 import { normalizeWorkoutTitle } from '@/utils/workoutTitle';
+import { ApplyWorkoutToStudentsModal } from './ApplyWorkoutToStudentsModal';
+import { eligibleStudentsForApply } from '@/lib/admin/eligibleStudents';
+import type { UnknownRecord } from '@/types/app';
 
 export const TemplatesTab: React.FC = () => {
     const {
@@ -10,6 +13,13 @@ export const TemplatesTab: React.FC = () => {
         templateQuery,
         setTemplateQuery,
         setEditingTemplate,
+        // Aplicar treino a vários alunos de uma vez (Onda 2) — a partir da biblioteca,
+        // sem precisar entrar num aluno específico.
+        usersList,
+        user,
+        applyManyTemplate,
+        setApplyManyTemplate,
+        handleApplyTemplateToStudents,
         // Preciso das funções para adicionar e deletar template
         // No original: setEditingTemplate({ id: '', name: 'Novo Treino', ... })
         // e handleDeleteTemplate (preciso mover pro hook ou deixar inline se for simples)
@@ -82,10 +92,18 @@ export const TemplatesTab: React.FC = () => {
 
                         <div className="flex items-center gap-2 mt-4 pt-4 border-t border-neutral-800/50">
                             <button
-                                onClick={() => setEditingTemplate(t)}
-                                className="flex-1 py-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-2"
+                                onClick={() => setApplyManyTemplate(t as unknown as UnknownRecord)}
+                                className="flex-1 py-2 bg-yellow-500/10 hover:bg-yellow-500/20 text-yellow-400 rounded-lg text-xs font-bold transition-colors flex items-center justify-center gap-2"
+                                title="Aplicar este treino a vários alunos"
                             >
-                                <Edit size={14} /> Editar
+                                <Users size={14} /> Aplicar a alunos
+                            </button>
+                            <button
+                                onClick={() => setEditingTemplate(t)}
+                                className="p-2 bg-neutral-800 hover:bg-neutral-700 text-neutral-300 rounded-lg transition-colors"
+                                title="Editar"
+                            >
+                                <Edit size={14} />
                             </button>
                             <button
                                 onClick={() => handleDeleteTemplate(t.id)}
@@ -108,6 +126,15 @@ export const TemplatesTab: React.FC = () => {
                     </div>
                 )}
             </div>
+
+            {applyManyTemplate && (
+                <ApplyWorkoutToStudentsModal
+                    workoutName={String(applyManyTemplate.name || 'Treino')}
+                    students={eligibleStudentsForApply(usersList, user?.id)}
+                    onClose={() => setApplyManyTemplate(null)}
+                    onApply={(ids) => handleApplyTemplateToStudents(applyManyTemplate, ids)}
+                />
+            )}
         </div>
     );
 };

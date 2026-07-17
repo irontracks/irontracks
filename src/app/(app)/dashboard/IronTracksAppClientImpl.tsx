@@ -17,6 +17,7 @@ import { pathnameToView, viewToPath } from './viewPath';
 // Heavy components — loaded only when needed
 const CardioGPSPanel = dynamic(() => import('@/components/workout/CardioGPSPanel'), { ssr: false })
 const AdminPanelV2 = dynamic(() => import('@/components/AdminPanelV2'), { ssr: false });
+const TeacherArea = dynamic(() => import('@/components/teacher-area/TeacherArea'), { ssr: false });
 const ChatListScreen = dynamic(() => import('@/components/ChatListScreen'), { ssr: false });
 const ChatDirectScreen = dynamic(() => import('@/components/ChatDirectScreen'), { ssr: false });
 const HistoryList = dynamic(() => import('@/components/HistoryList'), { ssr: false });
@@ -985,6 +986,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                             onGoHome={() => setView('dashboard')}
                             onOpenVip={openVipView}
                             onOpenAdmin={handleOpenAdmin}
+                            onOpenTeacherArea={() => setView('teacher')}
                             onOpenChatList={handleOpenChatList}
                             onOpenHistory={handleOpenHistory}
                             onOpenNotifications={handleOpenNotifications}
@@ -1369,6 +1371,14 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                 <div className="fixed inset-0 z-[60]">
                                     <SectionErrorBoundary section="Painel Admin" fullScreen onReset={() => setView('dashboard')}>
                                         <AdminPanelV2 user={user as AdminUser} onClose={() => setView('dashboard')} />
+                                    </SectionErrorBoundary>
+                                </div>
+                            )}
+
+                            {view === 'teacher' && (
+                                <div className="fixed inset-0 z-[60]">
+                                    <SectionErrorBoundary section="Área do Professor" fullScreen onReset={() => setView('dashboard')}>
+                                        <TeacherArea user={user as AdminUser} onClose={() => setView('dashboard')} />
                                     </SectionErrorBoundary>
                                 </div>
                             )}
