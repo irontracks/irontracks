@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { readFileSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 /**
@@ -82,5 +82,32 @@ describe('folha do chat', () => {
   it('trata 403 (Pro) e 429 (rate limit) com texto humano, não erro cru', () => {
     expect(chat).toContain('upgradeRequired')
     expect(chat).toContain('res.status === 429')
+  })
+})
+
+describe('sugestões absorvidas do antigo "O que comer para bater as metas?"', () => {
+  /**
+   * O botão 🧠 (SmartSuggestions → /api/ai/nutrition-suggest) fazia exatamente um
+   * dos alcances do chat e bebia do MESMO balde de 200/dia — duas portas pra mesma
+   * pergunta. Foi absorvido: componente e rota removidos.
+   */
+  it('o botão, o componente e a rota sumiram do repo', () => {
+    expect(existsSync(join(process.cwd(), 'src/components/dashboard/nutrition/SmartSuggestions.tsx'))).toBe(false)
+    expect(existsSync(join(process.cwd(), 'src/app/api/ai/nutrition-suggest/route.ts'))).toBe(false)
+    expect(mixer).not.toContain('SmartSuggestions')
+    expect(mixer).not.toContain('nutrition-suggest')
+  })
+
+  it('tocar numa sugestão NÃO lança — vira "se eu comer X" e passa pelo atalho', () => {
+    // É o que mantém a promessa: o usuário vê o impacto exato ANTES de decidir.
+    // Se um dia isto virar um lançamento direto, o número deixa de ser conferido.
+    expect(chat).toContain('send(`se eu comer ${s}`)')
+  })
+
+  it('a sugestão do modelo é só texto de alimento — nunca macro', () => {
+    const prompt = readFileSync(join(process.cwd(), 'src/lib/nutrition/chatPrompt.ts'), 'utf8')
+    const schema = prompt.slice(prompt.indexOf('const IntentSchema'), prompt.indexOf('export interface ParsedIntent'))
+    expect(schema).toContain('suggestions: z.array(z.string()')
+    expect(schema).not.toMatch(/\b(calories|protein|carbs|fat|dateKey|date)\b/)
   })
 })
