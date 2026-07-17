@@ -151,4 +151,32 @@ export const foodDatabase: Record<string, FoodItem> = {
   'hamburguer': { kcal: 295, p: 17, c: 24, f: 14, approx: { unidade: 200 } },
   'sopa': { kcal: 40, p: 2, c: 6, f: 1, approx: { prato: 300, concha: 150 } },
   'salada': { kcal: 20, p: 1.5, c: 3, f: 0.3, approx: { prato: 150 } },
+
+  // ── Pratos que o usuário lança e NINGUÉM tinha ────────────────────────────
+  // Sem eles, o parser caía num ingrediente citado na descrição ("1 sanduiche com
+  // bacon" → 15g de bacon) — e agora que a cabeça do nome manda, cairiam na IA,
+  // que é paga e bloqueia usuário free.
+  //
+  // Só entram os que a TACO NÃO cobre: 'pastel', 'quibe', 'feijoada', 'lasanha',
+  // 'bolo', 'nhoque', 'polenta', 'yakisoba' e 'estrogonofe' já têm alias exato lá,
+  // com dado curado — e a fase local roda ANTES da TACO, então duplicar aqui
+  // sobrescreveria número real por estimativa. Deixados de fora de propósito.
+  'strogonoff': { kcal: 157, p: 18, c: 3, f: 8, approx: { concha: 150, prato: 200 } }, // = TACO 'estrogonofe de frango' (grafia que a TACO não indexa)
+  'strogonoff de carne': { kcal: 173, p: 15, c: 3, f: 11, approx: { concha: 150, prato: 200 } }, // = TACO 'estrogonofe de carne'
+  'misto quente': { kcal: 290, p: 14, c: 28, f: 14, approx: { unidade: 120 } },
+  'sanduiche natural': { kcal: 200, p: 10, c: 25, f: 6, approx: { unidade: 150 } },
+  'x-burguer': { kcal: 260, p: 13, c: 22, f: 13, approx: { unidade: 180 } },
+  'x-salada': { kcal: 240, p: 12, c: 22, f: 11, approx: { unidade: 200 } },
+  'sushi': { kcal: 145, p: 6, c: 28, f: 1, approx: { unidade: 20, prato: 200 } },
+  'temaki': { kcal: 180, p: 9, c: 25, f: 5, approx: { unidade: 150 } },
+  'panqueca': { kcal: 200, p: 9, c: 22, f: 9, approx: { unidade: 100 } },
+  'crepe': { kcal: 230, p: 8, c: 25, f: 11, approx: { unidade: 120 } },
+  'risoto': { kcal: 150, p: 6, c: 20, f: 5, approx: { prato: 250, concha: 150 } },
+  'escondidinho': { kcal: 140, p: 8, c: 14, f: 6, approx: { prato: 250 } },
+  'brigadeiro': { kcal: 390, p: 4, c: 60, f: 15, approx: { unidade: 20 } },
+  'pudim': { kcal: 180, p: 5, c: 28, f: 5, approx: { fatia: 100 } },
+  'sorvete': { kcal: 200, p: 3, c: 24, f: 10, approx: { unidade: 60, copo: 120 } },
+  // 'torta' e 'sanduiche' soltos ficam FORA: são ambíguos ("torta de banana" é doce,
+  // "torta de frango" é salgada; 200 kcal de diferença). Palavra ambígua é onde a IA
+  // ganha da base — ela lê o resto da frase, a base não.
 }
