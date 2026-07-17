@@ -115,6 +115,21 @@ export const apiAdmin = {
   deleteAuthUserWithToken: (userId: string, token: string) =>
     apiPost<{ ok: boolean }>('/api/admin/delete-auth-user', { user_id: userId, token }),
 
+  /**
+   * POST excluir um professor + toda a cascata (alunos, treinos, histórico,
+   * assessments, auth.users). Vai pra rota server-side, que roda a RPC atômica
+   * delete_teacher_cascade via service-role — a escrita direta em `teachers` está
+   * revogada pro client (hardening 2026-07-11), por isso o .delete() do client dava
+   * "permission denied for table teachers". `id` = teachers.id OU user_id (a rota
+   * resolve os dois). Bearer no header pro app nativo, onde o cookie pode não valer.
+   */
+  deleteTeacher: (id: string, token: string) =>
+    apiPost<{ ok: boolean; report?: unknown }>(
+      '/api/admin/teachers/delete',
+      { id },
+      { headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` } },
+    ),
+
   // ─── Teacher Details ──────────────────────────────────────────────────────────
 
   /** GET students for a teacher */
