@@ -6,6 +6,8 @@ import { useDialog } from '@/contexts/DialogContext';
 import { workoutPlanHtml } from '@/utils/report/templates';
 import { escapeHtml } from '@/utils/escapeHtml';
 import { logWarn } from '@/lib/logger';
+import { saveTeacherWorkout } from '@/lib/workout/teacherWorkoutPayload';
+import { notifyStudentWorkoutAssigned } from '@/lib/notifications/workoutAssignedClient';
 import React from 'react';
 import { useStudentWorkoutCreate } from './useStudentWorkoutCreate';
 
@@ -70,7 +72,9 @@ export const useAdminTemplateOps = ({
                 restTime: ex.rest_time ?? 60,
                 method: ex.method || 'Normal',
                 videoUrl: ex.video_url || '',
-                notes: ex.notes || ''
+                notes: ex.notes || '',
+                // O texto do coach é persistido em `notes`; recarrega no campo COACH.
+                coachNotes: ex.notes || ''
             }))
         });
     }, [getSetsCount, setEditingStudentWorkout]);
@@ -89,7 +93,9 @@ export const useAdminTemplateOps = ({
                 restTime: Number(ex.rest_time ?? 60),
                 method: String(ex.method || 'Normal'),
                 videoUrl: String(ex.video_url || ''),
-                notes: String(ex.notes || '')
+                notes: String(ex.notes || ''),
+                // O texto do coach é persistido em `notes`; recarrega no campo COACH.
+                coachNotes: String(ex.notes || '')
             }))
         });
     }, [getSetsCount]);
@@ -103,27 +109,18 @@ export const useAdminTemplateOps = ({
         try {
             const workoutId = String(editingTemplate.id || '');
             if (!workoutId) { await alert('ID do treino não encontrado.'); return; }
-            const { error: wErr } = await supabase
-                .from('workouts')
-                .update({ name: title })
-                .eq('id', workoutId);
-            if (wErr) throw wErr;
-            for (let i = 0; i < exercises.length; i++) {
-                const ex = exercises[i] && typeof exercises[i] === 'object' ? (exercises[i] as UnknownRecord) : {};
-                if (ex.id) {
-                    await supabase.from('exercises').update({
-                        name: String(ex.name || ''),
-                        sets: getSetsCount(ex.sets) || 4,
-                        reps: ex.reps ?? '10',
-                        rpe: ex.rpe ?? 8,
-                        cadence: String(ex.cadence || '2020'),
-                        rest_time: ex.restTime ?? ex.rest_time ?? 60,
-                        method: String(ex.method || 'Normal'),
-                        video_url: String(ex.videoUrl || ex.video_url || ''),
-                        notes: String(ex.notes || '')
-                    }).eq('id', String(ex.id));
-                }
-            }
+            // Reescreve o template do professor (workout dele mesmo) via RPC
+            // save_workout_atomic — delete+reinsert atômico de exercícios e linhas de `sets`.
+            // O update direto em `exercises` quebrava (colunas sets/reps/rpe não existem).
+            const res = await saveTeacherWorkout(supabase, {
+                workoutId,
+                ownerUserId: String(user?.id || ''),
+                authorUserId: String(user?.id || ''),
+                title,
+                notes: String((editingTemplate as UnknownRecord)?.notes || ''),
+                exercises,
+            });
+            if (!res.ok) throw new Error(res.error || 'Falha ao salvar treino');
             setTemplates(prev => prev.map(t =>
                 String((t as UnknownRecord).id) === workoutId
                     ? { ...(t as UnknownRecord), name: title, exercises } as AdminWorkoutTemplate
@@ -135,7 +132,7 @@ export const useAdminTemplateOps = ({
             const msg = e && typeof e === 'object' && 'message' in e && typeof (e as { message?: unknown }).message === 'string' ? (e as { message: string }).message : String(e);
             await alert('Erro ao salvar treino: ' + msg);
         }
-    }, [alert, editingTemplate, supabase, getSetsCount, setTemplates]);
+    }, [alert, editingTemplate, supabase, user, setTemplates]);
 
     const handleAddTemplateToStudent = useCallback(async (template: UnknownRecord) => {
         if (!selectedStudent) return;
@@ -143,57 +140,18 @@ export const useAdminTemplateOps = ({
         if (!targetUserId) { await alert('Este aluno ainda não possui acesso ao app.'); return; }
         if (!(await confirm(`Adicionar treino "${template?.name || 'Treino'}" para ${selectedStudent.name || selectedStudent.email}?`))) return;
         try {
-            const templateExercises: UnknownRecord[] = Array.isArray(template.exercises) ? (template.exercises as UnknownRecord[]) : [];
-            const payload = {
-                user_id: targetUserId,
-                created_by: user?.id,
-                is_template: true,
-                name: template?.name || '',
-                notes: template?.notes || ''
-            };
-            const { data: newWorkout, error: wErr } = await supabase
-                .from('workouts')
-                .insert(payload)
-                .select()
-                .single();
-            if (wErr) throw wErr;
-            const toInsert = templateExercises.map((e: UnknownRecord) => ({
-                workout_id: newWorkout.id,
-                name: e?.name || '',
-                sets: getSetsCount(e?.sets) || 4,
-                reps: e?.reps ?? '10',
-                rpe: e?.rpe ?? 8,
-                cadence: e?.cadence || '2020',
-                rest_time: e?.rest_time ?? 60,
-                method: e?.method || 'Normal',
-                video_url: e?.video_url || '',
-                notes: e?.notes || ''
-            }));
-            let newExs: UnknownRecord[] = [];
-            if (toInsert.length) {
-                const { data: exRows, error: exErr } = await supabase.from('exercises').insert(toInsert).select();
-                if (exErr) throw exErr;
-                newExs = exRows || [];
-            }
-            for (let i = 0; i < templateExercises.length; i++) {
-                const srcEx: UnknownRecord = templateExercises[i] || ({} as UnknownRecord);
-                const dstEx = newExs[i] || null;
-                const setsArr: UnknownRecord[] = Array.isArray(srcEx.sets) ? (srcEx.sets as UnknownRecord[]) : [];
-                if (dstEx && setsArr.length) {
-                    const newSets = setsArr.map((s: UnknownRecord) => ({
-                        exercise_id: (dstEx as UnknownRecord).id,
-                        weight: s?.weight ?? null,
-                        reps: s?.reps ?? null,
-                        rpe: s?.rpe ?? null,
-                        set_number: s?.set_number ?? 1,
-                        completed: s?.completed ?? false
-                    }));
-                    if (newSets.length) {
-                        const { error: setErr } = await supabase.from('sets').insert(newSets);
-                        if (setErr) throw setErr;
-                    }
-                }
-            }
+            // Copia o template do professor pra conta do aluno via RPC save_workout_atomic:
+            // cria workout + exercícios + linhas de `sets` de uma vez. Antes, o insert direto
+            // em `exercises` quebrava (colunas sets/reps/rpe não existem na tabela).
+            const res = await saveTeacherWorkout(supabase, {
+                ownerUserId: String(targetUserId),
+                authorUserId: String(user?.id || ''),
+                title: String(template?.name || 'Treino'),
+                notes: String(template?.notes || ''),
+                exercises: template.exercises,
+            });
+            if (!res.ok) throw new Error(res.error || 'Falha ao enviar treino');
+            void notifyStudentWorkoutAssigned(String(targetUserId), String(template?.name || ''));
             let refreshed: UnknownRecord[] = [];
             const { data } = await supabase
                 .from('workouts')
@@ -213,7 +171,7 @@ export const useAdminTemplateOps = ({
             const msg = e && typeof e === 'object' && 'message' in e && typeof (e as { message?: unknown }).message === 'string' ? (e as { message: string }).message : String(e);
             await alert('Erro ao enviar: ' + msg);
         }
-    }, [alert, confirm, selectedStudent, supabase, user, getSetsCount, setStudentWorkouts, setSyncedWorkouts]);
+    }, [alert, confirm, selectedStudent, supabase, user, setStudentWorkouts, setSyncedWorkouts]);
 
     // ─── Export Handlers ──────────────────────────────────────────────────────
     const handleExportPdf = useCallback(async () => {
