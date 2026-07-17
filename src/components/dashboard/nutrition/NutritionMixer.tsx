@@ -1033,7 +1033,14 @@ export default function NutritionMixer({
                   <ul className="mt-2 space-y-1">
                     {mealPreview.items.map((it, i) => (
                       <li key={`${it.label}-${i}`} className="flex items-baseline justify-between gap-2 text-xs">
-                        <span className="min-w-0 truncate text-neutral-200">{it.label}</span>
+                        <span className="min-w-0 truncate text-neutral-200">
+                          {it.label}
+                          {/* Peso assumido, sempre à vista. Quando o alimento não vem da
+                              base local (TACO/Open Food Facts/customizado), não existe
+                              peso por unidade e o parser precisa chutar — aqui o chute
+                              deixa de ser silencioso e o usuário corrige com "200g de X". */}
+                          {it.grams > 0 && <span className="ml-1 text-neutral-500">· {it.grams}g</span>}
+                        </span>
                         <span className="shrink-0 whitespace-nowrap text-neutral-400">
                           <span className="font-semibold text-neutral-100">{it.calories}</span> kcal
                           <span className="ml-2 text-[10px] text-neutral-500">P{it.protein} C{it.carbs} G{it.fat}</span>
