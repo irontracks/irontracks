@@ -7,6 +7,7 @@ import type { UnknownRecord } from '@/types/app'
 import { apiAi } from '@/lib/api'
 import { saveTeacherWorkout } from '@/lib/workout/teacherWorkoutPayload'
 import { notifyStudentWorkoutAssigned } from '@/lib/notifications/workoutAssignedClient'
+import { wizardAnswersToStudentPayload, planToWorkoutDrafts } from '@/lib/workout/studentWorkoutWizard'
 import { useDialog } from '@/contexts/DialogContext'
 import type { WorkoutWizardAnswers, WorkoutDraft } from '@/components/dashboard/WorkoutWizardModal'
 
@@ -109,18 +110,19 @@ export function useStudentWorkoutCreate({
     const onWizardGenerate = useCallback(
         async (answers: WorkoutWizardAnswers, options?: { mode?: GenerateMode }): Promise<GenerateResult> => {
             const mode = options?.mode ?? 'single'
-            const res = await apiAi.workoutWizard({ answers, mode })
-            // Return shape matches what WorkoutWizardModal expects
-            if (mode === 'program') {
-                const drafts = Array.isArray((res as UnknownRecord)?.drafts)
-                    ? ((res as UnknownRecord).drafts as WorkoutDraft[])
-                    : []
-                return { drafts }
-            }
-            const draft = (res as UnknownRecord)?.draft as WorkoutDraft | undefined
-            return draft ?? { title: 'Treino', exercises: [] }
+            const studentId = String(selectedStudent?.user_id || '').trim()
+            // Sem conta no app não dá pra personalizar pelos dados do aluno.
+            if (!studentId) throw new Error('Este aluno ainda não possui acesso ao app.')
+
+            // Usa a rota que personaliza pelos dados do ALUNO (não do professor).
+            const payload = wizardAnswersToStudentPayload(answers, studentId, mode)
+            const res = await apiAi.studentWorkout(payload as unknown as Record<string, unknown>)
+            const drafts = planToWorkoutDrafts((res as UnknownRecord)?.plan)
+
+            if (mode === 'program') return { drafts }
+            return drafts[0] ?? { title: 'Treino', exercises: [] }
         },
-        []
+        [selectedStudent]
     )
 
     /**

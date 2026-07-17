@@ -9,6 +9,7 @@ import { env } from '@/utils/env'
 import { getGeminiModel } from '@/utils/ai/gemini'
 import { safeGemini, handleGeminiError } from '@/utils/ai/handleGeminiError'
 import { buildUserContextBlock } from '@/utils/ai/userContext'
+import { checkVipFeatureAccess, incrementVipUsage } from '@/utils/vip/limits'
 
 export const dynamic = 'force-dynamic'
 
@@ -45,12 +46,24 @@ export async function POST(req: Request) {
   try {
     const auth = await requireUser()
     if (!auth.ok) return auth.response
+    const supabase = auth.supabase
     const userId = String(auth.user.id || '').trim()
 
     const ip = getRequestIp(req)
     const rl = await checkRateLimitAsync(`ai:student-workout:${userId}:${ip}`, 10, 60_000)
     if (!rl.allowed) {
       return NextResponse.json({ ok: false, error: 'rate_limited' }, { status: 429 })
+    }
+
+    // Cota da IA de treino conta na conta de QUEM gera (o professor). Mesma feature key
+    // do wizard antigo, pra usar o mesmo balde. Professor/admin resolvem 'elite' pelo
+    // role, então na prática passam; o metering registra o uso.
+    const access = await checkVipFeatureAccess(supabase, userId, 'wizard_weekly')
+    if (!access.allowed) {
+      return NextResponse.json(
+        { ok: false, error: 'limit_reached', upgradeRequired: true, message: 'Limite de gerações de treino atingido. Faça upgrade para continuar.' },
+        { status: 403 },
+      )
     }
 
     const apiKey = env.gemini.apiKey
@@ -158,6 +171,8 @@ export async function POST(req: Request) {
     const parsed2 = extractJson(text)
 
     if (!parsed2) return NextResponse.json({ ok: false, error: 'Resposta inválida' }, { status: 400 })
+
+    await incrementVipUsage(supabase, userId, 'wizard')
 
     return NextResponse.json({ ok: true, plan: parsed2 })
   } catch (e: unknown) {
