@@ -84,3 +84,26 @@ describe('cleanFoodText — o que faz o atalho não cair no Gemini à toa', () =
     expect(cleanFoodText(null as unknown as string)).toBe('')
   })
 })
+
+describe('cleanFoodText — não deixa pergunta virar nome de refeição', () => {
+  it('"como ficará meus numero" (o caso reportado) some', () => {
+    // Foi parar como food_name no diário: "...30g de doce de leite da tirol, como
+    // ficará meus numero". O "ficará" (futuro) escapava do padrão de "quanto fica".
+    expect(cleanFoodText('30g de doce de leite da tirol, como ficará meus numero'))
+      .toBe('30g de doce de leite da tirol')
+  })
+
+  it.each([
+    ['1 whey como fica meus numeros', '1 whey'],
+    ['2 ovos como ficam minhas calorias', '2 ovos'],
+    ['1 banana quanto ficará de proteina', '1 banana'],
+    ['100g arroz e os meus numeros', '100g arroz'],
+  ])('%s → %s', (input, expected) => {
+    expect(cleanFoodText(input)).toBe(expected)
+  })
+
+  it('não corta alimento que por acaso tem "como" ou "número" no meio legítimo', () => {
+    // "comida" começa com "com" mas não é "como fic/vai/est".
+    expect(cleanFoodText('1 comida caseira')).toBe('1 comida caseira')
+  })
+})
