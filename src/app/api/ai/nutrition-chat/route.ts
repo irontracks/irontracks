@@ -223,12 +223,23 @@ async function simulate(
 ) {
   const resolved = await resolveFood(supabase, userId, foodText)
 
+  // A IA devolve um foodName LIMPO ("Sucrilhos com leite e doce de leite"); o
+  // parser/TACO não, então aí o próprio foodText (já limpo pelo cleanFoodText) serve.
+  // Guardar o nome da IA é a defesa que impede a pergunta crua de virar rótulo no
+  // diário mesmo se a limpeza de texto falhar num caso novo — foi assim que
+  // "...como ficará meus numero" foi parar como nome de refeição.
+  let aiFoodName = ''
   const addition = resolved
     ? resolved.meal
-    : await estimateMacrosFromText(foodText).then((e) =>
-        e ? { calories: e.calories, protein: e.protein, carbs: e.carbs, fat: e.fat } : null,
-      )
+    : await estimateMacrosFromText(foodText).then((e) => {
+        if (!e) return null
+        aiFoodName = String(e.foodName || '').trim()
+        return { calories: e.calories, protein: e.protein, carbs: e.carbs, fat: e.fat }
+      })
   if (!addition) return null
+
+  // Nome de exibição: o da IA quando veio dela; senão o texto (já limpo).
+  const displayName = (aiFoodName || foodText).slice(0, 120)
 
   // Refeição zerada não é comida — é o modelo não tendo reconhecido e respondendo
   // zeros. Sem isto, "se eu comer xyzabc123" vira "Xyzabc123 — 0 kcal. Seu dia vai
@@ -247,7 +258,7 @@ async function simulate(
       }))
     : [
         {
-          label: foodText.slice(0, 120),
+          label: displayName,
           grams: 0,
           calories: Number(addition.calories) || 0,
           protein: Number(addition.protein) || 0,
@@ -262,6 +273,8 @@ async function simulate(
     reply: buildTemplateReply(foodText, projection, items),
     sim: {
       foodText,
+      // Nome pro diário/card. Nunca a pergunta crua — ver displayName acima.
+      foodName: displayName,
       items,
       projection,
       source: resolved?.source ?? 'ai',

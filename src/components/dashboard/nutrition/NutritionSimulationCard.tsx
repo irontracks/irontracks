@@ -27,6 +27,8 @@ export interface SimulationItem {
 
 export interface Simulation {
   foodText: string
+  /** Nome limpo pro diário/card — nunca a pergunta crua. */
+  foodName?: string
   items: SimulationItem[]
   projection: MealProjection
   source: string
@@ -60,7 +62,7 @@ export default function NutritionSimulationCard({
         <div className="min-w-0">
           <div className="text-[10px] font-black uppercase tracking-widest text-yellow-500">Simulação</div>
           <div className="truncate text-sm font-bold text-white">
-            {sim.foodText}
+            {sim.foodName || sim.foodText}
             {totalGrams > 0 && <span className="ml-1 font-normal text-neutral-400">({Math.round(totalGrams)}g)</span>}
           </div>
         </div>

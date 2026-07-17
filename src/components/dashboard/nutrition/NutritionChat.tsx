@@ -164,7 +164,7 @@ export default function NutritionChat({
       setLoggingId(msgId)
       try {
         const res = await applyChatSimulationAction(
-          { foodText: sim.foodText, items: sim.items },
+          { foodText: sim.foodText, foodName: sim.foodName, items: sim.items },
           dateKey,
           `chat-${msgId}`, // idempotente: toque duplo não duplica o lançamento
         )
