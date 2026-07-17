@@ -61,7 +61,7 @@ describe('buildIntentPrompt', () => {
 describe('parseIntentOutput', () => {
   it('aceita JSON puro', () => {
     const r = parseIntentOutput('{"intent":"simulate","foodQuery":"5 ovos","reply":null}')
-    expect(r).toEqual({ intent: 'simulate', foodQuery: '5 ovos', reply: null })
+    expect(r).toEqual({ intent: 'simulate', foodQuery: '5 ovos', reply: null, suggestions: [] })
   })
 
   it('aceita JSON dentro de fence markdown (o modelo faz isso o tempo todo)', () => {
@@ -82,6 +82,31 @@ describe('parseIntentOutput', () => {
     expect(parseIntentOutput('{"intent":"simulate","foodQuery":"  "}')).toBeNull()
     expect(parseIntentOutput('{"intent":"answer","reply":null}')).toBeNull()
     expect(parseIntentOutput('{"intent":"refuse","reply":""}')).toBeNull()
+  })
+
+  it('devolve as sugestões tocáveis (absorveu o botão "O que comer para bater as metas?")', () => {
+    const r = parseIntentOutput(
+      '{"intent":"answer","reply":"Faltam 65g.","suggestions":["3 ovos","150g de frango"]}',
+    )
+    expect(r?.suggestions).toEqual(['3 ovos', '150g de frango'])
+  })
+
+  it('capa em 3 e descarta sugestão vazia', () => {
+    const r = parseIntentOutput(
+      '{"intent":"answer","reply":"ok","suggestions":["a","3 ovos","  ","150g de frango","1 whey","banana"]}',
+    )
+    // "a" tem 1 char → fora. Sobram 4 válidas, capadas em 3.
+    expect(r?.suggestions).toEqual(['3 ovos', '150g de frango', '1 whey'])
+  })
+
+  it('só "answer" tem sugestão — em refuse seria contraditório, em simulate o card já responde', () => {
+    expect(parseIntentOutput('{"intent":"refuse","reply":"Não é nutrição.","suggestions":["3 ovos"]}')?.suggestions).toEqual([])
+    expect(parseIntentOutput('{"intent":"simulate","foodQuery":"5 ovos","suggestions":["3 ovos"]}')?.suggestions).toEqual([])
+  })
+
+  it('sem sugestão, devolve lista vazia (nunca undefined na UI)', () => {
+    expect(parseIntentOutput('{"intent":"answer","reply":"Faltam 65g."}')?.suggestions).toEqual([])
+    expect(parseIntentOutput('{"intent":"answer","reply":"ok","suggestions":null}')?.suggestions).toEqual([])
   })
 
   it('ignora campo extra em vez de explodir (.strip)', () => {

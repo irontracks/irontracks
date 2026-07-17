@@ -149,7 +149,10 @@ export async function POST(req: Request) {
     }
 
     // 'answer' e 'refuse': o texto do modelo, lendo números que já vieram prontos.
-    return NextResponse.json({ ok: true, reply: parsed.reply, sim: null })
+    // `suggestions` são só TEXTOS de alimento: viram botões e, ao tocar, voltam como
+    // "se eu comer X" — ou seja, passam pelo atalho + cascata determinística. O
+    // número que o usuário vê continua não vindo do modelo.
+    return NextResponse.json({ ok: true, reply: parsed.reply, sim: null, suggestions: parsed.suggestions })
   } catch (e: unknown) {
     return handleGeminiError('nutrition-chat', e)
   }
