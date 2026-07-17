@@ -3,6 +3,7 @@ import { describe, it, expect, vi } from 'vitest'
 
 // dynamic() → stub (as tabs pesadas viram no-op; testamos o shell, não elas)
 vi.mock('next/dynamic', () => ({ default: () => { const Stub = () => null; return Stub } }))
+vi.mock('next/navigation', () => ({ useRouter: () => ({ push: vi.fn(), back: vi.fn() }) }))
 // Controller + provider + tabs estáticas → stubs controláveis
 const ctrl: Record<string, unknown> = {
   tab: 'dashboard', setTab: vi.fn(),
