@@ -1,77 +1,113 @@
+/**
+ * MEMO DE REFEIÇÃO — o que a IA já estimou uma vez, pra não pagar de novo.
+ *
+ * ── Por que "memo" e não "alimento aprendido" ─────────────────────────────────
+ * A IA estima REFEIÇÕES, não alimentos: o prompt manda "Some tudo e retorne um
+ * único objeto" (aiEstimate.ts), então o que volta é o total do que o usuário
+ * descreveu — "200g arroz, 100g feijão e 200g bife" → 1330 kcal.
+ *
+ * O código antigo gravava esse TOTAL nas colunas `*_per_100g` e devolvia as linhas
+ * ao parser como se fossem alimentos por 100g, que ele multiplicava por grams/100.
+ * Erro de categoria, e o JSDoc antigo até avisava ("Total calories of the meal (not
+ * per 100g)") logo acima do `kcal_per_100g: Math.round(totalCalories)`.
+ *
+ * Em produção isso deixou 41 linhas com média de 629 kcal/100g e máximo de 1650 —
+ * gordura pura tem 900, então nada comestível chega lá. Não eram erros de estimativa:
+ * eram totais de refeição na coluna errada.
+ *
+ * O que salvou os usuários foi um segundo bug: a chave é o texto CRU digitado
+ * ("200g arroz 100g feijao...") e o parser tira os números antes de comparar, então
+ * 40 das 41 linhas nunca casaram com nada. O recurso gastava uma chamada de Gemini e
+ * uma linha por refeição desconhecida — e nunca entregava. As que casavam (texto sem
+ * número, tipo "sushi") entregavam o total dividido por 2, porque o parser assumia
+ * 50g.
+ *
+ * ── O desenho agora ───────────────────────────────────────────────────────────
+ * Chave = texto digitado. Valor = total daquela refeição. Isso é EXATAMENTE o que já
+ * estava gravado — o dado nunca foi lixo, as colunas é que têm nome errado (renomear
+ * exige migration; ficam documentadas aqui). Então o memo é consultado por
+ * IGUALDADE do texto inteiro e devolve os totais DIRETO, sem multiplicar por
+ * grama nenhuma. Some o veneno e as 41 linhas viram úteis.
+ *
+ * Consequência boa: "mesma refeição de sempre" passa a responder na hora, de graça e
+ * sempre igual — que era a promessa original do recurso.
+ */
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { FoodItem } from './food-database'
+import type { MealLog } from './engine'
 
 /**
- * Normalize a food name to a lowercase key without accents/special chars.
+ * Normaliza o texto pra virar chave. Precisa ser idêntica na escrita e na leitura,
+ * senão o memo nunca casa.
  */
 export function normalizeFoodKey(name: string): string {
   return (name || '')
     .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[̀-ͯ]/g, '')
     .replace(/[^a-zA-Z0-9\s]/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
     .toLowerCase()
 }
 
-export type LearnedFoodRow = {
-  food_key: string
-  display_name: string
-  kcal_per_100g: number
-  protein_per_100g: number
-  carbs_per_100g: number
-  fat_per_100g: number
-  use_count: number
+/** Teto de memos por usuário. */
+const MAX_MEMOS_PER_USER = 200
+
+export interface MealMemo extends MealLog {
+  /** A chave que casou — pra contabilizar o uso. */
+  foodKey: string
 }
 
 /**
- * Fetch all learned foods for a user and convert them to the same format
- * as the static food database (FoodItem per 100g).
+ * Busca o memo do texto EXATO. Consulta indexada (user_id, food_key) — nada de
+ * carregar 500 linhas pra procurar no cliente, como a versão antiga fazia.
+ *
+ * ATENÇÃO às colunas: `kcal_per_100g` & cia guardam o TOTAL da refeição, não valores
+ * por 100g (ver o cabeçalho). O nome mente; o conteúdo é total.
  */
-export async function loadLearnedFoods(
+export async function loadMealMemo(
   supabase: SupabaseClient,
   userId: string,
-): Promise<Record<string, FoodItem>> {
+  text: string,
+): Promise<MealMemo | null> {
   try {
+    const foodKey = normalizeFoodKey(text)
+    if (!foodKey || foodKey.length < 2) return null
+
     const { data, error } = await supabase
       .from('nutrition_learned_foods')
-      .select('food_key, display_name, kcal_per_100g, protein_per_100g, carbs_per_100g, fat_per_100g, use_count')
+      .select('food_key, display_name, kcal_per_100g, protein_per_100g, carbs_per_100g, fat_per_100g')
       .eq('user_id', userId)
-      .order('use_count', { ascending: false })
-      .limit(500)
+      .eq('food_key', foodKey)
+      .maybeSingle()
 
-    if (error || !data) return {}
+    if (error || !data) return null
 
-    const result: Record<string, FoodItem> = {}
-    for (const row of data) {
-      const key = String(row.food_key || '').trim()
-      if (!key) continue
-      result[key] = {
-        kcal: Number(row.kcal_per_100g) || 0,
-        p: Number(row.protein_per_100g) || 0,
-        c: Number(row.carbs_per_100g) || 0,
-        f: Number(row.fat_per_100g) || 0,
-      }
+    const calories = Number(data.kcal_per_100g) || 0
+    const protein = Number(data.protein_per_100g) || 0
+    const carbs = Number(data.carbs_per_100g) || 0
+    const fat = Number(data.fat_per_100g) || 0
+
+    // Memo vazio não é resposta — deixa a cascata seguir em vez de gravar 0 kcal.
+    if (calories <= 0 && protein <= 0) return null
+
+    return {
+      foodKey: String(data.food_key || ''),
+      foodName: String(data.display_name || 'Refeição'),
+      calories,
+      protein,
+      carbs,
+      fat,
     }
-    return result
   } catch {
-    return {}
+    return null
   }
 }
 
 /**
- * Save an AI-estimated food to the learned foods table.
- * Uses UPSERT — if the food already exists for this user,
- * it updates the nutritional values and increments the use_count.
- *
- * @param originalInput The original text the user typed (e.g. "300g arroz branco")
- * @param totalCalories Total calories of the meal (not per 100g)
- * @param totalProtein Total protein of the meal
- * @param totalCarbs Total carbs of the meal
- * @param totalFat Total fat of the meal
- * @param foodName Display name from AI (e.g. "Arroz branco com frango")
+ * Guarda o que a IA estimou pra este texto. Os valores são os TOTAIS da refeição —
+ * é o que o memo precisa (ver o cabeçalho), e é o que as colunas já guardavam.
  */
-export async function saveLearnedFood(
+export async function saveMealMemo(
   supabase: SupabaseClient,
   userId: string,
   originalInput: string,
@@ -82,19 +118,19 @@ export async function saveLearnedFood(
   totalFat: number,
 ): Promise<void> {
   try {
-    // Normalize the original input as the key for future matching
     const foodKey = normalizeFoodKey(originalInput)
     if (!foodKey || foodKey.length < 2) return
 
-    // Rate limit: max 200 learned foods per user
+    // Não guarda refeição vazia: viraria um memo que responde 0 kcal pra sempre.
+    if (!(Number(totalCalories) > 0) && !(Number(totalProtein) > 0)) return
+
     const { count, error: countError } = await supabase
       .from('nutrition_learned_foods')
       .select('id', { count: 'exact', head: true })
       .eq('user_id', userId)
     if (countError) return
-    if ((count ?? 0) >= 200) return // silently cap
+    if ((count ?? 0) >= MAX_MEMOS_PER_USER) return // teto silencioso
 
-    // Sanitize the display name
     const safeName = String(foodName || originalInput).trim()
       .replace(/<[^>]*>/g, '')
       .replace(/[\x00-\x1F\x7F]/g, '')
@@ -107,25 +143,25 @@ export async function saveLearnedFood(
           user_id: userId,
           food_key: foodKey,
           display_name: safeName || 'Refeição',
-          kcal_per_100g: Math.round(totalCalories),
-          protein_per_100g: Math.round(totalProtein),
-          carbs_per_100g: Math.round(totalCarbs),
-          fat_per_100g: Math.round(totalFat),
+          kcal_per_100g: Math.round(Number(totalCalories) || 0),
+          protein_per_100g: Math.round(Number(totalProtein) || 0),
+          carbs_per_100g: Math.round(Number(totalCarbs) || 0),
+          fat_per_100g: Math.round(Number(totalFat) || 0),
           source: 'ai',
-          use_count: 1,
+          // `use_count` fica FORA de propósito: a coluna tem default 1, então o
+          // insert nasce em 1 e o update não mexe. Mandá-lo aqui zerava o contador a
+          // cada re-estimativa e fazia o bump não valer nada.
           updated_at: new Date().toISOString(),
         },
         { onConflict: 'user_id,food_key' },
       )
   } catch {
-    // Non-critical — don't break the flow if save fails
+    // Não-crítico — não pode quebrar o lançamento.
   }
 }
 
-/**
- * Increment the use_count when a learned food is matched by the parser.
- */
-export async function bumpLearnedFoodUsage(
+/** Conta o acerto do memo. Best-effort. */
+export async function bumpMealMemoUsage(
   supabase: SupabaseClient,
   userId: string,
   foodKey: string,
@@ -136,6 +172,6 @@ export async function bumpLearnedFoodUsage(
       p_food_key: foodKey,
     })
   } catch {
-    // Best-effort — ignore failures
+    // Best-effort — ignora falha.
   }
 }
