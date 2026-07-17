@@ -4,7 +4,7 @@ import { TeacherAreaNav } from '../TeacherAreaNav'
 
 describe('TeacherAreaNav', () => {
   it('mostra as 4 seções primárias + botão Mais', () => {
-    render(<TeacherAreaNav activeTab="dashboard" onSelect={() => {}} />)
+    render(<TeacherAreaNav activeTab="dashboard" onSelect={() => {}} onOpenSchedule={() => {}} />)
     for (const label of ['Início', 'Alunos', 'Treinos', 'Financeiro', 'Mais']) {
       expect(screen.getByText(label)).toBeTruthy()
     }
@@ -12,14 +12,14 @@ describe('TeacherAreaNav', () => {
 
   it('clicar numa seção primária chama onSelect com a key', () => {
     const onSelect = vi.fn()
-    render(<TeacherAreaNav activeTab="dashboard" onSelect={onSelect} />)
+    render(<TeacherAreaNav activeTab="dashboard" onSelect={onSelect} onOpenSchedule={() => {}} />)
     fireEvent.click(screen.getByText('Alunos'))
     expect(onSelect).toHaveBeenCalledWith('students')
   })
 
   it('"Mais" abre o sheet e permite escolher Prioridades', () => {
     const onSelect = vi.fn()
-    render(<TeacherAreaNav activeTab="dashboard" onSelect={onSelect} />)
+    render(<TeacherAreaNav activeTab="dashboard" onSelect={onSelect} onOpenSchedule={() => {}} />)
     // Prioridades não está visível antes de abrir o "Mais"
     expect(screen.queryByText('Prioridades')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: /Mais seções/i }))
@@ -27,8 +27,17 @@ describe('TeacherAreaNav', () => {
     expect(onSelect).toHaveBeenCalledWith('priorities')
   })
 
+  it('"Mais" oferece a Agenda, que chama onOpenSchedule', () => {
+    const onOpenSchedule = vi.fn()
+    render(<TeacherAreaNav activeTab="dashboard" onSelect={() => {}} onOpenSchedule={onOpenSchedule} />)
+    expect(screen.queryByText('Agenda')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: /Mais seções/i }))
+    fireEvent.click(screen.getByText('Agenda'))
+    expect(onOpenSchedule).toHaveBeenCalled()
+  })
+
   it('a seção ativa recebe aria-current', () => {
-    render(<TeacherAreaNav activeTab="templates" onSelect={() => {}} />)
+    render(<TeacherAreaNav activeTab="templates" onSelect={() => {}} onOpenSchedule={() => {}} />)
     const treinos = screen.getByText('Treinos').closest('button')
     expect(treinos?.getAttribute('aria-current')).toBe('page')
   })

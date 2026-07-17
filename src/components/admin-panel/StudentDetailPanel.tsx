@@ -1,9 +1,10 @@
 'use client';
 
 import React, { useCallback, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
     X, ArrowLeft, Edit3, Trash2, Download,
-    FileText, Loader2
+    FileText, Loader2, TrendingUp
 } from 'lucide-react';
 import HistoryList from '@/components/HistoryList';
 import AdminWorkoutEditor, { AdminWorkout } from '@/components/AdminWorkoutEditor';
@@ -34,6 +35,7 @@ const TeacherStudentWorkout = dynamic(
 
 export const StudentDetailPanel: React.FC = () => {
     const { alert } = useDialog();
+    const router = useRouter();
 
     const {
         selectedStudent,
@@ -293,6 +295,15 @@ export const StudentDetailPanel: React.FC = () => {
                                     < div className="mt-1 text-lg font-black text-white truncate" > {selectedStatusLabel} </div>
                                 </div>
                             </div>
+                            {selectedStudent?.user_id ? (
+                                <button
+                                    type="button"
+                                    onClick={() => router.push(`/relatorio/${String(selectedStudent.user_id)}`)}
+                                    className="mt-2 w-full flex items-center justify-center gap-2 py-2.5 rounded-2xl bg-yellow-500/10 hover:bg-yellow-500/20 border border-yellow-500/25 text-yellow-400 text-xs font-black uppercase tracking-widest transition-colors"
+                                >
+                                    <TrendingUp size={15} /> Ver evolução completa
+                                </button>
+                            ) : null}
                         </div>
                     )}
 
