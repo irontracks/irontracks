@@ -1,4 +1,4 @@
-import { render, screen, fireEvent } from '@testing-library/react'
+import { render, screen, fireEvent, act } from '@testing-library/react'
 import { describe, it, expect, vi } from 'vitest'
 
 // dynamic() → stub (as tabs pesadas viram no-op; testamos o shell, não elas)
@@ -46,5 +46,24 @@ describe('TeacherArea (shell)', () => {
     render(<TeacherArea user={teacher} onClose={onClose} />)
     fireEvent.click(screen.getByRole('button', { name: 'Fechar' }))
     expect(onClose).toHaveBeenCalled()
+  })
+
+  it('não-professor não fica em spinner eterno: vê "Acesso restrito" após o timer', () => {
+    // Regressão achada na revisão: sem o timer, um não-coach que abrisse a URL
+    // ficava em "Carregando..." pra sempre.
+    vi.useFakeTimers()
+    ctrl.isTeacher = false
+    ctrl.isAdmin = false
+    try {
+      const student = { id: 'u1', name: 'Aluno', role: 'student' } as unknown as AdminUser
+      render(<TeacherArea user={student} onClose={() => {}} />)
+      expect(screen.getByText(/Carregando Área do professor/i)).toBeTruthy()
+      act(() => { vi.advanceTimersByTime(3100) })
+      expect(screen.getByText(/Acesso restrito/i)).toBeTruthy()
+    } finally {
+      ctrl.isTeacher = true
+      ctrl.isAdmin = false
+      vi.useRealTimers()
+    }
   })
 })

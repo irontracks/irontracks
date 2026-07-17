@@ -8,7 +8,7 @@
 // identidade de coach. Nenhuma tab é reescrita.
 // ============================================================
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { Loader2, X, Crown } from 'lucide-react';
 import { useAdminPanelController } from '@/components/admin-panel/useAdminPanelController';
@@ -56,18 +56,41 @@ const TeacherArea = ({ user, onClose }: TeacherAreaProps) => {
 
     const hasAccess = isTeacher || isAdmin;
 
+    // O role pode chegar assíncrono na hidratação; espera até 3s antes de decidir
+    // "acesso negado". Sem isso, um não-professor que abrisse /dashboard/teacher na
+    // mão ficaria num spinner eterno (o layout gateia por aprovação, não por role).
+    const [waited, setWaited] = useState(false);
+    useEffect(() => {
+        if (hasAccess) return;
+        const timer = setTimeout(() => setWaited(true), 3000);
+        return () => clearTimeout(timer);
+    }, [hasAccess]);
+
     // Se o tab persistido não for uma seção da Área do professor (ex.: veio de um
     // tab admin), cai em 'dashboard'. Sem isso, a nav não destacaria nada.
     useEffect(() => {
         if (!TEACHER_SECTION_KEYS.has(tab)) setTab('dashboard');
     }, [tab, setTab]);
 
-    if (!hasAccess) {
+    if (!hasAccess && !waited) {
         return (
             <div className="fixed inset-0 z-[60] bg-neutral-950 text-white flex flex-col items-center justify-center gap-4">
                 <Loader2 size={32} className="text-yellow-500 animate-spin" />
                 <p className="text-sm text-neutral-400 font-medium">Carregando Área do professor...</p>
                 <button type="button" onClick={() => onClose?.()} className="mt-4 px-5 py-2.5 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-neutral-300 text-sm font-bold border border-neutral-700">Voltar</button>
+            </div>
+        );
+    }
+
+    if (!hasAccess) {
+        return (
+            <div className="fixed inset-0 z-[60] bg-neutral-950 text-white flex flex-col items-center justify-center gap-4 p-6">
+                <div className="w-16 h-16 rounded-3xl bg-yellow-500/10 border border-yellow-500/20 flex items-center justify-center">
+                    <Crown size={28} className="text-yellow-500" />
+                </div>
+                <h2 className="text-lg font-black text-white">Acesso restrito</h2>
+                <p className="text-sm text-neutral-400 text-center max-w-sm">Esta área é exclusiva para professores.</p>
+                <button type="button" onClick={() => onClose?.()} className="mt-4 px-6 py-3 rounded-2xl bg-yellow-500 hover:bg-yellow-400 text-black font-black text-sm">Voltar</button>
             </div>
         );
     }
