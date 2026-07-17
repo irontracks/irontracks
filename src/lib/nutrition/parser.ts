@@ -58,6 +58,47 @@ const TYPICAL_GRAMS_PER_UNIT: Record<string, number> = {
   unidade: 50,
 }
 
+/**
+ * Ordem de "quão porção é esta unidade", da refeição inteira pro tempero.
+ *
+ * Serve pra responder "quanto pesa UM/UMA <alimento>?" quando o alimento NÃO declara
+ * `unidade`. A base omite `unidade` de propósito em quem não tem unidade natural —
+ * "1 picanha" não significa nada —, mas declara em que o alimento É medido:
+ *   'arroz cozido'   → { colher: 25, concha: 100, prato: 180 }
+ *   'leite integral' → { copo: 250, xicara: 240 }
+ *   'atum em lata'   → { lata: 120 }
+ * Antes, esse sinal era ignorado e virava 50g de qualquer coisa. Agora pegamos a
+ * porção mais representativa que o PRÓPRIO alimento declara — nenhum número novo é
+ * inventado aqui, só escolhido entre os que já foram curados.
+ */
+const SERVING_UNIT_PRIORITY: readonly string[] = [
+  'prato',
+  'concha',
+  'copo',
+  'xicara',
+  'lata',
+  'bife',
+  'posta',
+  'medalhao',
+  'espiga',
+  'espetinho',
+  'fatia',
+  'pedaco',
+  'rodela',
+  'scoop',
+  'colher',
+]
+
+/** Peso de uma porção do alimento, escolhido entre as unidades que ele declara. */
+function servingGramsOf(approx: Record<string, number> | undefined): number | undefined {
+  if (!approx) return undefined
+  for (const unit of SERVING_UNIT_PRIORITY) {
+    const g = approx[unit]
+    if (typeof g === 'number' && Number.isFinite(g) && g > 0) return g
+  }
+  return undefined
+}
+
 type MacroTotals = { p: number; c: number; f: number; kcal: number }
 
 /** A single recognized food line, with its resolved grams and macros. */
@@ -211,11 +252,22 @@ export function analyzeMeal(text: string, extraFoods?: Record<string, FoodItem>)
       grams = qtd
     } else if (wasApprox) {
       const approx = matchedItem?.approx
-      const gramsPerUnit = approx?.[unitUsed] ?? approx?.[`${unitUsed}s`] ?? approx?.['unidade']
+      const gramsPerUnit =
+        approx?.[unitUsed] ??
+        approx?.[`${unitUsed}s`] ??
+        approx?.['unidade'] ??
+        // O alimento não declara `unidade`? Então "1 <alimento>" vale uma PORÇÃO dele,
+        // medida na unidade que ele mesmo declara — e não 50g cegos. Era daqui que
+        // saía "uma pizza grande = 50g = 133 kcal": 'pizza' declara { fatia: 120 } e
+        // o parser ignorava. Só vale quando o usuário não nomeou a unidade; se ele
+        // disse "2 colheres", respeita-se a colher (acima) mesmo que não exista.
+        (unitUsed === 'unidade' ? servingGramsOf(approx) : undefined)
       if (typeof gramsPerUnit === 'number' && Number.isFinite(gramsPerUnit) && gramsPerUnit > 0) {
         grams = qtd * gramsPerUnit
       } else {
-        // Sem `approx` no alimento: usa o peso típico da unidade em vez de 50 g cego.
+        // Último recurso: o alimento não declara NADA (TACO/OFF/customizado só têm
+        // valores por 100g). Aqui o chute é inevitável — a UI mostra o peso assumido
+        // pra ficar corrigível.
         grams = qtd * (TYPICAL_GRAMS_PER_UNIT[unitUsed] ?? 50)
       }
     } else {
