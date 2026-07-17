@@ -57,3 +57,39 @@ describe('buildTemplateReply', () => {
     expect(reply).not.toMatch(/NaN|undefined|null/)
   })
 })
+
+describe('peso assumido — torna visível o chute de 50g do parser', () => {
+  /**
+   * Quando o alimento não declara quanto pesa uma unidade, o parser usa 50g
+   * (parser.ts:219). Acerta em ovo (~50g) e erra feio em "uma pizza grande", que
+   * vira 50g/133 kcal — e o app responderia "cabe!" com toda a confiança. Mostrar
+   * o peso não conserta a estimativa; torna o erro visível e corrigível.
+   */
+  it('mostra o peso total somado dos items', () => {
+    const reply = buildTemplateReply('5 ovos cozidos', projectMeal(consumed, goals, eggs), [
+      { label: '5 ovos cozidos', grams: 250 },
+    ])
+    expect(reply).toContain('5 ovos cozidos (250g) —')
+  })
+
+  it('o caso da pizza: o usuário lê "(50g)" e tem como estranhar', () => {
+    const pizza = { calories: 133, protein: 6, carbs: 17, fat: 5 }
+    const reply = buildTemplateReply('uma pizza grande', projectMeal(consumed, goals, pizza), [
+      { label: 'uma pizza grande', grams: 50 },
+    ])
+    expect(reply).toContain('Uma pizza grande (50g)')
+  })
+
+  it('soma o peso de múltiplos alimentos', () => {
+    const reply = buildTemplateReply('frango e arroz', projectMeal(consumed, goals, eggs), [
+      { label: '200g de frango', grams: 200 },
+      { label: '100g de arroz', grams: 100 },
+    ])
+    expect(reply).toContain('(300g)')
+  })
+
+  it('sem peso conhecido, não inventa "(0g)"', () => {
+    expect(buildTemplateReply('x', projectMeal(consumed, goals, eggs), [{ label: 'x', grams: 0 }])).not.toContain('(0g)')
+    expect(buildTemplateReply('x', projectMeal(consumed, goals, eggs))).not.toContain('g) —')
+  })
+})
