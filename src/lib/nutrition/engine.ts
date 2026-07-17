@@ -128,7 +128,34 @@ export async function trackMeal(userId: string, meal: MealLog, dateKey?: string,
       .eq('user_id', safeUserId)
       .eq('date', resolvedDateKey)
 
-    if (sumError) throw new Error(sumError.message || 'nutrition_sum_entries_failed')
+    if (sumError) {
+      // NÃO-FATAL, pelo mesmo motivo que o passo 3 abaixo já documenta: a entry JÁ
+      // está gravada. Lançar aqui devolvia erro ao usuário com a refeição salva —
+      // ele reenviava e DUPLICAVA, porque o caminho online não carimba clientId
+      // (logMealAction/applyGeneratedMealAction/logBarcodeAction) e o segundo insert
+      // vira linha nova. Errar o agregado é barato: ele se autocorrige na próxima
+      // mutação do dia. Duplicar refeição, não.
+      //
+      // Devolve os totais zerados de propósito: o NutritionMixer só aplica
+      // `setTotals` quando algum total é > 0, então o anel mantém o valor atual em
+      // vez de piscar zero, e o refetch periódico conserta.
+      logWarn('nutrition:engine', 'recalc do dia falhou; entry preservada', sumError.message)
+      return {
+        entry_id: insertedEntry?.id ?? '',
+        id: insertedEntry?.id ?? '',
+        created_at: insertedEntry?.created_at ?? new Date().toISOString(),
+        food_name: insertedEntry?.food_name ?? foodName,
+        calories,
+        protein,
+        carbs,
+        fat,
+        items: insertedEntry?.items ?? safeItems,
+        totals_calories: 0,
+        totals_protein: 0,
+        totals_carbs: 0,
+        totals_fat: 0,
+      }
+    }
 
     const entriesList = Array.isArray(allEntries) ? allEntries : []
     const totalCalories = entriesList.reduce((sum, e) => sum + (Number((e as Record<string, unknown>)?.calories) || 0), 0)
