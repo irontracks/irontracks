@@ -5,6 +5,7 @@ import { logMealAction, logBarcodeAction, updateWaterAction, deleteMealAction, e
 import type { MealLog } from '@/lib/nutrition/engine'
 import { analyzeMeal } from '@/lib/nutrition/parser'
 import { projectMeal, type MacroKey } from '@/lib/nutrition/chatProjection'
+import { Sparkles } from 'lucide-react'
 import { useIsIosNative } from '@/hooks/useIsIosNative'
 import { createClient } from '@/utils/supabase/client'
 import { getErrorMessage } from '@/utils/errorMessage'
@@ -27,6 +28,7 @@ const PREVIEW_MACROS: ReadonlyArray<{ key: MacroKey; label: string }> = [
   { key: 'fat', label: 'G' },
 ]
 
+const NutritionChat = dynamic(() => import('./NutritionChat'), { ssr: false })
 const NutritionDayScore = dynamic(() => import('./NutritionDayScore'), { ssr: false })
 const NutritionEntryCard = dynamic(() => import('./NutritionEntryCard'), { ssr: false })
 const WaterTracker = dynamic(() => import('./WaterTracker'), { ssr: false })
@@ -266,6 +268,10 @@ export default function NutritionMixer({
   const [isPending, startTransition] = useTransition()
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const [entriesTick, setEntriesTick] = useState(0)
+  const [chatOpen, setChatOpen] = useState(false)
+  // Offline REATIVO: isOffline() é lido no render e não re-renderiza sozinho quando
+  // a rede cai. O chat depende do servidor, então o campo precisa sumir de verdade.
+  const [chatOffline, setChatOffline] = useState(false)
   const [entriesLoading, setEntriesLoading] = useState(false)
   const [entriesError, setEntriesError] = useState('')
   const [entryBusyId, setEntryBusyId] = useState('')
@@ -550,9 +556,15 @@ export default function NutritionMixer({
   // forçamos refetch do dia visível pra trocar os pendentes pelas entries reais.
   const hasPending = (Array.isArray(entries) ? entries : []).some((e) => e.pending)
   useEffect(() => {
-    const onOnline = () => { window.setTimeout(() => setEntriesTick((v) => v + 1), 4000) }
+    const syncChatOffline = () => setChatOffline(isOffline())
+    syncChatOffline()
+    const onOnline = () => { syncChatOffline(); window.setTimeout(() => setEntriesTick((v) => v + 1), 4000) }
     window.addEventListener('online', onOnline)
-    return () => window.removeEventListener('online', onOnline)
+    window.addEventListener('offline', syncChatOffline)
+    return () => {
+      window.removeEventListener('online', onOnline)
+      window.removeEventListener('offline', syncChatOffline)
+    }
   }, [])
   useEffect(() => {
     if (!hasPending) return
@@ -823,6 +835,40 @@ export default function NutritionMixer({
           </div>
         )}
       </Card>
+
+      {/* ══ PERGUNTAR — chat de nutrição ═════════════════════════════════ */}
+      {/* Logo abaixo do anel: é a pergunta que o usuário faz ANTES de comer, então
+          fica onde ele já está olhando o número do dia.
+          Três gates, cada um por um motivo:
+          - canViewMacros: é recurso Pro (mesma cota das outras 3 rotas de nutrição).
+          - isToday: a aba tem navegador de datas, e simular "agora" sobre um dia
+            fechado não faz sentido — o Lançar gravaria no passado sem avisar.
+          - !offline: o Mixer tem refeições otimistas (pending) que NÃO estão no
+            banco. O snapshot do servidor diria 1.200 kcal com o anel do lado
+            dizendo 1.900 — o chat contradiria a própria tela. */}
+      {canViewMacros && isToday && !chatOffline && (
+        <button
+          type="button"
+          onClick={() => setChatOpen(true)}
+          className="group flex w-full items-center gap-3 rounded-2xl border border-white/[0.08] bg-white/[0.03] px-4 py-3 text-left transition hover:border-yellow-500/30 active:scale-[0.99]"
+        >
+          <Sparkles size={16} className="shrink-0 text-yellow-500" />
+          <span className="min-w-0 flex-1 truncate text-sm text-neutral-400 transition group-hover:text-neutral-200">
+            Se eu comer 5 ovos agora, pra quanto vai?
+          </span>
+          <span className="shrink-0 rounded-lg bg-yellow-500/10 px-2 py-1 text-[10px] font-black uppercase tracking-wider text-yellow-500">
+            Perguntar
+          </span>
+        </button>
+      )}
+
+      <NutritionChat
+        open={chatOpen}
+        onClose={() => setChatOpen(false)}
+        dateKey={currentDateKey}
+        goals={{ ...safeGoals, source: goalsSource ?? 'default' }}
+        onLogged={() => setEntriesTick((v) => v + 1)}
+      />
 
       {/* ══ MACROS ═══════════════════════════════════════════════════════ */}
       {canViewMacros ? (
