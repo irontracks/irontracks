@@ -13,6 +13,11 @@
  */
 import type { MealProjection } from './chatProjection'
 
+export interface ReplyItem {
+  label: string
+  grams: number
+}
+
 const MACRO_LABEL = {
   protein: 'proteína',
   carbs: 'carboidrato',
@@ -30,7 +35,21 @@ function asSubject(foodText: string): string {
  * Narra a simulação com os números JÁ calculados em TypeScript.
  * Nenhum número aqui é inventado: todos vêm de `projectMeal`.
  */
-export function buildTemplateReply(foodText: string, p: MealProjection): string {
+/**
+ * Peso total que o app ASSUMIU. Sempre dito, e por um motivo concreto: quando o
+ * alimento não declara quanto pesa uma unidade, o parser cai num default de 50g
+ * (parser.ts:219). Isso acerta em ovo (~50g) e erra feio em "uma pizza grande" —
+ * que vira 50g e 133 kcal. Sem mostrar o peso, o app responderia "cabe!" com toda
+ * a confiança e o usuário não teria como perceber. Com o peso à vista, ele lê
+ * "(50g)", estranha e corrige ("800g de pizza"). Não conserta a estimativa —
+ * torna o erro visível e corrigível, que é o que dá pra fazer sem mexer no parser.
+ */
+function weightNote(items: ReplyItem[] | undefined): string {
+  const grams = (items ?? []).reduce((s, i) => s + (Number(i?.grams) || 0), 0)
+  return grams > 0 ? ` (${Math.round(grams)}g)` : ''
+}
+
+export function buildTemplateReply(foodText: string, p: MealProjection, items?: ReplyItem[]): string {
   const kcal = p.calories
   const parts: string[] = []
 
@@ -38,7 +57,7 @@ export function buildTemplateReply(foodText: string, p: MealProjection): string 
   //    frango SOMA" — a concordância depende do alimento, e errar português na
   //    primeira linha da resposta é pior do que não ter verbo.
   parts.push(
-    `${asSubject(foodText)} — **${kcal.add} kcal** · P ${p.protein.add}g · C ${p.carbs.add}g · G ${p.fat.add}g.`,
+    `${asSubject(foodText)}${weightNote(items)} — **${kcal.add} kcal** · P ${p.protein.add}g · C ${p.carbs.add}g · G ${p.fat.add}g.`,
   )
 
   // 2. Onde o dia fica.

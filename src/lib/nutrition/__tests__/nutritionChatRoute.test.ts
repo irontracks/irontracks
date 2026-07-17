@@ -62,15 +62,18 @@ describe('precisão — as fronteiras de confiança', () => {
   it('nada de IA roda antes do atalho determinístico decidir', () => {
     // Medido no CORPO do POST (o topo do arquivo tem os imports, que não são fluxo).
     const body = stripComments(
-      route.slice(route.indexOf('export async function POST'), route.indexOf('async function simulate')),
+      route.slice(route.indexOf('export async function POST'), route.indexOf('function notFoodReply')),
     )
     const decide = body.indexOf('detectIntent(')
     expect(decide).toBeGreaterThan(-1)
-    // A simulação (única coisa que pode chamar a IA) só acontece DEPOIS de decidir.
-    expect(body.indexOf('simulate(')).toBeGreaterThan(decide)
-    // E o próprio POST não chama modelo nenhum direto.
-    expect(body).not.toContain('estimateMacrosFromText')
-    expect(body).not.toContain('generateContent')
+
+    // Tudo que custa IA vem DEPOIS: a interpretação (generateContent) e a
+    // simulação (que só chama Gemini se a cascata falhar). Se um dia alguém
+    // chamar o modelo antes de tentar o atalho, o caso de uso #1 passa a custar
+    // dinheiro e a variar de resposta — é exatamente isto que o teste impede.
+    for (const call of ['generateContent', 'simulate(']) {
+      expect(body.indexOf(call), `${call} não pode preceder o atalho`).toBeGreaterThan(decide)
+    }
   })
 
   it('a IA de alimento é o ÚLTIMO recurso — só quando a cascata determinística falha', () => {
@@ -99,8 +102,64 @@ describe('escrita — esta rota não grava nada', () => {
   })
 })
 
-describe('injection — a pergunta do usuário é sanitizada antes de virar prompt', () => {
-  it('passa por sanitizeAiInput', () => {
+describe('injection — o que vira prompt é sanitizado', () => {
+  it('a pergunta passa por sanitizeAiInput', () => {
     expect(route).toContain('sanitizeAiInput(question)')
+  })
+
+  it('CADA turno do histórico também (o cliente é quem compõe o histórico)', () => {
+    expect(flat).toContain('text: sanitizeAiInput(h.text)')
+  })
+
+  it('o histórico é capado (tokens e superfície de injection)', () => {
+    expect(flat).toContain('.max(6)')
+    expect(flat).toContain("text: z.string().min(1).transform((s) => s.slice(0, 500))")
+  })
+})
+
+describe('a prosa do modelo é ENFEITE — a arquitetura sobrevive sem ela', () => {
+  it('writeProse devolve null em qualquer falha, em vez de derrubar o request', () => {
+    const fn = route.slice(route.indexOf('async function writeProse'), route.indexOf('async function simulate'))
+    expect(fn).toContain('try {')
+    expect(fn).toContain('} catch {')
+    expect(fn).toContain('return null')
+    // Falha do safeGemini não vira errorResponse aqui — vira null.
+    expect(fn.replace(/\s+/g, ' ')).toContain("if ('errorResponse' in res) return null")
+  })
+
+  it('quando a prosa falha, o narrador determinístico segura a resposta', () => {
+    // reply: prose ?? sim.reply — o ?? é o que garante que o usuário sempre tem número.
+    expect(flat).toContain('reply: prose ?? sim.reply')
+  })
+
+  it('o narrador determinístico é sempre calculado, mesmo quando a prosa vem', () => {
+    expect(route).toContain('buildTemplateReply(foodText, projection, items)')
+  })
+
+  it('prosa quebrada é recusada (pego em verificação real)', () => {
+    // O modelo respondeu "...seu dia vai ficar assim:" e parou — ia listar os
+    // números e não listou. Frase pendurada em dois-pontos é pior que o template.
+    expect(route).toContain('looksComplete(text)')
+    const fn = route.slice(route.indexOf('function looksComplete'), route.length)
+    expect(fn).toContain("/[:,;]$/.test(t)") // não termina no meio de uma enumeração
+    expect(fn).toContain('!/\\d/.test(t)') // simulação sem número não é resposta
+  })
+})
+
+describe('o modelo interpreta — mas não decide nada que valha número', () => {
+  it('usa o modelo rápido na interpretação', () => {
+    expect(route).toContain('getGeminiModel(apiKey, env.gemini.fastModelId)')
+  })
+
+  it('o foodQuery do modelo volta pra cascata determinística, não vira macro', () => {
+    // O que o modelo devolve é TEXTO de alimento; quem resolve macro é o simulate().
+    expect(flat).toContain('const foodText = cleanFoodText(parsed.foodQuery) || parsed.foodQuery')
+    expect(flat).toContain('const sim = await simulate(supabase, userId, foodText, snapshot.today.totals, goals)')
+  })
+
+  it('o schema de saída do modelo não tem macro nem data (nada que ele possa forjar)', () => {
+    const prompt = readFileSync(join(process.cwd(), 'src/lib/nutrition/chatPrompt.ts'), 'utf8')
+    const schema = prompt.slice(prompt.indexOf('const IntentSchema'), prompt.indexOf('export interface ParsedIntent'))
+    expect(schema).not.toMatch(/\b(calories|protein|carbs|fat|dateKey|date)\b/)
   })
 })
