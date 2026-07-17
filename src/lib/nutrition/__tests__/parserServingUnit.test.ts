@@ -88,3 +88,17 @@ describe('o que já funcionava não muda', () => {
     expect(gramsOf('1 copo de leite integral')).toBe(250)
   })
 })
+
+describe('alimento contável precisa declarar a unidade inteira', () => {
+  /**
+   * Pego na auditoria: 'abacate' declarava só { colher: 30 }, então "1 abacate"
+   * virava 30g/48 kcal — uma colher de abacate. A regra de porção (que usa a menor
+   * unidade quando é a única) está certa pra fatia de pão e colher de aveia; falha
+   * em fruta contável, que precisa declarar `unidade`.
+   */
+  it('"1 abacate" é um abacate, não uma colher de abacate', () => {
+    const g = gramsOf('1 abacate')
+    expect(g).toBeGreaterThan(150)
+    expect(gramsOf('1 colher de abacate')).toBe(30) // a colher continua colher
+  })
+})
