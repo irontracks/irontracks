@@ -65,7 +65,14 @@ export function useAdminActions({
             await alert('Aluno cadastrado com sucesso!', 'Sucesso');
         } catch (e: unknown) {
             const msg = e && typeof e === 'object' && 'message' in e && typeof (e as { message?: unknown }).message === 'string' ? (e as { message: string }).message : String(e);
-            await alert('Erro ao cadastrar: ' + msg);
+            // O trigger enforce_teacher_student_limit barra o professor no limite do
+            // plano (o INSERT direto do "+ Aluno" não passava por checagem nenhuma).
+            // Traduz o código cru numa mensagem com CTA de upgrade.
+            if (msg.includes('teacher_student_limit_reached')) {
+                await alert('Você atingiu o limite de alunos do seu plano. Faça upgrade para adicionar mais.', 'Limite do plano');
+            } else {
+                await alert('Erro ao cadastrar: ' + msg);
+            }
         } finally {
             setRegistering(false);
         }
