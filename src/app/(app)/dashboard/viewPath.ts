@@ -28,6 +28,7 @@ export const VIEWS = [
   'assessments',
   'vip',
   'edit',
+  'teacher',
 ] as const
 
 export type DashboardView = (typeof VIEWS)[number]
@@ -42,6 +43,7 @@ export function pathnameToView(pathname: string | null): DashboardView {
   if (pathname.startsWith('/dashboard/chat/') && pathname.length > '/dashboard/chat/'.length) return 'directChat'
   if (pathname === '/dashboard/chat' || pathname === '/dashboard/chat/') return 'chatList'
   if (pathname.startsWith('/dashboard/profile')) return 'profile'
+  if (pathname.startsWith('/dashboard/teacher')) return 'teacher'
   if (pathname.startsWith('/dashboard/admin')) return 'admin'
   if (pathname.startsWith('/dashboard/community')) return 'community'
   if (pathname.startsWith('/dashboard/assessments')) return 'assessments'
@@ -62,6 +64,7 @@ export function viewToPath(view: string): string {
     case 'chatList': return '/dashboard/chat'
     case 'directChat': return '/dashboard/chat/_'
     case 'profile': return '/dashboard/profile'
+    case 'teacher': return '/dashboard/teacher'
     case 'admin': return '/dashboard/admin'
     case 'community': return '/dashboard/community'
     case 'assessments': return '/dashboard/assessments'

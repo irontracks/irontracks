@@ -10,6 +10,7 @@ import {
   Command,
   CreditCard,
   History,
+  LayoutDashboard,
   LogOut,
   MessageSquare,
   Sparkles,
@@ -29,6 +30,7 @@ interface HeaderActionsMenuProps {
   hasActiveStory?: boolean      // ← true if user has a live story
   onAddStory?: () => void       // ← opens story creator on long press
   onOpenAdmin?: () => void
+  onOpenTeacherArea?: () => void
   onOpenChatList?: () => void
   onOpenHistory?: () => void
   onOpenNotifications?: () => void
@@ -125,6 +127,7 @@ export default function HeaderActionsMenu({
   hasActiveStory = false,
   onAddStory,
   onOpenAdmin,
+  onOpenTeacherArea,
   onOpenChatList,
   onOpenHistory,
   onOpenNotifications,
@@ -357,13 +360,23 @@ export default function HeaderActionsMenu({
               {/* Coach tools group */}
               {isCoach && (
                 <>
-                  <MenuItem
-                    icon={<Command size={14} className="text-yellow-400" />}
-                    label="Painel de Controle"
-                    gold
-                    data-tour="menu-coach-tools"
-                    onClick={() => { onOpenAdmin?.(); close() }}
-                  />
+                  {user?.role === 'teacher' ? (
+                    <MenuItem
+                      icon={<LayoutDashboard size={14} className="text-yellow-400" />}
+                      label="Área do professor"
+                      gold
+                      data-tour="menu-coach-tools"
+                      onClick={() => { onOpenTeacherArea?.(); close() }}
+                    />
+                  ) : (
+                    <MenuItem
+                      icon={<Command size={14} className="text-yellow-400" />}
+                      label="Painel de Controle"
+                      gold
+                      data-tour="menu-coach-tools"
+                      onClick={() => { onOpenAdmin?.(); close() }}
+                    />
+                  )}
                   <MenuItem
                     icon={<Calendar size={14} className="text-yellow-400" />}
                     label="Agenda"
