@@ -26,6 +26,55 @@ const normalizedFoodEntries = Object.entries(foodDatabase).map(([key, item]) => 
  * with optional extra foods (e.g. AI-learned foods from Supabase).
  * Extra foods are checked AFTER static entries, so static always wins.
  */
+/**
+ * Tira o conector "de" que SOBRA depois de remover a quantidade:
+ * "2 fatias de pão" → (remove "2 fatias") → " de pão" → "pão".
+ *
+ * Ancorado no início de propósito. Antes era `.replace(' de ', ' ')` — String.replace
+ * sem âncora, que troca a PRIMEIRA ocorrência onde quer que ela esteja. Quando o
+ * resto não começava com " de ", ele comia o " de " que é parte do NOME:
+ *   "1 pao de queijo"  → "pao queijo"  → não casa nada        → refeição rejeitada
+ *   "1 clara de ovo"   → "clara ovo"   → não casa 'clara de ovo',
+ *                                        mas CASA 'ovo'       → ovo inteiro, 4,5×
+ * A inconsistência que denunciava o bug: "1 unidade de pao de queijo" funcionava
+ * (aí o resto começa com " de ", e o replace fazia o que devia).
+ */
+function stripLeadingDe(text: string): string {
+  return text.trim().replace(/^de\s+/i, '').trim()
+}
+
+/** Escapa o texto pra virar regex literal. */
+function escapeRegex(text: string): string {
+  return text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+/**
+ * A chave aparece no texto como PALAVRA inteira (aceitando plural em -s)?
+ *
+ * O match era `foodName.includes(key)`, e substring cru deixava alimento curto roubar
+ * o longo — silenciosamente:
+ *   "macarrao"  contém "maca"      → macarrão virava MAÇÃ (78 kcal)
+ *   "macaxeira" contém "maca"      → idem
+ *   "uva passa" contém "uva"       → (aqui a maior-chave-vence salvava)
+ * A borda de palavra mata isso sem quebrar plural: "ovos cozidos" ainda casa 'ovo'
+ * (o `s?`), mas "macarrao" não casa 'maca' — depois de "maca" vem "r", não "s" nem
+ * espaço.
+ */
+function matchesWholeWord(foodName: string, key: string): boolean {
+  if (!key) return false
+  // Plural OPCIONAL em cada palavra, não só na última: o usuário escreve
+  // "3 claraS de ovo" e a chave é 'clara de ovo'. Com o -s só no fim, isso não
+  // casava a clara e casava 'ovo' — ovo inteiro, 4,5×. Mesmo caso de
+  // "castanhaS de caju".
+  const pattern = key
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((word) => `${escapeRegex(word)}s?`)
+    .join('\\s+')
+  if (!pattern) return false
+  return new RegExp(`(^|\\s)${pattern}(\\s|$)`).test(foodName)
+}
+
 function buildFoodEntries(extraFoods?: Record<string, FoodItem>) {
   if (!extraFoods || Object.keys(extraFoods).length === 0) return normalizedFoodEntries
   const extras = Object.entries(extraFoods).map(([key, item]) => {
@@ -231,7 +280,7 @@ export function analyzeMeal(text: string, extraFoods?: Record<string, FoodItem>)
       else if (unitRaw.startsWith('espetinho')) unitUsed = 'espetinho'
       else unitUsed = 'unidade'
 
-      foodName = normalizedLine.replace(approxMatch[0] || '', '').replace(' de ', ' ').trim().toLowerCase()
+      foodName = stripLeadingDe(normalizedLine.replace(approxMatch[0] || '', '')).toLowerCase()
       // When the unit IS the food ("2 ovos" → unit "ovos", empty name), fall back
       // to the unit word as the food name so it still matches the database.
       if (!foodName) foodName = (approxMatch[2] || '').trim().toLowerCase()
@@ -239,11 +288,11 @@ export function analyzeMeal(text: string, extraFoods?: Record<string, FoodItem>)
     } else if (gramMatch) {
       qtd = parseQtd(gramMatch[1] || '0')
       unitUsed = String(gramMatch[2] || '').toLowerCase() === 'ml' ? 'ml' : 'g'
-      foodName = normalizedLine.replace(gramMatch[0] || '', '').replace(' de ', ' ').trim().toLowerCase()
+      foodName = stripLeadingDe(normalizedLine.replace(gramMatch[0] || '', '')).toLowerCase()
     } else if (countMatch) {
       qtd = parseQtd(countMatch[1] || '0')
       unitUsed = 'unidade'
-      foodName = (countMatch[2] || '').replace(' de ', ' ').trim().toLowerCase()
+      foodName = stripLeadingDe(countMatch[2] || '').toLowerCase()
       wasApprox = true
     } else {
       qtd = 1
@@ -261,7 +310,7 @@ export function analyzeMeal(text: string, extraFoods?: Record<string, FoodItem>)
     let dbKeyMatched = ''
     for (const entry of allFoodEntries) {
       if (!entry.normalizedKey) continue
-      if (foodName.includes(entry.normalizedKey)) {
+      if (matchesWholeWord(foodName, entry.normalizedKey)) {
         if (!dbKeyMatched || entry.normalizedKeyLength > dbKeyMatched.length) {
           dbKeyMatched = entry.normalizedKey
           matchedItem = entry.item
