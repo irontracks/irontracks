@@ -59,12 +59,55 @@ describe('a cabeça vence o ingrediente, mesmo sendo chave menor', () => {
   })
 })
 
-describe('quando a cabeça é desconhecida, o ingrediente ainda salva', () => {
-  it('"arroz com frango" reconhece o frango (não existe chave "arroz" sozinha)', () => {
-    // Sem o fallback isto viraria não-reconhecido → IA → paywall pro usuário free.
-    const r = parse('150g de arroz com frango')
-    expect(r.unknown).toEqual([])
-    expect(r.grams).toBe(150)
+describe('cabeça desconhecida NÃO cai num ingrediente — não há fallback', () => {
+  /**
+   * Decisão do dono: nada em fallback. Um número plausível e errado é pior que não
+   * reconhecer, porque ninguém confere o que parece certo. Sem cabeça conhecida a
+   * linha vira unknownLine e a cascata resolve com quem sabe mais: TACO (590
+   * alimentos com alias curto) e, no fim, a IA — que lê a frase inteira ("de
+   * banana", "com requeijão") e acerta onde uma tabela estática não tem como.
+   */
+  it.each([
+    ['1 sanduiche com bacon', 'virava 15g de bacon = 81 kcal'],
+    ['1 torta de banana', 'virava uma banana = 71 kcal'],
+  ])('%s → não reconhecido (%s)', (input) => {
+    expect(parse(input).unknown).toHaveLength(1)
+  })
+
+  it('"arroz com frango" também não vira só frango', () => {
+    // Não existe chave 'arroz' sozinha na base local — quem resolve isso é o TACO,
+    // que tem o alias curto "arroz". Reconhecer só o frango escondia o arroz.
+    expect(parse('150g de arroz com frango').unknown).toHaveLength(1)
+  })
+})
+
+describe('pratos que ninguém tinha e agora a base local resolve', () => {
+  it.each([
+    ['1 misto quente', 120],
+    ['1 x-burguer', 180],
+    ['1 temaki', 150],
+    ['1 strogonoff', 200],
+    ['1 brigadeiro', 20],
+    ['1 pudim', 100],
+    ['1 sorvete', 60],
+    ['1 panqueca', 100],
+    ['1 risoto', 250],
+  ])('%s → %ig', (text, grams) => {
+    expect(parse(text).grams).toBe(grams)
+    expect(parse(text).unknown).toEqual([])
+  })
+
+  it('strogonoff usa o número real da TACO (grafia que ela não indexa)', () => {
+    // TACO: 'estrogonofe de frango' = 157 kcal/100g. 200g (prato) = 314.
+    expect(parse('1 strogonoff').kcal).toBe(314)
+  })
+
+  it('o que a TACO JÁ cobre fica fora da base local, pra não sobrescrever dado curado', () => {
+    // 'pastel', 'quibe' e 'lasanha' têm alias exato na TACO. A fase local roda ANTES
+    // dela, então duplicar aqui trocaria número real por estimativa minha.
+    for (const t of ['1 pastel de queijo', '1 quibe', '1 lasanha de frango']) {
+      expect(parse(t).unknown).toHaveLength(1)
+    }
   })
 })
 
