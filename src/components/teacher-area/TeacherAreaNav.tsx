@@ -1,16 +1,18 @@
 'use client';
 
 import React, { useState } from 'react';
-import { MoreHorizontal } from 'lucide-react';
+import { MoreHorizontal, Calendar } from 'lucide-react';
 import { TEACHER_PRIMARY_SECTIONS, TEACHER_MORE_SECTIONS, isMoreSection } from './teacherAreaSections';
 
 interface Props {
     activeTab: string;
     onSelect: (key: string) => void;
+    /** Abre a Agenda (página própria). Fica no sheet "Mais". */
+    onOpenSchedule: () => void;
 }
 
 /** Barra inferior da Área do professor: 4 seções fixas + botão "Mais". */
-export const TeacherAreaNav: React.FC<Props> = ({ activeTab, onSelect }) => {
+export const TeacherAreaNav: React.FC<Props> = ({ activeTab, onSelect, onOpenSchedule }) => {
     const [moreOpen, setMoreOpen] = useState(false);
     const moreActive = isMoreSection(activeTab);
 
@@ -30,6 +32,14 @@ export const TeacherAreaNav: React.FC<Props> = ({ activeTab, onSelect }) => {
                         onClick={() => setMoreOpen(false)}
                     />
                     <div className="absolute bottom-[72px] left-0 right-0 bg-neutral-900 border-t border-neutral-800 p-2 pb-[calc(0.5rem+env(safe-area-inset-bottom))] rounded-t-2xl">
+                        <button
+                            type="button"
+                            onClick={() => { setMoreOpen(false); onOpenSchedule(); }}
+                            className="w-full flex items-center gap-3 p-3 rounded-xl text-left text-neutral-200 hover:bg-neutral-800 transition-colors"
+                        >
+                            <Calendar size={18} />
+                            <span className="text-sm font-bold">Agenda</span>
+                        </button>
                         {TEACHER_MORE_SECTIONS.map(({ key, label, Icon }) => {
                             const active = activeTab === key;
                             return (

@@ -9,6 +9,7 @@
 // ============================================================
 
 import React, { useEffect, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import dynamic from 'next/dynamic';
 import { Loader2, X, Crown } from 'lucide-react';
 import { useAdminPanelController } from '@/components/admin-panel/useAdminPanelController';
@@ -51,6 +52,7 @@ export type TeacherAreaProps = {
 };
 
 const TeacherArea = ({ user, onClose }: TeacherAreaProps) => {
+    const router = useRouter();
     const ctrl = useAdminPanelController({ user, onClose });
     const { tab, setTab, isAdmin, isTeacher, selectedStudent, setSelectedStudent } = ctrl;
 
@@ -133,6 +135,7 @@ const TeacherArea = ({ user, onClose }: TeacherAreaProps) => {
                     <TeacherAreaNav
                         activeTab={tab}
                         onSelect={(key) => { setSelectedStudent(null); setTab(key); }}
+                        onOpenSchedule={() => router.push('/dashboard/schedule')}
                     />
                 )}
                 <Modals />
