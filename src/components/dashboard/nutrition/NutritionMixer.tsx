@@ -33,6 +33,7 @@ const NutritionDayScore = dynamic(() => import('./NutritionDayScore'), { ssr: fa
 const NutritionEntryCard = dynamic(() => import('./NutritionEntryCard'), { ssr: false })
 const WaterTracker = dynamic(() => import('./WaterTracker'), { ssr: false })
 const DietGenerator = dynamic(() => import('./DietGenerator'), { ssr: false })
+const PrescribedDietPlan = dynamic(() => import('./PrescribedDietPlan'), { ssr: false })
 const DateNavigator = dynamic(() => import('./DateNavigator'), { ssr: false })
 const CustomFoodScanner = dynamic(() => import('./CustomFoodScanner'), { ssr: false })
 const CustomFoodLibrary = dynamic(() => import('./CustomFoodLibrary'), { ssr: false })
@@ -979,6 +980,17 @@ export default function NutritionMixer({
           />
         </Card>
       )}
+
+      {/* ══ PLANO PRESCRITO PELO PROFESSOR ═══════════════════════════════ */}
+      {/* NÃO gatear por canViewMacros: o plano é uma ENTREGA do professor (não um recurso VIP
+          self-service), e o aluno pode ser FREE. O componente já se auto-protege — só
+          renderiza se existir plano ativo (senão retorna null). Gatear pelo VIP do aluno
+          escondia a dieta prescrita de alunos sem assinatura própria (achado da revisão). */}
+      <PrescribedDietPlan
+        dateKey={currentDateKey}
+        canApply={isToday}
+        onApplied={() => setEntriesTick(v => v + 1)}
+      />
 
       {/* ══ DIET GENERATOR — memória nutricional ═════════════════════════ */}
       {canViewMacros && safeGoals.calories > 0 && isToday && (
