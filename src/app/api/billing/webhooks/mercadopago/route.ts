@@ -291,7 +291,10 @@ export async function POST(req: Request) {
       // ── student_plan: activate student subscription ───────────────────────────
       // external_reference format: student_plan:teacherUserId:planId:studentUserId:subscriptionId
       if (scope === 'student_plan' && userId) {
-        const [, , , subscriptionId] = externalRef.split(':')
+        // subscriptionId é o 5º campo (índice 4). ANTES lia índice 3 (studentUserId) — a
+        // assinatura nunca ativava (o update .eq('id', <studentUserId>) não casava linha
+        // nenhuma). Latente porque produção tinha 0 assinaturas; corrigido na Fase 8.
+        const subscriptionId = externalRef.split(':')[4]
 
         if (status.toLowerCase() === 'approved' && subscriptionId) {
           const now = new Date()
