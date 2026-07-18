@@ -25,6 +25,7 @@ import type { UnknownRecord } from '@/types/app'
 import { StudentCheckinsTab } from './StudentCheckinsTab';
 import { StudentEvolutionTab } from './StudentEvolutionTab';
 import { StudentWorkoutsTab } from './StudentWorkoutsTab';
+import { StudentNutritionTab } from './StudentNutritionTab';
 import { StudentVideosTab } from './StudentVideosTab';
 import { StudentProfileTab } from './StudentProfileTab';
 
@@ -338,6 +339,16 @@ export const StudentDetailPanel: React.FC = () => {
                         </button>
                         <button
                             type="button"
+                            onClick={() => setSubTab('nutrition')}
+                            className={`flex-shrink-0 min-h-[44px] px-3 rounded-full font-black text-[10px] uppercase tracking-widest transition-all duration-300 active:scale-95 whitespace-nowrap ${subTab === 'nutrition'
+                                ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/20'
+                                : 'text-neutral-200'
+                                }`}
+                        >
+                            Nutrição
+                        </button>
+                        <button
+                            type="button"
                             onClick={() => setSubTab('evolution')}
                             className={`flex-shrink-0 min-h-[44px] px-3 rounded-full font-black text-[10px] uppercase tracking-widest transition-all duration-300 active:scale-95 whitespace-nowrap ${subTab === 'evolution'
                                 ? 'bg-yellow-500 text-black shadow-lg shadow-yellow-500/20'
@@ -397,6 +408,11 @@ export const StudentDetailPanel: React.FC = () => {
                 {
                     !loading && subTab === 'workouts' && (
                         <StudentWorkoutsTab />
+                    )
+                }
+                {
+                    !loading && subTab === 'nutrition' && (
+                        <StudentNutritionTab />
                     )}
 
                 {
