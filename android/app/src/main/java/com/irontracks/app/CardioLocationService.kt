@@ -104,9 +104,13 @@ class CardioLocationService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         startAsForeground()
-        setActive(true)
-        clear()
-        startUpdates()
+        if (!active) {
+            // A repeated start must not erase an active route or register a second
+            // LocationCallback. A non-null intent represents a new user session.
+            if (intent != null) clear()
+            setActive(true)
+            startUpdates()
+        }
         return START_STICKY
     }
 

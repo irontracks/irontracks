@@ -230,20 +230,7 @@ class IronTracksNativePlugin : Plugin(), SensorEventListener {
 
         val triggerMs = SystemClock.elapsedRealtime() + (seconds * 1000L)
 
-        try {
-            alarmManager.setExactAndAllowWhileIdle(
-                AlarmManager.ELAPSED_REALTIME_WAKEUP,
-                triggerMs,
-                pendingIntent
-            )
-        } catch (e: SecurityException) {
-            // Fallback if exact alarms not permitted (Android 14+)
-            alarmManager.set(
-                AlarmManager.ELAPSED_REALTIME_WAKEUP,
-                triggerMs,
-                pendingIntent
-            )
-        }
+        scheduleAlarm(alarmManager, triggerMs, pendingIntent)
 
         // Show ongoing notification with countdown
         showOngoingTimerNotification(id, seconds, title)
@@ -311,13 +298,7 @@ class IronTracksNativePlugin : Plugin(), SensorEventListener {
                 PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
             )
             val triggerMs = SystemClock.elapsedRealtime() + (delaySeconds * 1000L)
-            try {
-                alarmManager.setExactAndAllowWhileIdle(
-                    AlarmManager.ELAPSED_REALTIME_WAKEUP, triggerMs, pendingIntent
-                )
-            } catch (e: SecurityException) {
-                alarmManager.set(AlarmManager.ELAPSED_REALTIME_WAKEUP, triggerMs, pendingIntent)
-            }
+            scheduleAlarm(alarmManager, triggerMs, pendingIntent)
         }
 
         call.resolve(JSObject().put("id", id))
@@ -342,20 +323,38 @@ class IronTracksNativePlugin : Plugin(), SensorEventListener {
             return
         }
 
-        val effect = when (style) {
-            "light" -> VibrationEffect.createOneShot(20, 80)
-            "medium" -> VibrationEffect.createOneShot(40, 150)
-            "heavy" -> VibrationEffect.createOneShot(60, 255)
-            "rigid" -> VibrationEffect.createOneShot(15, 255)
-            "soft" -> VibrationEffect.createOneShot(50, 60)
-            "success" -> VibrationEffect.createWaveform(longArrayOf(0, 30, 60, 30), intArrayOf(0, 150, 0, 200), -1)
-            "warning" -> VibrationEffect.createWaveform(longArrayOf(0, 40, 40, 40), intArrayOf(0, 200, 0, 200), -1)
-            "error" -> VibrationEffect.createWaveform(longArrayOf(0, 50, 30, 50, 30, 50), intArrayOf(0, 255, 0, 255, 0, 255), -1)
-            "selection" -> VibrationEffect.createOneShot(10, 100)
-            else -> VibrationEffect.createOneShot(40, 150)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val effect = when (style) {
+                "light" -> VibrationEffect.createOneShot(20, 80)
+                "medium" -> VibrationEffect.createOneShot(40, 150)
+                "heavy" -> VibrationEffect.createOneShot(60, 255)
+                "rigid" -> VibrationEffect.createOneShot(15, 255)
+                "soft" -> VibrationEffect.createOneShot(50, 60)
+                "success" -> VibrationEffect.createWaveform(longArrayOf(0, 30, 60, 30), intArrayOf(0, 150, 0, 200), -1)
+                "warning" -> VibrationEffect.createWaveform(longArrayOf(0, 40, 40, 40), intArrayOf(0, 200, 0, 200), -1)
+                "error" -> VibrationEffect.createWaveform(longArrayOf(0, 50, 30, 50, 30, 50), intArrayOf(0, 255, 0, 255, 0, 255), -1)
+                "selection" -> VibrationEffect.createOneShot(10, 100)
+                else -> VibrationEffect.createOneShot(40, 150)
+            }
+            vibrator.vibrate(effect)
+        } else {
+            @Suppress("DEPRECATION")
+            when (style) {
+                "success" -> vibrator.vibrate(longArrayOf(0, 30, 60, 30), -1)
+                "warning" -> vibrator.vibrate(longArrayOf(0, 40, 40, 40), -1)
+                "error" -> vibrator.vibrate(longArrayOf(0, 50, 30, 50, 30, 50), -1)
+                else -> vibrator.vibrate(
+                    when (style) {
+                        "light" -> 20L
+                        "heavy" -> 60L
+                        "rigid" -> 15L
+                        "soft" -> 50L
+                        "selection" -> 10L
+                        else -> 40L
+                    }
+                )
+            }
         }
-
-        vibrator.vibrate(effect)
         call.resolve()
     }
 
@@ -604,6 +603,37 @@ class IronTracksNativePlugin : Plugin(), SensorEventListener {
         try {
             nm.notify(notifId, builder.build())
         } catch (_: SecurityException) {}
+    }
+
+    private fun scheduleAlarm(
+        alarmManager: AlarmManager,
+        triggerMs: Long,
+        pendingIntent: PendingIntent
+    ) {
+        val exactAllowed = Build.VERSION.SDK_INT < Build.VERSION_CODES.S ||
+            alarmManager.canScheduleExactAlarms()
+
+        try {
+            if (exactAllowed) {
+                alarmManager.setExactAndAllowWhileIdle(
+                    AlarmManager.ELAPSED_REALTIME_WAKEUP,
+                    triggerMs,
+                    pendingIntent
+                )
+            } else {
+                alarmManager.setAndAllowWhileIdle(
+                    AlarmManager.ELAPSED_REALTIME_WAKEUP,
+                    triggerMs,
+                    pendingIntent
+                )
+            }
+        } catch (_: SecurityException) {
+            alarmManager.setAndAllowWhileIdle(
+                AlarmManager.ELAPSED_REALTIME_WAKEUP,
+                triggerMs,
+                pendingIntent
+            )
+        }
     }
 
     private fun getVibrator(): Vibrator? {

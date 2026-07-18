@@ -1,101 +1,143 @@
 #!/bin/bash
-# IronTracks — Android release: bump versionCode + bundleRelease → AAB pronto pra upload.
-# Espelha o fluxo do scripts/ios-release.sh.
+# IronTracks Android release: validate, build, sign and optionally publish to Alpha.
 #
-# Uso:
-#   bash scripts/android-release.sh           # bump auto (versionCode atual + 1)
-#   bash scripts/android-release.sh 25        # força versionCode = 25
-#   bash scripts/android-release.sh --submit  # bump + build + sobe pro teste fechado Alpha
-#
-# Pré-requisitos:
-#   • Java 17+ (Temurin recomendado)
-#   • Android SDK em ~/Library/Android/sdk (ou setado via local.properties)
-#   • Keystore irontracks.jks + android/key.properties preenchido (já existe)
-#   • Pra --submit: ~/.googlecloud/service-accounts/irontracks-play.json
-#     + variável GOOGLE_PLAY_SERVICE_ACCOUNT no .env.local
+# Usage:
+#   bash scripts/android-release.sh
+#   bash scripts/android-release.sh 25
+#   bash scripts/android-release.sh 25 --submit
 
 set -euo pipefail
 
 PROJECT_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 GRADLE_FILE="$PROJECT_ROOT/android/app/build.gradle"
 ARTIFACT_DIR="$PROJECT_ROOT/android/app/build/outputs/bundle/release"
+AAB_PATH="$ARTIFACT_DIR/app-release.aab"
 
-# ─── 0. JAVA_HOME (JDK 17) ───────────────────────────────────────────────────
-# O Android Gradle Plugin não roda no JDK padrão do sistema quando é muito novo
-# (ex.: Java 25). Fixa o JDK 17 se o atual não for 17.x.
-if ! java -version 2>&1 | grep -q '"17'; then
-    if JDK17="$(/usr/libexec/java_home -v 17 2>/dev/null)"; then
-        export JAVA_HOME="$JDK17"
-        echo "==> JAVA_HOME → $JAVA_HOME (JDK 17)"
-    else
-        echo "❌ JDK 17 não encontrado (o AGP não roda no Java atual). Instale o Temurin 17."
-        exit 1
-    fi
-fi
-
-# ─── 0b. Guard: google-services.json (senão o AAB sai sem FCM/push) ──────────
-if [ ! -f "$PROJECT_ROOT/android/app/google-services.json" ]; then
-    echo "❌ android/app/google-services.json ausente — o AAB sairia SEM push (FCM)."
-    echo "   Copie o arquivo do Firebase antes de gerar o release."
-    exit 1
-fi
-
-# ─── Parse args ─────────────────────────────────────────────────────────────
 SUBMIT=false
 FORCED_VERSION=""
 for arg in "$@"; do
     case "$arg" in
         --submit) SUBMIT=true ;;
-        ''|*[!0-9]*) ;;
+        ''|*[!0-9]*)
+            echo "❌ Argumento inválido: $arg"
+            exit 1
+            ;;
         *) FORCED_VERSION="$arg" ;;
     esac
 done
 
-# ─── 1. Bump versionCode ────────────────────────────────────────────────────
-CURRENT_CODE=$(grep -E "versionCode\s+[0-9]+" "$GRADLE_FILE" | grep -oE '[0-9]+' | head -1)
+# Next 16 and this repository are validated on Node 20/22, never Node 23+.
+NODE_MAJOR="$(node -p 'Number(process.versions.node.split(`.`)[0])' 2>/dev/null || echo 0)"
+if [ "$NODE_MAJOR" -lt 20 ] || [ "$NODE_MAJOR" -ge 23 ]; then
+    if [ -x /opt/homebrew/opt/node@22/bin/node ]; then
+        export PATH="/opt/homebrew/opt/node@22/bin:$PATH"
+    else
+        echo "❌ Node 20 ou 22 é obrigatório. Versão atual: $(node --version 2>/dev/null || echo ausente)"
+        exit 1
+    fi
+fi
+
+if ! java -version 2>&1 | grep -q '"17'; then
+    if JDK17="$(/usr/libexec/java_home -v 17 2>/dev/null)"; then
+        export JAVA_HOME="$JDK17"
+    else
+        echo "❌ JDK 17 não encontrado."
+        exit 1
+    fi
+fi
+
+# Android mappings share the existing Sentry project until a dedicated Android
+# project is provisioned. Environment values can override these defaults in CI.
+export SENTRY_ORG="${SENTRY_ORG:-irontracks-company}"
+export SENTRY_PROJECT="${SENTRY_PROJECT:-javascript-nextjs}"
+
+for required in \
+    "$PROJECT_ROOT/android/app/google-services.json" \
+    "$PROJECT_ROOT/android/key.properties" \
+    "$PROJECT_ROOT/android/app/irontracks.jks"; do
+    if [ ! -f "$required" ]; then
+        echo "❌ Arquivo obrigatório ausente: $required"
+        exit 1
+    fi
+done
+
+TRACK="${ANDROID_TRACK:-alpha}"
+case "$TRACK" in
+    internal|alpha|beta|production) ;;
+    *) echo "❌ Track inválido: $TRACK"; exit 1 ;;
+esac
+if [ "$SUBMIT" = true ] && [ "$TRACK" = production ] && [ "${ANDROID_CONFIRM_PRODUCTION:-}" != "YES" ]; then
+    echo "❌ Produção exige ANDROID_CONFIRM_PRODUCTION=YES."
+    exit 1
+fi
+
+cd "$PROJECT_ROOT"
+echo "==> Preflight: TypeScript, ESLint, unit e smoke tests"
+npx tsc --noEmit
+npm run lint -- --max-warnings 0
+npm run test:unit
+npm run test:smoke
+
+CURRENT_CODE="$(grep -E 'versionCode\s+[0-9]+' "$GRADLE_FILE" | grep -oE '[0-9]+' | head -1)"
 if [ -n "$FORCED_VERSION" ]; then
     NEW_CODE="$FORCED_VERSION"
 else
     NEW_CODE=$((CURRENT_CODE + 1))
 fi
-echo "==> Bumping versionCode: $CURRENT_CODE → $NEW_CODE"
-sed -i '' "s/versionCode $CURRENT_CODE/versionCode $NEW_CODE/g" "$GRADLE_FILE"
+if [ "$NEW_CODE" -lt "$CURRENT_CODE" ]; then
+    echo "❌ versionCode não pode diminuir: $CURRENT_CODE → $NEW_CODE"
+    exit 1
+fi
 
-# ─── 2. Build web + sync ────────────────────────────────────────────────────
-# npm run build gera out/ (webDir do Capacitor). Sem isto, o cap sync aborta em
-# checkout limpo com "Could not find the web assets directory: ./out".
-echo "==> Building web (next build → out/)..."
-cd "$PROJECT_ROOT"
+BACKUP_FILE="$(mktemp /tmp/irontracks-build-gradle.XXXXXX)"
+cp "$GRADLE_FILE" "$BACKUP_FILE"
+BUILD_SUCCEEDED=false
+restore_version_on_error() {
+    if [ "$BUILD_SUCCEEDED" != true ]; then
+        cp "$BACKUP_FILE" "$GRADLE_FILE"
+        echo "⚠️  Build falhou; versionCode restaurado para $CURRENT_CODE."
+    fi
+    rm -f "$BACKUP_FILE"
+}
+trap restore_version_on_error EXIT
+
+if [ "$NEW_CODE" != "$CURRENT_CODE" ]; then
+    echo "==> versionCode: $CURRENT_CODE → $NEW_CODE"
+    sed -i '' "s/versionCode $CURRENT_CODE/versionCode $NEW_CODE/g" "$GRADLE_FILE"
+else
+    echo "==> versionCode mantido em $CURRENT_CODE"
+fi
+
+echo "==> Build web e sincronização do Capacitor Android"
 npm run build
-echo "==> Syncing Capacitor (web → android)..."
 npm run cap:sync:android
 
-# ─── 3. Gradle bundleRelease ────────────────────────────────────────────────
-echo "==> Generating signed AAB (release)..."
+echo "==> Testes Android, lint release e AAB assinado"
 cd "$PROJECT_ROOT/android"
-./gradlew :app:bundleRelease --no-daemon
+./gradlew :app:testReleaseUnitTest :app:lintRelease :app:bundleRelease --no-daemon
 
-AAB_PATH="$ARTIFACT_DIR/app-release.aab"
 if [ ! -f "$AAB_PATH" ]; then
     echo "❌ AAB não encontrado em $AAB_PATH"
     exit 1
 fi
-SIZE=$(du -h "$AAB_PATH" | cut -f1)
-echo "✅ AAB gerado: $AAB_PATH ($SIZE)"
+# Upload keys are self-signed by design, so `-strict` would reject a valid AAB.
+jarsigner -verify "$AAB_PATH" >/dev/null
 
-# ─── 4. Submit (opcional) ───────────────────────────────────────────────────
+BUILD_SUCCEEDED=true
+rm -f "$BACKUP_FILE"
+trap - EXIT
+
+SIZE="$(du -h "$AAB_PATH" | cut -f1)"
+SHA256="$(shasum -a 256 "$AAB_PATH" | awk '{print $1}')"
+echo "✅ AAB assinado: $AAB_PATH ($SIZE)"
+echo "   SHA-256: $SHA256"
+
 if [ "$SUBMIT" = true ]; then
-    # Faixa FECHADA (Alpha) — é onde os testadores entram via Grupo do Google pelo
-    # opt-in da /comercial. A faixa 'internal' usa lista de e-mails à parte e NÃO
-    # entrega a esses testadores. Sobrescreva com ANDROID_TRACK se precisar.
-    TRACK="${ANDROID_TRACK:-alpha}"
-    echo "==> Subindo pro Play Console (track: $TRACK)..."
+    echo "==> Enviando versionCode $NEW_CODE para $TRACK"
     cd "$PROJECT_ROOT"
-    node scripts/android-submit.mjs --aab "$AAB_PATH" --track "$TRACK"
-else
-    echo ""
-    echo "📦 Próximos passos:"
-    echo "   • Pra subir manualmente: Play Console → Teste fechado → Alpha → criar versão"
-    echo "   • Pra automatizar: rode 'bash scripts/android-release.sh --submit'"
-    echo "     (precisa de service account JSON em ~/.googlecloud/service-accounts/)"
+    node scripts/android-submit.mjs \
+        --aab "$AAB_PATH" \
+        --track "$TRACK" \
+        --name "IronTracks 1.14.1 ($NEW_CODE)" \
+        --notes "Correções do acesso ao teste Android, estabilidade na primeira abertura, GPS, timers e compatibilidade."
 fi
