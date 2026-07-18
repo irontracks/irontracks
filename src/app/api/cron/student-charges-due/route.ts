@@ -1,0 +1,76 @@
+import { NextResponse } from 'next/server'
+import { isCronAuthorized } from '@/utils/cron/auth'
+import { createAdminClient } from '@/utils/supabase/admin'
+import { insertNotifications } from '@/lib/social/notifyFollowers'
+import { respondDbError } from '@/utils/api/dbError'
+import { logError, logInfo } from '@/lib/logger'
+
+export const dynamic = 'force-dynamic'
+
+/**
+ * Cron diário — lembrete de mensalidade PIX recorrente do ALUNO.
+ *
+ * A cobrança recorrente por PIX não debita sozinha (PIX não tem auto-débito). Este cron
+ * automatiza a PARTE que o aluno esquecia: todo ciclo, quando a assinatura recorrente por PIX
+ * chega no vencimento, notifica o aluno pra pagar em 1 toque no app (fluxo api/student/charge,
+ * que já existe). As assinaturas por CARTÃO NÃO entram aqui — o MercadoPago as cobra sozinho.
+ *
+ * Idempotente: dispara pelo casamento EXATO de `next_due_date` com a data de hoje (roda 1x por
+ * ciclo, não spama diariamente). A `next_due_date` só avança quando o pagamento é confirmado
+ * (webhook), então um aluno que já pagou sai da janela automaticamente.
+ */
+
+export async function GET(req: Request) {
+  if (!isCronAuthorized(req)) {
+    return NextResponse.json({ ok: false, error: 'forbidden' }, { status: 403 })
+  }
+
+  try {
+    const admin = createAdminClient()
+    const today = new Date().toISOString().slice(0, 10) // YYYY-MM-DD (UTC)
+
+    // Assinaturas recorrentes por PIX que vencem HOJE (casamento exato = idempotente).
+    const { data: rows, error } = await admin
+      .from('student_subscriptions')
+      .select('id, student_user_id, teacher_user_id, next_due_date, student_service_plans(name)')
+      .eq('recurring', true)
+      .eq('billing_method', 'pix')
+      .eq('status', 'active')
+      .eq('next_due_date', today)
+      .not('student_user_id', 'is', null)
+      .limit(5000)
+
+    if (error) return respondDbError('cron:student-charges-due', error, 500)
+
+    const targets = (rows ?? []).filter((r) => Boolean(r.student_user_id))
+    if (targets.length === 0) return NextResponse.json({ ok: true, reminded: 0 })
+
+    const notifs = targets.map((r) => {
+      const uid = String(r.student_user_id || '')
+      const planData = r.student_service_plans
+      const planRow = (Array.isArray(planData) ? planData[0] : planData) as { name?: string } | null | undefined
+      const planName = String(planRow?.name || 'seu plano')
+      return {
+        user_id: uid,
+        recipient_id: uid,
+        sender_id: String(r.teacher_user_id || uid),
+        type: 'billing_issue' as const,
+        title: '💸 Mensalidade disponível para pagamento',
+        message: `A mensalidade de ${planName} está disponível. Abra o app e pague via PIX em 1 toque para manter seu acesso.`,
+        is_read: false,
+        metadata: {
+          scope: 'student_charge_due',
+          subscription_id: String(r.id),
+        },
+      }
+    })
+
+    await insertNotifications(notifs)
+
+    logInfo('cron:student-charges-due', `Lembrete de mensalidade enviado para ${targets.length} aluno(s)`)
+    return NextResponse.json({ ok: true, reminded: targets.length })
+  } catch (e) {
+    logError('cron:student-charges-due', e)
+    return NextResponse.json({ ok: false, error: 'internal' }, { status: 500 })
+  }
+}

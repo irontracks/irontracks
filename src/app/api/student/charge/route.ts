@@ -55,7 +55,7 @@ export async function POST(req: Request) {
     // Load subscription + plan
     const { data: sub } = await admin
       .from('student_subscriptions')
-      .select('id, teacher_user_id, plan_id, status, student_service_plans(id, name, price_cents, duration_days)')
+      .select('id, teacher_user_id, plan_id, status, student_service_plans(id, name, price_cents, duration_days, billing_interval)')
       .eq('id', subscription_id)
       .eq('student_user_id', user.id)
       .maybeSingle()
@@ -142,6 +142,14 @@ export async function POST(req: Request) {
       .single()
 
     if (chargeErr) return respondDbError('student:charge:insert', chargeErr)
+
+    // Plano não-avulso pago por PIX → marca a assinatura como recorrente por PIX. Assim o cron
+    // student-charges-due passa a lembrar o aluno nos próximos ciclos (PIX não auto-debita).
+    const interval = String((plan as Record<string, unknown>).billing_interval || '').toLowerCase()
+    if (interval && interval !== 'once') {
+      await admin.from('student_subscriptions').update({ recurring: true, billing_method: 'pix' }).eq('id', subscription_id)
+    }
+
     return NextResponse.json({ ok: true, charge })
   } catch (e: unknown) {
     return NextResponse.json({ ok: false, error: getErrorMessage(e) }, { status: 500 })
