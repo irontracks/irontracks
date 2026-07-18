@@ -2,7 +2,7 @@
 
 import React, { useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
-import { Dumbbell, History, Edit3, Trash2, Plus, Sparkles, ChevronDown, Upload, ScanLine, Users } from 'lucide-react';
+import { Dumbbell, History, Edit3, Trash2, Plus, Sparkles, ChevronDown, Upload, ScanLine, Users, CalendarRange } from 'lucide-react';
 import { normalizeWorkoutTitle } from '@/utils/workoutTitle';
 import { useAdminPanel } from './AdminPanelContext';
 import { useDialog } from '@/contexts/DialogContext';
@@ -14,6 +14,10 @@ import { eligibleStudentsForApply } from '@/lib/admin/eligibleStudents';
 
 const WorkoutWizardModal = dynamic(
     () => import('@/components/dashboard/WorkoutWizardModal'),
+    { ssr: false }
+);
+const PeriodizationModal = dynamic(
+    () => import('./PeriodizationModal').then(m => ({ default: m.PeriodizationModal })),
     { ssr: false }
 );
 
@@ -51,6 +55,7 @@ export const StudentWorkoutsTab: React.FC = () => {
     const toolsRef = useRef<HTMLDivElement>(null);
     const [isSyncing, setIsSyncing] = useState(false);
     const [deletingWorkoutId, setDeletingWorkoutId] = useState<string | null>(null);
+    const [periodizationOpen, setPeriodizationOpen] = useState(false);
 
     if (!selectedStudent) return null;
 
@@ -104,6 +109,14 @@ export const StudentWorkoutsTab: React.FC = () => {
                             className="min-h-[44px] px-4 py-3 bg-neutral-900/70 border border-yellow-500/25 text-yellow-400 rounded-xl text-[11px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-yellow-500/10 transition-all duration-300 active:scale-95"
                         >
                             <History size={16} /> Histórico
+                        </button>
+
+                        <button
+                            type="button"
+                            onClick={() => setPeriodizationOpen(true)}
+                            className="min-h-[44px] px-4 py-3 bg-neutral-900/70 border border-yellow-500/25 text-yellow-400 rounded-xl text-[11px] font-black uppercase tracking-widest flex items-center justify-center gap-2 hover:bg-yellow-500/10 transition-all duration-300 active:scale-95"
+                        >
+                            <CalendarRange size={16} /> Periodização
                         </button>
 
                         {/* Create workout — dropdown trigger */}
@@ -442,6 +455,10 @@ export const StudentWorkoutsTab: React.FC = () => {
                     onClose={() => setApplyManyTemplate(null)}
                     onApply={(ids) => handleApplyTemplateToStudents(applyManyTemplate, ids)}
                 />
+            )}
+
+            {periodizationOpen && (
+                <PeriodizationModal onClose={() => setPeriodizationOpen(false)} />
             )}
         </div>
     );
