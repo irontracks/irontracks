@@ -66,3 +66,25 @@ export async function uploadToCloudinary(
 export function isCloudinaryUrl(mediaPath: string): boolean {
   return mediaPath.startsWith('https://res.cloudinary.com/')
 }
+
+/**
+ * Injeta uma transformação de entrega numa URL de imagem do Cloudinary (logo após
+ * `/image/upload/`). Serve para normalizar formato/tamanho de uploads que NÃO passaram
+ * pela compressão no cliente (fallback quando o canvas/WebView não decodifica a imagem —
+ * ex.: HEIC vindo da galeria mislabelado como jpg). `f_auto` entrega webp/jpg conforme o
+ * navegador, garantindo que a foto sempre exiba (um `.heic` cru não renderiza no WebView).
+ *
+ * Só transforma URLs de imagem legítimas do Cloudinary; qualquer outra coisa (URL vazia,
+ * já transformada, Supabase, etc.) volta inalterada — nunca corrompe a entrada.
+ */
+export function cloudinaryDeliveryUrl(secureUrl: string, transform: string): string {
+  if (!secureUrl || !transform) return secureUrl
+  if (!secureUrl.startsWith('https://res.cloudinary.com/')) return secureUrl
+  const marker = '/image/upload/'
+  const idx = secureUrl.indexOf(marker)
+  if (idx === -1) return secureUrl
+  const after = secureUrl.slice(idx + marker.length)
+  // Já tem essa transformação aplicada? Evita duplicar em re-processamentos.
+  if (after.startsWith(`${transform}/`)) return secureUrl
+  return `${secureUrl.slice(0, idx + marker.length)}${transform}/${after}`
+}
