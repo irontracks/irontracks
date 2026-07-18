@@ -32,7 +32,10 @@ function fmtDate(iso: string): string {
  */
 export const StudentLoadEvolution: React.FC = () => {
     const { selectedStudent, supabase } = useAdminPanel();
-    const studentId = String(selectedStudent?.user_id || selectedStudent?.id || '').trim();
+    // SÓ o auth uid (user_id). O fallback pra students.id fazia a rota history responder
+    // 400 (não resolve o alvo) e mostrava erro; aluno sem conta simplesmente não tem
+    // histórico → cai no empty state.
+    const studentId = String(selectedStudent?.user_id || '').trim();
 
     const [series, setSeries] = useState<LoadSeries[]>([]);
     const [loading, setLoading] = useState(true);

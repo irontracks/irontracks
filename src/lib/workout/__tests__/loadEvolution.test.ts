@@ -21,6 +21,20 @@ describe('buildLoadEvolution', () => {
     expect(supino!.points[1].topWeight).toBe(85)
   })
 
+  it('exercício duplicado na MESMA sessão vira UM ponto do dia (volume somado, não evolução falsa)', () => {
+    const sessions: LoadSessionInput[] = [
+      { date: '2026-02-01', exercises: [{ name: 'Supino' }, { name: 'Supino' }], logs: { '0-0': set(80, 10), '1-0': set(60, 10) } },
+      { date: '2026-02-02', exercises: [{ name: 'Supino' }], logs: { '0-0': set(85, 10) } },
+    ]
+    const [supino] = buildLoadEvolution(sessions)
+    // 2 sessões = 2 pontos (não 3); a duplicata do dia 1 é agregada, não vira ponto extra
+    expect(supino.points).toHaveLength(2)
+    expect(supino.points[0].date).not.toBe(supino.points[1].date)
+    // dia 1: volume somado 80*10 + 60*10 = 1400; topWeight = max(80,60) = 80
+    expect(supino.points[0].volume).toBe(1400)
+    expect(supino.points[0].topWeight).toBe(80)
+  })
+
   it('e1rm (Epley) e volume por ponto', () => {
     const sessions: LoadSessionInput[] = [
       { date: '2026-02-01', exercises: [{ name: 'Rosca' }], logs: { '0-0': set(20, 10) } },

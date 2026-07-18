@@ -33,8 +33,13 @@ export interface LoadSeries {
 
 const round1 = (n: number): number => Math.round(n * 10) / 10;
 
+interface DayAgg { e1rm: number; volume: number; topWeight: number }
+
 export function buildLoadEvolution(sessions: LoadSessionInput[]): LoadSeries[] {
-    const map = new Map<string, { display: string; points: LoadPoint[] }>();
+    // Agrega POR (exercício normalizado, data). Assim o mesmo exercício listado 2x na mesma
+    // sessão (ou 2 séries do mesmo exIdx) vira UM ponto do dia — sem isso, uma única sessão
+    // com o exercício duplicado geraria uma "evolução" falsa com a mesma data repetida.
+    const map = new Map<string, { display: string; byDate: Map<string, DayAgg> }>();
 
     for (const s of Array.isArray(sessions) ? sessions : []) {
         if (!s || typeof s !== 'object') continue;
@@ -66,15 +71,21 @@ export function buildLoadEvolution(sessions: LoadSessionInput[]): LoadSeries[] {
             if (!hasWorking || (bestE1rm <= 0 && volume <= 0)) continue;
 
             const norm = normalizeExerciseName(name);
-            const entry = map.get(norm) || { display: name, points: [] };
-            entry.points.push({ date, e1rm: round1(bestE1rm), volume: round1(volume), topWeight: round1(topWeight) });
+            const entry = map.get(norm) || { display: name, byDate: new Map<string, DayAgg>() };
+            const cur = entry.byDate.get(date) || { e1rm: 0, volume: 0, topWeight: 0 };
+            cur.e1rm = Math.max(cur.e1rm, bestE1rm);
+            cur.volume += volume;
+            cur.topWeight = Math.max(cur.topWeight, topWeight);
+            entry.byDate.set(date, cur);
             map.set(norm, entry);
         }
     }
 
     const series: LoadSeries[] = [];
-    for (const { display, points } of map.values()) {
-        points.sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
+    for (const { display, byDate } of map.values()) {
+        const points: LoadPoint[] = Array.from(byDate.entries())
+            .map(([date, v]) => ({ date, e1rm: round1(v.e1rm), volume: round1(v.volume), topWeight: round1(v.topWeight) }))
+            .sort((a, b) => (a.date < b.date ? -1 : a.date > b.date ? 1 : 0));
         if (points.length >= 2) series.push({ exercise: display, points });
     }
     // Mais treinados primeiro (mais pontos), depois alfabético.
