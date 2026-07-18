@@ -59,4 +59,21 @@ describe('webhook — ramos student_plan_recurring', () => {
   it('valida o valor pago (assessPaymentAmount) antes de conceder', () => {
     expect(src).toMatch(/assessPaymentAmount\(amountCents/)
   })
+
+  it('preapproval autorizado NÃO concede acesso sozinho (achado: grant sem pagamento)', () => {
+    // O ramo de preapproval 'active' do aluno NÃO pode setar status:'active' (isso deixaria
+    // expires_at NULL, que o cron de suspensão nunca pega). Só o ramo de `payment` concede.
+    const block = src.slice(src.indexOf('student_plan_recurring'), src.indexOf('teacher_plan'))
+    expect(block).toMatch(/preapproval_id: providerSubscriptionId/)
+  })
+})
+
+describe('student/charge — renovação de assinatura ativa na janela', () => {
+  const src = stripComments(readFileSync('src/app/api/student/charge/route.ts', 'utf8'))
+
+  it('permite pagar assinatura active dentro da janela (next_due_date <= hoje)', () => {
+    // Achado: sem isso, o aluno recorrente não conseguia renovar antes de expirar (lapso forçado).
+    expect(src).toMatch(/inRenewalWindow/)
+    expect(src).toMatch(/next_due_date/)
+  })
 })

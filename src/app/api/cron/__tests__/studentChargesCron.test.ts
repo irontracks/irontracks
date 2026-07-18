@@ -20,10 +20,12 @@ describe('cron student-charges-due (lembrete PIX)', () => {
     expect(src).toMatch(/forbidden/)
   })
 
-  it('filtra recorrente + PIX + ativo + vence hoje (idempotente por data exata)', () => {
+  it('filtra recorrente + PIX + ativo + vencido (<= hoje, robusto a run perdido)', () => {
     expect(src).toMatch(/\.eq\(\s*['"]recurring['"]\s*,\s*true\s*\)/)
     expect(src).toMatch(/\.eq\(\s*['"]billing_method['"]\s*,\s*['"]pix['"]\s*\)/)
-    expect(src).toMatch(/\.eq\(\s*['"]next_due_date['"]\s*,\s*today\s*\)/)
+    // <= hoje (não igualdade exata): um run atrasado/perdido não pula a coorte (achado da revisão).
+    expect(src).toMatch(/\.lte\(\s*['"]next_due_date['"]\s*,\s*today\s*\)/)
+    expect(src).not.toMatch(/\.eq\(\s*['"]next_due_date['"]\s*,\s*today\s*\)/)
   })
 })
 

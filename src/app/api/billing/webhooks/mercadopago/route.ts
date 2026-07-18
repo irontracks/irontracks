@@ -178,8 +178,13 @@ export async function POST(req: Request) {
                 .update({ status: 'cancelled', canceled_at: nowIso, updated_at: nowIso })
                 .eq('id', subId)
             } else if (status === 'active') {
+              // Preapproval autorizado = cartão OK, mas NÃO significa que a 1ª cobrança foi
+              // coletada. Conceder acesso aqui deixaria a assinatura 'active' com expires_at=NULL
+              // (que o cron de suspensão nunca pega) se a 1ª cobrança falhar → acesso de graça.
+              // O acesso (status='active' + expires_at) é concedido SÓ pelo ramo de `payment`,
+              // que valida o valor. Aqui só registramos o vínculo do preapproval.
               await admin.from('student_subscriptions')
-                .update({ status: 'active', recurring: true, billing_method: 'card', preapproval_id: providerSubscriptionId, updated_at: nowIso })
+                .update({ recurring: true, billing_method: 'card', preapproval_id: providerSubscriptionId, updated_at: nowIso })
                 .eq('id', subId)
             } else {
               // pending/past_due/etc. — reflete o estado mapeado sem mexer no ciclo.
