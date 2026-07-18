@@ -1,4 +1,4 @@
-import { Home, Users, Dumbbell, Wallet, ListChecks, BookOpen, type LucideIcon } from 'lucide-react';
+import { Home, Users, Dumbbell, Wallet, ListChecks, BookOpen, MessageSquare, type LucideIcon } from 'lucide-react';
 
 /**
  * Navegação da Área do professor. Vocabulário de coaching, próprio — NÃO reusa
@@ -23,6 +23,7 @@ export const TEACHER_PRIMARY_SECTIONS: TeacherSection[] = [
 
 /** Seções secundárias, acessíveis pelo botão "Mais". */
 export const TEACHER_MORE_SECTIONS: TeacherSection[] = [
+    { key: 'conversas', label: 'Conversas', Icon: MessageSquare },
     { key: 'priorities', label: 'Prioridades', Icon: ListChecks },
     { key: 'guide', label: 'Guia', Icon: BookOpen },
 ];

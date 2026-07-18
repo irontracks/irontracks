@@ -24,6 +24,8 @@ import { TeacherAreaNav } from './TeacherAreaNav';
 import { TeacherWorkoutHighlight } from './TeacherWorkoutHighlight';
 import { TEACHER_SECTION_KEYS, labelForSection } from './teacherAreaSections';
 
+const TeacherConversationsInbox = dynamic(() => import('./TeacherConversationsInbox').then(m => ({ default: m.TeacherConversationsInbox })), { ssr: false });
+
 const TemplatesTab = dynamic(() => import('@/components/admin-panel/TemplatesTab').then(m => ({ default: m.TemplatesTab })), { ssr: false });
 const FinanceTabUnified = dynamic(() => import('@/components/admin-panel/FinanceTabUnified').then(m => ({ default: m.FinanceTabUnified })), { ssr: false });
 const TeacherManualTab = dynamic(() => import('@/components/admin-panel/TeacherManualTab'), { ssr: false });
@@ -134,6 +136,7 @@ const TeacherArea = ({ user, onClose }: TeacherAreaProps) => {
                     {tab === 'students' && !selectedStudent && <SectionBoundary name="Alunos"><StudentsTab /></SectionBoundary>}
                     {tab === 'templates' && !selectedStudent && <SectionBoundary name="Treinos"><TemplatesTab /></SectionBoundary>}
                     {tab === 'billing' && !selectedStudent && <SectionBoundary name="Financeiro"><FinanceTabUnified /></SectionBoundary>}
+                    {tab === 'conversas' && !selectedStudent && <SectionBoundary name="Conversas"><TeacherConversationsInbox /></SectionBoundary>}
                     {tab === 'priorities' && !selectedStudent && <SectionBoundary name="Prioridades"><PrioritiesTab /></SectionBoundary>}
                     {tab === 'guide' && !selectedStudent && <SectionBoundary name="Guia"><TeacherManualTab /></SectionBoundary>}
                     <StudentDetailPanel />

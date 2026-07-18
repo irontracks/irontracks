@@ -4,8 +4,9 @@ import React, { useCallback, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
     X, ArrowLeft, Edit3, Trash2, Download,
-    FileText, Loader2, TrendingUp
+    FileText, Loader2, TrendingUp, MessageSquare
 } from 'lucide-react';
+import { OPEN_TEACHER_CHAT_EVENT } from '@/components/teacher-area/TeacherChatHost';
 import HistoryList from '@/components/HistoryList';
 import AdminWorkoutEditor, { AdminWorkout } from '@/components/AdminWorkoutEditor';
 import { parseJsonWithSchema } from '@/utils/zod';
@@ -240,6 +241,22 @@ export const StudentDetailPanel: React.FC = () => {
                                         </div>
                                     )}
                                     <div className="flex items-center gap-2 w-full">
+                                        {selectedStudent?.user_id ? (
+                                            <button
+                                                type="button"
+                                                onClick={() => window.dispatchEvent(new CustomEvent(OPEN_TEACHER_CHAT_EVENT, {
+                                                    detail: {
+                                                        userId: String(selectedStudent.user_id),
+                                                        name: String(selectedStudent.name || selectedStudent.email || ''),
+                                                        photo: selectedStudent.photo_url ?? null,
+                                                    },
+                                                }))}
+                                                className="flex-1 min-h-[44px] px-4 py-3 bg-yellow-500/10 border border-yellow-500/25 hover:bg-yellow-500/20 text-yellow-400 rounded-xl font-black flex items-center justify-center gap-2 transition-all duration-300 active:scale-95"
+                                                title="Conversar com o aluno"
+                                            >
+                                                <MessageSquare size={18} /> Conversar
+                                            </button>
+                                        ) : null}
                                         <button
                                             type="button"
                                             onClick={() => setEditingStudent(true)}

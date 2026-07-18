@@ -18,6 +18,7 @@ import { pathnameToView, viewToPath } from './viewPath';
 const CardioGPSPanel = dynamic(() => import('@/components/workout/CardioGPSPanel'), { ssr: false })
 const AdminPanelV2 = dynamic(() => import('@/components/AdminPanelV2'), { ssr: false });
 const TeacherArea = dynamic(() => import('@/components/teacher-area/TeacherArea'), { ssr: false });
+const TeacherChatHost = dynamic(() => import('@/components/teacher-area/TeacherChatHost'), { ssr: false });
 const ChatListScreen = dynamic(() => import('@/components/ChatListScreen'), { ssr: false });
 const ChatDirectScreen = dynamic(() => import('@/components/ChatDirectScreen'), { ssr: false });
 const HistoryList = dynamic(() => import('@/components/HistoryList'), { ssr: false });
@@ -946,6 +947,9 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                 {/* Professor: host GLOBAL do controle de treino — abre o modal quando o aluno
                     aceita, em QUALQUER tela (antes só abria na aba de alunos). */}
                 {isCoach && <TeacherControlHost teacherUserId={user?.id ? String(user.id) : undefined} supabase={supabase} />}
+                {/* Professor: host GLOBAL do chat 1:1 com aluno — abre o ChatDirectScreen
+                    sobre qualquer tela quando o detalhe do aluno dispara o evento. */}
+                {isCoach && <TeacherChatHost user={user as AdminUser} />}
                     <div className="w-full bg-neutral-900 min-h-screen relative flex flex-col overflow-hidden" suppressHydrationWarning>
                         {/* GPS: Auto-detect gym toast */}
                         {view === 'dashboard' && <GymDetectToastWrapper userId={user?.id} onStartWorkout={() => setCreateWizardOpen(true)} />}
