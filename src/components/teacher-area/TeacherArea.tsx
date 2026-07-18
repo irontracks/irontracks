@@ -21,6 +21,7 @@ import { Modals } from '@/components/admin-panel/Modals';
 import { logError } from '@/lib/logger';
 import type { AdminUser } from '@/types/admin';
 import { TeacherAreaNav } from './TeacherAreaNav';
+import { TeacherWorkoutHighlight } from './TeacherWorkoutHighlight';
 import { TEACHER_SECTION_KEYS, labelForSection } from './teacherAreaSections';
 
 const TemplatesTab = dynamic(() => import('@/components/admin-panel/TemplatesTab').then(m => ({ default: m.TemplatesTab })), { ssr: false });
@@ -121,7 +122,15 @@ const TeacherArea = ({ user, onClose }: TeacherAreaProps) => {
 
                 {/* Conteúdo scrollável */}
                 <div className="flex-1 min-h-0 overflow-y-auto px-4 pt-3 pb-6">
-                    {tab === 'dashboard' && !selectedStudent && <SectionBoundary name="Início"><DashboardTab /></SectionBoundary>}
+                    {tab === 'dashboard' && !selectedStudent && (
+                        <SectionBoundary name="Início">
+                            <TeacherWorkoutHighlight
+                                onOpenWorkouts={() => setTab('templates')}
+                                onOpenStudents={() => setTab('students')}
+                            />
+                            <DashboardTab />
+                        </SectionBoundary>
+                    )}
                     {tab === 'students' && !selectedStudent && <SectionBoundary name="Alunos"><StudentsTab /></SectionBoundary>}
                     {tab === 'templates' && !selectedStudent && <SectionBoundary name="Treinos"><TemplatesTab /></SectionBoundary>}
                     {tab === 'billing' && !selectedStudent && <SectionBoundary name="Financeiro"><FinanceTabUnified /></SectionBoundary>}
