@@ -281,7 +281,11 @@ export default function StudentSubscriptionCard() {
   const cfg = STATUS_CONFIG[status] ?? STATUS_CONFIG['pending']
   const plan = subscription.student_service_plans
   const teacherName = String(teacher?.full_name || teacher?.name || 'Seu professor')
+  const todayStr = new Date().toISOString().slice(0, 10)
+  // Ativa já na janela de renovação (venceu a próx. cobrança) também pode pagar — senão o aluno
+  // recorrente perderia acesso todo ciclo por não poder renovar antes de expirar.
   const canPay = ['pending', 'past_due'].includes(status)
+    || (status === 'active' && !!subscription.next_due_date && String(subscription.next_due_date) <= todayStr)
   const isRecurring = Boolean(plan?.billing_interval && plan.billing_interval !== 'once')
 
   return (

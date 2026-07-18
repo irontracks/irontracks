@@ -55,13 +55,17 @@ export async function POST(req: Request) {
     // Load subscription + plan
     const { data: sub } = await admin
       .from('student_subscriptions')
-      .select('id, teacher_user_id, plan_id, status, student_service_plans(id, name, price_cents, duration_days, billing_interval)')
+      .select('id, teacher_user_id, plan_id, status, next_due_date, student_service_plans(id, name, price_cents, duration_days, billing_interval)')
       .eq('id', subscription_id)
       .eq('student_user_id', user.id)
       .maybeSingle()
 
     if (!sub) return NextResponse.json({ ok: false, error: 'assinatura_nao_encontrada' }, { status: 404 })
-    if (!['pending', 'past_due'].includes(sub.status)) {
+    // Pode pagar quando: pendente, em atraso, OU ativa já na janela de renovação (next_due_date
+    // <= hoje) — senão o aluno recorrente não conseguiria pagar antes de expirar (lapso forçado).
+    const todayStr = new Date().toISOString().slice(0, 10)
+    const inRenewalWindow = sub.status === 'active' && !!sub.next_due_date && String(sub.next_due_date) <= todayStr
+    if (!['pending', 'past_due'].includes(sub.status) && !inRenewalWindow) {
       return NextResponse.json({ ok: false, error: 'assinatura_ja_ativa' }, { status: 409 })
     }
 
