@@ -48,9 +48,28 @@ describe('trigger de limite de alunos no banco', () => {
   })
 })
 
-describe('UI — mensagem amigável do limite', () => {
-  it('o handleRegisterStudent traduz o erro do trigger em CTA de upgrade', () => {
-    expect(handler).toContain("msg.includes('teacher_student_limit_reached')")
-    expect(handler).toContain('Faça upgrade para adicionar mais')
+describe('UI — cadastro de aluno via rota de convite', () => {
+  // Mudança (Fase 7): o "+ Aluno" deixou de fazer INSERT direto em `students` e passou a
+  // chamar /api/teacher/students/invite (que além de cadastrar, PRÉ-APROVA pro primeiro
+  // acesso por email). Como o insert vira service-role (bypassa o trigger), o limite é
+  // enforçado NA ROTA (teacher_can_add_student) e devolvido como upgrade_required — a UI
+  // traduz isso no CTA de upgrade. O trigger no banco segue como defesa dos demais caminhos.
+  const invite = readFileSync(
+    join(process.cwd(), 'src/app/api/teacher/students/invite/route.ts'),
+    'utf8',
+  )
+
+  it('o handleRegisterStudent chama a rota de convite', () => {
+    expect(handler).toContain('/api/teacher/students/invite')
+  })
+
+  it('traduz upgrade_required no CTA de upgrade', () => {
+    expect(handler).toContain('upgrade_required')
+    expect(handler).toMatch(/upgrade/i)
+  })
+
+  it('a rota de convite enforça o limite (teacher_can_add_student) antes do insert service-role', () => {
+    expect(invite).toContain('teacher_can_add_student')
+    expect(invite).toContain('upgrade_required')
   })
 })

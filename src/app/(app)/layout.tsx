@@ -51,6 +51,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
             approved_at: new Date().toISOString(),
           }
           if (roleRequested === 'teacher') approvalPayload.role = 'teacher'
+          // Aluno convidado que entra por OTP não traz nome no metadata → handle_new_user
+          // deixa display_name = prefixo do email. Como este branch só roda enquanto ainda não
+          // aprovado (1º login), grava o nome do convite aqui — assim o nome fica certo mesmo
+          // que o aluno pule a tela de onboarding.
+          if (fullName) approvalPayload.display_name = fullName
 
           await admin.from('profiles').update(approvalPayload).eq('id', user.id)
 
