@@ -48,6 +48,13 @@ describe('motor compartilhado + reuso na rota VIP', () => {
     expect(engine).toMatch(/created_by_teacher/)
   })
 
+  it('erro de DB NÃO vaza a mensagem crua do Postgres (loga + código genérico)', () => {
+    // Regressão da revisão: throw new Error(pErr.message) vazaria nome de tabela/coluna/RLS.
+    expect(engine).not.toMatch(/throw new Error\((?:pErr|sErr|linkErr)\.message/)
+    expect(engine).toMatch(/logError\('periodization:/)
+    expect(engine).toMatch(/throw new Error\('database_error'\)/)
+  })
+
   it('a rota VIP self-service reusa o MESMO motor (dono = autor = próprio usuário)', () => {
     expect(vip).toMatch(/createPeriodizationProgram\(/)
     expect(vip).toMatch(/ownerUserId:\s*userId/)

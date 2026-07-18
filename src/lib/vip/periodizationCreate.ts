@@ -5,6 +5,7 @@ import { parseJsonWithSchema } from '@/utils/zod';
 import { normalizeExerciseName } from '@/utils/normalizeExerciseName';
 import { setTopWeightReps } from '@/utils/report/setVolume';
 import { getGeminiModel } from '@/utils/ai/gemini';
+import { logError } from '@/lib/logger';
 import { env } from '@/utils/env';
 import { VipPeriodizationQuestionnaire, buildWorkoutPlan } from '@/utils/vip/periodization';
 import { vipPeriodizationExerciseSeed } from '@/data/vipPeriodizationExercises';
@@ -197,7 +198,9 @@ export async function createPeriodizationProgram(
         })
         .select('id')
         .single();
-    if (pErr) throw new Error(pErr.message || 'failed_to_create_program');
+    // Loga o erro cru no Sentry mas NUNCA o devolve ao cliente (vazaria schema/RLS) —
+    // lança um código genérico, igual ao respondDbError original.
+    if (pErr) { logError('periodization:program', pErr); throw new Error('database_error'); }
     if (!programRow?.id) throw new Error('failed_to_create_program');
 
     const overview = await generateOverview(q, plan.split.split);
@@ -231,7 +234,7 @@ export async function createPeriodizationProgram(
             p_notes: day.notes || '',
             p_exercises: exercisesPayload,
         });
-        if (sErr) throw new Error(sErr.message || 'failed_to_create_workout');
+        if (sErr) { logError('periodization:save-workout', sErr); throw new Error('database_error'); }
         const workoutId = String(savedId || '').trim();
         if (!workoutId) throw new Error('failed_to_create_workout');
         createdWorkoutIds.push(workoutId);
@@ -247,7 +250,7 @@ export async function createPeriodizationProgram(
             scheduled_date: day.scheduledDate,
             workout_id: workoutId,
         });
-        if (linkErr) throw new Error(linkErr.message || 'failed_to_link_workout');
+        if (linkErr) { logError('periodization:link', linkErr); throw new Error('database_error'); }
     }
 
     return { programId, createdWorkoutIds, split: plan.split, weeks: plan.weeks };
