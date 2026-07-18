@@ -1033,9 +1033,9 @@ function AndroidModal({ onClose }: { onClose: () => void }) {
   }, [onClose])
 
   const steps = [
-    { n: '1', title: 'Entre no grupo de testadores', desc: 'Toque em "Entrar no grupo de testadores" abaixo e clique em "Participar do grupo". É grátis e sem aprovação.' },
-    { n: '2', title: 'Acesse o teste no Google Play', desc: 'Toque em "Acessar o teste", entre com sua conta Google e clique em "Tornar-se testador".' },
-    { n: '3', title: 'Aguarde 1 a 2 minutos', desc: 'O Google precisa processar sua entrada no grupo antes de liberar a instalação.' },
+    { n: '1', title: 'Entre no grupo de testadores', desc: 'Toque em "Entrar no grupo de testadores" e em "Participar do grupo" usando a mesma Conta Google da Play Store.' },
+    { n: '2', title: 'Acesse o teste no Google Play', desc: 'Com essa mesma Conta Google, toque em "Acessar o teste" e depois em "Tornar-se testador".' },
+    { n: '3', title: 'Aguarde a liberação do Google', desc: 'Normalmente leva alguns minutos. Em alguns casos, o Google pode levar algumas horas para liberar a instalação.' },
     { n: '4', title: 'Instale o IronTracks', desc: 'Toque em "Abrir na Play Store" abaixo e depois em "Instalar". Pronto!' },
   ]
 
@@ -1099,7 +1099,7 @@ function AndroidModal({ onClose }: { onClose: () => void }) {
         </div>
 
         <p style={{ color: 'rgba(245,245,245,0.55)', fontSize: 14, lineHeight: 1.6, marginBottom: 28 }}>
-          O IronTracks para Android está em teste fechado. Entre no grupo de testadores, acesse o teste e instale:
+          O IronTracks para Android está em teste fechado. Use a mesma Conta Google nos 3 botões abaixo:
         </p>
 
         {/* Steps */}
@@ -1122,7 +1122,16 @@ function AndroidModal({ onClose }: { onClose: () => void }) {
           ))}
         </div>
 
-        {/* CTA — 2 passos: 1º entrar no grupo, 2º acessar o teste */}
+        <div style={{
+          marginBottom: 24, padding: '12px 14px', borderRadius: 14,
+          background: 'rgba(255,255,255,0.035)', border: '1px solid rgba(255,255,255,0.1)',
+          color: 'rgba(245,245,245,0.62)', fontSize: 12, lineHeight: 1.55,
+        }}>
+          <strong style={{ color: '#f5f5f5' }}>Apareceu “O item não foi encontrado”?</strong>{' '}
+          Abra a Play Store, toque na foto do perfil e confirme que ela está usando a mesma Conta Google dos passos 1 e 2. Depois, aguarde a liberação e tente novamente pelo botão 3.
+        </div>
+
+        {/* CTA — os 3 botões devem ser abertos com a mesma Conta Google. */}
         <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
           <a
             href={GROUP}

@@ -13,6 +13,9 @@ test.describe('Fluxo de download Android da página comercial', () => {
 
     await expect(dialog).toBeVisible()
     await expect(closeButton).toBeInViewport()
+    await expect(dialog).toContainText('Use a mesma Conta Google nos 3 botões')
+    await expect(dialog).toContainText('O item não foi encontrado')
+    await expect(dialog).toContainText('algumas horas')
 
     const metrics = await panel.evaluate(element => {
       const rect = element.getBoundingClientRect()
@@ -43,5 +46,16 @@ test.describe('Fluxo de download Android da página comercial', () => {
     await closeButton.click()
     await expect(dialog).toBeHidden()
     await expect.poll(() => page.evaluate(() => document.body.style.overflow)).toBe('')
+  })
+
+  test('publica as instruções de exclusão de conta exigidas pela Play Store', async ({ page }) => {
+    await page.goto('/excluir-conta')
+
+    await expect(page.getByRole('heading', { name: 'Exclusão de conta e dados' })).toBeVisible()
+    await expect(page.getByText('Excluir minha conta')).toBeVisible()
+    await expect(page.getByRole('link', { name: 'Solicitar exclusão por e-mail' })).toHaveAttribute(
+      'href',
+      /^mailto:irontrackscompany@gmail\.com/,
+    )
   })
 })
