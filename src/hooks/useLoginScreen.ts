@@ -1,5 +1,5 @@
 'use client'
-import { useState, useCallback, useMemo, useEffect } from 'react'
+import { useState, useCallback, useMemo, useEffect, useRef } from 'react'
 import { z } from 'zod'
 import { createClient } from '@/utils/supabase/client'
 import { useRouter } from 'next/navigation'
@@ -91,6 +91,20 @@ const getOAuthHref = (provider: string) => {
     }
 }
 
+type CrefCheckState = {
+    status: 'idle' | 'checking' | 'verified' | 'invalid' | 'manual_review'
+    canContinue: boolean
+    message: string
+    inputKey?: string
+    normalizedCref?: string
+    professionalName?: string
+}
+
+const EMPTY_CREF_CHECK: CrefCheckState = { status: 'idle', canContinue: false, message: '' }
+
+const getCrefInputKey = (cref: string, fullName: string) =>
+    `${cref.trim().toUpperCase()}|${fullName.trim().toUpperCase()}`
+
 // ─── Hook ─────────────────────────────────────────────────────────────────────
 
 export function useLoginScreen() {
@@ -127,6 +141,10 @@ export function useLoginScreen() {
     const [reqSuccess, setReqSuccess] = useState(false)
     const [reqError, setReqError] = useState('')
     const [formData, setFormData] = useState({ full_name: '', email: '', phone: '', birth_date: '', is_teacher: false, cref: '' })
+    const [emailCrefCheck, setEmailCrefCheck] = useState<CrefCheckState>(EMPTY_CREF_CHECK)
+    const [requestCrefCheck, setRequestCrefCheck] = useState<CrefCheckState>(EMPTY_CREF_CHECK)
+    const emailCrefRequestId = useRef(0)
+    const requestCrefRequestId = useRef(0)
 
     const fieldSchemas = useMemo(() => ({
         email: z.string().min(1, 'E-mail obrigatório').email('E-mail inválido'),
@@ -152,6 +170,66 @@ export function useLoginScreen() {
     }, [fieldSchemas, emailData.password])
 
     const clearValidation = useCallback(() => setValidationErrors({}), [])
+
+    const runCrefVerification = useCallback(async (
+        cref: string,
+        fullName: string,
+        requestIdRef: { current: number },
+        setCheck: React.Dispatch<React.SetStateAction<CrefCheckState>>,
+    ): Promise<CrefCheckState> => {
+        const inputKey = getCrefInputKey(cref, fullName)
+        const requestId = ++requestIdRef.current
+        setCheck({ status: 'checking', canContinue: false, message: 'Verificando CREF...', inputKey })
+
+        try {
+            const result = await apiAuth.verifyCref(cref, fullName)
+            const next: CrefCheckState = {
+                status: result.status ?? 'manual_review',
+                canContinue: result.canContinue === true,
+                message: result.message || result.error || 'Não foi possível verificar o CREF.',
+                inputKey,
+                normalizedCref: result.normalizedCref,
+                professionalName: result.professionalName,
+            }
+            if (requestId === requestIdRef.current) setCheck(next)
+            return next
+        } catch {
+            const next: CrefCheckState = {
+                status: 'manual_review',
+                canContinue: true,
+                message: 'Não foi possível consultar o CREF agora. O cadastro seguirá para análise manual.',
+                inputKey,
+            }
+            if (requestId === requestIdRef.current) setCheck(next)
+            return next
+        }
+    }, [])
+
+    const verifyEmailCref = useCallback(async (): Promise<CrefCheckState> => {
+        const inputKey = getCrefInputKey(emailData.cref, emailData.fullName)
+        if (emailCrefCheck.inputKey === inputKey && !['idle', 'checking'].includes(emailCrefCheck.status)) {
+            return emailCrefCheck
+        }
+        return runCrefVerification(emailData.cref, emailData.fullName, emailCrefRequestId, setEmailCrefCheck)
+    }, [emailCrefCheck, emailData.cref, emailData.fullName, runCrefVerification])
+
+    const verifyRequestCref = useCallback(async (): Promise<CrefCheckState> => {
+        const inputKey = getCrefInputKey(formData.cref, formData.full_name)
+        if (requestCrefCheck.inputKey === inputKey && !['idle', 'checking'].includes(requestCrefCheck.status)) {
+            return requestCrefCheck
+        }
+        return runCrefVerification(formData.cref, formData.full_name, requestCrefRequestId, setRequestCrefCheck)
+    }, [formData.cref, formData.full_name, requestCrefCheck, runCrefVerification])
+
+    const resetEmailCrefCheck = useCallback(() => {
+        emailCrefRequestId.current += 1
+        setEmailCrefCheck(EMPTY_CREF_CHECK)
+    }, [])
+
+    const resetRequestCrefCheck = useCallback(() => {
+        requestCrefRequestId.current += 1
+        setRequestCrefCheck(EMPTY_CREF_CHECK)
+    }, [])
 
     const recoverCooldownLeft = useMemo(() => {
         if (!recoverCooldownUntil) return 0
@@ -312,6 +390,12 @@ export function useLoginScreen() {
                 const isTeacher = emailData.isTeacher === true
                 const cref = String(emailData.cref || '').trim()
                 if (isTeacher && !cref) throw new Error('CREF é obrigatório para cadastro de professor.')
+                let verifiedCref = cref
+                if (isTeacher) {
+                    const verification = await verifyEmailCref()
+                    if (!verification.canContinue) throw new Error(verification.message)
+                    verifiedCref = verification.normalizedCref || cref
+                }
                 const cleanPhone = emailData.phone.replace(/\D/g, '')
                 if (cleanPhone.length < 10) throw new Error('Telefone inválido (mínimo 10 dígitos com DDD).')
                 // Step 1: Create access_request FIRST so the whitelist trigger allows the signUp.
@@ -321,7 +405,7 @@ export function useLoginScreen() {
                 const accessReqJson = await apiAuth.createAccessRequest({
                     email, full_name: emailData.fullName, phone: emailData.phone,
                     birth_date: emailData.birthDate, role_requested: isTeacher ? 'teacher' : 'student',
-                    cref: isTeacher ? cref : null,
+                    cref: isTeacher ? verifiedCref : null,
                 })
                 if (!accessReqJson?.ok) {
                     throw new Error((accessReqJson?.error as string | undefined) || 'Falha ao registrar solicitação de acesso.')
@@ -330,7 +414,7 @@ export function useLoginScreen() {
                 // access_request and allow the insert.
                 const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
                     email, password,
-                    options: { data: { full_name: emailData.fullName, display_name: emailData.fullName, phone: emailData.phone, birth_date: emailData.birthDate, role_requested: isTeacher ? 'teacher' : 'student', cref: isTeacher ? cref : null } }
+                    options: { data: { full_name: emailData.fullName, display_name: emailData.fullName, phone: emailData.phone, birth_date: emailData.birthDate, role_requested: isTeacher ? 'teacher' : 'student', cref: isTeacher ? verifiedCref : null } }
                 })
                 if (signUpError) throw signUpError
                 if (rememberMe) localStorage.setItem('it_remembered_email', email)
@@ -378,7 +462,7 @@ export function useLoginScreen() {
         } finally {
             if (!holdLoading) setIsLoading(false)
         }
-    }, [authMode, emailData, rememberMe, recoverCooldownLeft, recoveryCode, recoveryPassword2, router])
+    }, [authMode, emailData, rememberMe, recoverCooldownLeft, recoveryCode, recoveryPassword2, router, verifyEmailCref])
 
     const handleRequestSubmit = useCallback(async (e: React.FormEvent) => {
         e.preventDefault(); setReqLoading(true); setReqError('')
@@ -386,17 +470,28 @@ export function useLoginScreen() {
         if (!emailRegex.test(formData.email)) { setReqError('Formato de e-mail inválido.'); setReqLoading(false); return }
         const cleanPhone = formData.phone.replace(/\D/g, '')
         if (cleanPhone.length < 10 || cleanPhone.length > 11) { setReqError('Telefone inválido (DDD + Número).'); setReqLoading(false); return }
-        const payload = { ...formData, role_requested: formData.is_teacher ? 'teacher' : 'student', cref: formData.is_teacher ? formData.cref : null }
         try {
+            let verifiedCref = formData.cref
+            if (formData.is_teacher) {
+                const verification = await verifyRequestCref()
+                if (!verification.canContinue) throw new Error(verification.message)
+                verifiedCref = verification.normalizedCref || formData.cref
+            }
+            const payload = { ...formData, role_requested: formData.is_teacher ? 'teacher' : 'student', cref: formData.is_teacher ? verifiedCref : null }
             const json = await apiAuth.createAccessRequest({ email: payload.email, full_name: payload.full_name, phone: payload.phone, birth_date: payload.birth_date, role_requested: payload.role_requested as 'teacher' | 'student', cref: payload.cref })
             if (!json?.ok) throw new Error((json?.error as string | undefined) || 'Erro ao enviar solicitação.')
             setReqSuccess(true)
         } catch (err: unknown) { setReqError(err instanceof Error ? err.message : 'Erro de conexão.') }
         finally { setReqLoading(false) }
-    }, [formData])
+    }, [formData, verifyRequestCref])
 
     const handleInputChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-        const { name, value } = e.target; setFormData(prev => ({ ...prev, [name]: value }))
+        const { name, value } = e.target
+        if (name === 'cref' || name === 'full_name') {
+            requestCrefRequestId.current += 1
+            setRequestCrefCheck(EMPTY_CREF_CHECK)
+        }
+        setFormData(prev => ({ ...prev, [name]: value }))
     }, [])
 
     return {
@@ -415,6 +510,9 @@ export function useLoginScreen() {
         showRequestModal, setShowRequestModal,
         reqLoading, reqSuccess, setReqSuccess,
         reqError, formData, setFormData,
+        emailCrefCheck, requestCrefCheck,
+        verifyEmailCref, verifyRequestCref,
+        resetEmailCrefCheck, resetRequestCrefCheck,
         handleGoogleLogin,
         handleAppleLogin,
         handleEmailAuth,

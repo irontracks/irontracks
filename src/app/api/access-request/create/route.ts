@@ -6,6 +6,7 @@ import { normalizeBrPhone } from '@/lib/whatsapp/zapi'
 import { logError } from '@/lib/logger'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { notifyAdminNewSignup } from '@/lib/admin/adminNotifications'
+import { verifyCref } from '@/lib/cref/verifyCref'
 
 export const dynamic = 'force-dynamic'
 
@@ -86,6 +87,22 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: true, message: 'Cadastro já realizado. Aguarde a aprovação do administrador.' })
     }
 
+    let storedCref = cref?.trim() || null
+    let crefVerification: 'verified' | 'manual_review' | undefined
+
+    if (role_requested === 'teacher' && storedCref) {
+      const verification = await verifyCref(storedCref, full_name)
+      if (!verification.canContinue) {
+        return NextResponse.json(
+          { ok: false, error: verification.message, cref_status: verification.status },
+          { status: 400 },
+        )
+      }
+
+      storedCref = verification.normalizedCref ?? storedCref
+      crefVerification = verification.status === 'verified' ? 'verified' : 'manual_review'
+    }
+
     // ── Upsert access request ─────────────────────────────────────────────────
 
     if (existingRequest?.id && existingRequest.status === 'rejected') {
@@ -96,7 +113,7 @@ export async function POST(req: Request) {
           phone,
           birth_date: birth_date ?? null,
           role_requested: role_requested ?? 'student',
-          cref: cref ?? null,
+          cref: storedCref,
           phone_verified: false,
           status: 'pending',
           updated_at: new Date().toISOString(),
@@ -108,7 +125,12 @@ export async function POST(req: Request) {
         return NextResponse.json({ ok: false, error: 'Erro ao atualizar solicitação.' }, { status: 500 })
       }
 
-      return NextResponse.json({ ok: true, message: 'Solicitação enviada com sucesso!', id: existingRequest.id })
+      return NextResponse.json({
+        ok: true,
+        message: 'Solicitação enviada com sucesso!',
+        id: existingRequest.id,
+        cref_verification: crefVerification,
+      })
     }
 
     const { data: inserted, error: insertError } = await supabaseAdmin
@@ -119,7 +141,7 @@ export async function POST(req: Request) {
         full_name,
         birth_date: birth_date ?? null,
         role_requested: role_requested ?? 'student',
-        cref: cref ?? null,
+        cref: storedCref,
         phone_verified: false,
         status: 'pending',
       })
@@ -138,7 +160,12 @@ export async function POST(req: Request) {
       role: role_requested === 'teacher' ? 'teacher' : 'student',
     }).catch(() => { })
 
-    return NextResponse.json({ ok: true, message: 'Solicitação enviada com sucesso!', id: inserted?.id ?? null })
+    return NextResponse.json({
+      ok: true,
+      message: 'Solicitação enviada com sucesso!',
+      id: inserted?.id ?? null,
+      cref_verification: crefVerification,
+    })
 
   } catch (error) {
     logError('access-request/create', error)
