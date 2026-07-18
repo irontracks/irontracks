@@ -139,13 +139,16 @@ const LoginScreen = () => {
     const {
         isLoading,
         errorMsg, setErrorMsg,
-        successMsg,
+        successMsg, setSuccessMsg,
         authMode, setAuthMode,
         showNoAccountModal, setShowNoAccountModal,
         showPassword, setShowPassword,
         rememberMe, setRememberMe,
         validationErrors, validateField, clearValidation,
         emailData, setEmailData,
+        firstAccessStep, setFirstAccessStep,
+        firstAccessCode, setFirstAccessCode,
+        handleFirstAccessSend, handleFirstAccessVerify,
         recoveryCode, setRecoveryCode,
         recoveryPassword2, setRecoveryPassword2,
         recoverCooldownLeft,
@@ -527,6 +530,13 @@ const LoginScreen = () => {
                                     </button>
                                 </div>
 
+                                <button
+                                    type="button"
+                                    onClick={(e) => { e.preventDefault(); e.stopPropagation(); setAuthMode('first_access'); setFirstAccessStep('email'); setErrorMsg(''); setSuccessMsg(''); clearValidation(); }}
+                                    className="w-full mt-1 text-[11px] font-bold text-yellow-500 hover:text-yellow-400 underline decoration-yellow-500/30 underline-offset-2 relative z-20 p-2"
+                                >
+                                    Sou aluno — primeiro acesso
+                                </button>
                             </>
                         )}
 
@@ -570,6 +580,93 @@ const LoginScreen = () => {
                             </div>
                         )}
                     </form>
+                )}
+
+                {authMode === 'first_access' && (
+                    <div className="w-full space-y-4 animate-in fade-in slide-in-from-right-8 duration-300">
+                        <div className="flex items-center mb-1">
+                            <button
+                                type="button"
+                                aria-label="Voltar"
+                                onClick={() => { setAuthMode('login'); setErrorMsg(''); setSuccessMsg(''); setFirstAccessStep('email'); setFirstAccessCode(''); }}
+                                className="p-2 -ml-2 text-neutral-400 hover:text-white transition-colors"
+                            >
+                                <ArrowLeft size={18} />
+                            </button>
+                            <span className="ml-1 text-sm font-black uppercase tracking-wide text-white">Primeiro acesso</span>
+                        </div>
+
+                        {firstAccessStep === 'email' ? (
+                            <>
+                                <p className="text-[11px] text-neutral-400 leading-relaxed px-1">
+                                    Seu professor cadastrou você? Digite o e-mail que ele usou e enviaremos um código para entrar — sem senha.
+                                </p>
+                                <div className="relative">
+                                    <Mail size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-neutral-500" />
+                                    <input
+                                        type="email"
+                                        inputMode="email"
+                                        autoComplete="email"
+                                        aria-label="Seu e-mail"
+                                        placeholder="seu@email.com"
+                                        value={emailData.email}
+                                        onChange={(e) => setEmailData(prev => ({ ...prev, email: e.target.value }))}
+                                        className="w-full bg-neutral-800/60 border border-neutral-700 rounded-xl pl-10 pr-4 py-3.5 text-sm text-white placeholder:text-neutral-600 focus:border-yellow-500 focus:outline-none"
+                                    />
+                                </div>
+                                <button
+                                    type="button"
+                                    onClick={handleFirstAccessSend}
+                                    disabled={isLoading}
+                                    className="w-full bg-gradient-to-r from-yellow-400 to-amber-500 text-black font-black py-3.5 rounded-xl text-sm uppercase tracking-wide hover:from-yellow-300 hover:to-amber-400 transition-all disabled:opacity-50"
+                                >
+                                    Enviar código
+                                </button>
+                            </>
+                        ) : (
+                            <>
+                                <p className="text-[11px] text-neutral-400 leading-relaxed px-1">
+                                    Enviamos um código de 6 dígitos para <span className="text-white font-semibold break-all">{emailData.email}</span>. Digite abaixo.
+                                </p>
+                                <input
+                                    type="text"
+                                    inputMode="numeric"
+                                    autoComplete="one-time-code"
+                                    aria-label="Código de 6 dígitos"
+                                    placeholder="______"
+                                    maxLength={6}
+                                    value={firstAccessCode}
+                                    onChange={(e) => setFirstAccessCode(e.target.value.replace(/\D/g, ''))}
+                                    className="w-full bg-neutral-800/60 border border-neutral-700 rounded-xl px-4 py-3.5 text-center text-2xl font-black tracking-[0.4em] text-white placeholder:text-neutral-700 focus:border-yellow-500 focus:outline-none"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={handleFirstAccessVerify}
+                                    disabled={isLoading}
+                                    className="w-full bg-gradient-to-r from-yellow-400 to-amber-500 text-black font-black py-3.5 rounded-xl text-sm uppercase tracking-wide hover:from-yellow-300 hover:to-amber-400 transition-all disabled:opacity-50"
+                                >
+                                    Entrar
+                                </button>
+                                <div className="flex justify-between items-center text-[11px] px-1">
+                                    <button
+                                        type="button"
+                                        onClick={() => { setFirstAccessStep('email'); setFirstAccessCode(''); setErrorMsg(''); setSuccessMsg(''); }}
+                                        className="text-neutral-400 hover:text-white transition-colors p-1"
+                                    >
+                                        Trocar e-mail
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={handleFirstAccessSend}
+                                        disabled={isLoading}
+                                        className="font-bold text-yellow-500 hover:text-yellow-400 transition-colors p-1 disabled:opacity-50"
+                                    >
+                                        Reenviar código
+                                    </button>
+                                </div>
+                            </>
+                        )}
+                    </div>
                 )}
 
                 {errorMsg && (
