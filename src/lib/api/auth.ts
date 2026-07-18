@@ -30,6 +30,18 @@ export interface AccessRequestResult {
   [key: string]: unknown
 }
 
+export interface CrefVerificationResult {
+  ok: boolean
+  status?: 'verified' | 'invalid' | 'manual_review'
+  canContinue?: boolean
+  normalizedCref?: string
+  message?: string
+  professionalName?: string
+  category?: string
+  registrationStatus?: string
+  error?: string
+}
+
 // ─── Client ───────────────────────────────────────────────────────────────────
 
 export const apiAuth = {
@@ -64,6 +76,10 @@ export const apiAuth = {
   /** POST verify recovery code and set new password */
   verifyRecoveryCode: (email: string, code: string, password: string) =>
     apiPost<RecoveryCodeResult>('/api/auth/recovery-code', { email, code, password }),
+
+  /** POST verify a teacher CREF against the official public registry */
+  verifyCref: (cref: string, fullName: string) =>
+    apiPost<CrefVerificationResult>('/api/cref/verify', { cref, full_name: fullName }),
 
   /** POST submit new access request (student or teacher) */
   createAccessRequest: (payload: {
