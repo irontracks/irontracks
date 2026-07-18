@@ -360,20 +360,20 @@ export default function HeaderActionsMenu({
               {/* Coach tools group */}
               {isCoach && (
                 <>
-                  {user?.role === 'teacher' ? (
-                    <MenuItem
-                      icon={<LayoutDashboard size={14} className="text-yellow-400" />}
-                      label="Área do professor"
-                      gold
-                      data-tour="menu-coach-tools"
-                      onClick={() => { onOpenTeacherArea?.(); close() }}
-                    />
-                  ) : (
+                  {/* Área do professor: pra TODO coach (teacher e admin). O admin ainda
+                      tem o "Painel de Controle" (painel completo) logo abaixo. */}
+                  <MenuItem
+                    icon={<LayoutDashboard size={14} className="text-yellow-400" />}
+                    label="Área do professor"
+                    gold
+                    data-tour="menu-coach-tools"
+                    onClick={() => { onOpenTeacherArea?.(); close() }}
+                  />
+                  {user?.role === 'admin' && (
                     <MenuItem
                       icon={<Command size={14} className="text-yellow-400" />}
                       label="Painel de Controle"
                       gold
-                      data-tour="menu-coach-tools"
                       onClick={() => { onOpenAdmin?.(); close() }}
                     />
                   )}
