@@ -13,8 +13,10 @@ import {
  * travam o vocabulário e os helpers da nav.
  */
 describe('teacherAreaSections', () => {
-  it('as keys são tabs válidos do painel do professor', () => {
-    const valid = new Set(['dashboard', 'students', 'templates', 'billing', 'priorities', 'guide'])
+  it('as keys são tabs reusados do painel OU seções exclusivas da Área do professor', () => {
+    // Tabs que o AdminPanelV2 já renderiza (reuso) + seções que só a Área do professor tem
+    // (renderizadas pelo próprio TeacherArea, ex.: conversas).
+    const valid = new Set(['dashboard', 'students', 'templates', 'billing', 'priorities', 'guide', 'conversas'])
     for (const s of [...TEACHER_PRIMARY_SECTIONS, ...TEACHER_MORE_SECTIONS]) {
       expect(valid.has(s.key), `key desconhecido: ${s.key}`).toBe(true)
     }
