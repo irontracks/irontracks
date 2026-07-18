@@ -251,12 +251,17 @@ class RestTimerService : Service() {
             getSystemService(Context.VIBRATOR_SERVICE) as? Vibrator
         }
 
-        vibrator?.vibrate(
-            VibrationEffect.createWaveform(
-                longArrayOf(0, 400, 200, 400, 200, 400),
-                intArrayOf(0, 255, 0, 255, 0, 255),
-                -1
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            vibrator?.vibrate(
+                VibrationEffect.createWaveform(
+                    longArrayOf(0, 400, 200, 400, 200, 400),
+                    intArrayOf(0, 255, 0, 255, 0, 255),
+                    -1
+                )
             )
-        )
+        } else {
+            @Suppress("DEPRECATION")
+            vibrator?.vibrate(longArrayOf(0, 400, 200, 400, 200, 400), -1)
+        }
     }
 }
