@@ -122,6 +122,10 @@ export function useLoginScreen() {
         email: '', password: '', confirmPassword: '', fullName: '', phone: '', birthDate: '', isTeacher: false, cref: ''
     })
 
+    // Primeiro acesso do aluno convidado: entra só com o email via código OTP (passwordless).
+    const [firstAccessStep, setFirstAccessStep] = useState<'email' | 'code'>('email')
+    const [firstAccessCode, setFirstAccessCode] = useState('')
+
     const [showRequestModal, setShowRequestModal] = useState(false)
     const [reqLoading, setReqLoading] = useState(false)
     const [reqSuccess, setReqSuccess] = useState(false)
@@ -380,6 +384,67 @@ export function useLoginScreen() {
         }
     }, [authMode, emailData, rememberMe, recoverCooldownLeft, recoveryCode, recoveryPassword2, router])
 
+    // ── Primeiro acesso (aluno convidado) — OTP por email ──────────────────────
+    // Passo 1: envia o código de 6 dígitos. shouldCreateUser cria a conta na hora (o trigger
+    // de whitelist só deixa se o email já foi cadastrado pelo professor — linha em `students`
+    // ou access_request; senão o erro cai no friendlyAuthError "acesso não liberado").
+    const handleFirstAccessSend = useCallback(async () => {
+        setErrorMsg(''); setSuccessMsg('')
+        const email = emailData.email.trim().toLowerCase()
+        if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { setErrorMsg('Digite um e-mail válido.'); return }
+        setIsLoading(true)
+        try {
+            const supabase = createClient()
+            const { error } = await supabase.auth.signInWithOtp({ email, options: { shouldCreateUser: true } })
+            if (error) throw error
+            if (rememberMe) { try { localStorage.setItem('it_remembered_email', email) } catch { } }
+            setFirstAccessStep('code')
+            setSuccessMsg('Enviamos um código de 6 dígitos para o seu e-mail. Pode levar 1 minuto.')
+        } catch (err: unknown) {
+            logError('error', 'FirstAccess Send Error:', err)
+            const raw = err instanceof Error ? err.message : 'Falha ao enviar o código.'
+            // Email não cadastrado pelo professor → trigger de whitelist recusa.
+            if (isWhitelistError(raw)) { setErrorMsg('Este e-mail ainda não foi cadastrado. Peça ao seu professor para te cadastrar primeiro.'); return }
+            setErrorMsg(friendlyAuthError(raw))
+        } finally {
+            setIsLoading(false)
+        }
+    }, [emailData.email, rememberMe])
+
+    // Passo 2: verifica o código, estabelece a sessão e manda pro onboarding (senha + dados).
+    const handleFirstAccessVerify = useCallback(async () => {
+        setErrorMsg('')
+        const email = emailData.email.trim().toLowerCase()
+        const token = firstAccessCode.replace(/\D/g, '').trim()
+        if (token.length < 4) { setErrorMsg('Digite o código recebido por e-mail.'); return }
+        setIsLoading(true)
+        let holdLoading = false
+        try {
+            const supabase = createClient()
+            const { data, error } = await supabase.auth.verifyOtp({ email, token, type: 'email' })
+            if (error) throw error
+            const session = data?.session
+            if (session?.access_token && session?.refresh_token) {
+                await apiAuth.persistSession(session.access_token, session.refresh_token)
+                writeSessionBackup(session.access_token, session.refresh_token)
+            }
+            holdLoading = true
+            // NÃO marca it.logged_in aqui: esse flag faz a LoginScreen pular direto pro
+            // /dashboard, o que puraria o onboarding (aluno ficaria sem senha). Quem marca é o
+            // /onboarding ao concluir. A sessão pro SSR do /onboarding já vem do persistSession.
+            // Primeiro acesso → onboarding (define senha + completa dados). Full reload igual
+            // aos outros caminhos (o cookie HTTP-only recém-setado precisa ir no SSR).
+            window.location.replace('/onboarding')
+        } catch (err: unknown) {
+            logError('error', 'FirstAccess Verify Error:', err)
+            const raw = err instanceof Error ? err.message : 'Código inválido.'
+            if (isWhitelistError(raw)) { setErrorMsg('Este e-mail ainda não foi cadastrado. Peça ao seu professor para te cadastrar primeiro.'); return }
+            setErrorMsg(friendlyAuthError(raw))
+        } finally {
+            if (!holdLoading) setIsLoading(false)
+        }
+    }, [emailData.email, firstAccessCode])
+
     const handleRequestSubmit = useCallback(async (e: React.FormEvent) => {
         e.preventDefault(); setReqLoading(true); setReqError('')
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
@@ -409,6 +474,9 @@ export function useLoginScreen() {
         rememberMe, setRememberMe,
         validationErrors, validateField, clearValidation,
         emailData, setEmailData,
+        firstAccessStep, setFirstAccessStep,
+        firstAccessCode, setFirstAccessCode,
+        handleFirstAccessSend, handleFirstAccessVerify,
         recoveryCode, setRecoveryCode,
         recoveryPassword2, setRecoveryPassword2,
         recoverCooldownLeft,

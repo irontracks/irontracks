@@ -42,7 +42,7 @@ interface UseAdminActionsParams {
 }
 
 export function useAdminActions({
-    supabase, user, alert, confirm, getAdminAuthHeaders,
+    supabase, alert, confirm, getAdminAuthHeaders,
     setUsersList, setTeachersList,
     newStudent, setNewStudent, setShowRegisterModal, setRegistering,
     newTeacher, setNewTeacher, setShowTeacherModal, setAddingTeacher,
@@ -54,25 +54,32 @@ export function useAdminActions({
         if (!newStudent.name || !newStudent.email) return await alert('Preencha nome e email.');
         setRegistering(true);
         try {
-            const { data, error } = await supabase
-                .from('students')
-                .insert({ name: newStudent.name, email: newStudent.email, teacher_id: user.id })
-                .select();
-            if (error) throw error;
-            setUsersList(prev => (data?.[0] ? [data[0], ...prev] : prev));
+            // Cadastrar aluno = CONVITE + pré-aprovação (rota service-role). Antes era um INSERT
+            // direto em `students`, que deixava o aluno preso no wait-approval (is_approved=false).
+            // A rota cria a linha + um access_request pré-aprovado, então o aluno já entra pelo
+            // "primeiro acesso" (OTP por email) sem depender de aprovação do admin.
+            const authHeaders = await getAdminAuthHeaders();
+            const res = await fetch('/api/teacher/students/invite', {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json', ...authHeaders },
+                body: JSON.stringify({ email: newStudent.email, fullName: newStudent.name }),
+            });
+            const json = await res.json().catch(() => ({}));
+            if (!res.ok || !json?.ok) {
+                if (json?.upgrade_required) {
+                    await alert('Você atingiu o limite de alunos do seu plano. Faça upgrade para adicionar mais.', 'Limite do plano');
+                    return;
+                }
+                throw new Error(String(json?.message || json?.error || 'Falha ao cadastrar aluno.'));
+            }
+            if (json?.student) setUsersList(prev => [json.student, ...prev]);
             setShowRegisterModal(false);
             setNewStudent({ name: '', email: '' });
-            await alert('Aluno cadastrado com sucesso!', 'Sucesso');
+            await alert('Aluno cadastrado! Ele já pode fazer o primeiro acesso usando o email.', 'Sucesso');
         } catch (e: unknown) {
             const msg = e && typeof e === 'object' && 'message' in e && typeof (e as { message?: unknown }).message === 'string' ? (e as { message: string }).message : String(e);
-            // O trigger enforce_teacher_student_limit barra o professor no limite do
-            // plano (o INSERT direto do "+ Aluno" não passava por checagem nenhuma).
-            // Traduz o código cru numa mensagem com CTA de upgrade.
-            if (msg.includes('teacher_student_limit_reached')) {
-                await alert('Você atingiu o limite de alunos do seu plano. Faça upgrade para adicionar mais.', 'Limite do plano');
-            } else {
-                await alert('Erro ao cadastrar: ' + msg);
-            }
+            await alert('Erro ao cadastrar: ' + msg);
         } finally {
             setRegistering(false);
         }
