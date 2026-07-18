@@ -25,13 +25,21 @@ export default function ServiceWorkerRegister() {
   const [updating, setUpdating] = useState(false)
   const registrationRef = useRef<ServiceWorkerRegistration | null>(null)
   const refreshRef = useRef(false)
+  const controlledRef = useRef(false)
 
   useEffect(() => {
     try {
       if (!('serviceWorker' in navigator)) return
       if (isLocalhost()) return
+      controlledRef.current = Boolean(navigator.serviceWorker.controller)
 
       const onControllerChange = () => {
+        // The first controller claim is a normal fresh install, not an update.
+        // Reloading here caused Android users to see a blocking black overlay.
+        if (!controlledRef.current) {
+          controlledRef.current = true
+          return
+        }
         if (refreshRef.current) return
         refreshRef.current = true
         setUpdating(true)

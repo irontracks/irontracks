@@ -15,6 +15,8 @@
  *   node scripts/android-submit.mjs                                 # último AAB em build/outputs
  *   node scripts/android-submit.mjs --aab path/to/app-release.aab
  *   node scripts/android-submit.mjs --track production              # default: alpha
+ *   node scripts/android-submit.mjs --name "IronTracks 1.14.1 (13)"
+ *   node scripts/android-submit.mjs --notes "Notas em português"
  *   node scripts/android-submit.mjs --dry-run
  *
  * Setup obrigatório (uma vez):
@@ -47,12 +49,34 @@ const args = process.argv.slice(2)
 let dryRun = false
 let aabPath = null
 let track = 'alpha'
+let releaseName = ''
+let releaseNotes = ''
 
 for (let i = 0; i < args.length; i++) {
     const a = args[i]
     if (a === '--dry-run') dryRun = true
     else if (a === '--aab') aabPath = args[++i]
     else if (a === '--track') track = args[++i]
+    else if (a === '--name') releaseName = args[++i]
+    else if (a === '--notes') releaseNotes = args[++i]
+    else {
+        console.error(`❌ Argumento inválido: ${a}`)
+        process.exit(1)
+    }
+}
+
+const allowedTracks = new Set(['internal', 'alpha', 'beta', 'production'])
+if (!allowedTracks.has(track)) {
+    console.error(`❌ Track inválido: ${track}`)
+    process.exit(1)
+}
+if (track === 'production' && process.env.ANDROID_CONFIRM_PRODUCTION !== 'YES') {
+    console.error('❌ Produção exige ANDROID_CONFIRM_PRODUCTION=YES.')
+    process.exit(1)
+}
+if (releaseNotes.length > 500) {
+    console.error('❌ As notas da versão excedem 500 caracteres.')
+    process.exit(1)
 }
 
 if (!aabPath) {
@@ -80,6 +104,7 @@ console.log('Config:')
 console.log('  Package:', PACKAGE_NAME)
 console.log('  AAB    :', aabPath)
 console.log('  Track  :', track)
+console.log('  Name   :', releaseName || '(automático)')
 console.log('  SA     :', saJson.client_email)
 console.log('  Mode   :', dryRun ? 'DRY RUN' : 'LIVE SUBMIT')
 console.log('')
@@ -173,12 +198,16 @@ console.log(`  versionCode=${bundle.versionCode}, sha1=${bundle.sha1?.slice(0, 1
 
 // ─── 3. Atribuir ao track ───────────────────────────────────────────────────
 console.log(`→ Atribuindo versionCode ${bundle.versionCode} ao track '${track}'...`)
+const release = {
+    status: 'completed',
+    versionCodes: [String(bundle.versionCode)],
+}
+if (releaseName) release.name = releaseName
+if (releaseNotes) release.releaseNotes = [{ language: 'pt-BR', text: releaseNotes }]
+
 await api('PUT', `/applications/${PACKAGE_NAME}/edits/${editId}/tracks/${track}`, {
     track,
-    releases: [{
-        status: 'completed',
-        versionCodes: [String(bundle.versionCode)],
-    }],
+    releases: [release],
 })
 console.log('  ✅ Track atualizado')
 
