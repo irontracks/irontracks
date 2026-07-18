@@ -247,6 +247,24 @@ export default function StudentSubscriptionCard() {
   const { loading, subscription, teacher, charge, refetch } = useStudentSubscription()
   const [payOpen, setPayOpen] = useState(false)
   const [detailsOpen, setDetailsOpen] = useState(false)
+  const [cardLoading, setCardLoading] = useState(false)
+  const [cardError, setCardError] = useState<string | null>(null)
+
+  // Assinatura recorrente por CARTÃO: abre o checkout hospedado do MercadoPago (init_point).
+  const handleCard = useCallback(async () => {
+    if (!subscription) return
+    setCardLoading(true); setCardError(null)
+    try {
+      const res = await apiStudentBilling.subscribeCard(subscription.id)
+      if (!res.ok || !res.init_point) { setCardError(res.message || 'Não foi possível abrir o checkout do cartão.'); return }
+      const opened = window.open(res.init_point, '_blank', 'noopener,noreferrer')
+      if (!opened) window.location.href = res.init_point
+    } catch {
+      setCardError('Erro ao iniciar a assinatura por cartão. Tente novamente.')
+    } finally {
+      setCardLoading(false)
+    }
+  }, [subscription])
 
   if (loading) {
     return (
@@ -264,6 +282,7 @@ export default function StudentSubscriptionCard() {
   const plan = subscription.student_service_plans
   const teacherName = String(teacher?.full_name || teacher?.name || 'Seu professor')
   const canPay = ['pending', 'past_due'].includes(status)
+  const isRecurring = Boolean(plan?.billing_interval && plan.billing_interval !== 'once')
 
   return (
     <>
@@ -295,7 +314,18 @@ export default function StudentSubscriptionCard() {
                 onClick={() => setPayOpen(true)}
                 className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-yellow-500 hover:bg-yellow-400 text-black font-bold text-xs transition-colors"
               >
-                <QrCode size={12} /> Pagar
+                <QrCode size={12} /> PIX
+              </button>
+            )}
+            {canPay && isRecurring && (
+              <button
+                type="button"
+                onClick={() => void handleCard()}
+                disabled={cardLoading}
+                className="flex items-center gap-1.5 px-3 py-2 rounded-xl bg-neutral-800 hover:bg-neutral-700 text-white font-bold text-xs transition-colors disabled:opacity-50"
+                title="Assinar com cartão — cobra sozinho todo ciclo"
+              >
+                {cardLoading ? <Loader2 size={12} className="animate-spin" /> : <CreditCard size={12} />} Cartão
               </button>
             )}
             <button
@@ -353,6 +383,10 @@ export default function StudentSubscriptionCard() {
           </div>
         )}
       </div>
+
+      {cardError && (
+        <p className="mt-2 text-xs text-red-400 bg-red-500/10 border border-red-500/20 rounded-xl px-3 py-2">{cardError}</p>
+      )}
 
       {payOpen && subscription && (
         <PixPaymentModal
