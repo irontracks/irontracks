@@ -125,7 +125,16 @@ export async function shouldThrottleBySenderType(senderId: unknown, type: unknow
   return Array.isArray(data) && data.length > 0
 }
 
-export async function insertNotifications(rows: unknown): Promise<{ ok: boolean; inserted: number; error?: string }> {
+/**
+ * `opts.skipPush`: NÃO dispara o push daqui. Use quando o chamador já enviou o push por conta
+ * própria — tipicamente via sendPushToAllPlatforms (iOS + Android), enquanto o push daqui é
+ * APNs/iOS-only. Sem isso, o usuário de iPhone recebe a MESMA notificação duas vezes (foi o
+ * que acontecia no cron muscle-weekly-insights: "Resumo da semana 💪" duplicado).
+ */
+export async function insertNotifications(
+  rows: unknown,
+  opts?: { skipPush?: boolean },
+): Promise<{ ok: boolean; inserted: number; error?: string }> {
   const admin = createAdminClient()
   const rawRows = (Array.isArray(rows) ? rows : [])
     .filter((r) => r && typeof r === 'object')
@@ -225,6 +234,7 @@ export async function insertNotifications(rows: unknown): Promise<{ ok: boolean;
   // Fire-and-forget: send remote push to all recipient devices, grouped by notification type.
   // Grouping ensures each recipient hears the right message, not always the first row's title.
   // Fan-out is capped at PUSH_FAN_OUT_LIMIT to prevent Lambda timeouts on popular profiles.
+  if (opts?.skipPush) return { ok: true, inserted }
   try {
     const PUSH_FAN_OUT_LIMIT = 1000
 

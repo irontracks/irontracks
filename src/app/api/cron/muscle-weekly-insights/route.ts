@@ -102,11 +102,16 @@ export async function GET(req: Request) {
         title: 'Resumo da semana 💪',
         message: body,
         is_read: false,
+        // Mesmo deep-link do push: tocar na notificação DENTRO do app também abre o resumo.
+        link: `/dashboard/report/weekly?week=${weekStartDate}`,
         metadata: { week_start: weekStartDate, workouts: workoutsCount },
       })
     }
 
-    if (notifs.length) await insertNotifications(notifs)
+    // skipPush: o push já foi enviado acima por sendPushToAllPlatforms (iOS + Android, com
+    // link). O push do insertNotifications é APNs/iOS-only — sem este skip, o usuário de
+    // iPhone recebia a MESMA notificação duas vezes (e a 2ª sem o deep-link).
+    if (notifs.length) await insertNotifications(notifs, { skipPush: true })
     return NextResponse.json({ ok: true, weekStartDate, processed, pushed })
   } catch (e) {
     logError('cron:muscle-weekly-insights', e)
