@@ -760,27 +760,37 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
     // a partir do userId, então não precisamos do channelId aqui.
     useEffect(() => {
         const onPushNavigate = (e: Event) => {
-            const detail = (e as CustomEvent<{ type?: string; senderId?: string; senderName?: string }>).detail;
+            const detail = (e as CustomEvent<{ type?: string; link?: string; senderId?: string; senderName?: string }>).detail;
             // Aluno tocou no push "treino novo do professor" → leva pra lista de treinos
             // (view 'dashboard'). Sem este branch, o tap só navegaria se o app abrisse no
             // dashboard por default; com ele, funciona mesmo já aberto em outra view.
             if (detail?.type === 'workout_assigned') { setView('dashboard'); return; }
-            if (detail?.type !== 'message') return;
-            const senderId = String(detail?.senderId || '').trim();
-            if (!senderId) return;
-            const senderName = String(detail?.senderName || '').trim();
-            setDirectChat({
-                channelId: '',
-                userId: senderId,
-                displayName: senderName || undefined,
-                other_user_id: senderId,
-                other_user_name: senderName || undefined,
-            });
-            setView('directChat');
+            if (detail?.type === 'message') {
+                const senderId = String(detail?.senderId || '').trim();
+                if (!senderId) return;
+                const senderName = String(detail?.senderName || '').trim();
+                setDirectChat({
+                    channelId: '',
+                    userId: senderId,
+                    displayName: senderName || undefined,
+                    other_user_id: senderId,
+                    other_user_name: senderName || undefined,
+                });
+                setView('directChat');
+                return;
+            }
+            // Fallback genérico: QUALQUER push que carregue um `link` interno navega pro
+            // destino — ex.: "Resumo da semana 💪" (link /dashboard/report/weekly?week=...,
+            // que o pathnameToView vira a view 'weeklySummary'). Antes, todo type diferente
+            // de 'message' caía num `return` e o link era ignorado: a push só abria o app.
+            // Só aceita caminho INTERNO ('/x', nunca '//host') — o payload vem de fora e não
+            // pode virar open-redirect.
+            const link = String(detail?.link || '').trim();
+            if (link.startsWith('/') && !link.startsWith('//')) router.push(link);
         };
         window.addEventListener('irontracks:push:navigate', onPushNavigate);
         return () => window.removeEventListener('irontracks:push:navigate', onPushNavigate);
-    }, [setView]);
+    }, [setView, router]);
 
     useEffect(() => {
         if (!hideVipOnIos) return;
