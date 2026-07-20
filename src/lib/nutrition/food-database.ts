@@ -17,6 +17,10 @@ export const foodDatabase: Record<string, FoodItem> = {
   'peito de frango': { kcal: 165, p: 31, c: 0, f: 4, approx: { unidade: 100, bife: 120, posta: 120 } },
   'frango desfiado': { kcal: 165, p: 31, c: 0, f: 4, approx: { colher: 25, concha: 80 } },
   'carne moida': { kcal: 212, p: 26, c: 0, f: 11, approx: { colher: 25, concha: 80 } },
+  // Sinônimo de 'carne moida' (PT-PT, e usado no Brasil). Sem esta chave, "300g carne
+  // picada com molho" não casava a base curada e caía na estimativa da IA, que devolvia
+  // 76 g de gordura em 300 g — mais que o DOBRO dos 33 g corretos — e 938 kcal em vez de 636.
+  'carne picada': { kcal: 212, p: 26, c: 0, f: 11, approx: { colher: 25, concha: 80 } },
   'carne bovina': { kcal: 212, p: 26, c: 0, f: 11, approx: { bife: 120, posta: 120, colher: 30 } },
   'patinho': { kcal: 133, p: 27, c: 0, f: 3, approx: { bife: 120, posta: 120 } },
   'alcatra': { kcal: 177, p: 26, c: 0, f: 8, approx: { bife: 120, posta: 120 } },
@@ -63,6 +67,16 @@ export const foodDatabase: Record<string, FoodItem> = {
   'grao de bico': { kcal: 164, p: 9, c: 27, f: 2.6, approx: { colher: 25, concha: 80 } },
   'macarrao cozido': { kcal: 131, p: 5, c: 25, f: 1.1, approx: { prato: 200, colher: 40 } },
   'macarrao integral': { kcal: 124, p: 5, c: 26, f: 0.5, approx: { prato: 200 } },
+  // Chave GENÉRICA: cobre qualquer formato ("macarrão parafuso/penne/espaguete/..."), que
+  // antes não casava nada e ia pra IA (250 g viraram 299 kcal / 56 g C, ~25% abaixo do real).
+  // Como vence a MAIOR chave que casa na cabeça do nome, 'macarrao cozido' e
+  // 'macarrao integral' continuam ganhando desta quando o usuário for específico.
+  'macarrao': { kcal: 131, p: 5, c: 25, f: 1.1, approx: { prato: 200, colher: 40 } },
+  // Formatos escritos sem a palavra "macarrão" (ex.: "250g parafuso").
+  'parafuso': { kcal: 131, p: 5, c: 25, f: 1.1, approx: { prato: 200, colher: 40 } },
+  'espaguete': { kcal: 131, p: 5, c: 25, f: 1.1, approx: { prato: 200, colher: 40 } },
+  'penne': { kcal: 131, p: 5, c: 25, f: 1.1, approx: { prato: 200, colher: 40 } },
+  'talharim': { kcal: 131, p: 5, c: 25, f: 1.1, approx: { prato: 200, colher: 40 } },
   'pao frances': { kcal: 300, p: 8, c: 59, f: 3, approx: { unidade: 50 } },
   'pao integral': { kcal: 247, p: 10, c: 41, f: 4, approx: { fatia: 30 } },
   'pao de forma': { kcal: 253, p: 8, c: 47, f: 3, approx: { fatia: 25 } },
