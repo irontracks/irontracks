@@ -67,9 +67,15 @@ describe('B) chave curta não rouba palavra maior', () => {
     // 'maca' era substring de 'macarrao' → macarrão virava 78 kcal de maçã.
     const r = parse('macarrao')
     expect(r.kcal).not.toBe(78)
-    // Sem chave 'macarrao' sozinha na base, o honesto é não reconhecer: aí a cascata
-    // leva pro TACO/IA em vez de servir fruta.
-    expect(r.unknown).toEqual(['macarrao'])
+    // A base GANHOU a chave genérica 'macarrao' (131 kcal) — antes ela não existia e este
+    // teste fixava o "não reconhece, manda pra IA" como o comportamento honesto possível.
+    // Agora resolve local como massa, que é melhor: sem custo de IA e sem o erro que ela
+    // cometia nos formatos ("macarrão parafuso" virava 299 kcal em vez de 328). O que este
+    // teste protege — macarrão nunca ser MAÇÃ — segue valendo, e agora com valor curado.
+    expect(r.unknown).toEqual([])
+    // Sem quantidade, o parser usa a porção declarada: 'macarrao' tem prato = 200 g,
+    // logo 200 g × 131 kcal/100 g = 262 (e não uma maçã de 78).
+    expect(r.kcal).toBe(262)
   })
 
   it('"macarrao cozido" continua casando o macarrão', () => {
