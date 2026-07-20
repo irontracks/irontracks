@@ -22,7 +22,7 @@ const norm = (v: unknown): string =>
     .replace(/[̀-ͯ]/g, '')
     .trim()
 
-const CARDIO_NAME_RE = /cardio|corrida|caminh|esteira|escada|elipt|bike|bici|cicl|run/
+const CARDIO_NAME_RE = /cardio|corrida|caminh|esteira|escada|elipt|bike|bici|cicl|run|fitdance|fit dance|danc/
 
 export function isCardioExercise(ex: unknown): boolean {
   const e = isRecord(ex) ? ex : {}

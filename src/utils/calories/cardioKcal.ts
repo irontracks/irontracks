@@ -42,6 +42,7 @@ const CARDIO_MET_BASE: Record<string, number> = {
   'bike outdoor': 7.5,
   eliptico: 5.0,    // elliptical trainer, moderate
   escada: 8.0,      // stair-treadmill / stepper
+  fitdance: 7.3,    // aerobic dance class (Compendium: dance aerobic, general)
 }
 
 const DEFAULT_CARDIO_MET = 6.0
