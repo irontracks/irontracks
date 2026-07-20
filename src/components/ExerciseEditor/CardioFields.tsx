@@ -14,7 +14,7 @@ interface CardioFieldsProps {
     onUpdateSetDetail: (setIdx: number, patch: Partial<SetDetail>) => void
 }
 
-const CARDIO_OPTIONS = ['Escada', 'Esteira', 'Bicicleta', 'Bike Outdoor', 'Corrida', 'Caminhada', 'Elíptico']
+const CARDIO_OPTIONS = ['Escada', 'Esteira', 'Bicicleta', 'Bike Outdoor', 'Corrida', 'Caminhada', 'Elíptico', 'FitDance']
 
 export const CardioFields: React.FC<CardioFieldsProps> = ({
     exercise,
