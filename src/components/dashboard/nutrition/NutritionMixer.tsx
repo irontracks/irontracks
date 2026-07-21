@@ -269,6 +269,8 @@ export default function NutritionMixer({
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const [entriesTick, setEntriesTick] = useState(0)
   const [chatOpen, setChatOpen] = useState(false)
+  /** Gerador de dieta aberto dentro do card de refeição (antes era um card à parte). */
+  const [dietOpen, setDietOpen] = useState(false)
   // Offline REATIVO: isOffline() é lido no render e não re-renderiza sozinho quando
   // a rede cai. O chat depende do servidor, então o campo precisa sumir de verdade.
   const [chatOffline, setChatOffline] = useState(false)
@@ -312,6 +314,12 @@ export default function NutritionMixer({
   // que ainda não aconteceu. DateNavigator já trava navegação pro futuro, isso
   // aqui é só a segunda camada de defesa.
   const isFutureDate = currentDateKey > todayDate
+
+  // ── Ações de IA do card de refeição ──────────────────────────────────────
+  // Mesmos gates de antes, só nomeados: eram condições inline em dois lugares
+  // diferentes da tela e agora as duas ações moram no mesmo card.
+  const canChat = !!canViewMacros && isToday && !chatOffline
+  const canGenerateDiet = !!canViewMacros && isToday && safeGoals.calories > 0
 
   // ── Panel toggles ────────────────────────────────────────────────────────
   const [activePanel, setActivePanel] = useState<'none' | 'scanner' | 'library' | 'water'>('none')
@@ -836,32 +844,10 @@ export default function NutritionMixer({
         )}
       </Card>
 
-      {/* ══ PERGUNTAR — chat de nutrição ═════════════════════════════════ */}
-      {/* Logo abaixo do anel: é a pergunta que o usuário faz ANTES de comer, então
-          fica onde ele já está olhando o número do dia.
-          Três gates, cada um por um motivo:
-          - canViewMacros: é recurso Pro (mesma cota das outras 3 rotas de nutrição).
-          - isToday: a aba tem navegador de datas, e simular "agora" sobre um dia
-            fechado não faz sentido — o Lançar gravaria no passado sem avisar.
-          - !offline: o Mixer tem refeições otimistas (pending) que NÃO estão no
-            banco. O snapshot do servidor diria 1.200 kcal com o anel do lado
-            dizendo 1.900 — o chat contradiria a própria tela. */}
-      {canViewMacros && isToday && !chatOffline && (
-        <button
-          type="button"
-          onClick={() => setChatOpen(true)}
-          className="group flex w-full items-center gap-3 rounded-2xl border border-white/[0.08] bg-white/[0.03] px-4 py-3 text-left transition hover:border-yellow-500/30 active:scale-[0.99]"
-        >
-          <Sparkles size={16} className="shrink-0 text-yellow-500" />
-          <span className="min-w-0 flex-1 truncate text-sm text-neutral-400 transition group-hover:text-neutral-200">
-            Se eu comer 5 ovos agora, pra quanto vai?
-          </span>
-          <span className="shrink-0 rounded-lg bg-yellow-500/10 px-2 py-1 text-[10px] font-black uppercase tracking-wider text-yellow-500">
-            Perguntar
-          </span>
-        </button>
-      )}
-
+      {/* O gatilho do chat MUDOU de lugar: agora vive dentro do card "Adicionar
+          refeição", junto do "Gerar dieta". As três ações de comida (lançar,
+          perguntar, gerar) ficam num lugar só em vez de espalhadas pela tela.
+          A folha em si continua montada aqui, no nível de cima. */}
       <NutritionChat
         open={chatOpen}
         onClose={() => setChatOpen(false)}
@@ -992,15 +978,8 @@ export default function NutritionMixer({
         onApplied={() => setEntriesTick(v => v + 1)}
       />
 
-      {/* ══ DIET GENERATOR — memória nutricional ═════════════════════════ */}
-      {canViewMacros && safeGoals.calories > 0 && isToday && (
-        <DietGenerator
-          goals={safeGoals}
-          dateKey={currentDateKey}
-          hideVipCtas={hideVipCtas}
-          onApplied={() => setEntriesTick(v => v + 1)}
-        />
-      )}
+      {/* O gerador de dieta saiu daqui — virou uma ação dentro do card
+          "Adicionar refeição" (ver AÇÕES DE IA logo abaixo). */}
 
       {/* ══ MEAL INPUT ═══════════════════════════════════════════════════ */}
       {!isFutureDate && (
@@ -1137,6 +1116,59 @@ export default function NutritionMixer({
               </button>
             )}
           </div>
+
+          {/* ══ AÇÕES DE IA ═══════════════════════════════════════════════
+              "Perguntar" e "Gerar dieta" viviam soltos na tela — um acima dos
+              macros, outro num card próprio. Como os três são a mesma intenção
+              ("resolver a comida de agora"), moram juntos aqui embaixo do Lançar.
+              Gates preservados um a um:
+              - canViewMacros: recurso Pro (mesma cota das rotas de nutrição).
+              - isToday: a aba navega por datas; simular/gerar "agora" sobre um
+                dia fechado gravaria no passado sem avisar.
+              - !chatOffline: o Mixer tem refeições otimistas que ainda não estão
+                no banco — offline, o chat contradiria o anel da própria tela.
+              - goals.calories > 0: sem meta não há dieta a gerar. */}
+          {(canChat || canGenerateDiet) && (
+            <div className="mt-2 flex items-center gap-2">
+              {canChat && (
+                <button
+                  type="button"
+                  onClick={() => setChatOpen(true)}
+                  className="flex h-9 flex-1 items-center justify-center gap-1.5 rounded-xl border border-white/[0.08] bg-white/[0.03] text-xs font-semibold text-neutral-300 transition hover:border-yellow-500/30 hover:text-white active:scale-[0.98]"
+                >
+                  <Sparkles size={13} className="text-yellow-500" />
+                  Perguntar
+                </button>
+              )}
+              {canGenerateDiet && (
+                <button
+                  type="button"
+                  onClick={() => setDietOpen(v => !v)}
+                  aria-expanded={dietOpen}
+                  className={`flex h-9 flex-1 items-center justify-center gap-1.5 rounded-xl border text-xs font-semibold transition active:scale-[0.98] ${
+                    dietOpen
+                      ? 'border-yellow-500/30 bg-yellow-500/10 text-yellow-300'
+                      : 'border-white/[0.08] bg-white/[0.03] text-neutral-300 hover:border-yellow-500/30 hover:text-white'
+                  }`}
+                >
+                  <span aria-hidden="true">🍱</span>
+                  {dietOpen ? 'Fechar dieta' : 'Gerar dieta'}
+                </button>
+              )}
+            </div>
+          )}
+
+          {canGenerateDiet && dietOpen && (
+            <div className="mt-3 border-t border-white/[0.06] pt-3">
+              <DietGenerator
+                embedded
+                goals={safeGoals}
+                dateKey={currentDateKey}
+                hideVipCtas={hideVipCtas}
+                onApplied={() => setEntriesTick(v => v + 1)}
+              />
+            </div>
+          )}
 
           {/* Schema missing */}
           {schemaMissing && (
