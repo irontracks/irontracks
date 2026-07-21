@@ -212,6 +212,22 @@ export default function StoriesBar({
     return ordered.find((g) => g.authorId === openAuthorId) || null
   }, [ordered, openAuthorId, myId, myGroup])
   const closeViewer = useCallback(() => setOpen(false), [])
+
+  // Navegação entre USUÁRIOS (auto-advance estilo Instagram). Opera sobre `ordered` (a fila de
+  // amigos). Ver o próprio story (myGroup, aberto pelo header) não encadeia nos amigos: findIndex
+  // dá -1 → não avança → fecha. Retornam true se trocaram de usuário.
+  const goNextUser = useCallback((): boolean => {
+    const list = ordered
+    const i = list.findIndex((g) => g.authorId === openAuthorId)
+    if (i >= 0 && i + 1 < list.length) { setOpenAuthorId(list[i + 1].authorId); return true }
+    return false
+  }, [ordered, openAuthorId])
+  const goPrevUser = useCallback((): boolean => {
+    const list = ordered
+    const i = list.findIndex((g) => g.authorId === openAuthorId)
+    if (i > 0) { setOpenAuthorId(list[i - 1].authorId); return true }
+    return false
+  }, [ordered, openAuthorId])
   const handleStoryUpdated = useCallback(
     (storyId: string, patch: Partial<Story>) => {
       const authorId = openAuthorId
@@ -348,11 +364,14 @@ export default function StoriesBar({
 
       {open && currentGroup ? (
         <StoryViewer
+          key={currentGroup.authorId}
           group={currentGroup}
           myId={myId}
           onClose={closeViewer}
           onStoryUpdated={handleStoryUpdated}
           onStoryDeleted={handleStoryDeleted}
+          onNextUser={goNextUser}
+          onPrevUser={goPrevUser}
         />
       ) : null}
     </div>
