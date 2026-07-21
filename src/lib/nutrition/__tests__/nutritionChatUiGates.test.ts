@@ -18,7 +18,19 @@ const flat = mixer.replace(/\s+/g, ' ')
 
 describe('gates do campo de chat', () => {
   it('os três gates estão no mesmo lugar', () => {
-    expect(flat).toContain('{canViewMacros && isToday && !chatOffline && (')
+    // O gatilho do chat mudou de lugar (foi pra dentro do card "Adicionar refeição",
+    // junto do "Gerar dieta"), e os gates viraram uma constante nomeada em vez de
+    // uma condição inline. O invariante que importa é o mesmo: os TRÊS continuam
+    // juntos numa única expressão — ninguém pode cair sozinho num refactor.
+    expect(flat).toContain('const canChat = !!canViewMacros && isToday && !chatOffline')
+    // ...e é ela que decide se o botão aparece.
+    expect(flat).toContain('{canChat && (')
+  })
+
+  it('gerar dieta exige meta definida, além dos gates de Pro e dia atual', () => {
+    // Sem meta não há dieta a gerar; sem isToday, aplicar uma refeição gerada
+    // gravaria num dia fechado.
+    expect(flat).toContain('const canGenerateDiet = !!canViewMacros && isToday && safeGoals.calories > 0')
   })
 
   it('isToday: a aba tem navegador de datas — simular "agora" num dia fechado não faz sentido', () => {
