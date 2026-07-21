@@ -106,7 +106,13 @@ export async function GET(req: Request) {
       })
       .filter((s) => Boolean(s.id && s.author_id))
     const storyIds = stories.map((s) => s.id).filter(Boolean)
-    const mediaPaths = stories.map((s) => s.media_path).filter(Boolean)
+    // Só CAMINHOS de bucket vão pra assinatura. media_path pode ser uma URL ABSOLUTA do
+    // Cloudinary (stories novos), e assinar isso gera uma URL Supabase falsa
+    // (.../object/sign/social-stories/https://res.cloudinary.com/...) que dá 400 → mídia
+    // quebrada (tela preta com ícone de imagem quebrada). A rota de fallback media/ já tratava
+    // https:// direto; a list não. Reportado pelo dono (stories abrindo pretos).
+    const isAbsoluteUrl = (p: string) => /^https?:\/\//i.test(p)
+    const mediaPaths = stories.map((s) => s.media_path).filter((p) => Boolean(p) && !isAbsoluteUrl(p))
 
     const emptyResult = { data: [] as unknown[], error: null }
     const [viewsResult, likesResult, commentsResult, profilesResult, signedUrlsResult] = await Promise.all([
@@ -177,7 +183,11 @@ export async function GET(req: Request) {
         createdAt: s.created_at,
         expiresAt: s.expires_at,
         caption: s.caption ?? null,
-        mediaUrl: signedUrlByPath.get(s.media_path) ?? `/api/social/stories/media?storyId=${encodeURIComponent(String(s.id))}&signedSeconds=${encodeURIComponent(String(signedSeconds))}`,
+        // URL absoluta (Cloudinary CDN, público) vai direto; caminho de bucket usa a URL
+        // assinada; se por acaso faltar, cai no fallback media/ (que revalida o vínculo).
+        mediaUrl: isAbsoluteUrl(s.media_path)
+          ? s.media_path
+          : (signedUrlByPath.get(s.media_path) ?? `/api/social/stories/media?storyId=${encodeURIComponent(String(s.id))}&signedSeconds=${encodeURIComponent(String(signedSeconds))}`),
         mediaKind: mediaKindFromPath(s.media_path),
         viewed: viewedSet.has(s.id),
         likeCount: likeCountByStory.get(s.id) || 0,
