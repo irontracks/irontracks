@@ -108,8 +108,10 @@ const GroupMethodSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx
             {/* Row 1: número + inputs */}
             <div className="flex items-center gap-2">
               <div className="w-8 text-xs font-mono text-neutral-400 shrink-0">#{setIdx + 1}</div>
+              {/* Sem type="number": num WebView (locale != pt-BR) ele REJEITA a vírgula, então
+                  peso decimal (95,5) não entrava — "só números redondos". inputMode="decimal"
+                  já mostra o teclado certo e o valor fica como texto, igual ao normalSet. */}
               <input
-                type="number"
                 inputMode="decimal"
                 aria-label={`Peso em kg – série ${setIdx + 1}`}
                 value={weightValue}
@@ -118,7 +120,6 @@ const GroupMethodSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx
                 className="flex-1 min-w-0 bg-black/30 border border-neutral-700 rounded-xl px-3 py-2 text-[16px] text-white placeholder:text-neutral-400 outline-none focus:ring-1 ring-yellow-500"
               />
               <input
-                type="number"
                 inputMode="numeric"
                 aria-label={`Reps – série ${setIdx + 1}`}
                 value={repsValue}
@@ -127,7 +128,6 @@ const GroupMethodSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx
                 className="w-20 shrink-0 bg-black/30 border border-neutral-700 rounded-xl px-3 py-2 text-[16px] text-white placeholder:text-neutral-400 outline-none focus:ring-1 ring-yellow-500"
               />
               <input
-                type="number"
                 inputMode="decimal"
                 aria-label={`RPE – série ${setIdx + 1}`}
                 value={rpeValue}
