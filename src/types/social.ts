@@ -89,6 +89,7 @@ export type Story = {
   viewed: boolean
   likeCount: number
   hasLiked: boolean
+  myReaction?: string | null // emoji com que o próprio usuário reagiu (fixa o destaque no viewer)
   commentCount: number
 }
 

@@ -103,7 +103,8 @@ export default function StoryViewer({
   const [durationMs, setDurationMs] = useState(5000)
   const [muted, setMuted] = useState(true)
   const [videoError, setVideoError] = useState('')
-  const [reactedEmoji, setReactedEmoji] = useState<string | null>(null)
+  const [reactedEmoji, setReactedEmoji] = useState<string | null>(null) // "pop" temporário de confirmação
+  const [myReaction, setMyReaction] = useState<string | null>(null)     // reação PERSISTENTE do usuário (fixa)
   const [isReacting, setIsReacting] = useState(false)
   const [liking, setLiking] = useState(false)
   const [sendingComment, setSendingComment] = useState(false)
@@ -177,6 +178,13 @@ export default function StoryViewer({
     onStoryUpdated(storyId, { viewed: true })
     apiSocial.viewStory(storyId).catch(() => { })
   }, [storyId, storyViewed, onStoryUpdated])
+
+  // Reação persistente: inicializa com o emoji que o usuário já reagiu (vem da list como
+  // `myReaction`). Sem isto, o destaque começava vazio e sumia após 1,2s → "não fixava".
+  useEffect(() => {
+    const mine = String((storyObj?.myReaction as string) || '').trim()
+    setMyReaction(mine || null)
+  }, [storyId, storyObj?.myReaction])
 
   // Navegação e Timer
   const goNext = useCallback(() => {
@@ -689,7 +697,8 @@ export default function StoryViewer({
                   disabled={isReacting}
                   onClick={async () => {
                     setIsReacting(true)
-                    setReactedEmoji(emoji)
+                    setMyReaction(emoji)          // fixa a reação (persistente)
+                    setReactedEmoji(emoji)        // "pop" de confirmação
                     setTimeout(() => setReactedEmoji(null), 1200)
                     try {
                       await fetch('/api/social/stories/react', {
@@ -702,8 +711,8 @@ export default function StoryViewer({
                     }
                   }}
                   className={`w-10 h-10 rounded-xl flex items-center justify-center text-lg transition-all duration-200 active:scale-125 disabled:opacity-60 ${
-                    reactedEmoji === emoji ? 'scale-125 bg-yellow-500/20 border-yellow-500/50' : 'bg-neutral-900/80 hover:bg-neutral-800/80 border-neutral-800'
-                  } border`}
+                    myReaction === emoji ? 'bg-yellow-500/20 border-yellow-500/60' : 'bg-neutral-900/80 hover:bg-neutral-800/80 border-neutral-800'
+                  } ${reactedEmoji === emoji ? 'scale-125' : ''} border`}
                 >
                   {emoji}
                 </button>
