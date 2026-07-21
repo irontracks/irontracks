@@ -70,6 +70,10 @@ interface StoryViewerProps {
   onClose: () => void
   onStoryUpdated: (storyId: string, patch: Partial<Story>) => void
   onStoryDeleted: (storyId: string) => void
+  /** Pula pro PRÓXIMO usuário (estilo Instagram). Retorna true se avançou; false se era o último. */
+  onNextUser?: () => boolean
+  /** Volta pro usuário ANTERIOR. Retorna true se voltou; false se era o primeiro. */
+  onPrevUser?: () => boolean
 }
 
 export default function StoryViewer({
@@ -78,6 +82,8 @@ export default function StoryViewer({
   onClose,
   onStoryUpdated,
   onStoryDeleted,
+  onNextUser,
+  onPrevUser,
 }: StoryViewerProps) {
   const { confirm, alert } = useDialog()
   const stories = useMemo(() => (Array.isArray(group.stories) ? group.stories : []), [group.stories])
@@ -183,7 +189,11 @@ export default function StoryViewer({
     setIdx((v) => {
       const nextIdx = v + 1
       if (nextIdx >= stories.length) {
-        if (!closeRequestedRef.current) {
+        // Fim dos stories DESTE usuário → tenta pular pro próximo usuário (estilo Instagram).
+        // Só fecha se não houver próximo. O onNextUser troca o grupo no pai (StoriesBar) e o
+        // key={authorId} remonta o viewer do zero (idx=0, timers resetados).
+        const advanced = onNextUser ? onNextUser() : false
+        if (!advanced && !closeRequestedRef.current) {
           closeRequestedRef.current = true
           setTimeout(() => onClose(), 0)
         }
@@ -191,7 +201,15 @@ export default function StoryViewer({
       }
       return nextIdx
     })
-  }, [onClose, stories.length])
+  }, [onClose, stories.length, onNextUser])
+
+  // Tap na borda ESQUERDA no primeiro story → volta pro usuário anterior (se houver).
+  const goPrev = useCallback(() => {
+    setIdx((v) => {
+      if (v <= 0) { onPrevUser?.(); return 0 }
+      return v - 1
+    })
+  }, [onPrevUser])
 
   useEffect(() => {
     elapsedRef.current = 0
@@ -647,8 +665,8 @@ export default function StoryViewer({
         </div>
 
         {/* Áreas de Toque para Navegação */}
-        <button className="absolute left-0 top-20 bottom-20 w-1/3 z-10" onClick={() => setIdx((v) => Math.max(0, v - 1))} aria-label="Anterior" />
-        <button className="absolute right-0 top-20 bottom-20 w-1/3 z-10" onClick={() => setIdx((v) => Math.min(stories.length - 1, v + 1))} aria-label="Próximo" />
+        <button className="absolute left-0 top-20 bottom-20 w-1/3 z-10" onClick={goPrev} aria-label="Anterior" />
+        <button className="absolute right-0 top-20 bottom-20 w-1/3 z-10" onClick={goNext} aria-label="Próximo" />
 
         {/* Footer / Controles */}
         <div className="absolute bottom-0 left-0 right-0 p-3 z-20 bg-gradient-to-t from-black/90 to-transparent pt-12">
