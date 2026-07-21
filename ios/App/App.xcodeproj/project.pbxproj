@@ -10,6 +10,9 @@
 		0E3A2E8BFA31635F597666E4 /* WatchSessionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 7C803BD5DF1345C17D4FDE6B /* WatchSessionManager.swift */; };
 		17D0776378C2E91F24C7CE68 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = E1BBCDEF1E0C97D84674225C /* PrivacyInfo.xcprivacy */; };
 		2FAD9763203C412B000D30F8 /* config.xml in Resources */ = {isa = PBXBuildFile; fileRef = 2FAD9762203C412B000D30F8 /* config.xml */; };
+		32EAC29DF61A11F1D019CC0B /* IronTracksWatchComplicationsBundle.swift in Sources */ = {isa = PBXBuildFile; fileRef = 78CAC7B6D88C5B7EEB45EAC1 /* IronTracksWatchComplicationsBundle.swift */; };
+		3A3BBD3275C2638FD806D2B9 /* SharedModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4F5306B577DAB4CF49320B7 /* SharedModels.swift */; };
+		40614440A8AF0DCE301AB40A /* IronTracksWatchComplications.appex in Embed Foundation Extensions */ = {isa = PBXBuildFile; fileRef = 771497BA3CBCC94CBD5F0242 /* IronTracksWatchComplications.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		4611E554830F2929AAD10280 /* WorkoutView.swift in Sources */ = {isa = PBXBuildFile; fileRef = D63264B20D182409F2E8EB56 /* WorkoutView.swift */; };
 		4D22ABE92AF431CB00220026 /* CapApp-SPM in Frameworks */ = {isa = PBXBuildFile; productRef = 4D22ABE82AF431CB00220026 /* CapApp-SPM */; };
 		50379B232058CBB4000EE86E /* capacitor.config.json in Resources */ = {isa = PBXBuildFile; fileRef = 50379B222058CBB4000EE86E /* capacitor.config.json */; };
@@ -19,21 +22,27 @@
 		504EC3121FED79650016851F /* LaunchScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = 504EC3101FED79650016851F /* LaunchScreen.storyboard */; };
 		50B271D11FEDC1A000F3C39B /* public in Resources */ = {isa = PBXBuildFile; fileRef = 50B271D01FEDC1A000F3C39B /* public */; };
 		5B63F25EF52AEA122973D9A7 /* IronTracksWatchApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = 01C8FC5B5A5672EB03203531 /* IronTracksWatchApp.swift */; };
+		5EA5E4339E80CAB8DEEAF0C0 /* NextWorkoutComplication.swift in Sources */ = {isa = PBXBuildFile; fileRef = BC9164CA242CEDA481209F86 /* NextWorkoutComplication.swift */; };
 		64F5E12B0FBE761409E7EC1F /* CardioView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1F288244F20E4B78628ECA5D /* CardioView.swift */; };
 		6B3C2121D43C56CA1ABE69E0 /* LocationManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 264F376959AF0EBA63259D0B /* LocationManager.swift */; };
 		753309CCBBFBBC9322856D0C /* DashboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = E3B78FD61B78C679FF19A936 /* DashboardView.swift */; };
 		79EB81F8ECC1D945D3D265C9 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 1A1FFB92F9B0F2046BD57710 /* Assets.xcassets */; };
 		93D071EABBCB7F8D6387AC40 /* SharedModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = D4F5306B577DAB4CF49320B7 /* SharedModels.swift */; };
+		97ADEBF4B976664254AD2251 /* StreakComplication.swift in Sources */ = {isa = PBXBuildFile; fileRef = 26409AC7FC8825971456B513 /* StreakComplication.swift */; };
 		9B57602656A90ACA6219A635 /* CardioOfflineQueue.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDBFBE6F9F3F728AA2C5781E /* CardioOfflineQueue.swift */; };
+		A0BFD09F8E01FD10ECF2AA5B /* WatchSharedStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FAEA38D348DCD70A6720E4F /* WatchSharedStore.swift */; };
+		A5BFD27A508AB6CD95F6CCC0 /* WorkoutInputFormat.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3E93657280CE53BF0A04C5B0 /* WorkoutInputFormat.swift */; };
 		A7545205D811F9E6EB5A4752 /* ContentView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 408E411FFC584A108ABE64E6 /* ContentView.swift */; };
 		AAAA0002AAAA0002AAAA0002 /* IronTracksNativePlugin.swift in Sources */ = {isa = PBXBuildFile; fileRef = AAAA0001AAAA0001AAAA0001 /* IronTracksNativePlugin.swift */; };
 		B588F44A4347B5C1BEB44831 /* IronTracksWatch Watch App.app in Embed Watch Content */ = {isa = PBXBuildFile; fileRef = ED8BD25E5B0958E7A3CD3698 /* IronTracksWatch Watch App.app */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		BB1C08C7B06F81EC6C61A1EB /* CheckinView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1774FDD63F12185176BB635F /* CheckinView.swift */; };
 		BBBB0001BBBB0001BBBB0001 /* SceneDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = BBBB0002BBBB0002BBBB0002 /* SceneDelegate.swift */; };
 		C1E9220281BF27A05CD2915D /* rest_alarm.wav in Resources */ = {isa = PBXBuildFile; fileRef = C02BF2E4C79C7C4727E02F34 /* rest_alarm.wav */; };
+		C34CF77DFD4F1BA2CB691FE5 /* RestTimerEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 5BF704B63F2B1697167614F5 /* RestTimerEngine.swift */; };
 		D020BD329DFEB2BBCC69AE7A /* VipGatePaywallView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 651BC0018D7F1DC7967BB96D /* VipGatePaywallView.swift */; };
 		E335CEEE42B6C9C7223A91E6 /* WatchBridge.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3B30C6B0FBC688E04227E7D4 /* WatchBridge.swift */; };
 		E445517AABE3AE7D00E1F373 /* HealthKitManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = DDBD28EEA1B02677FB2632AB /* HealthKitManager.swift */; };
+		F5154C927A750EA1C00B3A12 /* WatchSharedStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 8FAEA38D348DCD70A6720E4F /* WatchSharedStore.swift */; };
 		NS005NS005NS005NS005 /* NotificationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = NS001NS001NS001NS001 /* NotificationService.swift */; };
 		NS006NS006NS006NS006 /* NotificationService.appex in Embed App Extensions */ = {isa = PBXBuildFile; fileRef = NS002NS002NS002NS002 /* NotificationService.appex */; settings = {ATTRIBUTES = (RemoveHeadersOnCopy, ); }; };
 		SC01SC01SC01SC01SC01SC01 /* Sentry in Frameworks */ = {isa = PBXBuildFile; productRef = SC02SC02SC02SC02SC02SC02 /* Sentry */; };
@@ -47,6 +56,13 @@
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
+		689ED25559A7657AA9FF049C /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 504EC2FC1FED79650016851F /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 641F3857C46B1A47A39159A9;
+			remoteInfo = IronTracksWatchComplications;
+		};
 		FEFE8544253E9EF20011E319 /* PBXContainerItemProxy */ = {
 			isa = PBXContainerItemProxy;
 			containerPortal = 504EC2FC1FED79650016851F /* Project object */;
@@ -71,6 +87,17 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXCopyFilesBuildPhase section */
+		02F4B4769ACEA7509D2DCEA4 /* Embed Foundation Extensions */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = "";
+			dstSubfolderSpec = 13;
+			files = (
+				40614440A8AF0DCE301AB40A /* IronTracksWatchComplications.appex in Embed Foundation Extensions */,
+			);
+			name = "Embed Foundation Extensions";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		E403C7AFEBEC2B37171079AC /* Embed Watch Content */ = {
 			isa = PBXCopyFilesBuildPhase;
 			buildActionMask = 2147483647;
@@ -101,9 +128,11 @@
 		1774FDD63F12185176BB635F /* CheckinView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CheckinView.swift; sourceTree = "<group>"; };
 		1A1FFB92F9B0F2046BD57710 /* Assets.xcassets */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		1F288244F20E4B78628ECA5D /* CardioView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = CardioView.swift; sourceTree = "<group>"; };
+		26409AC7FC8825971456B513 /* StreakComplication.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = StreakComplication.swift; sourceTree = "<group>"; };
 		264F376959AF0EBA63259D0B /* LocationManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = LocationManager.swift; sourceTree = "<group>"; };
 		2FAD9762203C412B000D30F8 /* config.xml */ = {isa = PBXFileReference; lastKnownFileType = text.xml; path = config.xml; sourceTree = "<group>"; };
 		3B30C6B0FBC688E04227E7D4 /* WatchBridge.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WatchBridge.swift; sourceTree = "<group>"; };
+		3E93657280CE53BF0A04C5B0 /* WorkoutInputFormat.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WorkoutInputFormat.swift; sourceTree = "<group>"; };
 		408E411FFC584A108ABE64E6 /* ContentView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = ContentView.swift; sourceTree = "<group>"; };
 		45C7B568677AE56DA12C6742 /* IronTracksWatch.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = IronTracksWatch.entitlements; sourceTree = "<group>"; };
 		50379B222058CBB4000EE86E /* capacitor.config.json */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.json; path = capacitor.config.json; sourceTree = "<group>"; };
@@ -114,13 +143,19 @@
 		504EC3111FED79650016851F /* Base */ = {isa = PBXFileReference; lastKnownFileType = file.storyboard; name = Base; path = Base.lproj/LaunchScreen.storyboard; sourceTree = "<group>"; };
 		504EC3131FED79650016851F /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
 		50B271D01FEDC1A000F3C39B /* public */ = {isa = PBXFileReference; lastKnownFileType = folder; path = public; sourceTree = "<group>"; };
+		5BF704B63F2B1697167614F5 /* RestTimerEngine.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = RestTimerEngine.swift; sourceTree = "<group>"; };
 		651BC0018D7F1DC7967BB96D /* VipGatePaywallView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = VipGatePaywallView.swift; sourceTree = "<group>"; };
 		6BC87479BFFEE552E74E8F4E /* NotificationService.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = NotificationService.entitlements; sourceTree = "<group>"; };
+		771497BA3CBCC94CBD5F0242 /* IronTracksWatchComplications.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; lastKnownFileType = "wrapper.app-extension"; path = IronTracksWatchComplications.appex; sourceTree = BUILT_PRODUCTS_DIR; };
+		78CAC7B6D88C5B7EEB45EAC1 /* IronTracksWatchComplicationsBundle.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = IronTracksWatchComplicationsBundle.swift; sourceTree = "<group>"; };
 		7C803BD5DF1345C17D4FDE6B /* WatchSessionManager.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WatchSessionManager.swift; sourceTree = "<group>"; };
+		8C6F79E7B311EB469877541B /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		8FAEA38D348DCD70A6720E4F /* WatchSharedStore.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WatchSharedStore.swift; sourceTree = "<group>"; };
 		958DCC722DB07C7200EA8C5F /* debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; name = debug.xcconfig; path = ../debug.xcconfig; sourceTree = SOURCE_ROOT; };
 		AAAA0001AAAA0001AAAA0001 /* IronTracksNativePlugin.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = IronTracksNativePlugin.swift; sourceTree = "<group>"; };
 		AAAA0007AAAA0007AAAA0007 /* App.entitlements */ = {isa = PBXFileReference; lastKnownFileType = text.plist.entitlements; path = App.entitlements; sourceTree = "<group>"; };
 		BBBB0002BBBB0002BBBB0002 /* SceneDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = SceneDelegate.swift; sourceTree = "<group>"; };
+		BC9164CA242CEDA481209F86 /* NextWorkoutComplication.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = NextWorkoutComplication.swift; sourceTree = "<group>"; };
 		C02BF2E4C79C7C4727E02F34 /* rest_alarm.wav */ = {isa = PBXFileReference; includeInIndex = 1; path = rest_alarm.wav; sourceTree = "<group>"; };
 		D4F5306B577DAB4CF49320B7 /* SharedModels.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = SharedModels.swift; sourceTree = "<group>"; };
 		D63264B20D182409F2E8EB56 /* WorkoutView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = WorkoutView.swift; sourceTree = "<group>"; };
@@ -130,6 +165,7 @@
 		E3B78FD61B78C679FF19A936 /* DashboardView.swift */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = sourcecode.swift; path = DashboardView.swift; sourceTree = "<group>"; };
 		ED8BD25E5B0958E7A3CD3698 /* IronTracksWatch Watch App.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; lastKnownFileType = wrapper.application; path = "IronTracksWatch Watch App.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		F4A8B59B29604065B36C6721 /* Info.plist */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
+		FCD58FF01044EC47E2718074 /* IronTracksWatchComplications.entitlements */ = {isa = PBXFileReference; includeInIndex = 1; lastKnownFileType = text.plist.entitlements; path = IronTracksWatchComplications.entitlements; sourceTree = "<group>"; };
 		NS001NS001NS001NS001 /* NotificationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = NotificationService.swift; sourceTree = "<group>"; };
 		NS002NS002NS002NS002 /* NotificationService.appex */ = {isa = PBXFileReference; explicitFileType = "wrapper.app-extension"; includeInIndex = 0; path = NotificationService.appex; sourceTree = BUILT_PRODUCTS_DIR; };
 		NS003NS003NS003NS003 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; path = Info.plist; sourceTree = "<group>"; };
@@ -149,6 +185,13 @@
 			files = (
 				4D22ABE92AF431CB00220026 /* CapApp-SPM in Frameworks */,
 				SC01SC01SC01SC01SC01SC01 /* Sentry in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		86D1F28087512B147A278624 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -201,6 +244,7 @@
 				NS004NS004NS004NS004 /* NotificationService */,
 				504EC3051FED79650016851F /* Products */,
 				3480BFA2699EC43B86592820 /* IronTracksWatch Watch App */,
+				6E5A328548C89657C16FADC2 /* IronTracksWatchComplications */,
 			);
 			sourceTree = "<group>";
 		};
@@ -211,6 +255,7 @@
 				W002W002W002W002 /* IronTracksWidgets.appex */,
 				NS002NS002NS002NS002 /* NotificationService.appex */,
 				ED8BD25E5B0958E7A3CD3698 /* IronTracksWatch Watch App.app */,
+				771497BA3CBCC94CBD5F0242 /* IronTracksWatchComplications.appex */,
 			);
 			name = Products;
 			sourceTree = "<group>";
@@ -250,11 +295,26 @@
 			path = Views;
 			sourceTree = "<group>";
 		};
+		6E5A328548C89657C16FADC2 /* IronTracksWatchComplications */ = {
+			isa = PBXGroup;
+			children = (
+				78CAC7B6D88C5B7EEB45EAC1 /* IronTracksWatchComplicationsBundle.swift */,
+				BC9164CA242CEDA481209F86 /* NextWorkoutComplication.swift */,
+				26409AC7FC8825971456B513 /* StreakComplication.swift */,
+				8C6F79E7B311EB469877541B /* Info.plist */,
+				FCD58FF01044EC47E2718074 /* IronTracksWatchComplications.entitlements */,
+			);
+			name = IronTracksWatchComplications;
+			path = IronTracksWatchComplications;
+			sourceTree = "<group>";
+		};
 		9CD5C45CA4628CB33965C540 /* Models */ = {
 			isa = PBXGroup;
 			children = (
 				D4F5306B577DAB4CF49320B7 /* SharedModels.swift */,
 				7C803BD5DF1345C17D4FDE6B /* WatchSessionManager.swift */,
+				8FAEA38D348DCD70A6720E4F /* WatchSharedStore.swift */,
+				3E93657280CE53BF0A04C5B0 /* WorkoutInputFormat.swift */,
 			);
 			name = Models;
 			path = Models;
@@ -266,6 +326,7 @@
 				DDBD28EEA1B02677FB2632AB /* HealthKitManager.swift */,
 				264F376959AF0EBA63259D0B /* LocationManager.swift */,
 				DDBFBE6F9F3F728AA2C5781E /* CardioOfflineQueue.swift */,
+				5BF704B63F2B1697167614F5 /* RestTimerEngine.swift */,
 			);
 			name = Services;
 			path = Services;
@@ -322,6 +383,23 @@
 			productReference = 504EC3041FED79650016851F /* App.app */;
 			productType = "com.apple.product-type.application";
 		};
+		641F3857C46B1A47A39159A9 /* IronTracksWatchComplications */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = D8C18DAABA58AFF688D606FF /* Build configuration list for PBXNativeTarget "IronTracksWatchComplications" */;
+			buildPhases = (
+				54FFC180D3D1B55371823AB6 /* Sources */,
+				86D1F28087512B147A278624 /* Frameworks */,
+				BF2D482EC2A0F156024F2F15 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = IronTracksWatchComplications;
+			productName = IronTracksWatchComplications;
+			productReference = 771497BA3CBCC94CBD5F0242 /* IronTracksWatchComplications.appex */;
+			productType = "com.apple.product-type.app-extension";
+		};
 		8440180D3C2189B976C0FFF0 /* IronTracksWatch Watch App */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 54C7208C5C7B4CF637A41451 /* Build configuration list for PBXNativeTarget "IronTracksWatch Watch App" */;
@@ -329,10 +407,12 @@
 				F6AACF84CD1F9736D2D526CD /* Sources */,
 				E91DF4E1CD1CA06C92031CF1 /* Frameworks */,
 				003515FB7014763DA424745A /* Resources */,
+				02F4B4769ACEA7509D2DCEA4 /* Embed Foundation Extensions */,
 			);
 			buildRules = (
 			);
 			dependencies = (
+				492EA23A27ADA18B985EC783 /* PBXTargetDependency */,
 			);
 			name = "IronTracksWatch Watch App";
 			productName = "IronTracksWatch Watch App";
@@ -440,6 +520,7 @@
 				W001W001W001W001 /* IronTracksWidgets */,
 				NS010NS010NS010NS010 /* NotificationService */,
 				8440180D3C2189B976C0FFF0 /* IronTracksWatch Watch App */,
+				641F3857C46B1A47A39159A9 /* IronTracksWatchComplications */,
 			);
 		};
 /* End PBXProject section */
@@ -465,6 +546,13 @@
 				504EC30D1FED79650016851F /* Main.storyboard in Resources */,
 				2FAD9763203C412B000D30F8 /* config.xml in Resources */,
 				C1E9220281BF27A05CD2915D /* rest_alarm.wav in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BF2D482EC2A0F156024F2F15 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -498,6 +586,18 @@
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
+		54FFC180D3D1B55371823AB6 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				32EAC29DF61A11F1D019CC0B /* IronTracksWatchComplicationsBundle.swift in Sources */,
+				5EA5E4339E80CAB8DEEAF0C0 /* NextWorkoutComplication.swift in Sources */,
+				97ADEBF4B976664254AD2251 /* StreakComplication.swift in Sources */,
+				3A3BBD3275C2638FD806D2B9 /* SharedModels.swift in Sources */,
+				A0BFD09F8E01FD10ECF2AA5B /* WatchSharedStore.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		F6AACF84CD1F9736D2D526CD /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -514,6 +614,9 @@
 				4611E554830F2929AAD10280 /* WorkoutView.swift in Sources */,
 				D020BD329DFEB2BBCC69AE7A /* VipGatePaywallView.swift in Sources */,
 				9B57602656A90ACA6219A635 /* CardioOfflineQueue.swift in Sources */,
+				F5154C927A750EA1C00B3A12 /* WatchSharedStore.swift in Sources */,
+				C34CF77DFD4F1BA2CB691FE5 /* RestTimerEngine.swift in Sources */,
+				A5BFD27A508AB6CD95F6CCC0 /* WorkoutInputFormat.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -544,6 +647,12 @@
 			name = "IronTracksWatch Watch App";
 			target = 8440180D3C2189B976C0FFF0 /* IronTracksWatch Watch App */;
 			targetProxy = FEFE8544253E9EF20011E319 /* PBXContainerItemProxy */;
+		};
+		492EA23A27ADA18B985EC783 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			name = IronTracksWatchComplications;
+			target = 641F3857C46B1A47A39159A9 /* IronTracksWatchComplications */;
+			targetProxy = 689ED25559A7657AA9FF049C /* PBXContainerItemProxy */;
 		};
 		NS011NS011NS011NS011 /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
@@ -792,6 +901,35 @@
 			};
 			name = Release;
 		};
+		955C94C922384F169D725FC9 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = NO;
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = IronTracksWatchComplications/IronTracksWatchComplications.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 67;
+				DEVELOPMENT_TEAM = 5XLC55D3YR;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = IronTracksWatchComplications/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.15;
+				PRODUCT_BUNDLE_IDENTIFIER = com.irontracks.app.watchkitapp.complications;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				WATCHOS_DEPLOYMENT_TARGET = 9.0;
+			};
+			name = Debug;
+		};
 		9F3F82D8A8C2C94AB14CDA9E /* Release */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
@@ -831,6 +969,36 @@
 				SKIP_INSTALL = YES;
 				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_OPTIMIZATION_LEVEL = "-O";
+				SWIFT_VERSION = 5.0;
+				TARGETED_DEVICE_FAMILY = 4;
+				VALIDATE_PRODUCT = YES;
+				WATCHOS_DEPLOYMENT_TARGET = 9.0;
+			};
+			name = Release;
+		};
+		E73DA0C953BA9BA7C3B72090 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_EMBED_SWIFT_STANDARD_LIBRARIES = NO;
+				APPLICATION_EXTENSION_API_ONLY = YES;
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = IronTracksWatchComplications/IronTracksWatchComplications.entitlements;
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 67;
+				DEVELOPMENT_TEAM = 5XLC55D3YR;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = IronTracksWatchComplications/Info.plist;
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/Frameworks",
+					"@executable_path/../../Frameworks",
+				);
+				MARKETING_VERSION = 1.15;
+				PRODUCT_BUNDLE_IDENTIFIER = com.irontracks.app.watchkitapp.complications;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SDKROOT = watchos;
+				SKIP_INSTALL = YES;
 				SWIFT_VERSION = 5.0;
 				TARGETED_DEVICE_FAMILY = 4;
 				VALIDATE_PRODUCT = YES;
@@ -966,6 +1134,15 @@
 			buildConfigurations = (
 				9F3F82D8A8C2C94AB14CDA9E /* Release */,
 				4716C7DCDA51B2A3EF6B6B78 /* Debug */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		D8C18DAABA58AFF688D606FF /* Build configuration list for PBXNativeTarget "IronTracksWatchComplications" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				E73DA0C953BA9BA7C3B72090 /* Release */,
+				955C94C922384F169D725FC9 /* Debug */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Release;

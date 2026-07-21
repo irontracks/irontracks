@@ -119,27 +119,68 @@ xcodebuild -workspace App.xcodeproj/project.xcworkspace -scheme App \
 - `scripts/add-watch-bridge-file.rb` — adiciona `WatchBridge.swift` ao target App (já rodado)
 - `scripts/toggle-watch-assets.rb` — habilita/desabilita asset catalog (debug do actool)
 
+## Complications (watch face)
+
+Extensão WidgetKit separada em **`ios/App/IronTracksWatchComplications/`**, embutida no
+Watch App (`PlugIns/`). Duas complications:
+
+| Complication | Famílias | Mostra |
+|---|---|---|
+| **Ofensiva** | circular, canto, inline | dias seguidos + anel da meta semanal |
+| **Treino de hoje** | retangular, inline | nome do treino, nº de exercícios, semana |
+
+**Como os dados chegam lá:** app e extensão são processos separados — a ponte é o App
+Group `group.com.irontracks.shared`. `WatchSessionManager` grava um
+`WatchComplicationSnapshot` via `WatchSharedStore` a cada sync e chama
+`reloadAllTimelines()`. O store **ignora escritas sem mudança de conteúdo**: o watchOS dá
+um orçamento diário de reloads por complication e queimá-lo faz a face congelar no fim do
+dia.
+
+**Toque na complication** abre o app já na aba certa (`irontracks://watch/<aba>`,
+tratado no `onOpenURL` do `ContentView`).
+
+Recriar/atualizar o target: `ruby scripts/add-watch-complications-target.rb` (idempotente).
+
+## Timer de descanso
+
+`Services/RestTimerEngine.swift`. A fonte da verdade é uma **data de término**, não um
+contador — o tempo é sempre derivado do relógio, então não desvia quando o app sai de
+foreground (pulso abaixado, Always-On, troca de app). A UI usa `TimelineView`, que
+continua redesenhando em Always-On. Avisos: háptico a cada segundo nos últimos 3,
+háptico forte no fim, e uma notificação local como rede de segurança caso o app tenha
+sido suspenso.
+
+## Versionamento
+
+Os `Info.plist` do Watch App e da extensão usam `$(MARKETING_VERSION)` e
+`$(CURRENT_PROJECT_VERSION)` — as versões acompanham o app iOS automaticamente.
+(Antes estavam *hardcoded* em 1.9/36 enquanto o app já ia em 1.15/67, e o bump do
+`ios:release` nunca as alcançava.)
+
 ## Estado atual da entrega
 
-✅ Código Swift completo (10 arquivos, zero typecheck errors)
-✅ Target configurado no pbxproj (bundle, build settings, embed phase, dependency)
+✅ Watch App + extensão de Complications compilando e empacotando
+   (`App.app/Watch/…/PlugIns/IronTracksWatchComplications.appex`)
+✅ Target no pbxproj (bundle, build settings, embed phase, dependency)
 ✅ WatchConnectivity bridge no iPhone (com NotificationCenter relay)
-✅ Métodos Capacitor JS expostos
-✅ Hook React + WatchSyncProvider integrável
+✅ `WatchSyncProvider` montado em `DashboardProviders` + endpoint `log-set-from-watch`
+✅ Digital Crown pra carga/reps, encerramento explícito do treino, rótulos de acessibilidade
 
-⚠️ **Build full bloqueado por bug do CoreSimulator**: o runtime watchOS 26.4 falha em registrar via CLI (`xcodebuild -downloadPlatform watchOS` retorna "Duplicate" em loop). Solução: instalar via Xcode → Settings → Components UI manualmente.
+⚠️ **Capability HealthKit**: precisa estar habilitada no developer portal pro bundle
+`com.irontracks.app.watchkitapp` (e o App Group pro `.complications`) pra assinar o archive.
 
-⚠️ **Capability HealthKit pendente**: precisa ser habilitada no developer portal pro bundle `com.irontracks.app.watchkitapp` antes do archive funcionar com signing.
+### Build
 
-## Próximos passos manuais (5 min)
+```bash
+# Watch App isolado (sem assinar)
+cd ios/App && xcodebuild build -project App.xcodeproj \
+  -scheme "IronTracksWatch Watch App" -destination 'generic/platform=watchOS' \
+  CODE_SIGNING_ALLOWED=NO
 
-1. **Instalar runtime watchOS 26.4**: Abrir Xcode → ⌘, → Components → watchOS 26.4 → Get
-2. **Habilitar HealthKit** no developer.apple.com:
-   - Identifiers → adicionar `com.irontracks.app.watchkitapp` se não existir
-   - Marcar HealthKit (e HealthKit Background Delivery se quiser FC continuous)
-3. Rodar `npm run cap:open` e dar Play no scheme "IronTracksWatch Watch App" no simulador
-4. Confirmar pareamento iPhone+Watch (na primeira vez Xcode pareia automaticamente os simuladores)
-5. **Archive + upload** quando estiver tudo redondo:
-   ```bash
-   npm run ios:release    # script existente — vai detectar o Watch e empacotar tudo
-   ```
+# App completo com Watch + complications embutidos
+cd ios/App && xcodebuild build -project App.xcodeproj -scheme App \
+  -destination 'generic/platform=iOS' -configuration Release CODE_SIGNING_ALLOWED=NO
+
+# Release pra TestFlight (assina e envia)
+npm run ios:release
+```
