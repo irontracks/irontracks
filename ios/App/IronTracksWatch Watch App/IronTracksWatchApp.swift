@@ -22,6 +22,10 @@ struct IronTracksWatchApp: App {
                 .environmentObject(location)
                 .task {
                     await health.requestAuthorization()
+                    // Permissão de notificação serve de rede de segurança pro fim do
+                    // descanso quando o app não está em foreground. Se negar, o app
+                    // segue funcionando com háptico in-app.
+                    await RestTimerEngine.requestNotificationPermission()
                 }
         }
     }
