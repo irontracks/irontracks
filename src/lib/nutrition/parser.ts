@@ -1,6 +1,7 @@
 import { foodDatabase } from './food-database'
 import type { FoodItem } from './food-database'
 import type { MealLog } from './engine'
+import { detectPreparation, keyEncodesPreparation, applyPreparation } from './preparation'
 
 function normalizeFoodText(input: string): string {
   return (input || '')
@@ -170,6 +171,14 @@ export type ParsedMealItem = {
   protein: number
   carbs: number
   fat: number
+  /**
+   * Modo de preparo detectado no texto e que ALTEROU os macros ("frito",
+   * "à milanesa"). Ausente quando não há preparo, quando ele é neutro
+   * (grelhado/cozido) ou quando a chave do alimento já o codifica — nesses casos
+   * nada foi somado. Opcional de propósito: quem consome o item continua válido
+   * sem ele.
+   */
+  preparation?: string
 }
 
 /** Full breakdown of a meal: totals, per-item detail and unrecognized lines. */
@@ -375,11 +384,22 @@ export function analyzeMeal(text: string, extraFoods?: Record<string, FoodItem>)
       grams = qtd
     }
 
+    // MODO DE PREPARO: a cabeça do nome diz O QUE é ("frango"), o resto diz COMO
+    // foi feito ("frito") — e isso vale 10 g de gordura por 100 g que a base curada
+    // não tem. Só ajusta quando o preparo NÃO está embutido na chave que casou:
+    // 'frango grelhado', 'ovo cozido', 'batata cozida' e as entradas da TACO
+    // ("batata, inglesa, frita") já trazem o número do preparo, e somar de novo
+    // contaria duas vezes. Preparo neutro (grelhado/cozido/air fryer) é
+    // reconhecido só pra não virar ajuste indevido — delta zero.
+    const prep = detectPreparation(foodName)
+    const prepApplies = !!prep && !prep.neutral && !keyEncodesPreparation(dbKeyMatched, prep)
+    const effective = prep && prepApplies ? applyPreparation(matchedItem, prep) : matchedItem
+
     const multiplier = grams / 100
-    const p = Math.round(Number(matchedItem.p) * multiplier)
-    const c = Math.round(Number(matchedItem.c) * multiplier)
-    const f = Math.round(Number(matchedItem.f) * multiplier)
-    const kcal = Math.round(Number(matchedItem.kcal) * multiplier)
+    const p = Math.round(Number(effective.p) * multiplier)
+    const c = Math.round(Number(effective.c) * multiplier)
+    const f = Math.round(Number(effective.f) * multiplier)
+    const kcal = Math.round(Number(effective.kcal) * multiplier)
 
     const sp = Number.isFinite(p) ? p : 0
     const sc = Number.isFinite(c) ? c : 0
@@ -390,12 +410,15 @@ export function analyzeMeal(text: string, extraFoods?: Record<string, FoodItem>)
     totals.f += sf
     totals.kcal += skcal
     items.push({
-      label: rawLine,
+      // O preparo entra no label pro usuário VER por que a gordura subiu — o item
+      // é o que a UI, o histórico e o prompt do chat mostram.
+      label: prep && prepApplies ? `${rawLine} · ${prep.label}` : rawLine,
       grams: Math.max(0, Math.round(Number.isFinite(grams) ? grams : 0)),
       calories: Math.max(0, skcal),
       protein: Math.max(0, sp),
       carbs: Math.max(0, sc),
       fat: Math.max(0, sf),
+      ...(prep && prepApplies ? { preparation: prep.label } : {}),
     })
   }
 
