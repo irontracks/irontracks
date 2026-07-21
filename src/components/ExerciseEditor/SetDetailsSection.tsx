@@ -4,6 +4,7 @@ import React from 'react'
 import { Trash2 } from 'lucide-react'
 import type { AdvancedConfig, SetDetail } from './types'
 import { isPlank } from '@/utils/exerciseTracking'
+import { NumericInput } from '@/components/ui/NumericInput'
 
 interface SetDetailsSectionProps {
     setDetails: SetDetail[]
@@ -94,12 +95,10 @@ export const SetDetailsSection: React.FC<SetDetailsSectionProps> = ({
                                         <div className="text-[10px] text-neutral-400 uppercase font-black tracking-wider mb-1">
                                             {isIsoPlank ? 'Peso corporal (kg)' : 'Carga (kg)'}
                                         </div>
-                                        <input
-                                            type="number"
-                                            inputMode="decimal"
+                                        <NumericInput
                                             aria-label={`${isIsoPlank ? 'Peso corporal' : 'Carga'} em kg para série ${setIdx + 1}`}
                                             value={(s?.weight ?? '')}
-                                            onChange={(e) => onUpdateSetDetail(exerciseIndex, setIdx, { weight: e.target.value === '' ? null : Number(e.target.value) })}
+                                            onValueChange={(n) => onUpdateSetDetail(exerciseIndex, setIdx, { weight: n })}
                                             className="w-full bg-depth-1 border border-white/[0.06] rounded-lg p-2 text-base text-white outline-none focus:border-yellow-500/60 transition-colors"
                                         />
                                     </div>
@@ -128,12 +127,10 @@ export const SetDetailsSection: React.FC<SetDetailsSectionProps> = ({
                                     </div>
                                     <div>
                                         <div className="text-[10px] text-yellow-500 uppercase font-black tracking-wider mb-1">RPE</div>
-                                        <input
-                                            type="number"
-                                            inputMode="decimal"
+                                        <NumericInput
                                             aria-label={`RPE percebido para série ${setIdx + 1}`}
                                             value={(s?.rpe ?? '')}
-                                            onChange={(e) => onUpdateSetDetail(exerciseIndex, setIdx, { rpe: e.target.value === '' ? null : Number(e.target.value) })}
+                                            onValueChange={(n) => onUpdateSetDetail(exerciseIndex, setIdx, { rpe: n })}
                                             className="w-full bg-depth-1 border border-white/[0.06] rounded-lg p-2 text-base text-yellow-500 font-black outline-none focus:border-yellow-500/60 transition-colors"
                                         />
                                     </div>
@@ -161,13 +158,12 @@ export const SetDetailsSection: React.FC<SetDetailsSectionProps> = ({
                                     <div key={dIdx} className="grid grid-cols-[1fr_1fr_auto] gap-2 items-end">
                                         <div>
                                             <div className="text-[10px] text-neutral-400 uppercase font-black tracking-wider mb-1">Peso (kg)</div>
-                                            <input
-                                                type="number"
+                                            <NumericInput
                                                 aria-label={`Peso drop ${dIdx + 1} em kg`}
                                                 value={(d?.weight ?? '')}
-                                                onChange={(e) => {
+                                                onValueChange={(n) => {
                                                     const list = Array.isArray(config) ? [...config] : []
-                                                    list[dIdx] = { ...(list[dIdx] || {}), weight: e.target.value === '' ? null : Number(e.target.value) }
+                                                    list[dIdx] = { ...(list[dIdx] || {}), weight: n }
                                                     updateConfig(list)
                                                 }}
                                                 className="w-full bg-depth-1 border border-white/[0.06] rounded-lg p-2 text-sm text-white outline-none focus:border-yellow-500/60 transition-colors"
@@ -214,26 +210,26 @@ export const SetDetailsSection: React.FC<SetDetailsSectionProps> = ({
                                 </div>
                                 <div>
                                     <div className="text-[10px] text-neutral-400 uppercase font-black tracking-wider mb-1">Carga</div>
-                                    <input type="number" aria-label="Carga em kg" value={(config?.weight ?? '')}
-                                        onChange={(e) => updateConfig({ ...(config && typeof config === 'object' ? config : {}), weight: e.target.value === '' ? null : Number(e.target.value) })}
+                                    <NumericInput aria-label="Carga em kg" value={(config?.weight ?? '')}
+                                        onValueChange={(n) => updateConfig({ ...(config && typeof config === 'object' ? config : {}), weight: n })}
                                         className="w-full bg-depth-1 border border-white/[0.06] rounded-lg p-2 text-sm text-white outline-none focus:border-yellow-500/60 transition-colors" />
                                 </div>
                                 <div>
                                     <div className="text-[10px] text-neutral-400 uppercase font-black tracking-wider mb-1">Reps Iniciais</div>
-                                    <input type="number" aria-label="Repetições iniciais" value={(config?.initial_reps ?? '')}
-                                        onChange={(e) => updateConfig({ ...(config && typeof config === 'object' ? config : {}), initial_reps: e.target.value === '' ? null : Number(e.target.value) })}
+                                    <NumericInput decimal={false} aria-label="Repetições iniciais" value={(config?.initial_reps ?? '')}
+                                        onValueChange={(n) => updateConfig({ ...(config && typeof config === 'object' ? config : {}), initial_reps: n })}
                                         className="w-full bg-depth-1 border border-white/[0.06] rounded-lg p-2 text-sm text-white outline-none focus:border-yellow-500/60 transition-colors" />
                                 </div>
                                 <div>
                                     <div className="text-[10px] text-neutral-400 uppercase font-black tracking-wider mb-1">Pausa (s)</div>
-                                    <input type="number" aria-label="Pausa em segundos" value={(config?.rest_time_sec ?? '')}
-                                        onChange={(e) => updateConfig({ ...(config && typeof config === 'object' ? config : {}), rest_time_sec: e.target.value === '' ? null : Number(e.target.value) })}
+                                    <NumericInput decimal={false} aria-label="Pausa em segundos" value={(config?.rest_time_sec ?? '')}
+                                        onValueChange={(n) => updateConfig({ ...(config && typeof config === 'object' ? config : {}), rest_time_sec: n })}
                                         className="w-full bg-depth-1 border border-white/[0.06] rounded-lg p-2 text-sm text-white outline-none focus:border-yellow-500/60 transition-colors" />
                                 </div>
                                 <div>
                                     <div className="text-[10px] text-neutral-400 uppercase font-black tracking-wider mb-1">Mini-sets</div>
-                                    <input type="number" aria-label="Número de mini-sets" value={(config?.mini_sets ?? '')}
-                                        onChange={(e) => updateConfig({ ...(config && typeof config === 'object' ? config : {}), mini_sets: e.target.value === '' ? null : Number(e.target.value) })}
+                                    <NumericInput decimal={false} aria-label="Número de mini-sets" value={(config?.mini_sets ?? '')}
+                                        onValueChange={(n) => updateConfig({ ...(config && typeof config === 'object' ? config : {}), mini_sets: n })}
                                         className="w-full bg-depth-1 border border-white/[0.06] rounded-lg p-2 text-sm text-white outline-none focus:border-yellow-500/60 transition-colors" />
                                 </div>
                             </div>
@@ -244,26 +240,26 @@ export const SetDetailsSection: React.FC<SetDetailsSectionProps> = ({
                             <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-2">
                                 <div>
                                     <div className="text-[10px] text-neutral-400 uppercase font-black tracking-wider mb-1">Carga</div>
-                                    <input type="number" aria-label="Carga cluster em kg" value={(config?.weight ?? '')}
-                                        onChange={(e) => updateConfig({ ...(config && typeof config === 'object' ? config : {}), weight: e.target.value === '' ? null : Number(e.target.value) })}
+                                    <NumericInput aria-label="Carga cluster em kg" value={(config?.weight ?? '')}
+                                        onValueChange={(n) => updateConfig({ ...(config && typeof config === 'object' ? config : {}), weight: n })}
                                         className="w-full bg-depth-1 border border-white/[0.06] rounded-lg p-2 text-sm text-white outline-none focus:border-yellow-500/60 transition-colors" />
                                 </div>
                                 <div>
                                     <div className="text-[10px] text-neutral-400 uppercase font-black tracking-wider mb-1">Total Reps</div>
-                                    <input type="number" aria-label="Total de repetições do cluster" value={(config?.total_reps ?? '')}
-                                        onChange={(e) => updateConfig({ ...(config && typeof config === 'object' ? config : {}), total_reps: e.target.value === '' ? null : Number(e.target.value) })}
+                                    <NumericInput decimal={false} aria-label="Total de repetições do cluster" value={(config?.total_reps ?? '')}
+                                        onValueChange={(n) => updateConfig({ ...(config && typeof config === 'object' ? config : {}), total_reps: n })}
                                         className="w-full bg-depth-1 border border-white/[0.06] rounded-lg p-2 text-sm text-white outline-none focus:border-yellow-500/60 transition-colors" />
                                 </div>
                                 <div>
                                     <div className="text-[10px] text-neutral-400 uppercase font-black tracking-wider mb-1">Cluster</div>
-                                    <input type="number" aria-label="Tamanho do cluster" value={(config?.cluster_size ?? '')}
-                                        onChange={(e) => updateConfig({ ...(config && typeof config === 'object' ? config : {}), cluster_size: e.target.value === '' ? null : Number(e.target.value) })}
+                                    <NumericInput decimal={false} aria-label="Tamanho do cluster" value={(config?.cluster_size ?? '')}
+                                        onValueChange={(n) => updateConfig({ ...(config && typeof config === 'object' ? config : {}), cluster_size: n })}
                                         className="w-full bg-depth-1 border border-white/[0.06] rounded-lg p-2 text-sm text-white outline-none focus:border-yellow-500/60 transition-colors" />
                                 </div>
                                 <div>
                                     <div className="text-[10px] text-neutral-400 uppercase font-black tracking-wider mb-1">Intra (s)</div>
-                                    <input type="number" aria-label="Descanso intra-cluster em segundos" value={(config?.intra_rest_sec ?? '')}
-                                        onChange={(e) => updateConfig({ ...(config && typeof config === 'object' ? config : {}), intra_rest_sec: e.target.value === '' ? null : Number(e.target.value) })}
+                                    <NumericInput decimal={false} aria-label="Descanso intra-cluster em segundos" value={(config?.intra_rest_sec ?? '')}
+                                        onValueChange={(n) => updateConfig({ ...(config && typeof config === 'object' ? config : {}), intra_rest_sec: n })}
                                         className="w-full bg-depth-1 border border-white/[0.06] rounded-lg p-2 text-sm text-white outline-none focus:border-yellow-500/60 transition-colors" />
                                 </div>
                             </div>

@@ -15,6 +15,7 @@ import {
   Trash2, X, ArrowLeftRight,
 } from 'lucide-react'
 import Image from 'next/image'
+import { NumericInput } from '@/components/ui/NumericInput'
 
 interface ProgressPhoto {
   id: string
@@ -280,14 +281,11 @@ function UploadModal({ onClose, onUploaded }: UploadModalProps) {
           <div>
             <p className="text-xs font-bold text-neutral-400 uppercase tracking-widest mb-2">Peso (opcional)</p>
             <div className="flex items-center gap-2">
-              <input
+              <NumericInput
                 aria-label="Peso em kg"
-                type="number"
-                inputMode="decimal"
                 value={weight}
-                onChange={(e) => setWeight(e.target.value)}
+                onValueChange={(n) => setWeight(n == null ? '' : String(n))}
                 placeholder="ex: 85.5"
-                step="0.1"
                 min="20"
                 max="500"
                 className="flex-1 bg-neutral-900 border border-neutral-700 rounded-xl px-4 py-2.5 text-white text-[16px] focus:outline-none focus:border-yellow-500"
