@@ -117,7 +117,7 @@ export async function GET(req: Request) {
     const emptyResult = { data: [] as unknown[], error: null }
     const [viewsResult, likesResult, commentsResult, profilesResult, signedUrlsResult] = await Promise.all([
       storyIds.length ? admin.from('social_story_views').select('story_id').eq('viewer_id', userId).in('story_id', storyIds) : emptyResult,
-      storyIds.length ? admin.from('social_story_likes').select('story_id, user_id').in('story_id', storyIds) : emptyResult,
+      storyIds.length ? admin.from('social_story_likes').select('story_id, user_id, emoji').in('story_id', storyIds) : emptyResult,
       storyIds.length ? admin.from('social_story_comments').select('story_id').in('story_id', storyIds) : emptyResult,
       admin.from('profiles').select('id, display_name, photo_url, role').in('id', authorIds),
       mediaPaths.length ? admin.storage.from('social-stories').createSignedUrls(mediaPaths, signedSeconds) : Promise.resolve({ data: [] as { path: string; signedUrl: string }[] | null, error: null }),
@@ -131,13 +131,18 @@ export async function GET(req: Request) {
 
     const likeCountByStory = new Map<string, number>()
     const likedSet = new Set<string>()
+    const myReactionByStory = new Map<string, string>()
     for (const r of (Array.isArray(likesResult.data) ? likesResult.data : []) as unknown[]) {
       const row = asRecord(r)
       const sid = String(row?.story_id || '').trim()
       const uid = String(row?.user_id || '').trim()
       if (!sid) continue
       likeCountByStory.set(sid, (likeCountByStory.get(sid) || 0) + 1)
-      if (uid && uid === userId) likedSet.add(sid)
+      if (uid && uid === userId) {
+        likedSet.add(sid)
+        const emoji = String(row?.emoji || '').trim()
+        if (emoji) myReactionByStory.set(sid, emoji) // reação do PRÓPRIO usuário, pra fixar no viewer
+      }
     }
 
     const commentCountByStory = new Map<string, number>()
@@ -192,6 +197,7 @@ export async function GET(req: Request) {
         viewed: viewedSet.has(s.id),
         likeCount: likeCountByStory.get(s.id) || 0,
         hasLiked: likedSet.has(s.id),
+        myReaction: myReactionByStory.get(s.id) || null, // emoji com que EU reagi (pra fixar no viewer)
         commentCount: commentCountByStory.get(s.id) || 0,
       })
     }

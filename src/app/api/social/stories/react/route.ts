@@ -65,9 +65,11 @@ export async function POST(req: Request) {
     // passar se o usuário PODE VER o story. Antes a notificação era emitida via admin
     // ANTES e INDEPENDENTE disto, então um não-seguidor com o storyId em mãos spammava
     // o autor com "reagiu ao seu story" mesmo sem poder ver o story.
+    // Persiste o EMOJI escolhido (antes só gravava o like sem o emoji → a reação "não fixava").
+    // Trocar de emoji faz upsert no mesmo (story_id,user_id) e atualiza a reação.
     const { error: likeErr } = await auth.supabase
       .from('social_story_likes')
-      .upsert({ story_id: storyId, user_id: auth.user.id }, { onConflict: 'story_id,user_id' })
+      .upsert({ story_id: storyId, user_id: auth.user.id, emoji }, { onConflict: 'story_id,user_id' })
     if (likeErr) return NextResponse.json({ ok: false, error: 'forbidden' }, { status: 403 })
 
     // Notifica o autor, com dedup de 5min por (usuário→story) — sem isto, trocar de
