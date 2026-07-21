@@ -152,28 +152,29 @@ export default function NutritionStoryComposer({ open, mode, content, onClose }:
                     )}
                   </div>
 
-                  {/* Upload (só no modo refeição) */}
-                  {mode === 'meal' && (
-                    <div className="w-full max-w-[300px] sm:max-w-[340px] flex items-center gap-3">
-                      <label className={['flex-1 h-12 rounded-xl bg-neutral-900 border border-neutral-800 text-white font-bold text-[11px] uppercase tracking-wider hover:bg-neutral-800 hover:border-neutral-700 inline-flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-[0.98]', busy ? 'opacity-50 pointer-events-none' : ''].join(' ')}>
-                        <Upload size={16} className="text-yellow-500" />
-                        {backgroundImage || isVideo ? 'TROCAR MÍDIA' : 'ADICIONAR FOTO/VÍDEO'}
-                        <input
-                          ref={inputRef} type="file" aria-label="Adicionar mídia" accept="image/*,video/*" className="sr-only"
-                          onChange={(e) => { const f = e.target.files?.[0] || null; if (inputRef.current) inputRef.current.value = ''; loadMedia(f) }}
-                        />
-                      </label>
-                      {isVideo && (
-                        <button type="button" onClick={() => setShowTrimmer(v => !v)}
-                          className={`w-12 h-12 rounded-xl border flex items-center justify-center transition-colors active:scale-[0.98] ${showTrimmer ? 'bg-yellow-500 text-black border-yellow-500' : 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-white'}`}
-                          disabled={busy}
-                          aria-label="Cortar vídeo"
-                        >
-                          <Scissors size={16} />
-                        </button>
-                      )}
-                    </div>
-                  )}
+                  {/* Upload de foto/vídeo de fundo — vale nos DOIS modos (refeição e resumo do
+                      dia). Antes era gateado por `mode === 'meal'`, então o "Resumo do dia" só
+                      oferecia os estilos de cor, sem anexar mídia. O renderer já compõe os
+                      macros por cima da imagem/vídeo (transparentBg quando é vídeo). */}
+                  <div className="w-full max-w-[300px] sm:max-w-[340px] flex items-center gap-3">
+                    <label className={['flex-1 h-12 rounded-xl bg-neutral-900 border border-neutral-800 text-white font-bold text-[11px] uppercase tracking-wider hover:bg-neutral-800 hover:border-neutral-700 inline-flex items-center justify-center gap-2 cursor-pointer transition-all active:scale-[0.98]', busy ? 'opacity-50 pointer-events-none' : ''].join(' ')}>
+                      <Upload size={16} className="text-yellow-500" />
+                      {backgroundImage || isVideo ? 'TROCAR MÍDIA' : 'ADICIONAR FOTO/VÍDEO'}
+                      <input
+                        ref={inputRef} type="file" aria-label="Adicionar mídia" accept="image/*,video/*" className="sr-only"
+                        onChange={(e) => { const f = e.target.files?.[0] || null; if (inputRef.current) inputRef.current.value = ''; loadMedia(f) }}
+                      />
+                    </label>
+                    {isVideo && (
+                      <button type="button" onClick={() => setShowTrimmer(v => !v)}
+                        className={`w-12 h-12 rounded-xl border flex items-center justify-center transition-colors active:scale-[0.98] ${showTrimmer ? 'bg-yellow-500 text-black border-yellow-500' : 'bg-neutral-900 border-neutral-800 text-neutral-400 hover:text-white'}`}
+                        disabled={busy}
+                        aria-label="Cortar vídeo"
+                      >
+                        <Scissors size={16} />
+                      </button>
+                    )}
+                  </div>
 
                   {isExporting && (
                     <p className="text-[10px] text-yellow-500/70 font-bold uppercase tracking-widest">Renderizando vídeo…</p>
