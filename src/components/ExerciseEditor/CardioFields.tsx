@@ -2,6 +2,7 @@
 
 import React from 'react'
 import type { AdvancedConfig, SetDetail } from './types'
+import { NumericInput } from '@/components/ui/NumericInput'
 
 interface CardioFieldsProps {
     exercise: {
@@ -52,24 +53,23 @@ export const CardioFields: React.FC<CardioFieldsProps> = ({
                     <div className="text-[10px] text-neutral-400 uppercase font-black tracking-wider text-center block mb-1.5">
                         {isBikeOutdoor ? 'Tempo (min) (opcional)' : 'Tempo (minutos)'}
                     </div>
-                    <input
-                        type="number"
+                    <NumericInput
+                        decimal={false}
                         min={isBikeOutdoor ? undefined : 1}
                         aria-label="Tempo em minutos do exercício de cardio"
                         value={exercise.reps ? String(exercise.reps) : ''}
-                        onChange={(e) => onUpdateExercise('reps', e.target.value)}
+                        onValueChange={(n) => onUpdateExercise('reps', n == null ? '' : String(n))}
                         className="w-full bg-depth-2 rounded-2xl p-4 text-center text-xl font-black text-white outline-none focus:border-yellow-500/60 border border-white/[0.06] placeholder-neutral-700 transition-colors"
                         placeholder={isBikeOutdoor ? 'Livre' : '30'}
                     />
                 </div>
                 <div>
                     <div className="text-[10px] text-yellow-500 uppercase font-black tracking-wider text-center block mb-1.5">Intensidade</div>
-                    <input
-                        type="number"
+                    <NumericInput
                         min="1"
                         aria-label="Intensidade percebida do cardio (RPE)"
                         value={exercise.rpe ? String(exercise.rpe) : ''}
-                        onChange={(e) => onUpdateExercise('rpe', e.target.value)}
+                        onValueChange={(n) => onUpdateExercise('rpe', n == null ? '' : String(n))}
                         className="w-full bg-depth-2 border border-white/[0.06] rounded-2xl p-4 text-center text-xl font-black text-yellow-500 outline-none focus:border-yellow-500/60 placeholder-yellow-500/30 transition-colors"
                         placeholder="5"
                     />
@@ -96,33 +96,33 @@ export const CardioFields: React.FC<CardioFieldsProps> = ({
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                             <div>
                                 <div className="text-[10px] text-green-400 uppercase font-black tracking-wider block mb-1">Trabalho (s)</div>
-                                <input
-                                    type="number"
+                                <NumericInput
+                                    decimal={false}
                                     aria-label="Segundos de trabalho no HIT"
                                     value={config.workSec ?? ''}
-                                    onChange={(e) => updateCardioConfig('workSec', Number(e.target.value))}
+                                    onValueChange={(n) => updateCardioConfig('workSec', n ?? 0)}
                                     className="w-full bg-depth-1 border border-white/[0.06] rounded-lg p-2 text-sm text-white outline-none focus:border-green-500 placeholder-neutral-700 transition-colors"
                                     placeholder="30"
                                 />
                             </div>
                             <div>
                                 <div className="text-[10px] text-red-400 uppercase font-black tracking-wider block mb-1">Descanso (s)</div>
-                                <input
-                                    type="number"
+                                <NumericInput
+                                    decimal={false}
                                     aria-label="Segundos de descanso no HIT"
                                     value={config.restSec ?? ''}
-                                    onChange={(e) => updateCardioConfig('restSec', Number(e.target.value))}
+                                    onValueChange={(n) => updateCardioConfig('restSec', n ?? 0)}
                                     className={`w-full bg-depth-1 border rounded-lg p-2 text-sm text-white outline-none focus:border-red-500 placeholder-neutral-700 transition-colors ${hitInvalid ? 'border-red-500/50' : 'border-white/[0.06]'}`}
                                     placeholder="10"
                                 />
                             </div>
                             <div>
                                 <div className="text-[10px] text-neutral-400 uppercase font-black tracking-wider block mb-1">Rounds</div>
-                                <input
-                                    type="number"
+                                <NumericInput
+                                    decimal={false}
                                     aria-label="Número de rounds do HIT"
                                     value={config.rounds ?? ''}
-                                    onChange={(e) => updateCardioConfig('rounds', Number(e.target.value))}
+                                    onValueChange={(n) => updateCardioConfig('rounds', n ?? 0)}
                                     className="w-full bg-depth-1 border border-white/[0.06] rounded-lg p-2 text-sm text-white outline-none focus:border-yellow-500/60 placeholder-neutral-700 transition-colors"
                                     placeholder="10"
                                 />
@@ -162,45 +162,41 @@ export const CardioFields: React.FC<CardioFieldsProps> = ({
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-3 animate-in slide-in-from-top-2 duration-200 bg-black/20 p-3 rounded-xl">
                         <div>
                             <div className="text-[10px] text-neutral-400 uppercase font-black tracking-wider block mb-1">Inclinação (%)</div>
-                            <input
-                                type="number"
+                            <NumericInput
                                 aria-label="Inclinação da esteira em porcentagem"
                                 value={config.incline ?? ''}
-                                onChange={(e) => updateCardioConfig('incline', e.target.value)}
+                                onValueChange={(n) => updateCardioConfig('incline', n)}
                                 className="w-full bg-depth-1 border border-white/[0.06] rounded-lg p-2 text-sm text-white outline-none focus:border-yellow-500/60 placeholder-neutral-700 transition-colors"
                                 placeholder="0"
                             />
                         </div>
                         <div>
                             <div className="text-[10px] text-neutral-400 uppercase font-black tracking-wider block mb-1">Velocidade</div>
-                            <input
-                                type="number"
-                                step="0.1"
+                            <NumericInput
                                 aria-label="Velocidade em km/h"
                                 value={config.speed ?? ''}
-                                onChange={(e) => updateCardioConfig('speed', e.target.value)}
+                                onValueChange={(n) => updateCardioConfig('speed', n)}
                                 className="w-full bg-depth-1 border border-white/[0.06] rounded-lg p-2 text-sm text-white outline-none focus:border-yellow-500/60 placeholder-neutral-700 transition-colors"
                                 placeholder="km/h"
                             />
                         </div>
                         <div>
                             <div className="text-[10px] text-neutral-400 uppercase font-black tracking-wider block mb-1">Carga/Nível</div>
-                            <input
-                                type="number"
+                            <NumericInput
                                 aria-label="Carga ou nível de resistência do equipamento"
                                 value={config.resistance ?? ''}
-                                onChange={(e) => updateCardioConfig('resistance', e.target.value)}
+                                onValueChange={(n) => updateCardioConfig('resistance', n)}
                                 className="w-full bg-depth-1 border border-white/[0.06] rounded-lg p-2 text-sm text-white outline-none focus:border-yellow-500/60 placeholder-neutral-700 transition-colors"
                                 placeholder="Nível"
                             />
                         </div>
                         <div>
                             <div className="text-[10px] text-neutral-400 uppercase font-black tracking-wider block mb-1">FC Alvo (BPM)</div>
-                            <input
-                                type="number"
+                            <NumericInput
+                                decimal={false}
                                 aria-label="Frequência cardíaca alvo em BPM"
                                 value={config.heart_rate ?? ''}
-                                onChange={(e) => updateCardioConfig('heart_rate', e.target.value)}
+                                onValueChange={(n) => updateCardioConfig('heart_rate', n)}
                                 className="w-full bg-depth-1 border border-white/[0.06] rounded-lg p-2 text-sm text-red-400 font-black outline-none focus:border-red-500 placeholder-neutral-700 transition-colors"
                                 placeholder="♥"
                             />

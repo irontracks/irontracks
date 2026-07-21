@@ -3,6 +3,7 @@
 import React from 'react';
 import { ArrowLeft } from 'lucide-react';
 import ExerciseEditor from '@/components/ExerciseEditor';
+import { NumericInput } from '@/components/ui/NumericInput';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
 import { useBackHandler } from '@/hooks/useBackHandler';
 import { useBodyScrollLock } from '@/hooks/useBodyScrollLock';
@@ -160,7 +161,7 @@ export function HistoryListManualModal({
                         <div className="text-[10px] uppercase font-bold text-neutral-400">Duração (min)</div>
                         <input
                             aria-label="Duração (min)"
-                            type="number"
+                            inputMode="numeric"
                             value={manualDuration}
                             onChange={(e) => setManualDuration(e.target.value)}
                             className="w-full rounded-xl p-3 text-white outline-none border focus:border-yellow-500/40 transition-all"
@@ -210,7 +211,7 @@ export function HistoryListManualModal({
                                             <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 [&>*]:min-w-0">
                                                 <div>
                                                     <div className="text-[10px] text-neutral-400">Sets</div>
-                                                    <input aria-label="Sets" type="number" inputMode="numeric" value={ex.sets} onChange={(e) => updateManualExercise(idx, 'sets', e.target.value)} className="w-full bg-neutral-900 rounded p-2 text-center text-base" />
+                                                    <input aria-label="Sets" inputMode="numeric" value={ex.sets} onChange={(e) => updateManualExercise(idx, 'sets', e.target.value)} className="w-full bg-neutral-900 rounded p-2 text-center text-base" />
                                                 </div>
                                                 <div>
                                                     <div className="text-[10px] text-neutral-400">Reps</div>
@@ -222,7 +223,7 @@ export function HistoryListManualModal({
                                                 </div>
                                                 <div>
                                                     <div className="text-[10px] text-neutral-400">Descanso (s)</div>
-                                                    <input aria-label="Descanso (s)" type="number" inputMode="numeric" value={ex.restTime || 0} onChange={(e) => updateManualExercise(idx, 'restTime', e.target.value)} className="w-full bg-neutral-900 rounded p-2 text-center text-base" />
+                                                    <NumericInput aria-label="Descanso (s)" decimal={false} value={ex.restTime || 0} onValueChange={(n) => updateManualExercise(idx, 'restTime', n ?? 0)} className="w-full bg-neutral-900 rounded p-2 text-center text-base" />
                                                 </div>
                                             </div>
                                             <div>

@@ -8,6 +8,7 @@
 import { useState, useRef, useCallback, memo } from 'react'
 import dynamic from 'next/dynamic'
 import type { CustomFoodDraft } from './useCustomFoods'
+import { NumericInput } from '@/components/ui/NumericInput'
 import { lookupBarcodeAction } from '@/app/(app)/dashboard/nutrition/actions'
 
 const BarcodeScanner = dynamic(() => import('./BarcodeScanner'), { ssr: false })
@@ -42,15 +43,12 @@ function NumInput({ label, value, onChange }: { label: string; value: number; on
   return (
     <div className="flex flex-col gap-1">
       <label htmlFor={inputId} className="text-[10px] uppercase tracking-widest text-neutral-400">{label}</label>
-      <input
+      <NumericInput
         id={inputId}
         aria-label={label}
-        type="number"
-        inputMode="decimal"
         min="0"
-        step="0.1"
         value={value}
-        onChange={e => onChange(Math.max(0, parseFloat(e.target.value) || 0))}
+        onValueChange={n => onChange(Math.max(0, n ?? 0))}
         className="w-full rounded-xl bg-neutral-900 border border-neutral-700 px-3 py-2 text-[16px] text-white placeholder-neutral-600 focus:outline-none focus:border-yellow-500/60"
       />
     </div>

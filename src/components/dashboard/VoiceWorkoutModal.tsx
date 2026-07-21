@@ -18,6 +18,7 @@ import {
 import type { ParsedExercise } from '@/app/api/ai/parse-exercise-voice/route'
 import { requestVoicePermissions, openAppSettings, startNativeSpeechRecognition, stopNativeSpeechRecognition } from '@/utils/native/irontracksNative'
 import { isIosNative, isNativePlatform } from '@/utils/platform'
+import { NumericInput } from '@/components/ui/NumericInput'
 import { useFocusTrap } from '@/hooks/useFocusTrap'
 import { useBackHandler } from '@/hooks/useBackHandler'
 
@@ -139,7 +140,7 @@ function MicWave({ active }: { active: boolean }) {
 
 // Inline edit field
 function EditField({
-  label, value, onChange, type = 'text', placeholder, inputMode,
+  label, value, onChange, type = 'text', placeholder, inputMode, numeric,
 }: {
   label: string
   value: string
@@ -147,20 +148,36 @@ function EditField({
   type?: string
   placeholder?: string
   inputMode?: 'text' | 'decimal' | 'numeric' | 'tel' | 'search' | 'email' | 'url' | 'none'
+  /** Campo numérico: usa NumericInput (aceita vírgula, sem type="number"). */
+  numeric?: 'decimal' | 'integer'
 }) {
-  const isNumber = type === 'number'
+  const isNumber = numeric != null || type === 'number'
+  const cls = `w-full bg-neutral-800 border border-neutral-700 rounded-lg px-2.5 py-1.5 text-white font-medium focus:outline-none focus:border-yellow-500/60 ${isNumber ? 'text-[16px]' : 'text-sm'}`
   return (
     <label className="flex flex-col gap-0.5">
       <span className="text-[9px] font-black uppercase tracking-widest text-neutral-400">{label}</span>
-      <input
-        aria-label={label}
-        type={type}
-        inputMode={inputMode ?? (isNumber ? 'decimal' : undefined)}
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        placeholder={placeholder ?? '—'}
-        className={`w-full bg-neutral-800 border border-neutral-700 rounded-lg px-2.5 py-1.5 text-white font-medium focus:outline-none focus:border-yellow-500/60 ${isNumber ? 'text-[16px]' : 'text-sm'}`}
-      />
+      {numeric != null ? (
+        // NumericInput mantém a vírgula "grudada" enquanto digita (95,5) e só entrega o
+        // número normalizado — o <input type="number"> num WebView pt-BR bloqueava a vírgula.
+        <NumericInput
+          aria-label={label}
+          decimal={numeric === 'decimal'}
+          value={value}
+          onValueChange={n => onChange(n == null ? '' : String(n))}
+          placeholder={placeholder ?? '—'}
+          className={cls}
+        />
+      ) : (
+        <input
+          aria-label={label}
+          type={type}
+          inputMode={inputMode}
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          placeholder={placeholder ?? '—'}
+          className={cls}
+        />
+      )}
     </label>
   )
 }
@@ -253,14 +270,14 @@ function EditCard({
           placeholder="Nome do exercício"
         />
         <div className="grid grid-cols-3 gap-2">
-          <EditField label="Séries" value={draft.sets?.toString() ?? ''} onChange={v => set('sets', v)} type="number" placeholder="—" />
-          <EditField label="Reps" value={draft.reps?.toString() ?? ''} onChange={v => set('reps', v)} type="number" placeholder="—" />
-          <EditField label="Peso (kg)" value={draft.weightKg?.toString() ?? ''} onChange={v => set('weightKg', v)} type="number" placeholder="—" />
+          <EditField label="Séries" value={draft.sets?.toString() ?? ''} onChange={v => set('sets', v)} numeric="integer" placeholder="—" />
+          <EditField label="Reps" value={draft.reps?.toString() ?? ''} onChange={v => set('reps', v)} numeric="integer" placeholder="—" />
+          <EditField label="Peso (kg)" value={draft.weightKg?.toString() ?? ''} onChange={v => set('weightKg', v)} numeric="decimal" placeholder="—" />
         </div>
         <div className="grid grid-cols-3 gap-2">
           <EditField label="Cadência" value={draft.cadence ?? ''} onChange={v => set('cadence', v)} placeholder="ex: 2020" />
-          <EditField label="RPE" value={draft.rpe?.toString() ?? ''} onChange={v => set('rpe', v)} type="number" placeholder="1-10" />
-          <EditField label="Descanso (s)" value={draft.restSeconds?.toString() ?? ''} onChange={v => set('restSeconds', v)} type="number" placeholder="—" />
+          <EditField label="RPE" value={draft.rpe?.toString() ?? ''} onChange={v => set('rpe', v)} numeric="decimal" placeholder="1-10" />
+          <EditField label="Descanso (s)" value={draft.restSeconds?.toString() ?? ''} onChange={v => set('restSeconds', v)} numeric="integer" placeholder="—" />
         </div>
         <EditField label="Notas" value={draft.notes ?? ''} onChange={v => set('notes', v)} placeholder="observações..." />
       </div>
