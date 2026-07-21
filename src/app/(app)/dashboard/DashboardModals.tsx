@@ -199,9 +199,12 @@ export default function DashboardModals(props: DashboardModalsProps) {
     })()
 
     // Peso efetivo salvo ao continuar (o digitado ou o do perfil confirmado).
+    // Normaliza vírgula → ponto: o campo aceita "95,5" (pt-BR), mas quem consome o
+    // peso faz Number(), e Number("95,5") = NaN — o peso seria silenciosamente
+    // descartado no cálculo calórico. Guardamos sempre com ponto.
     const preCheckinResolvedDraft = () => ({
         ...(preCheckinDraft || {}),
-        weight: preCheckinWeightValue,
+        weight: preCheckinWeightValue.replace(',', '.'),
     })
 
     return (
@@ -633,11 +636,12 @@ export default function DashboardModals(props: DashboardModalsProps) {
                                 <label htmlFor="precheckin-weight" className="block text-xs font-black uppercase tracking-widest text-neutral-400 mb-2">
                                     Peso de hoje (kg)
                                 </label>
+                                {/* Sem type="number": num WebView (locale != pt-BR) ele REJEITA a vírgula
+                                    — o placeholder "Ex: 85,0" não entrava. inputMode="decimal" já mostra
+                                    o teclado com separador; o valor fica como texto e é parseado depois. */}
                                 <input
                                     id="precheckin-weight"
-                                    type="number"
                                     inputMode="decimal"
-                                    step="0.1"
                                     placeholder={profileBodyWeightKg ? String(profileBodyWeightKg) : 'Ex: 85,0'}
                                     value={preCheckinWeightValue}
                                     onChange={(e) => setPreCheckinDraft({ ...(preCheckinDraft || {}), weight: e.target.value })}
