@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { NumericInput } from '@/components/ui/NumericInput';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
 import { useBackHandler } from '@/hooks/useBackHandler';
 import { useBodyScrollLock } from '@/hooks/useBodyScrollLock';
@@ -111,7 +112,6 @@ export function HistoryListEditModal({
                             <div className="text-[10px] uppercase font-bold text-neutral-400">Duração (min)</div>
                             <input
                                 aria-label="Duração (min)"
-                                type="number"
                                 inputMode="numeric"
                                 value={editDuration}
                                 onChange={(e) => setEditDuration(e.target.value)}
@@ -155,7 +155,6 @@ export function HistoryListEditModal({
                                         <div className="text-[10px] text-neutral-400">Sets</div>
                                         <input
                                             aria-label="Sets"
-                                            type="number"
                                             inputMode="numeric"
                                             value={ex.sets}
                                             onChange={(e) => updateEditExercise(idx, 'sets', e.target.value)}
@@ -183,12 +182,11 @@ export function HistoryListEditModal({
                                     </div>
                                     <div>
                                         <div className="text-[10px] text-neutral-400">Descanso (s)</div>
-                                        <input
+                                        <NumericInput
                                             aria-label="Descanso (s)"
-                                            type="number"
-                                            inputMode="numeric"
+                                            decimal={false}
                                             value={ex.restTime || 0}
-                                            onChange={(e) => updateEditExercise(idx, 'restTime', e.target.value)}
+                                            onValueChange={(n) => updateEditExercise(idx, 'restTime', n ?? 0)}
                                             className="w-full bg-neutral-900 rounded p-2 text-center text-base"
                                         />
                                     </div>

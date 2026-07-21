@@ -108,9 +108,9 @@ function SetRow({
         {log.done ? '✓' : String(setIdx + 1)}
       </button>
 
-      {/* Weight */}
+      {/* Weight — sem type="number": num WebView (locale != pt-BR) ele bloqueia a
+          vírgula. O valor é string e é parseado depois (parseTrainingNumber). */}
       <input
-        type="number"
         inputMode="decimal"
         placeholder="Kg"
         value={log.weight ?? ''}
@@ -120,9 +120,8 @@ function SetRow({
         aria-label="Peso (kg)"
       />
 
-      {/* Reps */}
+      {/* Reps — idem: sem type="number" (string parseada depois). */}
       <input
-        type="number"
         inputMode="numeric"
         placeholder={defaultReps != null ? String(defaultReps) : 'Reps'}
         value={log.reps ?? ''}
