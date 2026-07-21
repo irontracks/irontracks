@@ -7,6 +7,7 @@ import {
 import { useAdminPanel } from './AdminPanelContext';
 import type { UnknownRecord } from '@/types/app';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
+import { NumericInput } from '@/components/ui/NumericInput';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -188,13 +189,13 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({ settings, loading, error,
         <label className="flex flex-col gap-1">
             <span className="text-xs font-bold text-neutral-300 uppercase tracking-wide">{label}</span>
             <div className="flex items-center gap-3">
-                <input
+                <NumericInput
                     aria-label={label}
-                    type="number"
+                    decimal={false}
                     min={min}
                     max={max}
                     value={settings[key as keyof typeof settings]}
-                    onChange={(e) => onChange(key, Number(e.target.value))}
+                    onValueChange={(n) => onChange(key, n ?? 0)}
                     className="w-24 bg-neutral-800 border border-neutral-700 rounded-lg px-3 py-1.5 text-white text-sm font-mono focus:outline-none focus:border-yellow-500/60"
                 />
                 <span className="text-xs text-neutral-400">{hint}</span>

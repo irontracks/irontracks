@@ -2,6 +2,7 @@ import React from 'react';
 import { Trash2, Plus, Link2, Play, ChevronDown } from 'lucide-react';
 import { useDialog } from '@/contexts/DialogContext';
 import { HelpHint } from '@/components/ui/HelpHint';
+import { NumericInput } from '@/components/ui/NumericInput';
 import { HELP_TERMS } from '@/utils/help/terms';
 import { WorkoutHeader } from './ExerciseEditor/EditorHeader';
 import { CardioFields, CARDIO_OPTIONS } from './ExerciseEditor/CardioFields';
@@ -345,11 +346,11 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
                                             <div>
                                                 <span className="block text-[10px] text-neutral-400 uppercase font-black tracking-wider text-center mb-1.5">Sets</span>
                                                 <div className="flex items-center gap-1">
-                                                    <input
+                                                    <NumericInput
                                                         aria-label="Número de sets"
-                                                        type="number"
+                                                        decimal={false}
                                                         value={setsCount || ''}
-                                                        onChange={e => updateExercise(index, 'sets', e.target.value)}
+                                                        onValueChange={n => updateExercise(index, 'sets', n)}
                                                         className="w-full bg-depth-2 border border-white/[0.06] rounded-xl px-2 py-2.5 text-center text-base font-black text-white outline-none focus:border-yellow-500/60 transition-colors"
                                                     />
                                                     <button
@@ -377,11 +378,10 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
                                                     RPE
                                                     <HelpHint title={HELP_TERMS.rpe.title} text={HELP_TERMS.rpe.text} tooltip={HELP_TERMS.rpe.tooltip} className="h-4 w-4 text-[10px]" />
                                                 </span>
-                                                <input
+                                                <NumericInput
                                                     aria-label="RPE"
-                                                    type="number"
                                                     value={exercise.rpe ? String(exercise.rpe) : ''}
-                                                    onChange={e => updateExercise(index, 'rpe', e.target.value)}
+                                                    onValueChange={n => updateExercise(index, 'rpe', n)}
                                                     className="w-full bg-depth-2 border border-white/[0.06] rounded-xl px-2 py-2.5 text-center text-base font-black text-yellow-500 outline-none focus:border-yellow-500/60 placeholder-yellow-500/30 transition-colors"
                                                     placeholder="8"
                                                 />
@@ -392,11 +392,11 @@ const ExerciseEditor: React.FC<ExerciseEditorProps> = ({ workout, onSave, onCanc
                                         <div className="grid grid-cols-3 gap-2.5 rounded-xl bg-black/20 p-2.5">
                                             <div>
                                                 <span className="block text-[10px] text-neutral-500 uppercase font-black tracking-wider text-center mb-1.5">Rest(s)</span>
-                                                <input
+                                                <NumericInput
                                                     aria-label="Descanso em segundos"
-                                                    type="number"
+                                                    decimal={false}
                                                     value={(exercise.restTime ?? '')}
-                                                    onChange={e => updateExercise(index, 'restTime', e.target.value)}
+                                                    onValueChange={n => updateExercise(index, 'restTime', n)}
                                                     className="w-full bg-depth-1 border border-white/[0.06] rounded-lg px-2 py-2 text-center text-sm font-bold text-neutral-200 outline-none focus:border-yellow-500/60 transition-colors"
                                                 />
                                             </div>

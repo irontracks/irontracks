@@ -5,6 +5,7 @@ import { X, Salad, Loader2, Check } from 'lucide-react';
 import { useFocusTrap } from '@/hooks/useFocusTrap';
 import { useAdminPanel } from './AdminPanelContext';
 import { useDialog } from '@/contexts/DialogContext';
+import { NumericInput } from '@/components/ui/NumericInput';
 
 interface Props {
     onClose: () => void;
@@ -15,8 +16,9 @@ interface Props {
 const FIELD = 'w-full bg-neutral-900 border border-neutral-700 rounded-lg px-3 py-2 text-sm text-white focus:border-yellow-500 focus:outline-none';
 const LABEL = 'block text-[11px] font-black uppercase tracking-widest text-neutral-400 mb-1.5';
 
-const clampInt = (v: string, min: number, max: number, fallback: number): number => {
-    const n = Math.round(Number(v));
+const clampInt = (v: number | null, min: number, max: number, fallback: number): number => {
+    if (v == null) return fallback;
+    const n = Math.round(v);
     if (!Number.isFinite(n)) return fallback;
     return Math.max(min, Math.min(max, n));
 };
@@ -91,23 +93,23 @@ export const PrescribeDietModal: React.FC<Props> = ({ onClose, onCreated }) => {
                     <div className="grid grid-cols-2 gap-3">
                         <div>
                             <label className={LABEL} htmlFor="d-cal">Calorias (kcal)</label>
-                            <input id="d-cal" aria-label="Calorias da meta em kcal" type="number" inputMode="numeric" min={800} max={10000} className={FIELD} value={calories}
-                                onChange={(e) => setCalories(clampInt(e.target.value, 0, 10000, 2000))} />
+                            <NumericInput id="d-cal" aria-label="Calorias da meta em kcal" decimal={false} min={800} max={10000} className={FIELD} value={calories}
+                                onValueChange={(n) => setCalories(clampInt(n, 0, 10000, 2000))} />
                         </div>
                         <div>
                             <label className={LABEL} htmlFor="d-prot">Proteína (g)</label>
-                            <input id="d-prot" aria-label="Proteína da meta em gramas" type="number" inputMode="numeric" min={0} max={1000} className={FIELD} value={protein}
-                                onChange={(e) => setProtein(clampInt(e.target.value, 0, 1000, 150))} />
+                            <NumericInput id="d-prot" aria-label="Proteína da meta em gramas" decimal={false} min={0} max={1000} className={FIELD} value={protein}
+                                onValueChange={(n) => setProtein(clampInt(n, 0, 1000, 150))} />
                         </div>
                         <div>
                             <label className={LABEL} htmlFor="d-carb">Carboidrato (g)</label>
-                            <input id="d-carb" aria-label="Carboidrato da meta em gramas" type="number" inputMode="numeric" min={0} max={2000} className={FIELD} value={carbs}
-                                onChange={(e) => setCarbs(clampInt(e.target.value, 0, 2000, 200))} />
+                            <NumericInput id="d-carb" aria-label="Carboidrato da meta em gramas" decimal={false} min={0} max={2000} className={FIELD} value={carbs}
+                                onValueChange={(n) => setCarbs(clampInt(n, 0, 2000, 200))} />
                         </div>
                         <div>
                             <label className={LABEL} htmlFor="d-fat">Gordura (g)</label>
-                            <input id="d-fat" aria-label="Gordura da meta em gramas" type="number" inputMode="numeric" min={0} max={1000} className={FIELD} value={fat}
-                                onChange={(e) => setFat(clampInt(e.target.value, 0, 1000, 60))} />
+                            <NumericInput id="d-fat" aria-label="Gordura da meta em gramas" decimal={false} min={0} max={1000} className={FIELD} value={fat}
+                                onValueChange={(n) => setFat(clampInt(n, 0, 1000, 60))} />
                         </div>
                         <div>
                             <label className={LABEL} htmlFor="d-meals">Refeições/dia</label>
