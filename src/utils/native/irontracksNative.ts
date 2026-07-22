@@ -1,6 +1,34 @@
 import { registerPlugin } from '@capacitor/core'
 import type { PluginListenerHandle } from '@capacitor/core'
+import * as Sentry from '@sentry/nextjs'
 import { isIosNative, isNativePlatform } from '@/utils/platform'
+
+/**
+ * Reporta falha ao INICIAR uma Live Activity.
+ *
+ * Por que existe: o lado Swift engolia a falha num `print` e resolvia a promise
+ * com `activityId: ""` — sucesso falso. Aqui o JS descartava a string vazia. Com
+ * isso, a Ilha Dinâmica e o aviso da tela bloqueada podiam sumir para todo mundo
+ * sem UM registro em lugar nenhum (foi exatamente o que aconteceu: o dono
+ * reportou o sumiço e o Sentry estava limpo).
+ *
+ * Isto é telemetria, não correção: a causa raiz continua no Swift, mas agora ela
+ * aparece. E como o app carrega o front do servidor, este aviso vale para todos
+ * os builds já instalados, sem precisar de TestFlight.
+ */
+const reportLiveActivityFailure = (
+  kind: 'workout' | 'rest',
+  reason: 'empty_activity_id' | 'threw',
+  error?: unknown,
+) => {
+  try {
+    const tags = { area: 'live-activity', kind, reason }
+    if (error !== undefined) Sentry.captureException(error, { tags })
+    else Sentry.captureMessage(`live_activity_start_failed:${kind}:${reason}`, { level: 'warning', tags })
+  } catch {
+    // Telemetria nunca pode derrubar o treino.
+  }
+}
 
 // ─── Plugin type ────────────────────────────────────────────────────────────
 
@@ -15,7 +43,9 @@ type IronTracksNativePlugin = {
   scheduleRestTimer: (opts: { id: string; seconds: number; title?: string; body?: string; repeatCount?: number; repeatEverySeconds?: number }) => Promise<void>
   cancelRestTimer: (opts: { id: string }) => Promise<void>
   // Live Activity
-  startRestLiveActivity: (opts: { id: string; seconds: number; title?: string; workoutStartMs?: number }) => Promise<void>
+  // Resolve com activityId ('' quando o Activity.request() falha no Swift).
+  // O tipo declarava Promise<void> e o retorno era jogado fora — a falha ficava invisível.
+  startRestLiveActivity: (opts: { id: string; seconds: number; title?: string; workoutStartMs?: number }) => Promise<{ activityId?: string } | void>
   updateRestLiveActivity: (opts: { id: string; isFinished: boolean; secondsRemaining?: number; targetSeconds?: number; endDateMs?: number }) => Promise<void>
   endRestLiveActivity: (opts: { id: string }) => Promise<void>
   endAllRestLiveActivities: () => Promise<void>
@@ -409,8 +439,12 @@ export const startRestLiveActivity = async (id: string, seconds: number, title?:
     const safeId = String(id || 'rest_timer').trim() || 'rest_timer'
     const safeSeconds = Math.max(1, Math.round(Number(seconds) || 0))
     if (!safeSeconds) return
-    await Native.startRestLiveActivity({ id: safeId, seconds: safeSeconds, title, workoutStartMs: workoutStartMs ?? 0 })
-  } catch { }
+    const result = await Native.startRestLiveActivity({ id: safeId, seconds: safeSeconds, title, workoutStartMs: workoutStartMs ?? 0 })
+    // Mesma pista do treino: id vazio = a Live Activity não nasceu.
+    if (result && !String(result.activityId || '')) reportLiveActivityFailure('rest', 'empty_activity_id')
+  } catch (e) {
+    reportLiveActivityFailure('rest', 'threw', e)
+  }
 }
 
 export const updateRestLiveActivity = async (
@@ -469,8 +503,13 @@ export const startWorkoutLiveActivity = async (state: WorkoutLiveActivityState):
       totalSetsCompleted: Math.max(0, Math.round(Number(state.totalSetsCompleted) || 0)),
       totalVolumeKg: Math.max(0, Number(state.totalVolumeKg) || 0),
     })
-    return String(result?.activityId || '')
-  } catch {
+    const activityId = String(result?.activityId || '')
+    // Swift resolve com id vazio quando o Activity.request() falha — é a única
+    // pista que temos de que a Ilha Dinâmica não vai aparecer.
+    if (!activityId) reportLiveActivityFailure('workout', 'empty_activity_id')
+    return activityId
+  } catch (e) {
+    reportLiveActivityFailure('workout', 'threw', e)
     return ''
   }
 }
