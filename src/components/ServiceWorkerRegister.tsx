@@ -105,32 +105,55 @@ export default function ServiceWorkerRegister() {
     } catch {}
   }, [appVersion])
 
-  const applyUpdate = () => {
-    const reg = registrationRef.current
-    const waiting = reg?.waiting
-    if (!waiting) return
-    setUpdating(true)
-    try {
-      waiting.postMessage({ type: 'SKIP_WAITING' })
-    } catch {}
-  }
+  // ─── Atualização automática ──────────────────────────────────────────────
+  //
+  // Antes isto era um modal que COBRIA a tela inteira (fixed inset-0) e exigia
+  // tocar em "Atualizar agora" pra liberar o app. Virava um pedágio a cada deploy.
+  //
+  // Agora aplica sozinho — mas só num momento SEGURO. Aplicar a atualização
+  // dispara controllerchange, que recarrega a página; se isso acontecer no meio
+  // de uma série, o usuário perde o contexto sem entender por quê. As duas
+  // janelas seguras:
+  //   • app em background (visibilityState hidden) — o reload é invisível;
+  //   • app visível SEM treino em andamento — nada crítico na tela.
+  // Com treino ativo, adia e reavalia (o hook useActiveSession marca o atributo).
+  useEffect(() => {
+    if (!updateReady || updating) return
 
-  if (!updateReady && !updating) return null
+    const workoutInProgress = () => {
+      try {
+        return document.documentElement.dataset.workoutActive === '1'
+      } catch {
+        return false
+      }
+    }
 
-  return (
-    <div className="fixed inset-0 z-[3000] bg-black/80 backdrop-blur-sm flex items-center justify-center p-6">
-      <div className="w-full max-w-sm rounded-2xl border border-neutral-800 bg-neutral-950 p-5 text-center shadow-2xl">
-        <div className="text-sm uppercase tracking-[0.25em] text-neutral-500 font-bold">Atualização</div>
-        <div className="mt-2 text-lg font-black text-white">Nova versão pronta</div>
-        <div className="mt-2 text-sm text-neutral-400">Atualize para continuar com a melhor experiência.</div>
-        <button
-          type="button"
-          onClick={applyUpdate}
-          className="mt-4 w-full min-h-[44px] rounded-xl bg-yellow-500 text-black font-black hover:bg-yellow-400 transition-colors"
-        >
-          {updating ? 'Atualizando...' : 'Atualizar agora'}
-        </button>
-      </div>
-    </div>
-  )
+    const applyIfSafe = () => {
+      const waiting = registrationRef.current?.waiting
+      if (!waiting) return
+      const hidden = document.visibilityState === 'hidden'
+      if (!hidden && workoutInProgress()) return
+      setUpdating(true)
+      trackUserEvent('sw_update_auto_applied', {
+        type: 'sw',
+        metadata: { version: appVersion, hidden, deferredByWorkout: false },
+      })
+      try {
+        waiting.postMessage({ type: 'SKIP_WAITING' })
+      } catch {}
+    }
+
+    applyIfSafe()
+    // Reavalia quando o app sai/volta do background e periodicamente, pra cobrir o
+    // caso "estava treinando quando a versão ficou pronta".
+    document.addEventListener('visibilitychange', applyIfSafe)
+    const retry = window.setInterval(applyIfSafe, 30_000)
+    return () => {
+      document.removeEventListener('visibilitychange', applyIfSafe)
+      window.clearInterval(retry)
+    }
+  }, [updateReady, updating, appVersion])
+
+  // Sem UI: a atualização é silenciosa.
+  return null
 }

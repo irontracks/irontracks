@@ -115,7 +115,15 @@ export function useActiveSession({ userId }: UseActiveSessionOptions): UseActive
     useEffect(() => {
         if (!isActive) return
         setIdleTimerDisabled(true).catch(() => { /* non-native env */ })
-        return () => { setIdleTimerDisabled(false).catch(() => { }) }
+        // Marca "treino em andamento" no documento. O ServiceWorkerRegister lê isto
+        // pra NÃO recarregar a página no meio de uma série ao aplicar uma atualização
+        // automática — o reload aconteceria sem aviso e no pior momento possível.
+        // Atributo (e não estado global) porque o SW register vive fora desta árvore.
+        try { document.documentElement.dataset.workoutActive = '1' } catch { }
+        return () => {
+            setIdleTimerDisabled(false).catch(() => { })
+            try { delete document.documentElement.dataset.workoutActive } catch { }
+        }
     }, [isActive])
 
     const handleUpdateSessionLog = useCallback((key: string, data: unknown) => {
