@@ -250,6 +250,12 @@ class RestTimerService : Service() {
             .setAutoCancel(true)
             .setPriority(NotificationCompat.PRIORITY_HIGH)
             .setCategory(NotificationCompat.CATEGORY_ALARM)
+            // Precisa estar AQUI, não só no canal: o setLockscreenVisibility do
+            // NotificationChannel é ignorado para apps comuns (o dumpsys mostra o
+            // canal como -1000/NO_OVERRIDE), e sem isto a notificação sai como
+            // vis=PRIVATE — com a tela bloqueada o usuário via "conteúdo oculto"
+            // em vez do nome do próximo exercício.
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             // Sem DEFAULT_SOUND: o som vem do canal (USAGE_ALARM). Com os dois, o
             // Android prefere o default de notificação e ANULA o alarme.
             .setDefaults(NotificationCompat.DEFAULT_LIGHTS)

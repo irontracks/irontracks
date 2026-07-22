@@ -37,6 +37,7 @@ import com.getcapacitor.PluginCall
 import com.getcapacitor.PluginMethod
 import com.getcapacitor.annotation.CapacitorPlugin
 import com.getcapacitor.annotation.Permission
+import com.getcapacitor.annotation.PermissionCallback
 import java.io.File
 import java.io.FileInputStream
 import java.util.UUID
@@ -148,8 +149,16 @@ class IronTracksNativePlugin : Plugin(), SensorEventListener {
         }
     }
 
-    @PluginMethod
-    fun handleNotificationPermResult(call: PluginCall) {
+    // TEM que ser @PermissionCallback, NÃO @PluginMethod: o
+    // requestPermissionForAlias acima resolve o callback pelo nome procurando
+    // SÓ entre os métodos anotados com @PermissionCallback. Com @PluginMethod
+    // o Capacitor não acha, rejeita a chamada com "There is no
+    // PermissionCallback method registered for the name: ..." e o JS cai no
+    // catch — em Android 13+ isso matava TODA a notificação nativa de descanso
+    // (o RestTimerService nunca era iniciado), inclusive com a permissão já
+    // concedida, porque o atalho de "já tem permissão" passa pelo mesmo lookup.
+    @PermissionCallback
+    private fun handleNotificationPermResult(call: PluginCall) {
         val granted = NotificationManagerCompat.from(context).areNotificationsEnabled()
         call.resolve(JSObject().put("granted", granted))
     }
