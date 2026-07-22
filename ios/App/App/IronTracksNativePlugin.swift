@@ -585,8 +585,15 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin, CLLocationMana
                     self.observePushToken(activity: activity, kind: "rest")
                     call.resolve(["activityId": activity.id])
                 } catch {
+                    // O motivo TEM que subir pro JS. Antes ele morria neste print e o
+                    // JS recebia sucesso com id vazio — a Live Activity podia estar
+                    // quebrada pra todo mundo sem um registro em lugar nenhum.
                     print("[IronTracks] Live Activity start failed: \(error.localizedDescription)")
-                    call.resolve(["activityId": ""])
+                    call.resolve([
+                        "activityId": "",
+                        "error": error.localizedDescription,
+                        "activitiesEnabled": ActivityAuthorizationInfo().areActivitiesEnabled,
+                    ])
                     return
                 }
 
@@ -765,8 +772,13 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin, CLLocationMana
                     self.observeWorkoutPushToken(activity: activity, kind: "workout")
                     call.resolve(["activityId": activity.id])
                 } catch {
+                    // Mesmo motivo do rest: sem isto, a falha é invisível em produção.
                     print("[IronTracks] Workout LA start failed: \(error.localizedDescription)")
-                    call.resolve(["activityId": ""])
+                    call.resolve([
+                        "activityId": "",
+                        "error": error.localizedDescription,
+                        "activitiesEnabled": ActivityAuthorizationInfo().areActivitiesEnabled,
+                    ])
                 }
             }
         } else {

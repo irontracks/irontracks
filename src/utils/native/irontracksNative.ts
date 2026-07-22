@@ -20,14 +20,35 @@ const reportLiveActivityFailure = (
   kind: 'workout' | 'rest',
   reason: 'empty_activity_id' | 'threw',
   error?: unknown,
+  /** Diagnóstico que o Swift devolve junto do id vazio (builds novos). */
+  native?: { error?: unknown; activitiesEnabled?: unknown },
 ) => {
   try {
-    const tags = { area: 'live-activity', kind, reason }
-    if (error !== undefined) Sentry.captureException(error, { tags })
-    else Sentry.captureMessage(`live_activity_start_failed:${kind}:${reason}`, { level: 'warning', tags })
+    const nativeError = String(native?.error ?? '').slice(0, 300)
+    const tags: Record<string, string> = { area: 'live-activity', kind, reason }
+    // `activitiesEnabled` distingue "usuário desligou nos Ajustes" de "o
+    // ActivityKit recusou" — os dois davam exatamente o mesmo sintoma.
+    if (native?.activitiesEnabled !== undefined) tags.activitiesEnabled = String(native.activitiesEnabled)
+    if (nativeError) tags.nativeError = nativeError.slice(0, 60)
+    const extra = { nativeError: nativeError || undefined }
+    if (error !== undefined) Sentry.captureException(error, { tags, extra })
+    else Sentry.captureMessage(`live_activity_start_failed:${kind}:${reason}`, { level: 'warning', tags, extra })
   } catch {
     // Telemetria nunca pode derrubar o treino.
   }
+}
+
+/**
+ * Retorno do início de uma Live Activity.
+ *
+ * `activityId` vazio = não nasceu. `error`/`activitiesEnabled` só existem em
+ * builds a partir da correção de diagnóstico — antes disso o Swift devolvia
+ * apenas o id vazio e o motivo morria num print.
+ */
+type LiveActivityStartResult = {
+  activityId?: string
+  error?: string
+  activitiesEnabled?: boolean
 }
 
 // ─── Plugin type ────────────────────────────────────────────────────────────
@@ -45,7 +66,7 @@ type IronTracksNativePlugin = {
   // Live Activity
   // Resolve com activityId ('' quando o Activity.request() falha no Swift).
   // O tipo declarava Promise<void> e o retorno era jogado fora — a falha ficava invisível.
-  startRestLiveActivity: (opts: { id: string; seconds: number; title?: string; workoutStartMs?: number }) => Promise<{ activityId?: string } | void>
+  startRestLiveActivity: (opts: { id: string; seconds: number; title?: string; workoutStartMs?: number }) => Promise<LiveActivityStartResult | void>
   updateRestLiveActivity: (opts: { id: string; isFinished: boolean; secondsRemaining?: number; targetSeconds?: number; endDateMs?: number }) => Promise<void>
   endRestLiveActivity: (opts: { id: string }) => Promise<void>
   endAllRestLiveActivities: () => Promise<void>
@@ -115,7 +136,7 @@ type IronTracksNativePlugin = {
     totalSetsForExercise?: number
     totalSetsCompleted?: number
     totalVolumeKg?: number
-  }) => Promise<{ activityId: string }>
+  }) => Promise<LiveActivityStartResult>
   updateWorkoutLiveActivity: (opts: {
     currentExerciseName?: string
     currentSetIndex?: number
@@ -441,7 +462,7 @@ export const startRestLiveActivity = async (id: string, seconds: number, title?:
     if (!safeSeconds) return
     const result = await Native.startRestLiveActivity({ id: safeId, seconds: safeSeconds, title, workoutStartMs: workoutStartMs ?? 0 })
     // Mesma pista do treino: id vazio = a Live Activity não nasceu.
-    if (result && !String(result.activityId || '')) reportLiveActivityFailure('rest', 'empty_activity_id')
+    if (result && !String(result.activityId || '')) reportLiveActivityFailure('rest', 'empty_activity_id', undefined, result)
   } catch (e) {
     reportLiveActivityFailure('rest', 'threw', e)
   }
@@ -506,7 +527,7 @@ export const startWorkoutLiveActivity = async (state: WorkoutLiveActivityState):
     const activityId = String(result?.activityId || '')
     // Swift resolve com id vazio quando o Activity.request() falha — é a única
     // pista que temos de que a Ilha Dinâmica não vai aparecer.
-    if (!activityId) reportLiveActivityFailure('workout', 'empty_activity_id')
+    if (!activityId) reportLiveActivityFailure('workout', 'empty_activity_id', undefined, result)
     return activityId
   } catch (e) {
     reportLiveActivityFailure('workout', 'threw', e)

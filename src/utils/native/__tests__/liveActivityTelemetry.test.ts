@@ -59,12 +59,26 @@ describe('telemetria de falha da Live Activity', () => {
   it('o tipo do plugin expõe o activityId do descanso', () => {
     // Estava declarado como Promise<void>: o Swift devolvia o id e o TS o
     // apagava do contrato, tornando a falha impossível de detectar.
-    expect(src).toMatch(/startRestLiveActivity:[\s\S]{0,220}activityId\?: string/)
+    expect(src).toMatch(/type LiveActivityStartResult = \{[\s\S]{0,200}activityId\?: string/)
+    expect(src).toMatch(/startRestLiveActivity:[\s\S]{0,220}LiveActivityStartResult/)
+  })
+
+  it('o contrato carrega o diagnóstico que o Swift devolve', () => {
+    // Sem isto o Sentry diria só "falhou", nunca "por quê".
+    const typeBlock = src.slice(
+      src.indexOf('type LiveActivityStartResult'),
+      src.indexOf('// ─── Plugin type'),
+    )
+    expect(typeBlock).toContain('error?: string')
+    expect(typeBlock).toContain('activitiesEnabled?: boolean')
   })
 
   it('a telemetria nunca derruba o treino', () => {
     const start = src.indexOf('const reportLiveActivityFailure')
-    const body = src.slice(start, start + 900)
+    // Até o fim da função (a próxima declaração de topo).
+    const rest = src.slice(start)
+    const end = rest.indexOf('\n}\n')
+    const body = end === -1 ? rest : rest.slice(0, end)
     expect(body).toMatch(/try\s*\{[\s\S]*\}\s*catch\s*\{/)
   })
 })
