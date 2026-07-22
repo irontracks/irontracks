@@ -419,7 +419,7 @@ const NormalSetInner = ({
           )}
         </div>
         {/* 4-column grid — no notes slot here; notes lives below both rows */}
-        <div className="grid items-center gap-1.5 min-w-0" style={{ gridTemplateColumns: 'minmax(0,3fr) minmax(0,2.5fr) minmax(0,1.5fr) 76px' }}>
+        <div className="grid items-center gap-1.5 min-w-0" style={{ gridTemplateColumns: 'minmax(0,3fr) minmax(0,2.5fr) minmax(0,1.5fr) 92px' }}>
           {/* Weight */}
           <input
             inputMode="decimal"
@@ -460,10 +460,12 @@ const NormalSetInner = ({
           <button
             type="button"
             onClick={onComplete}
-            className={`inline-flex items-center justify-center gap-1 h-9 w-[76px] rounded-xl font-black text-xs whitespace-nowrap active:scale-95 transition-all duration-150 ${btnColor}`}
+            className={`inline-flex items-center justify-center gap-1 h-9 w-[92px] rounded-xl font-black text-xs whitespace-nowrap active:scale-95 transition-all duration-150 ${btnColor}`}
           >
             <Check size={13} />
-            {sideDone ? '✓' : `${side} ✓`}
+            {/* Mesmo rótulo dos demais métodos (Concluir/Feito). O lado não precisa
+                estar aqui: o badge "LADO E/D" logo acima da linha já diz qual é. */}
+            {sideDone ? 'Feito' : 'Concluir'}
           </button>
         </div>
       </div>
@@ -475,7 +477,7 @@ const NormalSetInner = ({
   const renderUnilateralHeader = () => (
     <div
       className="grid items-center gap-1.5 px-2.5 text-[9px] uppercase tracking-widest text-neutral-400 font-bold min-w-0"
-      style={{ gridTemplateColumns: 'minmax(0,3fr) minmax(0,2.5fr) minmax(0,1.5fr) 76px' }}
+      style={{ gridTemplateColumns: 'minmax(0,3fr) minmax(0,2.5fr) minmax(0,1.5fr) 92px' }}
     >
       <span>Peso (kg)</span>
       <span className="text-center">Reps</span>
@@ -486,7 +488,7 @@ const NormalSetInner = ({
   const renderBilateralHeader = () => (
     <div
       className="grid items-center gap-1.5 px-2.5 text-[9px] uppercase tracking-widest text-neutral-400 font-bold min-w-0"
-      style={{ gridTemplateColumns: '32px 28px minmax(0,3fr) minmax(0,2.5fr) minmax(0,1.5fr) 76px' }}
+      style={{ gridTemplateColumns: '32px 28px minmax(0,3fr) minmax(0,2.5fr) minmax(0,1.5fr) 92px' }}
     >
       <span className="text-center">Set</span>
       <span />
@@ -540,7 +542,7 @@ const NormalSetInner = ({
               warmup or feeler (popover) — taps do nothing to avoid accidents
               during sweaty workouts. */}
           <div className="grid items-center gap-1.5"
-            style={{ gridTemplateColumns: '32px 36px minmax(0,3fr) minmax(0,2.5fr) minmax(0,1.5fr) 76px' }}>
+            style={{ gridTemplateColumns: '32px 36px minmax(0,3fr) minmax(0,2.5fr) minmax(0,1.5fr) 92px' }}>
 
             {/* Set-number badge with long-press → SetTypePopover */}
             <button
@@ -612,14 +614,14 @@ const NormalSetInner = ({
               type="button"
               onClick={handleComplete}
               className={[
-                'inline-flex items-center justify-center gap-1 h-9 w-[76px] rounded-xl font-black text-xs whitespace-nowrap active:scale-95 transition-all duration-150',
+                'inline-flex items-center justify-center gap-1 h-9 w-[92px] rounded-xl font-black text-xs whitespace-nowrap active:scale-95 transition-all duration-150',
                 done
                   ? 'bg-emerald-500 text-black shadow-sm shadow-emerald-500/30'
                   : 'bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700 hover:border-yellow-500/40',
               ].join(' ')}
             >
               <Check size={13} />
-              {done ? 'Feito' : 'OK'}
+              {done ? 'Feito' : 'Concluir'}
             </button>
           </div>
           {/* Per-set method picker */}

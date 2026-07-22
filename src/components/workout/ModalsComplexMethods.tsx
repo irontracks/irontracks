@@ -176,7 +176,7 @@ export function ModalsComplexMethods() {
                                                         aria-label={timerDone ? 'Descanso concluído' : `Iniciar descanso ${safeRestSec}s`}
                                                     >
                                                         {timerDone ? <Check size={14} /> : <Clock size={14} className="text-yellow-500" />}
-                                                        <span className="text-xs font-black">{timerDone ? 'OK' : `${safeRestSec}s`}</span>
+                                                        <span className="text-xs font-black">{timerDone ? 'Feito' : `${safeRestSec}s`}</span>
                                                     </button>
                                                 );
                                             })() : null}
@@ -765,7 +765,7 @@ export function ModalsComplexMethods() {
                                                         aria-label={timerDone ? 'Descanso concluído' : `Iniciar descanso ${safeRestSec}s`}
                                                     >
                                                         {timerDone ? <Check size={14} /> : <Clock size={14} className="text-yellow-500" />}
-                                                        <span className="text-xs font-black">{timerDone ? 'OK' : `${safeRestSec}s`}</span>
+                                                        <span className="text-xs font-black">{timerDone ? 'Feito' : `${safeRestSec}s`}</span>
                                                     </button>
                                                 );
                                             })() : null}
