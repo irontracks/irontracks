@@ -6,6 +6,7 @@ import type { MealLog } from '@/lib/nutrition/engine'
 import { analyzeMeal } from '@/lib/nutrition/parser'
 import { projectMeal, type MacroKey } from '@/lib/nutrition/chatProjection'
 import { Sparkles } from 'lucide-react'
+import { shouldHidePurchaseCtas } from '@/utils/vip/purchaseCtas'
 import { useIsIosNative } from '@/hooks/useIsIosNative'
 import { createClient } from '@/utils/supabase/client'
 import { getErrorMessage } from '@/utils/errorMessage'
@@ -214,7 +215,11 @@ export default function NutritionMixer({
 }) {
   const supabase = useMemo(() => createClient(), [])
   const isIosNative = useIsIosNative()
-  const hideVipCtas = isIosNative
+  // Regra única (utils/vip/purchaseCtas): iOS sem IAP e Android sem Play Billing
+  // não podem exibir caminho de compra próprio. Antes olhava só o iOS e ignorava
+  // a flag de IAP, divergindo do VipHub.
+  const [hideVipCtas, setHideVipCtas] = useState(false)
+  useEffect(() => { setHideVipCtas(shouldHidePurchaseCtas()) }, [])
   const [isAndroidNative, setIsAndroidNative] = useState(false)
   useEffect(() => {
     import('@/utils/platform').then(({ isAndroidNative: check }) => setIsAndroidNative(check()))

@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import NextImage from 'next/image'
 import { Crown, Sparkles, MessageSquare, Trash2, Zap, BarChart3, ChefHat, Dumbbell, Check, Plus, Loader2 } from 'lucide-react'
-import { isIosNative } from '@/utils/platform'
+import { shouldHidePurchaseCtas } from '@/utils/vip/purchaseCtas'
 import dynamic from 'next/dynamic'
 import { createWorkout } from '@/actions/workout-crud-actions'
 import VipWeeklySummaryCard from '@/components/vip/VipWeeklySummaryCard'
@@ -80,10 +80,9 @@ export default function VipHub({ user, locked, onOpenWorkoutEditor, onOpenVipTab
   const isLocked = !!locked
   const [hideVipCtas, setHideVipCtas] = useState(false)
   useEffect(() => {
-    // Only hide CTAs on iOS when Apple IAP is NOT enabled — otherwise
-    // MarketplaceClient renders the App Store subscription flow via RevenueCat.
-    const iapEnabled = String(process.env.NEXT_PUBLIC_ENABLE_IAP || '').trim().toLowerCase() === 'true'
-    setHideVipCtas(isIosNative() && !iapEnabled)
+    // Regra única em utils/vip/purchaseCtas: iOS sem IAP e Android sem Play
+    // Billing não podem exibir caminho de compra próprio.
+    setHideVipCtas(shouldHidePurchaseCtas())
   }, [])
   const name = useMemo(() => String(user?.displayName || user?.name || '').trim(), [user?.displayName, user?.name])
   const [mode, setMode] = useState('coach')
