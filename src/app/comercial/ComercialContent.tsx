@@ -717,8 +717,15 @@ function Wearables() {
             <h2 style={{ fontFamily: '"Space Grotesk", sans-serif', fontWeight: 700, fontSize: 'clamp(34px, 4.5vw, 60px)', letterSpacing: '-0.025em', lineHeight: 1.0, margin: '16px 0 20px' }}>
               Seu punho sabe mais<br /><span style={{ color: '#F5B800' }}>que sua desculpa.</span>
             </h2>
-            <p style={{ color: 'rgba(245,245,245,0.6)', fontSize: 16, lineHeight: 1.65, maxWidth: 520, marginBottom: 36 }}>
+            <p style={{ color: 'rgba(245,245,245,0.6)', fontSize: 16, lineHeight: 1.65, maxWidth: 520, marginBottom: 14 }}>
               BPM, FC de repouso, HRV, calorias e passos — do Apple Watch direto pro app, via Apple Health. Tudo sincronizado, sem precisar abrir o relógio.
+            </p>
+            {/* A página oferece download Android (botão no hero, "iOS · Android · Web"
+                nos números), mas TUDO nesta seção chega por HealthKit — é iOS. Sem este
+                aviso e sem o selo cinza do Android abaixo, o usuário Android baixava
+                esperando FC/HRV e não achava nada. */}
+            <p style={{ color: 'rgba(245,245,245,0.42)', fontSize: 13, lineHeight: 1.5, maxWidth: 520, marginBottom: 30 }}>
+              Requer iPhone com Apple Watch. No Android, a integração de saúde ainda não está disponível.
             </p>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {[
@@ -726,6 +733,7 @@ function Wearables() {
                 { label: 'Apple Health', sub: '— HealthKit · iOS nativo', active: true },
                 { label: 'Frequência cardíaca', sub: '— BPM em tempo real', active: true },
                 { label: 'HRV & Recuperação', sub: '— SDNN · FC de repouso', active: true },
+                { label: 'Android', sub: '— Health Connect · em breve', active: false },
               ].map(chip => (
                 <div key={chip.label} style={{
                   display: 'inline-flex', alignItems: 'center', gap: 10,
