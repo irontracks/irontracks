@@ -17,7 +17,8 @@ import {
   toDateMs,
   averageNumbers,
   extractLogWeight,
-  avgSideValues,
+  extractLogReps,
+  extractLogRpe,
   withTimeout,
   readReportCache,
   writeReportCache,
@@ -142,11 +143,11 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
             const log = isObject(value) ? value : null;
             if (!log) return;
             const weight = extractLogWeight(log);
-            // Unilateral grava reps/rpe por lado (L_reps/R_reps, L_rpe/R_rpe) — sem o
-            // fallback, o histórico do unilateral ficava sem reps/rpe (peso já coberto
-            // pelo extractLogWeight). Usa a média dos lados.
-            const reps = toNumber(log.reps ?? null) ?? avgSideValues(log.L_reps, log.R_reps);
-            const rpe = toNumber(log.rpe ?? null) ?? avgSideValues(log.L_rpe, log.R_rpe);
+            // Unilateral grava reps/rpe por lado (L_reps/R_reps, L_rpe/R_rpe) — os
+            // extractors fazem o fallback pelos lados. Não inlinar com `??`: toNumber
+            // devolve 0 (não null) para campo ausente e o fallback nunca rodaria.
+            const reps = extractLogReps(log);
+            const rpe = extractLogRpe(log);
             const notes = typeof log.notes === 'string' && log.notes.trim() ? log.notes.trim() : null;
             // Preserve drop-set per-stage values for this set (if any).
             const dropSet = isObject(log.drop_set) ? (log.drop_set as UnknownRecord) : null;

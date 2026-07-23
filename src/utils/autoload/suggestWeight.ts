@@ -186,7 +186,14 @@ export function suggestWeight(input: SuggestInput): WeightSuggestion {
   // Substituto → mais conservador: nunca acima da carga âncora do substituto.
   const preRound = input.fromSubstitute ? Math.min(modulated, topWeight) : modulated
 
-  const weight = roundToIncrement(preRound, roundIncrement, 'down')
+  const rounded = roundToIncrement(preRound, roundIncrement, 'down')
+
+  // Trava anti-regressão PÓS-arredondamento: o incremento é um palpite pelo nome do
+  // exercício e nem sempre bate com a máquina real (ex.: "Flexora em pé" → passo de
+  // 5 kg, mas o usuário treina com 8 kg). Arredondar pra baixo derrubaria 8 → 5 kg —
+  // uma regressão de 37% num dia normal. O histórico prova que topWeight é montável,
+  // então num dia sem amortecimento (e fora do cold-start por substituto) ele é o piso.
+  const weight = factor === 1 && !input.fromSubstitute && rounded < topWeight ? topWeight : rounded
 
   // Confiança.
   const hasRpe = valid.some((s) => isFiniteNum(s.rpe))

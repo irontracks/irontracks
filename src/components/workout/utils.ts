@@ -19,10 +19,10 @@ export const DELOAD_REDUCTION_MIN = 0.05;
 export const DELOAD_REDUCTION_MAX = 0.4;
 export const WEIGHT_ROUND_STEP = 0.5;
 export const REPORT_HISTORY_LIMIT = 80;
-// v3: builder passou a ler peso/reps/rpe por lado (L_weight/R_weight…) p/ exercícios
-// unilaterais. Bump invalida caches v2 (construídos sem isso) e força reconstrução —
-// senão o histórico de unilateral fica sem dados e o autoload/watermark não sugerem.
-export const REPORT_CACHE_KEY = 'irontracks.report.history.v3';
+// v4: o builder v3 lia o PESO por lado mas ainda gravava reps/rpe=0 no unilateral
+// (toNumber devolve 0, não null → o fallback L/R nunca rodava). Sem reps o motor
+// descarta a série e o autoload não sugere. Bump força reconstrução com o builder novo.
+export const REPORT_CACHE_KEY = 'irontracks.report.history.v4';
 export const REPORT_CACHE_TTL_MS = 1000 * 60 * 15;
 export const REPORT_FETCH_TIMEOUT_MS = 9000;
 export const DELOAD_SUGGEST_MODE = 'watermark';
@@ -137,6 +137,28 @@ export const extractLogWeight = (log: unknown): number | null => {
   const uni = avgSideValues(base.L_weight, base.R_weight);
   if (uni != null && uni > 0) return uni;
   return null;
+};
+
+/**
+ * Reps da série, com fallback para os campos por lado do unilateral (L_reps/R_reps).
+ *
+ * NÃO dá pra escrever `toNumber(log.reps) ?? avgSideValues(...)`: `toNumber` devolve 0
+ * (não null) quando o campo não existe — o `??` nunca cairia no fallback e o unilateral
+ * ficava com reps=0. Série sem reps é descartada pelo motor → autoload sem sugestão.
+ */
+export const extractLogReps = (log: unknown): number | null => {
+  const base: UnknownRecord = isObject(log) ? log : {};
+  const direct = toNumber(base.reps ?? null);
+  if (direct != null && direct > 0) return direct;
+  return avgSideValues(base.L_reps, base.R_reps);
+};
+
+/** RPE da série, com o mesmo fallback por lado (L_rpe/R_rpe) do unilateral. */
+export const extractLogRpe = (log: unknown): number | null => {
+  const base: UnknownRecord = isObject(log) ? log : {};
+  const direct = toNumber(base.rpe ?? null);
+  if (direct != null && direct > 0) return direct;
+  return avgSideValues(base.L_rpe, base.R_rpe);
 };
 
 export const withTimeout = async <T,>(promise: PromiseLike<T>, ms: number): Promise<T> => {
