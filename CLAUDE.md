@@ -95,6 +95,19 @@ Toda auditoria de uma área NÃO está concluída sem verificar a cobertura de t
 - **Push notifications:** nunca modificar sem testar em device físico real.
 - **App ID:** `com.irontracks.app`. **Web dir do Capacitor:** `out/` (gerado por `next build`).
 
+## Teste no simulador iOS (o agente verifica sozinho, não o dono)
+**Regra fixa: o agente testa no simulador — não pede pro dono virar QA.** Build p/ simulador:
+```bash
+xcodebuild -project ios/App/App.xcodeproj -scheme App -configuration Debug \
+  -destination 'platform=iOS Simulator,id=<UDID>' -derivedDataPath /tmp/itsim-dd \
+  CODE_SIGNING_ALLOWED=NO build
+```
+Depois instala o `.app` de `/tmp/itsim-dd/Build/Products/Debug-iphonesimulator/App.app`.
+
+**⚠️ SEMPRE CANCELAR o treino de teste — NUNCA finalizar.** O simulador loga numa conta REAL (dados de produção). Finalizar grava um treino falso no histórico do dono e polui o `reportHistory` que alimenta o autoload. Usar o **X → Confirmar** ("não salva no histórico"). O mesmo vale pra qualquer escrita: preferir fluxos reversíveis.
+
+**Limitação conhecida:** com `CODE_SIGNING_ALLOWED=NO` a extensão do widget não registra as `ActivityConfiguration` — o log mostra `activitykit … Fetched descriptors for content states: []` e **a Live Activity não renderiza no simulador**. Isso é do build, NÃO é regressão. Não tire conclusão sobre a Ilha Dinâmica a partir do simulador.
+
 ## ⚠️ Live Activity (Ilha Dinâmica + tela bloqueada) — ZONA DE NÃO MEXER
 **Esta área já quebrou 12+ vezes, sempre EM SILÊNCIO.** Antes de tocar em qualquer coisa aqui, rode `npx vitest run src/hooks/__tests__/liveActivityRegressionGuards.test.ts` e `.../liveActivityTelemetry.test.ts`. Se um guard falhar, você está reintroduzindo uma regressão conhecida — **corrija o código, não afrouxe o teste.**
 
