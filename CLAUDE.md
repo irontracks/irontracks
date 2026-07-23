@@ -103,7 +103,7 @@ Toda auditoria de uma área NÃO está concluída sem verificar a cobertura de t
 **Os 3 vetores já corrigidos (não recriar):**
 1. **Corrida do bridge** — `window.Capacitor` pode não estar injetado no 1º render da WebView. O efeito de start em `src/hooks/useWorkoutLiveActivity.ts` **precisa** depender de `nativeReady` (reavaliação) — nunca só de `[workoutStartMs]`, senão a LA nunca nasce.
 2. **Limpeza de órfãs** — em `IronTracksAppClientImpl.tsx`, encerrar a LA assim que as settings carregam matava a activity recém-criada (`activeSession` chega async). **O atraso antes de `endWorkoutLiveActivity()` é obrigatório.**
-3. **`load()` do plugin Swift** (`IronTracksNativePlugin.swift`) encerra todas as `Activity<RestTimerAttributes>` a cada carga — um reload da WebView no meio do treino derruba a LA de descanso. *(Pendente: exige build nova.)*
+3. **`load()` do plugin Swift** — ⛔ **INVESTIGADO E DESCARTADO. NÃO "CORRIJA".** Ele encerra todas as `Activity<RestTimerAttributes>`, e isso **está certo**: o `SceneDelegate` tem a trava `pluginRegistered`, então `load()` roda **uma vez por lançamento do app** (cold start) — NÃO a cada foreground nem em reload da WebView. No cold start o timer de descanso (JS) morreu junto com o app, então encerrar é o correto. Trocar por "só encerrar as vencidas" cria **Live Activities fantasma** contando sozinhas. Já foi analisado a fundo; não precisa de build.
 
 **Arquitetura (o que exige build vs. o que não exige):** JS/hook/bridge = deploy web, vale na hora pra todos os apps instalados. Swift/widget/`pbxproj` = **só com build nova no TestFlight**. Por isso: **nunca** faça o JS chamar um método nativo que o build instalado não tem — vira `"IronTracksNative" plugin is not implemented on ios` (já gerou 6.833 eventos no Sentry).
 
