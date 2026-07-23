@@ -44,6 +44,15 @@ describe('viewPath — inversão view ↔ pathname', () => {
     expect(viewToPath('inexistente')).toBe('/dashboard')
   })
 
+  it('agenda: /dashboard/schedule é a view "schedule", não cai no dashboard', () => {
+    // Bug real: 'schedule' não estava mapeada, então pathnameToView caía no
+    // default 'dashboard'. O botão "Agenda" navegava pra /dashboard/schedule mas
+    // o god component renderizava o dashboard (e o ScheduleClient, renderizado
+    // pela page dentro do {children} display:none do layout, ficava invisível).
+    expect(pathnameToView('/dashboard/schedule')).toBe('schedule')
+    expect(viewToPath('schedule')).toBe('/dashboard/schedule')
+  })
+
   it('casos que já funcionavam seguem iguais', () => {
     expect(pathnameToView('/dashboard')).toBe('dashboard')
     expect(pathnameToView('/dashboard/active')).toBe('active')
