@@ -159,8 +159,14 @@ const NormalSetInner = ({
 
   // #autoload: sugestão do motor para esta série (só quando ligado) + fonte do peso.
   const autoSuggestion = autoLoadEnabled ? autoLoadSuggestions?.[key] : null;
-  const isAutoWeight = Boolean(autoLoadEnabled && log.weightSource === 'auto' && !log.done);
   const autoSuggestionWeight = autoSuggestion?.weight ?? null;
+  // O destaque violeta + o 🧠 só valem quando o valor na caixa É a sugestão atual.
+  // Sem esta igualdade a UI mentia: caixa com 90 (preenchimento antigo) e hint
+  // dizendo "subi p/ 95kg" (sugestão nova) — número e explicação divergindo.
+  const isAutoWeight = Boolean(
+    autoLoadEnabled && log.weightSource === 'auto' && !log.done &&
+    autoSuggestionWeight != null && String(log.weight ?? '') === String(autoSuggestionWeight),
+  );
 
   // Preenche a caixa de peso com a sugestão do motor — SÓ em série de trabalho, ainda
   // não concluída, ainda vazia e ainda não tocada (weightSource nulo). Depois de preencher
@@ -169,9 +175,16 @@ const NormalSetInner = ({
     if (!autoLoadEnabled || isUnilateral) return;
     if (setType !== 'working' || log.done) return;
     if (autoSuggestionWeight == null) return;
-    if (String(log.weight ?? '').trim() !== '') return;
-    if (log.weightSource != null) return;
-    updateLog(key, { weight: String(autoSuggestionWeight), weightSource: 'auto', advanced_config: cfg ?? log.advanced_config ?? null });
+    if (log.weightSource === 'user') return; // o usuário assumiu — nunca reescreve
+    const current = String(log.weight ?? '').trim();
+    const next = String(autoSuggestionWeight);
+    if (current === next) return; // já sincronizado
+    // Valor preexistente que NÃO é nosso (sessão restaurada, peso do template) → respeita.
+    if (current !== '' && log.weightSource !== 'auto') return;
+    // Preenche quando vazio E re-sincroniza quando a sugestão muda (o histórico é
+    // carregado do cache primeiro e atualizado pela rede depois). Sem isto o número
+    // congelava desatualizado e passava a contradizer a explicação.
+    updateLog(key, { weight: next, weightSource: 'auto', advanced_config: cfg ?? log.advanced_config ?? null });
   }, [autoLoadEnabled, isUnilateral, setType, log.done, log.weight, log.weightSource, log.advanced_config, autoSuggestionWeight, key, cfg, updateLog]);
 
   // Unilateral: preenche AMBOS os lados (L_weight/R_weight) com a sugestão — a série
@@ -180,13 +193,18 @@ const NormalSetInner = ({
     if (!autoLoadEnabled || !isUnilateral) return;
     if (setType !== 'working' || log.done) return;
     if (autoSuggestionWeight == null) return;
-    if (log.weightSource != null) return;
-    const lEmpty = String(log.L_weight ?? '').trim() === '';
-    const rEmpty = String(log.R_weight ?? '').trim() === '';
-    if (!lEmpty && !rEmpty) return;
+    if (log.weightSource === 'user') return; // o usuário assumiu um dos lados — não toca
+    const next = String(autoSuggestionWeight);
+    const l = String(log.L_weight ?? '').trim();
+    const r = String(log.R_weight ?? '').trim();
+    // Preenche o lado vazio E re-sincroniza o que ainda é nosso ('auto') quando a
+    // sugestão muda — senão o número congela e contradiz a explicação.
+    const lStale = l !== next && (l === '' || log.weightSource === 'auto');
+    const rStale = r !== next && (r === '' || log.weightSource === 'auto');
+    if (!lStale && !rStale) return;
     const patch: Record<string, unknown> = { weightSource: 'auto', advanced_config: cfg ?? log.advanced_config ?? null };
-    if (lEmpty) patch.L_weight = String(autoSuggestionWeight);
-    if (rEmpty) patch.R_weight = String(autoSuggestionWeight);
+    if (lStale) patch.L_weight = next;
+    if (rStale) patch.R_weight = next;
     updateLog(key, patch);
   }, [autoLoadEnabled, isUnilateral, setType, log.done, log.L_weight, log.R_weight, log.weightSource, log.advanced_config, autoSuggestionWeight, key, cfg, updateLog]);
 
@@ -253,8 +271,12 @@ const NormalSetInner = ({
   );
 
   // ── Input fields — unilateral ─────────────────────────────────────────
-  const lWeightField = useInputField(extLWeight, (v) => updateLog(key, { L_weight: noNegWeight(v) }));
-  const rWeightField = useInputField(extRWeight, (v) => updateLog(key, { R_weight: noNegWeight(v) }));
+  // Marca a fonte como 'user' ao editar um lado — sem isto a re-sincronização do
+  // autoload sobrescreveria o peso que o usuário digitou no lado.
+  const lWeightField = useInputField(extLWeight, (v) =>
+    updateLog(key, { L_weight: noNegWeight(v), ...(autoLoadEnabled ? { weightSource: 'user' } : {}) }));
+  const rWeightField = useInputField(extRWeight, (v) =>
+    updateLog(key, { R_weight: noNegWeight(v), ...(autoLoadEnabled ? { weightSource: 'user' } : {}) }));
   const lRepsField   = useInputField(extLReps,   (v) => updateLog(key, { L_reps: v }));
   const rRepsField   = useInputField(extRReps,   (v) => updateLog(key, { R_reps: v }));
   const lRpeField    = useInputField(extLRpe,    (v) => updateLog(key, { L_rpe: v }));
