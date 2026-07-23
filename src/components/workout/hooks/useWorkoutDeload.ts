@@ -68,6 +68,8 @@ interface UseWorkoutDeloadProps {
   getPlannedSet: (ex: WorkoutExercise, setIdx: number) => UnknownRecord | null;
   alert: (msg: string, title?: string) => Promise<void>;
   confirm: (msg: string, title?: string) => Promise<boolean>;
+  /** Dono da sessão — escopa o cache de histórico. Sem ele, não se serve cache. */
+  userId: string;
 }
 
 export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
@@ -81,6 +83,7 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
     getPlannedSet,
     alert,
     confirm,
+    userId,
   } = props;
 
   // Report history state
@@ -90,7 +93,7 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
   // initializer deixa as sugestões prontas no 1º render p/ quem tem cache quente.
   const [reportHistory, setReportHistory] = useState<ReportHistory>(() => {
     try {
-      const cached = readReportCache();
+      const cached = readReportCache(userId);
       if (cached?.data) return cached.data;
     } catch { /* localStorage indisponível → cai no vazio */ }
     return { version: 1, exercises: {} };
@@ -294,7 +297,7 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
   useEffect(() => {
     let cancelled = false;
     let loadingTimeoutId: ReturnType<typeof setTimeout> | null = null;
-    const cached = readReportCache();
+    const cached = readReportCache(userId);
     if (cached?.data && !cancelled) {
       setReportHistory(cached.data);
       setReportHistoryUpdatedAt(cached.cachedAt);
@@ -348,7 +351,7 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
           setReportHistory(next);
           setReportHistoryUpdatedAt(Date.now());
           setReportHistoryStatus({ status: 'ready', error: '', source: 'network' });
-          writeReportCache(next);
+          writeReportCache(next, userId);
         }
       } catch (e) {
         logError('hook:useWorkoutDeload.fetchReportHistory', e);
@@ -366,7 +369,9 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
       cancelled = true;
       if (loadingTimeoutId) clearTimeout(loadingTimeoutId);
     };
-  }, [supabase, buildReportHistoryFromWorkouts]);
+    // userId nas deps: trocar de conta precisa REBUSCAR o histórico, senão o novo
+    // usuário fica com o estado do anterior em memória.
+  }, [supabase, buildReportHistoryFromWorkouts, userId]);
 
   // Watchdog: detect stale loading state and timeout (replaces old ticker dep)
   useEffect(() => {
