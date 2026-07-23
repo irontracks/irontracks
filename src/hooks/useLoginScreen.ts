@@ -4,7 +4,8 @@ import { z } from 'zod'
 import { createClient } from '@/utils/supabase/client'
 import { useRouter } from 'next/navigation'
 import { isIosNative } from '@/utils/platform'
-import { logError } from '@/lib/logger'
+import { logError, logWarn } from '@/lib/logger'
+import { isExpectedAuthError } from '@/utils/auth/expectedAuthError'
 import { apiAuth } from '@/lib/api'
 import { writeSessionBackup, readSessionBackup, clearSessionBackup } from '@/utils/auth/sessionBackup'
 import { sha256Hex } from '@/utils/auth/appleNonce'
@@ -520,7 +521,11 @@ export function useLoginScreen() {
             // aos outros caminhos (o cookie HTTP-only recém-setado precisa ir no SSR).
             window.location.replace('/onboarding')
         } catch (err: unknown) {
-            logError('error', 'FirstAccess Verify Error:', err)
+            // Código OTP expirado/inválido, rate limit etc. são esperados (usuário demorou
+            // ou reusou um link velho) — não são falha de app. Vão como warn (só console),
+            // não pro Sentry, pra não virar ruído. Só o inesperado é reportado.
+            if (isExpectedAuthError(err)) logWarn('auth', 'FirstAccess OTP verify (esperado)', err)
+            else logError('error', 'FirstAccess Verify Error:', err)
             const raw = err instanceof Error ? err.message : 'Código inválido.'
             if (isWhitelistError(raw)) { setErrorMsg('Este e-mail ainda não foi cadastrado. Peça ao seu professor para te cadastrar primeiro.'); return }
             setErrorMsg(friendlyAuthError(raw))
