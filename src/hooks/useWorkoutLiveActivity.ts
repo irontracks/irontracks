@@ -14,7 +14,7 @@
  */
 'use client'
 
-import { useEffect, useMemo, useRef } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import {
   startWorkoutLiveActivity,
   updateWorkoutLiveActivity,
@@ -58,6 +58,21 @@ const num = (v: unknown): number => {
 }
 
 const MIN_UPDATE_INTERVAL_MS = 1000
+
+// ⚠️ NÃO REMOVER — guarda de regressão da Live Activity (ver liveActivityRegressionGuards.test.ts)
+//
+// O bridge do Capacitor (`window.Capacitor`) pode NÃO estar injetado no primeiro
+// render da WebView (corrida de hidratação do Next). Como o efeito de start
+// dependia só de [workoutStartMs], um `isIosNative()` falso nesse instante fazia
+// a Live Activity NUNCA nascer: o efeito não rodava de novo, `startedRef` ficava
+// falso pra sempre e NENHUM evento chegava ao Sentry (a telemetria só cobre
+// "o Swift falhou", não "o JS nunca chamou o Swift").
+//
+// Esta foi a causa raiz da regressão recorrente "a ilha dinâmica sumiu de novo".
+// Por isso o hook reavalia o bridge por alguns segundos em vez de desistir no
+// primeiro render.
+const BRIDGE_POLL_MS = 250
+const BRIDGE_MAX_TRIES = 20 // ~5 s de janela
 
 export function useWorkoutLiveActivity({
   workoutName,
@@ -109,6 +124,25 @@ export function useWorkoutLiveActivity({
     }
   }, [exercises, logs, currentExerciseIdx])
 
+  // ── Prontidão do bridge nativo ────────────────────────────────────────────
+  // ⚠️ NÃO REMOVER (ver bloco de constantes acima + guard de regressão).
+  // Reavalia `isIosNative()` por ~5 s em vez de desistir no primeiro render.
+  const [nativeReady, setNativeReady] = useState<boolean>(() => isIosNative())
+  useEffect(() => {
+    if (nativeReady) return
+    let tries = 0
+    const id = setInterval(() => {
+      tries += 1
+      if (isIosNative()) {
+        setNativeReady(true)
+        clearInterval(id)
+        return
+      }
+      if (tries >= BRIDGE_MAX_TRIES) clearInterval(id)
+    }, BRIDGE_POLL_MS)
+    return () => clearInterval(id)
+  }, [nativeReady])
+
   // ── Lifecycle: start on mount, end on unmount ─────────────────────────────
   const startedRef = useRef(false)
   const lastUpdateMsRef = useRef(0)
@@ -133,7 +167,7 @@ export function useWorkoutLiveActivity({
   // the workout LA no longer needs to get out of the way — it just keeps
   // running underneath for the whole session.
   useEffect(() => {
-    if (!isIosNative()) return
+    if (!nativeReady) return
     if (!Number.isFinite(workoutStartMs) || workoutStartMs <= 0) return
     if (startedRef.current) return
     startedRef.current = true
@@ -153,11 +187,11 @@ export function useWorkoutLiveActivity({
     // Snapshot/workoutName changes flow through the dedicated update effect
     // below — we only re-run this lifecycle for start/end transitions.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [workoutStartMs])
+  }, [workoutStartMs, nativeReady])
 
   // ── Throttled updates: max 1 per second ───────────────────────────────────
   useEffect(() => {
-    if (!isIosNative()) return
+    if (!nativeReady) return
     if (!startedRef.current) return
 
     const now = Date.now()
@@ -176,5 +210,5 @@ export function useWorkoutLiveActivity({
       if (pendingUpdateTimerRef.current) clearTimeout(pendingUpdateTimerRef.current)
       pendingUpdateTimerRef.current = setTimeout(flush, MIN_UPDATE_INTERVAL_MS - elapsed)
     }
-  }, [snapshot])
+  }, [snapshot, nativeReady])
 }

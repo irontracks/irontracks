@@ -321,10 +321,26 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         if (!isIosNative()) return
         if (!userSettingsApi.loaded) return
         if (staleActivityCleanedRef.current) return
-        staleActivityCleanedRef.current = true
-        if (!activeSession) {
-            endWorkoutLiveActivity().catch(() => {})
+        // Há sessão ativa → não existe órfã pra limpar.
+        if (activeSession) {
+            staleActivityCleanedRef.current = true
+            return
         }
+        // ⚠️ NÃO REMOVER O ATRASO — guarda de regressão da Live Activity
+        // (ver src/hooks/__tests__/liveActivityRegressionGuards.test.ts).
+        //
+        // `activeSession` chega de forma ASSÍNCRONA. A versão anterior marcava o
+        // ref e chamava endWorkoutLiveActivity() assim que as settings carregavam;
+        // quando `loaded` virava true ANTES da sessão popular, isso encerrava a
+        // Live Activity que o ActiveWorkout tinha acabado de criar — sintoma
+        // clássico "a ilha dinâmica aparece e some". Esperar a sessão assentar
+        // resolve: se ela chegar, o efeito re-roda e o timer é cancelado.
+        const timer = setTimeout(() => {
+            if (staleActivityCleanedRef.current) return
+            staleActivityCleanedRef.current = true
+            endWorkoutLiveActivity().catch(() => { })
+        }, 6000)
+        return () => clearTimeout(timer)
     }, [userSettingsApi.loaded, activeSession])
 
     // Offline sync state — extracted to useOfflineSync hook
