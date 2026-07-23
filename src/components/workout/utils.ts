@@ -247,11 +247,27 @@ export const normalizeReportHistory = (data: unknown): ReportHistory => {
   return { version, exercises };
 };
 
-export const readReportCache = (): { data: ReportHistory; cachedAt: number; stale: boolean } | null => {
+/**
+ * Chave do cache ESCOPADA POR USUÁRIO.
+ *
+ * Sem escopo, trocar de conta no mesmo aparelho servia o histórico do usuário
+ * anterior: logar numa conta sem histórico gravava um cache VAZIO que era então
+ * entregue à conta cheia — e, por estar "fresco", o fetch de rede era pulado
+ * (`if (cached?.data && !cached.stale) return`). Sintoma: zero sugestões e zero
+ * watermark, sem nenhum erro. Reproduzido no simulador em 2026-07-23.
+ *
+ * `userId` é OBRIGATÓRIO de propósito: sem usuário conhecido não se serve cache
+ * (melhor buscar da rede do que arriscar servir dado de outra conta).
+ */
+const reportCacheKeyFor = (userId: string): string => `${REPORT_CACHE_KEY}.${userId}`;
+
+export const readReportCache = (userId: string): { data: ReportHistory; cachedAt: number; stale: boolean } | null => {
   try {
+    const uid = String(userId ?? '').trim();
+    if (!uid) return null;
     const win = typeof window !== 'undefined' ? window : null;
     if (!win || !win.localStorage) return null;
-    const raw = win.localStorage.getItem(REPORT_CACHE_KEY);
+    const raw = win.localStorage.getItem(reportCacheKeyFor(uid));
     if (!raw) return null;
     const parsed = safeJsonParse(raw);
     if (!isObject(parsed)) return null;
@@ -265,12 +281,14 @@ export const readReportCache = (): { data: ReportHistory; cachedAt: number; stal
   }
 };
 
-export const writeReportCache = (data: unknown) => {
+export const writeReportCache = (data: unknown, userId: string) => {
   try {
+    const uid = String(userId ?? '').trim();
+    if (!uid) return;
     const win = typeof window !== 'undefined' ? window : null;
     if (!win || !win.localStorage) return;
     const payload = { cachedAt: Date.now(), data: normalizeReportHistory(data) };
-    win.localStorage.setItem(REPORT_CACHE_KEY, JSON.stringify(payload));
+    win.localStorage.setItem(reportCacheKeyFor(uid), JSON.stringify(payload));
   } catch {}
 };
 

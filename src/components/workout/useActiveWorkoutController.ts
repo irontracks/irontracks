@@ -251,6 +251,8 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     getPlanConfig: (ex, setIdx) => getPlanConfig(ex, setIdx),
     getPlannedSet: (ex, setIdx) => getPlannedSet(ex, setIdx),
     alert: alertVoid, confirm,
+    // Escopa o cache de histórico por usuário (trocar de conta servia o do anterior).
+    userId: String((settings as Record<string, unknown>)?.userId ?? (session as Record<string, unknown>)?.userId ?? ''),
   });
   const {
     reportHistory, reportHistoryStatus, reportHistoryUpdatedAt,
