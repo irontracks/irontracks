@@ -12,6 +12,7 @@ import { buildReportMetrics, buildWeeklyVolumeStats, buildTrainingLoadFlags } fr
 import { logWarn, logError } from '@/lib/logger'
 import { notifyWorkoutFinished } from '@/lib/social/workoutNotifications'
 import { respondDbError } from '@/utils/api/dbError'
+import { buildPostCheckinRow } from './postCheckinRow'
 import { env } from '@/utils/env'
 
 const LogEntrySchema = z
@@ -262,6 +263,20 @@ export async function POST(request: Request) {
     try {
       await supabase.from('active_workout_sessions').delete().eq('user_id', user.id)
     } catch (e) { logWarn('workouts/finish', 'Failed to delete active_workout_sessions', e) }
+
+    // #2 auto-carga: espelha o check-out (RPE/satisfação/dor da sessão) numa linha
+    // estruturada de workout_checkins (kind='post') pra consulta longitudinal barata.
+    // Além do JSON em notes (mantido). Só na PRIMEIRA gravação (idempotente=replay já
+    // gravou) e nunca quebra a finalização. RLS: workout_id pertence ao user → passa.
+    if (!idempotent && saved?.id) {
+      try {
+        const row = buildPostCheckinRow(sessionObj?.postCheckin, {
+          userId: user.id,
+          workoutId: String(saved.id),
+        })
+        if (row) await supabase.from('workout_checkins').insert(row)
+      } catch (e) { logWarn('workouts/finish', 'Failed to persist structured post-checkin', e) }
+    }
 
     await notifyWorkoutFinished(user.id, saved?.id ? String(saved.id) : null, sessionObj)
 
