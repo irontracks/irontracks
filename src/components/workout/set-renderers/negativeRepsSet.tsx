@@ -9,11 +9,13 @@ import {
   normalizeExerciseKey,
 } from '../utils';
 import { UnknownRecord, WorkoutExercise } from '../types';
+import { useAutoloadWeight } from '../hooks/useAutoloadWeight';
 
 const NegativeRepsSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: number; setIdx: number }) => {
   const { getLog, updateLog, setNegativeRepsModal, openNotesKeys, toggleNotes, startTimer, reportHistory } = useWorkoutContext();
   const key = `${exIdx}-${setIdx}`;
   const log = getLog(key);
+  const { isAutoWeight, rationale: autoRationale } = useAutoloadWeight(ex, exIdx, setIdx);
   const nr = isObject(log.negative_reps) ? (log.negative_reps as UnknownRecord) : null;
   const savedWeight = String(nr?.weight ?? log.weight ?? '').trim();
   const reps = parseTrainingNumber(nr?.reps ?? log.reps) ?? null;
@@ -96,6 +98,11 @@ const NegativeRepsSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exId
         )}
       </div>
       {!done && !canDone && <div className="pl-12 text-[11px] text-neutral-500 font-semibold">Preencha peso, reps e tempo excêntrico no modal.</div>}
+      {isAutoWeight && autoRationale && (
+        <div className="pl-12 flex items-center gap-1 text-[10px] text-violet-300/80" title={autoRationale}>
+          <span aria-hidden>🧠</span><span className="truncate">{autoRationale}</span>
+        </div>
+      )}
       {isNotesOpen && (
         <div className="space-y-1.5">
           {prevNote && (
