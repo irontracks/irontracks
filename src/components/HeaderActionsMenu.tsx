@@ -16,7 +16,7 @@ import {
   Sparkles,
   Crown,
 } from 'lucide-react'
-import { isIosNative } from '@/utils/platform'
+import { shouldHidePurchaseCtas } from '@/utils/vip/purchaseCtas'
 
 interface HeaderActionsMenuProps {
   user: {
@@ -145,7 +145,7 @@ export default function HeaderActionsMenu({
   const [dropdownStyle, setDropdownStyle] = useState<React.CSSProperties>({})
   const openedAtRef = useRef(0)
   const triggerRef = useRef<HTMLButtonElement>(null)
-  useEffect(() => { setHideVipCtas(isIosNative()) }, [])
+  useEffect(() => { setHideVipCtas(shouldHidePurchaseCtas()) }, [])
   useEffect(() => { setPortalMounted(true) }, [])
 
   useEffect(() => {
