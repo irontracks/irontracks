@@ -18,6 +18,8 @@ import { env } from '@/utils/env'
 const LogEntrySchema = z
   .object({
     done: z.boolean().optional(),
+    // #4a auto-carga: série levada à falha muscular (sinal explícito p/ progressão)
+    failure: z.boolean().optional(),
     // null is a valid value when the user left the field blank (e.g. cardio sets)
     weight: z.union([z.string(), z.number(), z.null()]).optional(),
     reps: z.union([z.string(), z.number(), z.null()]).optional(),

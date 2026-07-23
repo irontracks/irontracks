@@ -151,6 +151,9 @@ const NormalSetInner = ({
   const lDone = !!log.L_done;
   const rDone = !!log.R_done;
   const done  = !!log.done;
+  // #4a auto-carga: série levada à falha muscular. RPE 10 ≠ sempre falha; esse
+  // sinal explícito muda a decisão de progressão do motor (falhou → não sobe carga).
+  const failed = !!log.failure;
 
   // External values — non-unilateral
   const extWeight = String(log.weight ?? cfg?.weight ?? '');
@@ -499,6 +502,23 @@ const NormalSetInner = ({
     </div>
   );
 
+  const failureToggle = (
+    <button
+      type="button"
+      onClick={() => updateLog(key, { failure: !failed, advanced_config: cfg ?? log.advanced_config ?? null })}
+      aria-pressed={failed}
+      aria-label={`Marcar série ${setIdx + 1} como levada à falha`}
+      className={[
+        'inline-flex items-center gap-1 h-7 px-2.5 rounded-lg text-[11px] font-black uppercase tracking-widest border transition-colors',
+        failed
+          ? 'text-red-300 bg-red-500/15 border-red-500/40'
+          : 'text-neutral-500 bg-black/30 border-neutral-700 hover:text-red-300 hover:border-red-500/40',
+      ].join(' ')}
+    >
+      💥 {failed ? 'Falha' : 'Falha?'}
+    </button>
+  );
+
   return (
     <div className="space-y-1" key={key}>
       {isUnilateral ? (
@@ -507,7 +527,8 @@ const NormalSetInner = ({
           {renderSideRow('L', lDone, lWeightField, lRepsField, lRpeField, handleCompleteL, setIdx === 0)}
           {renderSideRow('R', rDone, rWeightField, rRepsField, rRpeField, handleCompleteR, false)}
           {/* Notes button sits below both L+R rows — clear of exercise footer buttons */}
-          <div className="flex items-center justify-end px-0.5 -mt-0.5">
+          <div className="flex items-center justify-end gap-2 px-0.5 -mt-0.5">
+            {failureToggle}
             <button
               type="button"
               aria-label={isNotesOpen ? 'Fechar observações' : 'Observações'}
@@ -623,6 +644,10 @@ const NormalSetInner = ({
               <Check size={13} />
               {done ? 'Feito' : 'Concluir'}
             </button>
+          </div>
+          {/* #4a auto-carga: falha muscular — sempre visível (marca durante/ao concluir) */}
+          <div className="mt-1 flex justify-end">
+            {failureToggle}
           </div>
           {/* Per-set method picker */}
           {!done && (
