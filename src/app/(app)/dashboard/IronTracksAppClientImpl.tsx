@@ -18,6 +18,7 @@ import { pathnameToView, viewToPath } from './viewPath';
 const CardioGPSPanel = dynamic(() => import('@/components/workout/CardioGPSPanel'), { ssr: false })
 const AdminPanelV2 = dynamic(() => import('@/components/AdminPanelV2'), { ssr: false });
 const TeacherArea = dynamic(() => import('@/components/teacher-area/TeacherArea'), { ssr: false });
+const ScheduleClient = dynamic(() => import('./schedule/ScheduleClient'), { ssr: false });
 const TeacherChatHost = dynamic(() => import('@/components/teacher-area/TeacherChatHost'), { ssr: false });
 const ChatListScreen = dynamic(() => import('@/components/ChatListScreen'), { ssr: false });
 const ChatDirectScreen = dynamic(() => import('@/components/ChatDirectScreen'), { ssr: false });
@@ -1413,6 +1414,14 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                 <div className="fixed inset-0 z-[60]">
                                     <SectionErrorBoundary section="Área do Professor" fullScreen onReset={() => setView('dashboard')}>
                                         <TeacherArea user={user as AdminUser} onClose={() => setView('dashboard')} />
+                                    </SectionErrorBoundary>
+                                </div>
+                            )}
+
+                            {view === 'schedule' && (
+                                <div className="fixed inset-0 z-[60] overflow-y-auto bg-neutral-950">
+                                    <SectionErrorBoundary section="Agenda" fullScreen onReset={() => setView('dashboard')}>
+                                        <ScheduleClient />
                                     </SectionErrorBoundary>
                                 </div>
                             )}
