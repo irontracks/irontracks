@@ -12,6 +12,11 @@ import {
 } from '../utils';
 import { UnknownRecord, WorkoutExercise } from '../types';
 import { useAutoloadWeight } from '../hooks/useAutoloadWeight';
+import { roundSuggestedWeight } from '@/utils/autoload/plateMath';
+import { inferEquipmentFromName } from '@/utils/autoload/equipmentFromName';
+
+/** Queda de carga por etapa do drop (~20%: o que o método manda e o histórico mostra). */
+const DROP_STAGE_DECAY = 0.2;
 
 const DropSetSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: number; setIdx: number }) => {
   const {
@@ -27,7 +32,7 @@ const DropSetSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: nu
 
   const key = `${exIdx}-${setIdx}`;
   const log = getLog(key);
-  const { isAutoWeight, rationale: autoRationale } = useAutoloadWeight(ex, exIdx, setIdx);
+  const { isAutoWeight, rationale: autoRationale, suggestedWeight } = useAutoloadWeight(ex, exIdx, setIdx);
   const plannedSet = getPlannedSet(ex, setIdx);
   const cfgRaw = plannedSet?.advanced_config ?? plannedSet?.advancedConfig ?? null;
   const stagesPlannedRaw: unknown[] = Array.isArray(cfgRaw) ? cfgRaw : [];
@@ -50,10 +55,21 @@ const DropSetSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: nu
   const auto = isObject(plannedSet?.it_auto) ? (plannedSet.it_auto as UnknownRecord) : null;
   const modeLabel = String(auto?.label || '').trim() || 'Drop';
 
+  // #autoload no drop: o motor sugere o peso de TRABALHO, que aqui é a 1ª etapa.
+  // As seguintes caem ~20% (o que o próprio enunciado do método manda e o que o
+  // histórico real mostra), arredondadas pelo passo montável do equipamento.
+  // Só preenche etapa VAZIA — nunca sobrescreve o que o usuário ou o template puseram.
+  const autoStageWeight = (idx: number): string => {
+    if (suggestedWeight == null || suggestedWeight <= 0) return '';
+    const raw = suggestedWeight * Math.pow(1 - DROP_STAGE_DECAY, idx);
+    const rounded = roundSuggestedWeight(raw, inferEquipmentFromName(ex?.name));
+    return rounded > 0 ? String(rounded) : '';
+  };
+
   const stages: Array<{ weight: string; reps: number | null }> = Array.from({ length: stagesCount }).map((_, idx) => {
     const saved = isObject(stagesSavedRaw[idx]) ? (stagesSavedRaw[idx] as UnknownRecord) : null;
     const planned = isObject(stagesPlannedRaw[idx]) ? (stagesPlannedRaw[idx] as UnknownRecord) : null;
-    const weight = String(saved?.weight ?? planned?.weight ?? '').trim();
+    const weight = String(saved?.weight ?? planned?.weight ?? autoStageWeight(idx) ?? '').trim();
     const reps = parseTrainingNumber(saved?.reps ?? planned?.reps) ?? null;
     return { weight, reps };
   });

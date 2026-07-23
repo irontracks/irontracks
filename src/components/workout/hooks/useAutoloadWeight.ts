@@ -21,6 +21,9 @@ export function useAutoloadWeight(ex: WorkoutExercise, exIdx: number, setIdx: nu
   isAutoWeight: boolean
   rationale: string
   autoInputClass: string
+  /** Peso sugerido pelo motor (null quando não há). Métodos com etapas (drop) usam
+   *  isto para semear a 1ª etapa — o `log.weight` sozinho não chega nas etapas. */
+  suggestedWeight: number | null
 } {
   const { autoLoadEnabled, autoLoadSuggestions, getLog, updateLog, getPlanConfig } = useWorkoutContext()
 
@@ -62,5 +65,6 @@ export function useAutoloadWeight(ex: WorkoutExercise, exIdx: number, setIdx: nu
     isAutoWeight,
     rationale: suggestion?.rationale ?? '',
     autoInputClass: isAutoWeight ? AUTO_INPUT_CLASS : '',
+    suggestedWeight: sugWeight,
   }
 }

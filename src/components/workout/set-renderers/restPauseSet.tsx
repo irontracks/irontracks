@@ -218,7 +218,10 @@ const RestPauseSetInner = ({
                 <MessageSquare size={12} />
               </button>
             </div>
-            <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+            {/* Botão AO LADO, nunca embaixo. Era `flex-col sm:flex-row`: no celular
+                empilhava e o Concluir descia pra uma linha própria, destoando dos
+                demais métodos (reportado pelo dono). */}
+            <div className="flex flex-row items-center gap-2">
               <div className="flex items-center gap-2 flex-1 min-w-0">
                 <span className="text-[10px] uppercase tracking-widest font-black text-yellow-500 inline-flex items-center gap-1 group">
                   {modeLabel === 'SST' ? 'SST' : 'Rest-P'}
@@ -256,8 +259,8 @@ const RestPauseSetInner = ({
                 }}
                 className={
                   canDone
-                    ? 'inline-flex items-center justify-center gap-2 min-h-[40px] px-3 py-2 rounded-xl bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 font-black hover:bg-yellow-500/20 hover:border-yellow-500/50 active:scale-95 transition duration-150 sm:w-auto'
-                    : 'inline-flex items-center justify-center gap-2 min-h-[40px] px-3 py-2 rounded-xl bg-neutral-800/40 border border-neutral-800 text-neutral-400 font-bold cursor-not-allowed sm:w-auto'
+                    ? 'inline-flex items-center justify-center gap-2 min-h-[40px] px-3 py-2 rounded-xl bg-yellow-500/10 border border-yellow-500/30 text-yellow-400 font-black hover:bg-yellow-500/20 hover:border-yellow-500/50 active:scale-95 transition duration-150 shrink-0'
+                    : 'inline-flex items-center justify-center gap-2 min-h-[40px] px-3 py-2 rounded-xl bg-neutral-800/40 border border-neutral-800 text-neutral-400 font-bold cursor-not-allowed shrink-0'
                 }
               >
                 <Check size={16} />
