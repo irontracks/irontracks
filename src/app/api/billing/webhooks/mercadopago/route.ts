@@ -162,6 +162,39 @@ export async function POST(req: Request) {
 
       const meta = preapproval && typeof preapproval === 'object' ? { mercadopago: { raw: preapproval } } : { mercadopago: {} }
 
+      // ── student_plan_recurring: assinatura por cartão do ALUNO ────────────────
+      // O aluno guarda o preapproval em student_subscriptions.preapproval_id (não em
+      // app_subscriptions). Trata aqui e retorna cedo. O ciclo de cobrança (started/expires/
+      // next_due/last_payment) é do ramo de `payment`; aqui só reflete o ESTADO da assinatura.
+      // external_reference: student_plan_recurring:teacher:plan:student:sub
+      {
+        const extRef = String(preapproval?.external_reference || '').trim()
+        if (extRef.startsWith('student_plan_recurring:')) {
+          const subId = extRef.split(':')[4]
+          const nowIso = new Date().toISOString()
+          if (subId) {
+            if (status === 'cancelled') {
+              await admin.from('student_subscriptions')
+                .update({ status: 'cancelled', canceled_at: nowIso, updated_at: nowIso })
+                .eq('id', subId)
+            } else if (status === 'active') {
+              // Preapproval autorizado = cartão OK, mas NÃO significa que a 1ª cobrança foi
+              // coletada. Conceder acesso aqui deixaria a assinatura 'active' com expires_at=NULL
+              // (que o cron de suspensão nunca pega) se a 1ª cobrança falhar → acesso de graça.
+              // O acesso (status='active' + expires_at) é concedido SÓ pelo ramo de `payment`,
+              // que valida o valor. Aqui só registramos o vínculo do preapproval.
+              await admin.from('student_subscriptions')
+                .update({ recurring: true, billing_method: 'card', preapproval_id: providerSubscriptionId, updated_at: nowIso })
+                .eq('id', subId)
+            } else {
+              // pending/past_due/etc. — reflete o estado mapeado sem mexer no ciclo.
+              await admin.from('student_subscriptions').update({ status, updated_at: nowIso }).eq('id', subId)
+            }
+          }
+          return NextResponse.json({ ok: true })
+        }
+      }
+
       // Fix #4: Preserve existing metadata instead of overwriting
       const { data: existingSub } = await admin
         .from('app_subscriptions')
@@ -291,7 +324,10 @@ export async function POST(req: Request) {
       // ── student_plan: activate student subscription ───────────────────────────
       // external_reference format: student_plan:teacherUserId:planId:studentUserId:subscriptionId
       if (scope === 'student_plan' && userId) {
-        const [, , , subscriptionId] = externalRef.split(':')
+        // subscriptionId é o 5º campo (índice 4). ANTES lia índice 3 (studentUserId) — a
+        // assinatura nunca ativava (o update .eq('id', <studentUserId>) não casava linha
+        // nenhuma). Latente porque produção tinha 0 assinaturas; corrigido na Fase 8.
+        const subscriptionId = externalRef.split(':')[4]
 
         if (status.toLowerCase() === 'approved' && subscriptionId) {
           const now = new Date()
@@ -345,6 +381,82 @@ export async function POST(req: Request) {
             .from('student_subscriptions')
             .update({ status: 'cancelled', updated_at: new Date().toISOString() })
             .eq('id', subscriptionId)
+        }
+
+        return NextResponse.json({ ok: true })
+      }
+
+      // ── student_plan_recurring: cobrança RECORRENTE por cartão do ALUNO ───────
+      // external_reference: student_plan_recurring:teacherUserId:planId:studentUserId:subscriptionId
+      if (scope === 'student_plan_recurring' && userId) {
+        const parts = externalRef.split(':')
+        const teacherUserId = parts[1]
+        const recPlanId = parts[2]
+        const studentUserId = parts[3]
+        const subscriptionId = parts[4]
+        const now = new Date()
+
+        if (status.toLowerCase() === 'approved' && subscriptionId) {
+          const { data: sub } = await admin
+            .from('student_subscriptions')
+            .select('id, started_at, student_service_plans(duration_days, price_cents)')
+            .eq('id', subscriptionId)
+            .maybeSingle()
+          const planData = sub?.student_service_plans
+          const planRow = (Array.isArray(planData) ? planData[0] : planData) as { duration_days?: number; price_cents?: number } | null | undefined
+          const durationDays = Number(planRow?.duration_days ?? 30)
+
+          const amt = assessPaymentAmount(amountCents, planRow?.price_cents, currency, undefined)
+          if (amt.mismatch) logWarn('billing:webhooks:mp', `student_plan_recurring amount mismatch — ${amt.detail}`, { subscriptionId, dataId })
+          if (amt.block) {
+            logError('billing:webhooks:mp', new Error(`student_plan_recurring grant BLOQUEADO por valor — ${amt.detail} sub=${subscriptionId} dataId=${dataId}`))
+            return NextResponse.json({ ok: true, skipped: 'amount_mismatch' })
+          }
+
+          const expires = new Date(now); expires.setDate(expires.getDate() + durationDays)
+          const nextDue = new Date(expires); nextDue.setDate(nextDue.getDate() - 5)
+          const period = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`
+
+          // Idempotente por provider_payment_id (o webhook pode reentregar). O índice único
+          // (subscription_id, period) é a rede de segurança anti-cobrança-dupla no mesmo ciclo.
+          const { data: existingCharge } = await admin
+            .from('student_charges').select('id').eq('provider_payment_id', dataId).maybeSingle()
+          if (!existingCharge) {
+            const { error: insErr } = await admin.from('student_charges').insert({
+              subscription_id: subscriptionId,
+              teacher_user_id: teacherUserId,
+              student_user_id: studentUserId,
+              plan_id: recPlanId,
+              amount_cents: amountCents,
+              currency,
+              status: 'approved',
+              provider: 'mercadopago',
+              provider_payment_id: dataId,
+              period,
+              paid_at: now.toISOString(),
+              raw: payment,
+            })
+            if (insErr) logWarn('billing:webhooks:mp', `student_plan_recurring charge insert falhou (provável duplicata de ciclo) — ${insErr.message}`, { subscriptionId, period })
+          }
+
+          await admin.from('student_subscriptions').update({
+            status: 'active',
+            started_at: sub?.started_at || now.toISOString(),
+            expires_at: expires.toISOString(),
+            last_payment_at: now.toISOString(),
+            next_due_date: nextDue.toISOString().slice(0, 10),
+            dunning_attempts: 0,
+            updated_at: now.toISOString(),
+          }).eq('id', subscriptionId)
+
+          return NextResponse.json({ ok: true })
+        }
+
+        const revokeStatuses = ['refunded', 'cancelled', 'charged_back', 'chargedback', 'rejected']
+        if (revokeStatuses.includes(status.toLowerCase()) && subscriptionId) {
+          await admin.from('student_charges').update({ status }).eq('provider_payment_id', dataId)
+          // Cobrança recorrente falhou → assinatura fica past_due; o cron de suspensão trata a carência.
+          await admin.from('student_subscriptions').update({ status: 'past_due', updated_at: now.toISOString() }).eq('id', subscriptionId)
         }
 
         return NextResponse.json({ ok: true })
