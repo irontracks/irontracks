@@ -129,8 +129,17 @@ export function suggestWeight(input: SuggestInput): WeightSuggestion {
   const targetRpe = isFiniteNum(input.targetRpe) ? clampRpe(input.targetRpe as number) : DEFAULT_TARGET_RPE
   const inc = resolveIncrement(input.equipment)
 
-  // Equipamento sem carga (peso corporal / elástico) → não prescreve kg.
-  if (!inc.loadBearing) {
+  // Séries válidas do histórico (peso e reps positivos).
+  const valid = (Array.isArray(input.history) ? input.history : []).filter(
+    (s) => isFiniteNum(s?.weight) && s.weight > 0 && isFiniteNum(s?.reps) && s.reps > 0,
+  )
+  const hasWeightHistory = valid.length > 0
+
+  // Só trata como "sem carga externa" (progressão por reps) quando o equipamento diz
+  // isso E não há histórico de peso real. A inferência de equipamento pelo nome erra em
+  // exercícios com carga cujo nome parece peso corporal (ex.: "Abdominal infra" feito com
+  // 50kg no cabo/máquina) — nesse caso o histórico de kg manda e o motor sugere normalmente.
+  if (!inc.loadBearing && !hasWeightHistory) {
     return {
       weight: null,
       reps: targetReps || null,
@@ -139,11 +148,7 @@ export function suggestWeight(input: SuggestInput): WeightSuggestion {
     }
   }
 
-  // Séries válidas do histórico (peso e reps positivos).
-  const valid = (Array.isArray(input.history) ? input.history : []).filter(
-    (s) => isFiniteNum(s?.weight) && s.weight > 0 && isFiniteNum(s?.reps) && s.reps > 0,
-  )
-  if (valid.length === 0) {
+  if (!hasWeightHistory) {
     return {
       weight: null,
       reps: targetReps || null,
@@ -151,6 +156,10 @@ export function suggestWeight(input: SuggestInput): WeightSuggestion {
       rationale: 'Sem histórico neste exercício — faça a 1ª série pra calibrar.',
     }
   }
+
+  // Incremento de arredondamento: o do equipamento quando é de carga; senão o histórico
+  // de peso prova que é carregável, então usa um passo padrão seguro de 2,5 kg.
+  const roundIncrement = inc.loadBearing ? inc.increment : 2.5
 
   // Referência = melhor e1RM da última sessão + a série de maior carga (âncora anti-regressão).
   const e1rms = valid.map(estimateE1RM).filter(isFiniteNum) as number[]
@@ -177,7 +186,7 @@ export function suggestWeight(input: SuggestInput): WeightSuggestion {
   // Substituto → mais conservador: nunca acima da carga âncora do substituto.
   const preRound = input.fromSubstitute ? Math.min(modulated, topWeight) : modulated
 
-  const weight = roundToIncrement(preRound, inc.increment, 'down')
+  const weight = roundToIncrement(preRound, roundIncrement, 'down')
 
   // Confiança.
   const hasRpe = valid.some((s) => isFiniteNum(s.rpe))
