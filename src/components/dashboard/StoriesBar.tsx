@@ -18,6 +18,20 @@ const initials = (name: string) => {
   return n.slice(0, 1).toUpperCase()
 }
 
+/**
+ * Prévia (thumbnail) da mídia de um story, pra usar no círculo do PRÓPRIO story
+ * na fileira — em vez da foto de avatar, que duplicaria o avatar do header.
+ * Para vídeo, o Cloudinary devolve o primeiro frame só trocando a extensão por .jpg.
+ */
+export const storyPreviewUrl = (
+  story?: { mediaUrl: string | null; mediaKind?: 'image' | 'video' } | null,
+): string | null => {
+  const url = story?.mediaUrl
+  if (!url) return null
+  if (story?.mediaKind === 'video') return url.replace(/\.(mp4|mov|webm|m4v)(\?.*)?$/i, '.jpg')
+  return url
+}
+
 export default function StoriesBar({
   currentUserId,
   onMyStoryStateChange,
@@ -183,8 +197,15 @@ export default function StoriesBar({
   const ordered = useMemo(() => {
     const arr = Array.isArray(groups) ? groups : []
     if (!myId) return arr
-    // Own avatar removed from visual row — it lives in the header Story Ring
-    return arr.filter((g) => g.authorId !== myId)
+    // O próprio story volta pra fileira, SEMPRE em primeiro, mas o círculo mostra
+    // a prévia da mídia postada (não a foto de avatar — que duplicaria o avatar do
+    // header, motivo pelo qual ele tinha sido removido daqui). Só entra se houver
+    // story ativo; senão a fileira segue só com os amigos.
+    const mine = arr.find(
+      (g) => g.authorId === myId && Array.isArray(g.stories) && g.stories.length > 0,
+    )
+    const others = arr.filter((g) => g.authorId !== myId)
+    return mine ? [mine, ...others] : others
   }, [groups, myId])
 
   // Keep own story group available for viewing from the header tap
@@ -301,7 +322,10 @@ export default function StoriesBar({
         {ordered.map((g) => {
           const hasStories = Array.isArray(g.stories) && g.stories.length > 0
           const hasUnseen = !!g.hasUnseen
-          const name = String(g.displayName || '').trim() || 'Amigo'
+          const isMine = g.authorId === myId
+          const name = isMine ? 'Seu story' : (String(g.displayName || '').trim() || 'Amigo')
+          // No próprio story, o círculo mostra a prévia da mídia; nos amigos, o avatar.
+          const avatarSrc = (isMine ? storyPreviewUrl(g.stories?.[0]) : null) || g.photoUrl
 
           const ringType = !hasStories
             ? 'none'
@@ -317,7 +341,7 @@ export default function StoriesBar({
                   setOpen(true)
                 }}
                 className="w-[72px] focus:outline-none"
-                aria-label={hasStories ? `Abrir stories de ${name}` : `Sem stories de ${name}`}
+                aria-label={hasStories ? (isMine ? 'Ver seu story' : `Abrir stories de ${name}`) : `Sem stories de ${name}`}
               >
                 {/* Gradient ring wrapper */}
                 <div className="relative w-16 h-16 mx-auto">
@@ -342,8 +366,8 @@ export default function StoriesBar({
                     'absolute rounded-full overflow-hidden bg-neutral-900 flex items-center justify-center',
                     ringType !== 'none' ? 'inset-[3px]' : 'inset-0 border border-neutral-800',
                   ].join(' ')}>
-                    {g.photoUrl ? (
-                      <Image src={g.photoUrl} alt={name} width={64} height={64} className="w-full h-full object-cover" loading="lazy" />
+                    {avatarSrc ? (
+                      <Image src={avatarSrc} alt={name} width={64} height={64} className="w-full h-full object-cover" loading="lazy" />
                     ) : (
                       <span className="text-yellow-500 font-black">{initials(name)}</span>
                     )}
