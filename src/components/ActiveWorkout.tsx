@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Gamepad2 } from 'lucide-react';
+import { Gamepad2, Brain } from 'lucide-react';
 import { BackButton } from '@/components/ui/BackButton';
 import { useActiveWorkoutController } from './workout/useActiveWorkoutController';
 import { WorkoutProvider, WorkoutLogsProvider } from './workout/WorkoutContext';
@@ -130,6 +130,39 @@ export default function ActiveWorkout(props: ActiveWorkoutProps & { controlledBy
             card, the footer, a long copy line) overshoots the viewport width,
             it gets clipped instead of letting the modal pan side-to-side. */}
         <div className="flex-1 overflow-y-auto overflow-x-hidden">
+          {/* #autoload: chavinha da carga automática — só aparece p/ perfis do beta
+              (settings.autoLoadBeta, liberado via DB). Persiste em settings.autoLoad. */}
+          {Boolean(props.settings?.autoLoadBeta) && (
+            <button
+              type="button"
+              onClick={() => props.onToggleAutoLoad?.(!Boolean(props.settings?.autoLoad))}
+              aria-pressed={Boolean(props.settings?.autoLoad)}
+              className={[
+                'w-full flex items-center justify-between gap-3 px-4 py-2.5 border-b transition-colors',
+                props.settings?.autoLoad ? 'bg-violet-500/10 border-violet-500/30' : 'bg-neutral-900 border-neutral-800',
+              ].join(' ')}
+            >
+              <span className="flex items-center gap-2 min-w-0">
+                <Brain size={16} className={props.settings?.autoLoad ? 'text-violet-300' : 'text-neutral-400'} />
+                <span className="text-left min-w-0">
+                  <span className="block text-xs font-black uppercase tracking-widest text-white">Carga automática</span>
+                  <span className="block text-[10px] text-neutral-400 truncate">
+                    {props.settings?.autoLoad ? 'Ligada — o motor sugere seus pesos' : 'Desligada — pesos manuais'}
+                  </span>
+                </span>
+              </span>
+              <span className={[
+                'relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors',
+                props.settings?.autoLoad ? 'bg-violet-500' : 'bg-neutral-700',
+              ].join(' ')}>
+                <span className={[
+                  'inline-block h-5 w-5 transform rounded-full bg-white transition-transform',
+                  props.settings?.autoLoad ? 'translate-x-5' : 'translate-x-0.5',
+                ].join(' ')} />
+              </span>
+            </button>
+          )}
+
           {/* Teacher control badge — subtle indicator when a teacher is controlling */}
           {props.controlledByName && (
             <div className="bg-amber-500/10 border-b border-amber-500/20 px-4 py-2 flex items-center justify-between gap-2 text-sm">

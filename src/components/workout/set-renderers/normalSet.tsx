@@ -91,6 +91,8 @@ const NormalSetInner = ({
     openNotesKeys,
     toggleNotes,
     deloadSuggestions,
+    autoLoadEnabled,
+    autoLoadSuggestions,
     setCollapsed,
     reportHistory,
     settings,
@@ -155,6 +157,23 @@ const NormalSetInner = ({
   // sinal explícito muda a decisão de progressão do motor (falhou → não sobe carga).
   const failed = !!log.failure;
 
+  // #autoload: sugestão do motor para esta série (só quando ligado) + fonte do peso.
+  const autoSuggestion = autoLoadEnabled ? autoLoadSuggestions?.[key] : null;
+  const isAutoWeight = Boolean(autoLoadEnabled && log.weightSource === 'auto' && !log.done);
+  const autoSuggestionWeight = autoSuggestion?.weight ?? null;
+
+  // Preenche a caixa de peso com a sugestão do motor — SÓ em série de trabalho, ainda
+  // não concluída, ainda vazia e ainda não tocada (weightSource nulo). Depois de preencher
+  // (source='auto') ou de o usuário editar (source='user'), nunca mais reescreve.
+  useEffect(() => {
+    if (!autoLoadEnabled) return;
+    if (setType !== 'working' || log.done) return;
+    if (autoSuggestionWeight == null) return;
+    if (String(log.weight ?? '').trim() !== '') return;
+    if (log.weightSource != null) return;
+    updateLog(key, { weight: String(autoSuggestionWeight), weightSource: 'auto', advanced_config: cfg ?? log.advanced_config ?? null });
+  }, [autoLoadEnabled, setType, log.done, log.weight, log.weightSource, log.advanced_config, autoSuggestionWeight, key, cfg, updateLog]);
+
   // External values — non-unilateral
   const extWeight = String(log.weight ?? cfg?.weight ?? '');
   const extReps   = String(log.reps   ?? '');
@@ -198,8 +217,14 @@ const NormalSetInner = ({
   // Peso nunca é negativo (viraria volume negativo no resumo/sugestão). Normaliza
   // tirando o sinal na gravação. (reps NÃO passa por aqui — pode ser faixa "8-12".)
   const noNegWeight = (v: string) => String(v ?? '').replace(/-/g, '');
+  // #autoload: ao editar o peso na mão, marca a fonte como 'user' — isso desliga o
+  // preenchimento automático desta série e alimenta o aprendizado de override (fase futura).
   const weightField = useInputField(extWeight, (v) =>
-    updateLog(key, { weight: noNegWeight(v), advanced_config: cfg ?? log.advanced_config ?? null }),
+    updateLog(key, {
+      weight: noNegWeight(v),
+      ...(autoLoadEnabled ? { weightSource: 'user' } : {}),
+      advanced_config: cfg ?? log.advanced_config ?? null,
+    }),
   );
   const repsField = useInputField(extReps, (v) =>
     updateLog(key, { reps: v, advanced_config: cfg ?? log.advanced_config ?? null }),
@@ -603,7 +628,8 @@ const NormalSetInner = ({
               onFocus={weightField.handleFocus}
               onBlur={weightField.handleBlur}
               placeholder={weightPlaceholder}
-              className={inputBase}
+              title={isAutoWeight ? (autoSuggestion?.rationale || undefined) : undefined}
+              className={isAutoWeight ? `${inputBase} border-violet-500/60 ring-violet-500 text-violet-100 bg-violet-500/5` : inputBase}
             />
 
             {/* reps — plannedReps becomes the placeholder (narrow column, compact padding) */}
@@ -645,8 +671,14 @@ const NormalSetInner = ({
               {done ? 'Feito' : 'Concluir'}
             </button>
           </div>
-          {/* #4a auto-carga: falha muscular — sempre visível (marca durante/ao concluir) */}
-          <div className="mt-1 flex justify-end">
+          {/* Linha de rodapé: explicação da sugestão (🧠) à esquerda + chip de falha à direita */}
+          <div className="mt-1 flex items-center justify-between gap-2">
+            {isAutoWeight && autoSuggestion?.rationale ? (
+              <div className="flex items-center gap-1 min-w-0 text-[10px] text-violet-300/80" title={autoSuggestion.rationale}>
+                <span aria-hidden>🧠</span>
+                <span className="truncate">{autoSuggestion.rationale}</span>
+              </div>
+            ) : <span />}
             {failureToggle}
           </div>
           {/* Per-set method picker */}
