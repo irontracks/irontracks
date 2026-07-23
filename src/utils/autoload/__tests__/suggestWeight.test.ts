@@ -84,6 +84,19 @@ describe('suggestWeight', () => {
     expect(s.rationale).toMatch(/repeti/i)
   })
 
+  it('nome parece peso corporal MAS tem histórico de kg → sugere (bug do Abdominal infra)', () => {
+    // "Abdominal infra" era classificado como peso_corporal pelo nome → weight null.
+    // Com histórico de 50kg real, o motor respeita e sugere.
+    const s = suggestWeight({ ...base, targetReps: 20, equipment: ['peso_corporal'], history: [{ weight: 50, reps: 12, rpe: null }, { weight: 50, reps: 12, rpe: null }] })
+    expect(s.weight).toBe(50)
+    expect(s.weight! % 2.5).toBe(0)
+  })
+
+  it('peso corporal SEM histórico de kg → segue null (progride por reps)', () => {
+    const s = suggestWeight({ ...base, equipment: ['peso_corporal'], history: [] })
+    expect(s.weight).toBeNull()
+  })
+
   it('sem histórico → weight null (calibração)', () => {
     const s = suggestWeight({ ...base, history: [] })
     expect(s.weight).toBeNull()

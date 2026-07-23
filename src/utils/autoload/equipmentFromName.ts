@@ -24,7 +24,7 @@ const RULES: Array<{ slug: string; patterns: RegExp }> = [
   {
     slug: 'peso_corporal',
     patterns:
-      /barra fixa|\bpull ?up|\bpullup|\bmuscle ?up|paralel|\bdips?\b|mergulho|flex[ao]{1,2}\b|flexao|prancha|abdominal|\bpeso corporal|\bcorporal|australian|austral/,
+      /barra fixa|\bpull ?up|\bpullup|\bmuscle ?up|paralel|\bdips?\b|mergulho|flex[ao]{1,2}\b|flexao|prancha|\bpeso corporal|\bcorporal|australian|austral/,
   },
   { slug: 'smith', patterns: /\bsmith\b/ },
   { slug: 'halteres', patterns: /halter|\bdumbbell|\bdb\b|\bhalteres\b/ },
