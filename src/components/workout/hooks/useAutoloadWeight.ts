@@ -38,9 +38,16 @@ export function useAutoloadWeight(ex: WorkoutExercise, exIdx: number, setIdx: nu
   useEffect(() => {
     if (!autoLoadEnabled || done) return
     if (sugWeight == null) return
-    if (String(log.weight ?? '').trim() !== '') return
-    if (log.weightSource != null) return
-    updateLog(key, { weight: String(sugWeight), weightSource: 'auto', advanced_config: cfg ?? log.advanced_config ?? null })
+    if (log.weightSource === 'user') return // o usuário assumiu — nunca reescreve
+    const current = String(log.weight ?? '').trim()
+    const next = String(sugWeight)
+    if (current === next) return // já sincronizado
+    // Valor preexistente que NÃO é nosso (sessão restaurada, peso do template) → respeita.
+    if (current !== '' && log.weightSource !== 'auto') return
+    // Preenche quando vazio E re-sincroniza quando a sugestão muda (histórico vem do
+    // cache primeiro e da rede depois). Sem isto o número congela desatualizado e
+    // passa a contradizer a explicação mostrada ao lado.
+    updateLog(key, { weight: next, weightSource: 'auto', advanced_config: cfg ?? log.advanced_config ?? null })
   }, [autoLoadEnabled, done, sugWeight, log.weight, log.weightSource, log.advanced_config, key, cfg, updateLog])
 
   const isAutoWeight = Boolean(
