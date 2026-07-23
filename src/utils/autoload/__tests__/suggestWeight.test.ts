@@ -92,6 +92,24 @@ describe('suggestWeight', () => {
     expect(s.weight! % 2.5).toBe(0)
   })
 
+  it('carga fora do passo do equipamento não é arredondada pra baixo (anti-regressão)', () => {
+    // Máquina tem passo de 5 kg, mas o histórico prova que 8 kg é montável.
+    // Arredondar pra baixo daria 5 kg — 37% de regressão num dia normal.
+    const s = suggestWeight({ ...base, targetReps: 10, equipment: ['maquina'], history: [{ weight: 8, reps: 10, rpe: 8 }] })
+    expect(s.weight).toBe(8)
+  })
+
+  it('num dia ruim o arredondamento pra baixo continua valendo (deload é intencional)', () => {
+    const s = suggestWeight({
+      ...base,
+      targetReps: 10,
+      equipment: ['maquina'],
+      history: [{ weight: 40, reps: 10, rpe: 8 }],
+      readiness: { sleepHours: 4, soreness: 8 },
+    })
+    expect(s.weight!).toBeLessThan(40)
+  })
+
   it('peso corporal SEM histórico de kg → segue null (progride por reps)', () => {
     const s = suggestWeight({ ...base, equipment: ['peso_corporal'], history: [] })
     expect(s.weight).toBeNull()
