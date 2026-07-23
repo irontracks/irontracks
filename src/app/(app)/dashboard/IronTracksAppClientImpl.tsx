@@ -1234,6 +1234,10 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                         nextWorkout={nextWorkout}
                                         onEditWorkout={() => handleOpenActiveWorkoutEditor()}
                                         onAddExercise={() => handleOpenActiveWorkoutEditor({ addExercise: true })}
+                                        onToggleAutoLoad={(v: boolean) => {
+                                            userSettingsApi?.updateSetting?.('autoLoad', v)
+                                            void userSettingsApi?.save?.({ autoLoad: v })
+                                        }}
                                         controlledByName={controlNotice.controlStatus === 'active' ? controlNotice.controlledByName : null}
                                         onRevokeControl={controlNotice.reject}
                                     />

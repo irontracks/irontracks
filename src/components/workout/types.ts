@@ -65,6 +65,8 @@ export type ActiveWorkoutProps = {
   onAddExercise?: () => void;
   /** Name of the teacher controlling this session (null = not controlled) */
   controlledByName?: string | null;
+  /** #autoload: liga/desliga a carga automática (persiste em settings.autoLoad). */
+  onToggleAutoLoad?: (next: boolean) => void;
 };
 
 export type ReportHistoryItem = {

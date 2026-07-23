@@ -23,6 +23,12 @@ export const UserSettingsSchema = z
     moduleCommunity: z.boolean().default(true),
     promptPreWorkoutCheckin: z.boolean().default(true),
     promptPostWorkoutCheckin: z.boolean().default(true),
+    // ── Carga automática (motor de auto-regulação) — beta fechado ──────────────
+    // autoLoadBeta: liberado por perfil (via DB) — controla se a chavinha aparece.
+    // Invisível por padrão; ligado só p/ perfis de teste. autoLoad: o on/off que o
+    // usuário controla na chavinha do treino ativo (só efetivo se beta ligado).
+    autoLoadBeta: z.boolean().default(false),
+    autoLoad: z.boolean().default(false),
     showStoriesBar: z.boolean().default(true),
     showNewRecordsCard: z.boolean().default(true),
     showIronRank: z.boolean().default(true),

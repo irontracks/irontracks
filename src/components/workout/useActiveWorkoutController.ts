@@ -5,6 +5,7 @@ import { logError } from '@/lib/logger';
 // The controller no longer re-renders every second, only on user interaction.
 import { useWorkoutModals } from './hooks/useWorkoutModals';
 import { useWorkoutDeload } from './hooks/useWorkoutDeload';
+import { useWorkoutAutoload } from './hooks/useWorkoutAutoload';
 import { useWorkoutExerciseCrud } from './hooks/useWorkoutExerciseCrud';
 import { useWorkoutFinish } from './hooks/useWorkoutFinish';
 import { useWorkoutMethodSavers } from './hooks/useWorkoutMethodSavers';
@@ -260,6 +261,14 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     openDeloadModal, updateDeloadModalFromPercent, updateDeloadModalFromWeight,
     applyDeloadToExercise,
   } = deload;
+
+  // ── Carga automática (autoload) — reusa reportHistory + motor suggestWeight ──
+  const { autoLoadEnabled, autoLoadSuggestions } = useWorkoutAutoload({
+    exercises,
+    reportHistory,
+    settings: settings as Record<string, unknown> | null,
+    userId: String((settings as Record<string, unknown>)?.userId ?? (session as Record<string, unknown>)?.userId ?? '') || null,
+  });
 
 
   const startTimer = useCallback((seconds: unknown, context: unknown) => {
@@ -587,6 +596,8 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     reportHistoryStatus,
     reportHistoryUpdatedAt,
     deloadSuggestions,
+    autoLoadEnabled,
+    autoLoadSuggestions,
     currentExerciseIdx,
     setCurrentExerciseIdx,
     deleteConfirmIdx,
@@ -696,7 +707,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     groupMethodModal, setGroupMethodModal,
     postCheckinOpen, setPostCheckinOpen, postCheckinDraft, setPostCheckinDraft,
     reportHistory, reportHistoryStatus, reportHistoryUpdatedAt,
-    deloadSuggestions,
+    deloadSuggestions, autoLoadEnabled, autoLoadSuggestions,
     currentExerciseIdx, setCurrentExerciseIdx,
     editExerciseOpen, setEditExerciseOpen,
     editExerciseIdx, setEditExerciseIdx,
