@@ -100,6 +100,12 @@ export const averageNumbers = (list: unknown): number | null => {
   return total / arr.length;
 };
 
+/** Média dos valores L/R positivos (exercício unilateral). null se nenhum lado válido. */
+export const avgSideValues = (l: unknown, r: unknown): number | null => {
+  const vals = [toNumber(l), toNumber(r)].filter((v): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0);
+  return vals.length ? averageNumbers(vals) : null;
+};
+
 export const extractLogWeight = (log: unknown): number | null => {
   const base: UnknownRecord = isObject(log) ? log : {};
   const direct = toNumber(base.weight ?? null);
@@ -123,6 +129,10 @@ export const extractLogWeight = (log: unknown): number | null => {
   const restPause = isObject(base.rest_pause) ? (base.rest_pause as UnknownRecord) : null;
   const restPauseWeight = toNumber(restPause ? restPause.weight : null);
   if (restPauseWeight != null && restPauseWeight > 0) return restPauseWeight;
+  // Unilateral: peso gravado por lado (L_weight/R_weight), não no campo `weight`.
+  // Sem este fallback, o histórico (e o watermark/autoload) ficava vazio p/ unilaterais.
+  const uni = avgSideValues(base.L_weight, base.R_weight);
+  if (uni != null && uni > 0) return uni;
   return null;
 };
 

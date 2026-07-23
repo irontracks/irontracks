@@ -166,13 +166,29 @@ const NormalSetInner = ({
   // não concluída, ainda vazia e ainda não tocada (weightSource nulo). Depois de preencher
   // (source='auto') ou de o usuário editar (source='user'), nunca mais reescreve.
   useEffect(() => {
-    if (!autoLoadEnabled) return;
+    if (!autoLoadEnabled || isUnilateral) return;
     if (setType !== 'working' || log.done) return;
     if (autoSuggestionWeight == null) return;
     if (String(log.weight ?? '').trim() !== '') return;
     if (log.weightSource != null) return;
     updateLog(key, { weight: String(autoSuggestionWeight), weightSource: 'auto', advanced_config: cfg ?? log.advanced_config ?? null });
-  }, [autoLoadEnabled, setType, log.done, log.weight, log.weightSource, log.advanced_config, autoSuggestionWeight, key, cfg, updateLog]);
+  }, [autoLoadEnabled, isUnilateral, setType, log.done, log.weight, log.weightSource, log.advanced_config, autoSuggestionWeight, key, cfg, updateLog]);
+
+  // Unilateral: preenche AMBOS os lados (L_weight/R_weight) com a sugestão — a série
+  // de trabalho não concluída, lados vazios e não tocados (weightSource nulo).
+  useEffect(() => {
+    if (!autoLoadEnabled || !isUnilateral) return;
+    if (setType !== 'working' || log.done) return;
+    if (autoSuggestionWeight == null) return;
+    if (log.weightSource != null) return;
+    const lEmpty = String(log.L_weight ?? '').trim() === '';
+    const rEmpty = String(log.R_weight ?? '').trim() === '';
+    if (!lEmpty && !rEmpty) return;
+    const patch: Record<string, unknown> = { weightSource: 'auto', advanced_config: cfg ?? log.advanced_config ?? null };
+    if (lEmpty) patch.L_weight = String(autoSuggestionWeight);
+    if (rEmpty) patch.R_weight = String(autoSuggestionWeight);
+    updateLog(key, patch);
+  }, [autoLoadEnabled, isUnilateral, setType, log.done, log.L_weight, log.R_weight, log.weightSource, log.advanced_config, autoSuggestionWeight, key, cfg, updateLog]);
 
   // External values — non-unilateral
   const extWeight = String(log.weight ?? cfg?.weight ?? '');
@@ -433,6 +449,12 @@ const NormalSetInner = ({
           ? 'bg-amber-500 text-black border border-amber-500/50 shadow-sm shadow-amber-900/30'
           : 'bg-neutral-800 border border-neutral-700 text-neutral-200 hover:bg-neutral-700';
 
+    // #autoload: destaca o input do lado quando o valor ainda é a sugestão do motor.
+    const sideIsAuto = Boolean(
+      autoLoadEnabled && !done && log.weightSource === 'auto' &&
+      autoSuggestionWeight != null && String(wField.value) === String(autoSuggestionWeight),
+    );
+
     return (
       <div
         {...(isFirst ? { 'data-set-first': exIdx } : {})}
@@ -457,7 +479,8 @@ const NormalSetInner = ({
             onFocus={wField.handleFocus}
             onBlur={wField.handleBlur}
             placeholder={weightPlaceholder}
-            className={inputBase}
+            title={sideIsAuto ? (autoSuggestion?.rationale || undefined) : undefined}
+            className={sideIsAuto ? `${inputBase} border-violet-500/60 ring-violet-500 text-violet-100 bg-violet-500/5` : inputBase}
           />
 
           {/* Reps — plannedReps becomes the placeholder (narrow column, compact padding) */}
@@ -551,6 +574,11 @@ const NormalSetInner = ({
           {setIdx === 0 && renderUnilateralHeader()}
           {renderSideRow('L', lDone, lWeightField, lRepsField, lRpeField, handleCompleteL, setIdx === 0)}
           {renderSideRow('R', rDone, rWeightField, rRepsField, rRpeField, handleCompleteR, false)}
+          {autoLoadEnabled && isUnilateral && !done && log.weightSource === 'auto' && autoSuggestion?.rationale && (
+            <div className="flex items-center gap-1 px-0.5 text-[10px] text-violet-300/80" title={autoSuggestion.rationale}>
+              <span aria-hidden>🧠</span><span className="truncate">{autoSuggestion.rationale}</span>
+            </div>
+          )}
           {/* Notes button sits below both L+R rows — clear of exercise footer buttons */}
           <div className="flex items-center justify-end gap-2 px-0.5 -mt-0.5">
             {failureToggle}

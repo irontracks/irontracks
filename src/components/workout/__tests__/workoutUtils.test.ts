@@ -19,9 +19,38 @@ import {
   formatElapsed,
   normalizeExerciseKey,
   extractLogWeight,
+  avgSideValues,
   estimate1Rm,
   computeRecoveryPauseMs,
 } from '../utils';
+
+describe('avgSideValues (unilateral L/R)', () => {
+  it('média dos dois lados positivos', () => {
+    expect(avgSideValues(40, 44)).toBe(42);
+    expect(avgSideValues('40', '44')).toBe(42);
+  });
+  it('aceita vírgula decimal (pt-BR)', () => {
+    expect(avgSideValues('30,3', '30,3')).toBeCloseTo(30.3, 1);
+  });
+  it('só um lado válido → esse lado', () => {
+    expect(avgSideValues(50, null)).toBe(50);
+    expect(avgSideValues('', 50)).toBe(50);
+  });
+  it('nenhum válido → null', () => {
+    expect(avgSideValues(null, undefined)).toBeNull();
+    expect(avgSideValues(0, 0)).toBeNull();
+  });
+});
+
+describe('extractLogWeight — unilateral (L_weight/R_weight)', () => {
+  it('lê o peso por-lado quando `weight` está vazio (bug do flexora em pé)', () => {
+    expect(extractLogWeight({ weight: '', L_weight: '40', R_weight: '44' })).toBe(42);
+    expect(extractLogWeight({ L_weight: '50', R_weight: '50' })).toBe(50);
+  });
+  it('o campo `weight` compartilhado ainda tem prioridade', () => {
+    expect(extractLogWeight({ weight: 80, L_weight: '40', R_weight: '44' })).toBe(80);
+  });
+});
 
 // ─── computeRecoveryPauseMs (recuperação: gap longo = pausa) ──────────────────
 describe('computeRecoveryPauseMs', () => {
