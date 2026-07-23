@@ -406,6 +406,12 @@ export const onNativeNotificationAction = (handler: (actionId: string) => void) 
       if (actionId) handler(actionId)
     } catch { }
   })
+  // Neutraliza rejeição solta no REGISTRO (ex.: binário nativo antigo sem o plugin).
+  // Sem isto, em builds sem o IronTracksNative esta promise rejeitava na hora e virava
+  // unhandledrejection — foi a origem de ~6.8k eventos "plugin is not implemented on
+  // ios" no Sentry, todos com culprit /dashboard (onde este listener é registrado).
+  // O .catch do unsubscribe (abaixo) só roda se alguém desinscrever — tarde demais.
+  if (isPromise(listener)) listener.catch(() => { })
   return () => {
     try {
       if (!listener) return
