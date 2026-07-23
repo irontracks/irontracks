@@ -12,6 +12,7 @@ import {
   normalizeExerciseKey,
 } from '../utils';
 import { UnknownRecord, WorkoutExercise } from '../types';
+import { useAutoloadWeight } from '../hooks/useAutoloadWeight';
 
 const RestPauseSetInner = ({
   ex, exIdx, setIdx, sstOverride,
@@ -40,6 +41,7 @@ const RestPauseSetInner = ({
   const cfg = getPlanConfig(ex, setIdx);
   const plannedSet = getPlannedSet(ex, setIdx);
   const restTime = parseTrainingNumber(ex?.restTime ?? ex?.rest_time);
+  const { isAutoWeight, rationale: autoRationale, autoInputClass } = useAutoloadWeight(ex, exIdx, setIdx);
 
   // ── Focus-aware local input state (prevents ticker re-renders from erasing typed values) ──
   function useLocalField(external: string, onSave: (v: string) => void) {
@@ -169,7 +171,8 @@ const RestPauseSetInner = ({
                 onFocus={weightField.onFocus}
                 onBlur={weightField.onBlur}
                 placeholder={weightPlaceholder}
-                className="w-24 bg-black/30 border border-neutral-700 rounded-xl px-3 py-2 text-[16px] text-white placeholder:text-neutral-400/70 outline-none focus:ring-1 ring-yellow-500"
+                title={isAutoWeight ? (autoRationale || undefined) : undefined}
+                className={`w-24 bg-black/30 border border-neutral-700 rounded-xl px-3 py-2 text-[16px] text-white placeholder:text-neutral-400/70 outline-none focus:ring-1 ring-yellow-500 ${autoInputClass}`}
               />
               <button
                 type="button"
@@ -265,6 +268,11 @@ const RestPauseSetInner = ({
         )}
       </div>
       {!done && !canDone && <div className="pl-12 text-[11px] text-neutral-400 font-semibold">Preencha peso e reps de todos os mini-sets no modal para concluir.</div>}
+      {isAutoWeight && autoRationale && (
+        <div className="pl-12 flex items-center gap-1 text-[10px] text-violet-300/80" title={autoRationale}>
+          <span aria-hidden>🧠</span><span className="truncate">{autoRationale}</span>
+        </div>
+      )}
       {isNotesOpen && (
         <div className="space-y-1.5">
           {prevNote && (

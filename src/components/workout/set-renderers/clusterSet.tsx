@@ -13,6 +13,7 @@ import {
   normalizeExerciseKey,
 } from '../utils';
 import { UnknownRecord, WorkoutExercise } from '../types';
+import { useAutoloadWeight } from '../hooks/useAutoloadWeight';
 
 const ClusterSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: number; setIdx: number }) => {
   const {
@@ -33,6 +34,7 @@ const ClusterSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: nu
   const key = `${exIdx}-${setIdx}`;
   const log = getLog(key);
   const cfg = getPlanConfig(ex, setIdx);
+  const { isAutoWeight, rationale: autoRationale, autoInputClass } = useAutoloadWeight(ex, exIdx, setIdx);
   const restTime = parseTrainingNumber(ex?.restTime ?? ex?.rest_time);
   type DeloadEntrySuggestion = { weight?: number | null; reps?: number | null; rpe?: number | null };
   const suggestionValue = deloadSuggestions[key];
@@ -189,7 +191,8 @@ const ClusterSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: nu
                   updateLog(key, { weight: v, advanced_config: cfg ?? log.advanced_config ?? null });
                 }}
                 placeholder={weightPlaceholder}
-                className="w-24 bg-black/30 border border-neutral-700 rounded-xl px-3 py-2 text-[16px] text-white placeholder:text-neutral-400/70 outline-none focus:ring-1 ring-yellow-500"
+                title={isAutoWeight ? (autoRationale || undefined) : undefined}
+                className={`w-24 bg-black/30 border border-neutral-700 rounded-xl px-3 py-2 text-[16px] text-white placeholder:text-neutral-400/70 outline-none focus:ring-1 ring-yellow-500 ${autoInputClass}`}
               />
               <button
                 type="button"
@@ -280,6 +283,11 @@ const ClusterSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: nu
       </div>
 
       {!done && !canDone && <div className="pl-12 text-[11px] text-neutral-400 font-semibold">Preencha as reps de todos os blocos para concluir.</div>}
+      {isAutoWeight && autoRationale && (
+        <div className="pl-12 flex items-center gap-1 text-[10px] text-violet-300/80" title={autoRationale}>
+          <span aria-hidden>🧠</span><span className="truncate">{autoRationale}</span>
+        </div>
+      )}
       {!done && plannedBlocks.length > 0 && (
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
           {plannedBlocks.map((planned, idx) => {

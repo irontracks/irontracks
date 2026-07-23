@@ -11,6 +11,7 @@ import {
 } from '../utils';
 
 import { UnknownRecord, WorkoutExercise } from '../types';
+import { useAutoloadWeight } from '../hooks/useAutoloadWeight';
 
 // --- Group Method Set (Bi-Set / Super-Set / Tri-Set / Giant-Set / Pré-exaustão / Pós-exaustão) ---
 
@@ -31,6 +32,7 @@ const GroupMethodSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx
   const key = `${exIdx}-${setIdx}`;
   const log = getLog(key);
   const cfg = getPlanConfig(ex, setIdx);
+  const { isAutoWeight, rationale: autoRationale, autoInputClass } = useAutoloadWeight(ex, exIdx, setIdx);
   const method = String(ex?.method || '').trim();
   const perSetMethod = String(log.per_set_method || '').trim();
   const effectiveMethod = perSetMethod || method;
@@ -117,7 +119,8 @@ const GroupMethodSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx
                 value={weightValue}
                 onChange={(e) => updateLog(key, { weight: e?.target?.value ?? '' })}
                 placeholder={histWeight != null ? `${histWeight} kg` : plannedWeight != null ? `${plannedWeight} kg` : 'Peso (kg)'}
-                className="flex-1 min-w-0 bg-black/30 border border-neutral-700 rounded-xl px-3 py-2 text-[16px] text-white placeholder:text-neutral-400 outline-none focus:ring-1 ring-yellow-500"
+                title={isAutoWeight ? (autoRationale || undefined) : undefined}
+                className={`flex-1 min-w-0 bg-black/30 border border-neutral-700 rounded-xl px-3 py-2 text-[16px] text-white placeholder:text-neutral-400 outline-none focus:ring-1 ring-yellow-500 ${autoInputClass}`}
               />
               <input
                 inputMode="numeric"
@@ -189,6 +192,11 @@ const GroupMethodSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx
         )}
       </div>
       {!done && !canDone && <div className="pl-12 text-[11px] text-neutral-500 font-semibold">Preencha peso e reps para concluir.</div>}
+      {isAutoWeight && autoRationale && (
+        <div className="pl-12 flex items-center gap-1 text-[10px] text-violet-300/80" title={autoRationale}>
+          <span aria-hidden>🧠</span><span className="truncate">{autoRationale}</span>
+        </div>
+      )}
       {isNotesOpen && (
         <div className="space-y-1.5">
           {prevNote && (
