@@ -259,14 +259,11 @@ export default function HeaderActionsMenu({
         style={{ WebkitTouchCallout: 'none', WebkitUserSelect: 'none' } as React.CSSProperties}
         title={onAddStory ? 'Toque para menu • Segure para adicionar story' : 'Menu'}
       >
-        {/* Outer ring — pulsing yellow when has story, dashed when empty */}
+        {/* Sem anel de story: o próprio story agora aparece na fileira STORIES com
+            a prévia da mídia, então o anel virou redundante. Fica só uma borda
+            neutra discreta delimitando o avatar do menu. */}
         <div
-          className={[
-            'w-[50px] h-[50px] rounded-full flex items-center justify-center transition-all duration-300',
-            hasActiveStory
-              ? 'p-[2.5px] border-[3px] border-yellow-400 shadow-[0_0_12px_2px_rgba(234,179,8,0.45)] animate-pulse'
-              : 'p-[2px] border-2 border-dashed border-yellow-500/50',
-          ].join(' ')}
+          className="w-[50px] h-[50px] rounded-full flex items-center justify-center p-[2px] border border-neutral-700 transition-colors"
           style={{ WebkitTouchCallout: 'none', pointerEvents: 'none' } as React.CSSProperties}
         >
           {/* Inner avatar */}
