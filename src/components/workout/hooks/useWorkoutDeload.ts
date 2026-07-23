@@ -17,6 +17,7 @@ import {
   toDateMs,
   averageNumbers,
   extractLogWeight,
+  avgSideValues,
   withTimeout,
   readReportCache,
   writeReportCache,
@@ -82,7 +83,17 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
   } = props;
 
   // Report history state
-  const [reportHistory, setReportHistory] = useState<ReportHistory>({ version: 1, exercises: {} });
+  // Init SÍNCRONO do cache (localStorage) — sem isto, reportHistory só era populado
+  // num useEffect (após o 1º paint), e um usuário rápido digitava o peso antes das
+  // sugestões existirem (weightSource='user' travava o autoload). Ler o cache já no
+  // initializer deixa as sugestões prontas no 1º render p/ quem tem cache quente.
+  const [reportHistory, setReportHistory] = useState<ReportHistory>(() => {
+    try {
+      const cached = readReportCache();
+      if (cached?.data) return cached.data;
+    } catch { /* localStorage indisponível → cai no vazio */ }
+    return { version: 1, exercises: {} };
+  });
   type ReportHistoryStatus = { status: 'idle' | 'loading' | 'ready' | 'error'; error: string; source: string };
   const [reportHistoryStatus, setReportHistoryStatus] = useState<ReportHistoryStatus>({ status: 'idle', error: '', source: '' });
   const [reportHistoryUpdatedAt, setReportHistoryUpdatedAt] = useState<number>(0);
@@ -131,8 +142,11 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
             const log = isObject(value) ? value : null;
             if (!log) return;
             const weight = extractLogWeight(log);
-            const reps = toNumber(log.reps ?? null);
-            const rpe = toNumber(log.rpe ?? null);
+            // Unilateral grava reps/rpe por lado (L_reps/R_reps, L_rpe/R_rpe) — sem o
+            // fallback, o histórico do unilateral ficava sem reps/rpe (peso já coberto
+            // pelo extractLogWeight). Usa a média dos lados.
+            const reps = toNumber(log.reps ?? null) ?? avgSideValues(log.L_reps, log.R_reps);
+            const rpe = toNumber(log.rpe ?? null) ?? avgSideValues(log.L_rpe, log.R_rpe);
             const notes = typeof log.notes === 'string' && log.notes.trim() ? log.notes.trim() : null;
             // Preserve drop-set per-stage values for this set (if any).
             const dropSet = isObject(log.drop_set) ? (log.drop_set as UnknownRecord) : null;
