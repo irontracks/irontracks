@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic'
 import { X, Check, Upload, ArrowLeft, Clock, Dumbbell, Zap, ChevronRight, PlayCircle } from 'lucide-react'
 import SectionErrorBoundary from '@/components/SectionErrorBoundary'
 import { BackButton } from '@/components/ui/BackButton'
+import { CheckinScale } from '@/components/workout/CheckinScale'
 import type { AdminUser } from '@/types/admin'
 import type { ActiveWorkoutSession } from '@/types/app'
 import { getLatestWhatsNew } from '@/content/whatsNew'
@@ -675,6 +676,30 @@ export default function DashboardModals(props: DashboardModalsProps) {
                                         >{opt.label}</button>
                                     ))}
                                 </div>
+                            </div>
+                            {/* #3 auto-carga: prontidão do dia. Sono e dor muscular modulam a
+                                carga sugerida (dia ruim → o motor pega mais leve). Opcionais. */}
+                            <CheckinScale
+                                label="Dor muscular hoje (0–10)"
+                                hint="Dor/desconforto agora, antes de treinar. 0 = nenhuma."
+                                values={[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]}
+                                gridCols="grid-cols-6"
+                                value={String((preCheckinDraft as Record<string, unknown>)?.soreness ?? '')}
+                                onChange={(v) => setPreCheckinDraft({ ...(preCheckinDraft || {}), soreness: v })}
+                            />
+                            <div>
+                                <label htmlFor="precheckin-sleep" className="block text-xs font-black uppercase tracking-widest text-neutral-400 mb-2">
+                                    Sono na última noite (h)
+                                </label>
+                                <input
+                                    id="precheckin-sleep"
+                                    inputMode="decimal"
+                                    placeholder="Ex: 7,5"
+                                    value={String((preCheckinDraft as Record<string, unknown>)?.sleepHours ?? '')}
+                                    onChange={(e) => setPreCheckinDraft({ ...(preCheckinDraft || {}), sleepHours: e.target.value })}
+                                    className="w-full min-h-[44px] bg-neutral-800 border border-neutral-700 rounded-xl px-4 py-3 text-[16px] text-white focus:outline-none focus:border-yellow-500"
+                                />
+                                <p className="mt-1.5 text-[11px] text-neutral-500 leading-snug">Dormir pouco reduz a carga sugerida no treino de hoje.</p>
                             </div>
                             <div>
                                 <label className="block text-xs font-black uppercase tracking-widest text-neutral-400 mb-2">Notas (opcional)</label>

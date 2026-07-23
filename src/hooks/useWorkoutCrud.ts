@@ -164,6 +164,8 @@ export function useWorkoutCrud({
                     const energyN = Number(pre.energy || energyFromMood)
                     const sorenessN = Number(pre.soreness)
                     const timeN = Number(pre.timeMinutes)
+                    // #3 auto-carga: sono da última noite (prontidão). Aceita vírgula decimal.
+                    const sleepN = Number(String(pre.sleepHours ?? '').replace(',', '.'))
                     const supabase = createClient()
                     const weightKgN = Number(String(pre.weight ?? '').replace(',', '.'))
                     const { error: checkinError } = await supabase.from('workout_checkins').insert({
@@ -173,6 +175,7 @@ export function useWorkoutCrud({
                         active_session_user_id: null,
                         energy: Number.isFinite(energyN) && energyN >= 1 && energyN <= 5 ? Math.round(energyN) : null,
                         soreness: Number.isFinite(sorenessN) && sorenessN >= 0 && sorenessN <= 10 ? Math.round(sorenessN) : null,
+                        sleep_hours: Number.isFinite(sleepN) && sleepN >= 0 && sleepN <= 24 ? Math.round(sleepN * 10) / 10 : null,
                         notes: String(pre.notes || '').trim() ? String(pre.notes || '').trim() : null,
                         answers: {
                             mood: moodRaw || null,
