@@ -19,7 +19,10 @@ export const DELOAD_REDUCTION_MIN = 0.05;
 export const DELOAD_REDUCTION_MAX = 0.4;
 export const WEIGHT_ROUND_STEP = 0.5;
 export const REPORT_HISTORY_LIMIT = 80;
-export const REPORT_CACHE_KEY = 'irontracks.report.history.v2';
+// v3: builder passou a ler peso/reps/rpe por lado (L_weight/R_weight…) p/ exercícios
+// unilaterais. Bump invalida caches v2 (construídos sem isso) e força reconstrução —
+// senão o histórico de unilateral fica sem dados e o autoload/watermark não sugerem.
+export const REPORT_CACHE_KEY = 'irontracks.report.history.v3';
 export const REPORT_CACHE_TTL_MS = 1000 * 60 * 15;
 export const REPORT_FETCH_TIMEOUT_MS = 9000;
 export const DELOAD_SUGGEST_MODE = 'watermark';
