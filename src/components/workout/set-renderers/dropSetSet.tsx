@@ -103,6 +103,22 @@ const DropSetSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: nu
 
   const summaryText = stages.map((s) => `${s.weight || '?'}kg×${s.reps ?? '?'}`).join(' → ');
 
+  // Resumo dos pesos por etapa para MOSTRAR na linha. Antes o peso só aparecia
+  // dentro do modal — a série de drop não exibia peso algum na linha (só "Etapas N
+  // • Total: X"), ao contrário das normais que mostram o número na caixa. Isso dava
+  // a impressão de "o drop não automatizou". Violeta quando os pesos vieram do motor.
+  const stageWeightSummary = stages.map((s) => String(s.weight || '').trim()).filter(Boolean).join(' → ');
+  const stagesFilledByMotor = Boolean(
+    suggestedWeight != null && suggestedWeight > 0 && stageWeightSummary &&
+    stages.every((_, idx) => {
+      const saved = isObject(stagesSavedRaw[idx]) ? (stagesSavedRaw[idx] as UnknownRecord) : null;
+      const planned = isObject(stagesPlannedRaw[idx]) ? (stagesPlannedRaw[idx] as UnknownRecord) : null;
+      const hasSavedW = saved?.weight != null && String(saved.weight).trim() !== '';
+      const hasPlannedW = planned?.weight != null && String(planned.weight).trim() !== '';
+      return !hasSavedW && !hasPlannedW;
+    }),
+  );
+
   return (
     <div key={key} className="space-y-1">
       <div
@@ -146,9 +162,24 @@ const DropSetSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: nu
             <button
               type="button"
               onClick={() => {
+                // Preenche etapas de peso AINDA vazias com a sugestão atual do motor,
+                // preservando o que já foi digitado. Sem isto, um rascunho salvo com o
+                // peso vazio (modal aberto antes do histórico carregar, ou fechado sem
+                // preencher) CONGELA o campo vazio: reabrir usava o rascunho e ignorava
+                // a sugestão — mesmo já estando disponível. Era um dos jeitos de o drop
+                // aparecer "sem peso automático".
+                const fillEmptyWithSuggestion = (list: unknown[]) =>
+                  list.map((st, idx) => {
+                    const s = isObject(st) ? (st as UnknownRecord) : {};
+                    if (String(s.weight ?? '').trim()) return s;
+                    const auto = autoStageWeight(idx);
+                    return auto ? { ...s, weight: auto } : s;
+                  });
+
                 const draft = dropSetDraftsRef?.current?.[key];
-                if (draft && typeof draft === 'object') {
-                  setDropSetModal({ ...(draft as UnknownRecord), error: '' });
+                if (draft && typeof draft === 'object' && Array.isArray((draft as UnknownRecord).stages)) {
+                  const mergedStages = fillEmptyWithSuggestion((draft as UnknownRecord).stages as unknown[]);
+                  setDropSetModal({ ...(draft as UnknownRecord), stages: mergedStages, error: '' });
                   return;
                 }
                 const baseStages = stages.map((s) => ({
@@ -173,7 +204,9 @@ const DropSetSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: nu
                   className="h-4 w-4 text-[10px]"
                 />
               </span>
-              <span className="text-xs text-neutral-400 truncate">Etapas {stagesCount} • Total: {total || 0} reps</span>
+              <span className={['text-xs truncate', stagesFilledByMotor ? 'text-violet-300/90 font-semibold' : 'text-neutral-400'].join(' ')}>
+                {stageWeightSummary ? `${stageWeightSummary} kg · ` : ''}{stagesCount} etapas{total ? ` • ${total} reps` : ''}
+              </span>
             </div>
             <button
               type="button"

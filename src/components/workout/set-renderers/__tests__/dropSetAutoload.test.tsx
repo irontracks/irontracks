@@ -50,6 +50,7 @@ beforeEach(() => {
   logStore = {}
   plannedSet = null
   suggestions = {}
+  ctx.dropSetDraftsRef.current = {}
 })
 
 describe('Drop-set — autoload semeia as etapas', () => {
@@ -71,5 +72,55 @@ describe('Drop-set — autoload semeia as etapas', () => {
     suggestions = {}
     renderDrop()
     expect(stageWeightsSentToModal()).toEqual(['', ''])
+  })
+})
+
+/**
+ * Guard: rascunho vazio NÃO pode mascarar a sugestão.
+ *
+ * INCIDENTE: ao fechar o modal, o estado vira rascunho (`dropSetDraftsRef`). Se o
+ * modal abriu antes do histórico carregar (ou foi fechado sem preencher), o rascunho
+ * guardava etapas com peso VAZIO. Reabrir usava o rascunho e IGNORAVA a sugestão do
+ * motor — o drop aparecia "sem peso automático" pra sempre naquela sessão.
+ *
+ * INVARIANTE: ao reabrir, etapa de peso vazia recebe a sugestão atual; etapa já
+ * digitada pelo usuário é preservada.
+ */
+describe('Drop-set — rascunho vazio não congela a sugestão', () => {
+  it('rascunho com pesos vazios recebe a sugestão ao reabrir', () => {
+    suggestions = { '0-0': { weight: 50, reps: 10, confidence: 'high', rationale: 'x' } }
+    ctx.dropSetDraftsRef.current = {
+      '0-0': { key: '0-0', label: 'Drop', stages: [{ weight: '', reps: 8 }, { weight: '', reps: 6 }], rpe: '' },
+    }
+    renderDrop()
+    expect(stageWeightsSentToModal()).toEqual(['50', '40'])
+  })
+
+  it('peso digitado pelo usuário no rascunho é preservado (só preenche o vazio)', () => {
+    suggestions = { '0-0': { weight: 50, reps: 10, confidence: 'high', rationale: 'x' } }
+    ctx.dropSetDraftsRef.current = {
+      '0-0': { key: '0-0', label: 'Drop', stages: [{ weight: '60', reps: 8 }, { weight: '', reps: 6 }], rpe: '' },
+    }
+    renderDrop()
+    // 1ª etapa preservada (60); só a 2ª (vazia) recebe a sugestão (40).
+    expect(stageWeightsSentToModal()).toEqual(['60', '40'])
+  })
+})
+
+/**
+ * Guard: a LINHA do drop mostra o peso sugerido.
+ *
+ * INCIDENTE: a série de drop exibia só "Etapas N • Total: X" — nenhum peso na linha,
+ * ao contrário das séries normais que mostram o número na caixa. O usuário olhava e
+ * achava que "o drop não automatizou", mesmo com a sugestão pronta dentro do modal.
+ */
+describe('Drop-set — a linha exibe o peso das etapas', () => {
+  it('mostra o resumo "50 → 40 kg" sem precisar abrir o modal', () => {
+    suggestions = { '0-0': { weight: 50, reps: 10, confidence: 'high', rationale: 'x' } }
+    renderDrop()
+    const found = screen.getByText(
+      (_c, el) => el?.tagName === 'SPAN' && (el.textContent ?? '').replace(/\s+/g, ' ').includes('50 → 40 kg'),
+    )
+    expect(found).toBeTruthy()
   })
 })
