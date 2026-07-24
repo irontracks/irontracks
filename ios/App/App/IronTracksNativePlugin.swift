@@ -1523,6 +1523,10 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin, CLLocationMana
         DispatchQueue.main.async {
             self.alarmPlayer?.stop()
             self.alarmPlayer = nil
+            // Libera o canal de áudio pros outros apps (YouTube Music / Spotify)
+            // retomarem sozinhos — sem isto o app segurava o foco depois do alarme
+            // e a música só voltava no play manual.
+            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
             call.resolve()
         }
     }
