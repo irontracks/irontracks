@@ -1,8 +1,9 @@
 
 "use client";
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { playTimerFinishSound, playTick } from '@/lib/sounds';
+import { shouldAutoAdvanceRest } from './helpers/restAutoAdvance';
 import { isNativePlatform } from '@/utils/platform';
 import { useKeyboardInset } from '@/hooks/useKeyboardInset';
 import { addWidgetStartSetListener, cancelRestNotification, checkPendingWidgetAction, endRestLiveActivity, requestNativeNotifications, scheduleRestNotification, startRestLiveActivity, stopAlarmSound, triggerHaptic, updateRestLiveActivity, updateWorkoutRestCountdown } from '@/utils/native/irontracksNative';
@@ -50,7 +51,7 @@ interface RestTimerOverlayProps {
     workoutStartMs?: number;
 }
 
-const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context, onFinish, onStart, onClose: _onClose, settings, autoStartEnabled: _autoStartEnabled, onToggleAutoStart: _onToggleAutoStart, workoutStartMs }) => {
+const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context, onFinish, onStart, onClose: _onClose, settings, autoStartEnabled, onToggleAutoStart, workoutStartMs }) => {
     const isPlankMode = context?.kind === 'plank'
     const isCardioMode = context?.kind === 'cardio'
     // Timer de exercício (prancha/cardio) conta o tempo DO exercício, não o descanso.
@@ -83,25 +84,26 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
     // flash automatically shows again — no setState-in-effect needed.
     const [flashDismissedForTarget, setFlashDismissedForTarget] = useState<number | null>(null);
     const flashDismissed = targetTime != null && flashDismissedForTarget === targetTime;
-    // AUTO: persisted in localStorage so the user's preference survives across
-    // sets, sessions and app restarts. When ON, the overlay auto-advances 500 ms
-    // after the countdown reaches zero.
-    const [autoLocal, setAutoLocal] = useState<boolean>(() => {
-        if (typeof window === 'undefined') return false;
-        try {
-            return window.localStorage.getItem('irontracks.restTimerAuto.v1') === '1';
-        } catch {
-            return false;
-        }
-    });
+    // AUTO — fonte única de verdade: a preferência `restTimerAutoStart` das
+    // Configurações (chega via prop `autoStartEnabled`). Antes o overlay guardava um
+    // SEGUNDO estado próprio em localStorage ('irontracks.restTimerAuto.v1') e ignorava
+    // a prop — então o toggle "START automático" das Configurações não fazia NADA e o
+    // botão AUTO da barra vivia num universo paralelo. Resultado: o auto-start não
+    // obedecia o liga/desliga que o usuário via. Agora os dois controlam o MESMO valor.
+    //
+    // `autoOn` é só um espelho OTIMISTA da prop, pra o botão responder na hora (o save
+    // das settings tem round-trip). Ressincroniza sempre que a prop persistida muda —
+    // se o save falhar, a prop não muda e o espelho volta pro valor real no próximo
+    // render. O gate de auto-advance usa ESTE mesmo `autoOn`, então botão e gate nunca
+    // divergem (era exatamente a divergência que fazia o START disparar "sozinho").
+    const [autoOn, setAutoOn] = useState<boolean>(!!autoStartEnabled);
     useEffect(() => {
-        if (typeof window === 'undefined') return;
-        try {
-            window.localStorage.setItem('irontracks.restTimerAuto.v1', autoLocal ? '1' : '0');
-        } catch {
-            /* storage unavailable — preference simply won't persist */
-        }
-    }, [autoLocal]);
+        setAutoOn(!!autoStartEnabled);
+    }, [autoStartEnabled]);
+    const toggleAuto = useCallback(() => {
+        setAutoOn((v) => !v);      // feedback imediato
+        onToggleAutoStart?.();     // persiste no setting (fonte única)
+    }, [onToggleAutoStart]);
     const warnedRef = useRef(false);
     const notifyIdRef = useRef('');
     const soundIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -513,9 +515,12 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
     //   1. ONLY triggers when the countdown actually reaches 0 (isFinished).
     //      No more "500ms after overlay mounts" — at that moment the countdown
     //      is still running, so an auto-fire would be a skip-rest.
-    //   2. Gated by `autoStartEnabled` (the `restTimerAutoStart` user setting).
-    //      Default OFF — nobody gets it unless they opt-in via Settings.
-    //   3. Locked per-rest with `autoStartFiredRef`. Even if autoStartEnabled
+    //   2. Gated by `autoOn` — espelho da preferência `restTimerAutoStart`
+    //      (Configurações E botão AUTO da barra apontam pra ela). Default OFF:
+    //      ninguém pega auto-start sem ligar explicitamente. Até 2026-07-24 o gate
+    //      usava um estado local em localStorage desconectado deste setting — o
+    //      liga/desliga não era obedecido e o START disparava "sozinho".
+    //   3. Locked per-rest with `autoStartFiredRef`. Even if autoOn
     //      flips true AFTER the countdown already finished (e.g. user opens
     //      Settings during rest), nothing fires — the decision for this rest
     //      was locked the moment isFinished went true.
@@ -540,7 +545,7 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
         // Lock the decision for this rest at the moment it finishes. Any later
         // toggle of the Settings switch is ignored — only the NEXT rest uses it.
         autoStartFiredRef.current = true;
-        if (!autoLocal) return;
+        if (!shouldAutoAdvanceRest({ isFinished, autoOn })) return;
 
         const timeout = setTimeout(() => {
             // Bail if the user already tapped START manually during the delay
@@ -560,7 +565,7 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
             }
         }, 500);
         return () => clearTimeout(timeout);
-    }, [isFinished, autoLocal]);
+    }, [isFinished, autoOn]);
 
     // ── Widget lock-screen button bridge ───────────────────────────────────
     // When the user taps "PULAR DESCANSO" or "INICIAR SÉRIE" on the iOS lock
@@ -751,9 +756,9 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
                             </button>
                             {!isSideRest && !isTransition && (
                                 <button
-                                    onClick={() => setAutoLocal(v => !v)}
+                                    onClick={toggleAuto}
                                     className={`px-3 py-2 rounded-xl text-xs font-black transition-all active:scale-95 border ${
-                                        autoLocal
+                                        autoOn
                                             ? 'bg-amber-500 text-black border-amber-400 shadow-lg shadow-amber-900/40'
                                             : 'bg-neutral-800/80 text-neutral-400 border-neutral-700'
                                     }`}
