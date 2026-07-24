@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { parseTrainingNumber } from '@/utils/trainingNumber';
 import { Check, ChevronDown, MessageSquare, Pencil } from 'lucide-react';
 import { useWorkoutContext } from '../WorkoutContext';
@@ -12,6 +12,7 @@ import {
 
 import { UnknownRecord, WorkoutExercise } from '../types';
 import { useAutoloadWeight } from '../hooks/useAutoloadWeight';
+import { buildExerciseGroups } from '@/lib/workoutGroups';
 
 // --- Group Method Set (Bi-Set / Super-Set / Tri-Set / Giant-Set / Pré-exaustão / Pós-exaustão) ---
 
@@ -27,8 +28,19 @@ const GROUP_METHOD_INFO: Record<string, string> = {
 const PER_SET_METHODS = ['Normal', 'Drop-Set', 'SST', 'Rest-Pause', 'Cluster', 'Stripping', 'Bi-Set', 'Super-Set'];
 
 const GroupMethodSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: number; setIdx: number }) => {
-  const { getLog, updateLog, setGroupMethodModal, openNotesKeys, toggleNotes, startTimer, getPlanConfig, reportHistory } = useWorkoutContext();
+  const { getLog, updateLog, setGroupMethodModal, openNotesKeys, toggleNotes, startTimer, getPlanConfig, reportHistory, exercises } = useWorkoutContext();
   const [isPickerOpen, setIsPickerOpen] = useState(false);
+  // Este exercício é o ÚLTIMO membro do grupo (Bi-Set/Super-Set…)? Só aí o descanso
+  // deve rolar. Concluir a 1ª metade do par vai DIRETO pra outra ("0s descanso entre
+  // eles", como diz o GROUP_METHOD_INFO) via auto-alternância do ExerciseList. Antes,
+  // handleToggleDone disparava descanso em TODA série concluída — abrindo um timer
+  // espúrio ENTRE as metades e mandando o "próxima" pro lugar errado; no device isso
+  // deixava o 2º exercício do par frequentemente sem concluir. Solo (método de grupo
+  // isolado, sem par consecutivo) não entra no mapa → descansa normal.
+  const isLastGroupMember = useMemo(() => {
+    const g = buildExerciseGroups(Array.isArray(exercises) ? (exercises as unknown[]) : []).get(exIdx);
+    return !g || g.position === g.size - 1;
+  }, [exercises, exIdx]);
   const key = `${exIdx}-${setIdx}`;
   const log = getLog(key);
   const cfg = getPlanConfig(ex, setIdx);
@@ -73,7 +85,9 @@ const GroupMethodSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx
   const handleToggleDone = () => {
     const nextDone = !done;
     updateLog(key, { done: nextDone, weight: weightValue, reps: repsValue, rpe: rpeValue });
-    if (nextDone && restTime && restTime > 0) startTimer(restTime, { kind: 'rest', key, nextKey: null, restStartedAtMs: Date.now() });
+    // Descanso SÓ ao concluir o último membro do par/grupo (fim da rodada). Na 1ª
+    // metade não descansa — a auto-alternância leva direto ao exercício par.
+    if (nextDone && restTime && restTime > 0 && isLastGroupMember) startTimer(restTime, { kind: 'rest', key, nextKey: null, restStartedAtMs: Date.now() });
   };
 
   return (
