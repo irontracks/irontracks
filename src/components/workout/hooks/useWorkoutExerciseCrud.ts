@@ -27,9 +27,9 @@ interface ExerciseCrudDeps {
   setCollapsed: React.Dispatch<React.SetStateAction<Set<number>>>;
   linkedWeightExercises: Set<number>;
   setLinkedWeightExercises: React.Dispatch<React.SetStateAction<Set<number>>>;
-  editExerciseDraft: { name: string; sets: string; restTime: string; method: string; isUnilateral?: boolean; sideRestTime?: string | null; transitionTime?: string | null } | null;
-  setEditExerciseDraft: (v: { name: string; sets: string; restTime: string; method: string; isUnilateral?: boolean; sideRestTime?: string | null; transitionTime?: string | null }) => void;
-  setEditExerciseOriginal: (v: { name: string; sets: string; restTime: string; method: string; isUnilateral?: boolean; sideRestTime?: string | null; transitionTime?: string | null } | null) => void;
+  editExerciseDraft: { name: string; sets: string; restTime: string; method: string; isUnilateral?: boolean; isAlternating?: boolean; sideRestTime?: string | null; transitionTime?: string | null } | null;
+  setEditExerciseDraft: (v: { name: string; sets: string; restTime: string; method: string; isUnilateral?: boolean; isAlternating?: boolean; sideRestTime?: string | null; transitionTime?: string | null }) => void;
+  setEditExerciseOriginal: (v: { name: string; sets: string; restTime: string; method: string; isUnilateral?: boolean; isAlternating?: boolean; sideRestTime?: string | null; transitionTime?: string | null } | null) => void;
   persistToPlan: boolean;
   setPersistToPlan: (v: boolean) => void;
   editExerciseHasChanges: boolean;
@@ -205,12 +205,13 @@ export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
       // senão o <select> não casa e mostra "Normal" (e salvar perderia o método).
       const method = canonicalEditorMethod(ex?.method);
       const isUnilateral = !!(ex?.isUnilateral ?? (ex as Record<string, unknown>)?.is_unilateral);
+      const isAlternating = !!(ex?.isAlternating ?? (ex as Record<string, unknown>)?.is_alternating);
       const sideRestTimeNum = parseTrainingNumber((ex as Record<string, unknown>)?.sideRestTime ?? (ex as Record<string, unknown>)?.side_rest_time);
       const sideRestTime = typeof sideRestTimeNum === 'number' && sideRestTimeNum > 0 ? String(sideRestTimeNum) : '';
       const transitionTimeNum = parseTrainingNumber((ex as Record<string, unknown>)?.transitionTime ?? (ex as Record<string, unknown>)?.transition_time);
       const transitionTime = typeof transitionTimeNum === 'number' && transitionTimeNum > 0 ? String(transitionTimeNum) : '';
 
-      const snapshot = { name, sets: String(setsCount), restTime: String(restTime), method, isUnilateral, sideRestTime, transitionTime };
+      const snapshot = { name, sets: String(setsCount), restTime: String(restTime), method, isUnilateral, isAlternating, sideRestTime, transitionTime };
       setEditExerciseDraft(snapshot);
       setEditExerciseOriginal(snapshot);
       setPersistToPlan(false);
@@ -240,6 +241,7 @@ export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
     const restTime = typeof restParsed === 'number' && Number.isFinite(restParsed) && restParsed > 0 ? restParsed : null;
     const method = String(editExerciseDraft?.method || 'Normal').trim() || 'Normal';
     const isUnilateral = !!(editExerciseDraft as Record<string, unknown>)?.isUnilateral;
+    const isAlternating = !!(editExerciseDraft as Record<string, unknown>)?.isAlternating;
     const sideRestParsed = parseTrainingNumber((editExerciseDraft as Record<string, unknown>)?.sideRestTime);
     const sideRestTime = typeof sideRestParsed === 'number' && sideRestParsed > 0 ? sideRestParsed : null;
     const transitionParsed = parseTrainingNumber((editExerciseDraft as Record<string, unknown>)?.transitionTime);
@@ -266,6 +268,7 @@ export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
         restTime,
         setDetails: nextSetDetails,
         isUnilateral,
+        isAlternating,
         sideRestTime,
         transitionTime,
       };

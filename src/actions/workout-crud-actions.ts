@@ -79,6 +79,7 @@ export const buildExercisesPayload = (workout: unknown): unknown[] => {
                 method: exObj.method ?? null,
                 order: idx,
                 is_unilateral: !!(exObj.isUnilateral ?? exObj.is_unilateral),
+                is_alternating: !!(exObj.isAlternating ?? exObj.is_alternating),
                 side_rest_time: typeof sideRestRaw === 'number' && sideRestRaw > 0 ? sideRestRaw : null,
                 transition_time: typeof transitionRaw === 'number' && transitionRaw > 0 ? transitionRaw : null,
                 sets,
