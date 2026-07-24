@@ -489,6 +489,18 @@ export const estimateCaloriesMet = (
       }
     }
 
+    // Unilateral (L_/R_): peso/reps por lado. Sem isto o exercício unilateral
+    // contava volume 0 nas calorias (só líamos weight/reps "planos").
+    const lw = Number(String(obj?.L_weight ?? '').replace(',', '.'))
+    const lr = parseReps(String(obj?.L_reps ?? ''))
+    const rw = Number(String(obj?.R_weight ?? '').replace(',', '.'))
+    const rr = parseReps(String(obj?.R_reps ?? ''))
+    if ((lw > 0 && lr > 0) || (rw > 0 && rr > 0)) {
+      if (lw > 0 && lr > 0) { totalVolume += lw * lr; _totalReps += lr }
+      if (rw > 0 && rr > 0) { totalVolume += rw * rr; _totalReps += rr }
+      continue
+    }
+
     // Standard set — handle "8/10" done/planned format
     let w = Number(String(obj?.weight ?? '').replace(',', '.'))
     const r = parseReps(String(obj?.reps ?? ''))
@@ -500,8 +512,10 @@ export const estimateCaloriesMet = (
     }
 
     if (w > 0 && r > 0) {
-      totalVolume += w * r
-      _totalReps += r
+      // Alternado: os dois braços fazem as reps → dobra volume e reps.
+      const altMult = obj?.alternating === true ? 2 : 1
+      totalVolume += w * r * altMult
+      _totalReps += r * altMult
     }
   }
 

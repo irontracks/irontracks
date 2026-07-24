@@ -1,6 +1,6 @@
 
 import type { UnknownRecord } from '@/types/app'
-import { setVolume, setTopWeightReps, setBestE1rm, waveVolume } from './setVolume'
+import { setVolume, setTopWeightReps, setTotalReps, setBestE1rm, waveVolume } from './setVolume'
 import { estimateSessionKcalBreakdown } from '@/utils/calories/sessionKcal'
 import { distributeKcalWithFixed } from '@/utils/calories/distributeKcal'
 
@@ -131,22 +131,25 @@ const buildLogVolume = (logs: UnknownRecord, exerciseIndex: number) => {
     const weight = toNumber(value.weight ?? value.kg ?? value.load)
     const repsVal = durationSec > 0 ? durationSec : toNumber(value.reps)
 
+    // Alternado (rosca alternada): os dois braços fazem as reps → dobra volume e
+    // reps. Só quando é série de reps (não vale pra isometria por tempo).
+    const altMult = value.alternating === true && durationSec === 0 ? 2 : 1
     if (weight > 0 && repsVal > 0) {
-      volume += weight * repsVal
-      reps += repsVal
+      volume += weight * repsVal * altMult
+      reps += repsVal * altMult
       weightSum += weight
       weightCount += 1
     } else if (repsVal > 0) {
-      reps += repsVal
+      reps += repsVal * altMult
     } else {
       // Unilateral (L_weight/R_weight) NÃO grava weight/reps no topo → caía aqui com
-      // volume 0. Usa a fonte única setVolume/setTopWeightReps (soma L+R).
+      // volume 0. Usa a fonte única setVolume/setTotalReps (soma L+R).
       const uniVol = setVolume(value)
       if (uniVol > 0) {
         volume += uniVol
         const top = setTopWeightReps(value)
         if (top.weight > 0) { weightSum += top.weight; weightCount += 1 }
-        if (top.reps > 0) reps += top.reps
+        reps += setTotalReps(value)
       }
     }
     sets += 1

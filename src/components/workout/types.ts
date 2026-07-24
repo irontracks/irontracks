@@ -19,6 +19,7 @@ export type WorkoutExercise = Omit<Partial<Exercise>, 'setDetails'> & {
   exercise_library_id?: string;
   // snake_case aliases from DB
   is_unilateral?: boolean;
+  is_alternating?: boolean;
   side_rest_time?: number | string | null;
   transition_time?: number | string | null;
 };

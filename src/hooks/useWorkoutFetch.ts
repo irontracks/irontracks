@@ -96,7 +96,7 @@ async function hydrateWorkouts(
     try {
         const { data: exRows } = await supabase
             .from('exercises')
-            .select('id, workout_id, name, notes, video_url, rest_time, cadence, method, "order", is_unilateral, side_rest_time, transition_time')
+            .select('id, workout_id, name, notes, video_url, rest_time, cadence, method, "order", is_unilateral, is_alternating, side_rest_time, transition_time')
             .in('workout_id', workoutIds)
             .order('order', { ascending: true })
             .limit(5000)

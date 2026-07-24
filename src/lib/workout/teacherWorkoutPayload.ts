@@ -65,6 +65,7 @@ export interface TeacherExercisePayload {
     method: unknown
     order: number
     is_unilateral: boolean
+    is_alternating: boolean
     sets: TeacherSetPayload[]
 }
 
@@ -118,6 +119,7 @@ export function buildTeacherExercisesPayload(exercises: unknown): TeacherExercis
                 method: ex.method ?? null,
                 order: idx,
                 is_unilateral: !!(ex.isUnilateral ?? ex.is_unilateral),
+                is_alternating: !!(ex.isAlternating ?? ex.is_alternating),
                 sets,
             }
         })

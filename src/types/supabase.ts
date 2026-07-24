@@ -1242,6 +1242,7 @@ export type Database = {
         Row: {
           cadence: string | null
           id: string
+          is_alternating: boolean
           is_unilateral: boolean
           method: string | null
           muscle_group: string | null
@@ -1257,6 +1258,7 @@ export type Database = {
         Insert: {
           cadence?: string | null
           id?: string
+          is_alternating?: boolean
           is_unilateral?: boolean
           method?: string | null
           muscle_group?: string | null
@@ -1272,6 +1274,7 @@ export type Database = {
         Update: {
           cadence?: string | null
           id?: string
+          is_alternating?: boolean
           is_unilateral?: boolean
           method?: string | null
           muscle_group?: string | null

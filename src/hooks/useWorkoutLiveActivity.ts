@@ -21,6 +21,7 @@ import {
   endWorkoutLiveActivity,
 } from '@/utils/native/irontracksNative'
 import { isIosNative } from '@/utils/platform'
+import { setVolume } from '@/utils/report/setVolume'
 
 interface UseWorkoutLiveActivityArgs {
   /** Static title shown on the LA (e.g. "Treino A — Peito + Tríceps"). */
@@ -45,16 +46,6 @@ const setsCountFor = (ex: Record<string, unknown> | undefined): number => {
   if (Array.isArray(sd)) return sd.length
   const n = Number(ex.sets)
   return Number.isFinite(n) && n > 0 ? Math.round(n) : 0
-}
-
-/** Parse a possibly-stringified number, returning 0 on failure. */
-const num = (v: unknown): number => {
-  if (typeof v === 'number') return Number.isFinite(v) ? v : 0
-  if (typeof v === 'string') {
-    const n = Number(v.replace(',', '.').trim())
-    return Number.isFinite(n) ? n : 0
-  }
-  return 0
 }
 
 const MIN_UPDATE_INTERVAL_MS = 1000
@@ -98,9 +89,9 @@ export function useWorkoutLiveActivity({
       const done = log.done === true || log.completed === true
       if (!done) continue
       totalSetsCompleted += 1
-      const w = num(log.weight)
-      const r = num(log.reps)
-      if (w > 0 && r > 0) totalVolumeKg += w * r
+      // setVolume trata unilateral (L+R), alternado (×2), cluster e dropset —
+      // antes o widget lia só weight/reps e zerava o volume desses exercícios.
+      totalVolumeKg += setVolume(log)
 
       // Track the highest done set index inside the focused exercise so we can
       // surface "Série N/total" where N = next un-done set (or last+1 if all done).

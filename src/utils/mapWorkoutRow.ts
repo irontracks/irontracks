@@ -96,6 +96,7 @@ export const mapWorkoutRow = (w: unknown): Record<string, unknown> => {
                     rpe: rpeHeader,
                     setDetails: setDetailsWithMethods,
                     isUnilateral: !!e.is_unilateral,
+                    isAlternating: !!e.is_alternating,
                     sideRestTime: e.side_rest_time ?? null,
                     transitionTime: e.transition_time ?? null,
                 }

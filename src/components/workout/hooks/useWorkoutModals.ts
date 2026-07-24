@@ -56,16 +56,17 @@ export function useWorkoutModals(collapsedKey: string | null) {
     // ---- Edit exercise ----
     const [editExerciseOpen, setEditExerciseOpen] = useState<boolean>(false);
     const [editExerciseIdx, setEditExerciseIdx] = useState<number | null>(null);
-    const [editExerciseDraft, setEditExerciseDraft] = useState<{ name: string; sets: string; restTime: string; method: string; isUnilateral?: boolean; sideRestTime?: string | null; transitionTime?: string | null }>(() => ({
+    const [editExerciseDraft, setEditExerciseDraft] = useState<{ name: string; sets: string; restTime: string; method: string; isUnilateral?: boolean; isAlternating?: boolean; sideRestTime?: string | null; transitionTime?: string | null }>(() => ({
         name: '',
         sets: '3',
         restTime: '60',
         method: 'Normal',
         isUnilateral: false,
+        isAlternating: false,
         sideRestTime: '',
         transitionTime: '',
     }));
-    const [editExerciseOriginal, setEditExerciseOriginal] = useState<{ name: string; sets: string; restTime: string; method: string; isUnilateral?: boolean; sideRestTime?: string | null; transitionTime?: string | null } | null>(null);
+    const [editExerciseOriginal, setEditExerciseOriginal] = useState<{ name: string; sets: string; restTime: string; method: string; isUnilateral?: boolean; isAlternating?: boolean; sideRestTime?: string | null; transitionTime?: string | null } | null>(null);
     const [persistToPlan, setPersistToPlan] = useState<boolean>(false);
 
     const editExerciseHasChanges = useMemo(() => {
