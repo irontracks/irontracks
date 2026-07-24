@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import * as Sentry from '@sentry/nextjs'
 
-vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn() }))
+vi.mock('@sentry/nextjs', () => ({ captureException: vi.fn(), captureMessage: vi.fn() }))
 
 // We test the sanitize logic via the logger's behavior.
 // Since sanitize is not exported, we spy on console methods and check output.
@@ -106,6 +106,44 @@ describe('logError → Sentry', () => {
     const detail = (opts as { extra?: { detail?: Record<string, unknown> } })?.extra?.detail
     expect(detail?.token).toBe('[redacted]')
     expect(detail?.userId).toBe('42')
+  })
+})
+
+describe('logWarnRemote → Sentry (flight-recorder)', () => {
+  beforeEach(() => {
+    vi.mocked(Sentry.captureMessage).mockClear()
+    vi.mocked(Sentry.captureException).mockClear()
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+  })
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('reporta como MESSAGE nível warning (não exception) com o contexto na tag', async () => {
+    const { logWarnRemote } = await import('@/lib/logger')
+    logWarnRemote('workout.input.typed-value-discarded', 'rpe digitado descartado', { field: 'rpe', typed: '8' })
+    expect(Sentry.captureMessage).toHaveBeenCalledTimes(1)
+    expect(Sentry.captureException).not.toHaveBeenCalled()
+    const [msg, opts] = vi.mocked(Sentry.captureMessage).mock.calls[0]
+    expect(String(msg)).toContain('workout.input.typed-value-discarded')
+    const o = opts as { level?: string; tags?: { logContext?: string } }
+    expect(o?.level).toBe('warning')
+    expect(o?.tags?.logContext).toBe('workout.input.typed-value-discarded')
+  })
+
+  it('redige dados sensíveis no extra antes de mandar pro Sentry', async () => {
+    const { logWarnRemote } = await import('@/lib/logger')
+    logWarnRemote('ctx', 'msg', { token: 'abc', field: 'rpe' })
+    const [, opts] = vi.mocked(Sentry.captureMessage).mock.calls[0]
+    const detail = (opts as { extra?: { detail?: Record<string, unknown> } })?.extra?.detail
+    expect(detail?.token).toBe('[redacted]')
+    expect(detail?.field).toBe('rpe')
+  })
+
+  it('nunca quebra o fluxo se o Sentry lançar', async () => {
+    vi.mocked(Sentry.captureMessage).mockImplementationOnce(() => { throw new Error('sentry down') })
+    const { logWarnRemote } = await import('@/lib/logger')
+    expect(() => logWarnRemote('ctx', 'msg')).not.toThrow()
   })
 })
 
