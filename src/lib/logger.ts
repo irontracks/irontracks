@@ -65,3 +65,26 @@ export function logDebug(context: string, message: string, extra?: unknown) {
   const ts = new Date().toISOString()
   console.log(`[DEBUG ${ts}] ${context}: ${message}`, extra !== undefined ? sanitize(extra) : '')
 }
+
+/**
+ * logWarnRemote — como logWarn, mas TAMBÉM reporta ao Sentry (nível `warning`).
+ *
+ * Para sinais DIAGNÓSTICOS raros que precisam ser pesquisáveis/alertáveis em
+ * produção sem serem tratados como erro fatal — ex.: "flight-recorder" de um bug
+ * intermitente que não reproduz em dev. Diferente de `logWarn` (só console) e de
+ * `logError` (captura como exception). O try/catch garante que o reporting nunca
+ * quebre o fluxo da aplicação.
+ */
+export function logWarnRemote(context: string, message: string, extra?: unknown) {
+  const ts = new Date().toISOString()
+  if (!IS_PROD) console.warn(`[WARN* ${ts}] ${context}: ${message}`, extra !== undefined ? sanitize(extra) : '')
+  try {
+    Sentry.captureMessage(`${context}: ${message}`, {
+      level: 'warning',
+      tags: { logContext: context },
+      ...(extra !== undefined ? { extra: { detail: sanitize(extra) } } : {}),
+    })
+  } catch {
+    // reporting nunca pode quebrar a aplicação
+  }
+}

@@ -14,6 +14,7 @@ import {
 import { UnknownRecord, WorkoutExercise } from '../types';
 import type { SetType } from '@/types/workout';
 import { SetTypePopover, SET_TYPE_META, resolveSetType, useLongPress } from '../SetTypePopover';
+import { logWarnRemote } from '@/lib/logger';
 
 // ── Local-state input ─────────────────────────────────────────────────────
 // The workout ticker fires every 1 s and causes a full context re-render.
@@ -23,7 +24,7 @@ import { SetTypePopover, SET_TYPE_META, resolveSetType, useLongPress } from '../
 // global log on change (for immediate persistence), but reads from local state
 // so the displayed value is never clobbered by an external re-render while
 // the user is typing.
-function useInputField(externalValue: string, onChange: (v: string) => void) {
+function useInputField(externalValue: string, onChange: (v: string) => void, label?: string) {
   const [localValue, setLocalValue] = useState(externalValue);
   const isFocused = useRef(false);
   const blurredAtRef = useRef(0);
@@ -36,6 +37,20 @@ function useInputField(externalValue: string, onChange: (v: string) => void) {
       Date.now() - blurredAtRef.current < 2000
     ) {
       return;
+    }
+    // FLIGHT-RECORDER (bug "digito e some"): um valor DIGITADO está prestes a ser
+    // descartado porque o valor persistido (`externalValue`) voltou vazio. As 4
+    // camadas de merge defensivo (useInputField → updateLog → handleUpdateSessionLog
+    // → reconciliação) deveriam impedir isso, e não reproduz em dev — mas o usuário
+    // relata perda intermitente de RPE/reps no device. Reporta o contexto exato ao
+    // Sentry pra pegar a corrida no ambiente real, em vez de reverter em silêncio.
+    if (label && localValue && !externalValue) {
+      logWarnRemote('workout.input.typed-value-discarded', `${label} digitado descartado p/ vazio`, {
+        field: label,
+        typed: localValue,
+        sinceBlurMs: Date.now() - blurredAtRef.current,
+        focused: isFocused.current,
+      });
     }
     setLocalValue(externalValue);
   // localValue intentionally excluded — we only react to external changes
@@ -262,10 +277,10 @@ const NormalSetInner = ({
   );
   const repsField = useInputField(extReps, (v) =>
     updateLog(key, { reps: v, advanced_config: cfg ?? log.advanced_config ?? null }),
-  );
+  'reps');
   const rpeField = useInputField(extRpe, (v) =>
     updateLog(key, { rpe: v, advanced_config: cfg ?? log.advanced_config ?? null }),
-  );
+  'rpe');
   const notesField = useInputField(extNotes, (v) =>
     updateLog(key, { notes: v, advanced_config: cfg ?? log.advanced_config ?? null }),
   );
@@ -277,10 +292,10 @@ const NormalSetInner = ({
     updateLog(key, { L_weight: noNegWeight(v), ...(autoLoadEnabled ? { weightSource: 'user' } : {}) }));
   const rWeightField = useInputField(extRWeight, (v) =>
     updateLog(key, { R_weight: noNegWeight(v), ...(autoLoadEnabled ? { weightSource: 'user' } : {}) }));
-  const lRepsField   = useInputField(extLReps,   (v) => updateLog(key, { L_reps: v }));
-  const rRepsField   = useInputField(extRReps,   (v) => updateLog(key, { R_reps: v }));
-  const lRpeField    = useInputField(extLRpe,    (v) => updateLog(key, { L_rpe: v }));
-  const rRpeField    = useInputField(extRRpe,    (v) => updateLog(key, { R_rpe: v }));
+  const lRepsField   = useInputField(extLReps,   (v) => updateLog(key, { L_reps: v }), 'L_reps');
+  const rRepsField   = useInputField(extRReps,   (v) => updateLog(key, { R_reps: v }), 'R_reps');
+  const lRpeField    = useInputField(extLRpe,    (v) => updateLog(key, { L_rpe: v }), 'L_rpe');
+  const rRpeField    = useInputField(extRRpe,    (v) => updateLog(key, { R_rpe: v }), 'R_rpe');
 
   // Shared input style — weight column (3fr, roomy)
   const inputBase =
