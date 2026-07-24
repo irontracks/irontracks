@@ -141,12 +141,20 @@ const NormalSetInner = ({
     ? configuredRestTime
     : (autoRestWhenMissing ? defaultRestSeconds : configuredRestTime);
 
+  // Alternado (ex.: rosca alternada): alterna rep a rep, mesmo peso, SEM descanso
+  // entre lados. Renderiza como série única (1 registro) e NÃO entra no fluxo
+  // unilateral (2 linhas L/R + "TROCA LADO"). O volume dobra via marcador no log.
+  const isAlternating = !!(ex?.isAlternating ?? (ex as Record<string, unknown>)?.is_alternating);
+
   // Unilateral config — explicit flag, with fallback to name detection
-  // (catches templates created before the flag existed or imported without it)
+  // (catches templates created before the flag existed or imported without it).
+  // Alternado tem PRECEDÊNCIA: se ligado, o exercício não é tratado como unilateral.
   const explicitUnilateral = ex?.isUnilateral ?? (ex as Record<string, unknown>)?.is_unilateral;
-  const isUnilateral = explicitUnilateral != null
-    ? !!explicitUnilateral
-    : isUnilateralByName(typeof ex?.name === 'string' ? ex.name : null);
+  const isUnilateral = isAlternating
+    ? false
+    : explicitUnilateral != null
+      ? !!explicitUnilateral
+      : isUnilateralByName(typeof ex?.name === 'string' ? ex.name : null);
   const sideRestTime = parseTrainingNumber((ex as Record<string, unknown>)?.sideRestTime ?? (ex as Record<string, unknown>)?.side_rest_time) ?? 15;
 
   // Set state
@@ -422,6 +430,10 @@ const NormalSetInner = ({
     const nextDone = !done;
     updateLog(key, {
       done: nextDone,
+      // Marca a série como alternada → setVolume/reportMetrics/calorias dobram
+      // (os dois braços fizeram as reps). Persistido no log pra o histórico contar
+      // certo mesmo depois da sessão.
+      ...(isAlternating ? { alternating: true } : {}),
       completedAtMs:    nextDone ? nowMs : null,
       executionSeconds: nextDone ? executionSeconds : null,
       // restStartMs saved here so handleTimerFinish can compute restSeconds
@@ -622,6 +634,14 @@ const NormalSetInner = ({
       ) : (
         /* ── Non-unilateral single row ─────────────────────────────── */
         <>
+        {setIdx === 0 && isAlternating && (
+          <div className="px-1 pb-0.5">
+            <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-amber-400/90">
+              🔄 Alternado
+              <span className="text-neutral-500 normal-case font-normal tracking-normal">· conta os dois lados</span>
+            </span>
+          </div>
+        )}
         {setIdx === 0 && renderBilateralHeader()}
         <div
           {...(setIdx === 0 ? { 'data-set-first': exIdx } : {})}

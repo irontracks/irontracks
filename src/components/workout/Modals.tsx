@@ -544,21 +544,40 @@ export default function Modals() {
                 </select>
               </div>
 
-              {/* Unilateral toggle */}
-              <div className="flex items-center justify-between gap-3 py-0.5">
-                <div>
-                  <div className="text-sm font-black text-white">Exercício Unilateral</div>
-                  <div className="text-[11px] text-neutral-400">Executa em dois lados (L e R)</div>
+              {/* Lateralidade: bilateral / unilateral / alternado */}
+              <div className="py-0.5">
+                <div className="text-sm font-black text-white">Lateralidade</div>
+                <div className="text-[11px] text-neutral-400 mb-2">Como o exercício trabalha os dois lados</div>
+                <div className="grid grid-cols-3 gap-1.5">
+                  {([
+                    { key: 'bilateral', label: 'Bilateral', desc: 'Os dois juntos' },
+                    { key: 'unilateral', label: 'Unilateral', desc: 'Um lado, depois o outro' },
+                    { key: 'alternating', label: 'Alternado', desc: 'Alterna rep a rep' },
+                  ] as const).map((opt) => {
+                    const active =
+                      opt.key === 'alternating'
+                        ? !!editExerciseDraft?.isAlternating
+                        : opt.key === 'unilateral'
+                          ? (!!editExerciseDraft?.isUnilateral && !editExerciseDraft?.isAlternating)
+                          : (!editExerciseDraft?.isUnilateral && !editExerciseDraft?.isAlternating)
+                    return (
+                      <button
+                        key={opt.key}
+                        type="button"
+                        onClick={() => setEditExerciseDraft((prev) => ({
+                          ...prev,
+                          isUnilateral: opt.key === 'unilateral',
+                          isAlternating: opt.key === 'alternating',
+                        }))}
+                        aria-pressed={active}
+                        className={`rounded-xl border px-2 py-2 text-center transition-all ${active ? 'bg-amber-500/15 border-amber-500 text-white' : 'bg-black/30 border-neutral-700 text-neutral-400'}`}
+                      >
+                        <div className="text-xs font-bold">{opt.label}</div>
+                        <div className="text-[9px] leading-tight mt-0.5 opacity-80">{opt.desc}</div>
+                      </button>
+                    )
+                  })}
                 </div>
-                <button
-                  type="button"
-                  onClick={() => setEditExerciseDraft((prev) => ({ ...prev, isUnilateral: !prev?.isUnilateral }))}
-                  className={`w-12 h-7 rounded-full transition-all duration-200 relative flex-shrink-0 overflow-visible ${editExerciseDraft?.isUnilateral ? 'bg-amber-500' : 'bg-neutral-700'}`}
-                  aria-label="Toggle unilateral"
-                  style={{ minWidth: '3rem' }}
-                >
-                  <span className={`absolute top-1 left-0 w-5 h-5 rounded-full bg-white shadow-md transition-transform duration-200 ${editExerciseDraft?.isUnilateral ? 'translate-x-6' : 'translate-x-1'}`} />
-                </button>
               </div>
 
               {/* Side rest + transition time */}

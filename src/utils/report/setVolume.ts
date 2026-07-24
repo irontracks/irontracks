@@ -111,7 +111,27 @@ export const setVolume = (log: unknown): number => {
   const lv = parseWeightValue(log.L_weight) * parseRepsValue(log.L_reps)
   const rv = parseWeightValue(log.R_weight) * parseRepsValue(log.R_reps)
   if (lv > 0 || rv > 0) return lv + rv
-  return parseWeightValue(log.weight) * parseRepsValue(log.reps)
+  // Alternado (rosca alternada): 1 registro, mesmo peso, mas OS DOIS lados fazem
+  // as reps → o trabalho real é o dobro. O renderer grava `alternating: true` no
+  // log da série. Volume = peso × reps × 2.
+  const normal = parseWeightValue(log.weight) * parseRepsValue(log.reps)
+  return log.alternating === true ? normal * 2 : normal
+}
+
+/**
+ * Reps TOTAIS de uma série (pra somatório de repetições do relatório).
+ *   - unilateral: L_reps + R_reps (antes contava só um lado — corrigido junto);
+ *   - alternado: reps × 2 (os dois braços);
+ *   - normal: reps.
+ * Difere de setTopWeightReps (que devolve as reps de UM lado, pra display/1RM).
+ */
+export const setTotalReps = (log: unknown): number => {
+  if (!isRec(log)) return 0
+  const lr = parseRepsValue(log.L_reps)
+  const rr = parseRepsValue(log.R_reps)
+  if (lr > 0 || rr > 0) return lr + rr
+  const r = parseRepsValue(log.reps)
+  return log.alternating === true ? r * 2 : r
 }
 
 /**
