@@ -20,6 +20,21 @@ export const GROUP_METHODS = [
 
 const GROUP_METHOD_SET = new Set<string>(GROUP_METHODS);
 
+/**
+ * Quantos exercícios cada método encadeia por rodada. Sem isso, uma sequência de
+ * 4 Bi-Sets (= DOIS pares) virava um grupo único de 4 — e como o descanso só rola
+ * no último membro (groupMethodSet), o 2º exercício ficava sem descanso nenhum
+ * (bug real no treino de braço: Bíceps banco / Tríceps testa / Bíceps corda /
+ * Tríceps corda). Giant-Set é "4+" — não tem tamanho fixo, consome o run inteiro.
+ */
+const GROUP_METHOD_SIZE: Record<string, number> = {
+  'Bi-Set': 2,
+  'Super-Set': 2,
+  'Pré-exaustão': 2,
+  'Pós-exaustão': 2,
+  'Tri-Set': 3,
+};
+
 export interface ExerciseGroupInfo {
   /** Índices (no array original) dos exercícios que compõem este grupo. */
   members: number[];
@@ -56,10 +71,16 @@ export function buildExerciseGroups(exercises: unknown[]): Map<number, ExerciseG
     // Coleta o run consecutivo com o mesmo método
     let j = i;
     while (j < arr.length && methodOf(arr[j]) === method) j += 1;
-    const members: number[] = [];
-    for (let k = i; k < j; k += 1) members.push(k);
 
-    if (members.length >= 2) {
+    // Fatia o run em rodadas do tamanho do método (Bi-Set de 2 em 2, Tri-Set de
+    // 3 em 3). Sem tamanho declarado (Giant-Set), o run inteiro é uma rodada só.
+    const chunk = GROUP_METHOD_SIZE[method] ?? (j - i);
+    for (let start = i; start < j; start += chunk) {
+      const end = Math.min(start + chunk, j);
+      const members: number[] = [];
+      for (let k = start; k < end; k += 1) members.push(k);
+      // Sobra menor que a rodada (ex.: 3º Bi-Set sem par) fica solo → descansa normal.
+      if (members.length < 2 || members.length < chunk) continue;
       members.forEach((exIdx, position) => {
         map.set(exIdx, { members, position, method, size: members.length });
       });
