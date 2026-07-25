@@ -12,7 +12,7 @@ import {
   normalizeExerciseKey,
 } from '../utils';
 import { UnknownRecord, WorkoutExercise } from '../types';
-import { useAutoloadWeight } from '../hooks/useAutoloadWeight';
+import { useAutoloadWeight, AUTO_INPUT_CLASS } from '../hooks/useAutoloadWeight';
 import { roundSuggestedWeight } from '@/utils/autoload/plateMath';
 import { inferEquipmentFromName } from '@/utils/autoload/equipmentFromName';
 
@@ -249,8 +249,22 @@ const DropSetSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: nu
           não mostrava peso algum na tela, e a carga automática parecia não funcionar
           (só aparecia ao abrir o modal). Violeta quando as etapas vieram do motor. */}
       {!done && stageWeightSummary && (
-        <div className={['pl-12 text-[11px] font-semibold', stagesFilledByMotor ? 'text-violet-300/90' : 'text-neutral-400'].join(' ')}>
-          {stagesFilledByMotor && <span aria-hidden>🧠 </span>}{stageWeightSummary} kg
+        <div className="pl-12">
+          {/* Pílula com a MESMA marcação do input de peso dos outros métodos
+              (AUTO_INPUT_CLASS). Antes era só texto violeta solto: ao lado da
+              caixa violeta da série normal não lia como "o motor preencheu", e
+              o dono reportou que "o drop não marca em roxo igual o rest-pause". */}
+          <span
+            className={[
+              'inline-flex items-center gap-1 rounded-lg border px-2 py-1 text-[11px] font-semibold',
+              stagesFilledByMotor
+                ? AUTO_INPUT_CLASS
+                : 'border-neutral-700 bg-black/30 text-neutral-300',
+            ].join(' ')}
+          >
+            {stagesFilledByMotor && <span aria-hidden>🧠</span>}
+            {stageWeightSummary} kg
+          </span>
         </div>
       )}
 

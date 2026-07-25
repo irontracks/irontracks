@@ -15,7 +15,16 @@ import { useEffect } from 'react'
 import { useWorkoutContext } from '../WorkoutContext'
 import type { WorkoutExercise } from '../types'
 
-const AUTO_INPUT_CLASS = 'border-violet-500/60 ring-violet-500 text-violet-100 bg-violet-500/5'
+/**
+ * Marcação visual de "este valor veio do motor".
+ *
+ * Exportada porque nem todo método mostra o peso num `<input>`: o drop-set exibe
+ * o resumo das etapas numa linha própria (inline não cabe — o truncate colapsava
+ * e escondia o peso). Ele precisa da MESMA marcação, senão o usuário vê a caixa
+ * violeta na série normal e nada equivalente no drop, e conclui que a carga
+ * automática não funcionou ali.
+ */
+export const AUTO_INPUT_CLASS = 'border-violet-500/60 ring-violet-500 text-violet-100 bg-violet-500/5'
 
 export function useAutoloadWeight(ex: WorkoutExercise, exIdx: number, setIdx: number): {
   isAutoWeight: boolean
