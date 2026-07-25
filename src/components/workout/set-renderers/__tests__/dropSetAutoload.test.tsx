@@ -137,4 +137,31 @@ describe('Drop-set — a linha exibe o peso das etapas', () => {
       screen.queryAllByText((_c, el) => (el?.textContent ?? '').includes('kg')),
     ).toHaveLength(0)
   })
+
+  /**
+   * Guard da MARCAÇÃO do motor.
+   *
+   * INCIDENTE (device, 2026-07-25): na mesma tela, a série normal e o rest-pause
+   * mostravam a caixa de peso com borda violeta ("o motor preencheu isto"), e o
+   * drop mostrava o peso como texto solto. O dono reportou: "o drop não está
+   * marcando em roxo igual o do rest-p".
+   *
+   * O drop não pode usar `<input>` na linha (o truncate colapsava o texto), então
+   * a paridade vem de aplicar a MESMA constante `AUTO_INPUT_CLASS` na pílula do
+   * resumo. Este guard existe pra que as duas superfícies não divirjam de novo.
+   */
+  it('marca o resumo com a mesma classe do input de peso dos outros métodos', () => {
+    suggestions = { '0-0': { weight: 50, reps: 10, confidence: 'high', rationale: 'x' } }
+    renderDrop()
+
+    const matches = screen.getAllByText(
+      (_c, el) => (el?.textContent ?? '').replace(/\s+/g, ' ').includes('50 → 40 kg'),
+    )
+    const found = matches[matches.length - 1]
+
+    // Mesmas classes que useAutoloadWeight aplica no <input> dos demais métodos.
+    expect(found.className).toContain('border-violet-500/60')
+    expect(found.className).toContain('bg-violet-500/5')
+    expect(found.className).toContain('text-violet-100')
+  })
 })
