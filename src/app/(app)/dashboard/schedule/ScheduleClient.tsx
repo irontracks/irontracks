@@ -3,6 +3,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   CalendarDays,
+  ChevronDown,
   ChevronLeft,
   ChevronRight,
   Clock,
@@ -46,6 +47,12 @@ type FormState = {
 const DEFAULT_APPOINTMENT_DURATION_MINUTES = 60
 
 const WEEKDAY_LABELS = ['DOM', 'SEG', 'TER', 'QUA', 'QUI', 'SEX', 'SÁB'] as const
+
+const APPOINTMENT_TYPES = [
+  { value: 'personal', label: 'Personal' },
+  { value: 'assessment', label: 'Avaliação' },
+  { value: 'other', label: 'Outro' },
+] as const
 
 function toDateInputValue(date: Date) {
   const year = date.getFullYear()
@@ -103,6 +110,28 @@ function formatTime(iso: string) {
   return `${String(date.getHours()).padStart(2, '0')}:${String(date.getMinutes()).padStart(2, '0')}`
 }
 
+/** Duração exibida no sheet — espelha a regra do submit (fim inválido = 60 min). */
+function formatDuration(startTime: string, endTime: string) {
+  const [startHour, startMin] = (startTime || '').split(':').map(Number)
+  if (!Number.isFinite(startHour) || !Number.isFinite(startMin)) return ''
+  const [endHour, endMin] = (endTime || '').split(':').map(Number)
+
+  const start = startHour * 60 + startMin
+  const parsedEnd =
+    Number.isFinite(endHour) && Number.isFinite(endMin) ? endHour * 60 + endMin : Number.NaN
+  const end =
+    Number.isFinite(parsedEnd) && parsedEnd > start
+      ? parsedEnd
+      : start + DEFAULT_APPOINTMENT_DURATION_MINUTES
+
+  const total = end - start
+  const hours = Math.floor(total / 60)
+  const minutes = total % 60
+  if (hours && minutes) return `${hours}h${String(minutes).padStart(2, '0')}`
+  if (hours) return `${hours}h`
+  return `${minutes}min`
+}
+
 function getTypeLabel(type: 'personal' | 'assessment' | 'other') {
   if (type === 'personal') return 'Personal'
   if (type === 'assessment') return 'Avaliação'
@@ -138,6 +167,11 @@ export default function SchedulePage() {
 
   const selectedDateObj = useMemo(() => parseDateInput(selectedDate), [selectedDate])
   const todayValue = useMemo(() => toDateInputValue(new Date()), [])
+
+  const durationLabel = useMemo(
+    () => formatDuration(form.startTime, form.endTime),
+    [form.startTime, form.endTime]
+  )
 
   const weekDays = useMemo(() => {
     const start = startOfWeek(selectedDateObj)
@@ -529,16 +563,11 @@ export default function SchedulePage() {
                 <CalendarDays size={30} className="text-neutral-600" strokeWidth={1.5} />
               </div>
               <h3 className="text-base font-bold text-neutral-200 mb-1.5">Dia livre</h3>
-              <p className="text-sm text-neutral-500 max-w-[16rem] leading-relaxed mb-6">
+              {/* Sem CTA aqui de propósito: a FAB "Agendar" fica visível neste
+                  estado e dois botões para a mesma ação viram redundância. */}
+              <p className="text-sm text-neutral-500 max-w-[16rem] leading-relaxed">
                 Nenhum agendamento marcado. Use este espaço para encaixar um aluno.
               </p>
-              <button
-                type="button"
-                onClick={handleOpenModal}
-                className="min-h-[44px] px-5 rounded-xl border border-yellow-500/40 text-yellow-400 text-sm font-bold hover:bg-yellow-500/10 active:scale-95 transition"
-              >
-                Criar agendamento
-              </button>
             </div>
           ) : (
             <ul className="space-y-2.5">
@@ -618,95 +647,138 @@ export default function SchedulePage() {
 
         {/* ── Modal criar/editar ───────────────────────────────────── */}
         {isModalOpen && (
-          <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center px-4">
-            <div className="bg-neutral-900 border border-white/10 rounded-2xl w-full max-w-md p-5">
-              <div className="flex items-center justify-between mb-5">
-                <h2 className="text-lg font-black tracking-tight">
-                  {editingAppointment ? 'Editar agendamento' : 'Novo agendamento'}
-                </h2>
+          <div className="overlay-enter fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-end sm:items-center justify-center sm:px-4">
+            <div
+              className="overlay-content-enter bg-neutral-900 border-t sm:border border-white/10 rounded-t-3xl sm:rounded-2xl w-full sm:max-w-md max-h-[92vh] overflow-y-auto"
+              style={{ paddingBottom: 'max(env(safe-area-inset-bottom), 1.25rem)' }}
+            >
+              {/* Handle: sinaliza folha arrastável, padrão de sheet nativo */}
+              <div className="pt-3 pb-1 flex justify-center" aria-hidden="true">
+                <div className="w-9 h-1 rounded-full bg-white/15" />
+              </div>
+
+              <div className="px-5 pt-2 pb-4 flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <h2 className="text-lg font-black tracking-tight">
+                    {editingAppointment ? 'Editar agendamento' : 'Novo agendamento'}
+                  </h2>
+                  <p className="text-xs text-neutral-500 mt-0.5 truncate">
+                    {formatLongDate(parseDateInput(form.date))}
+                  </p>
+                </div>
                 <button
                   type="button"
                   onClick={handleCloseModal}
                   aria-label="Fechar"
-                  className="w-9 h-9 -mr-1 flex items-center justify-center rounded-full text-neutral-400 hover:text-white hover:bg-white/5 active:scale-95 transition"
+                  className="w-9 h-9 shrink-0 -mr-1 flex items-center justify-center rounded-full text-neutral-400 hover:text-white hover:bg-white/5 active:scale-95 transition"
                 >
                   <X size={18} />
                 </button>
               </div>
 
-              <form onSubmit={handleSubmitAppointment} className="space-y-4">
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold uppercase tracking-wider text-neutral-400">Data</label>
-                    <input
-                      type="date"
-                      value={form.date}
-                      onChange={e => setForm(prev => ({ ...prev, date: e.target.value }))}
-                      className="w-full bg-white/[0.04] border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-yellow-500 min-h-[44px]"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <label className="text-[11px] font-bold uppercase tracking-wider text-neutral-400">Hora início</label>
+              <form onSubmit={handleSubmitAppointment} className="px-5 space-y-5">
+                {/* Quando ─ data + janela de horário, agrupadas porque decidem a mesma coisa */}
+                <fieldset className="space-y-2">
+                  <legend className="text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-2">
+                    Quando
+                  </legend>
+                  <input
+                    type="date"
+                    value={form.date}
+                    aria-label="Data"
+                    onChange={e => setForm(prev => ({ ...prev, date: e.target.value }))}
+                    className="w-full appearance-none bg-white/[0.04] border border-white/10 rounded-xl px-3.5 h-12 text-[15px] text-white focus:outline-none focus:border-yellow-500/70 focus:bg-white/[0.06] transition"
+                  />
+                  <div className="grid grid-cols-2 gap-2">
                     <input
                       type="time"
                       value={form.startTime}
+                      aria-label="Hora de início"
                       onChange={e => setForm(prev => ({ ...prev, startTime: e.target.value }))}
-                      className="w-full bg-white/[0.04] border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-yellow-500 min-h-[44px]"
+                      className="w-full appearance-none bg-white/[0.04] border border-white/10 rounded-xl px-3.5 h-12 text-[15px] text-white focus:outline-none focus:border-yellow-500/70 focus:bg-white/[0.06] transition"
+                    />
+                    <input
+                      type="time"
+                      value={form.endTime}
+                      aria-label="Hora de término"
+                      onChange={e => setForm(prev => ({ ...prev, endTime: e.target.value }))}
+                      className="w-full appearance-none bg-white/[0.04] border border-white/10 rounded-xl px-3.5 h-12 text-[15px] text-white focus:outline-none focus:border-yellow-500/70 focus:bg-white/[0.06] transition"
                     />
                   </div>
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold uppercase tracking-wider text-neutral-400">Hora fim (opcional)</label>
-                  <input
-                    type="time"
-                    value={form.endTime}
-                    onChange={e => setForm(prev => ({ ...prev, endTime: e.target.value }))}
-                    className="w-full bg-white/[0.04] border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-yellow-500 min-h-[44px]"
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold uppercase tracking-wider text-neutral-400">Aluno</label>
-                  <select
-                    value={form.studentId}
-                    onChange={e => setForm(prev => ({ ...prev, studentId: e.target.value }))}
-                    className="w-full bg-white/[0.04] border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-yellow-500 min-h-[44px]"
-                  >
-                    <option value="">Sem aluno vinculado</option>
-                    {safeStudents.map(s => (
-                      <option key={s.id} value={s.id}>
-                        {s.name || s.email || 'Aluno sem nome'}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-[11px] font-bold uppercase tracking-wider text-neutral-400">Tipo</label>
-                  <select
-                    value={form.type}
-                    onChange={e => setForm(prev => ({ ...prev, type: e.target.value as FormState['type'] }))}
-                    className="w-full bg-white/[0.04] border border-white/10 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-yellow-500 min-h-[44px]"
-                  >
-                    <option value="personal">Personal</option>
-                    <option value="assessment">Avaliação</option>
-                    <option value="other">Outro</option>
-                  </select>
-                </div>
+                  {durationLabel && (
+                    <p className="text-xs text-neutral-500 pl-0.5">Duração de {durationLabel}</p>
+                  )}
+                </fieldset>
 
-                <div className="flex gap-2 pt-1">
+                {/* Tipo ─ 3 opções fixas viram chips: escolha visível sem abrir picker */}
+                <fieldset>
+                  <legend className="text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-2">
+                    Tipo
+                  </legend>
+                  <div className="grid grid-cols-3 gap-2">
+                    {APPOINTMENT_TYPES.map(option => {
+                      const isActive = form.type === option.value
+                      return (
+                        <button
+                          key={option.value}
+                          type="button"
+                          aria-pressed={isActive}
+                          onClick={() => setForm(prev => ({ ...prev, type: option.value }))}
+                          className={`h-11 rounded-xl text-sm font-bold transition active:scale-95 ${
+                            isActive
+                              ? 'bg-yellow-500 text-black'
+                              : 'bg-white/[0.04] border border-white/10 text-neutral-300 hover:bg-white/[0.07]'
+                          }`}
+                        >
+                          {option.label}
+                        </button>
+                      )
+                    })}
+                  </div>
+                </fieldset>
+
+                {/* Aluno ─ segue select (lista dinâmica), mas com chevron próprio */}
+                <fieldset>
+                  <legend className="text-[11px] font-bold uppercase tracking-wider text-neutral-500 mb-2">
+                    Aluno
+                  </legend>
+                  <div className="relative">
+                    <select
+                      value={form.studentId}
+                      aria-label="Aluno"
+                      onChange={e => setForm(prev => ({ ...prev, studentId: e.target.value }))}
+                      className="w-full appearance-none bg-white/[0.04] border border-white/10 rounded-xl pl-3.5 pr-10 h-12 text-[15px] text-white focus:outline-none focus:border-yellow-500/70 focus:bg-white/[0.06] transition"
+                    >
+                      <option value="">Sem aluno vinculado</option>
+                      {safeStudents.map(s => (
+                        <option key={s.id} value={s.id}>
+                          {s.name || s.email || 'Aluno sem nome'}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown
+                      size={16}
+                      className="absolute right-3.5 top-1/2 -translate-y-1/2 text-neutral-500 pointer-events-none"
+                    />
+                  </div>
+                </fieldset>
+
+                {/* Salvar domina; cancelar é texto — não competem pelo mesmo peso */}
+                <div className="flex items-center gap-3 pt-1">
                   <button
                     type="button"
                     onClick={handleCloseModal}
                     disabled={saving}
-                    className="flex-1 min-h-[48px] px-4 rounded-xl border border-white/10 text-neutral-300 text-sm font-bold bg-transparent hover:bg-white/5 disabled:opacity-50 active:scale-95 transition"
+                    className="px-4 min-h-[52px] text-sm font-bold text-neutral-400 hover:text-white disabled:opacity-50 active:scale-95 transition"
                   >
                     Cancelar
                   </button>
                   <button
                     type="submit"
                     disabled={saving}
-                    className="flex-1 min-h-[48px] px-4 rounded-xl bg-yellow-500 text-black text-sm font-black disabled:opacity-50 active:scale-95 transition"
+                    className="flex-1 min-h-[52px] rounded-2xl bg-yellow-500 text-black text-[15px] font-black disabled:opacity-50 active:scale-[0.98] transition"
                   >
-                    {saving ? 'Salvando…' : 'Salvar'}
+                    {saving ? 'Salvando…' : editingAppointment ? 'Salvar alterações' : 'Agendar'}
                   </button>
                 </div>
               </form>
