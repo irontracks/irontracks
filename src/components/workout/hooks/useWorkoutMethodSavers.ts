@@ -86,9 +86,35 @@ export function useWorkoutMethodSavers({
     setWaveModal,
     setGroupMethodModal,
     getLog,
-    updateLog,
+    updateLog: rawUpdateLog,
     startTimer,
 }: UseWorkoutMethodSaversProps) {
+
+    /**
+     * Todo save deste hook vem de um modal que o USUÁRIO preencheu e confirmou —
+     * logo o peso resultante é dele, não do motor.
+     *
+     * Sem marcar `weightSource: 'user'`, o peso salvo herdava a fonte anterior:
+     * se o autoload já tinha preenchido a caixa (fonte 'auto'), a guarda do
+     * useAutoloadWeight (`current !== '' && weightSource !== 'auto'`) não pegava,
+     * porque a fonte ERA 'auto' — e o efeito reescrevia o valor do usuário de
+     * volta pra sugestão. O NormalSet já marcava 'user' ao digitar; os 13 métodos
+     * avançados, que editam por modal, não.
+     *
+     * Marcado aqui na fronteira, e não nos 13 handlers, porque o 14º saver que
+     * alguém escrever também precisa disso.
+     */
+    const updateLog: UseWorkoutMethodSaversProps['updateLog'] = (key, patch) => {
+        if (isObject(patch)) {
+            const record = patch as UnknownRecord;
+            const weight = String(record.weight ?? '').trim();
+            if (weight) {
+                rawUpdateLog(key, { ...record, weightSource: 'user' });
+                return;
+            }
+        }
+        rawUpdateLog(key, patch);
+    };
 
     // ─── Cluster ──────────────────────────────────────────────────────────────
     const saveClusterModal = () => {
