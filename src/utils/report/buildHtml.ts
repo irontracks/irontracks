@@ -185,7 +185,9 @@ export function buildReportData(
     const baseLabel = baseMs ? `Base: ${formatShortDate(baseMs)}` : null
 
     type Progression = { type: 'weight' | 'reps' | 'volume'; deltaText: string; direction: 'up' | 'down' | 'flat' }
-    type SetRow = { index: number; weight: unknown; reps: unknown; cadence: unknown; tag: string | null; note: string | null; progression: Progression | null }
+    // `failure` é dimensão SEPARADA de `tag` (que carrega o método): uma série de
+    // drop-set também pode ter sido levada à falha, então não dá pra reaproveitar a tag.
+    type SetRow = { index: number; weight: unknown; reps: unknown; cadence: unknown; tag: string | null; note: string | null; progression: Progression | null; failure: boolean }
     const sets: SetRow[] = []
     let exVolume = 0
     for (let sIdx = 0; sIdx < setsPlanned; sIdx++) {
@@ -252,6 +254,8 @@ export function buildReportData(
         tag,
         note,
         progression,
+        // Aceita boolean e "true" (o log é serializado como JSON em workouts.notes).
+        failure: log.failure === true || String(log.failure ?? '').toLowerCase() === 'true',
       })
     }
 
@@ -639,6 +643,10 @@ export function buildReportHTML(
     const rows = sets.map((set, rowIdx) => {
       const tag = set?.tag ? String(set.tag) : ''
       const tagHtml = tag ? `<span class="set-tag">${escapeHtml(tag)}</span>` : ''
+      // Marca 💥 na série levada à falha — mesma informação que o relatório na tela.
+      const failureHtml = set?.failure
+        ? '<span class="set-tag" style="color:#fca5a5;background:rgba(239,68,68,.15);border:1px solid rgba(239,68,68,.4)">💥 Falha</span>'
+        : ''
       const note = set?.note ? String(set.note) : ''
       const weight = set?.weight ?? '—'
       const reps = set?.reps ?? '—'
@@ -658,7 +666,7 @@ export function buildReportHTML(
 
       let rowHtml = `
         <tr style="${auxStyle}${zebra}">
-          <td class="td-mono td-muted">#${escapeHtml(String(set?.index || ''))}${tagHtml}</td>
+          <td class="td-mono td-muted">#${escapeHtml(String(set?.index || ''))}${tagHtml}${failureHtml}</td>
           <td class="td-weight">${escapeHtml(String(weight))}</td>
           <td class="td-mono td-center">${escapeHtml(String(reps))}</td>
           ${showProgression ? `<td style="padding:10px 12px;text-align:center;font-size:11px;font-weight:900;border-radius:6px;${progStyle}">${escapeHtml(progText)}</td>` : ''}

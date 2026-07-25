@@ -41,11 +41,20 @@ const buildLogVolume = (logs: UnknownRecord, exerciseIndex: number) => {
   // Melhor 1RM estimado do dia = MÁXIMO por série. Mesma fonte única (setBestE1rm)
   // do baseline histórico, pro Δ1RM comparar maçãs com maçãs.
   let bestE1rm = 0
+  // Séries levadas à FALHA muscular. O flag já era gravado no log e ficava órfão —
+  // nada no relatório lia, então a falha marcada durante o treino sumia do histórico.
+  const failureSetIdxs: number[] = []
   Object.entries(logs).forEach(([key, value]) => {
     const parts = String(key || '').split('-')
     const eIdx = Number(parts[0])
     if (!Number.isFinite(eIdx) || eIdx !== exerciseIndex) return
     if (!isObject(value)) return
+    // Aceita boolean e "true" (o log é serializado como JSON em workouts.notes).
+    const failureRaw = value.failure ?? null
+    if (failureRaw === true || String(failureRaw ?? '').toLowerCase() === 'true') {
+      const sIdx = Number(parts[1])
+      if (Number.isFinite(sIdx)) failureSetIdxs.push(sIdx)
+    }
     const doneRaw = value.done ?? value.isDone ?? value.completed ?? null
     const done = doneRaw == null ? true : doneRaw === true || String(doneRaw || '').toLowerCase() === 'true'
     if (!done) return
@@ -158,6 +167,7 @@ const buildLogVolume = (logs: UnknownRecord, exerciseIndex: number) => {
     reps,
     avgWeight,
     bestE1rm: bestE1rm > 0 ? Math.round(bestE1rm * 10) / 10 : null,
+    failureSetIdxs: failureSetIdxs.sort((a, b) => a - b),
   }
 }
 
@@ -356,6 +366,10 @@ export type ReportExerciseMetrics = {
   caloriesKcal?: number
   /** Melhor 1RM estimado do dia (máx por série, Epley). null se sem carga válida. */
   bestE1rm: number | null
+  /** Quantas séries deste exercício foram levadas à FALHA muscular (flag `failure`). */
+  setsToFailure: number
+  /** Índices (0-based) das séries levadas à falha — pra marcar 💥 na série certa. */
+  failureSetIdxs: number[]
   delta: {
     volumeKg: number | null
     reps: number | null
@@ -483,6 +497,8 @@ export const buildReportMetrics = (session: UnknownRecord, previousSession?: Unk
       repsDone: logVolume.reps,
       avgWeightKg: logVolume.avgWeight,
       bestE1rm: logVolume.bestE1rm,
+      setsToFailure: logVolume.failureSetIdxs.length,
+      failureSetIdxs: logVolume.failureSetIdxs,
       delta: {
         volumeKg: deltaVolume,
         reps: deltaReps,

@@ -135,6 +135,7 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
           rpe: number | null;
           notes: string | null;
           dropStages: Array<{ weight: number | null; reps: number | null }> | null;
+          failed: boolean;
         }> = [];
         Object.entries(logsObj).forEach(([key, value]) => {
           try {
@@ -170,8 +171,12 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
             const doneRaw = log.done ?? log.isDone ?? log.completed ?? null;
             const done = doneRaw == null ? true : doneRaw === true || String(doneRaw || '').toLowerCase() === 'true';
             if (!done && !hasValues) return;
+            // Série levada à falha. Aceita boolean e a string "true" (o log passa
+            // por serialização JSON em workouts.notes e volta como texto).
+            const failureRaw = log.failure ?? null;
+            const failed = failureRaw === true || String(failureRaw ?? '').toLowerCase() === 'true';
             if (hasValues) {
-              indexedSets.push({ setIdx: sIdx, weight, reps, rpe, notes, dropStages });
+              indexedSets.push({ setIdx: sIdx, weight, reps, rpe, notes, dropStages, failed });
             }
           } catch { }
         });
@@ -217,6 +222,7 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
         const setRpes: (number | null)[] = Array(setsLen).fill(null);
         const setNotes: (string | null)[] = Array(setsLen).fill(null);
         const dropSetStages: (Array<{ weight: number | null; reps: number | null }> | null)[] = Array(setsLen).fill(null);
+        const setFailures: (boolean | null)[] = Array(setsLen).fill(null);
         const isPosNum = (v: number | null): v is number => typeof v === 'number' && Number.isFinite(v) && v > 0;
         for (const s of indexedSets) {
           setWeights[s.setIdx] = isPosNum(s.weight) ? s.weight : null;
@@ -224,12 +230,14 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
           setRpes[s.setIdx] = isPosNum(s.rpe) ? s.rpe : null;
           setNotes[s.setIdx] = s.notes ?? null;
           dropSetStages[s.setIdx] = s.dropStages ?? null;
+          setFailures[s.setIdx] = s.failed ? true : null;
         }
         const hasAnyWeight = setWeights.some(v => v !== null);
         const hasAnyReps = setReps.some(v => v !== null);
         const hasAnyRpe = setRpes.some(v => v !== null);
         const hasAnyNote = setNotes.some(v => v !== null);
         const hasAnyDropStages = dropSetStages.some(v => v !== null);
+        const hasAnyFailure = setFailures.some(v => v !== null);
         return {
           ts,
           avgWeight: avgWeight ?? null,
@@ -242,6 +250,7 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
           setRpes: hasAnyRpe ? setRpes : null,
           setNotes: hasAnyNote ? setNotes : null,
           dropSetStages: hasAnyDropStages ? dropSetStages : null,
+          setFailures: hasAnyFailure ? setFailures : null,
         };
       } catch (e) {
         logError('hook:useWorkoutDeload.buildHistoryEntry', e);
