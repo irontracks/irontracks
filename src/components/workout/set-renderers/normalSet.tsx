@@ -24,17 +24,32 @@ import { logWarnRemote } from '@/lib/logger';
 // global log on change (for immediate persistence), but reads from local state
 // so the displayed value is never clobbered by an external re-render while
 // the user is typing.
+/** Janela em que um valor DIGITADO é protegido de ser descartado por um
+ *  `externalValue` vazio (a gravação ainda não voltou pelo estado do React). */
+const TYPED_VALUE_GRACE_MS = 2000;
+
 function useInputField(externalValue: string, onChange: (v: string) => void, label?: string) {
   const [localValue, setLocalValue] = useState(externalValue);
   const isFocused = useRef(false);
   const blurredAtRef = useRef(0);
+  // Momento da última DIGITAÇÃO. A guarda abaixo olhava só o blur — e o Sentry
+  // (workout.input.typed-value-discarded, 8 eventos em 24 h no iPhone do dono)
+  // mostrou o descarte acontecendo com `blurredAtRef` ainda ZERO, ou seja SEM blur
+  // nenhum: `Date.now() - 0` é um número gigante, a guarda não pegava e o valor
+  // digitado era jogado fora. Todos os eventos eram unilaterais (L_/R_), onde o
+  // efeito de re-sync do autoload dispara um updateLog extra logo depois da tecla —
+  // re-render que chega ANTES do setState do campo propagar, trazendo externo vazio.
+  const typedAtRef = useRef(0);
 
   useEffect(() => {
     if (isFocused.current) return;
+    // Protege o que foi digitado há pouco, tenha havido blur ou não.
+    const lastInteraction = Math.max(blurredAtRef.current, typedAtRef.current);
     if (
       localValue &&
       !externalValue &&
-      Date.now() - blurredAtRef.current < 2000
+      lastInteraction > 0 &&
+      Date.now() - lastInteraction < TYPED_VALUE_GRACE_MS
     ) {
       return;
     }
@@ -48,7 +63,10 @@ function useInputField(externalValue: string, onChange: (v: string) => void, lab
       logWarnRemote('workout.input.typed-value-discarded', `${label} digitado descartado p/ vazio`, {
         field: label,
         typed: localValue,
-        sinceBlurMs: Date.now() - blurredAtRef.current,
+        // `null` quando o evento nunca ocorreu — antes mandávamos `Date.now() - 0`,
+        // um epoch inteiro disfarçado de duração (foi o que denunciou o bug).
+        sinceBlurMs: blurredAtRef.current > 0 ? Date.now() - blurredAtRef.current : null,
+        sinceTypedMs: typedAtRef.current > 0 ? Date.now() - typedAtRef.current : null,
         focused: isFocused.current,
       });
     }
@@ -60,6 +78,10 @@ function useInputField(externalValue: string, onChange: (v: string) => void, lab
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
       const v = e.target.value;
+      // Marca ANTES de propagar: o re-render disparado por onChange (ou por um
+      // efeito vizinho, como o re-sync do autoload) precisa ver esta digitação
+      // pra não descartar o valor achando que o campo está vazio.
+      typedAtRef.current = Date.now();
       setLocalValue(v);
       onChange(v);
     },
