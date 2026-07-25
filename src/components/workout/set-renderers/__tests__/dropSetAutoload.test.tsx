@@ -118,9 +118,23 @@ describe('Drop-set — a linha exibe o peso das etapas', () => {
   it('mostra o resumo "50 → 40 kg" sem precisar abrir o modal', () => {
     suggestions = { '0-0': { weight: 50, reps: 10, confidence: 'high', rationale: 'x' } }
     renderDrop()
-    const found = screen.getByText(
-      (_c, el) => el?.tagName === 'SPAN' && (el.textContent ?? '').replace(/\s+/g, ' ').includes('50 → 40 kg'),
+    // O peso fica numa linha PRÓPRIA (não inline na linha da série): inline, o
+    // truncate colapsava o texto e escondia o peso — foi o que aconteceu no device.
+    const matches = screen.getAllByText(
+      (_c, el) => (el?.textContent ?? '').replace(/\s+/g, ' ').includes('50 → 40 kg'),
     )
+    // O mais interno é o próprio nó do resumo (os demais são ancestrais).
+    const found = matches[matches.length - 1]
     expect(found).toBeTruthy()
+    // …e precisa estar VISÍVEL, não espremido/truncado numa linha lotada.
+    expect(found.className).not.toContain('truncate')
+  })
+
+  it('sem sugestão, não inventa linha de peso', () => {
+    suggestions = {}
+    renderDrop()
+    expect(
+      screen.queryAllByText((_c, el) => (el?.textContent ?? '').includes('kg')),
+    ).toHaveLength(0)
   })
 })

@@ -75,3 +75,32 @@ describe('Bi-Set — descanso só no último membro do par', () => {
     expect(startTimer).toHaveBeenCalledTimes(1)
   })
 })
+
+/**
+ * Guard: Concluir do Bi-Set exige SÓ o peso — igual à série normal.
+ *
+ * INCIDENTE (treino real 2026-07-24): o botão exigia peso E reps e ficava travado em
+ * silêncio. O 2º exercício de um Bi-Set ("Panturrilha em pé") terminou o treino com
+ * as 4 séries preenchidas e NENHUMA concluída. A série normal (normalSet) sempre
+ * concluiu sem reps — divergir aqui não tem razão de ser.
+ *
+ * INVARIANTE: com peso e SEM reps o botão conclui; sem peso, não.
+ */
+describe('Bi-Set — Concluir exige só o peso (igual à série normal)', () => {
+  it('conclui com peso e SEM reps', () => {
+    exercises = [biSet('Panturrilha sentado'), biSet('Panturrilha em pé')]
+    logByKey['0-0'] = { weight: '60' } // sem reps
+    render(<GroupMethodSet ex={biSet('Panturrilha sentado') as never} exIdx={0} setIdx={0} />)
+    clickConcluir()
+    expect(ctx.updateLog).toHaveBeenCalledWith('0-0', expect.objectContaining({ done: true }))
+  })
+
+  it('SEM peso continua bloqueado (e explica o que falta)', () => {
+    exercises = [biSet('Panturrilha sentado'), biSet('Panturrilha em pé')]
+    logByKey['0-0'] = {} // sem peso
+    render(<GroupMethodSet ex={biSet('Panturrilha sentado') as never} exIdx={0} setIdx={0} />)
+    clickConcluir()
+    expect(ctx.updateLog).not.toHaveBeenCalled()
+    expect(screen.getByText('Preencha o peso para concluir.')).toBeTruthy()
+  })
+})

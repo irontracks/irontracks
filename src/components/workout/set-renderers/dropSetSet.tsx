@@ -204,8 +204,12 @@ const DropSetSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: nu
                   className="h-4 w-4 text-[10px]"
                 />
               </span>
-              <span className={['text-xs truncate', stagesFilledByMotor ? 'text-violet-300/90 font-semibold' : 'text-neutral-400'].join(' ')}>
-                {stageWeightSummary ? `${stageWeightSummary} kg · ` : ''}{stagesCount} etapas{total ? ` • ${total} reps` : ''}
+              {/* Só o contador fica inline — a linha é apertada (Abrir + notas +
+                  Concluir) e qualquer texto maior era COLAPSADO pelo truncate, que
+                  foi o que escondeu o peso das etapas na validação de 2026-07-24.
+                  O peso vai na linha de baixo, onde sempre cabe. */}
+              <span className="text-xs truncate text-neutral-400">
+                {stagesCount} etapas{total ? ` • ${total} reps` : ''}
               </span>
             </div>
             <button
@@ -237,6 +241,15 @@ const DropSetSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: nu
           </div>
         )}
       </div>
+
+      {/* Peso das etapas na linha de baixo — sem isso o drop era o ÚNICO método que
+          não mostrava peso algum na tela, e a carga automática parecia não funcionar
+          (só aparecia ao abrir o modal). Violeta quando as etapas vieram do motor. */}
+      {!done && stageWeightSummary && (
+        <div className={['pl-12 text-[11px] font-semibold', stagesFilledByMotor ? 'text-violet-300/90' : 'text-neutral-400'].join(' ')}>
+          {stagesFilledByMotor && <span aria-hidden>🧠 </span>}{stageWeightSummary} kg
+        </div>
+      )}
 
       {!done && !canDone && (
         <div className="pl-12 text-[11px] text-neutral-500 font-semibold">
