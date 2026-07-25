@@ -88,6 +88,14 @@ export type ReportHistoryItem = {
   setRpes?: (number | null)[] | null;
   setNotes?: (string | null)[] | null;
   /**
+   * Séries levadas à FALHA muscular (flag `failure` do log), por índice de série.
+   * Alimenta duas coisas: a marca 💥 no histórico e — mais importante — a trava
+   * anti-progressão do motor de carga (`suggestWeight` segura o peso quando a
+   * última sessão foi à falha). Sem este array o motor NUNCA enxergava as falhas:
+   * a trava existia no código mas o dado nunca chegava nela.
+   */
+  setFailures?: (boolean | null)[] | null;
+  /**
    * Drop-set per-set, per-stage history. `dropSetStages[setIdx]` is the array
    * of stage objects logged on that set (or `null` if the set wasn't a drop
    * set). Lets the drop-set modal placeholder show the actual previous weight

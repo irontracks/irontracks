@@ -219,6 +219,19 @@ export const ReportExerciseCard = ({ exercise, exIdx, sessionLogs, prevLogs, bas
                     {!isCardio && bestE1rm != null && (
                         <span>1RM est: <span className="font-bold text-amber-300">{bestE1rm.toFixed(1)} kg</span></span>
                     )}
+                    {/* Quantas séries foram à falha neste exercício. Lê os logs da própria
+                        sessão (mesma fonte da marca por série), então vale também para
+                        relatórios antigos, sem depender do reportMeta gravado no finish. */}
+                    {!isCardio && (() => {
+                        const n = Array.from({ length: setsCount }).reduce<number>((acc, _, sIdx) => {
+                            const l = sessionLogs[`${exIdx}-${sIdx}`] as AnyObj | undefined
+                            const f = l?.failure
+                            return acc + (f === true || String(f ?? '').toLowerCase() === 'true' ? 1 : 0)
+                        }, 0)
+                        return n > 0
+                            ? <span className="text-red-300">💥 <span className="font-bold">{n}</span> {n > 1 ? 'séries à falha' : 'série à falha'}</span>
+                            : null
+                    })()}
                     {(() => {
                         const m = String((obj?.method ?? '') as string).trim()
                         return m && m !== 'Normal' ? <span className="text-red-300 font-bold uppercase">{m}</span> : null
@@ -302,6 +315,12 @@ export const ReportExerciseCard = ({ exercise, exIdx, sessionLogs, prevLogs, bas
                                             {isPr && <span className="text-yellow-400" title="Recorde pessoal">★</span>}
                                             {sIdx === bestSetIdx && (
                                                 <span className="text-[9px] bg-amber-500/20 text-amber-300 border border-amber-500/30 px-1 rounded font-black" title="Melhor série (maior 1RM estimado)">Melhor</span>
+                                            )}
+                                            {/* Série levada à falha muscular. O flag `failure` já era gravado
+                                                durante o treino mas NADA no relatório lia — a marca sumia do
+                                                histórico. Aceita boolean e "true" (log serializado em JSON). */}
+                                            {(logObj.failure === true || String(logObj.failure ?? '').toLowerCase() === 'true') && (
+                                                <span className="text-[9px] bg-red-500/15 text-red-300 border border-red-500/40 px-1 rounded font-black" title="Série levada à falha muscular">💥 Falha</span>
                                             )}
                                         </div>
                                     </td>

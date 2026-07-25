@@ -52,18 +52,24 @@ function buildHistorySets(item: {
   setWeights?: (number | null)[] | null
   setReps?: (number | null)[] | null
   setRpes?: (number | null)[] | null
+  setFailures?: (boolean | null)[] | null
 } | null | undefined): HistorySet[] {
   if (!item) return []
   const w = Array.isArray(item.setWeights) ? item.setWeights : []
   const r = Array.isArray(item.setReps) ? item.setReps : []
   const rp = Array.isArray(item.setRpes) ? item.setRpes : []
+  // `failed` alimenta a trava anti-progressão do motor (suggestWeight segura a
+  // carga quando a última sessão foi à falha). O array não era repassado, então a
+  // trava existia no motor mas NUNCA recebia o dado — o peso subia mesmo depois de
+  // uma série que estourou.
+  const f = Array.isArray(item.setFailures) ? item.setFailures : []
   const n = Math.max(w.length, r.length)
   const out: HistorySet[] = []
   for (let i = 0; i < n; i++) {
     const weight = asNum(w[i])
     const reps = asNum(r[i])
     if (weight !== null && weight > 0 && reps !== null && reps > 0) {
-      out.push({ weight, reps, rpe: asNum(rp[i]) })
+      out.push({ weight, reps, rpe: asNum(rp[i]), failed: f[i] === true })
     }
   }
   return out
