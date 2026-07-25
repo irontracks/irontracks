@@ -92,7 +92,7 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   return (
     <QueryProvider>
       <OfflineBanner />
-      {/* UpdateAvailableBanner self-gates to iOS native only via isIosNative() */}
+      {/* UpdateAvailableBanner self-gates to iOS/Android native via the hook */}
       <UpdateAvailableBanner />
       {children}
     </QueryProvider>

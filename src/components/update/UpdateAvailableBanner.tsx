@@ -3,13 +3,15 @@
 import { useCallback, useState } from 'react'
 import { ArrowUpCircle, X, Sparkles } from 'lucide-react'
 import { useAppStoreUpdateCheck } from '@/hooks/useAppStoreUpdateCheck'
+import { isAndroidNative } from '@/utils/platform'
+import { PLAY_STORE_DEEP_LINK } from '@/utils/version/latestNativeVersions'
 import { logWarn } from '@/lib/logger'
 
 /**
- * Top-of-app banner that prompts iOS users to update when a newer version
- * is live on the App Store.
+ * Top-of-app banner that prompts iOS and Android users to update when a newer
+ * version is live on their store.
  *
- * - Renders nothing on web/Android (iOS native only — the hook already gates).
+ * - Renders nothing on web (native only — the hook already gates).
  * - Renders nothing while the check is in flight (no false positive flash).
  * - Dismiss hides the banner and remembers the version so it doesn't nag
  *   again until an even newer version ships.
@@ -24,20 +26,17 @@ export function UpdateAvailableBanner() {
 
   const handleUpdate = useCallback(async () => {
     try {
-      const url = appStoreUrl || `itms-apps://apps.apple.com/app/id0`
-      // Prefer itms-apps:// on native iOS — skips Safari and opens the
-      // App Store app directly. Fall back to the https trackViewUrl when
-      // we don't know the native deep-link shape.
-      const deepLink = url.startsWith('https://apps.apple.com/')
-        ? url.replace('https://', 'itms-apps://')
-        : url
-      // Use Capacitor's Browser plugin if available; else window.open
-      try {
-        const mod = await import('@capacitor/app')
-        // @capacitor/app doesn't open URLs; fall through to window.open
-        void mod
-      } catch (e) {
-        logWarn('UpdateAvailableBanner.capApp', 'import failed', e)
+      // Deep link por loja: abre o app da loja direto, sem passar pelo navegador.
+      //   iOS     → itms-apps://
+      //   Android → market://
+      let deepLink: string
+      if (isAndroidNative()) {
+        deepLink = PLAY_STORE_DEEP_LINK
+      } else {
+        const url = appStoreUrl || 'https://apps.apple.com/br/app/irontracks/id6758735356'
+        deepLink = url.startsWith('https://apps.apple.com/')
+          ? url.replace('https://', 'itms-apps://')
+          : url
       }
       try {
         window.open(deepLink, '_blank')
