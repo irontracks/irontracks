@@ -99,6 +99,10 @@ type IronTracksNativePlugin = {
   // Photos
   saveImageToPhotos: (opts: { base64: string }) => Promise<{ saved: boolean; error: string }>
   saveFileToPhotos: (opts: { path: string; isVideo: boolean }) => Promise<{ saved: boolean; error: string }>
+  // PDF export — renderiza o HTML como application/pdf e abre o share sheet.
+  // SÓ existe em builds a partir de jul/2026: chamar direto num build antigo vira
+  // "plugin is not implemented on ios". Use `sharePdfFromHtml()` abaixo, que checa.
+  sharePdfFromHtml: (opts: { html: string; fileName?: string }) => Promise<{ shared: boolean; error: string }>
   // Voice
   requestVoicePermissions: () => Promise<{ microphone: string; speechRecognition: string }>
   startSpeechRecognition: (opts: { lang?: string }, callback: (result: { transcript?: string; isFinal?: boolean; error?: string; message?: string; code?: number }) => void) => Promise<string>
@@ -248,6 +252,7 @@ const webFallback: IronTracksNativePlugin = {
   getActiveCalories: async () => ({ calories: 0 }),
   saveImageToPhotos: async () => ({ saved: false, error: 'Not available on web' }),
   saveFileToPhotos: async () => ({ saved: false, error: 'Not available on web' }),
+  sharePdfFromHtml: async () => ({ shared: false, error: 'Not available on web' }),
   requestVoicePermissions: async () => ({ microphone: 'granted', speechRecognition: 'granted' }),
   startSpeechRecognition: async () => '',
   stopSpeechRecognition: async () => ({ ok: false }),
@@ -864,6 +869,38 @@ export const stopNativeSpeechRecognition = async () => {
     if (!isIosNative()) return
     await Native.stopSpeechRecognition()
   } catch { /* silent */ }
+}
+
+// ─── PDF export ───────────────────────────────────────────────────────────────
+
+/** Resultado do export nativo. `unsupported` = build instalado ainda não tem o
+ *  método Swift; o chamador deve cair no fallback web em vez de mostrar erro. */
+export type SharePdfResult = { shared: boolean; unsupported: boolean; error: string }
+
+/**
+ * Renderiza um HTML como PDF de verdade no lado nativo e abre o share sheet.
+ *
+ * Por que não dá pra fazer isso no JS: no WKWebView `window.print()` não existe,
+ * e o share sheet do iOS recusa arquivos `text/html` — o fallback antigo
+ * compartilhava uma `blob:` URL, que o iOS não resolve, e acabava
+ * compartilhando a PÁGINA ATUAL (o "salvar PDF" gerava a tela do app).
+ *
+ * Detecção de build: o proxy do Capacitor expõe QUALQUER nome de método como
+ * função, então checar `typeof` não prova nada — a única prova é chamar e ler o
+ * erro. Builds sem o método rejeitam com "not implemented"; devolvemos
+ * `unsupported: true` para o chamador usar o caminho antigo, sem estourar erro
+ * no Sentry (foram 6.8k eventos desse tipo).
+ */
+export const sharePdfFromHtml = async (html: string, fileName: string): Promise<SharePdfResult> => {
+  if (!isIosNative()) return { shared: false, unsupported: true, error: 'not_ios_native' }
+  try {
+    const result = await Native.sharePdfFromHtml({ html, fileName })
+    return { shared: !!result?.shared, unsupported: false, error: String(result?.error || '') }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e ?? '')
+    const unsupported = /not implemented|unimplemented|not available/i.test(msg)
+    return { shared: false, unsupported, error: msg }
+  }
 }
 
 // ─── Photos ───────────────────────────────────────────────────────────────────

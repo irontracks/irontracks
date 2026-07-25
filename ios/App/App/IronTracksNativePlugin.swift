@@ -69,6 +69,8 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin, CLLocationMana
         // Photos
         CAPPluginMethod(name: "saveImageToPhotos", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "saveFileToPhotos", returnType: CAPPluginReturnPromise),
+        // PDF export (relatório de treino / plano)
+        CAPPluginMethod(name: "sharePdfFromHtml", returnType: CAPPluginReturnPromise),
         // Voice
         CAPPluginMethod(name: "requestVoicePermissions", returnType: CAPPluginReturnPromise),
         CAPPluginMethod(name: "startSpeechRecognition", returnType: CAPPluginReturnCallback),
@@ -1890,6 +1892,76 @@ public class IronTracksNativePlugin: CAPPlugin, CAPBridgedPlugin, CLLocationMana
             }) { success, error in
                 call.resolve(["saved": success, "error": error?.localizedDescription ?? ""])
             }
+        }
+    }
+
+    // ─── PDF export ───────────────────────────────────────────────────────────
+    //
+    // Sintoma que originou isto (jul/2026): no iPhone, "salvar PDF" do relatório
+    // salvava a TELA DO APP em vez do relatório. Causa: no WKWebView não existe
+    // `window.print()`, e o share sheet do iOS recusa arquivos `text/html`
+    // (`navigator.canShare({files})` devolve false). O JS caía então no fallback
+    // de compartilhar uma `blob:` URL — que o iOS não resolve, então o share
+    // pegava a página atual da WebView.
+    //
+    // Aqui o HTML vira um PDF de verdade e vai pro share sheet como
+    // `application/pdf`, tipo que o iOS aceita. O JS SEMPRE precisa checar se
+    // este método existe antes de chamar: builds antigos não o têm e a chamada
+    // vira "plugin is not implemented on ios".
+    @objc func sharePdfFromHtml(_ call: CAPPluginCall) {
+        guard let html = call.getString("html"), !html.isEmpty else {
+            call.reject("html is required"); return
+        }
+        let rawName = call.getString("fileName") ?? "IronTracks.pdf"
+        let fileName = rawName.hasSuffix(".pdf") ? rawName : rawName + ".pdf"
+
+        DispatchQueue.main.async {
+            let formatter = UIMarkupTextPrintFormatter(markupText: html)
+            let renderer = UIPrintPageRenderer()
+            renderer.addPrintFormatter(formatter, startingAtPageAt: 0)
+
+            // A4 a 72dpi + margem de 24pt. `paperRect`/`printableRect` só são
+            // acessíveis por KVC — é o caminho padrão para renderizar fora de
+            // uma sessão de impressão real.
+            let paper = CGRect(x: 0, y: 0, width: 595.2, height: 841.8)
+            renderer.setValue(paper, forKey: "paperRect")
+            renderer.setValue(paper.insetBy(dx: 24, dy: 24), forKey: "printableRect")
+
+            let data = NSMutableData()
+            UIGraphicsBeginPDFContextToData(data, paper, nil)
+            for page in 0..<renderer.numberOfPages {
+                UIGraphicsBeginPDFPage()
+                renderer.drawPage(at: page, in: UIGraphicsGetPDFContextBounds())
+            }
+            UIGraphicsEndPDFContext()
+
+            guard data.length > 0 else {
+                call.resolve(["shared": false, "error": "empty_pdf"]); return
+            }
+
+            let url = FileManager.default.temporaryDirectory.appendingPathComponent(fileName)
+            do {
+                try data.write(to: url, options: .atomic)
+            } catch {
+                call.resolve(["shared": false, "error": error.localizedDescription]); return
+            }
+
+            guard let viewController = self.bridge?.viewController else {
+                call.resolve(["shared": false, "error": "no_view_controller"]); return
+            }
+            let sheet = UIActivityViewController(activityItems: [url], applicationActivities: nil)
+            // No iPad, apresentar sem âncora derruba o app.
+            if let popover = sheet.popoverPresentationController {
+                popover.sourceView = viewController.view
+                popover.sourceRect = CGRect(x: viewController.view.bounds.midX,
+                                            y: viewController.view.bounds.midY,
+                                            width: 0, height: 0)
+                popover.permittedArrowDirections = []
+            }
+            sheet.completionWithItemsHandler = { _, completed, _, error in
+                call.resolve(["shared": completed, "error": error?.localizedDescription ?? ""])
+            }
+            viewController.present(sheet, animated: true)
         }
     }
 
