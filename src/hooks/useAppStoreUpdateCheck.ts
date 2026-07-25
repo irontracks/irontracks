@@ -1,8 +1,9 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
-import { isIosNative } from '@/utils/platform'
+import { isIosNative, isAndroidNative } from '@/utils/platform'
 import { isNewerVersion } from '@/utils/version/compareVersions'
+import { LATEST_ANDROID_VERSION, PLAY_STORE_URL } from '@/utils/version/latestNativeVersions'
 import { logWarn } from '@/lib/logger'
 
 /** Apple iTunes Lookup response (only the fields we care about). */
@@ -87,13 +88,16 @@ function writeDismissedVersion(v: string): void {
 }
 
 /**
- * Check the App Store for a newer version of the currently running iOS app.
+ * Verifica se existe versão nativa mais nova que a instalada.
  *
- * Only runs on iOS native builds — returns an inert state on web and Android.
+ * Roda só em build nativo (iOS ou Android) — na web devolve estado inerte.
  *
  * Data flow:
  *   1. Read @capacitor/app to get the installed bundle version.
- *   2. Hit https://itunes.apple.com/lookup?bundleId=... with a 24h cache.
+ *   2. iOS: hit https://itunes.apple.com/lookup?bundleId=... with a 24h cache.
+ *      Android: lê a constante `LATEST_ANDROID_VERSION` (o Google Play não tem
+ *      API pública de consulta de versão) — servida pelo front remoto, então um
+ *      deploy web já propaga.
  *   3. Compare — if the store version is newer AND the user hasn't dismissed
  *      the banner for that exact version, surface `updateAvailable: true`.
  *
@@ -111,7 +115,9 @@ export function useAppStoreUpdateCheck(bundleId: string = DEFAULT_BUNDLE_ID): Ap
   const [dismissedVersion, setDismissedVersion] = useState<string | null>(null)
 
   useEffect(() => {
-    if (!isIosNative()) return
+    const ios = isIosNative()
+    const android = isAndroidNative()
+    if (!ios && !android) return
     setDismissedVersion(readDismissedVersion())
 
     let alive = true
@@ -129,7 +135,18 @@ export function useAppStoreUpdateCheck(bundleId: string = DEFAULT_BUNDLE_ID): Ap
         return
       }
 
-      // 2. Read from cache if fresh; else hit iTunes Lookup
+      // 1b. Android: o Google Play não tem API pública de consulta de versão,
+      // então a versão publicada vem de uma constante servida pelo front remoto
+      // (ver utils/version/latestNativeVersions). Sem fetch, sem cache: um
+      // deploy web já propaga o valor novo pra todos os aparelhos.
+      if (android) {
+        setLatestVersion(LATEST_ANDROID_VERSION)
+        setAppStoreUrl(PLAY_STORE_URL)
+        setReleaseNotes(null)
+        return
+      }
+
+      // 2. iOS: read from cache if fresh; else hit iTunes Lookup
       const cached = readCache()
       if (cached) {
         setLatestVersion(cached.latestVersion)
