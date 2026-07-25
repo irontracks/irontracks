@@ -104,6 +104,32 @@ export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
     });
   };
 
+  /**
+   * Pergunta se a mudança de séries vale só para HOJE ou também para o plano.
+   *
+   * Antes, adicionar/remover série mexia só na sessão e o plano nunca mudava —
+   * quem ajustava o treino de verdade tinha que repetir o ajuste toda semana, sem
+   * nenhuma pista de que aquilo era temporário.
+   *
+   * "Só neste treino" é o botão em DESTAQUE (padrão seguro escolhido pelo dono):
+   * alterar o plano é irreversível pela tela do treino ativo, então exige uma
+   * escolha consciente. Sem o persistidor disponível, não pergunta nada — não faz
+   * sentido oferecer uma opção que não dá pra cumprir.
+   */
+  const askPersistSetChange = async (kind: 'add' | 'remove', nextWorkout: UnknownRecord) => {
+    if (typeof onPersistWorkoutTemplate !== 'function') return;
+    try {
+      const onlyToday = await confirm(
+        kind === 'add'
+          ? 'Salvar esta série a mais só neste treino, ou também no plano (vale para os próximos)?'
+          : 'Remover esta série só neste treino, ou também do plano (vale para os próximos)?',
+        kind === 'add' ? 'Série adicionada' : 'Série removida',
+        { confirmText: 'Só neste treino', cancelText: 'Salvar no plano' },
+      );
+      if (!onlyToday) onPersistWorkoutTemplate(nextWorkout);
+    } catch { /* diálogo indisponível → mantém só na sessão (o padrão seguro) */ }
+  };
+
   const addExtraSetToExercise = async (exIdx: unknown) => {
     if (!workout || typeof onUpdateSession !== 'function') return;
     const idx = Number(exIdx);
@@ -142,6 +168,7 @@ export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
         if (next.has(idx)) next.delete(idx);
         return next;
       });
+      await askPersistSetChange('add', { ...workout, exercises: nextExercises });
     } catch (e: unknown) {
       try {
         const msg = isObject(e) && typeof e.message === 'string' ? e.message : String(e || '');
@@ -180,6 +207,7 @@ export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
       } catch { }
 
       onUpdateSession({ workout: { ...workout, exercises: nextExercises }, logs: nextLogs });
+      await askPersistSetChange('remove', { ...workout, exercises: nextExercises });
     } catch (e: unknown) {
       try {
         const msg = isObject(e) && typeof e.message === 'string' ? e.message : String(e || '');
