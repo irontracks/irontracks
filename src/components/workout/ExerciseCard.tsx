@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useMemo, useState, useEffect } from 'react';
-import { ArrowDown, CheckCircle2, ChevronDown, ChevronUp, Dumbbell, Link, Loader2, Pencil, Play, Plus, Trash2, Trophy } from 'lucide-react';
+import { ArrowDown, CheckCircle2, ChevronDown, ChevronUp, Dumbbell, Link, Loader2, Pencil, Play, Plus, Trash2, Trophy, Weight } from 'lucide-react';
 import { useWorkoutContext, useWorkoutLogs } from './WorkoutContext';
 import { pickExerciseLogSlice, shallowEqualByRef } from './helpers/exerciseLogSlice';
 import {
@@ -32,6 +32,10 @@ import { CardioSetInput } from './CardioSetInput';
 import ExecutionVideoCapture from '@/components/ExecutionVideoCapture';
 import { logError, logInfo } from '@/lib/logger'
 import AIExerciseSwap from './AIExerciseSwap'
+import PlateCalculatorSheet from './PlateCalculatorSheet'
+import { inferEquipmentFromName } from '@/utils/autoload/equipmentFromName';
+import { resolveIncrement } from '@/utils/autoload/plateMath';
+import { DEFAULT_GYM_INVENTORY, type PlateInventory } from '@/utils/plates/plateInventory';
 
 type GroupPos = 'first' | 'middle' | 'last';
 
@@ -62,6 +66,9 @@ function ExerciseCardInner({ ex, exIdx, groupPos, logsSlice }: { ex: WorkoutExer
     openDeleteConfirm,
     closeDeleteConfirm,
     removeExerciseFromWorkout,
+    settings,
+    updateLog,
+    onSavePlateSetup,
   } = useWorkoutContext();
 
   const name = String(ex?.name || '').trim() || `Exercício ${exIdx + 1}`;
@@ -90,6 +97,41 @@ function ExerciseCardInner({ ex, exIdx, groupPos, logsSlice }: { ex: WorkoutExer
 
   // Compute whether all sets in this exercise are marked done
   const allSetsDone = setsCount > 0 && doneSetsCount === setsCount;
+
+  // ── Calculadora de anilhas ────────────────────────────────────────────────
+  // Só aparece em exercício de BARRA: em máquina/cabo/halter não existe anilha por
+  // lado, e o ícone seria ruído num header que já tem 6 botões.
+  const [plateCalcOpen, setPlateCalcOpen] = useState(false);
+  const isBarbell = useMemo(
+    () => resolveIncrement(inferEquipmentFromName(name)).equipmentClass === 'barbell',
+    [name],
+  );
+  const plateInventory: PlateInventory = useMemo(() => {
+    const raw = (settings as Record<string, unknown> | null | undefined)?.plateInventory;
+    const counts = isObject(raw) ? (raw as Record<string, number>) : null;
+    const bar = Number((settings as Record<string, unknown> | null | undefined)?.barWeightKg);
+    return {
+      // Inventário vazio = academia completa. Ninguém é obrigado a cadastrar nada
+      // para a calculadora funcionar; só quem treina em casa ajusta.
+      counts: counts && Object.keys(counts).length > 0 ? counts : DEFAULT_GYM_INVENTORY.counts,
+      barWeightKg: Number.isFinite(bar) && bar >= 0 ? bar : DEFAULT_GYM_INVENTORY.barWeightKg,
+    };
+  }, [settings]);
+  /**
+   * Série que receberá o peso: a primeira NÃO concluída (a que o usuário está fazendo).
+   * Quando todas estão concluídas, cai na última — aplicar numa série já fechada é
+   * correção legítima. O sheet SEMPRE mostra o rótulo antes de aplicar: em drop-set,
+   * cluster e stripping a "série corrente" tem sub-etapas, e escrever no lugar errado
+   * é a classe de bug que já mordeu a família de renderers.
+   */
+  const targetSetIdx = useMemo(() => {
+    for (let i = 0; i < setsCount; i++) {
+      // Deriva de `logs` (o slice deste exercício), não de getLog: getLog é estável e lê
+      // uma ref, então o memo não reavaliaria ao concluir uma série.
+      if (!logs[`${exIdx}-${i}`]?.done) return i;
+    }
+    return Math.max(0, setsCount - 1);
+  }, [setsCount, exIdx, logs]);
 
   // Completion animation — brief scale+glow when exercise finishes
   const [justCompleted, setJustCompleted] = useState(false);
@@ -484,6 +526,21 @@ function ExerciseCardInner({ ex, exIdx, groupPos, logsSlice }: { ex: WorkoutExer
           >
             <Link size={14} className={linkedWeightExercises?.has(exIdx) ? '' : 'opacity-60'} />
           </button>
+          {isBarbell ? (
+            <button
+              type="button"
+              onClick={(e) => {
+                try { e.preventDefault(); e.stopPropagation(); } catch { }
+                setCurrentExerciseIdx(exIdx);
+                setPlateCalcOpen(true);
+              }}
+              className="h-9 w-9 inline-flex items-center justify-center rounded-xl bg-neutral-900 border border-neutral-800 text-neutral-400 hover:text-yellow-400 hover:bg-neutral-800 transition-colors active:scale-95 flex-shrink-0"
+              title="Calculadora de anilhas"
+              aria-label="Calculadora de anilhas"
+            >
+              <Weight size={15} />
+            </button>
+          ) : null}
           <AIExerciseSwap exerciseName={name} exerciseIndex={exIdx} />
           <button
             type="button"
@@ -524,6 +581,23 @@ function ExerciseCardInner({ ex, exIdx, groupPos, logsSlice }: { ex: WorkoutExer
           </button>
         </div>
       </div>
+
+      {plateCalcOpen ? (
+        <PlateCalculatorSheet
+          isOpen={plateCalcOpen}
+          onClose={() => setPlateCalcOpen(false)}
+          exerciseName={name}
+          setLabel={`Série ${targetSetIdx + 1}`}
+          initialWeight={parseTrainingNumber(getLog(`${exIdx}-${targetSetIdx}`).weight) ?? null}
+          inventory={plateInventory}
+          onApply={(w) => {
+            // weightSource 'user': o usuário assumiu esta carga — o motor de autoload
+            // nunca mais a reescreve (mesma regra do campo digitado à mão).
+            updateLog(`${exIdx}-${targetSetIdx}`, { weight: String(w), weightSource: 'user' });
+          }}
+          onSaveInventory={(counts, bar) => onSavePlateSetup?.(counts, bar)}
+        />
+      ) : null}
 
       {deleteConfirmIdx === exIdx && (
         <div className="mt-3 rounded-xl border border-red-500/25 p-4" style={{ background: 'rgba(239,68,68,0.07)' }}>

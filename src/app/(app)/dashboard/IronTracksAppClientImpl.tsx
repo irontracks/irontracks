@@ -1255,6 +1255,11 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
                                             userSettingsApi?.updateSetting?.('autoLoad', v)
                                             void userSettingsApi?.save?.({ autoLoad: v })
                                         }}
+                                        onSavePlateSetup={(counts: Record<string, number>, barWeightKg: number) => {
+                                            userSettingsApi?.updateSetting?.('plateInventory', counts)
+                                            userSettingsApi?.updateSetting?.('barWeightKg', barWeightKg)
+                                            void userSettingsApi?.save?.({ plateInventory: counts, barWeightKg })
+                                        }}
                                         controlledByName={controlNotice.controlStatus === 'active' ? controlNotice.controlledByName : null}
                                         onRevokeControl={controlNotice.reject}
                                     />
