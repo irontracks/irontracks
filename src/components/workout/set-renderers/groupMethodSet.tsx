@@ -57,7 +57,12 @@ const GroupMethodSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx
   const repsValue = String(log.reps ?? '');
   const rpeValue = String(log.rpe ?? '');
   const done = !!log.done;
-  const canDone = !!String(weightValue || '').trim() && !!String(repsValue || '').trim() && parseTrainingNumber(repsValue) != null && parseTrainingNumber(repsValue)! > 0;
+  // Concluir exige SÓ o peso — igual à série normal (normalSet conclui sem reps).
+  // Antes exigia peso E reps, e o botão ficava travado em silêncio: no treino real de
+  // 2026-07-24 o 2º exercício de um Bi-Set ("Panturrilha em pé") terminou com as 4
+  // séries preenchidas e NENHUMA concluída. Divergir da série normal aqui não tem
+  // razão de ser — reps continua sendo gravado quando preenchido.
+  const canDone = !!String(weightValue || '').trim();
   const notesValue = String(log.notes ?? '');
   const hasNotes = notesValue.trim().length > 0;
   const isNotesOpen = openNotesKeys.has(key);
@@ -205,7 +210,7 @@ const GroupMethodSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx
           </>
         )}
       </div>
-      {!done && !canDone && <div className="pl-12 text-[11px] text-neutral-500 font-semibold">Preencha peso e reps para concluir.</div>}
+      {!done && !canDone && <div className="pl-12 text-[11px] text-neutral-500 font-semibold">Preencha o peso para concluir.</div>}
       {isAutoWeight && autoRationale && (
         <div className="pl-12 flex items-center gap-1 text-[10px] text-violet-300/80" title={autoRationale}>
           <span aria-hidden>🧠</span><span className="truncate">{autoRationale}</span>
