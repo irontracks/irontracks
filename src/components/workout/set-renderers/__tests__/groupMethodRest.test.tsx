@@ -31,6 +31,7 @@ const ctx = {
   getPlanConfig: () => null,
   reportHistory: null,
   get exercises() { return exercises },
+  settings: null as Record<string, unknown> | null,
   // consumido por useAutoloadWeight
   autoLoadEnabled: false,
   autoLoadSuggestions: {},
@@ -42,6 +43,7 @@ const biSet = (name: string) => ({ name, method: 'Bi-Set', restTime: 120, sets: 
 beforeEach(() => {
   startTimer.mockClear()
   ctx.updateLog.mockClear()
+  ctx.settings = null
   for (const k of Object.keys(logByKey)) delete logByKey[k]
   // Série preenchida (peso+reps) → botão "Concluir" habilitado.
   logByKey['0-0'] = { weight: '60', reps: '12' }
@@ -67,12 +69,71 @@ describe('Bi-Set — descanso só no último membro do par', () => {
     expect(startTimer).toHaveBeenCalledWith(120, expect.objectContaining({ kind: 'rest' }))
   })
 
+  /**
+   * INCIDENTE (relato do dono, 2026-07-25): "concluo o 2º exercício do Bi-Set e o
+   * descanso não corre". Treino real `ccdb912b`: 4 Bi-Sets seguidos (Bíceps banco /
+   * Tríceps testa / Bíceps corda / Tríceps corda) = DOIS pares, mas o run virava um
+   * grupo único de 4 → só o 4º era "último membro" e descansava.
+   */
+  it('4 Bi-Sets seguidos (dois pares): o 2º fecha o 1º par e DESCANSA', () => {
+    exercises = [biSet('Bíceps banco'), biSet('Tríceps testa'), biSet('Bíceps corda'), biSet('Tríceps corda')]
+    logByKey['1-0'] = { weight: '30', reps: '10' }
+    render(<GroupMethodSet ex={biSet('Tríceps testa') as never} exIdx={1} setIdx={0} />)
+    clickConcluir()
+    expect(startTimer).toHaveBeenCalledWith(120, expect.objectContaining({ kind: 'rest' }))
+  })
+
+  it('4 Bi-Sets seguidos: o 3º ABRE o 2º par e NÃO descansa', () => {
+    exercises = [biSet('Bíceps banco'), biSet('Tríceps testa'), biSet('Bíceps corda'), biSet('Tríceps corda')]
+    logByKey['2-0'] = { weight: '20', reps: '12' }
+    render(<GroupMethodSet ex={biSet('Bíceps corda') as never} exIdx={2} setIdx={0} />)
+    clickConcluir()
+    expect(startTimer).not.toHaveBeenCalled()
+  })
+
   it('método de grupo SOLO (sem par consecutivo) descansa normal', () => {
     // Um único Bi-Set isolado não forma grupo (precisa de 2 consecutivos).
     exercises = [biSet('Panturrilha sentado'), { name: 'Rosca', method: 'Normal', sets: 3 }]
     render(<GroupMethodSet ex={biSet('Panturrilha sentado') as never} exIdx={0} setIdx={0} />)
     clickConcluir()
     expect(startTimer).toHaveBeenCalledTimes(1)
+  })
+})
+
+/**
+ * Guard: paridade com o normalSet quando o descanso está 0/vazio.
+ *
+ * O editor SUGERE restTime 0 ao marcar Bi-Set ("0s entre eles"). Quando esse 0 fica
+ * no ÚLTIMO membro do par, o fim da rodada não descansava nunca — enquanto a série
+ * normal já caía no descanso padrão via `autoRestTimerWhenMissing`.
+ */
+describe('Bi-Set — fallback de descanso padrão (paridade com a série normal)', () => {
+  const biSetZero = (name: string) => ({ name, method: 'Bi-Set', restTime: 0, sets: 4 })
+
+  it('sem a flag, restTime 0 continua sem descanso (comportamento antigo)', () => {
+    exercises = [biSetZero('A'), biSetZero('B')]
+    logByKey['1-0'] = { weight: '40' }
+    render(<GroupMethodSet ex={biSetZero('B') as never} exIdx={1} setIdx={0} />)
+    clickConcluir()
+    expect(startTimer).not.toHaveBeenCalled()
+  })
+
+  it('com autoRestTimerWhenMissing, o último membro usa o descanso padrão', () => {
+    ctx.settings = { autoRestTimerWhenMissing: true, restTimerDefaultSeconds: 90 }
+    exercises = [biSetZero('A'), biSetZero('B')]
+    logByKey['1-0'] = { weight: '40' }
+    render(<GroupMethodSet ex={biSetZero('B') as never} exIdx={1} setIdx={0} />)
+    clickConcluir()
+    expect(startTimer).toHaveBeenCalledWith(90, expect.objectContaining({ kind: 'rest' }))
+  })
+
+  it('com a flag, o 1º membro do par continua SEM descanso', () => {
+    ctx.settings = { autoRestTimerWhenMissing: true, restTimerDefaultSeconds: 90 }
+    exercises = [biSetZero('A'), biSetZero('B')]
+    logByKey['0-0'] = { weight: '40' }
+    render(<GroupMethodSet ex={biSetZero('A') as never} exIdx={0} setIdx={0} />)
+    clickConcluir()
+    expect(startTimer).not.toHaveBeenCalled()
   })
 })
 

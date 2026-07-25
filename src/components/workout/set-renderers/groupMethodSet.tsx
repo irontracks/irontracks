@@ -29,7 +29,7 @@ const GROUP_METHOD_INFO: Record<string, string> = {
 const PER_SET_METHODS = ['Normal', 'Drop-Set', 'SST', 'Rest-Pause', 'Cluster', 'Stripping', 'Bi-Set', 'Super-Set'];
 
 const GroupMethodSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: number; setIdx: number }) => {
-  const { getLog, updateLog, setGroupMethodModal, openNotesKeys, toggleNotes, startTimer, getPlanConfig, reportHistory, exercises } = useWorkoutContext();
+  const { getLog, updateLog, setGroupMethodModal, openNotesKeys, toggleNotes, startTimer, getPlanConfig, reportHistory, exercises, settings } = useWorkoutContext();
   const [isPickerOpen, setIsPickerOpen] = useState(false);
   // Este exercício é o ÚLTIMO membro do grupo (Bi-Set/Super-Set…)? Só aí o descanso
   // deve rolar. Concluir a 1ª metade do par vai DIRETO pra outra ("0s descanso entre
@@ -68,7 +68,16 @@ const GroupMethodSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx
   const hasNotes = notesValue.trim().length > 0;
   const isNotesOpen = openNotesKeys.has(key);
   const hasAnyNote = hasNotes || !!prevNote;
-  const restTime = parseTrainingNumber(ex?.restTime ?? ex?.rest_time);
+  // O editor SUGERE restTime 0 ao marcar Bi-Set ("0s entre eles") e isso vale pro
+  // 1º membro — mas quando fica 0 no ÚLTIMO membro, o fim da rodada não descansava
+  // nunca. Mesmo fallback do normalSet (`autoRestTimerWhenMissing`), pra família
+  // não divergir: sem a flag, comportamento antigo intacto.
+  const configuredRestTime = parseTrainingNumber(ex?.restTime ?? ex?.rest_time);
+  const restSettings = settings as Record<string, unknown> | null;
+  const defaultRestSeconds = Math.max(15, Math.min(600, Number(restSettings?.restTimerDefaultSeconds ?? 90) || 90));
+  const restTime = (configuredRestTime && configuredRestTime > 0)
+    ? configuredRestTime
+    : (restSettings?.autoRestTimerWhenMissing ? defaultRestSeconds : configuredRestTime);
   // ex.sets é a CONTAGEM (número), nunca um array — o Array.isArray(ex.sets) dava
   // SEMPRE false e o watermark planejado por-série nunca aparecia. O plano por-série
   // vive em setDetails.
