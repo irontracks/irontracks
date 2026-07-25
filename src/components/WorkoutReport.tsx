@@ -4,6 +4,7 @@ import dynamic from 'next/dynamic';
 import NextImage from 'next/image';
 import { Download, ArrowLeft, FileText, Code, Share2, Save } from 'lucide-react';
 import { buildReportHTML } from '@/utils/report/buildHtml';
+import { exportHtmlAsPdf } from '@/utils/report/exportHtmlAsPdf';
 import { fetchLogoDataUrl } from '@/utils/report/fetchLogoDataUrl';
 import { fetchMuscleMapAssets } from '@/utils/report/fetchMuscleMapAssets';
 import { generatePostWorkoutInsights, applyProgressionToNextTemplate } from '@/actions/workout-actions';
@@ -249,58 +250,19 @@ const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose,
             });
 
             const title = String(session?.workoutTitle || 'Treino').trim() || 'Treino'
-            const fileName = `${title.replace(/\s+/g, '_')}_irontracks.html`
 
-            // iOS WKWebView blocks window.open() and print().
-            // Web Share API: opens native share sheet → user taps "Print" → save as PDF.
-            const canShare = typeof navigator !== 'undefined' && typeof navigator.share === 'function'
-            if (canShare) {
-                try {
-                    const blob = new Blob([html], { type: 'text/html' })
-                    const file = new File([blob], fileName, { type: 'text/html' })
-                    const canShareFiles = typeof (navigator as { canShare?: (data: { files: File[] }) => boolean }).canShare === 'function'
-                        && (navigator as { canShare: (data: { files: File[] }) => boolean }).canShare({ files: [file] })
-                    if (canShareFiles) {
-                        await navigator.share({ files: [file], title: `${title} • IronTracks` })
-                    } else {
-                        const url = URL.createObjectURL(blob)
-                        await navigator.share({ title: `${title} • IronTracks`, url })
-                        URL.revokeObjectURL(url)
-                    }
-                    setShowExportMenu(false)
-                    return
-                } catch (shareErr) {
-                    const msg = shareErr instanceof Error ? shareErr.message : ''
-                    if (msg.toLowerCase().includes('cancel') || msg.toLowerCase().includes('abort')) return
-                    // other error: fall through to desktop fallback
-                }
-            }
-
-            // Desktop fallback: open new tab + native print dialog (Save as PDF)
-            const blobFallback = new Blob([html], { type: 'text/html' });
-            const blobFallbackUrl = URL.createObjectURL(blobFallback);
-            const printWindow = window.open(blobFallbackUrl, '_blank');
-            if (printWindow) {
-                setTimeout(() => {
-                    try {
-                        printWindow.focus();
-                        printWindow.print();
-                    } catch { }
-                    setTimeout(() => URL.revokeObjectURL(blobFallbackUrl), 60_000);
-                }, 500);
-            } else {
-                URL.revokeObjectURL(blobFallbackUrl);
-                // Last resort: downloadable HTML file
-                const blob = new Blob([html], { type: 'text/html' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = fileName;
-                document.body.appendChild(a);
-                a.click();
-                a.remove();
-                URL.revokeObjectURL(url);
-            }
+            // Caminho único de export (ver utils/report/exportHtmlAsPdf).
+            // Antes daqui saía um `navigator.share({ url: blobUrl })` quando o iOS
+            // recusava o arquivo .html — e o iOS, sem resolver a `blob:` URL,
+            // compartilhava a PÁGINA ATUAL: o "salvar PDF" gerava a tela do app
+            // em vez do relatório. Agora o iOS gera um PDF nativo de verdade.
+            await exportHtmlAsPdf({
+                html,
+                title,
+                baseFileName: `${title.replace(/\s+/g, '_')}_irontracks`,
+                alert: (msg: string) => { alert(msg); },
+            });
+            setShowExportMenu(false);
 
         } catch (e: unknown) {
             alert('Não foi possível abrir impressão: ' + (getErrorMessage(e)) + '\nPermita pop-ups para este site.');
@@ -391,8 +353,20 @@ const WorkoutReport = ({ session, previousSession, user, isVip: _isVip, onClose,
                     await navigator.share({ files: [file], title });
                     return;
                 }
-                if (pdfUrl) await navigator.share({ title, url: pdfUrl });
-                return;
+                // ⚠️ NÃO compartilhar `pdfUrl` aqui: é uma object URL, e o iOS não
+                // resolve `blob:` no share sheet — ele compartilha a PÁGINA ATUAL,
+                // que é como o "salvar PDF" acabava gerando a tela do app.
+                // Quando o conteúdo é HTML, refaz pelo caminho único (PDF nativo).
+                if (pdfBlob && !isPdf) {
+                    const html = await pdfBlob.text();
+                    await exportHtmlAsPdf({
+                        html,
+                        title,
+                        baseFileName: 'relatorio-irontracks',
+                        alert: (msg: string) => { alert(msg); },
+                    });
+                    return;
+                }
             }
             if (!pdfUrl) {
                 alert('Não foi possível gerar o link do PDF. Tente novamente.');
