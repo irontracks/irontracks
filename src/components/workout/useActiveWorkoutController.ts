@@ -545,6 +545,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     exercises,
     ui,
     settings,
+    onSavePlateSetup: props.onSavePlateSetup,
     collapsed,
     setCollapsed,
     finishing,
@@ -687,6 +688,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     currentExDoneSets,
   }), [
     sessionForContext, anyModalOpen, workout, exercises, ui, settings,
+    props.onSavePlateSetup,
     collapsed, setCollapsed, finishing,
     openNotesKeys, setOpenNotesKeys,
     addExerciseOpen, setAddExerciseOpen, addExerciseDraft, setAddExerciseDraft,

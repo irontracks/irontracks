@@ -29,6 +29,14 @@ export const UserSettingsSchema = z
     // usuário controla na chavinha do treino ativo (só efetivo se beta ligado).
     autoLoadBeta: z.boolean().default(false),
     autoLoad: z.boolean().default(false),
+    // ── Calculadora de anilhas ────────────────────────────────────────────────
+    // Inventário real de anilhas do usuário: valor da anilha (kg, como string) →
+    // quantidade de UNIDADES. Vazio = academia completa (DEFAULT_GYM_INVENTORY),
+    // para não obrigar ninguém a cadastrar nada. Só quem treina em casa ajusta.
+    // Consumido por utils/plates/plateInventory.ts.
+    plateInventory: z.record(z.string(), z.number().int().nonnegative()).default({}),
+    /** Peso da barra usada pelo usuário (kg). Base de toda decomposição. */
+    barWeightKg: z.number().nonnegative().default(20),
     showStoriesBar: z.boolean().default(true),
     showNewRecordsCard: z.boolean().default(true),
     showIronRank: z.boolean().default(true),

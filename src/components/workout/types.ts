@@ -67,6 +67,12 @@ export type ActiveWorkoutProps = {
   controlledByName?: string | null;
   /** #autoload: liga/desliga a carga automática (persiste em settings.autoLoad). */
   onToggleAutoLoad?: (next: boolean) => void;
+  /**
+   * Calculadora de anilhas: persiste o inventário do usuário em
+   * settings.plateInventory / settings.barWeightKg. Mesmo padrão do onToggleAutoLoad
+   * (updateSetting otimista + save), porque o sheet edita direto no toque do stepper.
+   */
+  onSavePlateSetup?: (counts: Record<string, number>, barWeightKg: number) => void;
 };
 
 export type ReportHistoryItem = {
