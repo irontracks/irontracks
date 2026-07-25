@@ -173,6 +173,15 @@ export function suggestWeight(input: SuggestInput): WeightSuggestion {
   if (raw < topWeight) raw = topWeight
 
   // Se a última sessão foi à falha, não progride (segura na carga anterior).
+  //
+  // `failed` vem SÓ da falha que o usuário marcou na série (o toggle). Métodos que
+  // vão à falha por definição — Heavy Duty, Repetições Forçadas — deliberadamente
+  // NÃO gravam `log.failure`: neles toda série é à falha, então marcar sempre
+  // congelaria a carga no topWeight para sempre e o aluno nunca progrediria.
+  // Decisão de produto do dono (2026-07-25), travada em
+  // set-renderers/__tests__/failureIsManualOnly.test.ts. Não "corrija" isso:
+  // o `reps_failure` desses métodos é a CONTAGEM de reps até falhar, coisa
+  // diferente da flag.
   if (anyFailed && raw > topWeight) raw = topWeight
 
   // Trava de salto: no máximo +10% vs. a maior carga anterior (segurança).
