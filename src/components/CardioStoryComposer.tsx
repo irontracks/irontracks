@@ -154,26 +154,23 @@ export default function CardioStoryComposer({ open, content, onClose }: CardioSt
                       </div>
                     )}
 
-                    {/* Pinça (2 dedos) = zoom · arrasto (1 dedo) = mover o card (sem foto) */}
-                    {!isVideo && (
-                      <div
-                        className="absolute inset-0 z-20 touch-none select-none cursor-grab active:cursor-grabbing"
-                        onTouchStart={(e) => onWorkoutTouchStart({ touches: Array.from(e.touches) })}
-                        onTouchMove={(e) => onWorkoutTouchMove({ touches: Array.from(e.touches) }, previewRef.current?.getBoundingClientRect() ?? null)}
-                        onTouchEnd={onWorkoutTouchEnd}
-                        onTouchCancel={onWorkoutTouchEnd}
-                        onWheel={(e) => onWorkoutWheel(e.deltaY)}
-                      >
-                        <div className="absolute top-2 left-1/2 -translate-x-1/2 pointer-events-none px-2.5 py-1 rounded-full bg-black/55 backdrop-blur border border-white/15 text-[9px] font-black uppercase tracking-widest text-white/80 whitespace-nowrap">
-                          Pinça: zoom · Arraste: mover
-                        </div>
+                    {/* Pinça (2 dedos) = zoom · arrasto (1 dedo) = mover o card (a foto/vídeo fica fixo) */}
+                    <div
+                      className="absolute inset-0 z-20 touch-none select-none cursor-grab active:cursor-grabbing"
+                      onTouchStart={(e) => onWorkoutTouchStart({ touches: Array.from(e.touches) })}
+                      onTouchMove={(e) => onWorkoutTouchMove({ touches: Array.from(e.touches) }, previewRef.current?.getBoundingClientRect() ?? null)}
+                      onTouchEnd={onWorkoutTouchEnd}
+                      onTouchCancel={onWorkoutTouchEnd}
+                      onWheel={(e) => onWorkoutWheel(e.deltaY)}
+                    >
+                      <div className="absolute top-2 left-1/2 -translate-x-1/2 pointer-events-none px-2.5 py-1 rounded-full bg-black/55 backdrop-blur border border-white/15 text-[9px] font-black uppercase tracking-widest text-white/80 whitespace-nowrap">
+                        Pinça: zoom · Arraste: mover
                       </div>
-                    )}
+                    </div>
                   </div>
 
                   {/* Controles de zoom precisos (+/− e Reset) */}
-                  {!isVideo && (
-                    <div className="w-full max-w-[300px] sm:max-w-[340px] flex items-center gap-2">
+                  <div className="w-full max-w-[300px] sm:max-w-[340px] flex items-center gap-2">
                       <button
                         type="button" onClick={() => nudgeWorkoutScale(-0.05)} disabled={busy}
                         aria-label="Diminuir zoom"
@@ -191,8 +188,7 @@ export default function CardioStoryComposer({ open, content, onClose }: CardioSt
                         type="button" onClick={resetWorkoutTransform} disabled={busy}
                         className="h-11 px-4 rounded-xl bg-neutral-900 border border-neutral-800 text-neutral-300 text-[11px] font-bold uppercase tracking-wider hover:bg-neutral-800 hover:text-white disabled:opacity-50 transition-colors active:scale-95"
                       >Reset</button>
-                    </div>
-                  )}
+                  </div>
 
                   {/* Upload de foto de fundo (opcional) */}
                   <div className="w-full max-w-[300px] sm:max-w-[340px] flex items-center gap-3">

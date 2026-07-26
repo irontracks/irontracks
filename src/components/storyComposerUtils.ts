@@ -398,7 +398,7 @@ export const drawStory = ({
     transparentBg?: boolean;
     skipClear?: boolean;
     template?: StoryTemplate;
-    /** Zoom/reposicionamento do card no layout 'workout' (pinça + arrasto). */
+    /** Zoom/reposicionamento do conteúdo (pinça + arrasto) — vale para todos os layouts. */
     workoutTransform?: { scale: number; offsetX: number; offsetY: number };
 }) => {
     // Atalhos do template (cores/fontes/card). A GEOMETRIA segue literal abaixo —
@@ -439,6 +439,23 @@ export const drawStory = ({
     baseOverlay.addColorStop(1, template.overlay.gradientEnd);
     ctx.fillStyle = baseOverlay;
     ctx.fillRect(0, 0, canvasW, canvasH);
+
+    // Zoom/reposição do conteúdo (pinça + arrasto) — vale para TODOS os layouts.
+    // Só o CONTEÚDO transforma: fundo (foto/gradiente) e overlay acima ficam fixos.
+    // Pivô no centro do canvas pra o zoom crescer/encolher "no lugar".
+    // ⚠️ Todo caminho de saída desta função precisa do `restore` correspondente
+    // (há um `return` antecipado no bloco live/group e outro no workout).
+    const wt = workoutTransform ?? { scale: 1, offsetX: 0, offsetY: 0 };
+    const wtApplied = wt.scale !== 1 || wt.offsetX !== 0 || wt.offsetY !== 0;
+    if (wtApplied) {
+        ctx.save();
+        ctx.translate(wt.offsetX, wt.offsetY);
+        const pivotX = canvasW / 2;
+        const pivotY = canvasH / 2;
+        ctx.translate(pivotX, pivotY);
+        ctx.scale(wt.scale, wt.scale);
+        ctx.translate(-pivotX, -pivotY);
+    }
 
     const left = SAFE_SIDE;
     const right = canvasW - SAFE_SIDE;
@@ -582,27 +599,13 @@ export const drawStory = ({
         ];
 
         cards.forEach((c, idx) => drawCard(cardsBoxes[idx], c));
+        if (wtApplied) ctx.restore();
         return;
     }
 
     // ── Layout "Treino do Dia" — tabela de exercícios (Exercício/Reps/Peso/RPE) ─
     if (layoutId === 'workout') {
         const rows = Array.isArray(metrics?.exercises) ? metrics.exercises : [];
-
-        // Zoom/reposicionamento do card (pinça + arrasto). Pivô no centro do canvas
-        // pra o zoom crescer/encolher "no lugar". O fundo (foto) NÃO é afetado —
-        // só o conteúdo do card.
-        const wt = workoutTransform ?? { scale: 1, offsetX: 0, offsetY: 0 };
-        const wtApplied = wt.scale !== 1 || wt.offsetX !== 0 || wt.offsetY !== 0;
-        if (wtApplied) {
-            ctx.save();
-            ctx.translate(wt.offsetX, wt.offsetY);
-            const pivotX = canvasW / 2;
-            const pivotY = canvasH / 2;
-            ctx.translate(pivotX, pivotY);
-            ctx.scale(wt.scale, wt.scale);
-            ctx.translate(-pivotX, -pivotY);
-        }
 
         // Brand
         ctx.textBaseline = 'top';
@@ -921,6 +924,8 @@ export const drawStory = ({
 
         ctx.restore();
     })();
+
+    if (wtApplied) ctx.restore();
 };
 
 // ── Zoom/reposição do card no layout 'workout' (funções puras, testáveis) ─────

@@ -221,8 +221,10 @@ export default function StoryComposer({ open, session, onClose, calories }: Stor
                       </div>
                     )}
 
-                    {/* Layout TREINO: pinça (2 dedos) pra zoom + arrasto (1 dedo) pra mover o card */}
-                    {layout === 'workout' && (
+                    {/* Pinça (2 dedos) = zoom · arrasto (1 dedo) = mover o card. Vale em TODOS os
+                        layouts — exceto LIVE/GRUPO, que já usam o arrasto para posicionar as peças
+                        (lá o zoom sai pelos botões +/− abaixo, senão este overlay comeria o pointer). */}
+                    {layout !== 'live' && layout !== 'group' && (
                       <div
                         className="absolute inset-0 z-20 touch-none select-none cursor-grab active:cursor-grabbing"
                         onTouchStart={(e) => onWorkoutTouchStart({ touches: Array.from(e.touches) })}
@@ -239,9 +241,8 @@ export default function StoryComposer({ open, session, onClose, calories }: Stor
 
                   </div>
 
-                  {/* Controles de zoom (layout TREINO) — precisos via +/− */}
-                  {layout === 'workout' && (
-                    <div className="w-full max-w-[300px] sm:max-w-[340px] flex items-center gap-2">
+                  {/* Controles de zoom — precisos via +/−. Em todos os layouts. */}
+                  <div className="w-full max-w-[300px] sm:max-w-[340px] flex items-center gap-2">
                       <button
                         type="button" onClick={() => nudgeWorkoutScale(-0.05)} disabled={busy}
                         aria-label="Diminuir zoom"
@@ -259,8 +260,7 @@ export default function StoryComposer({ open, session, onClose, calories }: Stor
                         type="button" onClick={resetWorkoutTransform} disabled={busy}
                         className="h-11 px-4 rounded-xl bg-neutral-900 border border-neutral-800 text-neutral-300 text-[11px] font-bold uppercase tracking-wider hover:bg-neutral-800 hover:text-white disabled:opacity-50 transition-colors active:scale-95"
                       >Reset</button>
-                    </div>
-                  )}
+                  </div>
 
                   {/* Media Controls */}
                   <div className="w-full max-w-[300px] sm:max-w-[340px] flex items-center gap-3">

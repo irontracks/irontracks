@@ -51,6 +51,7 @@ export const drawNutritionStory = ({
   transparentBg = false,
   skipClear = false,
   template,
+  workoutTransform,
 }: {
   ctx: CanvasRenderingContext2D
   canvasW: number
@@ -60,6 +61,8 @@ export const drawNutritionStory = ({
   transparentBg?: boolean
   skipClear?: boolean
   template: StoryTemplate
+  /** Zoom/reposição do card (pinça + arrasto). O fundo/foto NÃO é afetado. */
+  workoutTransform?: { scale: number; offsetX: number; offsetY: number }
 }) => {
   const C = template.colors
   const F = template.fonts
@@ -94,6 +97,20 @@ export const drawNutritionStory = ({
   overlay.addColorStop(1, template.overlay.gradientEnd)
   ctx.fillStyle = overlay
   ctx.fillRect(0, 0, canvasW, canvasH)
+
+  // Zoom/reposição do card (pinça + arrasto). Só o CONTEÚDO transforma — o fundo
+  // (foto/gradiente + overlay acima) fica fixo. Pivô no centro do canvas.
+  const wt = workoutTransform ?? { scale: 1, offsetX: 0, offsetY: 0 }
+  const wtApplied = wt.scale !== 1 || wt.offsetX !== 0 || wt.offsetY !== 0
+  if (wtApplied) {
+    ctx.save()
+    ctx.translate(wt.offsetX, wt.offsetY)
+    const pvX = canvasW / 2
+    const pvY = canvasH / 2
+    ctx.translate(pvX, pvY)
+    ctx.scale(wt.scale, wt.scale)
+    ctx.translate(-pvX, -pvY)
+  }
 
   const left = SAFE_SIDE
   const right = canvasW - SAFE_SIDE
@@ -327,6 +344,8 @@ export const drawNutritionStory = ({
     ctx.fillText(timeStr, pillX + padX, pillY + padY)
     ctx.restore()
   })()
+
+  if (wtApplied) ctx.restore()
 }
 
 // ── Adapters: dados do NutritionMixer → conteúdo do story ────────────────────
