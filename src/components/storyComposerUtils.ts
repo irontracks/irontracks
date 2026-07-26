@@ -387,6 +387,7 @@ export const drawStory = ({
     skipClear = false,
     template = DEFAULT_STORY_TEMPLATE,
     workoutTransform,
+    brandOffset,
 }: {
     ctx: CanvasRenderingContext2D;
     canvasW: number;
@@ -400,6 +401,8 @@ export const drawStory = ({
     template?: StoryTemplate;
     /** Zoom/reposicionamento do conteúdo (pinça + arrasto) — vale para todos os layouts. */
     workoutTransform?: { scale: number; offsetX: number; offsetY: number };
+    /** Deslocamento SÓ da marca (IRON·TRACKS), por cima do transform geral. */
+    brandOffset?: { x: number; y: number };
 }) => {
     // Atalhos do template (cores/fontes/card). A GEOMETRIA segue literal abaixo —
     // o template só troca cor/peso/itálico/acento, nunca posições/tamanhos.
@@ -447,6 +450,8 @@ export const drawStory = ({
     // (há um `return` antecipado no bloco live/group e outro no workout).
     const wt = workoutTransform ?? { scale: 1, offsetX: 0, offsetY: 0 };
     const wtApplied = wt.scale !== 1 || wt.offsetX !== 0 || wt.offsetY !== 0;
+    // Offset SÓ da marca (aplicado dentro do transform geral, nos blocos de brand).
+    const bOff = clampBrandOffset(brandOffset);
     if (wtApplied) {
         ctx.save();
         ctx.translate(wt.offsetX, wt.offsetY);
@@ -612,6 +617,8 @@ export const drawStory = ({
         const bY = SAFE_TOP + 14;
         const bSize = 48;
         ctx.save();
+        // Marca solta do resto: offset próprio dentro do transform geral.
+        ctx.translate(bOff.x, bOff.y);
         ctx.shadowColor = 'rgba(0,0,0,0.6)';
         ctx.shadowBlur = 12;
         ctx.font = f(F.brandWeight, bSize, F.brandStyle);
@@ -753,6 +760,8 @@ export const drawStory = ({
 
     // Shadow for legibility on any background
     ctx.save();
+    // Marca solta do resto: offset próprio dentro do transform geral.
+    ctx.translate(bOff.x, bOff.y);
     ctx.shadowColor = 'rgba(0,0,0,0.6)';
     ctx.shadowBlur = 12;
     ctx.fillStyle = C.brandPrimary;
@@ -972,3 +981,59 @@ export const panToWorkoutOffset = (
     offsetX: clampWorkoutOffset(g.startOffsetX + (x - g.startX) * factor),
     offsetY: clampWorkoutOffset(g.startOffsetY + (y - g.startY) * factor),
 })
+
+// ── Marca (IRON·TRACKS) solta do resto ───────────────────────────────────────
+// O arrasto/zoom geral move o bloco inteiro. A marca tem um offset PRÓPRIO por
+// cima disso, pra o usuário tirá-la de perto do título sem desmontar o resto.
+export type Offset = { x: number; y: number }
+export const NO_OFFSET: Offset = { x: 0, y: 0 }
+
+/** Âncora da marca no canvas (mesma origem usada pelos renderers). */
+export const BRAND_BASE_X = SAFE_SIDE
+export const BRAND_BASE_Y = SAFE_TOP + 18
+
+export const clampBrandOffset = (o: Offset | null | undefined): Offset => ({
+    x: clampWorkoutOffset(Number(o?.x) || 0),
+    y: clampWorkoutOffset(Number(o?.y) || 0),
+})
+
+/**
+ * Onde o handle da marca cai no preview (fração 0..1 do lado), já contando o
+ * zoom/pan geral — senão o handle descola do desenho assim que se dá zoom.
+ */
+export const brandHandlePct = (
+    brandOffset: Offset | null | undefined,
+    wt: { scale: number; offsetX: number; offsetY: number } | null | undefined,
+): Offset => {
+    const b = clampBrandOffset(brandOffset)
+    const scale = clampWorkoutScale(Number(wt?.scale) || 1)
+    const offX = Number(wt?.offsetX) || 0
+    const offY = Number(wt?.offsetY) || 0
+    const pivotX = CANVAS_W / 2
+    const pivotY = CANVAS_H / 2
+    const cx = BRAND_BASE_X + b.x
+    const cy = BRAND_BASE_Y + b.y
+    return {
+        x: ((cx - pivotX) * scale + pivotX + offX) / CANVAS_W,
+        y: ((cy - pivotY) * scale + pivotY + offY) / CANVAS_H,
+    }
+}
+
+/**
+ * Arrasto do handle: px de tela → px de canvas. Divide pela escala porque o
+ * offset da marca é aplicado DENTRO do transform geral (com zoom 2x, 10px de
+ * dedo já valem 20px de canvas — sem dividir, a marca foge do dedo).
+ */
+export const dragToBrandOffset = (
+    start: Offset,
+    dxScreen: number,
+    dyScreen: number,
+    factor: number,
+    scale: number,
+): Offset => {
+    const s = clampWorkoutScale(Number(scale) || 1)
+    return clampBrandOffset({
+        x: (Number(start?.x) || 0) + (Number(dxScreen) || 0) * factor / s,
+        y: (Number(start?.y) || 0) + (Number(dyScreen) || 0) * factor / s,
+    })
+}

@@ -26,6 +26,9 @@ import {
     clampWorkoutScale,
     pinchToWorkoutTransform,
     panToWorkoutOffset,
+    dragToBrandOffset,
+    NO_OFFSET,
+    type Offset,
     isIOSUserAgent,
     formatDatePt,
     calculateTotalVolume,
@@ -52,6 +55,8 @@ export type StoryRenderer = (args: {
     template: StoryTemplate
     /** Zoom/reposição do card (pinça + arrasto) — mesmo do layout 'workout'. */
     workoutTransform?: { scale: number; offsetX: number; offsetY: number }
+    /** Deslocamento SÓ da marca (IRON·TRACKS). */
+    brandOffset?: Offset
 }) => void
 
 interface UseStoryComposerOptions {
@@ -125,6 +130,14 @@ export function useStoryComposer({
     // tamanho padrão, ignorando o zoom que o usuário deixou).
     const workoutTransformRef = useRef(workoutTransform)
     useEffect(() => { workoutTransformRef.current = workoutTransform }, [workoutTransform])
+    // Marca (IRON·TRACKS) solta do resto: offset próprio, por cima do transform geral.
+    // Mesmo motivo do ref acima — o export lê pelo REF, nunca pelo closure.
+    const [brandOffset, setBrandOffset] = useState<Offset>(NO_OFFSET)
+    const brandOffsetRef = useRef(brandOffset)
+    useEffect(() => { brandOffsetRef.current = brandOffset }, [brandOffset])
+    const brandDragRef = useRef<{ pointerId: number | null; startX: number; startY: number; start: Offset }>({
+        pointerId: null, startX: 0, startY: 0, start: NO_OFFSET,
+    })
     const workoutGestureRef = useRef<{
         mode: 'none' | 'pan' | 'pinch'
         startX: number; startY: number
@@ -317,6 +330,8 @@ export function useStoryComposer({
         setLivePositions(DEFAULT_LIVE_POSITIONS)
         setDraggingKey(null)
         setWorkoutTransform({ scale: 1, offsetX: 0, offsetY: 0 })
+        setBrandOffset(NO_OFFSET)
+        brandDragRef.current = { pointerId: null, startX: 0, startY: 0, start: NO_OFFSET }
         workoutGestureRef.current.mode = 'none'
         dragRef.current = { key: null, pointerId: null, startX: 0, startY: 0, startPos: { x: 0, y: 0 } }
         if (!isClose) {
@@ -507,6 +522,7 @@ export function useStoryComposer({
             setDraggingKey(null)
             // Zerar zoom/reposição ao trocar de layout (cada layout começa neutro).
             setWorkoutTransform({ scale: 1, offsetX: 0, offsetY: 0 })
+            setBrandOffset(NO_OFFSET)
             workoutGestureRef.current.mode = 'none'
             dragRef.current = { key: null, pointerId: null, startX: 0, startY: 0, startPos: { x: 0, y: 0 } }
             // Entering Grupo always resets positions to its Normal-like default —
@@ -527,6 +543,7 @@ export function useStoryComposer({
     }, [])
     const resetWorkoutTransform = useCallback(() => {
         setWorkoutTransform({ scale: 1, offsetX: 0, offsetY: 0 })
+        setBrandOffset(NO_OFFSET)
         workoutGestureRef.current.mode = 'none'
     }, [])
 
@@ -587,6 +604,39 @@ export function useStoryComposer({
         nudgeWorkoutScale(deltaY < 0 ? 0.05 : -0.05)
     }, [nudgeWorkoutScale])
 
+    // ── Arrasto da MARCA (handle próprio, independente do bloco) ───────────────
+    // Handle separado (pointer, com capture) em vez de reusar o overlay de gesto:
+    // o overlay cobre a prévia inteira e move TUDO — a marca precisa sair dele.
+    const onBrandPointerDown = useCallback((e: React.PointerEvent<HTMLElement>) => {
+        try {
+            if (typeof e?.pointerId !== 'number') return
+            e.preventDefault?.(); e.stopPropagation?.()
+            brandDragRef.current = { pointerId: e.pointerId, startX: e.clientX, startY: e.clientY, start: brandOffsetRef.current }
+            e.currentTarget?.setPointerCapture?.(e.pointerId)
+        } catch { }
+    }, [])
+
+    const onBrandPointerMove = useCallback((e: React.PointerEvent<HTMLElement>, rect: DOMRect | null) => {
+        try {
+            const { pointerId, startX, startY, start } = brandDragRef.current
+            if (typeof pointerId !== 'number' || e?.pointerId !== pointerId) return
+            e.preventDefault?.(); e.stopPropagation?.()
+            const factor = canvasFactor(rect)
+            const scale = workoutTransformRef.current.scale
+            setBrandOffset(dragToBrandOffset(start, e.clientX - startX, e.clientY - startY, factor, scale))
+        } catch { }
+    }, [])
+
+    const onBrandPointerUp = useCallback((e: React.PointerEvent<HTMLElement>) => {
+        try {
+            const { pointerId } = brandDragRef.current
+            if (typeof pointerId !== 'number' || e?.pointerId !== pointerId) return
+            e.preventDefault?.(); e.stopPropagation?.()
+            e.currentTarget?.releasePointerCapture?.(pointerId)
+            brandDragRef.current = { pointerId: null, startX: 0, startY: 0, start: brandOffsetRef.current }
+        } catch { }
+    }, [])
+
     // Canvas helpers
     // Desenha o overlay no ctx: renderer injetado (ex.: nutrição) ou o drawStory
     // de treino (default). Centraliza o branch dos 3 call-sites de render.
@@ -603,10 +653,11 @@ export function useStoryComposer({
         opts: { backgroundImage: HTMLImageElement | null; transparentBg?: boolean; skipClear?: boolean },
     ) => {
         const wt = workoutTransformRef.current
+        const bo = brandOffsetRef.current
         if (draw) {
-            draw({ ctx, canvasW: CANVAS_W, canvasH: CANVAS_H, backgroundImage: opts.backgroundImage, transparentBg: opts.transparentBg, skipClear: opts.skipClear, template, workoutTransform: wt })
+            draw({ ctx, canvasW: CANVAS_W, canvasH: CANVAS_H, backgroundImage: opts.backgroundImage, transparentBg: opts.transparentBg, skipClear: opts.skipClear, template, workoutTransform: wt, brandOffset: bo })
         } else {
-            drawStory({ ctx, canvasW: CANVAS_W, canvasH: CANVAS_H, backgroundImage: opts.backgroundImage, metrics, layout, livePositions, transparentBg: opts.transparentBg, skipClear: opts.skipClear, template, workoutTransform: wt })
+            drawStory({ ctx, canvasW: CANVAS_W, canvasH: CANVAS_H, backgroundImage: opts.backgroundImage, metrics, layout, livePositions, transparentBg: opts.transparentBg, skipClear: opts.skipClear, template, workoutTransform: wt, brandOffset: bo })
         }
     }
 
@@ -861,6 +912,8 @@ export function useStoryComposer({
         // workout zoom/reposição
         workoutTransform, nudgeWorkoutScale, resetWorkoutTransform,
         onWorkoutTouchStart, onWorkoutTouchMove, onWorkoutTouchEnd, onWorkoutWheel,
+        // marca (IRON·TRACKS) independente
+        brandOffset, onBrandPointerDown, onBrandPointerMove, onBrandPointerUp,
         // handlers
         loadMedia, onSelectLayout,
         onPiecePointerDown, onPiecePointerMove, onPiecePointerUp,

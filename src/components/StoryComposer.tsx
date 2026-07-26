@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useStoryComposer } from '@/components/stories/useStoryComposer'
 import { StoryControlPanel } from '@/components/stories/StoryControlPanel'
 import { StoryComposerIosSavePanel } from './StoryComposerIosSavePanel'
+import { BrandDragHandle } from '@/components/stories/BrandDragHandle'
 import { getTemplateById } from '@/components/stories/storyTemplates'
 import { useUserSettings } from '@/hooks/useUserSettings'
 import { useBackHandler } from '@/hooks/useBackHandler'
@@ -58,6 +59,7 @@ export default function StoryComposer({ open, session, onClose, calories }: Stor
     metrics: rawMetrics,
     workoutTransform, nudgeWorkoutScale, resetWorkoutTransform,
     onWorkoutTouchStart, onWorkoutTouchMove, onWorkoutTouchEnd, onWorkoutWheel,
+    brandOffset, onBrandPointerDown, onBrandPointerMove, onBrandPointerUp,
     loadMedia, onSelectLayout,
     onPiecePointerDown, onPiecePointerMove, onPiecePointerUp,
     onGroupPointerDown, onGroupPointerMove, onGroupPointerUp,
@@ -82,11 +84,11 @@ export default function StoryComposer({ open, session, onClose, calories }: Stor
     const ctx = canvas.getContext('2d')
     if (!ctx) return
     let raf = 0
-    const draw = () => drawStory({ ctx, canvasW: CANVAS_W, canvasH: CANVAS_H, backgroundImage, metrics, layout, livePositions, transparentBg: mediaKind === 'video', template, workoutTransform })
+    const draw = () => drawStory({ ctx, canvasW: CANVAS_W, canvasH: CANVAS_H, backgroundImage, metrics, layout, livePositions, transparentBg: mediaKind === 'video', template, workoutTransform, brandOffset })
     if (isExporting) { draw(); return }
     if (layout === 'live' && draggingKey) { raf = requestAnimationFrame(draw) } else { draw() }
     return () => cancelAnimationFrame(raf)
-  }, [open, backgroundImage, layout, livePositions, mediaKind, metrics, draggingKey, isExporting, template, workoutTransform])
+  }, [open, backgroundImage, layout, livePositions, mediaKind, metrics, draggingKey, isExporting, template, workoutTransform, brandOffset])
 
   const livePieces = React.useMemo(() => [
     { key: 'brand', label: 'IRONTRACKS' },
@@ -237,6 +239,17 @@ export default function StoryComposer({ open, session, onClose, calories }: Stor
                           Pinça: zoom · Arraste: mover
                         </div>
                       </div>
+                    )}
+
+                    {layout !== 'live' && layout !== 'group' && (
+                      <BrandDragHandle
+                        brandOffset={brandOffset}
+                        workoutTransform={workoutTransform}
+                        previewRef={previewRef}
+                        onPointerDown={onBrandPointerDown}
+                        onPointerMove={onBrandPointerMove}
+                        onPointerUp={onBrandPointerUp}
+                      />
                     )}
 
                   </div>

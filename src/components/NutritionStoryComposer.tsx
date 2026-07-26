@@ -6,6 +6,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import { useStoryComposer } from '@/components/stories/useStoryComposer'
 import { NutritionStoryControlPanel } from '@/components/stories/NutritionStoryControlPanel'
 import { StoryComposerIosSavePanel } from './StoryComposerIosSavePanel'
+import { BrandDragHandle } from '@/components/stories/BrandDragHandle'
 import { CANVAS_W, CANVAS_H, SAFE_TOP, SAFE_BOTTOM, SAFE_SIDE } from './storyComposerUtils'
 import { drawNutritionStory, type NutritionStoryContent } from '@/components/stories/nutritionStory'
 import { NUTRITION_STORY_TEMPLATES, getNutritionTemplateById } from '@/components/stories/nutritionStoryTemplates'
@@ -42,7 +43,7 @@ export default function NutritionStoryComposer({ open, mode, content, onClose }:
 
   // Renderer injetado + meta/caption do POST (deriva do content).
   const draw = useCallback(
-    (args: { ctx: CanvasRenderingContext2D; canvasW: number; canvasH: number; backgroundImage: HTMLImageElement | null; transparentBg?: boolean; skipClear?: boolean; template: import('@/components/stories/storyTemplates').StoryTemplate; workoutTransform?: { scale: number; offsetX: number; offsetY: number } }) =>
+    (args: { ctx: CanvasRenderingContext2D; canvasW: number; canvasH: number; backgroundImage: HTMLImageElement | null; transparentBg?: boolean; skipClear?: boolean; template: import('@/components/stories/storyTemplates').StoryTemplate; workoutTransform?: { scale: number; offsetX: number; offsetY: number }; brandOffset?: { x: number; y: number } }) =>
       drawNutritionStory({ ...args, content }),
     [content],
   )
@@ -63,6 +64,7 @@ export default function NutritionStoryComposer({ open, mode, content, onClose }:
     showTrimmer, setShowTrimmer, videoDuration, trimRange, setTrimRange, previewTime,
     workoutTransform, nudgeWorkoutScale, resetWorkoutTransform,
     onWorkoutTouchStart, onWorkoutTouchMove, onWorkoutTouchEnd, onWorkoutWheel,
+    brandOffset, onBrandPointerDown, onBrandPointerMove, onBrandPointerUp,
     loadMedia, shareImage, postToIronTracks,
   } = useStoryComposer({
     open,
@@ -86,8 +88,8 @@ export default function NutritionStoryComposer({ open, mode, content, onClose }:
     if (!canvas) return
     const ctx = canvas.getContext('2d')
     if (!ctx) return
-    drawNutritionStory({ ctx, canvasW: CANVAS_W, canvasH: CANVAS_H, backgroundImage, content, transparentBg: isVideo, template, workoutTransform })
-  }, [open, backgroundImage, isVideo, content, template, workoutTransform])
+    drawNutritionStory({ ctx, canvasW: CANVAS_W, canvasH: CANVAS_H, backgroundImage, content, transparentBg: isVideo, template, workoutTransform, brandOffset })
+  }, [open, backgroundImage, isVideo, content, template, workoutTransform, brandOffset])
 
   if (!open) return null
 
@@ -166,6 +168,16 @@ export default function NutritionStoryComposer({ open, mode, content, onClose }:
                         Pinça: zoom · Arraste: mover
                       </div>
                     </div>
+
+                    {/* Alça da MARCA — arrasta o IRON·TRACKS sozinho, fora do bloco */}
+                    <BrandDragHandle
+                      brandOffset={brandOffset}
+                      workoutTransform={workoutTransform}
+                      previewRef={previewRef}
+                      onPointerDown={onBrandPointerDown}
+                      onPointerMove={onBrandPointerMove}
+                      onPointerUp={onBrandPointerUp}
+                    />
                   </div>
 
                   {/* Controles de zoom precisos (+/− e Reset) */}

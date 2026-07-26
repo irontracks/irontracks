@@ -12,6 +12,7 @@ import {
   SAFE_TOP,
   SAFE_BOTTOM,
   SAFE_SIDE,
+  clampBrandOffset,
 } from '../storyComposerUtils'
 import { type StoryTemplate, storyFont } from './storyTemplates'
 
@@ -52,6 +53,7 @@ export const drawNutritionStory = ({
   skipClear = false,
   template,
   workoutTransform,
+  brandOffset,
 }: {
   ctx: CanvasRenderingContext2D
   canvasW: number
@@ -63,6 +65,8 @@ export const drawNutritionStory = ({
   template: StoryTemplate
   /** Zoom/reposição do card (pinça + arrasto). O fundo/foto NÃO é afetado. */
   workoutTransform?: { scale: number; offsetX: number; offsetY: number }
+  /** Deslocamento SÓ da marca (IRON·TRACKS), por cima do transform geral. */
+  brandOffset?: { x: number; y: number }
 }) => {
   const C = template.colors
   const F = template.fonts
@@ -102,6 +106,7 @@ export const drawNutritionStory = ({
   // (foto/gradiente + overlay acima) fica fixo. Pivô no centro do canvas.
   const wt = workoutTransform ?? { scale: 1, offsetX: 0, offsetY: 0 }
   const wtApplied = wt.scale !== 1 || wt.offsetX !== 0 || wt.offsetY !== 0
+  const bOff = clampBrandOffset(brandOffset)
   if (wtApplied) {
     ctx.save()
     ctx.translate(wt.offsetX, wt.offsetY)
@@ -162,6 +167,8 @@ export const drawNutritionStory = ({
   const brandY = SAFE_TOP + 18
   const brandSize = 54
   ctx.save()
+  // Marca solta do resto: offset próprio dentro do transform geral.
+  ctx.translate(bOff.x, bOff.y)
   ctx.shadowColor = 'rgba(0,0,0,0.6)'
   ctx.shadowBlur = 12
   ctx.textBaseline = 'top'
