@@ -4,8 +4,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import { getKcalEstimate } from '@/utils/calories/kcalClient'
 import { estimateCaloriesMet } from '@/utils/calories/metEstimate'
-import { setTopWeightReps, setVolume, isWorkingSet } from '@/utils/report/setVolume'
-import { isSetCompleted } from '@/utils/report/setCompletion'
+import { setVolume, isWorkingSet } from '@/utils/report/setVolume'
+import { buildWorkoutStoryRows } from './workoutStoryRows'
 import { VideoCompositor } from '@/lib/video/VideoCompositor'
 import { composeStoryVideoOnIos, cancelNativeStoryCompose } from '@/utils/native/videoComposer'
 import { getErrorMessage } from '@/utils/errorMessage'
@@ -232,33 +232,9 @@ export function useStoryComposer({
             })
             : null
 
-        // ── Linhas por exercício pro layout "Treino" — top set (mais pesado) ──
-        const workoutRows = (exerciseNames || []).map((name, exIdx) => {
-            let bestW = 0, bestReps = 0, bestRpe = 0, performed = false
-            let totalReps = 0 // soma das reps de TODAS as séries = total de execuções do exercício
-            Object.entries(logs).forEach(([key, log]) => {
-                if (Number(key.split('-')[0]) !== exIdx) return
-                const obj = log && typeof log === 'object' ? (log as Record<string, unknown>) : null
-                if (!obj || !isSetCompleted(obj)) return
-                const { weight: w, reps: r } = setTopWeightReps(obj)
-                if (w <= 0 && r <= 0) return
-                performed = true
-                if (r > 0) totalReps += r
-                if (w > bestW || (w === bestW && r > bestReps)) {
-                    bestW = w; bestReps = r
-                    const rn = Number(String(obj.rpe ?? obj.L_rpe ?? obj.R_rpe ?? '').replace(',', '.'))
-                    bestRpe = Number.isFinite(rn) && rn > 0 ? rn : 0
-                }
-            })
-            if (!performed) return null
-            return {
-                name,
-                reps: bestReps > 0 ? String(bestReps) : '—',
-                weight: bestW > 0 ? bestW.toLocaleString('pt-BR') : '—',
-                rpe: bestRpe > 0 ? String(bestRpe) : (rpe ? String(rpe) : '—'),
-                totalReps: totalReps > 0 ? String(totalReps) : '—',
-            }
-        }).filter(Boolean) as { name: string; reps: string; weight: string; rpe: string; totalReps: string }[]
+        // Linhas da tabela do layout "Treino" — regra em módulo puro e testado
+        // (musculação pelo log; cardio pelo tempo, mesmo sem série concluída).
+        const workoutRows = buildWorkoutStoryRows(s, rpe)
 
         // ── Prefer explicit exec/rest seconds from session ────────────────────
         const execSeconds = Number(s?.executionTotalSeconds ?? s?.execution_total_seconds ?? 0) || 0
