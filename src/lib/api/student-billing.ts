@@ -83,4 +83,11 @@ export const apiStudentBilling = {
 
   pay: (payload: { subscription_id: string; cpfCnpj: string; mobilePhone: string; name?: string }) =>
     apiPost<{ ok: boolean; charge: StudentCharge; resumed?: boolean }>('/api/student/charge', payload as unknown as Record<string, unknown>),
+
+  // Assinatura RECORRENTE por cartão (MercadoPago preapproval) — retorna o init_point pra abrir.
+  subscribeCard: (subscriptionId: string) =>
+    apiPost<{ ok: boolean; init_point: string; preapproval_id: string; amount: number; error?: string; message?: string }>(
+      '/api/student/checkout-recurring',
+      { subscription_id: subscriptionId } as Record<string, unknown>,
+    ),
 }
