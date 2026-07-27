@@ -1,16 +1,18 @@
 'use client'
 
 import React from 'react'
-import { CANVAS_W, CANVAS_H, brandHandlePct, clampWorkoutScale } from '../storyComposerUtils'
+import { CANVAS_W, CANVAS_H, brandHandlePct } from '../storyComposerUtils'
 
 /**
  * Alça de arrasto da MARCA (IRON·TRACKS) sobre a prévia do story.
  *
  * A marca é desenhada no canvas, então não dá pra arrastá-la direto: esta alça
- * é um retângulo HTML posicionado por cima dela (já contando o zoom/pan geral,
- * senão descola do desenho assim que se dá zoom) e devolve o deslocamento ao
+ * é um retângulo HTML posicionado por cima dela e devolve o deslocamento ao
  * hook. Fica ACIMA do overlay de gesto (z-30) — o overlay move o bloco inteiro
  * e comeria o pointer.
+ *
+ * A alça NÃO acompanha o zoom/pan do bloco porque a marca também não: ela é
+ * 100% independente (encolher os dados não encolhe a marca).
  *
  * Componente único de propósito: os três composers (treino, nutrição, cardio)
  * consomem o MESMO handle, para não repetir a alça 3× e divergirem em silêncio.
@@ -22,7 +24,6 @@ const BRAND_BOX_H = 66
 
 interface BrandDragHandleProps {
     brandOffset: { x: number; y: number }
-    workoutTransform: { scale: number; offsetX: number; offsetY: number }
     previewRef: React.RefObject<HTMLDivElement | null>
     onPointerDown: (e: React.PointerEvent<HTMLElement>) => void
     onPointerMove: (e: React.PointerEvent<HTMLElement>, rect: DOMRect | null) => void
@@ -30,11 +31,10 @@ interface BrandDragHandleProps {
 }
 
 export function BrandDragHandle({
-    brandOffset, workoutTransform, previewRef,
+    brandOffset, previewRef,
     onPointerDown, onPointerMove, onPointerUp,
 }: BrandDragHandleProps) {
-    const pct = brandHandlePct(brandOffset, workoutTransform)
-    const scale = clampWorkoutScale(workoutTransform?.scale ?? 1)
+    const pct = brandHandlePct(brandOffset)
 
     return (
         <button
@@ -44,8 +44,8 @@ export function BrandDragHandle({
             style={{
                 left: `${pct.x * 100}%`,
                 top: `${pct.y * 100}%`,
-                width: `${((BRAND_BOX_W * scale) / CANVAS_W) * 100}%`,
-                height: `${((BRAND_BOX_H * scale) / CANVAS_H) * 100}%`,
+                width: `${(BRAND_BOX_W / CANVAS_W) * 100}%`,
+                height: `${(BRAND_BOX_H / CANVAS_H) * 100}%`,
                 marginLeft: '-6px',
                 marginTop: '-6px',
             }}

@@ -172,7 +172,6 @@ export default function NutritionStoryComposer({ open, mode, content, onClose }:
                     {/* Alça da MARCA — arrasta o IRON·TRACKS sozinho, fora do bloco */}
                     <BrandDragHandle
                       brandOffset={brandOffset}
-                      workoutTransform={workoutTransform}
                       previewRef={previewRef}
                       onPointerDown={onBrandPointerDown}
                       onPointerMove={onBrandPointerMove}

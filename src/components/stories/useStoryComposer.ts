@@ -55,7 +55,7 @@ export type StoryRenderer = (args: {
     template: StoryTemplate
     /** Zoom/reposição do card (pinça + arrasto) — mesmo do layout 'workout'. */
     workoutTransform?: { scale: number; offsetX: number; offsetY: number }
-    /** Deslocamento SÓ da marca (IRON·TRACKS). */
+    /** Posição própria da marca (IRON·TRACKS) — independente do transform geral. */
     brandOffset?: Offset
 }) => void
 
@@ -130,7 +130,7 @@ export function useStoryComposer({
     // tamanho padrão, ignorando o zoom que o usuário deixou).
     const workoutTransformRef = useRef(workoutTransform)
     useEffect(() => { workoutTransformRef.current = workoutTransform }, [workoutTransform])
-    // Marca (IRON·TRACKS) solta do resto: offset próprio, por cima do transform geral.
+    // Marca (IRON·TRACKS) 100% independente: posição própria, imune ao zoom/pan do bloco.
     // Mesmo motivo do ref acima — o export lê pelo REF, nunca pelo closure.
     const [brandOffset, setBrandOffset] = useState<Offset>(NO_OFFSET)
     const brandOffsetRef = useRef(brandOffset)
@@ -622,8 +622,7 @@ export function useStoryComposer({
             if (typeof pointerId !== 'number' || e?.pointerId !== pointerId) return
             e.preventDefault?.(); e.stopPropagation?.()
             const factor = canvasFactor(rect)
-            const scale = workoutTransformRef.current.scale
-            setBrandOffset(dragToBrandOffset(start, e.clientX - startX, e.clientY - startY, factor, scale))
+            setBrandOffset(dragToBrandOffset(start, e.clientX - startX, e.clientY - startY, factor))
         } catch { }
     }, [])
 

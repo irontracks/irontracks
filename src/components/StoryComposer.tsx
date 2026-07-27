@@ -244,7 +244,6 @@ export default function StoryComposer({ open, session, onClose, calories }: Stor
                     {layout !== 'live' && layout !== 'group' && (
                       <BrandDragHandle
                         brandOffset={brandOffset}
-                        workoutTransform={workoutTransform}
                         previewRef={previewRef}
                         onPointerDown={onBrandPointerDown}
                         onPointerMove={onBrandPointerMove}

@@ -401,7 +401,7 @@ export const drawStory = ({
     template?: StoryTemplate;
     /** Zoom/reposicionamento do conteúdo (pinça + arrasto) — vale para todos os layouts. */
     workoutTransform?: { scale: number; offsetX: number; offsetY: number };
-    /** Deslocamento SÓ da marca (IRON·TRACKS), por cima do transform geral. */
+    /** Posição própria da marca (IRON·TRACKS) — imune ao zoom/pan do bloco. */
     brandOffset?: { x: number; y: number };
 }) => {
     // Atalhos do template (cores/fontes/card). A GEOMETRIA segue literal abaixo —
@@ -617,8 +617,9 @@ export const drawStory = ({
         const bY = SAFE_TOP + 14;
         const bSize = 48;
         ctx.save();
-        // Marca solta do resto: offset próprio dentro do transform geral.
-        ctx.translate(bOff.x, bOff.y);
+        // Marca em espaço próprio: desfaz o zoom/pan do bloco e aplica só o
+        // offset dela (independência total do resto do story).
+        enterBrandSpace(ctx, wt, bOff);
         ctx.shadowColor = 'rgba(0,0,0,0.6)';
         ctx.shadowBlur = 12;
         ctx.font = f(F.brandWeight, bSize, F.brandStyle);
@@ -760,8 +761,9 @@ export const drawStory = ({
 
     // Shadow for legibility on any background
     ctx.save();
-    // Marca solta do resto: offset próprio dentro do transform geral.
-    ctx.translate(bOff.x, bOff.y);
+    // Marca em espaço próprio: desfaz o zoom/pan do bloco e aplica só o offset
+    // dela (independência total do resto do story).
+    enterBrandSpace(ctx, wt, bOff);
     ctx.shadowColor = 'rgba(0,0,0,0.6)';
     ctx.shadowBlur = 12;
     ctx.fillStyle = C.brandPrimary;
@@ -982,9 +984,11 @@ export const panToWorkoutOffset = (
     offsetY: clampWorkoutOffset(g.startOffsetY + (y - g.startY) * factor),
 })
 
-// ── Marca (IRON·TRACKS) solta do resto ───────────────────────────────────────
-// O arrasto/zoom geral move o bloco inteiro. A marca tem um offset PRÓPRIO por
-// cima disso, pra o usuário tirá-la de perto do título sem desmontar o resto.
+// ── Marca (IRON·TRACKS) 100% independente do bloco ───────────────────────────
+// O arrasto/zoom geral move e redimensiona o bloco (título, cards, tabela). A
+// marca NÃO entra nisso: vive em espaço próprio, com posição própria e tamanho
+// fixo. Antes o offset dela era aplicado DENTRO do transform geral, então
+// encolher os dados encolhia a marca junto — não era independência de verdade.
 export type Offset = { x: number; y: number }
 export const NO_OFFSET: Offset = { x: 0, y: 0 }
 
@@ -998,42 +1002,53 @@ export const clampBrandOffset = (o: Offset | null | undefined): Offset => ({
 })
 
 /**
- * Onde o handle da marca cai no preview (fração 0..1 do lado), já contando o
- * zoom/pan geral — senão o handle descola do desenho assim que se dá zoom.
+ * Onde a alça da marca cai no preview (fração 0..1 do lado). NÃO depende do
+ * zoom/pan geral — a marca não é afetada por eles.
  */
-export const brandHandlePct = (
-    brandOffset: Offset | null | undefined,
-    wt: { scale: number; offsetX: number; offsetY: number } | null | undefined,
-): Offset => {
+export const brandHandlePct = (brandOffset: Offset | null | undefined): Offset => {
     const b = clampBrandOffset(brandOffset)
-    const scale = clampWorkoutScale(Number(wt?.scale) || 1)
-    const offX = Number(wt?.offsetX) || 0
-    const offY = Number(wt?.offsetY) || 0
-    const pivotX = CANVAS_W / 2
-    const pivotY = CANVAS_H / 2
-    const cx = BRAND_BASE_X + b.x
-    const cy = BRAND_BASE_Y + b.y
     return {
-        x: ((cx - pivotX) * scale + pivotX + offX) / CANVAS_W,
-        y: ((cy - pivotY) * scale + pivotY + offY) / CANVAS_H,
+        x: (BRAND_BASE_X + b.x) / CANVAS_W,
+        y: (BRAND_BASE_Y + b.y) / CANVAS_H,
     }
 }
 
-/**
- * Arrasto do handle: px de tela → px de canvas. Divide pela escala porque o
- * offset da marca é aplicado DENTRO do transform geral (com zoom 2x, 10px de
- * dedo já valem 20px de canvas — sem dividir, a marca foge do dedo).
- */
+/** Arrasto da alça: px de tela → px de canvas (só o fator de exibição). */
 export const dragToBrandOffset = (
     start: Offset,
     dxScreen: number,
     dyScreen: number,
     factor: number,
-    scale: number,
-): Offset => {
-    const s = clampWorkoutScale(Number(scale) || 1)
-    return clampBrandOffset({
-        x: (Number(start?.x) || 0) + (Number(dxScreen) || 0) * factor / s,
-        y: (Number(start?.y) || 0) + (Number(dyScreen) || 0) * factor / s,
-    })
+): Offset => clampBrandOffset({
+    x: (Number(start?.x) || 0) + (Number(dxScreen) || 0) * factor,
+    y: (Number(start?.y) || 0) + (Number(dyScreen) || 0) * factor,
+})
+
+/**
+ * Põe o ctx em ESPAÇO DA MARCA: desfaz o transform geral (zoom + pan do bloco)
+ * e aplica só o offset próprio da marca. Chamar logo após o `ctx.save()` do
+ * bloco da marca — o `ctx.restore()` correspondente devolve o transform geral.
+ *
+ * Desfazer é o ponto todo: os renderers desenham a marca já dentro do transform
+ * do bloco, então sem a inversa o zoom dos dados encolhe/estica a marca junto.
+ * A inversa de `T(off)·P·S·P⁻¹` é `P·S⁻¹·P⁻¹·T(-off)` — nesta ordem de chamadas.
+ */
+export const enterBrandSpace = (
+    ctx: CanvasRenderingContext2D,
+    workoutTransform: { scale: number; offsetX: number; offsetY: number } | null | undefined,
+    brandOffset: Offset | null | undefined,
+): void => {
+    const s = clampWorkoutScale(Number(workoutTransform?.scale) || 1)
+    const offX = Number(workoutTransform?.offsetX) || 0
+    const offY = Number(workoutTransform?.offsetY) || 0
+    const pivotX = CANVAS_W / 2
+    const pivotY = CANVAS_H / 2
+    if (s !== 1) {
+        ctx.translate(pivotX, pivotY)
+        ctx.scale(1 / s, 1 / s)
+        ctx.translate(-pivotX, -pivotY)
+    }
+    if (offX !== 0 || offY !== 0) ctx.translate(-offX, -offY)
+    const b = clampBrandOffset(brandOffset)
+    if (b.x !== 0 || b.y !== 0) ctx.translate(b.x, b.y)
 }

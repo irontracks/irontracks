@@ -14,6 +14,7 @@ import {
   SAFE_BOTTOM,
   SAFE_SIDE,
   clampBrandOffset,
+  enterBrandSpace,
 } from '../storyComposerUtils'
 import { type StoryTemplate, storyFont } from './storyTemplates'
 
@@ -130,7 +131,7 @@ export const drawCardioStory = ({
   template: StoryTemplate
   /** Zoom/reposição do card (pinça + arrasto). O fundo/foto NÃO é afetado. */
   workoutTransform?: { scale: number; offsetX: number; offsetY: number }
-  /** Deslocamento SÓ da marca (IRON·TRACKS), por cima do transform geral. */
+  /** Posição própria da marca (IRON·TRACKS) — imune ao zoom/pan do bloco. */
   brandOffset?: { x: number; y: number }
 }) => {
   const C = template.colors
@@ -190,8 +191,9 @@ export const drawCardioStory = ({
   const brandY = SAFE_TOP + 18
   const brandSize = 54
   ctx.save()
-  // Marca solta do resto: offset próprio dentro do transform geral.
-  ctx.translate(bOff.x, bOff.y)
+  // Marca em espaço próprio: desfaz o zoom/pan do bloco e aplica só o offset
+  // dela (independência total do resto do story).
+  enterBrandSpace(ctx, wt, bOff)
   ctx.shadowColor = 'rgba(0,0,0,0.6)'
   ctx.shadowBlur = 12
   ctx.textBaseline = 'top'

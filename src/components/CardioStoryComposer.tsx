@@ -173,7 +173,6 @@ export default function CardioStoryComposer({ open, content, onClose }: CardioSt
                     {/* Alça da MARCA — arrasta o IRON·TRACKS sozinho, fora do bloco */}
                     <BrandDragHandle
                       brandOffset={brandOffset}
-                      workoutTransform={workoutTransform}
                       previewRef={previewRef}
                       onPointerDown={onBrandPointerDown}
                       onPointerMove={onBrandPointerMove}
