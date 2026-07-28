@@ -1,6 +1,10 @@
 'use client'
 
-import { Activity, Camera, User, X } from 'lucide-react'
+import { useState } from 'react'
+import { Activity, Camera, ChevronDown, User, X } from 'lucide-react'
+
+// Menu de ações fica RECOLHIDO por padrão (pedido do dono, jul/2026): a tela de
+// avaliações abre limpa, mostrando primeiro os números. Toque no título expande.
 
 type AssessmentHeaderProps = {
   onCreate: () => void
@@ -30,6 +34,9 @@ export const AssessmentHeader = ({
   // Layout: nº de colunas = nº de botões (Nova + Histórico são fixos).
   const count = 2 + (onAddBia ? 1 : 0) + (onPhotoAssessment ? 1 : 0)
   const cols = count >= 4 ? 'sm:grid-cols-4' : count === 3 ? 'sm:grid-cols-3' : 'sm:grid-cols-2'
+
+  const [open, setOpen] = useState(false)
+  const toggleOpen = () => setOpen((v) => !v)
   return (
     <div
       className="rounded-2xl border p-6 mb-6 relative overflow-hidden"
@@ -43,20 +50,29 @@ export const AssessmentHeader = ({
       <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-yellow-500/60 to-transparent" />
 
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 relative z-10">
-        <div className="flex items-center">
+        <button
+          type="button"
+          onClick={toggleOpen}
+          aria-expanded={open}
+          aria-label={open ? 'Recolher menu de avaliações' : 'Expandir menu de avaliações'}
+          className="flex items-center text-left min-w-0 w-full sm:w-auto"
+        >
           <div
             className="w-10 h-10 rounded-xl flex items-center justify-center mr-3 shrink-0"
             style={{ background: 'rgba(234,179,8,0.12)', border: '1px solid rgba(234,179,8,0.2)' }}
           >
             <User className="w-5 h-5 text-yellow-500" />
           </div>
-          <div>
+          <div className="min-w-0">
             <h1 className="text-xl font-black text-white">Avaliações Físicas</h1>
             <p className="text-neutral-500 text-sm">Gerencie as avaliações e acompanhe a evolução</p>
           </div>
-        </div>
+          <ChevronDown
+            className={`w-5 h-5 text-neutral-400 shrink-0 ml-3 transition-transform duration-300 ${open ? 'rotate-180' : ''}`}
+          />
+        </button>
         <div className="w-full sm:w-auto flex items-center gap-2">
-          <div className={`grid grid-cols-1 ${cols} gap-2 flex-1 sm:flex-none`}>
+          <div className={`${open ? 'grid' : 'hidden'} grid-cols-1 ${cols} gap-2 flex-1 sm:flex-none`}>
             <button
               onClick={onCreate}
               className="w-full min-h-[44px] px-4 py-2 rounded-xl text-black font-black shadow-lg shadow-yellow-500/20 hover:shadow-yellow-500/30 transition-all duration-300 active:scale-95 btn-gold-animated"
