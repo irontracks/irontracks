@@ -20,6 +20,13 @@ interface RestTimerContext {
      *  - undefined when there is no next set (last set of last exercise)
      */
     nextSetLabel?: string;
+    /** Descanso que venceu com o app FECHADO e foi restaurado (ver
+     *  `sanitizeRestoredSession`). Liga o modo silencioso: barra + START
+     *  visíveis, sem flash "BORA!", sem alarme, sem auto-advance e sem
+     *  reagendar notificação/Live Activity de um descanso que já acabou. */
+    restoredExpired?: boolean;
+    /** Momento em que aquele descanso deveria ter terminado (ms). */
+    restoredExpiredAtMs?: number;
     onComplete?: (finalDurationSeconds?: number) => void;
 }
 
@@ -52,6 +59,8 @@ interface RestTimerOverlayProps {
 }
 
 const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context, onFinish, onStart, onClose: _onClose, settings, autoStartEnabled, onToggleAutoStart, workoutStartMs }) => {
+    // Descanso restaurado já vencido: só a barra com START, em silêncio.
+    const isRestoredExpired = context?.restoredExpired === true
     const isPlankMode = context?.kind === 'plank'
     const isCardioMode = context?.kind === 'cardio'
     // Timer de exercício (prancha/cardio) conta o tempo DO exercício, não o descanso.
@@ -236,7 +245,9 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
     }, [allowTickCountdown, context?.kind, isFinished, soundVolume, soundsEnabled, timeLeft]);
 
     useEffect(() => {
-        if (isFinished) {
+        // Descanso vencido com o app fechado não toca alarme na volta: o usuário
+        // já perdeu esse descanso, tocar agora é só susto.
+        if (isFinished && !isRestoredExpired) {
             alarmActiveRef.current = true;
             // Limite do alarme: se "alarme contínuo" está DESLIGADO, o alarme para
             // sozinho ao atingir o MENOR entre repeatMaxSeconds e (repeatMaxCount ×
@@ -287,7 +298,7 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
             if (!isFinished) return;
             stopAlarm(false);
         };
-    }, [allowVibrate, isFinished, repeatAlarm, repeatIntervalMs, soundVolume, soundsEnabled]);
+    }, [allowVibrate, isFinished, isRestoredExpired, repeatAlarm, repeatIntervalMs, soundVolume, soundsEnabled]);
 
     useEffect(() => {
         if (!isFinished) return;
@@ -338,6 +349,8 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
     continuousAlarmRef.current = continuousAlarm;
     const soundsEnabledRef = useRef(soundsEnabled);
     soundsEnabledRef.current = soundsEnabled;
+    const isRestoredExpiredRef = useRef(isRestoredExpired);
+    isRestoredExpiredRef.current = isRestoredExpired;
 
     useEffect(() => {
         if (!targetTime) {
@@ -354,6 +367,19 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
         }
         hasNotifiedRef.current = false;
         const id = `${context?.kind || 'rest'}-${context?.exerciseId || ''}-${context?.setId || ''}-${targetTime}`;
+
+        // Restaurado já vencido: NADA de agendar notificação/alarme/Live Activity —
+        // o descanso acabou enquanto o app estava fechado. Só renderiza a barra
+        // (o tick abaixo marca isFinished) pra o usuário apertar START.
+        if (isRestoredExpiredRef.current) {
+            notifyIdRef.current = '';
+            totalSecondsRef.current = 1;
+            // 0:00 em vez do atraso real: "+2:41:00 além do planejado" (o tempo em
+            // que o app ficou fechado) não é informação útil, é ruído.
+            setTimeLeft(0);
+            setIsFinished(true);
+            return;
+        }
 
         // ★ CANCEL any previous notification before scheduling new one
         if (notifyIdRef.current && notifyIdRef.current !== id) {
@@ -542,6 +568,9 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
             return;
         }
         if (autoStartFiredRef.current) return;
+        // Restaurado vencido: o START tem que ser do usuário. Auto-avançar aqui
+        // devolveria exatamente o bug que isto conserta (voltar já "iniciado").
+        if (isRestoredExpired) return;
         // Lock the decision for this rest at the moment it finishes. Any later
         // toggle of the Settings switch is ignored — only the NEXT rest uses it.
         autoStartFiredRef.current = true;
@@ -565,7 +594,7 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
             }
         }, 500);
         return () => clearTimeout(timeout);
-    }, [isFinished, autoOn]);
+    }, [isFinished, autoOn, isRestoredExpired]);
 
     // ── Widget lock-screen button bridge ───────────────────────────────────
     // When the user taps "PULAR DESCANSO" or "INICIAR SÉRIE" on the iOS lock
@@ -635,7 +664,7 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
         : 0;
     const redOffset = circ * extraProgress;
 
-    const isOvertime = isFinished || extraSeconds > 0;
+    const isOvertime = (isFinished && !isRestoredExpired) || extraSeconds > 0;
     const kind = String(context?.kind ?? '');
     const isSideRest = kind === 'side_rest';
     const isTransition = kind === 'transition';
@@ -651,7 +680,7 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
                 so the user can scan the upcoming sets before pressing START).
                 stopPropagation still guards against the tap leaking to the
                 workout modal below. */}
-            {isFinished && !isTransition && !flashDismissed && (
+            {isFinished && !isTransition && !flashDismissed && !isRestoredExpired && (
                 <div
                     role="presentation"
                     className={`fixed inset-0 z-[2000] backdrop-blur-sm flex flex-col items-center justify-center px-6 overflow-x-hidden cursor-pointer ${isSideRest ? 'bg-amber-500/90' : 'bg-green-600/90'}`}

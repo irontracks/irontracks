@@ -36,30 +36,36 @@ function parseJsonWithSchema<T>(raw: string, schema: z.ZodType<T>): T | null {
 }
 
 /**
- * Strip a stale rest-timer target from a hydrated session.
+ * Marca um descanso que já venceu enquanto o app estava fechado.
  *
- * `timerTargetTime` is an absolute timestamp (ms since epoch). When the app is
- * killed / backgrounded / restored a non-trivial amount of time later, the
- * persisted timestamp ends up in the PAST — which the RestTimerOverlay reads
- * on its first tick as `remaining = targetTime - now < 0`, setting
- * `isFinished = true` immediately and dumping the user on the green "BORA!"
- * screen with a growing overtime counter BEFORE they've even interacted with
- * the app.
+ * `timerTargetTime` é um timestamp absoluto (ms). Se o app é morto/suspenso e
+ * volta depois do fim do descanso, esse alvo está no PASSADO. O tratamento
+ * ANTIGO era descartar o timer inteiro — o que resolvia o problema imediato
+ * (o RestTimerOverlay abria direto no flash verde "BORA!" com contador de
+ * atraso crescendo, sem o usuário ter tocado em nada), mas criava outro:
+ * o app voltava SEM a barra de descanso, ou seja, exatamente como se o usuário
+ * já tivesse apertado START. Ele perdia o botão que marca o início real da
+ * série (relatado pelo dono em jul/2026).
  *
- * Follow-up clicks on OK in this corrupted state appeared to "not start a
- * timer" because the overlay was still stuck finished from the stale target,
- * or because Realtime echo delivered the expired state back from another
- * device and overwrote the fresh `now + duration` value.
+ * Tratamento atual: PRESERVA o timer e marca `restoredExpired` no contexto. O
+ * overlay entende essa marca como "modo silencioso" — mostra a barra com o
+ * START pra o usuário tocar, mas sem flash, sem alarme, sem auto-advance e sem
+ * reagendar notificação/Live Activity (nada disso faz sentido pra um descanso
+ * que terminou enquanto o app estava fechado).
  *
- * Rule: if the persisted `timerTargetTime` is within 5s of now, or in the
- * past, drop it. 5s slack covers legitimate near-live resumes (foregrounding
- * during a rest) while cutting out every stale value.
+ * A folga de 5s cobre o resume legítimo no meio de um descanso (nesse caso o
+ * timer volta contando normalmente, sem marca alguma).
  */
-function sanitizeRestoredSession(session: Record<string, unknown>): Record<string, unknown> {
+export function sanitizeRestoredSession(session: Record<string, unknown>): Record<string, unknown> {
     const raw = session.timerTargetTime
     const t = typeof raw === 'number' && Number.isFinite(raw) ? raw : 0
     if (t > 0 && t <= Date.now() + 5000) {
-        return { ...session, timerTargetTime: null, timerContext: null }
+        const ctx = isRecord(session.timerContext) ? session.timerContext : {}
+        return {
+            ...session,
+            timerTargetTime: t,
+            timerContext: { ...ctx, restoredExpired: true, restoredExpiredAtMs: t },
+        }
     }
     return session
 }

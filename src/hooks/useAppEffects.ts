@@ -270,8 +270,15 @@ export function useAppEffects({
   // ── Handler: transition from rest timer back to active set ────
   const handleStartFromRestTimer = useCallback(
     (ctx?: unknown) => {
-      const nowMs = Date.now()
       const ctxObj = isRecord(ctx) ? (ctx as Record<string, unknown>) : null
+      // Descanso restaurado (venceu com o app fechado): o descanso REAL terminou
+      // no `restoredExpiredAtMs`. Usar `Date.now()` gravaria como descanso todo o
+      // tempo em que o app ficou fechado — 2h de "descanso" no relatório.
+      const restoredEndRaw = ctxObj?.restoredExpiredAtMs
+      const restoredEndMs = typeof restoredEndRaw === 'number' && Number.isFinite(restoredEndRaw) ? restoredEndRaw : 0
+      const nowMs = Date.now()
+      // Só o cálculo do descanso usa o teto; a série começa AGORA.
+      const restEndMs = restoredEndMs > 0 ? Math.min(nowMs, restoredEndMs) : nowMs
       const prevKey = ctxObj ? String(ctxObj.key ?? '').trim() : ''
       const nextKey = ctxObj ? String(ctxObj.nextKey ?? '').trim() : ''
       const restStartedRaw = ctxObj ? ctxObj.restStartedAtMs : null
@@ -284,7 +291,7 @@ export function useAppEffects({
         const completedRaw = prevLogObj.completedAtMs
         const completedAtMs = typeof completedRaw === 'number' ? completedRaw : Number(String(completedRaw ?? '').trim())
         const base = restStartedAtMs > 0 ? restStartedAtMs : completedAtMs > 0 ? completedAtMs : 0
-        const restSeconds = base > 0 ? Math.max(0, Math.round((nowMs - base) / 1000)) : null
+        const restSeconds = base > 0 ? Math.max(0, Math.round((restEndMs - base) / 1000)) : null
         if (restSeconds != null) {
           handleUpdateSessionLog(prevKey, { ...prevLogObj, restSeconds })
         }
