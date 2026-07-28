@@ -8,7 +8,7 @@ import {
   normalizeExerciseKey,
   calculateTotalVolume,
 } from '@/utils/report/formatters'
-import { setTopWeightReps, setVolume, isWorkingSet } from '@/utils/report/setVolume'
+import { setTopWeightReps, setTotalReps, setVolume, isWorkingSet } from '@/utils/report/setVolume'
 import { resolveReportSetsCount } from '@/utils/report/resolveSetsCount'
 import { formatSetStages } from '@/utils/report/formatStages'
 import { isCardioExercise, getCardioSummary, type CardioSummary } from '@/utils/report/cardioSummary'
@@ -331,7 +331,10 @@ export function buildReportData(
         const { weight: w, reps: r } = setTopWeightReps(log) // trata unilateral
         if (w <= 0 && r <= 0) return
         setsLoggedCount += 1
-        if (r > 0) repsTotal += r
+        // Total de reps soma os dois lados no unilateral (setTotalReps); `r`
+        // acima é o lado, usado só para saber se a série tem conteúdo.
+        const totalReps = setTotalReps(log)
+        if (totalReps > 0) repsTotal += totalReps
         if (w > topWeight) topWeight = w
         const parts = String(k || '').split('-')
         const eIdx = parseInt(parts[0] || '0', 10)

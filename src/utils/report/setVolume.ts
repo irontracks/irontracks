@@ -126,6 +126,23 @@ export const setTopWeightReps = (log: unknown): { weight: number; reps: number }
 }
 
 /**
+ * Repetições TOTAIS de uma série — unilateral soma os dois lados.
+ *
+ * `setTopWeightReps` devolve o lado (12), que é o certo para EXIBIR a série ao
+ * lado do peso daquele lado e para o 1RM. Para CONTAGEM (reps do exercício, da
+ * sessão, Δ reps) o certo é o total feito: 12 por lado = 24. Sem isto a mesma
+ * linha do relatório mostrava volume dos DOIS lados e reps de UM (flagrado pelo
+ * dono em jul/2026: unilateral com 3×12+12 aparecia como 36 reps, não 72).
+ */
+export const setTotalReps = (log: unknown): number => {
+  if (!isRec(log)) return 0
+  const lr = parseRepsValue(log.L_reps)
+  const rr = parseRepsValue(log.R_reps)
+  if (lr > 0 || rr > 0) return lr + rr
+  return parseRepsValue(log.reps)
+}
+
+/**
  * True se a série CONTA para estatísticas: foi feita (done) E não é aquecimento
  * nem feeler. Mesma regra do relatório de finalização (reportMetrics), pra o card
  * "Resumo" do histórico não superestimar o volume contando aquecimento.

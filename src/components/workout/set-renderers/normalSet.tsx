@@ -367,6 +367,18 @@ const NormalSetInner = ({
     }
   };
 
+  // Tempo de execução da série (unilateral): mesmo cálculo do bilateral, a partir
+  // do `startedAtMs` gravado quando o usuário dá START no descanso. Era fixo em 0,
+  // então a coluna EXECUÇÃO do relatório saía vazia em TODO exercício unilateral.
+  const execSecondsFrom = (nowMs: number) => {
+    const startedRaw = (log as UnknownRecord)?.startedAtMs;
+    const startedAtMs =
+      typeof startedRaw === 'number' ? startedRaw : Number(String(startedRaw ?? '').trim());
+    return Number.isFinite(startedAtMs) && startedAtMs > 0
+      ? Math.max(0, Math.round((nowMs - startedAtMs) / 1000))
+      : 0;
+  };
+
   // ── Unilateral: complete L side ───────────────────────────────────────
   const handleCompleteL = () => {
     if (completeBusyRef.current) return;
@@ -394,7 +406,7 @@ const NormalSetInner = ({
       L_reps: lRepsField.value,
       L_weight: lWeightField.value,
       L_rpe: lRpeField.value,
-      ...(willSetDone ? { done: true, completedAtMs: nowMs, executionSeconds: 0 } : {}),
+      ...(willSetDone ? { done: true, completedAtMs: nowMs, executionSeconds: execSecondsFrom(nowMs) } : {}),
       advanced_config: cfg ?? log.advanced_config ?? null,
     });
 
@@ -432,7 +444,7 @@ const NormalSetInner = ({
       R_reps: rRepsField.value,
       R_weight: rWeightField.value,
       R_rpe: rRpeField.value,
-      ...(willSetDone ? { done: true, completedAtMs: nowMs, executionSeconds: 0 } : {}),
+      ...(willSetDone ? { done: true, completedAtMs: nowMs, executionSeconds: execSecondsFrom(nowMs) } : {}),
       advanced_config: cfg ?? log.advanced_config ?? null,
     });
 

@@ -1,6 +1,6 @@
 
 import type { UnknownRecord } from '@/types/app'
-import { setVolume, setTopWeightReps, setBestE1rm, waveVolume } from './setVolume'
+import { setVolume, setTopWeightReps, setTotalReps, setBestE1rm, waveVolume } from './setVolume'
 import { estimateSessionKcalBreakdown } from '@/utils/calories/sessionKcal'
 import { distributeKcalWithFixed } from '@/utils/calories/distributeKcal'
 
@@ -155,7 +155,10 @@ const buildLogVolume = (logs: UnknownRecord, exerciseIndex: number) => {
         volume += uniVol
         const top = setTopWeightReps(value)
         if (top.weight > 0) { weightSum += top.weight; weightCount += 1 }
-        if (top.reps > 0) reps += top.reps
+        // Reps TOTAIS (L+R): o volume desta linha já soma os dois lados, então
+        // contar só um lado deixava reps e volume falando línguas diferentes.
+        const totalReps = setTotalReps(value)
+        if (totalReps > 0) reps += totalReps
       }
     }
     sets += 1
