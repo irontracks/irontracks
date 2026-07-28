@@ -13,6 +13,7 @@
  */
 import { useEffect } from 'react'
 import { useWorkoutContext } from '../WorkoutContext'
+import { plateHintForExercise } from '@/utils/autoload/plateBreakdown'
 import type { WorkoutExercise } from '../types'
 
 /**
@@ -33,6 +34,8 @@ export function useAutoloadWeight(ex: WorkoutExercise, exIdx: number, setIdx: nu
   /** Peso sugerido pelo motor (null quando não há). Métodos com etapas (drop) usam
    *  isto para semear a 1ª etapa — o `log.weight` sozinho não chega nas etapas. */
   suggestedWeight: number | null
+  /** "8×20 + 1×2,5 por lado" — só em barra/máquina de anilha; '' nos demais. */
+  plateHint: string
 } {
   const { autoLoadEnabled, autoLoadSuggestions, getLog, updateLog, getPlanConfig } = useWorkoutContext()
 
@@ -70,10 +73,14 @@ export function useAutoloadWeight(ex: WorkoutExercise, exIdx: number, setIdx: nu
     String(log.weight ?? '') === String(sugWeight),
   )
 
+  // Dica de montagem: só faz sentido enquanto o peso na tela É o do motor.
+  const plateHint = isAutoWeight ? (plateHintForExercise(ex?.name, sugWeight) ?? '') : ''
+
   return {
     isAutoWeight,
     rationale: suggestion?.rationale ?? '',
     autoInputClass: isAutoWeight ? AUTO_INPUT_CLASS : '',
     suggestedWeight: sugWeight,
+    plateHint,
   }
 }

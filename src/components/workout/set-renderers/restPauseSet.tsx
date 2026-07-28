@@ -14,6 +14,7 @@ import {
 } from '../utils';
 import { UnknownRecord, WorkoutExercise } from '../types';
 import { useAutoloadWeight } from '../hooks/useAutoloadWeight';
+import { AutoloadNote } from './AutoloadNote';
 
 const RestPauseSetInner = ({
   ex, exIdx, setIdx, sstOverride,
@@ -42,7 +43,7 @@ const RestPauseSetInner = ({
   const cfg = getPlanConfig(ex, setIdx);
   const plannedSet = getPlannedSet(ex, setIdx);
   const restTime = parseTrainingNumber(ex?.restTime ?? ex?.rest_time);
-  const { isAutoWeight, rationale: autoRationale, autoInputClass } = useAutoloadWeight(ex, exIdx, setIdx);
+  const { isAutoWeight, rationale: autoRationale, plateHint: autoPlateHint, autoInputClass } = useAutoloadWeight(ex, exIdx, setIdx);
 
   // ── Focus-aware local input state (prevents ticker re-renders from erasing typed values) ──
   function useLocalField(external: string, onSave: (v: string) => void) {
@@ -274,11 +275,7 @@ const RestPauseSetInner = ({
         )}
       </div>
       {!done && !canDone && <div className="pl-12 text-[11px] text-neutral-400 font-semibold">Preencha peso e reps de todos os mini-sets no modal para concluir.</div>}
-      {isAutoWeight && autoRationale && (
-        <div className="pl-12 flex items-center gap-1 text-[10px] text-violet-300/80" title={autoRationale}>
-          <span aria-hidden>🧠</span><span className="truncate">{autoRationale}</span>
-        </div>
-      )}
+      <AutoloadNote show={isAutoWeight} rationale={autoRationale} plateHint={autoPlateHint} className="pl-12" />
       {isNotesOpen && (
         <div className="space-y-1.5">
           {prevNote && (

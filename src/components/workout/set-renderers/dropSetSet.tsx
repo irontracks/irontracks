@@ -13,6 +13,7 @@ import {
 } from '../utils';
 import { UnknownRecord, WorkoutExercise } from '../types';
 import { useAutoloadWeight, AUTO_INPUT_CLASS } from '../hooks/useAutoloadWeight';
+import { AutoloadNote } from './AutoloadNote';
 import { roundSuggestedWeight } from '@/utils/autoload/plateMath';
 import { inferEquipmentFromName } from '@/utils/autoload/equipmentFromName';
 
@@ -33,7 +34,7 @@ const DropSetSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: nu
 
   const key = `${exIdx}-${setIdx}`;
   const log = getLog(key);
-  const { isAutoWeight, rationale: autoRationale, suggestedWeight } = useAutoloadWeight(ex, exIdx, setIdx);
+  const { isAutoWeight, rationale: autoRationale, plateHint: autoPlateHint, suggestedWeight } = useAutoloadWeight(ex, exIdx, setIdx);
   const plannedSet = getPlannedSet(ex, setIdx);
   const cfgRaw = plannedSet?.advanced_config ?? plannedSet?.advancedConfig ?? null;
   const stagesPlannedRaw: unknown[] = Array.isArray(cfgRaw) ? cfgRaw : [];
@@ -274,11 +275,7 @@ const DropSetSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: nu
         </div>
       )}
 
-      {isAutoWeight && autoRationale && (
-        <div className="pl-12 flex items-center gap-1 text-[10px] text-violet-300/80" title={autoRationale}>
-          <span aria-hidden>🧠</span><span className="truncate">{autoRationale}</span>
-        </div>
-      )}
+      <AutoloadNote show={isAutoWeight} rationale={autoRationale} plateHint={autoPlateHint} className="pl-12" />
 
       {isNotesOpen && (
         <div className="space-y-1.5">

@@ -10,12 +10,13 @@ import {
 } from '../utils';
 import { UnknownRecord, WorkoutExercise } from '../types';
 import { useAutoloadWeight } from '../hooks/useAutoloadWeight';
+import { AutoloadNote } from './AutoloadNote';
 
 const ForcedRepsSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx: number; setIdx: number }) => {
   const { getLog, updateLog, setForcedRepsModal, openNotesKeys, toggleNotes, startTimer, reportHistory } = useWorkoutContext();
   const key = `${exIdx}-${setIdx}`;
   const log = getLog(key);
-  const { isAutoWeight, rationale: autoRationale } = useAutoloadWeight(ex, exIdx, setIdx);
+  const { isAutoWeight, rationale: autoRationale, plateHint: autoPlateHint } = useAutoloadWeight(ex, exIdx, setIdx);
   const fr = isObject(log.forced_reps) ? (log.forced_reps as UnknownRecord) : null;
   const savedWeight = String(fr?.weight ?? log.weight ?? '').trim();
   // CONTAGEM de reps até falhar — não confundir com a flag `log.failure`, que é o
@@ -102,11 +103,7 @@ const ForcedRepsSetInner = ({ ex, exIdx, setIdx }: { ex: WorkoutExercise; exIdx:
         )}
       </div>
       {!done && !canDone && <div className="pl-12 text-[11px] text-neutral-500 font-semibold">Preencha peso, reps à falha e reps forçadas no modal.</div>}
-      {isAutoWeight && autoRationale && (
-        <div className="pl-12 flex items-center gap-1 text-[10px] text-violet-300/80" title={autoRationale}>
-          <span aria-hidden>🧠</span><span className="truncate">{autoRationale}</span>
-        </div>
-      )}
+      <AutoloadNote show={isAutoWeight} rationale={autoRationale} plateHint={autoPlateHint} className="pl-12" />
       {isNotesOpen && (
         <div className="space-y-1.5">
           {prevNote && (

@@ -15,6 +15,8 @@ import { UnknownRecord, WorkoutExercise } from '../types';
 import type { SetType } from '@/types/workout';
 import { SetTypePopover, SET_TYPE_META, resolveSetType, useLongPress } from '../SetTypePopover';
 import { logWarnRemote } from '@/lib/logger';
+import { plateHintForExercise } from '@/utils/autoload/plateBreakdown';
+import { AutoloadNote } from './AutoloadNote';
 
 // ── Local-state input ─────────────────────────────────────────────────────
 // The workout ticker fires every 1 s and causes a full context re-render.
@@ -204,6 +206,8 @@ const NormalSetInner = ({
     autoLoadEnabled && log.weightSource === 'auto' && !log.done &&
     autoSuggestionWeight != null && String(log.weight ?? '') === String(autoSuggestionWeight),
   );
+  // Dica de montagem (barra / máquina de anilha): "8×20 + 1×2,5 por lado".
+  const autoPlateHint = plateHintForExercise(ex?.name, autoSuggestionWeight) ?? '';
 
   // Preenche a caixa de peso com a sugestão do motor — SÓ em série de trabalho, ainda
   // não concluída, ainda vazia e ainda não tocada (weightSource nulo). Depois de preencher
@@ -633,11 +637,12 @@ const NormalSetInner = ({
           {setIdx === 0 && renderUnilateralHeader()}
           {renderSideRow('L', lDone, lWeightField, lRepsField, lRpeField, handleCompleteL, setIdx === 0)}
           {renderSideRow('R', rDone, rWeightField, rRepsField, rRpeField, handleCompleteR, false)}
-          {autoLoadEnabled && isUnilateral && !done && log.weightSource === 'auto' && autoSuggestion?.rationale && (
-            <div className="flex items-center gap-1 px-0.5 text-[10px] text-violet-300/80" title={autoSuggestion.rationale}>
-              <span aria-hidden>🧠</span><span className="truncate">{autoSuggestion.rationale}</span>
-            </div>
-          )}
+          <AutoloadNote
+            show={Boolean(autoLoadEnabled && !done && log.weightSource === 'auto')}
+            rationale={autoSuggestion?.rationale ?? ''}
+            plateHint={autoPlateHint}
+            className="px-0.5"
+          />
           {/* Notes button sits below both L+R rows — clear of exercise footer buttons */}
           <div className="flex items-center justify-end gap-2 px-0.5 -mt-0.5">
             {failureToggle}
@@ -760,11 +765,8 @@ const NormalSetInner = ({
           </div>
           {/* Linha de rodapé: explicação da sugestão (🧠) à esquerda + chip de falha à direita */}
           <div className="mt-1 flex items-center justify-between gap-2">
-            {isAutoWeight && autoSuggestion?.rationale ? (
-              <div className="flex items-center gap-1 min-w-0 text-[10px] text-violet-300/80" title={autoSuggestion.rationale}>
-                <span aria-hidden>🧠</span>
-                <span className="truncate">{autoSuggestion.rationale}</span>
-              </div>
+            {isAutoWeight && (autoSuggestion?.rationale || autoPlateHint) ? (
+              <AutoloadNote show rationale={autoSuggestion?.rationale ?? ''} plateHint={autoPlateHint} />
             ) : <span />}
             {failureToggle}
           </div>
