@@ -1,7 +1,13 @@
 import { NextResponse } from 'next/server'
 import { logError, logWarn } from '@/lib/logger'
-import crypto from 'crypto'
 import { z } from 'zod'
+import {
+  verifyWebhook,
+  mapSubscriptionStatus,
+  addInterval,
+  assessPaymentAmount,
+  isRevokeStatus,
+} from '@/utils/billing/mercadopagoWebhookRules'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { mercadopagoRequest } from '@/lib/mercadopago'
 import { parseJsonBody } from '@/utils/zod'
@@ -21,81 +27,6 @@ async function bustVipCaches(userId: string) {
     cacheDelete(`vip:access:${uid}`).catch(() => {}),
     cacheDelete(`dashboard:bootstrap:${uid}`).catch(() => {}),
   ])
-}
-
-const parseSignature = (raw: string) => {
-  const parts = raw.split(',').map((p) => p.trim()).filter(Boolean)
-  let ts = ''
-  let v1 = ''
-  for (const part of parts) {
-    const [k, v] = part.split('=').map((s) => (s || '').trim())
-    if (k === 'ts') ts = v || ''
-    if (k === 'v1') v1 = v || ''
-  }
-  return { ts, v1 }
-}
-
-const WEBHOOK_TOLERANCE_MS = 5 * 60 * 1000 // 5 minutes
-
-const verifyWebhook = (opts: { secret: string; xSignature: string; xRequestId: string; dataId: string }) => {
-  const { ts, v1 } = parseSignature(opts.xSignature)
-  if (!ts || !v1) return false
-
-  // Replay protection: reject if timestamp is older than 5 minutes
-  const tsMs = Number(ts) * 1000
-  if (!Number.isFinite(tsMs) || Math.abs(Date.now() - tsMs) > WEBHOOK_TOLERANCE_MS) return false
-
-  const manifest = `id:${opts.dataId};request-id:${opts.xRequestId};ts:${ts};`
-  const hashed = crypto.createHmac('sha256', opts.secret).update(manifest).digest('hex')
-  return hashed.toLowerCase() === v1.toLowerCase()
-}
-
-const mapSubscriptionStatus = (status: string) => {
-  const s = (status || '').toLowerCase()
-  if (['authorized', 'approved'].includes(s)) return 'active'
-  if (['paused'].includes(s)) return 'past_due'
-  if (['cancelled', 'canceled'].includes(s)) return 'cancelled'
-  return 'pending'
-}
-
-const addInterval = (start: Date, interval: string) => {
-  const d = new Date(start)
-  if (String(interval || '').toLowerCase() === 'year') {
-    d.setMonth(d.getMonth() + 12)
-    return d
-  }
-  d.setMonth(d.getMonth() + 1)
-  return d
-}
-
-/**
- * Defense-in-depth (auditoria 2026-06-28): confere o valor pago vs o preço do plano
- * antes de conceder acesso. NÃO é externamente explorável (valor é fixado no checkout
- * server-side + webhook tem HMAC + dados vêm da API do MP), mas protege contra bug de
- * checkout ou fluxo futuro. Política CONSERVADORA pra nunca barrar receita legítima:
- *   - sem preço de referência no banco  -> não bloqueia (fail-open);
- *   - mismatch leve (preço mudou, arredondamento) -> só sinaliza (alerta), concede;
- *   - mismatch GRAVE (pago < 50% do esperado, ou moeda divergente) -> bloqueia o grant.
- * Como não há cupom/desconto e o valor é server-fixed, < 50% só pode ser bug/fraude.
- */
-function assessPaymentAmount(
-  paidCents: number,
-  expectedCents: number | null | undefined,
-  paidCurrency: string,
-  expectedCurrency: string | null | undefined,
-): { block: boolean; mismatch: boolean; detail: string } {
-  const expected = Number(expectedCents || 0)
-  if (!Number.isFinite(expected) || expected <= 0) {
-    return { block: false, mismatch: false, detail: 'no_reference_price' }
-  }
-  const paid = Number.isFinite(paidCents) ? paidCents : 0
-  const curExpected = String(expectedCurrency || '').trim().toUpperCase()
-  const currencyOk = !curExpected || String(paidCurrency || '').toUpperCase() === curExpected
-  const ratio = expected > 0 ? paid / expected : 1
-  const block = !currencyOk || ratio < 0.5
-  const mismatch = !currencyOk || Math.abs(paid - expected) > 2
-  const detail = `paid=${paid} expected=${expected} paidCur=${paidCurrency} expCur=${curExpected || 'n/a'} ratio=${ratio.toFixed(3)}`
-  return { block, mismatch, detail }
 }
 
 const BodySchema = z
@@ -339,8 +270,7 @@ export async function POST(req: Request) {
             .eq('provider_payment_id', dataId)
         }
 
-        const revokeStatuses = ['refunded', 'cancelled', 'charged_back', 'chargedback']
-        if (revokeStatuses.includes(status.toLowerCase()) && subscriptionId) {
+        if (isRevokeStatus(status) && subscriptionId) {
           await admin
             .from('student_subscriptions')
             .update({ status: 'cancelled', updated_at: new Date().toISOString() })
@@ -375,8 +305,7 @@ export async function POST(req: Request) {
             .eq('user_id', userId)
         }
 
-        const revokeStatuses = ['refunded', 'cancelled', 'charged_back', 'chargedback']
-        if (revokeStatuses.includes(status.toLowerCase())) {
+        if (isRevokeStatus(status)) {
           await admin
             .from('teachers')
             .update({ plan_tier_key: 'free', plan_status: 'cancelled', plan_valid_until: null })
@@ -485,8 +414,7 @@ export async function POST(req: Request) {
         }
 
         // Fix #3: Revoke VIP on refund/chargeback/cancellation
-        const revokeStatuses = ['refunded', 'cancelled', 'charged_back', 'chargedback']
-        if (revokeStatuses.includes(status.toLowerCase())) {
+        if (isRevokeStatus(status)) {
           // Revoke entitlements
           await admin
             .from('user_entitlements')
