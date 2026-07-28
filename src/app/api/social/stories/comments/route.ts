@@ -39,14 +39,24 @@ export async function GET(req: Request) {
 
     const admin = createAdminClient()
 
-    // Security: verify follow relationship before exposing comments
+    // Security: story viva + follow aceito antes de expor comentários.
+    // A RLS social_story_comments_select já exige NOT is_deleted AND expires_at > now(),
+    // mas aqui usamos admin client (RLS off) — sem repetir a checagem, comentários de
+    // story expirada/apagada continuavam legíveis, e story inexistente caía no
+    // fail-open do `if (authorId && ...)` (auditoria 2026-07-28).
     const { data: story } = await admin
       .from('social_stories')
-      .select('author_id')
+      .select('author_id, expires_at, is_deleted')
       .eq('id', storyId)
       .maybeSingle()
-    const authorId = String(story?.author_id || '').trim()
-    if (authorId && authorId !== auth.user.id) {
+    if (!story) return NextResponse.json({ ok: false, error: 'not_found' }, { status: 404 })
+    if (story.is_deleted) return NextResponse.json({ ok: false, error: 'not_found' }, { status: 404 })
+    if (story.expires_at && new Date(String(story.expires_at)).getTime() <= Date.now()) {
+      return NextResponse.json({ ok: false, error: 'not_found' }, { status: 404 })
+    }
+    const authorId = String(story.author_id || '').trim()
+    if (!authorId) return NextResponse.json({ ok: false, error: 'not_found' }, { status: 404 })
+    if (authorId !== auth.user.id) {
       const { data: follow } = await admin
         .from('social_follows')
         .select('id')
