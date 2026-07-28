@@ -629,6 +629,16 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
             }
             updateWorkoutRestCountdown(0);
             stopAlarm(true);
+            // Cardio/prancha: o botão CONCLUI o exercício com o tempo REAL feito.
+            // Antes caía no caminho do descanso (onStart), que só fechava o
+            // cronômetro — a série não era gravada e o card ficava preso em
+            // "em andamento" até o usuário achar o Parar (dono, jul/2026).
+            if (isExerciseTimer) {
+                const doneSeconds = Math.max(1, Math.round(totalSecondsRef.current - timeLeft));
+                if (typeof onFinish === 'function') onFinish(context);
+                if (typeof context?.onComplete === 'function') context.onComplete(doneSeconds);
+                return;
+            }
             if (typeof onStart === 'function') onStart(context);
             else if (typeof onFinish === 'function') onFinish(context);
         } catch {
@@ -781,9 +791,17 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
                                             : 'bg-gradient-to-r from-yellow-500 to-amber-400 shadow-yellow-900/30 hover:shadow-yellow-500/40'
                                 }`}
                             >
-                                {isSideRest ? 'TROCAR LADO ▶' : isTransition ? 'CHEGUEI ✓' : 'START ▶'}
+                                {isSideRest
+                                    ? 'TROCAR LADO ▶'
+                                    : isTransition
+                                        ? 'CHEGUEI ✓'
+                                        : isExerciseTimer
+                                            ? 'CONCLUIR ✓'
+                                            : 'START ▶'}
                             </button>
-                            {!isSideRest && !isTransition && (
+                            {/* AUTO é o auto-start do DESCANSO — não faz sentido em
+                                cardio/prancha, onde o botão conclui o exercício. */}
+                            {!isSideRest && !isTransition && !isExerciseTimer && (
                                 <button
                                     onClick={toggleAuto}
                                     className={`px-3 py-2 rounded-xl text-xs font-black transition-all active:scale-95 border ${

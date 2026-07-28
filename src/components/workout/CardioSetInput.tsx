@@ -1,6 +1,7 @@
 import React, { useState, useRef, useCallback } from 'react'
 import { flushSync } from 'react-dom'
-import { Check, Play, Square } from 'lucide-react'
+import { Check, Play } from 'lucide-react'
+import { RunningTimerCard } from './RunningTimerCard'
 import { useWorkoutContext } from './WorkoutContext'
 import { UnknownRecord } from './types'
 import { parseTrainingNumber } from '@/utils/trainingNumber'
@@ -62,6 +63,7 @@ export const CardioSetInput: React.FC<Props> = ({ ex, exIdx, setIdx, setsCount }
   const [speed, setSpeed] = useState(initialSpeed)
   const [incline, setIncline] = useState(initialIncline)
   const [isRunning, setIsRunning] = useState(false)
+  const [startedAtMs, setStartedAtMs] = useState(0)
   const startedAtRef = useRef<number>(0)
   // Trava anti-duplo-toque (~400ms), igual aos sets normais/plank.
   const lastToggleRef = useRef<number>(0)
@@ -128,14 +130,20 @@ export const CardioSetInput: React.FC<Props> = ({ ex, exIdx, setIdx, setsCount }
     if (!canStart) return
     lastToggleRef.current = Date.now()
     startedAtRef.current = Date.now()
+    setStartedAtMs(startedAtRef.current)
     setIsRunning(true)
 
     startTimer(targetSeconds, {
       kind: 'cardio',
       key,
       exerciseName: name,
-      onComplete: () => {
-        commitLog(targetSeconds)
+      // `finalDurationSeconds` chega quando o usuário encerra pela barra do
+      // cronômetro antes da meta — grava o tempo REAL, não o planejado.
+      onComplete: (finalDurationSeconds?: number) => {
+        const done = Number.isFinite(finalDurationSeconds) && Number(finalDurationSeconds) > 0
+          ? Math.round(Number(finalDurationSeconds))
+          : targetSeconds
+        commitLog(done)
         setIsRunning(false)
       },
     })
@@ -174,19 +182,13 @@ export const CardioSetInput: React.FC<Props> = ({ ex, exIdx, setIdx, setsCount }
 
   if (isRunning) {
     return (
-      <div className="rounded-xl border px-3 py-2.5 bg-neutral-900/50 border-neutral-800/80">
-        <div className="flex items-center justify-between">
-          <span className="text-sm text-neutral-300">Série {setIdx + 1} • Cardio em andamento</span>
-          <button
-            type="button"
-            onClick={handleStop}
-            className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-red-500/90 text-white text-xs font-black"
-          >
-            <Square size={14} />
-            Parar
-          </button>
-        </div>
-      </div>
+      <RunningTimerCard
+        setIdx={setIdx}
+        label="Cardio"
+        startedAtMs={startedAtMs}
+        targetSeconds={targetSeconds}
+        onStop={handleStop}
+      />
     )
   }
 
