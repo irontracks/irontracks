@@ -48,14 +48,14 @@ Comandos de re-varredura ficam no fim do arquivo.
 
 ### APIs: 67 de 246 rotas (27%) sem menção
 
-| Área | Sem cobertura | Rotas mais sensíveis |
+| Área | Situação | Rotas mais sensíveis |
 |---|---|---|
-| admin | 15 / 46 | `workouts/delete-any`, `workouts/delete`, `vip/revoke` |
-| cron | 6 / 16 | ~~`teacher-plan-suspend`~~ ✅, `teacher-plan-expiring`, `purge-soft-delete-bin`, `admin-vip-expiring`, `whatsapp-reactivation`, `clean-live-activity-tokens` |
-| professor / marketplace / aluno | 9 / 30 | `teachers/checkout`, `checkout-recurring`, `cancel-recurring`, `student/charge` |
-| pagamento | 2 | ~~`marketplace/webhooks/asaas`~~ ✅, `billing/webhooks/mercadopago` |
-| privacidade | 2 | `account/delete`, `account/export` |
-| descanso / push | 5 | `rest/fire`, `rest/schedule-push`, `rest/cancel-push`, `push/register` |
+| admin | ✅ guard de classe nas 46 + comportamento nas 2 destrutivas | `workouts/delete-any`, `vip/revoke` cobertas; `workouts/delete` e `students/delete` só pelo guard de classe |
+| cron | ✅ guard de classe nos 16 + comportamento em 4 | falta comportamento de `admin-vip-expiring` e `whatsapp-reactivation` |
+| professor / marketplace / aluno | parcial | ✅ `teachers/checkout`; faltam `checkout-recurring`, `cancel-recurring`, `student/charge` |
+| pagamento | ✅ os 3 gateways cobertos | RevenueCat, Asaas e Mercado Pago |
+| privacidade | ❌ 2 | `account/delete`, `account/export` |
+| descanso / push | ❌ 5 | `rest/fire`, `rest/schedule-push`, `rest/cancel-push`, `push/register` |
 
 Lista completa: reproduzível pelo script no fim do arquivo.
 
@@ -85,8 +85,27 @@ temáticos — a busca por URL não as detecta.
 | **`cron/teacher-plan-suspend`** | `.../teacher-plan-suspend/__tests__/teacherPlanSuspend.test.ts` — carência de 3 dias, filtro de plano pago/ativo, idempotência, sem notificação quando o UPDATE falha | 10 |
 | **`marketplace/webhooks/asaas`** | `.../asaas/__tests__/asaasWebhook.test.ts` — fail-closed sem segredo, 401/429, dedup por `23505`, evento sem id, mapeamento status→assinatura, estorno/chargeback nunca ativam | 19 |
 
-Os três foram provados vermelhos com o defeito presente antes de entrar
-(cron sem auth; `GRACE_DAYS = 0`; `REFUNDED → active`).
+| **`billing/webhooks/mercadopago`** | `utils/billing/__tests__/mercadopagoWebhookRules.test.ts` + `.../mercadopago/__tests__/mercadopagoWebhook.test.ts` — regras puras (HMAC, replay, valor pago) extraídas para módulo testável; handler cobre 500/400/401, grant, revogação e bloqueio por valor | 52 |
+| **`teachers/checkout`** | `.../teachers/checkout/__tests__/teacherCheckout.test.ts` — 401/429/404/400/409, valor sempre do banco, elo com o webhook, 502 sem fatura fantasma | 15 |
+| **Todas as 46 rotas de admin** | `src/app/api/admin/__tests__/adminDestructiveGuards.test.ts` — service-role exige papel, client de usuário exige sessão, destrutiva autoriza antes de tocar dados; comportamento de `workouts/delete-any` e `vip/revoke` | 63 |
+| **`external_reference`** | `utils/billing/__tests__/externalReference.test.ts` + `externalReferenceSourceGuard.test.ts` — ida e volta entre checkout e webhook, e ninguém monta/lê a string à mão | 13 |
+| **4 crons** (`clean-live-activity-tokens`, `purge-soft-delete-bin`, `teacher-plan-expiring`, + suspend) | `src/app/api/cron/__tests__/cronBehaviour.test.ts` — cortes de data e janelas de aviso | 14 |
+
+Todos provados vermelhos com o defeito presente antes de entrar (cron sem auth;
+`GRACE_DAYS = 0`; `REFUNDED → active`; guard de valor neutralizado; `confirm`
+ignorado; corte de 24h reduzido; janela de 1 dia estreitada).
+
+### Bugs encontrados e corrigidos no caminho
+
+1. **Assinatura de aluno nunca ativava após pagamento aprovado.** O checkout
+   escrevia `student_plan:professor:plano:aluno:assinatura` e o webhook lia a
+   assinatura da posição 3 — o ID do aluno. `.eq('id', <aluno>)` não casa com
+   nada: cobrança marcada como paga, assinatura pendente. Zero impacto em
+   produção (0 assinaturas, 0 cobranças no banco). Corrigido na raiz: builder e
+   parser compartilhados + guard de ida e volta.
+2. **`admin/workouts/delete-any` exigia justificativa e a descartava.** Apagar
+   treino de terceiro em cascata não deixava trilha, enquanto `vip/revoke` já
+   gravava. Agora grava `audit_events` com autor, dono, motivo e contagem.
 
 ---
 
