@@ -45,9 +45,14 @@ export default function WorkoutHeader() {
   return (
     <>
       <div
-        className="bg-neutral-950 border-b border-neutral-800 px-4 md:px-6 flex-shrink-0 relative"
-        style={{ paddingTop: 'max(calc(env(safe-area-inset-top) - 48px), 4px)' }}
+        className="bg-neutral-950/80 backdrop-blur-xl border-b border-white/[0.06] px-4 md:px-6 pb-2 flex-shrink-0 relative"
+        style={{ paddingTop: 'max(calc(env(safe-area-inset-top) - 48px), 6px)' }}
       >
+        {/* Halo dourado no topo — profundidade sem peso visual */}
+        <div
+          className="pointer-events-none absolute inset-x-0 top-0 h-px"
+          style={{ background: 'linear-gradient(90deg, transparent, rgba(251,191,36,0.25), transparent)' }}
+        />
         <div className="max-w-6xl mx-auto flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <BackButton onClick={exitOnBack} className="!py-0.5" />
@@ -59,7 +64,7 @@ export default function WorkoutHeader() {
               <button
                 type="button"
                 onClick={() => openFullEditor?.()}
-                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-yellow-500 text-black hover:bg-yellow-400 transition-colors active:scale-95 whitespace-nowrap"
+                className="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl bg-yellow-500/10 border border-yellow-500/25 text-yellow-400 hover:bg-yellow-500/20 hover:border-yellow-500/40 transition-colors active:scale-95 whitespace-nowrap"
                 title="Editar treino (exercícios, cardio, ordem)"
               >
                 <Plus size={16} />
@@ -101,7 +106,7 @@ export default function WorkoutHeader() {
 
           <div className="min-w-0 flex-1">
             <div className="flex items-center justify-end gap-2">
-              <div className="font-black text-white truncate">{String(workout?.title || 'Treino')}</div>
+              <div className="font-black text-white truncate tracking-tight">{String(workout?.title || 'Treino')}</div>
               <HeartRateMonitor />
             </div>
             <div className="text-xs text-neutral-400 flex items-center justify-end gap-2 mt-0.5">
@@ -133,13 +138,18 @@ export default function WorkoutHeader() {
                   </div>
                 );
               })()}
-              {totalSets > 0 && (
-                <span className="font-mono text-neutral-500">
-                  {completedSets}/{totalSets}
-                </span>
-              )}
-              <Clock size={14} className="text-yellow-500" />
-              <span className="font-mono text-yellow-500">{formatElapsed(elapsedSeconds)}</span>
+              <span className="inline-flex items-center gap-2 rounded-full bg-white/[0.04] border border-white/[0.07] px-2.5 py-1">
+                {totalSets > 0 && (
+                  <>
+                    <span className="font-mono tabular-nums text-neutral-400">
+                      {completedSets}<span className="text-neutral-600">/{totalSets}</span>
+                    </span>
+                    <span className="h-3 w-px bg-white/10" />
+                  </>
+                )}
+                <Clock size={13} className="text-yellow-500/80" />
+                <span className="font-mono tabular-nums text-yellow-400">{formatElapsed(elapsedSeconds)}</span>
+              </span>
             </div>
           </div>
         </div>

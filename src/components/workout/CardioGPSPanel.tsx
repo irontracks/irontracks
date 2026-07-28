@@ -742,10 +742,12 @@ export default function CardioGPSPanel({
   // ── Accordion mode (inside a workout) ─────────────────────────────────────
   return (
     <div
-      className="mx-4 rounded-2xl border overflow-hidden"
+      className="mx-4 mt-3 rounded-2xl border overflow-hidden"
       style={{
-        background: 'linear-gradient(135deg, rgba(15,15,15,0.98) 0%, rgba(10,20,15,0.98) 100%)',
-        borderColor: isTracking ? 'rgba(34,197,94,0.3)' : 'rgba(255,255,255,0.08)',
+        background: isTracking
+          ? 'linear-gradient(135deg, rgba(18,26,21,0.98) 0%, rgba(10,20,15,0.98) 100%)'
+          : 'rgba(255,255,255,0.03)',
+        borderColor: isTracking ? 'rgba(34,197,94,0.28)' : 'rgba(255,255,255,0.06)',
       }}
     >
       <button
@@ -753,11 +755,19 @@ export default function CardioGPSPanel({
         onClick={() => setIsOpen((v) => !v)}
         aria-expanded={isOpen}
         aria-label={isOpen ? 'Recolher painel de cardio' : 'Expandir painel de cardio'}
-        className="w-full min-h-[44px] flex items-center justify-between px-4 py-3 text-left"
+        className="w-full min-h-[44px] flex items-center justify-between px-3.5 py-3 text-left"
       >
-        <div className="flex items-center gap-2">
-          <span className="text-base">🏃</span>
-          <span className="text-sm font-bold text-white">Cardio</span>
+        <div className="flex items-center gap-3">
+          <span
+            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border text-[15px]"
+            style={{
+              borderColor: isTracking ? 'rgba(34,197,94,0.25)' : 'rgba(255,255,255,0.06)',
+              background: isTracking ? 'rgba(34,197,94,0.12)' : 'rgba(255,255,255,0.04)',
+            }}
+          >
+            🏃
+          </span>
+          <span className="text-[11px] font-black uppercase tracking-[0.18em] text-white/90">Cardio</span>
           {isTracking && (
             <div className="flex items-center gap-1.5">
               <span

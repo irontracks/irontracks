@@ -137,27 +137,39 @@ export default function ActiveWorkout(props: ActiveWorkoutProps & { controlledBy
               type="button"
               onClick={() => props.onToggleAutoLoad?.(!Boolean(props.settings?.autoLoad))}
               aria-pressed={Boolean(props.settings?.autoLoad)}
+              aria-label="Carga automática"
               className={[
-                'w-full flex items-center justify-between gap-3 px-4 py-2.5 border-b transition-colors',
-                props.settings?.autoLoad ? 'bg-violet-500/10 border-violet-500/30' : 'bg-neutral-900 border-neutral-800',
+                'mx-4 mt-3 w-[calc(100%-2rem)] rounded-2xl border px-3.5 py-3 flex items-center justify-between gap-3 transition-colors',
+                props.settings?.autoLoad
+                  ? 'border-violet-400/20 bg-violet-500/[0.07]'
+                  : 'border-white/[0.06] bg-white/[0.03]',
               ].join(' ')}
             >
-              <span className="flex items-center gap-2 min-w-0">
-                <Brain size={16} className={props.settings?.autoLoad ? 'text-violet-300' : 'text-neutral-400'} />
+              <span className="flex items-center gap-3 min-w-0">
+                <span className={[
+                  'flex h-8 w-8 shrink-0 items-center justify-center rounded-xl border transition-colors',
+                  props.settings?.autoLoad
+                    ? 'border-violet-400/25 bg-violet-500/15 text-violet-200'
+                    : 'border-white/[0.06] bg-white/[0.04] text-neutral-500',
+                ].join(' ')}>
+                  <Brain size={15} />
+                </span>
                 <span className="text-left min-w-0">
-                  <span className="block text-xs font-black uppercase tracking-widest text-white">Carga automática</span>
-                  <span className="block text-[10px] text-neutral-400 truncate">
-                    {props.settings?.autoLoad ? 'Ligada — o motor sugere seus pesos' : 'Desligada — pesos manuais'}
+                  <span className="block text-[11px] font-black uppercase tracking-[0.18em] text-white/90">Carga automática</span>
+                  <span className="block text-[11px] text-neutral-500 truncate mt-0.5">
+                    {props.settings?.autoLoad ? 'O motor sugere seus pesos' : 'Pesos manuais'}
                   </span>
                 </span>
               </span>
               <span className={[
-                'relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors',
-                props.settings?.autoLoad ? 'bg-violet-500' : 'bg-neutral-700',
+                'relative inline-flex h-[26px] w-[46px] shrink-0 items-center rounded-full border transition-colors',
+                props.settings?.autoLoad
+                  ? 'bg-violet-500 border-violet-400/40 shadow-[0_0_12px_rgba(139,92,246,0.35)]'
+                  : 'bg-neutral-800 border-white/[0.08]',
               ].join(' ')}>
                 <span className={[
-                  'inline-block h-5 w-5 transform rounded-full bg-white transition-transform',
-                  props.settings?.autoLoad ? 'translate-x-5' : 'translate-x-0.5',
+                  'inline-block h-[20px] w-[20px] transform rounded-full bg-white shadow-sm transition-transform duration-200',
+                  props.settings?.autoLoad ? 'translate-x-[23px]' : 'translate-x-[3px]',
                 ].join(' ')} />
               </span>
             </button>
