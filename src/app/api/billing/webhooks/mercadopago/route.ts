@@ -7,6 +7,7 @@ import {
   addInterval,
   assessPaymentAmount,
   isRevokeStatus,
+  parseExternalReference,
 } from '@/utils/billing/mercadopagoWebhookRules'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { mercadopagoRequest } from '@/lib/mercadopago'
@@ -210,8 +211,18 @@ export async function POST(req: Request) {
         path: `/v1/payments/${encodeURIComponent(dataId)}`,
       })
 
-      const externalRef = String(payment?.external_reference || '').trim()
-      const [scope, userId, planId] = externalRef.split(':')
+      // Ler por posição aqui já custou caro: o fluxo do aluno pegava a
+      // assinatura da posição errada. O parser vive junto do builder usado
+      // pelos checkouts, com teste de ida e volta.
+      const parsedRef = parseExternalReference(payment?.external_reference)
+      const scope = parsedRef.scope
+      const userId = parsedRef.scope === 'student_plan'
+        ? parsedRef.teacherUserId
+        : parsedRef.scope === 'unknown' ? '' : parsedRef.userId
+      const planId = parsedRef.scope === 'teacher_plan'
+        ? parsedRef.tierKey
+        : parsedRef.scope === 'student_plan' ? parsedRef.planId
+        : parsedRef.scope === 'vip' ? parsedRef.planId : ''
       const amount = Number(payment?.transaction_amount || 0)
       const amountCents = Math.round((Number.isFinite(amount) ? amount : 0) * 100)
       const currency = String(payment?.currency_id || 'BRL').trim().toUpperCase()
@@ -222,7 +233,7 @@ export async function POST(req: Request) {
       // ── student_plan: activate student subscription ───────────────────────────
       // external_reference format: student_plan:teacherUserId:planId:studentUserId:subscriptionId
       if (scope === 'student_plan' && userId) {
-        const [, , , subscriptionId] = externalRef.split(':')
+        const subscriptionId = parsedRef.scope === 'student_plan' ? parsedRef.subscriptionId : ''
 
         if (status.toLowerCase() === 'approved' && subscriptionId) {
           const now = new Date()

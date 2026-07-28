@@ -3,6 +3,7 @@ import { z } from 'zod'
 import { createClient } from '@/utils/supabase/server'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { mercadopagoRequest } from '@/lib/mercadopago'
+import { buildTeacherPlanReference } from '@/utils/billing/mercadopagoWebhookRules'
 import { parseJsonBody } from '@/utils/zod'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
@@ -96,7 +97,7 @@ export async function POST(req: Request) {
         description: `IronTracks — Plano ${plan.name}`,
         payment_method_id: 'pix',
         // scope:teacher_plan lets the webhook identify and process this payment
-        external_reference: `teacher_plan:${user.id}:${planId}`,
+        external_reference: buildTeacherPlanReference(user.id, planId),
         notification_url: `${baseUrl}/api/billing/webhooks/mercadopago`,
         payer: {
           email: user.email || undefined,

@@ -45,37 +45,68 @@ function sign(dataId = DATA_ID, requestId = REQ_ID, atMs = Date.now()) {
   return `ts=${ts},v1=${v1}`
 }
 
-type Captures = {
-  writes: Array<{ table: string; op: 'update' | 'upsert' | 'insert'; payload: Record<string, unknown> }>
+type Write = {
+  table: string
+  op: 'update' | 'upsert' | 'insert'
+  payload: Record<string, unknown>
+  /** Filtros aplicados no `.eq()` — é onde mora o alvo do UPDATE. */
+  filters: Record<string, unknown>
 }
+type Captures = { writes: Array<Write> }
 
+/**
+ * Mock encadeável que RESPEITA os filtros `.eq()`.
+ *
+ * Versão anterior deste mock devolvia a linha configurada em qualquer leitura,
+ * ignorando o `.eq('id', ...)`. Com isso o teste do bug da external_reference
+ * passava tanto com o código quebrado quanto com o corrigido — guard falso. Uma
+ * leitura por id só devolve dado quando o id BATE, e todo write registra o
+ * filtro usado, para o teste poder afirmar em QUEM se escreveu.
+ */
 function makeAdmin(rows: Record<string, unknown> = {}) {
   const captures: Captures = { writes: [] }
 
   const from = vi.fn((table: string) => {
+    const filters: Record<string, unknown> = {}
     const chain: Record<string, unknown> = {}
     const self = () => chain
 
+    const matches = (row: Record<string, unknown> | null): boolean => {
+      if (!row) return false
+      for (const [col, val] of Object.entries(filters)) {
+        if (col in row && row[col] !== val) return false
+      }
+      return true
+    }
+
     chain.select = vi.fn(self)
-    chain.eq = vi.fn(self)
+    chain.eq = vi.fn((col: string, val: unknown) => { filters[col] = val; return chain })
+    chain.filter = vi.fn(self)
     chain.in = vi.fn(self)
     chain.order = vi.fn(self)
     chain.limit = vi.fn(self)
-    chain.maybeSingle = vi.fn(async () => ({ data: (rows[table] as Record<string, unknown>) ?? null, error: null }))
-    chain.single = vi.fn(async () => ({ data: (rows[table] as Record<string, unknown>) ?? null, error: null }))
+    chain.maybeSingle = vi.fn(async () => {
+      const row = (rows[table] as Record<string, unknown>) ?? null
+      return { data: matches(row) ? row : null, error: null }
+    })
+    chain.single = vi.fn(async () => {
+      const row = (rows[table] as Record<string, unknown>) ?? null
+      return { data: matches(row) ? row : null, error: null }
+    })
 
     chain.insert = vi.fn(async (payload: Record<string, unknown>) => {
-      captures.writes.push({ table, op: 'insert', payload })
+      captures.writes.push({ table, op: 'insert', payload, filters: { ...filters } })
       return { error: null }
     })
     chain.upsert = vi.fn(async (payload: Record<string, unknown>) => {
-      captures.writes.push({ table, op: 'upsert', payload })
+      captures.writes.push({ table, op: 'upsert', payload, filters: { ...filters } })
       return { error: null }
     })
     chain.update = vi.fn((payload: Record<string, unknown>) => {
-      captures.writes.push({ table, op: 'update', payload })
+      const write: Write = { table, op: 'update', payload, filters: {} }
+      captures.writes.push(write)
       const term: Record<string, unknown> = {}
-      term.eq = vi.fn(() => term)
+      term.eq = vi.fn((col: string, val: unknown) => { write.filters[col] = val; return term })
       term.in = vi.fn(() => term)
       term.select = vi.fn(() => term)
       term.maybeSingle = vi.fn(async () => ({ data: null, error: null }))
@@ -255,6 +286,87 @@ describe('webhook MP — VIP por pagamento', () => {
     expect(ent?.payload).toMatchObject({ status: 'revoked' })
     const sub = writesTo(captures, 'app_subscriptions').find((w) => w.payload.status === 'cancelled')
     expect(sub).toBeTruthy()
+  })
+})
+
+describe('webhook MP — mensalidade do aluno', () => {
+  beforeEach(() => { vi.clearAllMocks() })
+
+  // Regressão: o webhook lia o subscriptionId da posição errada da
+  // external_reference (pegava o ID do aluno). O pagamento era aprovado, a
+  // cobrança marcada como paga, e a assinatura do aluno seguia pendente.
+  const REF = 'student_plan:prof-1:plano-1:aluno-1:assinatura-1'
+
+  it('ativa a ASSINATURA cobrada, não o registro do aluno', async () => {
+    const { client, captures } = makeAdmin({
+      student_subscriptions: { id: 'assinatura-1', plan_id: 'plano-1', student_service_plans: { duration_days: 30, price_cents: 9990 } },
+    })
+    vi.mocked(createAdminClient).mockReturnValue(client)
+    vi.mocked(mercadopagoRequest).mockResolvedValue(mpPayment({ external_reference: REF }))
+
+    await POST(post(paymentEvent))
+
+    const sub = writesTo(captures, 'student_subscriptions').find((w) => w.op === 'update')
+    expect(sub?.payload).toMatchObject({ status: 'active' })
+    expect(sub?.payload.expires_at).toBeTruthy()
+    // O alvo do UPDATE é a assinatura (posição 4), nunca o aluno (posição 3).
+    expect(sub?.filters.id).toBe('assinatura-1')
+  })
+
+  it('usa a duração do plano da assinatura cobrada', async () => {
+    // Só encontra o plano se a leitura foi feita com o id certo — com o id
+    // errado a assinatura não é achada e a duração cai no default de 30 dias.
+    const { client, captures } = makeAdmin({
+      student_subscriptions: { id: 'assinatura-1', plan_id: 'plano-1', student_service_plans: { duration_days: 90, price_cents: 9990 } },
+    })
+    vi.mocked(createAdminClient).mockReturnValue(client)
+    vi.mocked(mercadopagoRequest).mockResolvedValue(mpPayment({ external_reference: REF }))
+
+    await POST(post(paymentEvent))
+
+    const sub = writesTo(captures, 'student_subscriptions').find((w) => w.op === 'update')
+    const expires = new Date(String(sub?.payload.expires_at)).getTime()
+    const days = Math.round((expires - Date.now()) / (24 * 60 * 60 * 1000))
+    expect(days).toBe(90)
+  })
+
+  it('marca a cobrança como paga', async () => {
+    const { client, captures } = makeAdmin({
+      student_subscriptions: { id: 'assinatura-1', plan_id: 'plano-1', student_service_plans: { duration_days: 30, price_cents: 9990 } },
+    })
+    vi.mocked(createAdminClient).mockReturnValue(client)
+    vi.mocked(mercadopagoRequest).mockResolvedValue(mpPayment({ external_reference: REF }))
+
+    await POST(post(paymentEvent))
+
+    const charge = writesTo(captures, 'student_charges').find((w) => w.op === 'update')
+    expect(charge?.payload).toMatchObject({ status: 'approved' })
+  })
+
+  it('estorno cancela a assinatura do aluno', async () => {
+    const { client, captures } = makeAdmin({
+      student_subscriptions: { id: 'assinatura-1', plan_id: 'plano-1', student_service_plans: { duration_days: 30, price_cents: 9990 } },
+    })
+    vi.mocked(createAdminClient).mockReturnValue(client)
+    vi.mocked(mercadopagoRequest).mockResolvedValue(mpPayment({ external_reference: REF, status: 'refunded' }))
+
+    await POST(post(paymentEvent))
+
+    const sub = writesTo(captures, 'student_subscriptions').find((w) => w.payload.status === 'cancelled')
+    expect(sub).toBeTruthy()
+  })
+
+  it('valor abaixo da metade da mensalidade bloqueia a ativação', async () => {
+    const { client, captures } = makeAdmin({
+      student_subscriptions: { id: 'assinatura-1', plan_id: 'plano-1', student_service_plans: { duration_days: 30, price_cents: 9990 } },
+    })
+    vi.mocked(createAdminClient).mockReturnValue(client)
+    vi.mocked(mercadopagoRequest).mockResolvedValue(mpPayment({ external_reference: REF, transaction_amount: 5 }))
+
+    const body = await (await POST(post(paymentEvent))).json()
+
+    expect(body).toMatchObject({ skipped: 'amount_mismatch' })
+    expect(writesTo(captures, 'student_subscriptions').filter((w) => w.op === 'update')).toHaveLength(0)
   })
 })
 

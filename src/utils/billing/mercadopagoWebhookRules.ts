@@ -68,6 +68,67 @@ export function addInterval(start: Date, interval: string): Date {
   return d
 }
 
+/**
+ * ── external_reference ────────────────────────────────────────────────────────
+ *
+ * É o único elo entre quem cria a cobrança (as rotas de checkout) e quem
+ * concede o acesso (o webhook): uma string com campos separados por `:`. Estava
+ * montada à mão numa ponta e desestruturada por posição na outra — e as duas
+ * pontas divergiram em silêncio no fluxo `student_plan`: o checkout escreve
+ * `student_plan:professor:plano:aluno:assinatura` (5 campos) e o webhook lia a
+ * assinatura da posição 3, que é o ID do ALUNO. Resultado: pagamento aprovado
+ * não ativava assinatura nenhuma (`.eq('id', <id do aluno>)` não casa com nada).
+ *
+ * Nunca chegou a queimar ninguém — o fluxo ainda não tinha uso em produção.
+ * Agora as duas pontas usam estas funções, e o teste de ida-e-volta prova que
+ * elas concordam. Não monte nem leia essa string à mão.
+ */
+export type ExternalReference =
+  | { scope: 'vip'; userId: string; planId: string }
+  | { scope: 'teacher_plan'; userId: string; tierKey: string }
+  | { scope: 'student_plan'; teacherUserId: string; planId: string; studentUserId: string; subscriptionId: string }
+  | { scope: 'unknown'; raw: string }
+
+export function buildVipReference(userId: string, planId: string): string {
+  return `vip:${userId}:${planId}`
+}
+
+export function buildTeacherPlanReference(userId: string, tierKey: string): string {
+  return `teacher_plan:${userId}:${tierKey}`
+}
+
+export function buildStudentPlanReference(input: {
+  teacherUserId: string
+  planId: string
+  studentUserId: string
+  subscriptionId: string
+}): string {
+  return `student_plan:${input.teacherUserId}:${input.planId}:${input.studentUserId}:${input.subscriptionId}`
+}
+
+export function parseExternalReference(raw: unknown): ExternalReference {
+  const s = String(raw ?? '').trim()
+  const parts = s.split(':')
+  const scope = parts[0] || ''
+
+  if (scope === 'vip' && parts[1]) {
+    return { scope: 'vip', userId: parts[1], planId: parts[2] || '' }
+  }
+  if (scope === 'teacher_plan' && parts[1]) {
+    return { scope: 'teacher_plan', userId: parts[1], tierKey: parts[2] || '' }
+  }
+  if (scope === 'student_plan' && parts[1]) {
+    return {
+      scope: 'student_plan',
+      teacherUserId: parts[1],
+      planId: parts[2] || '',
+      studentUserId: parts[3] || '',
+      subscriptionId: parts[4] || '',
+    }
+  }
+  return { scope: 'unknown', raw: s }
+}
+
 /** Status do MP que revogam acesso já concedido. */
 export const REVOKE_STATUSES = ['refunded', 'cancelled', 'charged_back', 'chargedback']
 

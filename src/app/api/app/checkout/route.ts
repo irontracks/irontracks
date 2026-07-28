@@ -4,6 +4,7 @@ import { createClient } from '@/utils/supabase/server'
 // NEEDS ADMIN: RLS bypass required for cross-user data operations
 import { createAdminClient } from '@/utils/supabase/admin'
 import { mercadopagoRequest } from '@/lib/mercadopago'
+import { buildVipReference } from '@/utils/billing/mercadopagoWebhookRules'
 import { parseJsonBody } from '@/utils/zod'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { respondDbError } from '@/utils/api/dbError'
@@ -158,7 +159,7 @@ export async function POST(req: Request) {
         transaction_amount: amount,
         description: plan.name,
         payment_method_id: 'pix',
-        external_reference: `vip:${user.id}:${plan.id}`,
+        external_reference: buildVipReference(user.id, String(plan.id)),
         notification_url: `${baseUrl}/api/billing/webhooks/mercadopago`,
         payer: {
           email: user.email || undefined,
