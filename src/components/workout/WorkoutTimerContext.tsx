@@ -5,9 +5,20 @@ import { useWorkoutTicker } from './hooks/useWorkoutTicker'
 import { formatElapsed, computeRecoveryPauseMs } from './utils'
 
 // Gap de background/suspensão acima disto é tratado como PAUSA (não é treino):
-// app esquecido aberto, tela bloqueada por muito tempo, ou morto e restaurado.
-// Abaixo disto (ex.: tela bloqueada no meio de uma série) continua contando.
-const LONG_GAP_MS = 2 * 60 * 1000
+// app esquecido aberto ou morto e restaurado horas depois.
+//
+// Já foi 2 min — e isso ERRAVA o tempo para baixo em todo treino real: o
+// descanso faz parte da sessão, e descansar 3 min com o celular no bolso (tela
+// bloqueada) caía na regra e era descontado. O dono flagrou pelos prints de
+// jul/2026: a Ilha Dinâmica marcava ~43 min enquanto o app marcava 35:56 na
+// mesma sessão — os 7 min de diferença eram exatamente os descansos com a tela
+// apagada. A Live Activity conta tempo de parede puro e estava certa.
+//
+// 20 min: nenhum descanso legítimo chega perto disso, e o caso que a regra
+// existe para pegar ("esqueci o treino aberto", restaurar no dia seguinte)
+// passa longe. Mexer aqui muda o tempo gravado no histórico — ver guard em
+// `__tests__/workoutElapsedPause.test.tsx`.
+export const LONG_GAP_MS = 20 * 60 * 1000
 
 export interface WorkoutTimerValue {
   ticker: number
