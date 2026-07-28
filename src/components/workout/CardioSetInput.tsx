@@ -1,6 +1,7 @@
 import React, { useState, useRef, useCallback } from 'react'
 import { flushSync } from 'react-dom'
-import { Check, Play } from 'lucide-react'
+import { Check, Play, Satellite } from 'lucide-react'
+import { isIndoorCardioName } from '@/utils/cardio/outdoorCardio'
 import { RunningTimerCard } from './RunningTimerCard'
 import { useWorkoutContext } from './WorkoutContext'
 import { UnknownRecord } from './types'
@@ -27,7 +28,7 @@ const TREADMILL_REGEX = /\b(esteira|treadmill)\b/i
  * mecânica do PlankSetInput (mesmo timer/Live Activity, só que kind: 'cardio').
  */
 export const CardioSetInput: React.FC<Props> = ({ ex, exIdx, setIdx, setsCount }) => {
-  const { getLog, updateLog, startTimer, getPlannedSet, setCollapsed } = useWorkoutContext()
+  const { getLog, updateLog, startTimer, getPlannedSet, setCollapsed, openCardioGps } = useWorkoutContext()
 
   const restTime = parseTrainingNumber(ex?.restTime ?? (ex as Record<string, unknown>)?.rest_time) ?? 0
   const name = String(ex?.name ?? '').trim()
@@ -199,6 +200,8 @@ export const CardioSetInput: React.FC<Props> = ({ ex, exIdx, setIdx, setsCount }
     ? 'flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center font-black text-[11px] bg-emerald-500 text-black'
     : 'flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center font-black text-[11px] bg-yellow-500 text-black'
   const gridCols = isTreadmill ? 'grid-cols-3' : 'grid-cols-2'
+  // `openCardioGps` só vem do contexto quando o painel de GPS não está visível.
+  const showGpsShortcut = Boolean(openCardioGps) && setIdx === 0 && !isIndoorCardioName(name)
 
   return (
     <div className={containerClass}>
@@ -285,6 +288,18 @@ export const CardioSetInput: React.FC<Props> = ({ ex, exIdx, setIdx, setsCount }
           >
             Concluir sem cronômetro
           </button>
+          {/* Porta de entrada do GPS quando o painel não está no topo. Só na
+              primeira série (não repetir 4×) e nunca em máquina parada. */}
+          {showGpsShortcut && (
+            <button
+              type="button"
+              onClick={() => openCardioGps?.()}
+              className="w-full inline-flex items-center justify-center gap-1.5 text-[12px] font-bold text-emerald-400/90 py-1 active:scale-95 transition-transform"
+            >
+              <Satellite size={13} />
+              Rastrear percurso com GPS
+            </button>
+          )}
         </div>
       )}
     </div>

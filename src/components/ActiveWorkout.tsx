@@ -15,6 +15,7 @@ import WorkoutFooter from './workout/WorkoutFooter';
 import Modals from './workout/Modals';
 import { ActiveWorkoutProps } from './workout/types';
 import { logError } from '@/lib/logger';
+import { hasOutdoorCardio, shouldShowCardioPanel } from '@/utils/cardio/outdoorCardio';
 import dynamic from 'next/dynamic';
 const CardioGPSPanel = dynamic(() => import('@/components/workout/CardioGPSPanel'), { ssr: false });
 
@@ -73,6 +74,49 @@ export default function ActiveWorkout(props: ActiveWorkoutProps & { controlledBy
     ?? 0,
   ) || 0;
 
+  // ── Painel de cardio com GPS: só ocupa o topo quando é relevante ──
+  //
+  // Ele vivia fixo acima do exercício 01 em TODO treino — inclusive num treino
+  // de peito, onde ninguém corre. Agora nasce só quando há corrida em andamento
+  // (ou recuperada de um app morto no meio, que não pode ficar sem porta de
+  // entrada) ou quando o treino tem cardio ao ar livre. Fora isso, chega por
+  // ação explícita: botão no card de cardio e item no menu do header.
+  const cardioUserId = String(props.settings?.userId ?? props.session?.userId ?? '') || null;
+  const [cardioGpsOpened, setCardioGpsOpened] = React.useState(false);
+  const [hasRecoveredCardio, setHasRecoveredCardio] = React.useState(false);
+
+  React.useEffect(() => {
+    if (!cardioUserId) return;
+    let cancelled = false;
+    void import('@/lib/offline/cardioPersistence')
+      .then(({ recoverActiveCardio }) => recoverActiveCardio(cardioUserId))
+      .then((state) => { if (!cancelled && state) setHasRecoveredCardio(true); })
+      .catch((e) => { logError('ActiveWorkout.recoverCardio', e); });
+    return () => { cancelled = true };
+  }, [cardioUserId]);
+
+  const workoutHasOutdoorCardio = React.useMemo(
+    () => hasOutdoorCardio((exercises ?? []) as ReadonlyArray<unknown>),
+    [exercises],
+  );
+
+  // Uma vez visível, NUNCA desmonta sozinho: o painel é o dono do tracking em
+  // curso — tirá-lo do ar no meio de uma corrida perderia a sessão. Os três
+  // estados só andam de false pra true, então a decisão é monotônica.
+  const showCardioPanel = shouldShowCardioPanel({
+    workoutHasOutdoorCardio,
+    recoveredRun: hasRecoveredCardio,
+    openedManually: cardioGpsOpened,
+  });
+
+  const openCardioGps = React.useCallback(() => {
+    setCardioGpsOpened(true);
+    // Deixa o painel montar antes de rolar até ele.
+    setTimeout(() => {
+      document.querySelector('[data-cardio-gps-panel]')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }, 80);
+  }, []);
+
   // Enhanced context injects _exitOnBack and cancelWorkout (direct, no animation)
   const enhancedController = React.useMemo((): WorkoutContextType => {
     const originalOnFinish = controller.onFinish as ((s: unknown, saved: boolean) => void) | undefined;
@@ -95,9 +139,13 @@ export default function ActiveWorkout(props: ActiveWorkoutProps & { controlledBy
             }, 100);
           }
         : undefined,
+      // Só oferece o atalho enquanto o painel NÃO está na tela — com ele visível,
+      // um botão "abrir cardio GPS" seria exatamente a redundância que saímos
+      // de cima do treino pra eliminar.
+      openCardioGps: showCardioPanel ? undefined : openCardioGps,
       ...(props.onBack ? { _exitOnBack: () => triggerExit(props.onBack!) } : {}),
     };
-  }, [controller, props.onBack, triggerExit]);
+  }, [controller, props.onBack, triggerExit, openCardioGps, showCardioPanel]);
 
 
   if (!session || !workout) {
@@ -197,11 +245,13 @@ export default function ActiveWorkout(props: ActiveWorkoutProps & { controlledBy
             </div>
           )}
 
-          {/* GPS Cardio Tracking Panel */}
-          <CardioGPSPanel
-            workoutId={props.session?.workout?.id}
-            userId={String(props.settings?.userId ?? props.session?.userId ?? '') || null}
-          />
+          {/* GPS Cardio Tracking Panel — condicional, ver showCardioPanel acima */}
+          {showCardioPanel && (
+            <CardioGPSPanel
+              workoutId={props.session?.workout?.id}
+              userId={cardioUserId}
+            />
+          )}
           <ExerciseList />
         </div>
 

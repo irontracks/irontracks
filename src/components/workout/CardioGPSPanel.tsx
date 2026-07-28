@@ -742,6 +742,7 @@ export default function CardioGPSPanel({
   // ── Accordion mode (inside a workout) ─────────────────────────────────────
   return (
     <div
+      data-cardio-gps-panel
       className="mx-4 mt-3 rounded-2xl border overflow-hidden"
       style={{
         background: isTracking

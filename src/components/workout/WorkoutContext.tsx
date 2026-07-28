@@ -8,6 +8,12 @@ export type WorkoutContextType = ReturnType<typeof useActiveWorkoutController>['
   _exitOnBack?: () => void;
   /** Direct cancel — bypasses triggerExit animation to avoid being blocked by stale exitTimerRef */
   cancelWorkout?: () => void;
+  /**
+   * Abre o painel de cardio com GPS. Ele só nasce no topo do treino quando é
+   * relevante (corrida em andamento/recuperada ou cardio outdoor no treino);
+   * nos demais casos chega por aqui — botão no card de cardio e menu do header.
+   */
+  openCardioGps?: () => void;
 };
 
 export type WorkoutLogs = ReturnType<typeof useActiveWorkoutController>['logs'];

@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { Clock, GripVertical, MoreHorizontal, Plus } from 'lucide-react';
+import { Clock, GripVertical, MoreHorizontal, Plus, Satellite } from 'lucide-react';
 import { BackButton } from '@/components/ui/BackButton';
 import { useWorkoutContext } from './WorkoutContext';
 import { useWorkoutTimer } from './WorkoutTimerContext';
@@ -18,6 +18,7 @@ export default function WorkoutHeader() {
     progressPct,
     session,
     _exitOnBack: exitOnBack,
+    openCardioGps,
   } = useWorkoutContext();
   const { ticker, elapsedSeconds, formatElapsed } = useWorkoutTimer();
 
@@ -98,6 +99,18 @@ export default function WorkoutHeader() {
                       <GripVertical size={15} />
                       Organizar
                     </button>
+                    {/* Saída de emergência do cardio GPS — presente só quando o
+                        painel não está no topo (ver openCardioGps no contexto). */}
+                    {openCardioGps && (
+                      <button
+                        type="button"
+                        onClick={() => { openCardioGps(); setOverflowOpen(false); }}
+                        className="w-full flex items-center gap-3 px-4 py-3 text-sm font-black text-left text-emerald-400 hover:bg-neutral-800 transition-colors border-t border-neutral-800"
+                      >
+                        <Satellite size={15} />
+                        Cardio com GPS
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
