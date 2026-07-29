@@ -28,10 +28,24 @@ import {
 
 // ─── LocalStorage ─────────────────────────────────────────────────────────────
 
-export const loadDeloadHistory = (): ReportHistory => {
+/**
+ * Chave por USUÁRIO. As chaves eram constantes globais, então num aparelho
+ * compartilhado (mesma família, mesmo navegador) o histórico de deload e a trilha
+ * de auditoria de uma conta ficavam visíveis para a próxima que logasse. O cache de
+ * histórico de treino ao lado já é escopado exatamente por isso — ver o comentário
+ * em utils.ts sobre o vazamento entre contas corrigido em 2026-07-23.
+ *
+ * Sem `userId` cai na chave legada (não perde o dado de quem já tinha).
+ */
+const scopedKey = (base: string, userId?: string | null): string => {
+    const uid = String(userId ?? '').trim();
+    return uid ? `${base}.${uid}` : base;
+};
+
+export const loadDeloadHistory = (userId?: string | null): ReportHistory => {
     try {
         if (typeof window === 'undefined') return { version: 1, exercises: {} };
-        const raw = window.localStorage.getItem(DELOAD_HISTORY_KEY);
+        const raw = window.localStorage.getItem(scopedKey(DELOAD_HISTORY_KEY, userId));
         if (!raw) return { version: 1, exercises: {} };
         const parsed = safeJsonParse(raw);
         return normalizeReportHistory(parsed);
@@ -40,21 +54,22 @@ export const loadDeloadHistory = (): ReportHistory => {
     }
 };
 
-export const saveDeloadHistory = (next: ReportHistory) => {
+export const saveDeloadHistory = (next: ReportHistory, userId?: string | null) => {
     try {
         if (typeof window === 'undefined') return;
-        window.localStorage.setItem(DELOAD_HISTORY_KEY, JSON.stringify(next));
+        window.localStorage.setItem(scopedKey(DELOAD_HISTORY_KEY, userId), JSON.stringify(next));
     } catch { }
 };
 
-export const appendDeloadAudit = (entry: unknown) => {
+export const appendDeloadAudit = (entry: unknown, userId?: string | null) => {
     try {
         if (typeof window === 'undefined') return;
-        const raw = window.localStorage.getItem(DELOAD_AUDIT_KEY);
+        const key = scopedKey(DELOAD_AUDIT_KEY, userId);
+        const raw = window.localStorage.getItem(key);
         const parsed: unknown = raw ? safeJsonParse(raw) : null;
         const list: unknown[] = Array.isArray(parsed) ? parsed : [];
         const next = [entry, ...list].slice(0, 100);
-        window.localStorage.setItem(DELOAD_AUDIT_KEY, JSON.stringify(next));
+        window.localStorage.setItem(key, JSON.stringify(next));
     } catch { }
 };
 

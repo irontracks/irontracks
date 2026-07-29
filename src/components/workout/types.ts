@@ -108,6 +108,16 @@ export type ReportHistoryItem = {
    * for each stage instead of the same average across all of them.
    */
   dropSetStages?: (Array<{ weight: number | null; reps: number | null }> | null)[] | null;
+  /**
+   * A sessão teve DELOAD aplicado neste exercício (o log da série carrega o campo
+   * `deload`). As cargas são baixas de propósito, então esta sessão não serve como
+   * referência de progressão: o motor de carga a interpretava como regressão real
+   * do atleta, ancorava a trava anti-regressão no peso reduzido e, com o teto de
+   * +10% por sessão, levava várias sessões para voltar ao patamar anterior —
+   * punindo quem fez um deload planejado. O dado é preservado (aparece no
+   * histórico); quem consome decide se usa.
+   */
+  deloadApplied?: boolean;
 };
 
 export type ReportHistory = {

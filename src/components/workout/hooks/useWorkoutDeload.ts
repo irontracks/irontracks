@@ -137,6 +137,7 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
           dropStages: Array<{ weight: number | null; reps: number | null }> | null;
           failed: boolean;
         }> = [];
+        let hadDeload = false;
         Object.entries(logsObj).forEach(([key, value]) => {
           try {
             const parts = String(key || '').split('-');
@@ -187,6 +188,11 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
             // por serialização JSON em workouts.notes e volta como texto).
             const failureRaw = log.failure ?? null;
             const failed = failureRaw === true || String(failureRaw ?? '').toLowerCase() === 'true';
+            // Marca a sessão como "teve deload neste exercício". O campo `deload` é
+            // gravado por applyDeloadToExercise e, até aqui, nunca era lido por
+            // ninguém — então carga reduzida de propósito entrava no histórico como
+            // treino normal.
+            if (isObject(log.deload)) hadDeload = true;
             if (hasValues) {
               indexedSets.push({ setIdx: sIdx, weight, reps, rpe, notes, dropStages, failed });
             }
@@ -263,6 +269,7 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
           setNotes: hasAnyNote ? setNotes : null,
           dropSetStages: hasAnyDropStages ? dropSetStages : null,
           setFailures: hasAnyFailure ? setFailures : null,
+          deloadApplied: hadDeload ? true : undefined,
         };
       } catch (e) {
         logError('hook:useWorkoutDeload.buildHistoryEntry', e);
@@ -512,7 +519,7 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
 
   const persistDeloadHistoryFromSession = () => {
     try {
-      const history = loadDeloadHistory();
+      const history = loadDeloadHistory(userId);
       const next = { version: 1, ...(history && typeof history === 'object' ? history : {}), exercises: { ...(history?.exercises || {}) } };
       const list = Array.isArray(exercises) ? exercises : [];
       list.forEach((ex, exIdx) => {
@@ -526,7 +533,7 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
         const updated = [...items, { ...entry, name }].slice(-DELOAD_HISTORY_SIZE);
         next.exercises[key] = { name, items: updated };
       });
-      saveDeloadHistory(next);
+      saveDeloadHistory(next, userId);
     } catch (e) { logError('hook:useWorkoutDeload.persistDeloadHistory', e) }
   };
 
@@ -534,7 +541,7 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
   const buildDeloadSuggestion = (ex: WorkoutExercise, exIdx: number, aiSuggestion: AiRecommendation | null = null): DeloadSuggestion => {
     const name = String(ex?.name || '').trim() || `Exercício ${exIdx + 1}`;
     const key = normalizeExerciseKey(name);
-    const history = loadDeloadHistory();
+    const history = loadDeloadHistory(userId);
     const items = history.exercises[key]?.items ?? [];
     const reportItems = reportHistory.exercises[key]?.items ?? [];
     const preferredItems: ReportHistoryItem[] = reportItems.length ? reportItems : items;
@@ -622,7 +629,7 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
     try {
       const name = String(ex?.name || '').trim() || `Exercício ${exIdx + 1}`;
       const key = normalizeExerciseKey(name);
-      const history = loadDeloadHistory();
+      const history = loadDeloadHistory(userId);
       const items = history.exercises[key]?.items ?? [];
       const reportItems = reportHistory.exercises[key]?.items ?? [];
       const preferredItems: ReportHistoryItem[] = reportItems.length ? reportItems : items;
@@ -826,7 +833,14 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
     const minWeight = Number(deloadModal.minWeight || 0);
     const nextWeightRaw = toNumber(value);
     if (nextWeightRaw == null) return;
-    const nextWeight = roundToStep(Math.max(nextWeightRaw, minWeight || 0), WEIGHT_ROUND_STEP);
+    // Mesmos limites do slider de percentual (5%–40%). O campo de peso livre não
+    // tinha teto superior: digitar um valor acima do peso base fazia
+    // `ratio = target/base` passar de 1 e o "deload" AUMENTAR a carga em todas as
+    // séries, gravado com metadado de deload. O piso de 1RM continua valendo.
+    const maxAllowed = baseWeight * (1 - DELOAD_REDUCTION_MIN);
+    const minAllowed = Math.max(minWeight || 0, baseWeight * (1 - DELOAD_REDUCTION_MAX));
+    const bounded = clampNumber(nextWeightRaw, Math.min(minAllowed, maxAllowed), maxAllowed);
+    const nextWeight = roundToStep(bounded, WEIGHT_ROUND_STEP);
     const appliedReduction = clampNumber(1 - nextWeight / baseWeight, 0, 1);
     setDeloadModal((prev) => (prev && typeof prev === 'object' ? { ...prev, reductionPct: appliedReduction, suggestedWeight: nextWeight } : prev));
   };
@@ -850,9 +864,17 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
       const minWeight = Number(deloadModal.minWeight || 0);
       const appliedAt = new Date().toISOString();
       const appliedWeights: unknown[] = [];
+      let skippedDone = 0;
       for (let setIdx = 0; setIdx < setsCount; setIdx += 1) {
         const key = `${exIdx}-${setIdx}`;
         const log = getLog(key);
+        // Série JÁ CONCLUÍDA não é reescrita: o peso dela é o que a pessoa
+        // levantou de fato. Antes o loop sobrescrevia tudo, então aplicar deload
+        // na 4ª série falsificava retroativamente as 3 primeiras — e com elas o
+        // volume, o relatório e o PDF da sessão.
+        const doneRaw = log.done ?? log.isDone ?? log.completed ?? null;
+        const alreadyDone = doneRaw === true || String(doneRaw ?? '').toLowerCase() === 'true';
+        if (alreadyDone) { skippedDone += 1; continue; }
         const cfg = getPlanConfig(ex, setIdx);
         const planned = getPlannedSet(ex, setIdx);
         const logWeight = extractLogWeight(log);
@@ -869,6 +891,15 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
         const nextRpe = !hasRpe && suggestion?.rpe != null ? String(suggestion.rpe) : currentRpe;
         updateLog(key, {
           weight: String(nextWeight),
+          // `weightSource: 'user'` é OBRIGATÓRIO aqui. O deload vem de um modal que
+          // a pessoa confirmou, então o peso é dela — não do motor. Sem esta marca o
+          // log herdava a fonte anterior ('auto', quando o autoload tinha preenchido
+          // a caixa), a guarda do useAutoloadWeight não pegava, e o efeito de
+          // re-sincronização reescrevia a sugestão ANTIGA por cima: a redução
+          // desaparecia da tela no render seguinte, sem erro e sem log.
+          // Mesma correção que useWorkoutMethodSavers.ts:93 já fez para os 13
+          // savers de método avançado — o deload era o escritor que ficou de fora.
+          weightSource: 'user',
           reps: nextReps,
           rpe: nextRpe,
           deload: {
@@ -894,9 +925,28 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
         appliedAt,
         weights: appliedWeights,
         workoutId: workout?.id ?? null,
-      });
+        skippedDone,
+      }, userId);
       setDeloadModal(null);
-    } catch {
+      // Sem este aviso a pessoa vê só parte das séries mudar e conclui que o
+      // deload falhou — quando na verdade as concluídas foram preservadas de
+      // propósito (o peso delas é histórico, não plano).
+      if (skippedDone > 0 && appliedWeights.length > 0) {
+        try {
+          await alert(
+            `Deload aplicado nas séries que faltam. ${skippedDone} série${skippedDone > 1 ? 's' : ''} já concluída${skippedDone > 1 ? 's' : ''} não foi alterada — o peso registrado é o que você levantou.`,
+          );
+        } catch { }
+      } else if (appliedWeights.length === 0) {
+        try {
+          await alert('Todas as séries deste exercício já foram concluídas — não há o que reduzir.');
+        } catch { }
+      }
+    } catch (e) {
+      // Antes este catch era cego: o usuário via a mensagem genérica e ninguém
+      // via nada no Sentry. Aplicar deload é escrita em treino real — falha aqui
+      // precisa ser investigável.
+      logError('deload:apply', e, { exIdx });
       try {
         await alert('Não foi possível aplicar o deload agora.');
       } catch { }
