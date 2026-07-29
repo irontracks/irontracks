@@ -10,6 +10,7 @@ import { getGeminiModel } from '@/utils/ai/gemini'
 import { safeGemini, handleGeminiError } from '@/utils/ai/handleGeminiError'
 import { buildUserContextBlock } from '@/utils/ai/userContext'
 import { respondDbError } from '@/utils/api/dbError'
+import { setVolume, isWorkingSet } from '@/utils/report/setVolume'
 
 export const dynamic = 'force-dynamic'
 
@@ -107,6 +108,27 @@ export async function POST(req: Request) {
 
     const userCtx = await buildUserContextBlock(admin, userId, ['profile', 'assessment', 'training', 'nutrition'])
 
+    // Agregados computados no SERVIDOR, com a mesma fonte canônica do relatório
+    // (setVolume trata unilateral/cluster/dropset; isWorkingSet filtra aquecimento).
+    // Antes o schema pedia "sessions" e "totalVolume" ao próprio modelo, com os
+    // logs crus no payload — LLM fazendo aritmética inventa número (o relatório
+    // pós-treino chegou a exibir 18.232 kg onde o real era 26.300).
+    const officialTotals = (() => {
+      let volumeKg = 0
+      let setsDone = 0
+      for (const s of sessionData) {
+        const logs = s.logs && typeof s.logs === 'object' ? (s.logs as Record<string, unknown>) : {}
+        for (const log of Object.values(logs)) {
+          if (!log || typeof log !== 'object') continue
+          if (!isWorkingSet(log)) continue
+          setsDone += 1
+          const vol = setVolume(log)
+          if (Number.isFinite(vol) && vol > 0) volumeKg += vol
+        }
+      }
+      return { sessions: sessionData.length, totalVolumeKg: Math.round(volumeKg), totalSetsDone: setsDone }
+    })()
+
     const prompt = [
       userCtx,
       'Você é um coach de musculação e analista de performance.',
@@ -116,8 +138,6 @@ export async function POST(req: Request) {
       'Retorne APENAS JSON (sem markdown) com esta estrutura:',
       '{',
       '  "summary": string (resumo narrativo em 2-3 frases, pt-BR),',
-      '  "sessions": number,',
-      '  "totalVolume": number (kg),',
       '  "highlights": string[] (3-5 destaques positivos, curtos),',
       '  "warnings": string[] (0-3 pontos de atenção),',
       '  "muscleBalance": [{ "group": string, "status": "ok"|"deficit"|"excess", "suggestion": string }],',
@@ -128,9 +148,13 @@ export async function POST(req: Request) {
       'Regras:',
       '- Seja objetivo e prático.',
       '- Use apenas dados fornecidos, não invente números.',
+      '- PROIBIDO somar, contar ou recalcular a partir dos logs. Todo número agregado (volume total, nº de séries, nº de treinos) DEVE ser copiado LITERALMENTE das MÉTRICAS OFICIAIS abaixo.',
       '- muscleBalance deve ter pelo menos os 6 principais grupos.',
       '',
-      'Treinos da semana:',
+      'MÉTRICAS OFICIAIS DA SEMANA (fonte de verdade — copie EXATAMENTE, NÃO recalcule):',
+      JSON.stringify(officialTotals),
+      '',
+      'Treinos da semana (detalhe por série — use para qualidade/equilíbrio muscular, NUNCA para somar totais):',
       JSON.stringify(sessionData),
     ].filter(Boolean).join('\n')
 
@@ -147,7 +171,16 @@ export async function POST(req: Request) {
 
     await incrementVipUsage(supabase, userId, 'insights')
 
-    return NextResponse.json({ ok: true, report: parsed })
+    // Os agregados são SEMPRE os do servidor, nunca os que o modelo devolveu:
+    // o texto pode narrar, mas o número exibido vem do cálculo canônico.
+    const report = {
+      ...(parsed && typeof parsed === 'object' ? parsed : {}),
+      sessions: officialTotals.sessions,
+      totalVolume: officialTotals.totalVolumeKg,
+      totalSets: officialTotals.totalSetsDone,
+    }
+
+    return NextResponse.json({ ok: true, report })
   } catch (e: unknown) {
     return handleGeminiError('weekly-report', e)
   }
