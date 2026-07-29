@@ -270,6 +270,10 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     reportHistory,
     settings: settings as Record<string, unknown> | null,
     userId: String((settings as Record<string, unknown>)?.userId ?? (session as Record<string, unknown>)?.userId ?? '') || null,
+    // `logs` alimenta SÓ a leitura das séries de Reconhecimento concluídas (sinal do
+    // dia). O hook usa uma chave canônica desses sinais como dependência, então o
+    // motor não recalcula a cada tecla — ver comentário em useWorkoutAutoload.
+    logs,
   });
 
 

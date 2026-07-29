@@ -54,7 +54,35 @@ export interface SuggestInput {
    * próprio exercício — reduz a confiança e é mais conservador.
    */
   fromSubstitute?: boolean
+  /**
+   * SÉRIE DE RECONHECIMENTO de HOJE, já concluída, deste mesmo exercício.
+   *
+   * É a única medida do dia que o motor tem: o histórico diz o que você conseguiu
+   * na última sessão, isto diz como você está agora. Quando presente e confiável,
+   * substitui a projeção do histórico (e resolve o cold-start: exercício inédito
+   * passa a ter sugestão, em vez do "faça a 1ª série pra calibrar" que o motor
+   * escrevia sem nunca cumprir).
+   *
+   * Opt-in DUPLO, por decisão do dono: só chega aqui quando o usuário marcou a
+   * série como "Reconhecimento" E preencheu o RPE. Sem RPE não há como estimar
+   * esforço, e a literatura mostra que RPE autorreportado longe da falha é
+   * impreciso — então exigir o preenchimento é o que mantém o sinal utilizável.
+   */
+  todaySignal?: HistorySet | null
 }
+
+/**
+ * Faixa em que o sinal do dia pode mexer na carga. Força não varia 30% entre duas
+ * sessões: se a conta deu isso, o erro está na estimativa (RPE mal reportado), não
+ * no atleta. Amortece mais do que empurra, mesmo viés de segurança da prontidão.
+ */
+const DAY_FACTOR_MIN = 0.9
+const DAY_FACTOR_MAX = 1.05
+/**
+ * Acima deste RIR o RPE relatado é notoriamente impreciso (o erro cresce quanto
+ * mais longe da falha). Nessa faixa o sinal só pode AMORTECER, nunca subir carga.
+ */
+const UNRELIABLE_RIR = 4
 
 export interface WeightSuggestion {
   /** Peso sugerido em kg, ou null quando não há base / equipamento não é de carga. */
@@ -88,6 +116,19 @@ export function estimateE1RM(set: HistorySet): number | null {
   const rir = isFiniteNum(set.rpe) ? Math.max(0, 10 - clampRpe(set.rpe)) : 1
   const effectiveReps = set.reps + rir
   return set.weight * (1 + effectiveReps / 30)
+}
+
+/**
+ * Só aceita o sinal do dia quando ele é aproveitável: peso e reps positivos E RPE
+ * informado. Sem RPE não há como estimar o esforço, e chutar aqui contaminaria a
+ * carga das séries de trabalho — melhor ignorar e cair no comportamento normal.
+ */
+export function usableTodaySignal(signal: HistorySet | null | undefined): HistorySet | null {
+  if (!signal) return null
+  if (!isFiniteNum(signal.weight) || signal.weight <= 0) return null
+  if (!isFiniteNum(signal.reps) || signal.reps <= 0) return null
+  if (!isFiniteNum(signal.rpe) || signal.rpe <= 0) return null
+  return signal
 }
 
 /** Inverte Epley: dado e1RM e o alvo (reps @ RPE), devolve o peso teórico. */
@@ -148,12 +189,31 @@ export function suggestWeight(input: SuggestInput): WeightSuggestion {
     }
   }
 
+  const todaySignal = usableTodaySignal(input.todaySignal)
+
   if (!hasWeightHistory) {
+    // COLD START resolvido pelo reconhecimento: sem histórico, mas com uma série
+    // de hoje medida, dá pra calibrar. É literalmente o que a mensagem abaixo
+    // prometia ("faça a 1ª série pra calibrar") e o motor nunca cumpria.
+    if (todaySignal) {
+      const e1rmToday = estimateE1RM(todaySignal)
+      if (isFiniteNum(e1rmToday)) {
+        const rawToday = weightForTarget(e1rmToday, targetReps || todaySignal.reps, targetRpe)
+        const roundIncrementCold = inc.loadBearing ? inc.increment : 2.5
+        const weightCold = roundToIncrement(rawToday, roundIncrementCold, 'down')
+        return {
+          weight: weightCold > 0 ? weightCold : null,
+          reps: targetReps || null,
+          confidence: 'medium',
+          rationale: `Calibrado pelo reconhecimento de hoje (${fmtKg(todaySignal.weight)}kg × ${todaySignal.reps} @RPE${todaySignal.rpe}) — sugeri ${fmtKg(weightCold)}kg.`,
+        }
+      }
+    }
     return {
       weight: null,
       reps: targetReps || null,
       confidence: 'low',
-      rationale: 'Sem histórico neste exercício — faça a 1ª série pra calibrar.',
+      rationale: 'Sem histórico neste exercício — marque uma série como Reconhecimento e preencha o RPE pra calibrar.',
     }
   }
 
@@ -167,10 +227,34 @@ export function suggestWeight(input: SuggestInput): WeightSuggestion {
   const topWeight = Math.max(...valid.map((s) => s.weight))
   const anyFailed = valid.some((s) => s.failed === true)
 
-  let raw = weightForTarget(bestE1rm, targetReps || valid[0].reps, targetRpe)
+  // ── Sinal do dia (série de reconhecimento) ────────────────────────────────
+  // Compara a força medida HOJE com a projetada pelo histórico. O quociente é o
+  // "fator do dia": <1 = você está pior que na última vez, >1 = melhor.
+  let dayFactor = 1
+  let dayNote: string | null = null
+  if (todaySignal) {
+    const e1rmToday = estimateE1RM(todaySignal)
+    if (isFiniteNum(e1rmToday) && bestE1rm > 0) {
+      const rawFactor = e1rmToday / bestE1rm
+      const rir = Math.max(0, 10 - clampRpe(todaySignal.rpe as number))
+      // RPE impreciso (longe da falha) só autoriza amortecer, nunca empurrar peso.
+      const upperBound = rir >= UNRELIABLE_RIR ? 1 : DAY_FACTOR_MAX
+      dayFactor = Math.max(DAY_FACTOR_MIN, Math.min(upperBound, rawFactor))
+      const pct = Math.round((dayFactor - 1) * 100)
+      dayNote = `reconhecimento de hoje (${fmtKg(todaySignal.weight)}kg × ${todaySignal.reps} @RPE${todaySignal.rpe})${pct !== 0 ? `: ${pct > 0 ? '+' : ''}${pct}%` : ' bateu com o histórico'}`
+    }
+  }
+
+  let raw = weightForTarget(bestE1rm * dayFactor, targetReps || valid[0].reps, targetRpe)
 
   // Trava anti-regressão: num dia normal não sugere MENOS que a maior carga anterior.
-  if (raw < topWeight) raw = topWeight
+  //
+  // Ela é SUSPENSA quando existe sinal do dia apontando para baixo: aí não é chute,
+  // é medição — o motor tem evidência de hoje para reduzir. Sem esta exceção o
+  // cálculo do reconhecimento viraria enfeite (calcularia 117 e exibiria 130).
+  // O piso continua garantido pelo clamp de DAY_FACTOR_MIN.
+  const dayAllowsRegression = dayFactor < 1
+  if (raw < topWeight && !dayAllowsRegression) raw = topWeight
 
   // Se a última sessão foi à falha, não progride (segura na carga anterior).
   //
@@ -202,12 +286,17 @@ export function suggestWeight(input: SuggestInput): WeightSuggestion {
   // 5 kg, mas o usuário treina com 8 kg). Arredondar pra baixo derrubaria 8 → 5 kg —
   // uma regressão de 37% num dia normal. O histórico prova que topWeight é montável,
   // então num dia sem amortecimento (e fora do cold-start por substituto) ele é o piso.
-  const weight = factor === 1 && !input.fromSubstitute && rounded < topWeight ? topWeight : rounded
+  // `dayAllowsRegression` entra aqui pelo mesmo motivo do piso acima: quando o
+  // reconhecimento de hoje mandou reduzir, restaurar o topWeight anularia a medição.
+  const weight =
+    factor === 1 && !input.fromSubstitute && !dayAllowsRegression && rounded < topWeight
+      ? topWeight
+      : rounded
 
-  // Confiança.
+  // Confiança. Medida de hoje vale mais que projeção do histórico.
   const hasRpe = valid.some((s) => isFiniteNum(s.rpe))
-  let confidence: WeightSuggestion['confidence'] = hasRpe ? 'high' : 'medium'
-  if (input.fromSubstitute) confidence = 'low'
+  let confidence: WeightSuggestion['confidence'] = hasRpe || todaySignal ? 'high' : 'medium'
+  if (input.fromSubstitute && !todaySignal) confidence = 'low'
 
   // Explicação.
   const ref = valid.reduce((a, b) => (b.weight >= a.weight ? b : a), valid[0])
@@ -217,6 +306,7 @@ export function suggestWeight(input: SuggestInput): WeightSuggestion {
   if (weight > topWeight) parts.push(`subi p/ ${fmtKg(weight)}kg`)
   else if (weight === topWeight) parts.push(`mantém ${fmtKg(weight)}kg`)
   else parts.push(`ajustei p/ ${fmtKg(weight)}kg`)
+  if (dayNote) parts.push(dayNote)
   if (reason && factor < 1) parts.push(`(-${Math.round((1 - factor) * 100)}%: ${reason})`)
 
   return { weight, reps: targetReps || null, confidence, rationale: parts.join(' — ') }

@@ -9,10 +9,11 @@
  * `settings.autoLoad` (a chavinha do usuário) estão ligados. Fora disso devolve mapa
  * vazio e não faz fetch — custo/efeito zero pro resto dos usuários.
  */
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { createClient } from '@/utils/supabase/client'
 import type { ReportHistory } from '../types'
-import { normalizeExerciseKey } from '../utils'
+import { normalizeExerciseKey, extractLogWeight, extractLogReps, extractLogRpe, isObject } from '../utils'
+import { resolveSetType } from '../SetTypePopover'
 import { suggestWeight, type HistorySet, type ReadinessToday } from '@/utils/autoload/suggestWeight'
 import { inferEquipmentFromName } from '@/utils/autoload/equipmentFromName'
 import { logWarnRemote } from '@/lib/logger'
@@ -29,6 +30,20 @@ interface Params {
   reportHistory: ReportHistory | null | undefined
   settings: Record<string, unknown> | null | undefined
   userId?: string | null
+  /**
+   * Logs da sessão em curso — usados SÓ para achar séries de Reconhecimento já
+   * concluídas (o sinal do dia). Não se depende deste objeto no memo pesado: ele
+   * muda a cada tecla, e recalcular todas as sugestões nesse ritmo travaria a tela
+   * do treino. Ver `feelerSignalKey` abaixo.
+   */
+  logs?: Record<string, unknown> | null
+}
+
+/** Sinal do dia extraído de uma série de Reconhecimento concluída. */
+interface FeelerSignal {
+  weight: number
+  reps: number
+  rpe: number
 }
 
 const isRec = (v: unknown): v is Record<string, unknown> => !!v && typeof v === 'object' && !Array.isArray(v)
@@ -98,7 +113,73 @@ export function pickUsableHistory(
   return []
 }
 
-export function useWorkoutAutoload({ exercises, reportHistory, settings, userId }: Params): {
+/**
+ * Extrai o sinal do dia por exercício: a série marcada como "Reconhecimento", já
+ * concluída, com peso, reps E RPE preenchidos. Havendo mais de uma no exercício,
+ * vence a de MAIOR carga — quanto mais perto da carga de trabalho, menor o erro da
+ * extrapolação de e1RM.
+ *
+ * Exportada para o guard poder exercitar a regra sem montar a tela do treino.
+ */
+export function extractFeelerSignals(
+  exercises: unknown[],
+  logs: Record<string, unknown> | null | undefined,
+): Record<number, FeelerSignal> {
+  const out: Record<number, FeelerSignal> = {}
+  if (!logs || typeof logs !== 'object') return out
+
+  for (const [key, raw] of Object.entries(logs)) {
+    const log = isObject(raw) ? raw : null
+    if (!log) continue
+    const parts = String(key || '').split('-')
+    const exIdx = Number(parts[0])
+    const setIdx = Number(parts[1])
+    if (!Number.isFinite(exIdx) || !Number.isFinite(setIdx)) continue
+
+    // Só série CONCLUÍDA conta: reconhecimento em andamento ainda não é medida.
+    const doneRaw = log.done ?? log.isDone ?? log.completed ?? null
+    const done = doneRaw === true || String(doneRaw ?? '').toLowerCase() === 'true'
+    if (!done) continue
+
+    // O tipo pode vir do log (override da sessão) ou do template. Usa a MESMA
+    // resolução dos renderers — duplicar essa lógica é como essa família de
+    // código acumula divergência silenciosa.
+    const ex = isObject(exercises?.[exIdx]) ? (exercises[exIdx] as Record<string, unknown>) : null
+    const details = Array.isArray(ex?.setDetails)
+      ? (ex?.setDetails as unknown[])
+      : Array.isArray(ex?.set_details)
+        ? (ex?.set_details as unknown[])
+        : []
+    const planned = isObject(details[setIdx]) ? (details[setIdx] as Record<string, unknown>) : null
+    const setType = resolveSetType({
+      set_type: (log.set_type ?? planned?.set_type) as string | null | undefined,
+      is_warmup: log.is_warmup ?? planned?.is_warmup,
+    })
+    if (setType !== 'feeler') continue
+
+    const weight = extractLogWeight(log)
+    const reps = extractLogReps(log)
+    const rpe = extractLogRpe(log)
+    // Opt-in do dono: sem RPE preenchido o sinal não é usado.
+    if (weight == null || weight <= 0 || reps == null || reps <= 0 || rpe == null || rpe <= 0) continue
+
+    const prev = out[exIdx]
+    if (!prev || weight > prev.weight) out[exIdx] = { weight, reps, rpe }
+  }
+
+  return out
+}
+
+/** Chave canônica dos sinais — muda só quando um reconhecimento muda, não a cada tecla. */
+function feelerSignalsKey(signals: Record<number, FeelerSignal>): string {
+  return Object.keys(signals)
+    .map(Number)
+    .sort((a, b) => a - b)
+    .map((i) => `${i}:${signals[i].weight}:${signals[i].reps}:${signals[i].rpe}`)
+    .join('|')
+}
+
+export function useWorkoutAutoload({ exercises, reportHistory, settings, userId, logs }: Params): {
   autoLoadEnabled: boolean
   autoLoadSuggestions: Record<string, AutoloadSuggestion>
 } {
@@ -145,6 +226,16 @@ export function useWorkoutAutoload({ exercises, reportHistory, settings, userId 
     return () => { cancelled = true }
   }, [enabled, userId])
 
+  // Sinais do dia. Este memo é LEVE (varre ~30 logs) e roda a cada tecla, sem
+  // problema. O memo pesado abaixo depende da CHAVE canônica, não deste objeto —
+  // então recalcular todas as sugestões só acontece quando um Reconhecimento é
+  // concluído/alterado. Depender de `logs` ali dispararia o motor inteiro a cada
+  // dígito, num contexto que já é separado justamente por performance.
+  const feelerSignals = useMemo(() => extractFeelerSignals(exercises, logs), [exercises, logs])
+  const feelerKey = feelerSignalsKey(feelerSignals)
+  const feelerSignalsRef = useRef(feelerSignals)
+  feelerSignalsRef.current = feelerSignals
+
   const autoLoadSuggestions = useMemo<Record<string, AutoloadSuggestion>>(() => {
     if (!enabled || !Array.isArray(exercises) || !reportHistory) return {}
     const map: Record<string, AutoloadSuggestion> = {}
@@ -173,12 +264,14 @@ export function useWorkoutAutoload({ exercises, reportHistory, settings, userId 
       const ordered = histEntry?.items ?? []
       const history = pickUsableHistory(ordered)
 
+      const feeler = feelerSignalsRef.current[exIdx]
       const suggestion = suggestWeight({
         history,
         targetReps: parseTopReps(ex.reps),
         targetRpe: parseRpe(ex.rpe),
         equipment: inferEquipmentFromName(name),
         readiness,
+        todaySignal: feeler ? { weight: feeler.weight, reps: feeler.reps, rpe: feeler.rpe } : null,
       })
 
       // Motor ligado e mesmo assim sem sugestão: warning pesquisável no Sentry.
@@ -207,7 +300,11 @@ export function useWorkoutAutoload({ exercises, reportHistory, settings, userId 
     })
 
     return map
-  }, [enabled, exercises, reportHistory, readiness])
+  // `feelerKey` (string) no lugar de `feelerSignals` (objeto novo a cada render):
+  // é o que impede o motor de recalcular a cada tecla digitada. O valor é lido do
+  // ref, que está sempre atualizado quando a chave muda.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enabled, exercises, reportHistory, readiness, feelerKey])
 
   return { autoLoadEnabled: enabled, autoLoadSuggestions }
 }
