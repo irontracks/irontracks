@@ -36,8 +36,13 @@ export function FailureToggle({ exIdx, setIdx, compact = false }: {
       aria-label={`Marcar série ${setIdx + 1} como levada à falha`}
       title={failed ? 'Série levada à falha' : 'Marcar como levada à falha'}
       className={[
-        'shrink-0 inline-flex items-center justify-center gap-1 rounded-lg font-black uppercase tracking-widest border transition-colors',
-        compact ? 'h-9 w-9 text-[11px]' : 'h-7 px-2.5 text-[11px]',
+        // `whitespace-nowrap` é o que impede o rótulo de quebrar em duas linhas
+        // (emoji em cima, palavra embaixo) quando a nota do autoload disputa a
+        // largura no mesmo flex. `tracking-wide` + `font-bold` no lugar de
+        // `tracking-widest` + `font-black`: em caixa alta a palavra ficava larga
+        // e pesada demais para o tamanho do botão.
+        'shrink-0 inline-flex items-center justify-center gap-1 rounded-lg font-bold uppercase tracking-wide whitespace-nowrap border transition-colors',
+        compact ? 'h-9 w-9 text-[11px]' : 'h-7 px-2.5 text-[10px]',
         failed
           ? 'text-red-300 bg-red-500/15 border-red-500/40'
           : 'text-neutral-500 bg-black/30 border-neutral-700 hover:text-red-300 hover:border-red-500/40',
