@@ -158,6 +158,31 @@ export const isWorkingSet = (log: unknown): boolean => {
   return true
 }
 
+/**
+ * Volume TOTAL da sessão (kg) a partir do mapa de logs — FONTE ÚNICA de verdade.
+ *
+ * Todo lugar que exibe, grava ou compara "volume total" precisa passar por aqui:
+ * card do relatório, PDF, Story, histórico, calorias, métricas oficiais da IA e o
+ * `reportMeta.totals.volumeKg` gravado no finish. Até jul/2026 cada um tinha sua
+ * própria soma e duas delas divergiam na MESMA sessão — `buildLogVolume`
+ * (reportMetrics) reimplementava o cálculo por série e, na isometria, multiplicava
+ * peso × SEGUNDOS: uma prancha de 60 s com o peso corporal (73 kg) virava 4.380 kg
+ * de "volume" que só o reportMeta enxergava (caso real de 09/07: 24.247 vs 17.650).
+ *
+ * Regra: soma `setVolume` de cada série de TRABALHO (`isWorkingSet`), varrendo o
+ * mapa inteiro de logs — não filtra por exercício, igual ao card e ao PDF.
+ */
+export const sessionVolumeKg = (logs: unknown): number => {
+  if (!isRec(logs)) return 0
+  let volume = 0
+  for (const log of Object.values(logs)) {
+    if (!isWorkingSet(log)) continue
+    const v = setVolume(log)
+    if (Number.isFinite(v) && v > 0) volume += v
+  }
+  return volume
+}
+
 /** Epley 1RM: peso × (1 + reps/30). 1 rep = o próprio peso. 0 se inválido. */
 export const epley1rm = (weight: number, reps: number): number => {
   if (!(weight > 0) || !(reps > 0)) return 0

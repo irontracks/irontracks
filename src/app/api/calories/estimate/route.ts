@@ -21,7 +21,7 @@ import {
 } from '@/utils/calories/metEstimate'
 import { checkRateLimitAsync } from '@/utils/rateLimit'
 import { clampSessionKcal } from '@/utils/calories/cardioKcal'
-import { setVolume, isWorkingSet } from '@/utils/report/setVolume'
+import { sessionVolumeKg } from '@/utils/report/setVolume'
 import { logError } from '@/lib/logger'
 
 const ZodBodySchema = z
@@ -71,21 +71,14 @@ const calculateClusterVolume = (cluster: unknown): number => {
 }
 
 /**
- * Volume total p/ a estimativa de calorias — FONTE ÚNICA (setVolume + isWorkingSet).
- *
- * A versão anterior tratava cluster, mas depois caía em `weight × reps` do TOPO do
- * log: SUBCONTAVA drop-set/stripping (as etapas viravam "último peso × total de
- * reps"), zerava exercícios UNILATERAIS (só gravam L_/R_) e contava aquecimento.
- * Como o volume alimenta o MET, as calorias saíam subestimadas nesses treinos.
+ * Volume total p/ a estimativa de calorias — delega à FONTE ÚNICA
+ * (`sessionVolumeKg`). Este endpoint já teve a própria conta, que subcontava
+ * drop-set/stripping e zerava unilaterais; o volume alimenta o MET, então
+ * qualquer divergência aqui vira kcal errada. Não reimplementar.
  */
 const calculateTotalVolume = (logs: Record<string, unknown>) => {
   try {
-    let volume = 0
-    Object.values(logs).forEach((log: unknown) => {
-      if (!isWorkingSet(log)) return
-      volume += setVolume(log)
-    })
-    return volume
+    return sessionVolumeKg(logs)
   } catch { return 0 }
 }
 

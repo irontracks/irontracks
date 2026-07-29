@@ -1,6 +1,6 @@
 
 import type { UnknownRecord } from '@/types/app'
-import { setVolume, setTopWeightReps, setTotalReps, setBestE1rm, waveVolume } from './setVolume'
+import { setVolume, setTopWeightReps, setTotalReps, setBestE1rm, sessionVolumeKg } from './setVolume'
 import { estimateSessionKcalBreakdown } from '@/utils/calories/sessionKcal'
 import { distributeKcalWithFixed } from '@/utils/calories/distributeKcal'
 
@@ -68,14 +68,18 @@ const buildLogVolume = (logs: UnknownRecord, exerciseIndex: number) => {
     const e1 = setBestE1rm(value)
     if (e1 > bestE1rm) bestE1rm = e1
 
-    // ── Cluster: soma os blocks (blocksDetailed), não lastWeight×total do topo ──
-    // O saver grava weight=lastWeight/reps=total no topo, que enganaria o cálculo
-    // normal (volume = lastWeight×total). setVolume soma o peso próprio de cada bloco
-    // (igual ao histórico e à tendência semanal).
+    // ── VOLUME: fonte ÚNICA (setVolume), calculado UMA vez pra todos os formatos ──
+    // Cada branch abaixo reimplementava a soma por conta própria e divergiam em
+    // silêncio do card/PDF/IA. O pior era a isometria, que multiplicava peso ×
+    // SEGUNDOS (prancha de 60 s com peso corporal = milhares de kg fantasma). Os
+    // branches agora só derivam reps / peso médio / contagem de séries — o volume
+    // nunca mais é recalculado aqui. Ver sessionVolumeKg em setVolume.ts.
+    const setVol = setVolume(value)
+    if (Number.isFinite(setVol) && setVol > 0) volume += setVol
+
+    // ── Cluster: reps/peso médio vêm do topo (o saver grava lastWeight/total lá) ──
     if (isObject(value.cluster)) {
-      const cv = setVolume(value)
-      if (cv > 0) {
-        volume += cv
+      if (setVol > 0) {
         const cTop = setTopWeightReps(value)
         if (cTop.reps > 0) reps += cTop.reps
         if (cTop.weight > 0) { weightSum += cTop.weight; weightCount += 1 }
@@ -84,9 +88,8 @@ const buildLogVolume = (logs: UnknownRecord, exerciseIndex: number) => {
       return
     }
 
-    // ── Drop-set / Stripping: sum each stage's volume; first-stage (main) weight as avg ──
-    // Mesma estrutura `stages: [{weight,reps}]`. Sem tratar stripping, o topo
-    // (peso da 1ª etapa, a mais pesada, × total de reps) inflava volume e 1RM.
+    // ── Drop-set / Stripping: reps somam as etapas; peso médio = 1ª etapa (a principal) ──
+    // Mesma estrutura `stages: [{weight,reps}]`.
     const dropSet = isObject(value.drop_set) ? (value.drop_set as UnknownRecord) : null
     const stripping = isObject(value.stripping) ? (value.stripping as UnknownRecord) : null
     const dropStages = dropSet && Array.isArray(dropSet.stages)
@@ -95,7 +98,6 @@ const buildLogVolume = (logs: UnknownRecord, exerciseIndex: number) => {
         ? (stripping.stages as unknown[])
         : []
     if (dropStages.length > 0) {
-      let dropVol = 0
       let totalReps = 0
       let firstWeight: number | null = null
       for (const stage of dropStages) {
@@ -103,26 +105,20 @@ const buildLogVolume = (logs: UnknownRecord, exerciseIndex: number) => {
         const sw = toNumber((stage as UnknownRecord).weight)
         const sr = toNumber((stage as UnknownRecord).reps)
         if (sw > 0 && sr > 0) {
-          dropVol += sw * sr
           totalReps += sr
           if (firstWeight === null) firstWeight = sw
         }
       }
       if (totalReps > 0) reps += totalReps
-      if (dropVol > 0) volume += dropVol
       if (firstWeight !== null) { weightSum += firstWeight; weightCount += 1 }
       sets += 1
       return
     }
 
-    // ── Wave (onda): soma peso×reps de cada tier (peso próprio por intensidade,
-    //    retrocompat com peso base único). Sem isso, o topo (peso base × total)
-    //    subestima/superestima quando as cargas variam entre tiers. ──
+    // ── Wave (onda): reps somam os tiers de cada onda; peso médio = tier pesado ──
     const wave = isObject(value.wave) ? (value.wave as UnknownRecord) : null
     const waveList = wave && Array.isArray(wave.waves) ? (wave.waves as unknown[]) : []
     if (waveList.length > 0) {
-      const wv = waveVolume(wave)
-      if (wv > 0) volume += wv
       let waveReps = 0
       for (const w of waveList) {
         if (!isObject(w)) continue
@@ -136,23 +132,23 @@ const buildLogVolume = (logs: UnknownRecord, exerciseIndex: number) => {
     }
 
     // ── Plank / isometric: durationSeconds carries the actual hold time ──
+    // ATENÇÃO: `repsVal` aqui vira a CONTAGEM (reps/segundos aguentados) — nunca
+    // multiplicador de volume. Peso × segundos não é carga levantada; a energia da
+    // isometria já entra pelo modelo MET das calorias.
     const durationSec = toNumber(value.durationSeconds ?? value.duration_seconds ?? 0)
     const weight = toNumber(value.weight ?? value.kg ?? value.load)
     const repsVal = durationSec > 0 ? durationSec : toNumber(value.reps)
 
     if (weight > 0 && repsVal > 0) {
-      volume += weight * repsVal
       reps += repsVal
       weightSum += weight
       weightCount += 1
     } else if (repsVal > 0) {
       reps += repsVal
     } else {
-      // Unilateral (L_weight/R_weight) NÃO grava weight/reps no topo → caía aqui com
-      // volume 0. Usa a fonte única setVolume/setTopWeightReps (soma L+R).
-      const uniVol = setVolume(value)
-      if (uniVol > 0) {
-        volume += uniVol
+      // Unilateral (L_weight/R_weight) NÃO grava weight/reps no topo → reps/peso
+      // médio saem da fonte única (setTopWeightReps/setTotalReps, somando L+R).
+      if (setVol > 0) {
         const top = setTopWeightReps(value)
         if (top.weight > 0) { weightSum += top.weight; weightCount += 1 }
         // Reps TOTAIS (L+R): o volume desta linha já soma os dois lados, então
@@ -337,20 +333,25 @@ const extractSessionDateMs = (session: UnknownRecord) => {
   return Number.isFinite(ms) ? ms : 0
 }
 
+/**
+ * Volume de uma sessão do HISTÓRICO (tendência semanal / flags de carga).
+ *
+ * Recalcula SEMPRE a partir dos logs, mesmo quando a sessão já tem
+ * `reportMeta.totals.volumeKg` gravado: as sessões finalizadas até jul/2026
+ * carregam o total inflado pela isometria (peso × segundos), e confiar nesse
+ * número faria a semana inteira comparar carga fantasma. O reportMeta só entra
+ * como último recurso (sessão sem mapa de logs legível).
+ */
 const getSessionVolumeKg = (session: UnknownRecord) => {
+  const logs = isObject(session.logs) ? (session.logs as UnknownRecord) : {}
+  const fromLogs = Math.round(sessionVolumeKg(logs) * 10) / 10
+  if (fromLogs > 0) return fromLogs
   if (isObject(session.reportMeta) && isObject((session.reportMeta as UnknownRecord).totals)) {
     const totals = (session.reportMeta as UnknownRecord).totals as UnknownRecord
     const v = toNumber(totals.volumeKg)
     if (v > 0) return v
   }
-  const exercises = Array.isArray(session.exercises) ? (session.exercises as unknown[]) : []
-  const logs = isObject(session.logs) ? (session.logs as UnknownRecord) : {}
-  let total = 0
-  exercises.forEach((raw, index) => {
-    if (!isObject(raw)) return
-    total += buildLogVolume(logs, index).volumeKg
-  })
-  return Math.round(total * 10) / 10
+  return 0
 }
 
 export type ReportExerciseMetrics = {
@@ -428,7 +429,11 @@ export const buildReportMetrics = (session: UnknownRecord, previousSession?: Unk
   const prevMap = previousSession && isObject(previousSession) ? buildPrevByExercise(previousSession) : null
   const exerciseOrder: string[] = []
   const metrics: ReportExerciseMetrics[] = []
-  let totalVolume = 0
+  // Total NÃO é a soma dos exercícios: a soma por exercício perde os logs que não
+  // casam com nenhum item de `exercises` (exercício removido/sem nome), e era mais
+  // uma via de divergência com o card, o PDF e as métricas da IA — todos varrem o
+  // mapa de logs inteiro. Fonte única: sessionVolumeKg.
+  const totalVolume = sessionVolumeKg(logs)
   let totalSets = 0
   let totalReps = 0
   let restSum = 0
@@ -478,7 +483,6 @@ export const buildReportMetrics = (session: UnknownRecord, previousSession?: Unk
       cadenceTotalExpected += logTimes.cadenceExpectedSec
       cadenceTotalActual += logTimes.cadenceActualSec
     }
-    totalVolume += logVolume.volumeKg
     totalSets += logVolume.sets
     totalReps += logVolume.reps
     const prev = prevMap ? prevMap.get(name) : null

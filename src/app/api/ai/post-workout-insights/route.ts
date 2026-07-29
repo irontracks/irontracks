@@ -11,7 +11,7 @@ import { safeGemini, handleGeminiError } from '@/utils/ai/handleGeminiError'
 import { getGeminiModel } from '@/utils/ai/gemini'
 import { buildUserContextBlock } from '@/utils/ai/userContext'
 import { respondDbError } from '@/utils/api/dbError'
-import { setVolume, isWorkingSet } from '@/utils/report/setVolume'
+import { computeAiSessionMetrics } from '@/utils/report/aiSessionMetrics'
 import { reconcileAiNarrative } from '@/utils/report/reconcileAiNarrative'
 
 export const dynamic = 'force-dynamic'
@@ -94,62 +94,6 @@ const extractJsonFromModelText = (text: string) => {
   const end = cleaned.lastIndexOf('}')
   if (start === -1 || end === -1 || end <= start) return null
   return safeJsonParse(cleaned.slice(start, end + 1))
-}
-
-const computeMetrics = (session: Record<string, unknown>) => {
-  try {
-    const s = session && typeof session === 'object' ? session : {}
-    const logs = s?.logs && typeof s.logs === 'object' ? (s.logs as Record<string, unknown>) : {}
-    const exercises = Array.isArray(s?.exercises) ? (s.exercises as unknown[]) : []
-    const exNameByIdx = new Map<number, string>()
-    exercises.forEach((ex: unknown, idx: number) => {
-      const exObj = ex && typeof ex === 'object' ? (ex as Record<string, unknown>) : {}
-      const name = String(exObj?.name || '').trim()
-      if (!name) return
-      exNameByIdx.set(idx, name)
-    })
-
-    let totalVolume = 0
-    let setsDone = 0
-    const volumeByExIdx = new Map<number, number>()
-    const exercisesWithLogs = new Set<number>()
-
-    // Fonte ÚNICA (mesma do volume exibido no relatório): setVolume trata
-    // unilateral (L_/R_), cluster e dropset; isWorkingSet filtra aquecimento/feeler
-    // e exige série feita. Antes somava só weight×reps do topo → volume subestimado
-    // (ex.: 17.650 vs 30.195 reais) e o Coach IA reportava número divergente.
-    Object.entries(logs).forEach(([k, log]) => {
-      if (!log || typeof log !== 'object') return
-      const parts = String(k || '').split('-')
-      const exIdx = Number(parts[0])
-      if (!Number.isFinite(exIdx)) return
-      if (!isWorkingSet(log)) return
-      exercisesWithLogs.add(exIdx)
-      setsDone += 1
-      const vol = setVolume(log)
-      if (Number.isFinite(vol) && vol > 0) {
-        totalVolume += vol
-        volumeByExIdx.set(exIdx, (volumeByExIdx.get(exIdx) || 0) + vol)
-      }
-    })
-
-    const topExercises = Array.from(volumeByExIdx.entries())
-      .sort((a, b) => (b[1] || 0) - (a[1] || 0))
-      .slice(0, 3)
-      .map(([idx, vol]) => ({
-        name: exNameByIdx.get(idx) || `Exercício ${idx + 1}`,
-        volumeKg: Math.round(Number(vol) || 0),
-      }))
-
-    return {
-      totalVolumeKg: Math.round(totalVolume),
-      totalSetsDone: setsDone,
-      totalExercises: exercisesWithLogs.size,
-      topExercises,
-    }
-  } catch {
-    return null
-  }
 }
 
 export async function POST(req: Request) {
@@ -320,10 +264,10 @@ export async function POST(req: Request) {
     // logs sozinho e errava: em 29/07/2026 o card dizia 26.300 kg e o texto
     // "18.232 kg"; o MESMO 18.232 saiu numa sessão de volume 17.566 kg, e a
     // string não existia no payload. LLM não faz aritmética: recebe pronto e narra.
-    const metrics = computeMetrics(sessionObj)
+    const metrics = computeAiSessionMetrics(sessionObj)
     const prevMetrics =
       previousSession && typeof previousSession === 'object'
-        ? computeMetrics(previousSession as Record<string, unknown>)
+        ? computeAiSessionMetrics(previousSession as Record<string, unknown>)
         : null
 
     const prompt = [

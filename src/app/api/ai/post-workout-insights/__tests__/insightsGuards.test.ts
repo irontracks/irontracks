@@ -6,12 +6,25 @@ const src = readFileSync(
   resolve(process.cwd(), 'src/app/api/ai/post-workout-insights/route.ts'),
   'utf8',
 )
+// As MÉTRICAS OFICIAIS moram fora do route.ts desde jul/2026 (para o guard de
+// paridade em utils/report/__tests__/volumeSingleSource.test.ts poder exercitá-las
+// direto). O invariante é o mesmo: o número que a IA cita nasce aqui.
+const metricsSrc = readFileSync(
+  resolve(process.cwd(), 'src/utils/report/aiSessionMetrics.ts'),
+  'utf8',
+)
 
 describe('post-workout-insights — volume canônico (guard #B)', () => {
   it('usa setVolume + isWorkingSet (não weight×reps flat que subestimava)', () => {
-    expect(src).toContain("from '@/utils/report/setVolume'")
-    expect(src).toContain('setVolume(log)')
-    expect(src).toContain('isWorkingSet(log)')
+    expect(metricsSrc).toContain("from '@/utils/report/setVolume'")
+    expect(metricsSrc).toContain('setVolume(log)')
+    expect(metricsSrc).toContain('isWorkingSet(log)')
+  })
+
+  it('o total sai da fonte única, não de uma soma local do módulo', () => {
+    // Divergência de jul/2026: `reportMeta.totals.volumeKg` e `ai.metrics
+    // .totalVolumeKg` eram duas contas independentes da MESMA sessão.
+    expect(metricsSrc).toMatch(/totalVolumeKg:\s*Math\.round\(sessionVolumeKg\(logs\)\)/)
   })
 })
 
@@ -24,7 +37,7 @@ describe('post-workout-insights — a IA nunca calcula agregado (guard #C)', () 
    * A causa era de ORDEM — computeMetrics rodava DEPOIS de generateContent,
    * então o número correto nunca entrava no prompt.
    */
-  const idxMetrics = src.indexOf('computeMetrics(sessionObj)')
+  const idxMetrics = src.indexOf('computeAiSessionMetrics(sessionObj)')
   const idxPrompt = src.indexOf('const prompt = [')
   const idxGenerate = src.indexOf('generateContent(prompt)')
 
