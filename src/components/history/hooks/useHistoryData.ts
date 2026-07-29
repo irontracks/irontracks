@@ -5,7 +5,7 @@ import { z } from 'zod';
 import { createClient } from '@/utils/supabase/client';
 import { adminFetchJson } from '@/utils/admin/adminFetch';
 import { logError } from '@/lib/logger';
-import { setVolume, isWorkingSet } from '@/utils/report/setVolume';
+import { sessionVolumeKg } from '@/utils/report/setVolume';
 import {
     WorkoutLog, WorkoutSummary, WorkoutTemplate, ManualExercise,
     NewWorkoutState, HistoryListProps,
@@ -47,20 +47,14 @@ export function toDateMs(value: unknown): number | null {
     }
 }
 
-/** Calculates total volume from a logs map */
+/**
+ * Volume total de um mapa de logs — delega à fonte ÚNICA (`sessionVolumeKg`).
+ * Não reimplementar a soma aqui: cada cópia paralela já divergiu do card/PDF/
+ * reportMeta em produção.
+ */
 export function calculateTotalVolumeFromLogs(logs: unknown): number {
     try {
-        const safeLogs: Record<string, unknown> = isRecord(logs) ? logs : {};
-        let volume = 0;
-        Object.values(safeLogs).forEach((log) => {
-            if (!isRecord(log)) return;
-            // Exclui aquecimento/feeler e séries não feitas — mesma regra do
-            // relatório de finalização, pra o "Resumo" não superestimar o volume.
-            if (!isWorkingSet(log)) return;
-            // setVolume trata cluster + unilateral (L+R) + série normal.
-            volume += setVolume(log);
-        });
-        return volume;
+        return sessionVolumeKg(logs);
     } catch {
         return 0;
     }

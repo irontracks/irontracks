@@ -4,6 +4,8 @@ import { useState } from 'react';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { ManualExercise, WorkoutLog, WorkoutSummary, isRecord, parseRawSession } from '@/components/historyListTypes';
 import { calculateTotalVolumeFromLogs } from './useHistoryData';
+import { buildReportMetrics } from '@/utils/report/reportMetrics';
+import { computeAiSessionMetrics } from '@/utils/report/aiSessionMetrics';
 
 interface UseHistoryActionsProps {
     user: { id?: string; role?: string } | null;
@@ -85,9 +87,14 @@ export function useHistoryActions({ user, supabase, setHistory, alert, confirm }
     const [editDuration, setEditDuration] = useState('45');
     const [editNotes, setEditNotes] = useState('');
     const [editExercises, setEditExercises] = useState<ManualExercise[]>([]);
+    // Sessão original crua. O formulário de edição só conhece título/data/duração/
+    // séries — sem esta base, salvar reescrevia `workouts.notes` do ZERO e apagava
+    // tudo o que ele não sabe editar: reportMeta, ai, check-ins, cardio, RPE.
+    const [editBaseSession, setEditBaseSession] = useState<Record<string, unknown>>({});
 
     const openEdit = (session: WorkoutSummary) => {
         const raw = parseRawSession(session.rawSession ?? session.notes);
+        setEditBaseSession(isRecord(raw) ? (raw as Record<string, unknown>) : {});
         setEditId(session.id);
         setEditTitle(session.workoutTitle || raw?.workoutTitle || 'Treino');
         const d = raw?.date ? new Date(raw.date) : (session.date ? new Date(session.date) : new Date());
@@ -169,7 +176,26 @@ export function useHistoryActions({ user, supabase, setHistory, alert, confirm }
                 }
             });
             const totalSeconds = parseInt(editDuration || '0', 10) * 60;
-            const session = { workoutTitle: editTitle, date: new Date(editDate).toISOString(), totalTime: totalSeconds, realTotalTime: totalSeconds, logs, exercises, notes: editNotes || '' };
+            // Parte da sessão ORIGINAL e sobrescreve só o que o formulário edita.
+            // Este UPDATE não passa por /api/workouts/finish, então é aqui que o
+            // `reportMeta` precisa ser recalculado — reconstruir a sessão do zero
+            // (o que se fazia até jul/2026) deixava o treino editado sem
+            // `reportMeta.totals`, e é a explicação mais provável das sessões que
+            // aparecem no banco com esse campo nulo.
+            const session: Record<string, unknown> = {
+                ...editBaseSession,
+                workoutTitle: editTitle, date: new Date(editDate).toISOString(),
+                totalTime: totalSeconds, realTotalTime: totalSeconds,
+                logs, exercises, notes: editNotes || '',
+            };
+            session.reportMeta = buildReportMetrics(session);
+            // As MÉTRICAS OFICIAIS que a IA já tinha gravado viraram passado ao
+            // mudar os pesos: re-sincroniza, senão as duas fontes de volume da
+            // mesma sessão voltam a divergir (guard volumeSingleSource).
+            if (isRecord(session.ai)) {
+                const metrics = computeAiSessionMetrics(session);
+                if (metrics) session.ai = { ...(session.ai as Record<string, unknown>), metrics };
+            }
             const { error } = await supabase.from('workouts').update({ name: editTitle, date: new Date(editDate).toISOString(), notes: JSON.stringify(session) }).eq('id', editId).eq('user_id', user.id);
             if (error) throw error;
             setShowEdit(false);

@@ -16,7 +16,7 @@ import { getMuscleMapWeek } from '@/actions/workout-actions'
 import { parseJsonWithSchema } from '@/utils/zod'
 import { normalizeExerciseName } from '@/utils/normalizeExerciseName'
 import { MUSCLE_BY_ID } from '@/utils/muscleMapConfig'
-import { setVolume } from '@/utils/report/setVolume'
+import { setVolume, isWorkingSet } from '@/utils/report/setVolume'
 import { z } from 'zod'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
@@ -227,6 +227,10 @@ export const useMuscleTrends = ({
               const eIdx = Number(parts[0])
               if (!Number.isFinite(eIdx) || eIdx !== exIdx) return
               if (!v || typeof v !== 'object') return
+              // Mesma regra do card/PDF/reportMeta: aquecimento, feeler e série não
+              // concluída ficam FORA. Sem este filtro a tendência por músculo somava
+              // aquecimento e inflava a semana em relação a todas as outras telas.
+              if (!isWorkingSet(v)) return
               // setVolume trata unilateral (L+R) e cluster — antes só lia weight/reps
               // do topo e zerava esses exercícios na tendência semanal.
               volume += setVolume(v)
