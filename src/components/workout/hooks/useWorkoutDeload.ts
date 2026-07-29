@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type {
   UnknownRecord,
   WorkoutExercise,
@@ -426,6 +426,44 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
     }, 2000); // Check every 2s — no need for 1s granularity on a timeout watchdog
     return () => clearInterval(id);
   }, []);
+
+  /**
+   * ALERTAS PROATIVOS de deload, por índice de exercício.
+   *
+   * A análise de estagnação/regressão já era calculada — e o único uso dela era um
+   * placeholder cinza no campo de peso, que fica escondido atrás do valor do
+   * autoload e portanto nunca aparecia. Resultado: em 543 sessões concluídas, zero
+   * deloads aplicados. A ferramenta existia e ninguém tinha como saber.
+   *
+   * Aqui a mesma análise passa a virar aviso visível no card do exercício. Só
+   * dispara com histórico suficiente (`hasEnoughHistory`) e quando há algo de fato
+   * a dizer — estagnação ou regressão. Progressão normal não gera ruído.
+   */
+  const deloadAlerts = useMemo<Record<number, { status: 'stagnation' | 'overtraining'; suggestedPct: number; itemsCount: number }>>(() => {
+    const out: Record<number, { status: 'stagnation' | 'overtraining'; suggestedPct: number; itemsCount: number }> = {};
+    try {
+      if (!Array.isArray(exercises) || !exercises.length) return out;
+      exercises.forEach((ex, exIdx) => {
+        const name = String((ex as UnknownRecord)?.name || '').trim();
+        if (!name) return;
+        const histEntry = reportHistory.exercises?.[normalizeExerciseKey(name)];
+        const items: ReportHistoryItem[] = Array.isArray(histEntry?.items) ? histEntry.items : [];
+        if (!items.length) return;
+        const analysis = analyzeDeloadHistory(items);
+        if (!analysis.hasEnoughHistory) return;
+        if (analysis.status !== 'stagnation' && analysis.status !== 'overtraining') return;
+        out[exIdx] = {
+          status: analysis.status,
+          suggestedPct:
+            analysis.status === 'overtraining' ? DELOAD_REDUCTION_OVERTRAIN : DELOAD_REDUCTION_STAGNATION,
+          itemsCount: analysis.itemsCount,
+        };
+      });
+    } catch (e) {
+      logError('hook:useWorkoutDeload.deloadAlerts', e);
+    }
+    return out;
+  }, [reportHistory, exercises]);
 
   // ── Popula deloadSuggestions com o peso do último treino como watermark ──
   // Roda sempre que reportHistory muda (carregou do cache ou da rede).
@@ -878,7 +916,23 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
         const cfg = getPlanConfig(ex, setIdx);
         const planned = getPlannedSet(ex, setIdx);
         const logWeight = extractLogWeight(log);
-        const baseSetWeight = logWeight != null ? logWeight : toNumber(cfg?.weight ?? planned?.weight ?? baseWeight);
+        // REFERÊNCIA da redução — não compõe cortes.
+        //
+        // O deload reduzia sempre o que estava na caixa. Mas essa caixa pode já
+        // ter vindo cortada pelo motor de carga (prontidão do check-in ×0,88 e
+        // sinal da série de Reconhecimento ×0,90), e aí os cortes se multiplicavam:
+        // 0,88 × 0,90 × 0,78 ≈ 0,62, ou seja ~38% abaixo da carga projetada, sem
+        // nenhum dos dois sistemas saber do outro.
+        //
+        // Regra: peso que o USUÁRIO assumiu (weightSource 'user') é a referência —
+        // é escolha dele e manda. Peso posto pelo motor ('auto') ou campo vazio não
+        // serve de referência: usa-se o maior entre ele e o planejado, para a
+        // redução incidir sobre a carga cheia e não sobre uma já descontada.
+        const plannedWeight = toNumber(cfg?.weight ?? planned?.weight ?? null);
+        const userOwnsWeight = String(log.weightSource ?? '') === 'user';
+        const baseSetWeight = userOwnsWeight && logWeight != null
+          ? logWeight
+          : Math.max(logWeight ?? 0, plannedWeight ?? 0) || toNumber(baseWeight) || 0;
         if (!baseSetWeight || baseSetWeight <= 0) continue;
         const nextWeight = roundToStep(Math.max(baseSetWeight * ratio, minWeight || 0), WEIGHT_ROUND_STEP);
         const suggestionValue = deloadSuggestions[key];
@@ -959,6 +1013,7 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
     reportHistoryStatus,
     reportHistoryUpdatedAt,
     deloadSuggestions,
+    deloadAlerts,
     deloadModal,
     setDeloadModal,
     deloadAiCacheRef,

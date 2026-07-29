@@ -127,7 +127,22 @@ export type ReportHistory = {
 
 export type AiRecommendation = { weight: number | null; reps: number | null; rpe: number | null };
 export type DeloadSetEntries = Record<string, { weight: number | null; reps: number | null; rpe: number | null }>;
-export type DeloadAnalysis = { status: 'overtraining' | 'stagnation' | 'stable'; volumeDelta: number | null; weightDelta: number | null };
+export type DeloadAnalysis = {
+  status: 'overtraining' | 'stagnation' | 'stable';
+  volumeDelta: number | null;
+  weightDelta: number | null;
+  /** Sessões consideradas na análise. */
+  itemsCount: number;
+  /**
+   * Havia histórico suficiente para o status significar algo. Com menos de
+   * DELOAD_HISTORY_MIN sessões, `volumeDelta`/`weightDelta` ficam null e o status
+   * cai em 'stable' por ausência de dado — o que dava ao usuário uma frase de
+   * análise ("progressão estável") calculada sobre 1 ponto. O status continua
+   * preenchido para não quebrar quem já consome, mas quem for AFIRMAR algo deve
+   * checar esta flag primeiro.
+   */
+  hasEnoughHistory: boolean;
+};
 
 export type DeloadSuggestion =
   | {
