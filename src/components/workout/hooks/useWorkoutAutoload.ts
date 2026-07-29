@@ -102,10 +102,26 @@ export function buildHistorySets(item: {
  * invertido na máquina, pulado em 27/07, sem sugestão nenhuma em 29/07.
  */
 export function pickUsableHistory(
-  items: Array<Parameters<typeof buildHistorySets>[0] & { ts?: number }> | null | undefined,
+  items:
+    | Array<Parameters<typeof buildHistorySets>[0] & { ts?: number; deloadApplied?: boolean }>
+    | null
+    | undefined,
 ): HistorySet[] {
   if (!Array.isArray(items) || !items.length) return []
   const ordered = [...items].sort((a, b) => Number(b?.ts ?? 0) - Number(a?.ts ?? 0))
+
+  // 1ª passada: sessões SEM deload. Carga de deload é baixa de propósito — usá-la
+  // como referência faz o motor achar que o atleta regrediu, ancorar a trava
+  // anti-regressão no peso reduzido e levar várias sessões (teto de +10% cada) pra
+  // voltar ao patamar. Ou seja: quem faz um deload planejado era punido por isso.
+  for (const item of ordered) {
+    if (item?.deloadApplied) continue
+    const sets = buildHistorySets(item)
+    if (sets.length) return sets
+  }
+
+  // 2ª passada: se TODO o histórico disponível é de deload, é melhor calibrar por
+  // ele do que não sugerir nada.
   for (const item of ordered) {
     const sets = buildHistorySets(item)
     if (sets.length) return sets
