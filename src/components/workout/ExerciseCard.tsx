@@ -52,6 +52,7 @@ function ExerciseCardInner({ ex, exIdx, groupPos, logsSlice }: { ex: WorkoutExer
     reportHistoryStatus,
     reportHistoryLoadingRef,
     reportHistory,
+    deloadAlerts,
     openDeloadModal,
     openEditExercise,
     addExtraSetToExercise,
@@ -72,6 +73,9 @@ function ExerciseCardInner({ ex, exIdx, groupPos, logsSlice }: { ex: WorkoutExer
   } = useWorkoutContext();
 
   const name = String(ex?.name || '').trim() || `Exercício ${exIdx + 1}`;
+  // Aviso proativo de deload deste exercício (estagnação/regressão com histórico
+  // suficiente). Sem isto o app calculava a análise e não contava pra ninguém.
+  const deloadAlert = (deloadAlerts as Record<number, { status: 'stagnation' | 'overtraining'; suggestedPct: number; itemsCount: number }> | undefined)?.[exIdx];
   const observation = String(ex?.notes || '').trim();
   const setsHeader = Math.max(0, Number.parseInt(String(ex?.sets ?? '0'), 10) || 0);
   const sdArr: unknown[] = Array.isArray(ex?.setDetails) ? (ex.setDetails as unknown[]) : Array.isArray(ex?.set_details) ? (ex.set_details as unknown[]) : [];
@@ -442,6 +446,31 @@ function ExerciseCardInner({ ex, exIdx, groupPos, logsSlice }: { ex: WorkoutExer
               <div className="text-sm text-neutral-200 whitespace-pre-wrap leading-snug">{observation}</div>
             </div>
           ) : null}
+          {/* Aviso proativo de deload: a análise de estagnação/regressão já existia
+              e só alimentava um placeholder cinza escondido atrás do valor do
+              autoload — daí a feature nunca ter sido usada (0 de 543 sessões).
+              Agora ela fala. Só aparece com histórico suficiente e quando há algo
+              a dizer; progressão normal não gera ruído. */}
+          {deloadAlert ? (
+            <button
+              type="button"
+              onClick={async (e) => {
+                try { e.preventDefault(); e.stopPropagation(); } catch { }
+                setCurrentExerciseIdx(exIdx);
+                await openDeloadModal(ex, exIdx);
+              }}
+              className="mt-2 w-full text-left rounded-xl bg-amber-500/10 border border-amber-500/30 px-3 py-2 active:scale-[0.99] transition-transform"
+            >
+              <div className="text-[13px] text-amber-200 leading-snug">
+                {deloadAlert.status === 'overtraining'
+                  ? `Carga caiu nas últimas sessões (${deloadAlert.itemsCount} treinos analisados).`
+                  : `Sem progresso nas últimas sessões (${deloadAlert.itemsCount} treinos analisados).`}
+              </div>
+              <div className="mt-0.5 text-[11px] font-bold uppercase tracking-wide text-amber-400">
+                Reduzir {Math.round(deloadAlert.suggestedPct * 100)}% hoje →
+              </div>
+            </button>
+          ) : null}
           {/* Per-card sets progress bar */}
           {setsCount > 0 && (
             <div className="mt-2 h-[3px] w-full bg-neutral-800/60 rounded-full overflow-hidden">
@@ -502,11 +531,20 @@ function ExerciseCardInner({ ex, exIdx, groupPos, logsSlice }: { ex: WorkoutExer
               setCurrentExerciseIdx(exIdx);
               await openDeloadModal(ex, exIdx);
             }}
-            className="h-9 w-9 inline-flex items-center justify-center rounded-xl bg-neutral-900 border border-neutral-800 text-neutral-500 hover:text-yellow-400 hover:bg-neutral-800 transition-colors active:scale-95 flex-shrink-0"
+            className={[
+              'h-9 inline-flex items-center justify-center gap-1 rounded-xl border transition-colors active:scale-95 flex-shrink-0',
+              // Com aviso ativo o botão ganha rótulo e destaque: era um ícone de
+              // seta sem texto no meio de outros ícones, e no celular não há hover
+              // pra revelar o `title` — ninguém descobria que ali morava o deload.
+              deloadAlert ? 'px-2.5 border-amber-500/50 bg-amber-500/15 text-amber-300' : 'w-9 bg-neutral-900 border-neutral-800 text-neutral-500 hover:text-yellow-400 hover:bg-neutral-800',
+            ].join(' ')}
             title="Sugestão de Deload"
             aria-label="Sugestão de Deload"
           >
             {isReportLoading ? <Loader2 size={16} className="animate-spin text-yellow-500" /> : <ArrowDown size={16} />}
+            {deloadAlert ? (
+              <span className="text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">Deload</span>
+            ) : null}
           </button>
           <button
             type="button"

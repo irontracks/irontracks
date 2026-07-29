@@ -95,7 +95,12 @@ export const analyzeDeloadHistory = (items: ReportHistoryItem[]): DeloadAnalysis
         (!hasRegression && weightDelta != null && Math.abs(weightDelta) <= DELOAD_STAGNATION_PCT);
 
     const status: DeloadAnalysis['status'] = hasRegression ? 'overtraining' : hasStagnation ? 'stagnation' : 'stable';
-    return { status, volumeDelta, weightDelta };
+    // Sem sessões suficientes, os deltas são null e o status cai em 'stable' por
+    // FALTA de dado, não por leitura da progressão. Quem afirma algo ao usuário
+    // (ou dispara aviso proativo) tem de olhar `hasEnoughHistory`, não só o status.
+    const itemsCount = ordered.length;
+    const hasEnoughHistory = itemsCount >= DELOAD_HISTORY_MIN && (volumeDelta != null || weightDelta != null);
+    return { status, volumeDelta, weightDelta, itemsCount, hasEnoughHistory };
 };
 
 export const parseAiRecommendation = (text: unknown): AiRecommendation => {
@@ -137,12 +142,21 @@ export const estimate1RmFromSets = (
 
 export const getDeloadReason = (analysis: DeloadAnalysis, reductionPct: number, historyCount: number) => {
     const pct = Math.round((Number(reductionPct) || 0) * 1000) / 10;
+    // Sem base suficiente, NÃO afirma cenário. Antes dizia "devido à progressão
+    // estável nos últimos histórico curto (1 treinos)" — uma frase com cara de
+    // análise, calculada sobre um único ponto de dado.
+    const enough = analysis?.hasEnoughHistory !== false && historyCount >= DELOAD_HISTORY_MIN;
+    if (!enough) {
+        const n = Number(historyCount) || 0;
+        return n > 0
+            ? `Redução de ${pct}%. Só ${n} ${n === 1 ? 'treino' : 'treinos'} no histórico — ainda não dá pra afirmar estagnação; ajuste no slider se precisar.`
+            : `Redução de ${pct}%. Sem histórico deste exercício — valor de partida, ajuste no slider se precisar.`;
+    }
     const label =
         analysis?.status === 'overtraining'
             ? 'regressão'
             : analysis?.status === 'stagnation'
                 ? 'estagnação'
                 : 'progressão estável';
-    const historyLabel = historyCount >= DELOAD_HISTORY_MIN ? `${historyCount} treinos` : `histórico curto (${historyCount || 0} treinos)`;
-    return `Redução de ${pct}% devido à ${label} nos últimos ${historyLabel}.`;
+    return `Redução de ${pct}% devido à ${label} nos últimos ${historyCount} treinos.`;
 };

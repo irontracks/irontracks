@@ -256,7 +256,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
   });
   const {
     reportHistory, reportHistoryStatus, reportHistoryUpdatedAt,
-    deloadSuggestions, deloadModal, setDeloadModal,
+    deloadSuggestions, deloadAlerts, deloadModal, setDeloadModal,
     deloadAiCacheRef, reportHistoryLoadingRef,
     reportHistoryLoadingSinceRef, reportHistoryStatusRef, reportHistoryUpdatedAtRef,
     persistDeloadHistoryFromSession,
@@ -603,6 +603,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     reportHistoryStatus,
     reportHistoryUpdatedAt,
     deloadSuggestions,
+    deloadAlerts,
     autoLoadEnabled,
     autoLoadSuggestions,
     currentExerciseIdx,
@@ -715,7 +716,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     groupMethodModal, setGroupMethodModal,
     postCheckinOpen, setPostCheckinOpen, postCheckinDraft, setPostCheckinDraft,
     reportHistory, reportHistoryStatus, reportHistoryUpdatedAt,
-    deloadSuggestions, autoLoadEnabled, autoLoadSuggestions,
+    deloadSuggestions, deloadAlerts, autoLoadEnabled, autoLoadSuggestions,
     currentExerciseIdx, setCurrentExerciseIdx,
     editExerciseOpen, setEditExerciseOpen,
     editExerciseIdx, setEditExerciseIdx,
