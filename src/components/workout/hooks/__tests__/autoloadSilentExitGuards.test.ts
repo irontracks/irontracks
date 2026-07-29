@@ -36,6 +36,29 @@ describe('o motor não escolhe histórico cegamente', () => {
   })
 })
 
+describe('sinal do dia não pode custar performance', () => {
+  /**
+   * O motor roda sobre TODOS os exercícios. Se o memo pesado depender de `logs`
+   * (que muda a cada tecla), o cálculo inteiro dispara a cada dígito digitado
+   * durante o treino — e os logs vivem num contexto separado exatamente por isso.
+   * A dependência correta é a chave canônica dos reconhecimentos.
+   */
+  const depsMatch = /\}, \[enabled, exercises, reportHistory, readiness([^\]]*)\]\)/.exec(autoload)
+
+  it('o memo de sugestões depende da chave canônica, não dos logs', () => {
+    expect(depsMatch).not.toBeNull()
+    const extraDeps = depsMatch?.[1] ?? ''
+    expect(extraDeps).toContain('feelerKey')
+    expect(extraDeps).not.toContain('logs')
+    // objeto novo a cada render — dependeria disso e quebraria a memoização
+    expect(extraDeps).not.toContain('feelerSignals')
+  })
+
+  it('a extração de sinais é isolada e testável (não inline no memo)', () => {
+    expect(autoload).toContain('export function extractFeelerSignals')
+  })
+})
+
 describe('saída do motor é observável', () => {
   it('emite warning remoto quando está ligado e mesmo assim não sugere', () => {
     expect(autoload).toContain('logWarnRemote')
