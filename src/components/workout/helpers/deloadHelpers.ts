@@ -10,13 +10,19 @@ import {
     ReportHistoryItem,
     AiRecommendation,
     DeloadAnalysis,
+    UnknownRecord,
 } from '../types';
 import {
+    isObject,
     safeJsonParse,
     normalizeReportHistory,
     averageNumbers,
     toNumber,
     estimate1Rm,
+    clampNumber,
+    roundToStep,
+    extractLogWeight,
+    WEIGHT_ROUND_STEP,
     DELOAD_HISTORY_KEY,
     DELOAD_AUDIT_KEY,
     DELOAD_HISTORY_SIZE,
@@ -24,6 +30,8 @@ import {
     DELOAD_RECENT_WINDOW,
     DELOAD_STAGNATION_PCT,
     DELOAD_REGRESSION_PCT,
+    DELOAD_REDUCTION_MIN,
+    DELOAD_REDUCTION_MAX,
 } from '../utils';
 
 // ─── LocalStorage ─────────────────────────────────────────────────────────────
@@ -72,6 +80,144 @@ export const appendDeloadAudit = (entry: unknown, userId?: string | null) => {
         window.localStorage.setItem(key, JSON.stringify(next));
     } catch { }
 };
+
+// ─── Aplicação do deload (núcleo puro) ────────────────────────────────────────
+
+export type DeloadSetInput = {
+    /** "exIdx-setIdx" */
+    key: string;
+    /** log atual da série (peso/reps/rpe/done/weightSource/advanced_config). */
+    log: UnknownRecord;
+    /** Peso planejado desta série (do plano ou do template), quando houver. */
+    plannedWeight: number | null;
+    /** Sugestão de reps/RPE já calculada para esta série, quando houver. */
+    suggestion: UnknownRecord | null;
+    /** advanced_config resolvido para esta série. */
+    cfg: unknown;
+};
+
+export type DeloadPatch = { key: string; patch: UnknownRecord };
+
+export type DeloadPlan = {
+    patches: DeloadPatch[];
+    /** Séries preservadas por já estarem concluídas. */
+    skippedDone: number;
+    appliedWeights: number[];
+};
+
+/**
+ * Decide, para cada série, o peso pós-deload e o patch a gravar. Núcleo PURO —
+ * extraído de `applyDeloadToExercise` para poder ser testado de verdade, em vez de
+ * por source-guard: era o único ponto do deload que escreve algo e não tinha
+ * nenhum teste de comportamento (auditoria 2026-07-29).
+ *
+ * Três regras não óbvias moram aqui:
+ *
+ *  1. Série já CONCLUÍDA não é tocada — o peso dela é o que a pessoa levantou.
+ *     Reescrever falsificava retroativamente volume, relatório e PDF.
+ *  2. `weightSource: 'user'` é obrigatório no patch. O deload nasce de um modal
+ *     que a pessoa confirmou, então o peso é dela. Sem essa marca a série seguia
+ *     'auto' e o re-sync do autoload reescrevia a sugestão antiga por cima,
+ *     desfazendo o deload em silêncio.
+ *  3. A REFERÊNCIA da redução respeita a origem do peso, para os cortes não se
+ *     comporem: peso assumido pelo usuário manda; peso posto pelo motor (que já
+ *     pode vir descontado por prontidão e reconhecimento) cede lugar ao maior
+ *     entre ele e o planejado, para a redução incidir sobre a carga cheia.
+ */
+export function buildDeloadPatches(input: {
+    sets: DeloadSetInput[];
+    ratio: number;
+    minWeight: number;
+    baseWeight: number;
+    appliedAt: string;
+    meta: { reductionPct: unknown; reason: unknown; historyCount: unknown };
+}): DeloadPlan {
+    const { sets, ratio, minWeight, baseWeight, appliedAt, meta } = input;
+    const patches: DeloadPatch[] = [];
+    const appliedWeights: number[] = [];
+    let skippedDone = 0;
+
+    for (const item of Array.isArray(sets) ? sets : []) {
+        const log: UnknownRecord = isObject(item?.log) ? item.log : {};
+
+        const doneRaw = log.done ?? log.isDone ?? log.completed ?? null;
+        const alreadyDone = doneRaw === true || String(doneRaw ?? '').toLowerCase() === 'true';
+        if (alreadyDone) { skippedDone += 1; continue; }
+
+        const logWeight = extractLogWeight(log);
+        const suggestion = isObject(item?.suggestion) ? item.suggestion : null;
+        // Peso desta série na ÚLTIMA sessão — é a referência de "carga cheia".
+        //
+        // Usar o planejado do template aqui foi um erro meu: o template envelhece.
+        // No Crucifixo do dono, o template dizia 70 kg mas a carga real havia caído
+        // para 50; com o template como referência, "reduzir 22%" resultava em
+        // 54,5 kg — o botão de DELOAD AUMENTAVA a carga. O histórico recente não
+        // envelhece, então é ele que distingue os dois casos:
+        //   • motor cortou HOJE (prontidão/reconhecimento): caixa < última sessão
+        //     → reduz sobre a última sessão, sem compor cortes;
+        //   • carga caiu de verdade: caixa ≈ última sessão → reduz sobre ela mesma.
+        const lastSessionWeight = toNumber(suggestion?.weight ?? null);
+        const plannedWeight = toNumber(item?.plannedWeight ?? null);
+        const userOwnsWeight = String(log.weightSource ?? '') === 'user';
+        const reference = userOwnsWeight && logWeight != null
+            ? logWeight
+            : Math.max(logWeight ?? 0, lastSessionWeight ?? 0) || plannedWeight || toNumber(baseWeight) || 0;
+        if (!reference || reference <= 0) continue;
+
+        // Invariante de sanidade: deload REDUZ. Nunca devolve peso acima da
+        // referência, qualquer que seja a combinação de piso e arredondamento.
+        const target = Math.min(Math.max(reference * ratio, minWeight || 0), reference);
+        const nextWeight = roundToStep(target, WEIGHT_ROUND_STEP);
+        const baseSetWeight = reference;
+        const currentReps = log.reps;
+        const currentRpe = log.rpe;
+        const hasReps = String(currentReps ?? '').trim().length > 0;
+        const hasRpe = String(currentRpe ?? '').trim().length > 0;
+
+        patches.push({
+            key: item.key,
+            patch: {
+                weight: String(nextWeight),
+                weightSource: 'user',
+                reps: !hasReps && suggestion?.reps != null ? String(suggestion.reps) : currentReps,
+                rpe: !hasRpe && suggestion?.rpe != null ? String(suggestion.rpe) : currentRpe,
+                deload: {
+                    appliedAt,
+                    originalWeight: baseSetWeight,
+                    suggestedWeight: nextWeight,
+                    reductionPct: meta?.reductionPct,
+                    reason: meta?.reason,
+                    historyCount: meta?.historyCount,
+                },
+                advanced_config: item?.cfg ?? log.advanced_config ?? null,
+            },
+        });
+        appliedWeights.push(nextWeight);
+    }
+
+    return { patches, skippedDone, appliedWeights };
+}
+
+/**
+ * Clampa o peso digitado no campo livre do modal e devolve a redução resultante.
+ *
+ * O campo não tinha teto superior: digitar acima do peso base fazia a razão passar
+ * de 1 e o "deload" AUMENTAR a carga em todas as séries, gravado com metadado de
+ * deload. Agora respeita os mesmos limites do slider (5%–40%) e o piso de 1RM.
+ */
+export function clampDeloadWeight(
+    nextWeightRaw: number,
+    baseWeight: number,
+    minWeight: number,
+): { weight: number; reductionPct: number } | null {
+    if (!Number.isFinite(baseWeight) || baseWeight <= 0) return null;
+    if (!Number.isFinite(nextWeightRaw)) return null;
+    const maxAllowed = baseWeight * (1 - DELOAD_REDUCTION_MIN);
+    const minAllowed = Math.max(minWeight || 0, baseWeight * (1 - DELOAD_REDUCTION_MAX));
+    const bounded = clampNumber(nextWeightRaw, Math.min(minAllowed, maxAllowed), maxAllowed);
+    const weight = roundToStep(bounded, WEIGHT_ROUND_STEP);
+    return { weight, reductionPct: clampNumber(1 - weight / baseWeight, 0, 1) };
+}
 
 // ─── Pure Analysis Functions ──────────────────────────────────────────────────
 

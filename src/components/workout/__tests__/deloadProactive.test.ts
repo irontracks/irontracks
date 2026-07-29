@@ -123,13 +123,6 @@ describe('alertas proativos existem e são conservadores', () => {
   })
 })
 
-describe('cortes não se compõem (deload × motor de carga)', () => {
-  it('a referência da redução respeita peso assumido pelo usuário', () => {
-    expect(hookSrc).toContain('userOwnsWeight')
-    expect(hookSrc).toMatch(/String\(log\.weightSource \?\? ''\) === 'user'/)
-  })
-
-  it('quando o peso é do motor, usa o maior entre caixa e planejado', () => {
-    expect(hookSrc).toMatch(/Math\.max\(logWeight \?\? 0, plannedWeight \?\? 0\)/)
-  })
-})
+// A regra de referência de corte migrou para `buildDeloadPatches` e é exercitada
+// de verdade em deloadApply.test.ts (incluindo o caso real do Crucifixo, em que
+// usar o template como referência fazia o deload AUMENTAR a carga).

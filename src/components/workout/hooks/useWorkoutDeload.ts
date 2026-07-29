@@ -52,6 +52,8 @@ import {
   parseAiRecommendation,
   estimate1RmFromSets,
   getDeloadReason,
+  buildDeloadPatches,
+  clampDeloadWeight,
 } from '../helpers/deloadHelpers';
 import { generatePostWorkoutInsights } from '@/actions/workout-actions';
 import { logError } from '@/lib/logger';
@@ -871,16 +873,10 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
     const minWeight = Number(deloadModal.minWeight || 0);
     const nextWeightRaw = toNumber(value);
     if (nextWeightRaw == null) return;
-    // Mesmos limites do slider de percentual (5%–40%). O campo de peso livre não
-    // tinha teto superior: digitar um valor acima do peso base fazia
-    // `ratio = target/base` passar de 1 e o "deload" AUMENTAR a carga em todas as
-    // séries, gravado com metadado de deload. O piso de 1RM continua valendo.
-    const maxAllowed = baseWeight * (1 - DELOAD_REDUCTION_MIN);
-    const minAllowed = Math.max(minWeight || 0, baseWeight * (1 - DELOAD_REDUCTION_MAX));
-    const bounded = clampNumber(nextWeightRaw, Math.min(minAllowed, maxAllowed), maxAllowed);
-    const nextWeight = roundToStep(bounded, WEIGHT_ROUND_STEP);
-    const appliedReduction = clampNumber(1 - nextWeight / baseWeight, 0, 1);
-    setDeloadModal((prev) => (prev && typeof prev === 'object' ? { ...prev, reductionPct: appliedReduction, suggestedWeight: nextWeight } : prev));
+    // Limites e arredondamento em `clampDeloadWeight` (função pura testada).
+    const clamped = clampDeloadWeight(nextWeightRaw, baseWeight, minWeight);
+    if (!clamped) return;
+    setDeloadModal((prev) => (prev && typeof prev === 'object' ? { ...prev, reductionPct: clamped.reductionPct, suggestedWeight: clamped.weight } : prev));
   };
 
 
@@ -901,73 +897,38 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
       const ratio = targetWeight / baseWeight;
       const minWeight = Number(deloadModal.minWeight || 0);
       const appliedAt = new Date().toISOString();
-      const appliedWeights: unknown[] = [];
-      let skippedDone = 0;
-      for (let setIdx = 0; setIdx < setsCount; setIdx += 1) {
-        const key = `${exIdx}-${setIdx}`;
-        const log = getLog(key);
-        // Série JÁ CONCLUÍDA não é reescrita: o peso dela é o que a pessoa
-        // levantou de fato. Antes o loop sobrescrevia tudo, então aplicar deload
-        // na 4ª série falsificava retroativamente as 3 primeiras — e com elas o
-        // volume, o relatório e o PDF da sessão.
-        const doneRaw = log.done ?? log.isDone ?? log.completed ?? null;
-        const alreadyDone = doneRaw === true || String(doneRaw ?? '').toLowerCase() === 'true';
-        if (alreadyDone) { skippedDone += 1; continue; }
-        const cfg = getPlanConfig(ex, setIdx);
-        const planned = getPlannedSet(ex, setIdx);
-        const logWeight = extractLogWeight(log);
-        // REFERÊNCIA da redução — não compõe cortes.
-        //
-        // O deload reduzia sempre o que estava na caixa. Mas essa caixa pode já
-        // ter vindo cortada pelo motor de carga (prontidão do check-in ×0,88 e
-        // sinal da série de Reconhecimento ×0,90), e aí os cortes se multiplicavam:
-        // 0,88 × 0,90 × 0,78 ≈ 0,62, ou seja ~38% abaixo da carga projetada, sem
-        // nenhum dos dois sistemas saber do outro.
-        //
-        // Regra: peso que o USUÁRIO assumiu (weightSource 'user') é a referência —
-        // é escolha dele e manda. Peso posto pelo motor ('auto') ou campo vazio não
-        // serve de referência: usa-se o maior entre ele e o planejado, para a
-        // redução incidir sobre a carga cheia e não sobre uma já descontada.
-        const plannedWeight = toNumber(cfg?.weight ?? planned?.weight ?? null);
-        const userOwnsWeight = String(log.weightSource ?? '') === 'user';
-        const baseSetWeight = userOwnsWeight && logWeight != null
-          ? logWeight
-          : Math.max(logWeight ?? 0, plannedWeight ?? 0) || toNumber(baseWeight) || 0;
-        if (!baseSetWeight || baseSetWeight <= 0) continue;
-        const nextWeight = roundToStep(Math.max(baseSetWeight * ratio, minWeight || 0), WEIGHT_ROUND_STEP);
-        const suggestionValue = deloadSuggestions[key];
-        const suggestion = isObject(suggestionValue) ? (suggestionValue as UnknownRecord) : null;
-        const currentReps = log.reps;
-        const currentRpe = log.rpe;
-        const hasReps = String(currentReps ?? '').trim().length > 0;
-        const hasRpe = String(currentRpe ?? '').trim().length > 0;
-        const nextReps = !hasReps && suggestion?.reps != null ? String(suggestion.reps) : currentReps;
-        const nextRpe = !hasRpe && suggestion?.rpe != null ? String(suggestion.rpe) : currentRpe;
-        updateLog(key, {
-          weight: String(nextWeight),
-          // `weightSource: 'user'` é OBRIGATÓRIO aqui. O deload vem de um modal que
-          // a pessoa confirmou, então o peso é dela — não do motor. Sem esta marca o
-          // log herdava a fonte anterior ('auto', quando o autoload tinha preenchido
-          // a caixa), a guarda do useAutoloadWeight não pegava, e o efeito de
-          // re-sincronização reescrevia a sugestão ANTIGA por cima: a redução
-          // desaparecia da tela no render seguinte, sem erro e sem log.
-          // Mesma correção que useWorkoutMethodSavers.ts:93 já fez para os 13
-          // savers de método avançado — o deload era o escritor que ficou de fora.
-          weightSource: 'user',
-          reps: nextReps,
-          rpe: nextRpe,
-          deload: {
-            appliedAt,
-            originalWeight: baseSetWeight,
-            suggestedWeight: nextWeight,
-            reductionPct: deloadModal.reductionPct,
-            reason: deloadModal.reason,
-            historyCount: deloadModal.historyCount,
-          },
-          advanced_config: cfg ?? log.advanced_config ?? null,
-        });
-        appliedWeights.push(nextWeight);
-      }
+
+      // O cálculo (pular série concluída, escolher a referência que não compõe
+      // cortes, aplicar piso e montar o patch) vive em `buildDeloadPatches`, função
+      // pura testada de verdade. Aqui o hook só coleta o estado e grava.
+      const plan = buildDeloadPatches({
+        sets: Array.from({ length: setsCount }, (_, setIdx) => {
+          const key = `${exIdx}-${setIdx}`;
+          const cfg = getPlanConfig(ex, setIdx);
+          const planned = getPlannedSet(ex, setIdx);
+          const suggestionValue = deloadSuggestions[key];
+          return {
+            key,
+            log: getLog(key),
+            plannedWeight: toNumber(cfg?.weight ?? planned?.weight ?? null),
+            suggestion: isObject(suggestionValue) ? (suggestionValue as UnknownRecord) : null,
+            cfg,
+          };
+        }),
+        ratio,
+        minWeight,
+        baseWeight,
+        appliedAt,
+        meta: {
+          reductionPct: deloadModal.reductionPct,
+          reason: deloadModal.reason,
+          historyCount: deloadModal.historyCount,
+        },
+      });
+
+      for (const { key, patch } of plan.patches) updateLog(key, patch);
+      const appliedWeights: unknown[] = plan.appliedWeights;
+      const skippedDone = plan.skippedDone;
       appendDeloadAudit({
         ts: Date.now(),
         exIdx,

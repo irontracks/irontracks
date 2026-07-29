@@ -28,29 +28,33 @@ import { pickUsableHistory } from '../hooks/useWorkoutAutoload'
 
 const deloadSrc = readFileSync(resolve(process.cwd(), 'src/components/workout/hooks/useWorkoutDeload.ts'), 'utf8')
 
-describe('deload — aplicação não é desfeita pelo autoload (defeito 1)', () => {
-  it("grava weightSource: 'user' junto com o peso reduzido", () => {
-    // o patch do updateLog precisa carregar a marca; sem ela a série segue 'auto'
-    expect(deloadSrc).toMatch(/weight: String\(nextWeight\),[\s\S]{0,900}weightSource: 'user'/)
+/**
+ * O comportamento da aplicação (weightSource, skip de concluída, referência de
+ * corte, piso, clamp do campo livre) é coberto de VERDADE em deloadApply.test.ts,
+ * que importa e executa `buildDeloadPatches`/`clampDeloadWeight`.
+ *
+ * O que resta aqui é a FIAÇÃO: garantir que o hook usa esse núcleo testado em vez
+ * de reimplementar a lógica inline — que foi exatamente como os bugs entraram.
+ */
+describe('deload — o hook usa o núcleo testado (fiação)', () => {
+  it('delega o cálculo das séries a buildDeloadPatches', () => {
+    expect(deloadSrc).toContain('buildDeloadPatches({')
+    // e grava TODOS os patches devolvidos
+    expect(deloadSrc).toMatch(/for \(const \{ key, patch \} of plan\.patches\) updateLog\(key, patch\)/)
   })
-})
 
-describe('deload — não reescreve série já concluída (defeito 2)', () => {
-  it('pula séries concluídas no loop de aplicação', () => {
-    expect(deloadSrc).toMatch(/alreadyDone/)
-    expect(deloadSrc).toMatch(/if \(alreadyDone\) \{ skippedDone \+= 1; continue; \}/)
+  it('delega o clamp do campo de peso a clampDeloadWeight', () => {
+    expect(deloadSrc).toContain('clampDeloadWeight(')
   })
 
-  it('avisa o usuário quando pulou séries (senão parece que falhou)', () => {
+  it('não reimplementa a lógica inline (senão o núcleo testado é contornado)', () => {
+    expect(deloadSrc).not.toMatch(/weightSource: 'user',[\s\S]{0,200}deload: \{/)
+    expect(deloadSrc).not.toContain('const alreadyDone')
+  })
+
+  it('avisa o usuário quando pulou séries concluídas', () => {
     expect(deloadSrc).toMatch(/skippedDone > 0/)
     expect(deloadSrc).toMatch(/já concluída/)
-  })
-})
-
-describe('deload — não pode virar aumento de carga (defeito 3)', () => {
-  it('o campo de peso livre respeita os limites de redução do slider', () => {
-    expect(deloadSrc).toMatch(/maxAllowed[\s\S]{0,120}DELOAD_REDUCTION_MIN/)
-    expect(deloadSrc).toMatch(/minAllowed[\s\S]{0,160}DELOAD_REDUCTION_MAX/)
   })
 })
 
