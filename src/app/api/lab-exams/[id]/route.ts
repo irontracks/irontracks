@@ -8,6 +8,7 @@
  */
 import { NextResponse } from 'next/server'
 import { requireUser } from '@/utils/auth/route'
+import { canCoachStudent } from '@/utils/auth/studentAccess'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
 import { getErrorMessage } from '@/utils/errorMessage'
@@ -42,8 +43,10 @@ export async function DELETE(request: Request, ctx: { params: Promise<{ id: stri
     if (!exam) return NextResponse.json({ ok: false, error: 'not_found' }, { status: 404 })
 
     const assessedUserId = String((exam as { user_id?: string }).user_id || '')
-    const trainerId = (exam as { trainer_id?: string | null }).trainer_id || null
-    if (userId !== assessedUserId && userId !== trainerId) {
+    // Gate por VÍNCULO REAL (canCoachStudent), não por row.trainer_id: o trainer_id
+    // é gravado na criação e nunca revalidado, então um ex-personal continuava
+    // apagando exames do ex-aluno depois do vínculo desfeito (auditoria 2026-07-28).
+    if (userId !== assessedUserId && !(await canCoachStudent({ id: userId, email: auth.user.email }, assessedUserId))) {
       return NextResponse.json({ ok: false, error: 'forbidden' }, { status: 403 })
     }
 

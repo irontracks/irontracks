@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
-import { createClient } from '@/utils/supabase/server'
+import { requireRole } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { parseJsonBody } from '@/utils/zod'
 import { getErrorMessage } from '@/utils/errorMessage'
@@ -25,9 +25,12 @@ const PlanSchema = z.object({
 
 export async function GET() {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
+    // Gate de papel igual ao das 24 rotas irmãs de /api/teacher (e ao
+    // service-plans/[id], que opera na MESMA tabela): sem ele, aluno comum
+    // acessava a superfície de professor (auditoria 2026-07-28).
+    const auth = await requireRole(['teacher', 'admin'])
+    if (!auth.ok) return auth.response
+    const user = auth.user
 
     const admin = createAdminClient()
     const { data, error } = await admin
@@ -45,9 +48,9 @@ export async function GET() {
 
 export async function POST(req: Request) {
   try {
-    const supabase = await createClient()
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return NextResponse.json({ ok: false, error: 'unauthorized' }, { status: 401 })
+    const auth = await requireRole(['teacher', 'admin'])
+    if (!auth.ok) return auth.response
+    const user = auth.user
 
     const parsed = await parseJsonBody(req, PlanSchema)
     if (parsed.response) return parsed.response
