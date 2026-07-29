@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { logWarn } from '@/lib/logger'
+import { logWarn, logWarnRemote } from '@/lib/logger'
 import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
 import { createAdminClient } from '@/utils/supabase/admin'
@@ -12,6 +12,7 @@ import { getGeminiModel } from '@/utils/ai/gemini'
 import { buildUserContextBlock } from '@/utils/ai/userContext'
 import { respondDbError } from '@/utils/api/dbError'
 import { setVolume, isWorkingSet } from '@/utils/report/setVolume'
+import { reconcileAiNarrative } from '@/utils/report/reconcileAiNarrative'
 
 export const dynamic = 'force-dynamic'
 
@@ -314,6 +315,17 @@ export async function POST(req: Request) {
     // do usuário. Coaching baseado em exames fica nas superfícies de saúde dedicadas.
     const userCtx = await buildUserContextBlock(supabase, userId, ['profile', 'nutrition'])
 
+    // Métricas oficiais ANTES do prompt. Antes elas eram computadas só depois da
+    // geração, então o número correto nunca chegava ao modelo — ele somava os
+    // logs sozinho e errava: em 29/07/2026 o card dizia 26.300 kg e o texto
+    // "18.232 kg"; o MESMO 18.232 saiu numa sessão de volume 17.566 kg, e a
+    // string não existia no payload. LLM não faz aritmética: recebe pronto e narra.
+    const metrics = computeMetrics(sessionObj)
+    const prevMetrics =
+      previousSession && typeof previousSession === 'object'
+        ? computeMetrics(previousSession as Record<string, unknown>)
+        : null
+
     const prompt = [
       `${userCtx ? userCtx + '\n\n' : ''}Você é um coach de musculação e um analista de performance do app IronTracks.`,
       'Personalize pelo CONTEXTO DO USUÁRIO acima (objetivo, avaliação, treino, nutrição).',
@@ -337,12 +349,20 @@ export async function POST(req: Request) {
       '- Escreva em pt-BR.',
       '- Seja objetivo e prático.',
       '- Não invente números: use apenas os dados fornecidos.',
+      '- PROIBIDO somar, contar ou recalcular qualquer coisa a partir dos logs. Todo número agregado (volume total, número de séries, número de exercícios, comparação com a sessão anterior) DEVE ser copiado LITERALMENTE das MÉTRICAS OFICIAIS abaixo.',
+      '- Se um total que você quer citar não estiver nas MÉTRICAS OFICIAIS, não cite esse número.',
       '- Se não der para afirmar algo, omita.',
       hasPainData
         ? '- O atleta reportou OBSERVAÇÕES DE DOR/DESCONFORTO. Preencha pain_suggestions com (2-5 sugestões práticas) de técnicas de recuperação, mobilidade, ajuste de carga ou exercícios alternativos para cada área afetada. Seja específico e baseado em evidências.'
         : '- Não há relatos de dor nesta sessão. Retorne pain_suggestions como array vazio [].',
       '',
-      'Sessão atual:',
+      'MÉTRICAS OFICIAIS DA SESSÃO ATUAL (fonte de verdade — copie EXATAMENTE, NÃO recalcule):',
+      JSON.stringify(metrics),
+      '',
+      'MÉTRICAS OFICIAIS DA SESSÃO ANTERIOR (fonte de verdade para comparações, pode ser null):',
+      JSON.stringify(prevMetrics),
+      '',
+      'Sessão atual (detalhe por série — use para qualidade/técnica, NUNCA para somar totais):',
       JSON.stringify(session),
       '',
       'Sessão anterior (pode ser null):',
@@ -364,8 +384,18 @@ export async function POST(req: Request) {
     if (!parsed) return NextResponse.json({ ok: false, error: 'ai_invalid_input' }, { status: 400 })
 
     const baseAi = normalizeAi(parsed)
-    const metrics = computeMetrics(sessionObj)
-    const ai = metrics ? { ...baseAi, metrics } : baseAi
+    // Cinto de segurança: mesmo com as métricas oficiais no prompt, uma geração
+    // azarada ainda pode escrever um total divergente — e este relatório sai do
+    // app (Story/Card/PDF). Bullet com agregado que não bate é descartado, e a
+    // divergência vira warning pesquisável no Sentry pra medir a taxa residual.
+    const { ai: reconciled, divergences } = reconcileAiNarrative(baseAi, metrics)
+    if (divergences.length) {
+      logWarnRemote('ai:post-workout-insights', 'narrativa com agregado divergente descartada', {
+        workoutId: String(workout.id),
+        divergences: divergences.map((d) => ({ kind: d.kind, declared: d.declared, official: d.official })),
+      })
+    }
+    const ai = metrics ? { ...reconciled, metrics } : reconciled
 
     const mergedSession = (() => {
       const base = sessionFromNotes && typeof sessionFromNotes === 'object' ? sessionFromNotes : sessionFromBody && typeof sessionFromBody === 'object' ? sessionFromBody : session
