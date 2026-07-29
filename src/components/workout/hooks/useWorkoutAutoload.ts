@@ -15,6 +15,7 @@ import type { ReportHistory } from '../types'
 import { normalizeExerciseKey } from '../utils'
 import { suggestWeight, type HistorySet, type ReadinessToday } from '@/utils/autoload/suggestWeight'
 import { inferEquipmentFromName } from '@/utils/autoload/equipmentFromName'
+import { logWarnRemote } from '@/lib/logger'
 
 export interface AutoloadSuggestion {
   weight: number | null
@@ -48,7 +49,7 @@ const asNum = (v: unknown): number | null => {
 }
 
 /** Reconstrói as séries da última sessão de um exercício a partir dos arrays por-set. */
-function buildHistorySets(item: {
+export function buildHistorySets(item: {
   setWeights?: (number | null)[] | null
   setReps?: (number | null)[] | null
   setRpes?: (number | null)[] | null
@@ -73,6 +74,28 @@ function buildHistorySets(item: {
     }
   }
   return out
+}
+
+/**
+ * Escolhe o histórico utilizável: percorre as sessões do exercício da mais recente
+ * para a mais antiga e devolve a primeira que produza séries válidas.
+ *
+ * Existe porque pegar cegamente a sessão mais recente cegava o motor: bastava o
+ * último treino daquele exercício ter sido PULADO (o motor prefila o peso, o usuário
+ * não executa, então fica peso sem reps) para o histórico virar [] e o motor concluir
+ * "nunca fizeram isso" — ignorando os treinos bons logo atrás. Caso real: Crucifixo
+ * invertido na máquina, pulado em 27/07, sem sugestão nenhuma em 29/07.
+ */
+export function pickUsableHistory(
+  items: Array<Parameters<typeof buildHistorySets>[0] & { ts?: number }> | null | undefined,
+): HistorySet[] {
+  if (!Array.isArray(items) || !items.length) return []
+  const ordered = [...items].sort((a, b) => Number(b?.ts ?? 0) - Number(a?.ts ?? 0))
+  for (const item of ordered) {
+    const sets = buildHistorySets(item)
+    if (sets.length) return sets
+  }
+  return []
 }
 
 export function useWorkoutAutoload({ exercises, reportHistory, settings, userId }: Params): {
@@ -140,10 +163,15 @@ export function useWorkoutAutoload({ exercises, reportHistory, settings, userId 
       if (setsCount <= 0) return
 
       const histEntry = reportHistory.exercises?.[normalizeExerciseKey(name)]
-      const latest = histEntry?.items?.length
-        ? [...histEntry.items].sort((a, b) => b.ts - a.ts)[0]
-        : null
-      const history = buildHistorySets(latest)
+      // Percorre do mais recente pro mais antigo até achar uma sessão que produza
+      // séries utilizáveis. Antes pegava `sort(...)[0]` cego: bastava a sessão mais
+      // recente ter sido PULADA (peso prefilado pelo motor, sem reps) pra
+      // `buildHistorySets` devolver [] e o motor concluir "sem histórico",
+      // ignorando os treinos bons logo atrás. Uma sessão pulada apagava todo o
+      // histórico anterior daquele exercício (caso real: Crucifixo invertido,
+      // pulado em 27/07 → sem sugestão em 29/07).
+      const ordered = histEntry?.items ?? []
+      const history = pickUsableHistory(ordered)
 
       const suggestion = suggestWeight({
         history,
@@ -152,6 +180,19 @@ export function useWorkoutAutoload({ exercises, reportHistory, settings, userId 
         equipment: inferEquipmentFromName(name),
         readiness,
       })
+
+      // Motor ligado e mesmo assim sem sugestão: warning pesquisável no Sentry.
+      // Esta saída era 100% silenciosa — nem tela, nem log —, então o modo de falha
+      // que cegou o Crucifixo invertido só apareceu quando o dono estranhou na mão.
+      // Toda saída silenciosa em caminho crítico é bomba-relógio (ver CLAUDE.md).
+      if (suggestion.weight == null) {
+        logWarnRemote('autoload:sem-sugestao', 'motor ligado não sugeriu carga', {
+          exercise: name,
+          historyItems: ordered.length,
+          usableSets: history.length,
+          rationale: suggestion.rationale,
+        })
+      }
 
       // Mesma sugestão de base para todas as séries do exercício (progressão é
       // por exercício na Fase 1). O normalSet decide preencher só séries de trabalho.
