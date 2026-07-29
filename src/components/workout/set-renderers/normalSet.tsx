@@ -779,6 +779,11 @@ const NormalSetInner = ({
           <div className="mt-1 flex items-center justify-between gap-2">
             {isAutoWeight && (autoSuggestion?.rationale || autoPlateHint) ? (
               <AutoloadNote show rationale={autoSuggestion?.rationale ?? ''} plateHint={autoPlateHint} />
+            ) : autoLoadEnabled && setType === 'working' && !done && autoSuggestionWeight == null && autoSuggestion?.rationale ? (
+              /* Motor ligado que não teve base pra sugerir: mostra o PORQUÊ em cinza.
+                 O rationale já era computado e jogado fora, então o usuário via uma
+                 caixa vazia igualzinha à de quem está com o autoload desligado. */
+              <AutoloadNote show muted rationale={autoSuggestion.rationale} />
             ) : <span />}
             {failureToggle}
           </div>

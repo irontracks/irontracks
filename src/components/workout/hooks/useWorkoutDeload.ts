@@ -171,6 +171,18 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
             const doneRaw = log.done ?? log.isDone ?? log.completed ?? null;
             const done = doneRaw == null ? true : doneRaw === true || String(doneRaw || '').toLowerCase() === 'true';
             if (!done && !hasValues) return;
+            // Descarta o PREFILL do próprio motor de carga: peso escrito por ele
+            // (weightSource 'auto'), sem nenhuma rep e sem conclusão explícita, é
+            // exercício PULADO — não treino executado. Sem esta guarda o prefill
+            // entrava no histórico (só o peso já satisfaz `hasValues`, e `done`
+            // ausente vira true acima), o exercício virava um item com
+            // `setReps: null`, e na sessão seguinte o autoload lia esse item, não
+            // achava rep nenhuma e concluía "sem histórico" — auto-envenenamento.
+            // Deliberadamente estreita: exige as TRÊS condições, para não afrouxar
+            // o default de `done` ausente, do qual as sessões legadas dependem.
+            const isEnginePrefillOnly =
+              String(log.weightSource ?? '').toLowerCase() === 'auto' && reps == null && doneRaw == null;
+            if (isEnginePrefillOnly) return;
             // Série levada à falha. Aceita boolean e a string "true" (o log passa
             // por serialização JSON em workouts.notes e volta como texto).
             const failureRaw = log.failure ?? null;
