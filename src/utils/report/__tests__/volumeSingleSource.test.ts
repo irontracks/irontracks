@@ -246,7 +246,38 @@ describe('reportMeta.totals.volumeKg — isometria não vira carga levantada', (
     const session = SESSIONS.find((s) => s.nome.startsWith('PRANCHA'))!.session
     const ex = buildReportMetrics(session).exercises[0]
     expect(ex.setsDone).toBe(3)
+    // `repsDone` em SEGUNDOS é contrato com a UI: ReportExerciseTable renderiza
+    // `${repsDone}s` quando o exercício é prancha. Zerar aqui apagaria a linha.
     expect(ex.repsDone).toBe(180) // 3 × 60 s aguentados
+  })
+
+  /**
+   * Consequências de o volume da isometria ser 0 — as duas foram introduzidas
+   * junto com a correção do volume e precisam ficar travadas.
+   */
+  it('o tempo aguentado alimenta a EXECUÇÃO (senão a prancha perde a base de rateio)', () => {
+    // `distributeKcalWithFixed` rateia por volume quando algum exercício não tem
+    // tempo medido. Com volume 0 e execução 0, a prancha receberia 0 kcal — foi
+    // isso que a correção do volume causou. PlankSetInput/CardioSetInput gravam
+    // `durationSeconds`, nunca `executionSeconds`.
+    const session = SESSIONS.find((s) => s.nome.startsWith('PRANCHA'))!.session
+    const ex = buildReportMetrics(session).exercises[0]
+    expect(ex.executionMinutes).toBe(3) // 180 s aguentados
+  })
+
+  it('não reporta "peso médio" onde não houve carga levantada', () => {
+    // O campo `weight` da prancha é o peso corporal preenchido por default. Com
+    // volume 0, exibi-lo como peso médio deixava a tabela auto-contraditória.
+    const session = SESSIONS.find((s) => s.nome.startsWith('PRANCHA'))!.session
+    const ex = buildReportMetrics(session).exercises[0]
+    expect(ex.volumeKg).toBe(0)
+    expect(ex.avgWeightKg).toBeNull()
+  })
+
+  it('exercício com carga de verdade continua reportando peso médio', () => {
+    const session = SESSIONS.find((s) => s.nome === 'série normal')!.session
+    const ex = buildReportMetrics(session).exercises[0]
+    expect(ex.avgWeightKg).toBe(80)
   })
 })
 

@@ -141,8 +141,12 @@ const buildLogVolume = (logs: UnknownRecord, exerciseIndex: number) => {
 
     if (weight > 0 && repsVal > 0) {
       reps += repsVal
-      weightSum += weight
-      weightCount += 1
+      // "Peso médio" só faz sentido onde houve carga LEVANTADA (volume > 0). Na
+      // isometria o campo `weight` é preenchido com o PESO CORPORAL por default
+      // (PlankSetInput), então contá-lo aqui punha a tabela do relatório numa
+      // contradição visível desde que o volume da prancha passou a ser 0:
+      // "Peso médio 96,8 kg" na mesma linha de "Volume —".
+      if (setVol > 0) { weightSum += weight; weightCount += 1 }
     } else if (repsVal > 0) {
       reps += repsVal
     } else {
@@ -236,7 +240,14 @@ const buildLogTimes = (
     const doneRaw = value.done ?? value.isDone ?? value.completed ?? null
     const done = doneRaw == null ? true : doneRaw === true || String(doneRaw || '').toLowerCase() === 'true'
     if (!done) return
-    const exec = toNumber((value as UnknownRecord).executionSeconds ?? (value as UnknownRecord).execution_seconds)
+    // Tempo de execução. ISOMETRIA/CARDIO não gravam `executionSeconds` — o tempo
+    // real está em `durationSeconds` (PlankSetInput/CardioSetInput). Sem este
+    // fallback a coluna "Execução" da prancha ficava vazia embora o app soubesse
+    // exatamente quantos segundos o usuário aguentou, e a série não tinha NENHUMA
+    // base de rateio depois que o volume da isometria (corretamente) virou 0.
+    const execRaw = toNumber((value as UnknownRecord).executionSeconds ?? (value as UnknownRecord).execution_seconds)
+    const holdSec = toNumber((value as UnknownRecord).durationSeconds ?? (value as UnknownRecord).duration_seconds)
+    const exec = execRaw > 0 ? execRaw : holdSec
     const rest = toNumber((value as UnknownRecord).restSeconds ?? (value as UnknownRecord).rest_seconds)
     if (exec > 0) executionSeconds += Math.round(exec)
     if (rest > 0) {
