@@ -24,7 +24,7 @@ import { HelpHint } from '@/components/ui/HelpHint';
 import { HELP_TERMS } from '@/utils/help/terms';
 import { parseTrainingNumber } from '@/utils/trainingNumber';
 import { setTopWeightReps } from '@/utils/report/setVolume';
-import { isObject, isClusterConfig, isRestPauseConfig } from './utils';
+import { isObject, isClusterConfig, isRestPauseConfig, normalizeExerciseKey } from './utils';
 import { WorkoutExercise, UnknownRecord } from './types';
 import { isPlank } from '@/utils/exerciseTracking';
 import { PlankSetInput } from './PlankSetInput';
@@ -54,6 +54,9 @@ function ExerciseCardInner({ ex, exIdx, groupPos, logsSlice }: { ex: WorkoutExer
     reportHistory,
     deloadAlerts,
     openDeloadModal,
+    autoLoadEnabled,
+    deloadOffKeys,
+    toggleExerciseDeload,
     openEditExercise,
     addExtraSetToExercise,
     getPlannedSet,
@@ -539,31 +542,67 @@ function ExerciseCardInner({ ex, exIdx, groupPos, logsSlice }: { ex: WorkoutExer
             exerciseId={String(ex?.id || ex?.exercise_id || '')}
             exerciseLibraryId={String(ex?.exercise_library_id || '')}
           />
-          <button
-            type="button"
-            onClick={async (e) => {
-              try {
-                e.preventDefault();
-                e.stopPropagation();
-              } catch { }
-              setCurrentExerciseIdx(exIdx);
-              await openDeloadModal(ex, exIdx);
-            }}
-            className={[
-              'h-9 inline-flex items-center justify-center gap-1 rounded-xl border transition-colors active:scale-95 flex-shrink-0',
-              // Com aviso ativo o botão ganha rótulo e destaque: era um ícone de
-              // seta sem texto no meio de outros ícones, e no celular não há hover
-              // pra revelar o `title` — ninguém descobria que ali morava o deload.
-              deloadAlert ? 'px-2.5 border-amber-500/50 bg-amber-500/15 text-amber-300' : 'w-9 bg-neutral-900 border-neutral-800 text-neutral-500 hover:text-yellow-400 hover:bg-neutral-800',
-            ].join(' ')}
-            title="Sugestão de Deload"
-            aria-label="Sugestão de Deload"
-          >
-            {isReportLoading ? <Loader2 size={16} className="animate-spin text-yellow-500" /> : <ArrowDown size={16} />}
-            {deloadAlert ? (
-              <span className="text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">Deload</span>
-            ) : null}
-          </button>
+          {autoLoadEnabled ? (
+            // Motor novo ligado: o botão vira liga/desliga do deload DESTE exercício.
+            // ON (padrão) = o motor pode aliviar a carga em dia ruim / regressão.
+            // OFF = nunca reduz, só mantém/sobe. Aposenta o modal manual antigo (que
+            // segue disponível para quem NÃO usa a carga automática, no ramo abaixo).
+            (() => {
+              const exKey = normalizeExerciseKey(name);
+              const deloadOn = !deloadOffKeys?.has(exKey);
+              return (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    try { e.preventDefault(); e.stopPropagation(); } catch { }
+                    toggleExerciseDeload?.(exIdx);
+                  }}
+                  className={[
+                    'h-9 inline-flex items-center justify-center gap-1 rounded-xl border transition-colors active:scale-95 flex-shrink-0 px-2.5',
+                    deloadOn
+                      ? 'border-amber-500/50 bg-amber-500/15 text-amber-300'
+                      : 'border-neutral-800 bg-neutral-900 text-neutral-500 hover:bg-neutral-800',
+                  ].join(' ')}
+                  title={deloadOn
+                    ? 'Deload ligado — em dia ruim o motor pode aliviar a carga. Toque para desligar.'
+                    : 'Deload desligado — o motor nunca reduz, só mantém ou sobe. Toque para ligar.'}
+                  aria-label={`Deload de ${name}: ${deloadOn ? 'ligado' : 'desligado'}`}
+                  aria-pressed={deloadOn}
+                >
+                  <ArrowDown size={16} className={deloadOn ? '' : 'opacity-50'} />
+                  <span className="text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">
+                    Deload {deloadOn ? 'ON' : 'OFF'}
+                  </span>
+                </button>
+              );
+            })()
+          ) : (
+            <button
+              type="button"
+              onClick={async (e) => {
+                try {
+                  e.preventDefault();
+                  e.stopPropagation();
+                } catch { }
+                setCurrentExerciseIdx(exIdx);
+                await openDeloadModal(ex, exIdx);
+              }}
+              className={[
+                'h-9 inline-flex items-center justify-center gap-1 rounded-xl border transition-colors active:scale-95 flex-shrink-0',
+                // Com aviso ativo o botão ganha rótulo e destaque: era um ícone de
+                // seta sem texto no meio de outros ícones, e no celular não há hover
+                // pra revelar o `title` — ninguém descobria que ali morava o deload.
+                deloadAlert ? 'px-2.5 border-amber-500/50 bg-amber-500/15 text-amber-300' : 'w-9 bg-neutral-900 border-neutral-800 text-neutral-500 hover:text-yellow-400 hover:bg-neutral-800',
+              ].join(' ')}
+              title="Sugestão de Deload"
+              aria-label="Sugestão de Deload"
+            >
+              {isReportLoading ? <Loader2 size={16} className="animate-spin text-yellow-500" /> : <ArrowDown size={16} />}
+              {deloadAlert ? (
+                <span className="text-[10px] font-bold uppercase tracking-wide whitespace-nowrap">Deload</span>
+              ) : null}
+            </button>
+          )}
           <button
             type="button"
             onClick={(e) => {

@@ -68,6 +68,12 @@ export type ActiveWorkoutProps = {
   /** #autoload: liga/desliga a carga automática (persiste em settings.autoLoad). */
   onToggleAutoLoad?: (next: boolean) => void;
   /**
+   * Deload por-exercício: liga/desliga o deload do motor novo pra UM exercício
+   * (chave normalizada). Persiste em settings.autoLoadDeloadOff (lista de chaves
+   * com deload off). Mesmo padrão do onToggleAutoLoad (updateSetting otimista + save).
+   */
+  onToggleExerciseDeload?: (exerciseKey: string, nextEnabled: boolean) => void;
+  /**
    * Calculadora de anilhas: persiste o inventário do usuário em
    * settings.plateInventory / settings.barWeightKg. Mesmo padrão do onToggleAutoLoad
    * (updateSetting otimista + save), porque o sheet edita direto no toque do stepper.

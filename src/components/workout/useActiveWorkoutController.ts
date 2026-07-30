@@ -16,7 +16,7 @@ import {
   WorkoutDraft,
   WorkoutExercise,
 } from './types';
-import { isObject, shouldOpenFinishPrompt, buildWorkoutSummary } from './utils';
+import { isObject, shouldOpenFinishPrompt, buildWorkoutSummary, normalizeExerciseKey } from './utils';
 import { sessionContextChanged } from './helpers/sessionContextIdentity';
 import {
   getPlanConfig,
@@ -279,6 +279,26 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     // de outro treino.
     workoutName: String((workout as Record<string, unknown>)?.name ?? (session as Record<string, unknown>)?.name ?? ''),
   });
+
+  // ── Deload por-exercício (o botão do card) ──────────────────────────────────
+  // Lê a lista persistida de exercícios com deload DESLIGADO e expõe um toggle que
+  // persiste via o mesmo caminho de settings do autoLoad (props.onToggleExerciseDeload).
+  const deloadOffKeys = useMemo(() => {
+    const list = Array.isArray((settings as Record<string, unknown> | null)?.autoLoadDeloadOff)
+      ? ((settings as Record<string, unknown>).autoLoadDeloadOff as unknown[])
+      : [];
+    return new Set(list.filter((v): v is string => typeof v === 'string' && v.trim() !== ''));
+  }, [settings]);
+
+  const toggleExerciseDeload = useCallback((exIdx: number) => {
+    const ex = exercises?.[exIdx];
+    const name = String((ex as Record<string, unknown>)?.name || '').trim();
+    if (!name) return;
+    const key = normalizeExerciseKey(name);
+    // Está off agora? Então o toque LIGA (nextEnabled = true). E vice-versa.
+    const nextEnabled = deloadOffKeys.has(key);
+    propsRef.current?.onToggleExerciseDeload?.(key, nextEnabled);
+  }, [exercises, deloadOffKeys]);
 
 
   const startTimer = useCallback((seconds: unknown, context: unknown) => {
@@ -610,6 +630,8 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     deloadAlerts,
     autoLoadEnabled,
     autoLoadSuggestions,
+    deloadOffKeys,
+    toggleExerciseDeload,
     currentExerciseIdx,
     setCurrentExerciseIdx,
     deleteConfirmIdx,
@@ -721,6 +743,7 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     postCheckinOpen, setPostCheckinOpen, postCheckinDraft, setPostCheckinDraft,
     reportHistory, reportHistoryStatus, reportHistoryUpdatedAt,
     deloadSuggestions, deloadAlerts, autoLoadEnabled, autoLoadSuggestions,
+    deloadOffKeys, toggleExerciseDeload,
     currentExerciseIdx, setCurrentExerciseIdx,
     editExerciseOpen, setEditExerciseOpen,
     editExerciseIdx, setEditExerciseIdx,
