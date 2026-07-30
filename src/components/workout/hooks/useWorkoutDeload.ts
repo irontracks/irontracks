@@ -113,6 +113,13 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
   const deloadAiCacheRef = useRef<Record<string, unknown>>({});
   const supabase = useStableSupabaseClient();
 
+  // Treino em curso, normalizado. Escopa a ANÁLISE de deload: o histórico é
+  // agrupado por nome de exercício, e o mesmo exercício vive em treinos diferentes
+  // com cargas incomparáveis (ver `workoutKey` em ReportHistoryItem).
+  const currentWorkoutKey = normalizeExerciseKey(
+    String(workout?.name ?? (session as UnknownRecord | null)?.name ?? ''),
+  );
+
   useEffect(() => {
     reportHistoryStatusRef.current = reportHistoryStatus && typeof reportHistoryStatus === 'object' ? reportHistoryStatus : { status: 'idle', error: '', source: '' };
   }, [reportHistoryStatus]);
@@ -229,6 +236,11 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
           toDateMs(meta.date) ??
           toDateMs(meta.created_at) ??
           Date.now();
+        // Treino de origem — ver `workoutKey` em ReportHistoryItem. Sem isto o
+        // histórico do exercício mistura treinos com cargas incomparáveis.
+        const workoutKey = normalizeExerciseKey(
+          String(meta.name ?? meta.workout_name ?? (base.workout as UnknownRecord | undefined)?.name ?? ''),
+        );
         // Build per-set arrays indexed by setIdx (the index the consumer reads
         // with `setWeights[setIdx]`). The previous version filtered out null/0
         // values, which silently shifted later sets down — `setWeights[1]`
@@ -272,6 +284,7 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
           dropSetStages: hasAnyDropStages ? dropSetStages : null,
           setFailures: hasAnyFailure ? setFailures : null,
           deloadApplied: hadDeload ? true : undefined,
+          workoutKey: workoutKey || undefined,
         };
       } catch (e) {
         logError('hook:useWorkoutDeload.buildHistoryEntry', e);
@@ -451,7 +464,9 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
         const histEntry = reportHistory.exercises?.[normalizeExerciseKey(name)];
         const items: ReportHistoryItem[] = Array.isArray(histEntry?.items) ? histEntry.items : [];
         if (!items.length) return;
-        const analysis = analyzeDeloadHistory(items);
+        // Escopado pelo treino atual: sem isto o aviso disparava por alternância
+        // entre treinos diferentes, não por regressão real.
+        const analysis = analyzeDeloadHistory(items, currentWorkoutKey);
         if (!analysis.hasEnoughHistory) return;
         if (analysis.status !== 'stagnation' && analysis.status !== 'overtraining') return;
         out[exIdx] = {
@@ -465,7 +480,7 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
       logError('hook:useWorkoutDeload.deloadAlerts', e);
     }
     return out;
-  }, [reportHistory, exercises]);
+  }, [reportHistory, exercises, currentWorkoutKey]);
 
   // ── Popula deloadSuggestions com o peso do último treino como watermark ──
   // Roda sempre que reportHistory muda (carregou do cache ou da rede).
@@ -598,7 +613,7 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
     if (!baseWeight || !Number.isFinite(Number(baseWeight)) || Number(baseWeight) <= 0) {
       return { ok: false, error: 'Deload indisponível: sem carga no relatório nem no plano.' };
     }
-    const analysis = analyzeDeloadHistory(preferredItems);
+    const analysis = analyzeDeloadHistory(preferredItems, currentWorkoutKey);
     const targetReduction =
       analysis.status === 'overtraining'
         ? DELOAD_REDUCTION_OVERTRAIN

@@ -274,6 +274,10 @@ export function useActiveWorkoutController(props: ActiveWorkoutProps) {
     // dia). O hook usa uma chave canônica desses sinais como dependência, então o
     // motor não recalcula a cada tecla — ver comentário em useWorkoutAutoload.
     logs,
+    // Escopa o histórico pelo treino em curso: o mesmo exercício vive em treinos
+    // diferentes com cargas incomparáveis, e sem isto o motor ancorava na sessão
+    // de outro treino.
+    workoutName: String((workout as Record<string, unknown>)?.name ?? (session as Record<string, unknown>)?.name ?? ''),
   });
 
 

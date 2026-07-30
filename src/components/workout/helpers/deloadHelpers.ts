@@ -221,8 +221,24 @@ export function clampDeloadWeight(
 
 // ─── Pure Analysis Functions ──────────────────────────────────────────────────
 
-export const analyzeDeloadHistory = (items: ReportHistoryItem[]): DeloadAnalysis => {
-    const ordered = Array.isArray(items) ? items.slice(-DELOAD_HISTORY_SIZE) : [];
+export const analyzeDeloadHistory = (
+    items: ReportHistoryItem[],
+    /**
+     * Treino atual (nome normalizado). Informado, a análise usa SÓ sessões deste
+     * treino — e se não houver o mínimo, devolve `hasEnoughHistory: false` em vez de
+     * cair no agregado.
+     *
+     * Sem esse recorte a análise comparava contextos diferentes: "Remada na máquina"
+     * aparece em cinco treinos do dono, de 40 a 110 kg, e a alternância entre eles
+     * era lida como "carga caiu" — falso positivo confirmado no aviso de 29/07.
+     */
+    preferWorkoutKey?: string | null,
+): DeloadAnalysis => {
+    const wanted = String(preferWorkoutKey ?? '').trim();
+    const source = wanted
+        ? (Array.isArray(items) ? items.filter((i) => String(i?.workoutKey ?? '') === wanted) : [])
+        : items;
+    const ordered = Array.isArray(source) ? source.slice(-DELOAD_HISTORY_SIZE) : [];
     const recent = ordered.slice(-DELOAD_RECENT_WINDOW);
     const older = ordered.slice(0, Math.max(0, ordered.length - recent.length));
     const avgRecentVolume = averageNumbers(recent.map((i) => i.totalVolume).filter((v) => typeof v === 'number' && Number.isFinite(v) && v > 0));

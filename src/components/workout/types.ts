@@ -118,6 +118,18 @@ export type ReportHistoryItem = {
    * histórico); quem consome decide se usa.
    */
   deloadApplied?: boolean;
+  /**
+   * Treino de ORIGEM desta sessão (nome normalizado), porque o histórico é
+   * agrupado por nome de exercício e o mesmo exercício vive em treinos diferentes.
+   *
+   * Caso real do dono: "Remada na máquina" aparece em cinco treinos, com cargas
+   * que não se comparam — 110 kg no "TER · Pull", 90 no "QUA · Upper A", 40 no
+   * "QUA · Costas + Ombro". Só no dia 14/07 o exercício apareceu em três treinos
+   * com 60, 110 e 100 kg. Agregado por nome, a série temporal viravam ruído:
+   * o motor ancorava na carga de outro treino e o deload lia a alternância de
+   * contexto como "carga caiu" (falso positivo confirmado em 29/07).
+   */
+  workoutKey?: string;
 };
 
 export type ReportHistory = {
