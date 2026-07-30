@@ -29,6 +29,11 @@ export const UserSettingsSchema = z
     // usuário controla na chavinha do treino ativo (só efetivo se beta ligado).
     autoLoadBeta: z.boolean().default(false),
     autoLoad: z.boolean().default(false),
+    // Deload por-exercício: chaves normalizadas (normalizeExerciseKey) dos exercícios
+    // com o deload DESLIGADO. Ausente da lista = ligado (default). Com deload off o
+    // motor de carga nunca reduz o peso — só mantém ou sobe. Substitui o modal manual
+    // antigo: o botão do card virou um liga/desliga por exercício.
+    autoLoadDeloadOff: z.array(z.string()).default([]),
     // ── Calculadora de anilhas ────────────────────────────────────────────────
     // Inventário real de anilhas do usuário: valor da anilha (kg, como string) →
     // quantidade de UNIDADES. Vazio = academia completa (DEFAULT_GYM_INVENTORY),

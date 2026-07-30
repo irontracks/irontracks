@@ -110,6 +110,60 @@ describe('suggestWeight', () => {
     expect(s.weight!).toBeLessThan(40)
   })
 
+  // ── Deload por-exercício (toggle do botão) — OFF = motor nunca reduz ──────────
+  describe('deloadEnabled=false: nunca reduz, só mantém/sobe', () => {
+    it('dia ruim NÃO reduz — segura no topWeight (vs. o caso acima que reduzia)', () => {
+      const s = suggestWeight({
+        ...base,
+        targetReps: 10,
+        equipment: ['maquina'],
+        history: [{ weight: 40, reps: 10, rpe: 8 }],
+        readiness: { sleepHours: 4, soreness: 8 },
+        deloadEnabled: false,
+      })
+      expect(s.weight).toBe(40)
+      expect(s.rationale).toMatch(/deload desligado/i)
+    })
+
+    it('sinal do dia apontando pra baixo NÃO reduz com deload off', () => {
+      // Reconhecimento fraco hoje mandaria reduzir; deload off segura no topWeight.
+      const s = suggestWeight({
+        ...base,
+        targetReps: 8,
+        equipment: ['barra'],
+        history: [{ weight: 100, reps: 8, rpe: 8 }],
+        todaySignal: { weight: 80, reps: 8, rpe: 9 },
+        deloadEnabled: false,
+      })
+      expect(s.weight!).toBeGreaterThanOrEqual(100)
+    })
+
+    it('progressão (subir) continua livre com deload off', () => {
+      // Dia bom, sobrou (RPE baixo) → deve subir acima de 80 mesmo com deload off.
+      const s = suggestWeight({
+        ...base,
+        history: [{ weight: 80, reps: 8, rpe: 6 }],
+        deloadEnabled: false,
+      })
+      expect(s.weight!).toBeGreaterThan(80)
+    })
+
+    it('deloadEnabled=true (e undefined) preserva o amortecimento em dia ruim', () => {
+      const on = suggestWeight({
+        ...base, targetReps: 10, equipment: ['maquina'],
+        history: [{ weight: 40, reps: 10, rpe: 8 }],
+        readiness: { sleepHours: 4, soreness: 8 }, deloadEnabled: true,
+      })
+      const def = suggestWeight({
+        ...base, targetReps: 10, equipment: ['maquina'],
+        history: [{ weight: 40, reps: 10, rpe: 8 }],
+        readiness: { sleepHours: 4, soreness: 8 },
+      })
+      expect(on.weight!).toBeLessThan(40)
+      expect(def.weight!).toBeLessThan(40)
+    })
+  })
+
   it('peso corporal SEM histórico de kg → segue null (progride por reps)', () => {
     const s = suggestWeight({ ...base, equipment: ['peso_corporal'], history: [] })
     expect(s.weight).toBeNull()

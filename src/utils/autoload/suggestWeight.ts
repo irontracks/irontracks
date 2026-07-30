@@ -69,6 +69,18 @@ export interface SuggestInput {
    * impreciso — então exigir o preenchimento é o que mantém o sinal utilizável.
    */
   todaySignal?: HistorySet | null
+  /**
+   * Deload LIGADO neste exercício? Toggle por-exercício (o botão do card de treino).
+   *
+   * `false` = deload DESLIGADO: o motor nunca REDUZ a carga — o piso vira sempre o
+   * topWeight (maior carga da última sessão utilizável), independentemente de
+   * prontidão ruim ou de sinal do dia apontando pra baixo. Progressão (subir) segue
+   * livre. `true`/undefined = comportamento normal (pode amortecer em dia ruim).
+   *
+   * Substitui o antigo modal manual de deload: em vez de recalcular/aplicar uma
+   * redução pontual, o usuário decide por exercício se o motor novo pode reduzir.
+   */
+  deloadEnabled?: boolean
 }
 
 /**
@@ -288,8 +300,14 @@ export function suggestWeight(input: SuggestInput): WeightSuggestion {
   // então num dia sem amortecimento (e fora do cold-start por substituto) ele é o piso.
   // `dayAllowsRegression` entra aqui pelo mesmo motivo do piso acima: quando o
   // reconhecimento de hoje mandou reduzir, restaurar o topWeight anularia a medição.
+  // Deload DESLIGADO neste exercício (toggle por-exercício): o motor nunca reduz —
+  // o piso é o topWeight, valha o que valer a prontidão ou o sinal do dia. Subir
+  // continua livre. Default (undefined → LIGADO) mantém o comportamento anterior.
+  const deloadOff = input.deloadEnabled === false
+  const heldByDeloadOff = deloadOff && rounded < topWeight
   const weight =
-    factor === 1 && !input.fromSubstitute && !dayAllowsRegression && rounded < topWeight
+    heldByDeloadOff ||
+    (factor === 1 && !input.fromSubstitute && !dayAllowsRegression && rounded < topWeight)
       ? topWeight
       : rounded
 
@@ -307,7 +325,10 @@ export function suggestWeight(input: SuggestInput): WeightSuggestion {
   else if (weight === topWeight) parts.push(`mantém ${fmtKg(weight)}kg`)
   else parts.push(`ajustei p/ ${fmtKg(weight)}kg`)
   if (dayNote) parts.push(dayNote)
-  if (reason && factor < 1) parts.push(`(-${Math.round((1 - factor) * 100)}%: ${reason})`)
+  // Deload off e o motor teria reduzido: explica por que segurou (senão o dayNote/
+  // prontidão aparecem apontando pra baixo e o número "mantém", contradizendo).
+  if (heldByDeloadOff) parts.push('deload desligado — mantida a carga')
+  else if (reason && factor < 1) parts.push(`(-${Math.round((1 - factor) * 100)}%: ${reason})`)
 
   return { weight, reps: targetReps || null, confidence, rationale: parts.join(' — ') }
 }
