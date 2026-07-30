@@ -6,6 +6,7 @@ import { parseJsonWithSchema } from '@/utils/zod'
 import { z } from 'zod'
 import { getErrorMessage } from '@/utils/errorMessage'
 import type { SetDetail, Exercise, Workout } from '@/components/ExerciseEditor/types'
+import { defaultAdvancedConfigForMethod } from '@/components/workout/helpers/editorMethod'
 
 interface UseExerciseEditorLogicParams {
     workout: Workout
@@ -74,7 +75,16 @@ export function useExerciseEditorLogic({
                 const switchingBetweenSpecial = prevIsSpecial && nextIsSpecial && prevMethod !== nextMethod
                 const shouldResetConfig = nextMethod === 'Normal' || nextMethod === 'Bi-Set' || nextMethod === 'Cardio' || switchingBetweenSpecial
                 const baseDetails = ensureSetDetails({ ...ex, method: nextMethod }, setsCount)
-                const nextDetails = shouldResetConfig ? baseDetails.map(s => ({ ...s, advanced_config: null })) : baseDetails
+                // Escolher o método no dropdown agora CONFIGURA as etapas, em vez de
+                // deixar `advanced_config: null`. Antes o método era só um rótulo: a
+                // série sabia que era drop-set/rest-pause e chegava vazia no treino,
+                // obrigando a preencher tudo à mão toda vez. `defaultAdvancedConfigForMethod`
+                // é chamado DENTRO do map de propósito — cada série precisa da própria
+                // cópia, senão editar uma altera as outras.
+                const nextDetails = shouldResetConfig
+                    ? baseDetails.map(s => ({ ...s, advanced_config: defaultAdvancedConfigForMethod(nextMethod) }))
+                    // Preserva o que o professor já tinha ajustado à mão; só preenche o vazio.
+                    : baseDetails.map(s => ({ ...s, advanced_config: s.advanced_config ?? defaultAdvancedConfigForMethod(nextMethod) }))
                 const currentRestTimeNum = Number(ex?.restTime ?? ex?.rest_time ?? NaN)
                 const shouldSuggestRestZero = nextMethod === 'Bi-Set' && (!Number.isFinite(currentRestTimeNum) || currentRestTimeNum === 60)
                 newExercises[index] = { ...ex, method: nextMethod, restTime: shouldSuggestRestZero ? 0 : (ex?.restTime ?? ex?.rest_time ?? null), sets: setsCount, setDetails: nextDetails }

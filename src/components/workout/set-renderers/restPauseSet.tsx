@@ -2,6 +2,13 @@
 
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { parseTrainingNumber } from '@/utils/trainingNumber';
+
+/**
+ * Mini-sets assumidos quando o exercício está marcado como Rest-Pause mas chegou
+ * sem configuração. Mesmo valor que o editor grava por padrão — os dois precisam
+ * concordar, senão o card mostra uma quantidade e o plano diz outra.
+ */
+const DEFAULT_MINI_SETS = 2;
 import { Check, MessageSquare, Pencil } from 'lucide-react';
 import { useWorkoutContext } from '../WorkoutContext';
 import { FailureToggle } from './FailureToggle';
@@ -105,7 +112,13 @@ const RestPauseSetInner = ({
       const fromLog = Math.floor(parseTrainingNumber(rp?.planned_mini_sets) ?? 0)
       if (fromLog > 0) return fromLog
       // If mini_reps are already saved in the log, use their count
-      return minisArrRaw.length
+      if (minisArrRaw.length) return minisArrRaw.length
+      // Último recurso: o método é Rest-Pause mas o exercício veio SEM configuração
+      // (treino antigo, ou montado antes de o dropdown de método criar as etapas).
+      // Cair em 0 deixava o card sem nenhum mini-set: a pessoa via o método marcado
+      // e nada para preencher, tendo de configurar do zero em todo treino. Dois é o
+      // mesmo default que o editor usa. (queixa do dono, 30/07)
+      return DEFAULT_MINI_SETS
     })()
 
   const minis: Array<number | null> = Array.from({ length: miniSets }).map((_, idx) => {

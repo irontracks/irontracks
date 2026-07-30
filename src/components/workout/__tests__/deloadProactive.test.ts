@@ -115,7 +115,9 @@ describe('alertas proativos existem e são conservadores', () => {
 
   it('o card mostra o aviso e ele abre o modal de deload', () => {
     expect(cardSrc).toContain('deloadAlert')
-    expect(cardSrc).toMatch(/deloadAlert \? \([\s\S]{0,600}openDeloadModal/)
+    // janela larga de propósito: o bloco cresceu ao ganhar a ajuda e a explicação
+    // do benefício. O que importa é o `openDeloadModal` estar DENTRO do aviso.
+    expect(cardSrc).toMatch(/deloadAlert \? \([\s\S]{0,2000}openDeloadModal/)
   })
 
   it('o botão ganha rótulo quando há aviso (era ícone sem texto)', () => {

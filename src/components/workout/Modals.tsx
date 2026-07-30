@@ -8,6 +8,8 @@ import dynamic from 'next/dynamic';
 import { ArrowDown, ArrowUp, Check, Clock, GripVertical, Loader2, Save, X } from 'lucide-react';
 import { Reorder, useDragControls } from 'framer-motion';
 import { CheckinScale } from './CheckinScale';
+import { HelpHint } from '@/components/ui/HelpHint';
+import { HELP_TERMS } from '@/utils/help/terms';
 
 import type { Workout as EditorWorkout } from '@/components/ExerciseEditor/types';
 
@@ -307,9 +309,25 @@ export default function Modals() {
               >
                 <div className="p-4 border-b border-neutral-800 flex items-center justify-between gap-3">
                   <div className="min-w-0">
-                    <div className="text-[11px] uppercase tracking-widest text-yellow-500 font-black">Deload</div>
+                    <div className="flex items-center gap-1.5">
+                      <div className="text-[11px] uppercase tracking-widest text-yellow-500 font-black">Deload</div>
+                      {/* O modal inteiro assumia que a pessoa já conhece o termo: mostrava
+                          "peso base", "peso mínimo seguro" e "% de redução" sem dizer o que
+                          é deload nem por que aliviar carga ajuda. O texto de ajuda já
+                          existia em HELP_TERMS, só nunca tinha sido ligado. */}
+                      <HelpHint
+                        forceVisible
+                        title={HELP_TERMS.deload.title}
+                        text={HELP_TERMS.deload.text}
+                        tooltip={HELP_TERMS.deload.tooltip}
+                        className="h-4 w-4 text-[10px]"
+                      />
+                    </div>
                     <div className="text-lg font-black text-white truncate">{String(deloadModal?.name || 'Exercício')}</div>
                     <div className="text-xs text-neutral-400 truncate">{String(deloadModal?.reason || '')}</div>
+                    <div className="mt-1 text-[11px] text-neutral-500 leading-snug">
+                      Treinar mais leve por uma sessão para recuperar e voltar mais forte.
+                    </div>
                   </div>
                   <button
                     type="button"
