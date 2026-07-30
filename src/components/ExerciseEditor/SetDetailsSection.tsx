@@ -5,6 +5,7 @@ import { Trash2 } from 'lucide-react'
 import type { AdvancedConfig, SetDetail } from './types'
 import { isPlank } from '@/utils/exerciseTracking'
 import { NumericInput } from '@/components/ui/NumericInput'
+import { defaultAdvancedConfigForMethod } from '@/components/workout/helpers/editorMethod'
 
 interface SetDetailsSectionProps {
     setDetails: SetDetail[]
@@ -71,10 +72,14 @@ export const SetDetailsSection: React.FC<SetDetailsSectionProps> = ({
                                 value={isDropCfg ? 'Drop-set' : (config?.type === 'sst' ? 'SST' : (isRestPauseCfg ? 'Rest-Pause' : 'Normal'))}
                                 onChange={(e) => {
                                     const val = e.target.value
+                                    // Defaults de Drop-set/Rest-Pause vêm da fonte única
+                                    // (editorMethod), a mesma que o dropdown de método do
+                                    // exercício usa — os dois divergirem foi o que fez o
+                                    // método virar rótulo sem etapa nenhuma.
                                     if (val === 'Normal') updateConfig(null)
-                                    else if (val === 'Drop-set') updateConfig([{ weight: null, reps: '' }])
+                                    else if (val === 'Drop-set') updateConfig(defaultAdvancedConfigForMethod('Drop-set'))
                                     else if (val === 'SST') updateConfig({ type: 'sst', initial_reps: 10, mini_sets: 2, rest_time_sec: 10 })
-                                    else if (val === 'Rest-Pause') updateConfig({ initial_reps: 10, mini_sets: 2, rest_time_sec: 20 })
+                                    else if (val === 'Rest-Pause') updateConfig(defaultAdvancedConfigForMethod('Rest-Pause'))
                                 }}
                                 className="bg-depth-1 text-[10px] font-black text-neutral-300 border border-white/[0.06] rounded-lg px-2 py-1 outline-none focus:border-yellow-500/60 transition-colors"
                             >

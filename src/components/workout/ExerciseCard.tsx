@@ -452,24 +452,42 @@ function ExerciseCardInner({ ex, exIdx, groupPos, logsSlice }: { ex: WorkoutExer
               Agora ela fala. Só aparece com histórico suficiente e quando há algo
               a dizer; progressão normal não gera ruído. */}
           {deloadAlert ? (
-            <button
-              type="button"
-              onClick={async (e) => {
-                try { e.preventDefault(); e.stopPropagation(); } catch { }
-                setCurrentExerciseIdx(exIdx);
-                await openDeloadModal(ex, exIdx);
-              }}
-              className="mt-2 w-full text-left rounded-xl bg-amber-500/10 border border-amber-500/30 px-3 py-2 active:scale-[0.99] transition-transform"
-            >
-              <div className="text-[13px] text-amber-200 leading-snug">
-                {deloadAlert.status === 'overtraining'
-                  ? `Carga caiu nas últimas sessões (${deloadAlert.itemsCount} treinos analisados).`
-                  : `Sem progresso nas últimas sessões (${deloadAlert.itemsCount} treinos analisados).`}
+            <div className="mt-2 rounded-xl bg-amber-500/10 border border-amber-500/30 px-3 py-2">
+              <div className="flex items-start justify-between gap-2">
+                <div className="text-[13px] text-amber-200 leading-snug">
+                  {deloadAlert.status === 'overtraining'
+                    ? `Sua carga caiu nas últimas ${deloadAlert.itemsCount} vezes que você fez este treino.`
+                    : `Você está há ${deloadAlert.itemsCount} treinos sem evoluir neste exercício.`}
+                </div>
+                {/* O termo "deload" é jargão: quem nunca ouviu não sabe que reduzir
+                    carga de propósito é o que destrava a evolução. O texto de ajuda
+                    já existia pronto em HELP_TERMS e não era usado em lugar nenhum. */}
+                <HelpHint
+                  forceVisible
+                  title={HELP_TERMS.deload.title}
+                  text={HELP_TERMS.deload.text}
+                  tooltip={HELP_TERMS.deload.tooltip}
+                  className="h-5 w-5 shrink-0 text-[11px] border-amber-500/40 text-amber-300"
+                />
               </div>
-              <div className="mt-0.5 text-[11px] font-bold uppercase tracking-wide text-amber-400">
-                Reduzir {Math.round(deloadAlert.suggestedPct * 100)}% hoje →
+              {/* Explica o BENEFÍCIO antes de pedir a ação — sem isso o aviso manda
+                  o usuário fazer algo que soa contraintuitivo (treinar mais leve). */}
+              <div className="mt-1 text-[11px] text-amber-200/70 leading-snug">
+                Aliviar a carga por um treino ajuda o corpo a recuperar e costuma
+                destravar a evolução na semana seguinte.
               </div>
-            </button>
+              <button
+                type="button"
+                onClick={async (e) => {
+                  try { e.preventDefault(); e.stopPropagation(); } catch { }
+                  setCurrentExerciseIdx(exIdx);
+                  await openDeloadModal(ex, exIdx);
+                }}
+                className="mt-1.5 text-[11px] font-bold uppercase tracking-wide text-amber-400 active:scale-95 transition-transform"
+              >
+                Aliviar {Math.round(deloadAlert.suggestedPct * 100)}% hoje →
+              </button>
+            </div>
           ) : null}
           {/* Per-card sets progress bar */}
           {setsCount > 0 && (
