@@ -37,6 +37,8 @@ interface Params {
    * do treino. Ver `feelerSignalKey` abaixo.
    */
   logs?: Record<string, unknown> | null
+  /** Nome do treino em curso — escopa o histórico (ver `pickUsableHistory`). */
+  workoutName?: string | null
 }
 
 /** Sinal do dia extraído de uma série de Reconhecimento concluída. */
@@ -103,12 +105,35 @@ export function buildHistorySets(item: {
  */
 export function pickUsableHistory(
   items:
-    | Array<Parameters<typeof buildHistorySets>[0] & { ts?: number; deloadApplied?: boolean }>
+    | Array<Parameters<typeof buildHistorySets>[0] & { ts?: number; deloadApplied?: boolean; workoutKey?: string }>
     | null
     | undefined,
+  /**
+   * Treino atual (nome normalizado). Quando informado, sessões DESTE treino têm
+   * prioridade absoluta: o mesmo exercício vive em treinos diferentes com cargas
+   * incomparáveis ("Remada na máquina" vai de 40 a 110 kg conforme o treino), e
+   * ancorar na sessão de outro treino fazia o motor sugerir a carga errada.
+   */
+  preferWorkoutKey?: string | null,
 ): HistorySet[] {
   if (!Array.isArray(items) || !items.length) return []
-  const ordered = [...items].sort((a, b) => Number(b?.ts ?? 0) - Number(a?.ts ?? 0))
+  const all = [...items].sort((a, b) => Number(b?.ts ?? 0) - Number(a?.ts ?? 0))
+
+  const wanted = String(preferWorkoutKey ?? '').trim()
+  if (wanted) {
+    const sameWorkout = all.filter((i) => String(i?.workoutKey ?? '') === wanted)
+    // Dentro do mesmo treino valem as mesmas regras: pula sessão pulada e deload.
+    const fromSame = pickFrom(sameWorkout)
+    if (fromSame.length) return fromSame
+  }
+
+  return pickFrom(all)
+}
+
+/** Escolhe o melhor item de uma lista já ordenada do mais recente ao mais antigo. */
+function pickFrom(
+  ordered: Array<Parameters<typeof buildHistorySets>[0] & { deloadApplied?: boolean }>,
+): HistorySet[] {
 
   // 1ª passada: sessões SEM deload. Carga de deload é baixa de propósito — usá-la
   // como referência faz o motor achar que o atleta regrediu, ancorar a trava
@@ -195,7 +220,7 @@ function feelerSignalsKey(signals: Record<number, FeelerSignal>): string {
     .join('|')
 }
 
-export function useWorkoutAutoload({ exercises, reportHistory, settings, userId, logs }: Params): {
+export function useWorkoutAutoload({ exercises, reportHistory, settings, userId, logs, workoutName }: Params): {
   autoLoadEnabled: boolean
   autoLoadSuggestions: Record<string, AutoloadSuggestion>
 } {
@@ -247,6 +272,9 @@ export function useWorkoutAutoload({ exercises, reportHistory, settings, userId,
   // então recalcular todas as sugestões só acontece quando um Reconhecimento é
   // concluído/alterado. Depender de `logs` ali dispararia o motor inteiro a cada
   // dígito, num contexto que já é separado justamente por performance.
+  // Treino em curso, normalizado — escopa o histórico por treino de origem.
+  const currentWorkoutKey = normalizeExerciseKey(String(workoutName ?? ''))
+
   const feelerSignals = useMemo(() => extractFeelerSignals(exercises, logs), [exercises, logs])
   const feelerKey = feelerSignalsKey(feelerSignals)
   const feelerSignalsRef = useRef(feelerSignals)
@@ -278,7 +306,7 @@ export function useWorkoutAutoload({ exercises, reportHistory, settings, userId,
       // histórico anterior daquele exercício (caso real: Crucifixo invertido,
       // pulado em 27/07 → sem sugestão em 29/07).
       const ordered = histEntry?.items ?? []
-      const history = pickUsableHistory(ordered)
+      const history = pickUsableHistory(ordered, currentWorkoutKey)
 
       const feeler = feelerSignalsRef.current[exIdx]
       const suggestion = suggestWeight({
@@ -320,7 +348,7 @@ export function useWorkoutAutoload({ exercises, reportHistory, settings, userId,
   // é o que impede o motor de recalcular a cada tecla digitada. O valor é lido do
   // ref, que está sempre atualizado quando a chave muda.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enabled, exercises, reportHistory, readiness, feelerKey])
+  }, [enabled, exercises, reportHistory, readiness, feelerKey, currentWorkoutKey])
 
   return { autoLoadEnabled: enabled, autoLoadSuggestions }
 }
