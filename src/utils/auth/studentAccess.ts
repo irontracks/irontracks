@@ -54,3 +54,32 @@ export async function canCoachStudent(
   }
   return false
 }
+
+/**
+ * user_ids dos alunos com vínculo REAL com `callerId` (students.teacher_id).
+ *
+ * Para LISTAGENS, onde `canCoachStudent` (uma pergunta por aluno) não serve: em
+ * vez de filtrar por `trainer_id` da própria linha — que o atacante escolhe ao
+ * criar o registro — a query passa a filtrar por `user_id in (self, ...alunos)`.
+ * Uma linha forjada com {user_id: vítima, trainer_id: self} deixa de aparecer,
+ * porque a vítima não é aluna do caller.
+ *
+ * Fail-closed: qualquer erro devolve lista vazia (o caller ainda vê o que é dele).
+ */
+export async function listCoachedStudentIds(callerId: string): Promise<string[]> {
+  const id = String(callerId || '').trim()
+  if (!id) return []
+  const admin = createAdminClient()
+  try {
+    const { data } = await admin
+      .from('students')
+      .select('user_id')
+      .eq('teacher_id', id)
+      .not('user_id', 'is', null)
+    const rows = (data || []) as Array<{ user_id: string | null }>
+    return [...new Set(rows.map((r) => String(r.user_id || '').trim()).filter(Boolean))]
+  } catch (e) {
+    logError('listCoachedStudentIds', e)
+    return []
+  }
+}
