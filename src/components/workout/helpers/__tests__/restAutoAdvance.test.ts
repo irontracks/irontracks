@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
-import { shouldAutoAdvanceRest } from '../restAutoAdvance'
+import { shouldAutoAdvanceRest, REST_ALARM_FULL_CYCLE_MS } from '../restAutoAdvance'
 
 /**
  * Barreiras da regressão do auto-start do descanso (START/AUTO), 2026-07-24.
@@ -67,5 +67,41 @@ describe('fiação do overlay + default seguro (source-guard)', () => {
   it('a preferência nasce DESLIGADA (sem opt-in explícito, nada auto-inicia)', () => {
     const schema = readFileSync('src/schemas/settings.ts', 'utf8')
     expect(schema).toMatch(/restTimerAutoStart:\s*z\.boolean\(\)\.default\(false\)/)
+  })
+})
+
+/**
+ * INCIDENTE 2026-07-31 (relatado pelo dono DURANTE o treino): "o apito de fim de
+ * descanso não funciona com o app ligado" e "às vezes não vai pro descanso, começa
+ * a contar a outra série direto" — o MESMO bug.
+ *
+ * Com o AUTO ligado, o avanço disparava 500 ms após o descanso zerar e a primeira
+ * coisa que fazia era `stopAlarm(true)`. O alarme leva ~550 ms só nos três tons
+ * (`playTimerFinishSound`: 880 → 1047 → 1319, o último começando em +0,30 s e
+ * durando 0,25 s), então som e vibração morriam antes de avisar. Com a tela
+ * bloqueada o WebView congela, o timer não roda, o avanço não acontece — e a
+ * notificação nativa tocava normal. Daí "só falha com o app aberto".
+ */
+describe('REST_ALARM_FULL_CYCLE_MS — o avanço não pode cortar o alarme', () => {
+  /** Duração real de playTimerFinishSound: último tom começa em 0,30 s e dura 0,25 s. */
+  const DURACAO_DO_ALARME_MS = 550
+
+  it('espera o ciclo inteiro do alarme antes de avançar', () => {
+    expect(REST_ALARM_FULL_CYCLE_MS).toBeGreaterThan(DURACAO_DO_ALARME_MS)
+  })
+
+  it('os 500 ms antigos não seriam suficientes (é o que quebrou)', () => {
+    expect(500).toBeLessThan(DURACAO_DO_ALARME_MS)
+  })
+
+  it('não é longo a ponto de virar espera irritante entre séries', () => {
+    expect(REST_ALARM_FULL_CYCLE_MS).toBeLessThanOrEqual(3000)
+  })
+
+  it('o overlay usa a constante, não um número solto', () => {
+    const src = readFileSync('src/components/workout/RestTimerOverlay.tsx', 'utf8')
+    const trecho = src.slice(src.indexOf('autoStartFiredRef.current = true'))
+    expect(trecho).toMatch(/\}, REST_ALARM_FULL_CYCLE_MS\)/)
+    expect(trecho.slice(0, 1200)).not.toMatch(/\}, 500\)/)
   })
 })

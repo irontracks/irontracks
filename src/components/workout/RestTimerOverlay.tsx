@@ -3,7 +3,7 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { playTimerFinishSound, playTick } from '@/lib/sounds';
-import { shouldAutoAdvanceRest } from './helpers/restAutoAdvance';
+import { shouldAutoAdvanceRest, REST_ALARM_FULL_CYCLE_MS } from './helpers/restAutoAdvance';
 import { isNativePlatform } from '@/utils/platform';
 import { useKeyboardInset } from '@/hooks/useKeyboardInset';
 import { addWidgetStartSetListener, cancelRestNotification, checkPendingWidgetAction, endRestLiveActivity, requestNativeNotifications, scheduleRestNotification, startRestLiveActivity, stopAlarmSound, triggerHaptic, updateRestLiveActivity, updateWorkoutRestCountdown } from '@/utils/native/irontracksNative';
@@ -576,6 +576,10 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
         autoStartFiredRef.current = true;
         if (!shouldAutoAdvanceRest({ isFinished, autoOn })) return;
 
+        // Espera o alarme cumprir a função ANTES de avançar. Com 500 ms o
+        // `stopAlarm(true)` abaixo cortava som e vibração no meio — o aviso de fim
+        // de descanso simplesmente não acontecia com o app na frente (relatado em
+        // treino, 2026-07-31). Ver REST_ALARM_FULL_CYCLE_MS.
         const timeout = setTimeout(() => {
             // Bail if the user already tapped START manually during the delay
             if (startBusyRef.current) return;
@@ -592,7 +596,7 @@ const RestTimerOverlay: React.FC<RestTimerOverlayProps> = ({ targetTime, context
                     if (typeof onFinishRef.current === 'function') onFinishRef.current(contextRef.current);
                 } catch { /* swallow — nothing useful to do */ }
             }
-        }, 500);
+        }, REST_ALARM_FULL_CYCLE_MS);
         return () => clearTimeout(timeout);
     }, [isFinished, autoOn, isRestoredExpired]);
 
