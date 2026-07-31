@@ -1,7 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { shouldAutoAdvanceRest, REST_ALARM_FULL_CYCLE_MS } from '../restAutoAdvance'
-import { readFileSync } from 'node:fs'
 
 /**
  * Barreiras da regressão do auto-start do descanso (START/AUTO), 2026-07-24.
