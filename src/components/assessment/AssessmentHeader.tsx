@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Activity, Camera, ChevronDown, User, X } from 'lucide-react'
+import { Activity, Camera, ChevronDown, Images, User, X } from 'lucide-react'
 
 // Menu de ações fica RECOLHIDO por padrão (pedido do dono, jul/2026): a tela de
 // avaliações abre limpa, mostrando primeiro os números. Toque no título expande.
@@ -22,6 +22,11 @@ type AssessmentHeaderProps = {
    * foto com laudo de IA (composição corporal via Gemini Vision).
    */
   onPhotoAssessment?: () => void
+  /**
+   * Quando definido, exibe o botão "Laudos" que abre o histórico das
+   * avaliações por foto já geradas (o laudo fica salvo no banco).
+   */
+  onPhotoHistory?: () => void
 }
 
 export const AssessmentHeader = ({
@@ -30,10 +35,11 @@ export const AssessmentHeader = ({
   onClose,
   onAddBia,
   onPhotoAssessment,
+  onPhotoHistory,
 }: AssessmentHeaderProps) => {
   // Layout: nº de colunas = nº de botões (Nova + Histórico são fixos).
-  const count = 2 + (onAddBia ? 1 : 0) + (onPhotoAssessment ? 1 : 0)
-  const cols = count >= 4 ? 'sm:grid-cols-4' : count === 3 ? 'sm:grid-cols-3' : 'sm:grid-cols-2'
+  const count = 2 + (onAddBia ? 1 : 0) + (onPhotoAssessment ? 1 : 0) + (onPhotoHistory ? 1 : 0)
+  const cols = count >= 5 ? 'sm:grid-cols-5' : count === 4 ? 'sm:grid-cols-4' : count === 3 ? 'sm:grid-cols-3' : 'sm:grid-cols-2'
 
   const [open, setOpen] = useState(false)
   const toggleOpen = () => setOpen((v) => !v)
@@ -107,6 +113,21 @@ export const AssessmentHeader = ({
               >
                 <Camera className="w-4 h-4" />
                 Por Foto
+              </button>
+            ) : null}
+            {onPhotoHistory ? (
+              <button
+                onClick={onPhotoHistory}
+                className="w-full min-h-[44px] px-4 py-2 rounded-xl border font-bold transition-all duration-300 active:scale-95 inline-flex items-center justify-center gap-2"
+                style={{
+                  background: 'rgba(168,85,247,0.05)',
+                  borderColor: 'rgba(168,85,247,0.22)',
+                  color: '#c4b5fd',
+                }}
+                title="Ver os laudos por foto já gerados"
+              >
+                <Images className="w-4 h-4" />
+                Laudos
               </button>
             ) : null}
             <button
