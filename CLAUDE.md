@@ -72,7 +72,7 @@ scripts/        # Scripts de build e utilitários
 ## Gotchas específicos deste repo
 - **Git worktrees NÃO têm `node_modules`.** Pro ESLint num worktree, aponte pro binário do repo principal: `node --import tsx "<repo-principal>/node_modules/eslint/bin/eslint.js" --config eslint.config.mjs <arquivos> --max-warnings 0`. Pra build iOS num worktree, rode `npm ci` NO worktree antes — **NÃO** faça symlink pro `node_modules` do main (conflito de versão no grafo SPM do iOS).
 - **Supabase project id:** `enbueukmvgodngydkpzm` (via MCP `mcp__supabase__*`).
-- **Versão iOS:** `ios:release` só bumpa o build number (`CURRENT_PROJECT_VERSION`). A **versão pública (`MARKETING_VERSION`) é bumpada à mão** no `project.pbxproj` (6 build configs) antes de um release novo.
+- **Versão iOS:** `ios:release` só bumpa o build number (`CURRENT_PROJECT_VERSION`). A **versão pública (`MARKETING_VERSION`) é bumpada à mão** no `project.pbxproj` (**10 ocorrências** hoje — confira com `grep -c`, não confie no número) antes de um release novo. Ver "iOS — release" pra saber QUANDO ela precisa subir.
 - **App Store Connect API:** chave em `~/.appstoreconnect/keys/AuthKey_W834H36CBM.p8` (Key ID `W834H36CBM`); o **Issuer ID não fica no disco** (pegar no painel Users and Access → Integrations). Detalhes em `docs/ios-release.md`.
 
 ## Regra crítica: `npm run deploy` deve sempre funcionar
@@ -143,11 +143,26 @@ npm run ios:release 25        # força build = 25
 ```
 
 O script `scripts/ios-release.sh`:
-1. Bumpa `CURRENT_PROJECT_VERSION` no `project.pbxproj` (todos os 6 build configs)
+1. Bumpa `CURRENT_PROJECT_VERSION` no `project.pbxproj` (todos os build configs)
 2. Roda `xcodebuild archive` (signing automático com cert "Apple Development: Maicon Benitz", team `5XLC55D3YR`)
 3. Roda `xcodebuild -exportArchive` com `method=app-store-connect` + `destination=upload` — envia direto pra Apple
 
 Em ~10 min depois aparece no TestFlight do iPhone do usuário. Auth reusa a session do Xcode em `Xcode → Settings → Accounts` (uma vez configurado, não pede de novo).
+
+**Rode do REPO PRINCIPAL, nunca de um worktree.** O grafo SPM resolve os plugins Capacitor por caminho dentro de `node_modules/`; num worktree sem `npm ci` completo o archive morre em `the package at '…/@capacitor-community/apple-sign-in' cannot be accessed`. (Ver o gotcha de worktree lá em cima — a build iOS é o caso que mais dói.)
+
+**Quando a `MARKETING_VERSION` PRECISA subir:** depois que uma versão é aprovada na App Store, a Apple fecha o "trem" dela e recusa build nova com o mesmo `CFBundleShortVersionString` — mesmo com build number maior. O erro vem no `exportArchive`, só na hora do upload (o archive passa):
+
+```
+90062: CFBundleShortVersionString [1.18] must contain a higher version
+       than that of the previously approved version [1.18]
+90186: Invalid Pre-Release Train. The train version '1.18' is closed
+       for new build submissions
+```
+
+Aconteceu em 31/07/2026 (1.18 → 1.19). Se for subir build e a versão atual já estiver publicada, bumpe a `MARKETING_VERSION` ANTES — evita um ciclo inteiro de archive perdido (~5 min).
+
+**Warning conhecido, não é falha:** `Upload Symbols Failed … dSYM for the Sentry.framework`. O upload conclui; o efeito é crash dentro do framework do Sentry vir sem símbolos.
 
 ## Supabase — padrões obrigatórios
 - Novas migrations via MCP (`mcp__supabase__apply_migration` / `list_migrations`); ficam em `supabase/migrations/` com timestamp. Verificar `mcp__supabase__get_advisors` depois.
