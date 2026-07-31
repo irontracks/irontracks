@@ -53,6 +53,7 @@ function ExerciseCardInner({ ex, exIdx, groupPos, logsSlice }: { ex: WorkoutExer
     reportHistoryLoadingRef,
     reportHistory,
     deloadAlerts,
+    sessionDeloadAlert,
     openDeloadModal,
     autoLoadEnabled,
     deloadOffKeys,
@@ -78,7 +79,12 @@ function ExerciseCardInner({ ex, exIdx, groupPos, logsSlice }: { ex: WorkoutExer
   const name = String(ex?.name || '').trim() || `Exercício ${exIdx + 1}`;
   // Aviso proativo de deload deste exercício (estagnação/regressão com histórico
   // suficiente). Sem isto o app calculava a análise e não contava pra ninguém.
-  const deloadAlert = (deloadAlerts as Record<number, { status: 'stagnation' | 'overtraining'; suggestedPct: number; itemsCount: number }> | undefined)?.[exIdx];
+  //
+  // Cala quando a descarga vira decisão de SESSÃO (banner no topo do treino):
+  // repetir o mesmo recado em cada card e mais uma vez no topo é ruído, e ruído
+  // foi o que manteve esta feature sem uso.
+  const deloadAlertRaw = (deloadAlerts as Record<number, { status: 'stagnation' | 'overtraining'; suggestedPct: number; itemsCount: number }> | undefined)?.[exIdx];
+  const deloadAlert = sessionDeloadAlert ? undefined : deloadAlertRaw;
   const observation = String(ex?.notes || '').trim();
   const setsHeader = Math.max(0, Number.parseInt(String(ex?.sets ?? '0'), 10) || 0);
   const sdArr: unknown[] = Array.isArray(ex?.setDetails) ? (ex.setDetails as unknown[]) : Array.isArray(ex?.set_details) ? (ex.set_details as unknown[]) : [];

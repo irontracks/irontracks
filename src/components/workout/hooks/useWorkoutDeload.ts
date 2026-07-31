@@ -5,6 +5,7 @@ import type {
   WorkoutSession,
   ReportHistory,
   ReportHistoryItem,
+  DeloadAnalysis,
   AiRecommendation,
   DeloadSetEntries,
   DeloadSetSuggestion,
@@ -29,6 +30,7 @@ import {
   DELOAD_REDUCTION_STABLE,
   DELOAD_REDUCTION_STAGNATION,
   DELOAD_REDUCTION_OVERTRAIN,
+  DELOAD_SESSION_MIN_EXERCISES,
   DELOAD_MIN_1RM_FACTOR,
   DELOAD_REDUCTION_MIN,
   DELOAD_REDUCTION_MAX,
@@ -49,6 +51,7 @@ import {
   saveDeloadHistory,
   appendDeloadAudit,
   analyzeDeloadHistory,
+  buildSessionDeloadAlert,
   parseAiRecommendation,
   estimate1RmFromSets,
   getDeloadReason,
@@ -104,6 +107,11 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
   const [reportHistoryStatus, setReportHistoryStatus] = useState<ReportHistoryStatus>({ status: 'idle', error: '', source: '' });
   const [reportHistoryUpdatedAt, setReportHistoryUpdatedAt] = useState<number>(0);
   const [deloadSuggestions, setDeloadSuggestions] = useState<Record<string, unknown>>({});
+  // Modal da descarga de SESSÃO: guarda os exercícios propostos e quais estão
+  // marcados (opt-out por exercício — quem não travou não precisa aliviar).
+  const [sessionDeloadModal, setSessionDeloadModal] = useState<
+    { exIdxs: number[]; selected: number[]; status: 'stagnation' | 'overtraining'; suggestedPct: number } | null
+  >(null);
   const [deloadModal, setDeloadModal] = useState<UnknownRecord | null>(null);
 
   const reportHistoryLoadingRef = useRef<boolean>(false);
@@ -481,6 +489,29 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
     }
     return out;
   }, [reportHistory, exercises, currentWorkoutKey]);
+
+  /**
+   * ALERTA DE SESSÃO — a decisão de descarga é do TREINO, não de um exercício.
+   *
+   * O diagnóstico continua por exercício (é onde o histórico vive, e estagnação
+   * de fato é local: panturrilha travar não é motivo pra aliviar o agachamento).
+   * Mas a AÇÃO é de sessão: a fadiga que justifica deload é sistêmica, e reduzir
+   * um exercício só não descansa nada. Além disso, decidir oito vezes é a razão
+   * mais provável de a ferramenta nunca ter sido usada — 0 de 547 sessões.
+   *
+   * Regra: a partir de DELOAD_SESSION_MIN_EXERCISES exercícios sinalizados, o
+   * banner do treino assume e os avisos por card se calam (senão o usuário vê o
+   * mesmo recado N+1 vezes). Com um exercício só, segue o aviso local.
+   */
+  const sessionDeloadAlert = useMemo(
+    () => buildSessionDeloadAlert(
+      deloadAlerts,
+      DELOAD_SESSION_MIN_EXERCISES,
+      DELOAD_REDUCTION_OVERTRAIN,
+      DELOAD_REDUCTION_STAGNATION,
+    ),
+    [deloadAlerts],
+  );
 
   // ── Popula deloadSuggestions com o peso do último treino como watermark ──
   // Roda sempre que reportHistory muda (carregou do cache ou da rede).
@@ -984,12 +1015,108 @@ export function useWorkoutDeload(props: UseWorkoutDeloadProps) {
   };
 
 
+  /**
+   * Aplica a descarga a VÁRIOS exercícios de uma vez (decisão de sessão).
+   *
+   * Não passa pelo `deloadModal` — aquele estado descreve a UI de um exercício.
+   * Reusa as mesmas funções puras do caminho individual (`buildDeloadSuggestion`
+   * monta a proposta, `buildDeloadPatches` decide série a série), então as regras
+   * que já custaram caro continuam valendo para todos: série concluída não é
+   * reescrita (o peso dela é histórico, não plano) e o piso de 1RM é respeitado.
+   */
+  const applyDeloadToSession = async (exIdxs: number[]): Promise<void> => {
+    const alvos = (Array.isArray(exIdxs) ? exIdxs : []).filter((i) => Number.isFinite(i) && i >= 0);
+    if (!alvos.length) return;
+    const appliedAt = new Date().toISOString();
+    let exercisesAplicados = 0;
+    let seriesAplicadas = 0;
+    let seriesPuladas = 0;
+    const semBase: string[] = [];
+
+    for (const exIdx of alvos) {
+      const ex = exercises?.[exIdx];
+      if (!ex || typeof ex !== 'object') continue;
+      try {
+        const sug = buildDeloadSuggestion(ex as WorkoutExercise, exIdx);
+        if (!sug.ok || !sug.baseWeight || !sug.suggestedWeight) {
+          semBase.push(String((ex as UnknownRecord)?.name || `Exercício ${exIdx + 1}`));
+          continue;
+        }
+        const { setsCount } = collectExerciseSetInputs(ex as WorkoutExercise, exIdx, getLog);
+        const plan = buildDeloadPatches({
+          sets: Array.from({ length: setsCount }, (_, setIdx) => {
+            const key = `${exIdx}-${setIdx}`;
+            const cfg = getPlanConfig(ex as WorkoutExercise, setIdx);
+            const planned = getPlannedSet(ex as WorkoutExercise, setIdx);
+            const suggestionValue = deloadSuggestions[key];
+            return {
+              key,
+              log: getLog(key),
+              plannedWeight: toNumber(cfg?.weight ?? planned?.weight ?? null),
+              suggestion: isObject(suggestionValue) ? (suggestionValue as UnknownRecord) : null,
+              cfg,
+            };
+          }),
+          ratio: sug.suggestedWeight / sug.baseWeight,
+          minWeight: Number(sug.minWeight || 0),
+          baseWeight: sug.baseWeight,
+          appliedAt,
+          meta: {
+            reductionPct: sug.appliedReduction,
+            reason: getDeloadReason(sug.analysis as DeloadAnalysis, Number(sug.appliedReduction || 0), Number(sug.historyCount || 0)),
+            historyCount: sug.historyCount,
+          },
+        });
+        for (const { key, patch } of plan.patches) updateLog(key, patch);
+        seriesPuladas += plan.skippedDone;
+        if (plan.appliedWeights.length > 0) {
+          exercisesAplicados += 1;
+          seriesAplicadas += plan.appliedWeights.length;
+          appendDeloadAudit({
+            ts: Date.now(),
+            exIdx,
+            name: sug.name,
+            baseWeight: sug.baseWeight,
+            suggestedWeight: sug.suggestedWeight,
+            reductionPct: sug.appliedReduction,
+            historyCount: sug.historyCount,
+            appliedAt,
+            weights: plan.appliedWeights,
+            workoutId: workout?.id ?? null,
+            skippedDone: plan.skippedDone,
+            scope: 'session',
+          }, userId);
+        }
+      } catch (e) {
+        // Um exercício que falha não pode derrubar a descarga dos outros — mas
+        // também não pode sumir em silêncio.
+        logError('deload:apply-session', e, { exIdx });
+      }
+    }
+
+    setSessionDeloadModal(null);
+    try {
+      if (exercisesAplicados === 0) {
+        await alert('Nada a reduzir: as séries destes exercícios já foram concluídas.');
+      } else {
+        const partes = [`Descarga aplicada em ${exercisesAplicados} ${exercisesAplicados === 1 ? 'exercício' : 'exercícios'} (${seriesAplicadas} ${seriesAplicadas === 1 ? 'série' : 'séries'}).`];
+        if (seriesPuladas > 0) partes.push(`${seriesPuladas} já concluída${seriesPuladas > 1 ? 's' : ''} não foi alterada — o peso registrado é o que você levantou.`);
+        if (semBase.length) partes.push(`Sem carga de referência em: ${semBase.join(', ')}.`);
+        await alert(partes.join(' '));
+      }
+    } catch { }
+  };
+
   return {
     reportHistory,
     reportHistoryStatus,
     reportHistoryUpdatedAt,
     deloadSuggestions,
     deloadAlerts,
+    sessionDeloadAlert,
+    sessionDeloadModal,
+    setSessionDeloadModal,
+    applyDeloadToSession,
     deloadModal,
     setDeloadModal,
     deloadAiCacheRef,
