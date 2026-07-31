@@ -15,6 +15,7 @@ import { UnknownRecord, WorkoutExercise } from '../types';
 import type { SetType } from '@/types/workout';
 import { SetTypePopover, SET_TYPE_META, resolveSetType, useLongPress } from '../SetTypePopover';
 import { logWarnRemote } from '@/lib/logger';
+import { decideExternalSync } from '../helpers/inputSyncDecision';
 import { plateHintForExercise } from '@/utils/autoload/plateBreakdown';
 import { AutoloadNote } from './AutoloadNote';
 
@@ -42,17 +43,42 @@ function useInputField(externalValue: string, onChange: (v: string) => void, lab
   // efeito de re-sync do autoload dispara um updateLog extra logo depois da tecla —
   // re-render que chega ANTES do setState do campo propagar, trazendo externo vazio.
   const typedAtRef = useRef(0);
+  // `onChange` num ref: o efeito abaixo precisa devolver o valor ao log sem
+  // entrar nas deps (o efeito reage só a `externalValue`, de propósito).
+  const onChangeRef = useRef(onChange);
+  onChangeRef.current = onChange;
+  // Trava de restauração: devolve o valor perdido UMA vez por instância. Se o
+  // externo insistir em voltar vazio, aceita — melhor perder o campo do que ficar
+  // num vai-e-volta infinito com o estado de cima.
+  const restoredRef = useRef(false);
 
   useEffect(() => {
-    if (isFocused.current) return;
-    // Protege o que foi digitado há pouco, tenha havido blur ou não.
-    const lastInteraction = Math.max(blurredAtRef.current, typedAtRef.current);
-    if (
-      localValue &&
-      !externalValue &&
-      lastInteraction > 0 &&
-      Date.now() - lastInteraction < TYPED_VALUE_GRACE_MS
-    ) {
+    const agora = Date.now();
+    const decisao = decideExternalSync({
+      localValue,
+      externalValue,
+      isFocused: isFocused.current,
+      blurredAt: blurredAtRef.current,
+      typedAt: typedAtRef.current,
+      now: agora,
+      graceMs: TYPED_VALUE_GRACE_MS,
+      alreadyRestored: restoredRef.current,
+    });
+
+    if (decisao === 'keep') return;
+
+    // O valor sumiu do log sem o usuário ter tocado no campo — devolve. É a
+    // última camada que ainda tem o valor em mãos no momento em que ele some.
+    if (decisao === 'restore') {
+      restoredRef.current = true;
+      if (label) {
+        logWarnRemote('workout.input.persisted-value-vanished', `${label} sumiu do log sem o usuário mexer`, {
+          field: label,
+          value: localValue,
+          focused: isFocused.current,
+        });
+      }
+      try { onChangeRef.current?.(localValue); } catch { /* best effort */ }
       return;
     }
     // FLIGHT-RECORDER (bug "digito e some"): um valor DIGITADO está prestes a ser
