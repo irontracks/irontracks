@@ -5,6 +5,7 @@ import NextImage from 'next/image'
 import { Camera, X, Check, Loader2, Sparkles, RotateCcw, Dumbbell, AlertTriangle } from 'lucide-react'
 import { createBodyPhotoAssessment } from '@/actions/bodyPhotoAssessment-actions'
 import { analyzeBodyPhoto, fetchBodyPhotoCorrelation } from '@/lib/api/bodyPhoto'
+import { translateAiError } from '@/utils/ai/clientErrors'
 import { compressBodyPhoto, uploadBodyPhoto, type CompressedPhoto } from '@/utils/storage/bodyPhotoUpload'
 import { BODY_PHOTO_POSES, POSE_LABELS_PT, type BodyPhotoPose, type BodyPhotoLaudo, type BodyPhotoCorrelation, type TrainingWindowSummary } from '@/types/bodyPhotoAssessment'
 import { BodyPhotoLaudoView } from './BodyPhotoLaudoView'
@@ -12,6 +13,15 @@ import { BodyPhotoCorrelationView } from './BodyPhotoCorrelationView'
 import { useBackHandler } from '@/hooks/useBackHandler'
 
 type Stage = 'capture' | 'processing' | 'result' | 'error'
+
+/**
+ * Texto de erro das rotas de IA. As rotas devolvem `message` (texto nosso, já em
+ * pt-BR) OU só um código canônico (`ai_error`, `ai_rate_limited`…). Sem esta
+ * tradução o código cru vazava pra tela — o usuário via literalmente "ai_error"
+ * quando a cota diária do Gemini estourou (31/07/2026).
+ */
+const aiErrorText = (res: { message?: string; error?: string }): string =>
+    res.message?.trim() || translateAiError(res.error)
 
 const POSE_HINT: Record<BodyPhotoPose, string> = {
     front: 'Em pé, de frente, braços levemente afastados do corpo.',
@@ -67,7 +77,7 @@ export const BodyPhotoCaptureModal: React.FC<Props> = ({ open, onClose, studentU
         setCorrelationLoading(true); setCorrelationError('')
         try {
             const res = await fetchBodyPhotoCorrelation(assessmentId)
-            if (!res.ok || !res.correlation || !res.window) throw new Error(res.message || res.error || 'Falha na correlação.')
+            if (!res.ok || !res.correlation || !res.window) throw new Error(aiErrorText(res))
             setCorrelation({ data: res.correlation, window: res.window })
         } catch (e) {
             setCorrelationError(e instanceof Error ? e.message : 'Erro inesperado.')
@@ -119,7 +129,7 @@ export const BodyPhotoCaptureModal: React.FC<Props> = ({ open, onClose, studentU
 
             setProgress('Analisando com IA… isso pode levar alguns segundos.')
             const res = await analyzeBodyPhoto(id)
-            if (!res.ok || !res.analysis) throw new Error(res.message || res.error || 'Falha na análise.')
+            if (!res.ok || !res.analysis) throw new Error(aiErrorText(res))
 
             setLaudo(res.analysis)
             setStage('result')

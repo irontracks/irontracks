@@ -167,6 +167,14 @@ describe('rotas da Avaliação por Foto usam structured output', () => {
         expect(src).not.toContain('function extractJson(')
     })
 
+    it('o modal traduz código de IA em vez de exibi-lo cru', () => {
+        // Bug real (31/07/2026): a tela mostrou literalmente "ai_error" ao usuário
+        // quando a cota diária do Gemini estourou.
+        const src = readFileSync('src/components/body-photo/BodyPhotoCaptureModal.tsx', 'utf8')
+        expect(src).toContain('translateAiError')
+        expect(src).not.toMatch(/new Error\(res\.message \|\| res\.error/)
+    })
+
     it('os responseSchema espelham os limites do Zod', () => {
         const links = CORRELATION_RESPONSE_SCHEMA.properties.links
         expect(links.maxItems).toBe(CORRELATION_LIMITS.links)

@@ -19,8 +19,11 @@ import { AI_ERROR_KNOWN_CODES, type AiErrorCode } from './errorCodes'
 const KNOWN_CODES = AI_ERROR_KNOWN_CODES
 
 const PT_BR_MESSAGES: Record<AiErrorCode, string> = {
+  // Cobre os DOIS casos de 429: rajada de chamadas e cota diária estourada
+  // (quotaId GenerateRequestsPerDayPerProjectPerModel). Prometer "alguns
+  // segundos" na cota diária seria mentira — o usuário tentaria em looping.
   ai_rate_limited:
-    'Muitas tentativas em sequência. Aguarde alguns segundos e tente novamente.',
+    'Limite de uso da IA atingido. Aguarde alguns instantes e tente de novo — se continuar, a cota do dia se esgotou.',
   ai_forbidden:
     'A chave da IA está com problema (cota ou billing). Já avisamos o time — tente novamente mais tarde.',
   ai_model_missing:
