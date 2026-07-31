@@ -361,6 +361,20 @@ const NormalSetInner = ({
       const nextPlanned = getPlannedSet(ex, setIdx + 1);
       const nextKey = nextPlanned ? `${exIdx}-${setIdx + 1}` : null;
       startTimer(restTime, { kind: 'rest', key, nextKey, restStartedAtMs: nowMs });
+    } else {
+      // Concluir a série e NÃO cair no descanso — o app segue direto pra próxima.
+      // Relatado em treino (2026-07-31) como "às vezes não vai pro descanso".
+      // Aqui a causa é sempre a mesma: este exercício não tem tempo de descanso
+      // configurado. Instrumentado porque só o payload diz se é config do treino
+      // (esperado) ou `restTime` chegando vazio por bug de leitura do plano — as
+      // duas hipóteses são indistinguíveis do lado de fora.
+      logWarnRemote('workout.rest.skipped-no-rest-time', 'série concluída sem descanso: restTime ausente', {
+        exercise: String((ex as { name?: unknown })?.name ?? ''),
+        exIdx,
+        setIdx,
+        restTimeRaw: String(restTime ?? ''),
+        method: String((ex as { method?: unknown })?.method ?? ''),
+      });
     }
     if (setsCount != null && setIdx === setsCount - 1) {
       collapseAndScroll(restTime && restTime > 0 ? 600 : 300);
