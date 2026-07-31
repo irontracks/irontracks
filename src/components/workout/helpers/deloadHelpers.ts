@@ -235,10 +235,18 @@ export const analyzeDeloadHistory = (
     preferWorkoutKey?: string | null,
 ): DeloadAnalysis => {
     const wanted = String(preferWorkoutKey ?? '').trim();
-    const source = wanted
-        ? (Array.isArray(items) ? items.filter((i) => String(i?.workoutKey ?? '') === wanted) : [])
-        : items;
-    const ordered = Array.isArray(source) ? source.slice(-DELOAD_HISTORY_SIZE) : [];
+    const base = Array.isArray(items) ? items : [];
+    const source = wanted ? base.filter((i) => String(i?.workoutKey ?? '') === wanted) : base;
+    // Sessões em que o próprio app já mandou reduzir NÃO são evidência de
+    // regressão — a carga caiu porque foi mandada cair. Sem este filtro o deload
+    // se auto-alimenta: aplicar -22% derruba o volume muito além do limiar de 3%,
+    // a análise seguinte lê "regressão" e sugere outro corte, e assim por diante.
+    // O motor de carga já ignora essas sessões (useWorkoutAutoload: `if
+    // (item?.deloadApplied) continue`); a análise ficava de fora da mesma regra.
+    // Ficou latente enquanto ninguém aplicava deload (0 de 547 sessões até
+    // jul/2026) — vira ativo no primeiro uso de verdade.
+    const semDeload = source.filter((i) => i?.deloadApplied !== true);
+    const ordered = semDeload.slice(-DELOAD_HISTORY_SIZE);
     const recent = ordered.slice(-DELOAD_RECENT_WINDOW);
     const older = ordered.slice(0, Math.max(0, ordered.length - recent.length));
     const avgRecentVolume = averageNumbers(recent.map((i) => i.totalVolume).filter((v) => typeof v === 'number' && Number.isFinite(v) && v > 0));
@@ -263,6 +271,54 @@ export const analyzeDeloadHistory = (
     const itemsCount = ordered.length;
     const hasEnoughHistory = itemsCount >= DELOAD_HISTORY_MIN && (volumeDelta != null || weightDelta != null);
     return { status, volumeDelta, weightDelta, itemsCount, hasEnoughHistory };
+};
+
+export type ExerciseDeloadAlert = {
+    status: 'stagnation' | 'overtraining';
+    suggestedPct: number;
+    itemsCount: number;
+};
+
+export type SessionDeloadAlert = {
+    exIdxs: number[];
+    status: 'stagnation' | 'overtraining';
+    suggestedPct: number;
+    itemsCount: number;
+};
+
+/**
+ * Promove os avisos POR EXERCÍCIO a uma decisão de SESSÃO.
+ *
+ * O diagnóstico segue por exercício (é onde o histórico vive, e estagnação
+ * costuma ser local), mas a ação é do treino: a fadiga que justifica descarga é
+ * sistêmica — aliviar um exercício só não descansa nada — e decidir oito vezes
+ * seguidas é a explicação mais provável de a ferramenta nunca ter sido usada
+ * (0 de 547 sessões concluídas até jul/2026).
+ *
+ * Abaixo do mínimo, devolve null e o aviso continua no card do exercício: com um
+ * exercício travado o caso é local, não uma sessão inteira pedindo descanso.
+ *
+ * Regressão em QUALQUER exercício manda o cenário — e com ele a redução maior.
+ * `itemsCount` é o MENOR entre os exercícios: é o tamanho da evidência mais
+ * fraca do conjunto, e é ele que o texto mostra ao usuário.
+ */
+export const buildSessionDeloadAlert = (
+    alerts: Record<number, ExerciseDeloadAlert>,
+    minExercises: number,
+    reductionOvertrain: number,
+    reductionStagnation: number,
+): SessionDeloadAlert | null => {
+    const entries = Object.entries(alerts ?? {})
+        .map(([k, v]) => [Number(k), v] as const)
+        .filter(([k, v]) => Number.isFinite(k) && k >= 0 && isObject(v));
+    if (entries.length < Math.max(1, minExercises)) return null;
+    const temRegressao = entries.some(([, v]) => v.status === 'overtraining');
+    return {
+        exIdxs: entries.map(([k]) => k).sort((a, b) => a - b),
+        status: temRegressao ? 'overtraining' : 'stagnation',
+        suggestedPct: temRegressao ? reductionOvertrain : reductionStagnation,
+        itemsCount: Math.min(...entries.map(([, v]) => Number(v.itemsCount) || 0)),
+    };
 };
 
 export const parseAiRecommendation = (text: unknown): AiRecommendation => {

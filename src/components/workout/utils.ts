@@ -15,6 +15,11 @@ export const DELOAD_REDUCTION_STABLE = 0.12;
 export const DELOAD_REDUCTION_STAGNATION = 0.15;
 export const DELOAD_REDUCTION_OVERTRAIN = 0.22;
 export const DELOAD_MIN_1RM_FACTOR = 0.5;
+/**
+ * A partir de quantos exercícios sinalizados a descarga vira decisão de SESSÃO.
+ * Com 1 só, o caso é local (aquele exercício travou) e o aviso segue no card.
+ */
+export const DELOAD_SESSION_MIN_EXERCISES = 2;
 export const DELOAD_REDUCTION_MIN = 0.05;
 export const DELOAD_REDUCTION_MAX = 0.4;
 export const WEIGHT_ROUND_STEP = 0.5;

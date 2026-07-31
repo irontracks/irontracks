@@ -1,6 +1,7 @@
 
 import type { UnknownRecord } from '@/types/app'
 import { setVolume, setTopWeightReps, setTotalReps, setBestE1rm, sessionVolumeKg } from './setVolume'
+import { detectSessionDeload, isDeloadSession, type SessionDeload } from './sessionDeload'
 import { estimateSessionKcalBreakdown } from '@/utils/calories/sessionKcal'
 import { distributeKcalWithFixed } from '@/utils/calories/distributeKcal'
 
@@ -430,6 +431,8 @@ export type ReportMetrics = {
   }
   /** Cadence analysis (null if no exercises had cadence defined) */
   cadence: CadenceCompliance | null
+  /** Descarga aplicada nesta sessão (null quando não houve). Derivado dos logs. */
+  deload: SessionDeload | null
   exerciseOrder: string[]
   exercises: ReportExerciseMetrics[]
 }
@@ -578,6 +581,7 @@ export const buildReportMetrics = (session: UnknownRecord, previousSession?: Unk
       compliance,
     },
     cadence: cadenceCompliance,
+    deload: (() => { const d = detectSessionDeload(logs); return d.applied ? d : null })(),
     exerciseOrder,
     exercises: metrics,
   }
@@ -604,6 +608,10 @@ export const buildTrainingLoadFlags = (currentSession: UnknownRecord, history: U
   const prevSessions = (Array.isArray(history) ? history : [])
     .map((s) => (isObject(s) ? s : null))
     .filter((s): s is UnknownRecord => Boolean(s))
+    // Sessão de DESCARGA não entra na média de referência: ela tem 15–22 % menos
+    // carga por ordem do próprio app, então baixaria a régua e faria a sessão
+    // normal seguinte parecer um pico.
+    .filter((s) => !isDeloadSession(s))
     .map((s) => ({ ms: extractSessionDateMs(s), volume: getSessionVolumeKg(s) }))
     .filter((s) => s.ms > 0 && s.ms < baseDate)
     .sort((a, b) => b.ms - a.ms)
@@ -615,14 +623,20 @@ export const buildTrainingLoadFlags = (currentSession: UnknownRecord, history: U
   const dayDropPct = prevAvg > 0 ? Math.round(((currentVolume - prevAvg) / prevAvg) * 1000) / 10 : 0
   const weekDeltaPct = weekly.deltaPct
   const isHeavyWeek = weekly.isHeavyWeek
-  const isBadDay = prevAvg > 0 ? dayDropPct <= -10 : false
-  const reason = isBadDay && isHeavyWeek
-    ? 'Queda no dia com semana pesada'
-    : isBadDay
-      ? 'Queda no dia vs média recente'
-      : isHeavyWeek
-        ? 'Semana pesada sem queda crítica no dia'
-        : 'Dentro do padrão recente'
+  // Descarga PLANEJADA não é dia ruim. A queda é o objetivo do dia — sem esta
+  // guarda o relatório acusa "queda no dia" e o Coach IA escreve que o aluno
+  // regrediu justamente quando ele seguiu a orientação do app.
+  const isDeloadDay = isDeloadSession(currentSession)
+  const isBadDay = prevAvg > 0 && !isDeloadDay ? dayDropPct <= -10 : false
+  const reason = isDeloadDay
+    ? 'Sessão de descarga (deload) — queda de carga planejada'
+    : isBadDay && isHeavyWeek
+      ? 'Queda no dia com semana pesada'
+      : isBadDay
+        ? 'Queda no dia vs média recente'
+        : isHeavyWeek
+          ? 'Semana pesada sem queda crítica no dia'
+          : 'Dentro do padrão recente'
   return { dayDropPct, weekDeltaPct, isBadDay, isHeavyWeek, reason }
 }
 
