@@ -2,7 +2,7 @@
 
 import React, { useCallback, useRef, useState } from 'react'
 import NextImage from 'next/image'
-import { Camera, X, Check, Loader2, Sparkles, RotateCcw, Dumbbell } from 'lucide-react'
+import { Camera, X, Check, Loader2, Sparkles, RotateCcw, Dumbbell, AlertTriangle } from 'lucide-react'
 import { createBodyPhotoAssessment } from '@/actions/bodyPhotoAssessment-actions'
 import { analyzeBodyPhoto, fetchBodyPhotoCorrelation } from '@/lib/api/bodyPhoto'
 import { compressBodyPhoto, uploadBodyPhoto, type CompressedPhoto } from '@/utils/storage/bodyPhotoUpload'
@@ -241,10 +241,21 @@ export const BodyPhotoCaptureModal: React.FC<Props> = ({ open, onClose, studentU
                                             className="inline-flex items-center justify-center gap-2 min-h-[44px] px-5 rounded-xl border font-bold transition active:scale-95 disabled:opacity-50"
                                             style={{ background: 'rgba(168,85,247,0.08)', borderColor: 'rgba(168,85,247,0.3)', color: '#d8b4fe' }}
                                         >
-                                            {correlationLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Dumbbell className="w-4 h-4" />}
-                                            {correlationLoading ? 'Cruzando com seus treinos…' : 'Correlação com treino'}
+                                            {correlationLoading
+                                                ? <Loader2 className="w-4 h-4 animate-spin" />
+                                                : correlationError ? <RotateCcw className="w-4 h-4" /> : <Dumbbell className="w-4 h-4" />}
+                                            {correlationLoading
+                                                ? 'Cruzando com seus treinos…'
+                                                : correlationError ? 'Tentar novamente' : 'Correlação com treino'}
                                         </button>
-                                        {correlationError ? <p className="mt-2 text-sm text-red-400">{correlationError}</p> : null}
+                                        {/* Erro fica DEPOIS do botão e o botão vira a ação de retry — antes a
+                                            mensagem aparecia solta e o usuário não sabia que era só clicar de novo. */}
+                                        {correlationError && !correlationLoading ? (
+                                            <div className="mt-3 mx-auto max-w-sm flex items-start gap-2 rounded-xl border border-red-500/25 bg-red-500/10 px-3 py-2 text-left">
+                                                <AlertTriangle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                                                <p className="text-[13px] leading-snug text-red-300">{correlationError}</p>
+                                            </div>
+                                        ) : null}
                                     </div>
                                 )}
                             </div>

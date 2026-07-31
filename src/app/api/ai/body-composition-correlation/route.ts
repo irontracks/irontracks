@@ -16,34 +16,25 @@ import { requireUser } from '@/utils/auth/route'
 import { canCoachStudent } from '@/utils/auth/studentAccess'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
-import { parseJsonBody, parseJsonWithSchema } from '@/utils/zod'
+import { parseJsonBody } from '@/utils/zod'
 import { respondDbError } from '@/utils/api/dbError'
 import { env } from '@/utils/env'
 import { getGeminiModel } from '@/utils/ai/gemini'
 import { safeGemini } from '@/utils/ai/handleGeminiError'
-import { logError } from '@/lib/logger'
+import { extractJsonFromModelText } from '@/utils/ai/extractJson'
+import { logError, logWarnRemote } from '@/lib/logger'
 import { aggregateTrainingWindow } from '@/utils/bodyPhoto/trainingWindow'
-import { BodyPhotoCorrelationSchema, type TrainingWindowSummary } from '@/types/bodyPhotoAssessment'
+import { CORRELATION_RESPONSE_SCHEMA, bodyPhotoGenerationConfig, normalizeCorrelation } from '@/utils/bodyPhoto/aiContract'
+import { BodyPhotoCorrelationSchema, type BodyPhotoCorrelation, type TrainingWindowSummary } from '@/types/bodyPhotoAssessment'
 import { buildUserContextBlock } from '@/utils/ai/userContext'
 
 export const dynamic = 'force-dynamic'
 
 const DEFAULT_LOOKBACK_DAYS = 90
+const MAX_OUTPUT_TOKENS = 4096
+/** 1 tentativa + 1 reforço. Com structured output a 2ª quase nunca é usada. */
+const MAX_MODEL_ATTEMPTS = 2
 const BodySchema = z.object({ assessmentId: z.string().uuid() }).strip()
-
-const safeJsonParse = (raw: unknown) => parseJsonWithSchema(raw, z.unknown())
-function extractJson(text: string): unknown {
-    let cleaned = String(text || '').trim()
-    if (!cleaned) return null
-    const fence = cleaned.match(/^```(?:json)?\s*\n?([\s\S]*?)\n?\s*```$/m)
-    if (fence?.[1]) cleaned = fence[1].trim()
-    const direct = safeJsonParse(cleaned)
-    if (direct) return direct
-    const s = cleaned.indexOf('{')
-    const e = cleaned.lastIndexOf('}')
-    if (s === -1 || e <= s) return null
-    return safeJsonParse(cleaned.slice(s, e + 1))
-}
 
 const dayStr = (d: Date) => d.toISOString().slice(0, 10)
 
@@ -178,33 +169,52 @@ export async function POST(req: Request) {
             'Seja concreto e cite números do treino (volume, séries, sessões). Se houver avaliação anterior, comente a evolução dos scores.',
             'Se não houver treino registrado na janela, diga isso com clareza e baixe a confiança.',
             '',
-            'Retorne APENAS JSON puro:',
-            '{',
-            '  "headline": "frase de impacto citando treino e físico",',
-            '  "narrative": "explicação correlacionando treino executado e físico observado",',
-            '  "whatIsWorking": ["o que o treino está sustentando no físico"],',
-            '  "whatIsMissing": ["lacunas: grupos pouco treinados vs. pontos fracos do laudo"],',
-            '  "links": [{ "muscleGroup": "Peitoral", "observation": "texto citando volume", "trend": "supported|undertrained|overtrained|neutral" }],',
-            '  "nextFocus": [{ "focus": "grupo/área", "action": "ajuste concreto de treino" }],',
-            '  "confidence": "high|medium|low"',
-            '}',
+            'Campos: headline (frase de impacto citando treino e físico), narrative (explicação',
+            'correlacionando treino executado e físico observado), whatIsWorking (o que o treino',
+            'sustenta no físico), whatIsMissing (grupos pouco treinados vs. pontos fracos do laudo),',
+            'links (grupo muscular ↔ observação citando volume ↔ trend), nextFocus (ajustes concretos),',
+            'confidence. Frases curtas e diretas — respeite os limites de tamanho do schema.',
             '',
             'DADOS:',
             JSON.stringify(promptData),
         ].join('\n')
 
-        const model = getGeminiModel(apiKey, env.gemini.modelId)
-        const geminiResult = await safeGemini('body-composition-correlation', () => model.generateContent(prompt))
-        if ('errorResponse' in geminiResult) return geminiResult.errorResponse
+        // Structured output: o schema vai NA CHAMADA, não só no texto do prompt.
+        // Sem isso o modelo devolvia JSON quebrado em ~1/3 das vezes (ver aiContract.ts).
+        const model = getGeminiModel(
+            apiKey,
+            env.gemini.modelId,
+            bodyPhotoGenerationConfig(CORRELATION_RESPONSE_SCHEMA, MAX_OUTPUT_TOKENS),
+        )
 
-        const rawText = geminiResult.value?.response?.text?.() || ''
-        const validated = BodyPhotoCorrelationSchema.safeParse(extractJson(rawText))
-        if (!validated.success) {
-            logError('ai:body-composition-correlation:invalid', new Error('schema mismatch'), { rawPreview: String(rawText).slice(0, 200) })
+        let correlation: BodyPhotoCorrelation | null = null
+        let lastPreview = ''
+        for (let attempt = 1; attempt <= MAX_MODEL_ATTEMPTS && !correlation; attempt++) {
+            const attemptPrompt = attempt === 1
+                ? prompt
+                : `${prompt}\n\nATENÇÃO: a resposta anterior veio fora do formato. Responda SOMENTE o JSON do schema, com textos curtos dentro dos limites.`
+            const geminiResult = await safeGemini('body-composition-correlation', () => model.generateContent(attemptPrompt))
+            if ('errorResponse' in geminiResult) return geminiResult.errorResponse
+
+            const rawText = geminiResult.value?.response?.text?.() || ''
+            const normalized = normalizeCorrelation(extractJsonFromModelText(rawText))
+            const validated = BodyPhotoCorrelationSchema.safeParse(normalized)
+            if (validated.success) {
+                correlation = validated.data
+                if (attempt > 1) {
+                    logWarnRemote('ai:body-composition-correlation:retry-ok', 'correlação só passou na 2ª tentativa')
+                }
+                break
+            }
+            lastPreview = String(rawText).slice(0, 400)
+        }
+
+        if (!correlation) {
+            logError('ai:body-composition-correlation:invalid', new Error('schema mismatch'), { rawPreview: lastPreview })
             return NextResponse.json({ ok: false, error: 'correlation_failed', message: 'Não consegui gerar a correlação. Tente novamente.' }, { status: 422 })
         }
 
-        return NextResponse.json({ ok: true, correlation: validated.data, window })
+        return NextResponse.json({ ok: true, correlation, window })
     } catch (e) {
         logError('ai:body-composition-correlation', e)
         return NextResponse.json({ ok: false, error: 'internal' }, { status: 500 })
