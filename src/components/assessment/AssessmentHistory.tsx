@@ -26,6 +26,7 @@ import { AssessmentListItem, measurementFields, skinfoldFields } from '@/compone
 import { AssessmentPlanModal } from '@/components/assessment/AssessmentPlanModal';
 import { AssessmentHistoryModal } from './AssessmentHistoryModal';
 import { BodyPhotoCaptureModal } from '@/components/body-photo/BodyPhotoCaptureModal';
+import { BodyPhotoHistoryModal } from '@/components/body-photo/BodyPhotoHistoryModal';
 import { LabExamsSection } from '@/components/lab-exams/LabExamsSection';
 import { useAssessmentHistoryData } from '@/hooks/useAssessmentHistoryData';
 import { ArrowLeft } from 'lucide-react';
@@ -66,6 +67,9 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
   const router = useRouter();
   const [quickBiaOpen, setQuickBiaOpen] = React.useState(false);
   const [photoModalOpen, setPhotoModalOpen] = React.useState(false);
+  // Histórico dos laudos por foto — o laudo fica salvo no banco; sem esta tela
+  // ele só existia enquanto o modal de captura estava aberto.
+  const [photoHistoryOpen, setPhotoHistoryOpen] = React.useState(false);
 
   const {
     // Core data
@@ -149,6 +153,7 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
           onClose={undefined}
           onAddBia={studentId ? () => setQuickBiaOpen(true) : undefined}
           onPhotoAssessment={() => setPhotoModalOpen(true)}
+          onPhotoHistory={() => setPhotoHistoryOpen(true)}
         />
 
         <div
@@ -174,6 +179,7 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
           studentUserId={studentId ?? null}
           gender={poseGender}
         />
+        {photoHistoryOpen ? <BodyPhotoHistoryModal onClose={() => setPhotoHistoryOpen(false)} /> : null}
       </div>
     );
   }
@@ -188,6 +194,7 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
           onClose={onClose}
           onAddBia={studentId ? () => setQuickBiaOpen(true) : undefined}
           onPhotoAssessment={() => setPhotoModalOpen(true)}
+          onPhotoHistory={() => setPhotoHistoryOpen(true)}
         />
         {latestAssessment && previousAssessment && (
           <AssessmentSummaryCards
@@ -454,6 +461,7 @@ export default function AssessmentHistory({ studentId: propStudentId, onClose }:
           studentUserId={studentId ?? null}
           gender={poseGender}
         />
+        {photoHistoryOpen ? <BodyPhotoHistoryModal onClose={() => setPhotoHistoryOpen(false)} /> : null}
       </div>
     </DialogProvider>
   );
