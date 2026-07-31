@@ -71,6 +71,51 @@ describe('lab_exams — autorização por vínculo vivo', () => {
   })
 })
 
+/**
+ * Mesma classe, outra família (31/07/2026): as rotas de IA da Avaliação por Foto
+ * já gateavam por `canCoachStudent`, mas as rotas de DADOS da mesma feature
+ * (listar/abrir laudo e mintar upload de foto) continuavam comparando o caller
+ * com `trainer_id` da linha — e a LISTA ainda filtrava por `trainer_id.eq.`,
+ * o que faria uma linha forjada {user_id: vítima, trainer_id: self} aparecer.
+ * Foto de corpo inteiro é o dado mais sensível do app; o gate tem que ser o
+ * mesmo em toda a família.
+ */
+describe('body_photo_assessments — autorização por vínculo vivo', () => {
+  const bodyPhotoRoutes = allRoutes.filter((f) =>
+    fs.readFileSync(f, 'utf-8').includes("from('body_photo_assessments')"),
+  )
+
+  it('a varredura encontra as rotas de avaliação por foto (sanidade)', () => {
+    expect(bodyPhotoRoutes.length).toBeGreaterThanOrEqual(4)
+  })
+
+  it('nenhuma rota usa o trainer_id da linha como credencial de acesso', () => {
+    const antiPattern = /!==\s*(trainerId|.*\.trainer_id)\b/
+    const offenders = bodyPhotoRoutes.filter((f) => antiPattern.test(fs.readFileSync(f, 'utf-8'))).map(rel)
+    expect(offenders).toEqual([])
+  })
+
+  it('nenhuma listagem filtra por trainer_id — o filtro é pelo DONO da avaliação', () => {
+    const offenders = bodyPhotoRoutes.filter((f) => /trainer_id\.eq\./.test(fs.readFileSync(f, 'utf-8'))).map(rel)
+    expect(offenders).toEqual([])
+  })
+
+  it('toda rota com service-role exige vínculo vivo (canCoachStudent/listCoachedStudentIds)', () => {
+    const offenders = bodyPhotoRoutes
+      .filter((f) => {
+        const src = fs.readFileSync(f, 'utf-8')
+        if (!src.includes('createAdminClient')) return false
+        const hasLiveLink =
+          src.includes('canCoachStudent') ||
+          src.includes('listCoachedStudentIds') ||
+          (src.includes("from('students')") && src.includes("eq('teacher_id'"))
+        return !hasLiveLink
+      })
+      .map(rel)
+    expect(offenders).toEqual([])
+  })
+})
+
 describe('/api/admin que aceita teacher — recorte por vínculo', () => {
   // Rotas de admin que também liberam o papel `teacher` e recebem id de usuário
   // no request. `admin/vip/batch-status` aceitava 200 UUIDs quaisquer e devolvia
