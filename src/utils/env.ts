@@ -140,14 +140,6 @@ export const env = {
     get trustedProxyDepth() { return parseInt(optionalEnv('TRUSTED_PROXY_DEPTH', '1'), 10) },
   },
 
-  // ── Z-API (WhatsApp) ──────────────────────────────────────
-  zapi: {
-    get instanceId() { return optionalEnv('ZAPI_INSTANCE_ID') },
-    get token() { return optionalEnv('ZAPI_TOKEN') },
-    /** Security token sent by Z-API in the "client-token" header on webhooks */
-    get clientToken() { return optionalEnv('ZAPI_CLIENT_TOKEN') },
-  },
-
   // ── YouTube ───────────────────────────────────────────────
   youtube: {
     get apiKey() { return optionalEnv('YOUTUBE_API_KEY') },

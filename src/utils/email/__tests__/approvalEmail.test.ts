@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { buildApprovalEmail, firstName, APP_URL, SUPPORT_EMAIL } from '@/utils/email/approvalEmail'
+import { buildApprovalEmail, buildRejectionEmail, firstName, APP_URL, SUPPORT_EMAIL } from '@/utils/email/approvalEmail'
 
 /**
  * Guards do e-mail de aprovação — o único contato do produto com quem esperou
@@ -68,6 +68,41 @@ describe('buildApprovalEmail', () => {
         const b = buildApprovalEmail({ name: 'Roberson', accountExisted: false })
         expect(a.subject).toBe(b.subject)
         expect(a.subject).toBe('Seu acesso ao IronTracks foi aprovado')
+    })
+})
+
+describe('buildRejectionEmail', () => {
+    it('escapa o nome — mesma origem pública do e-mail de aprovação', () => {
+        const { html } = buildRejectionEmail({ name: '<b>x</b>' })
+        expect(html).not.toContain('<b>x</b>')
+        expect(html).toContain('&lt;b&gt;')
+    })
+
+    it('não inventa motivo — não existe campo de motivo no sistema', () => {
+        const { html, text } = buildRejectionEmail({ name: 'Ana' })
+        for (const body of [html, text]) {
+            expect(body).not.toMatch(/porque|motivo|razão|critério/i)
+        }
+    })
+
+    it('oferece um caminho de resposta', () => {
+        // Recusar sem dar para onde falar é fechar a porta na cara.
+        const { text } = buildRejectionEmail({ name: 'Ana' })
+        expect(text).toContain(SUPPORT_EMAIL)
+        expect(text).toMatch(/responder este e-mail/i)
+    })
+
+    it('não promete acesso nem manda entrar no app', () => {
+        // Um link "Entrar" num e-mail de recusa é crueldade acidental.
+        const { html, text } = buildRejectionEmail({ name: 'Ana' })
+        expect(html).not.toContain(`href="${APP_URL}"`)
+        expect(text).not.toContain(APP_URL)
+    })
+
+    it('tem versão em texto, como o de aprovação', () => {
+        const { text } = buildRejectionEmail({ name: 'Ana' })
+        expect(text).not.toContain('<')
+        expect(text.length).toBeGreaterThan(40)
     })
 })
 

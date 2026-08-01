@@ -118,15 +118,6 @@ const CRON_CATALOG = [
     notificationType: null,
     toleranceHours: 36,
   },
-  {
-    id: 'whatsapp-reactivation',
-    path: '/api/cron/whatsapp-reactivation',
-    schedule: '0 14 * * *',
-    label: 'WhatsApp — Reativação',
-    // Insere em whatsapp_conversations, não em notifications.
-    notificationType: null,
-    toleranceHours: 36,
-  },
 ] as const
 
 type CronStatus = 'ok' | 'stale' | 'silent' | 'unknown'
