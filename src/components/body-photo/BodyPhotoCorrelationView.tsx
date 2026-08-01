@@ -63,14 +63,16 @@ export const BodyPhotoCorrelationView: React.FC<{
                 </div>
             ) : null}
 
-            {/* Top exercícios */}
-            {window.topExercises?.length ? (
+            {/* Mais treinados = mais SÉRIES. Ordenar por carga aqui enganava tanto
+                quanto enganou a IA: exercício de carga leve (flexora, elevação
+                lateral, abdominal) sumia da lista mesmo com muita série. */}
+            {(window.topExercisesBySets?.length || window.topExercises?.length) ? (
                 <div className="space-y-1.5">
                     <h4 className="text-[11px] uppercase tracking-widest font-black text-neutral-500">Mais treinados no período</h4>
-                    {window.topExercises.slice(0, 5).map((ex, i) => (
+                    {(window.topExercisesBySets?.length ? window.topExercisesBySets : window.topExercises).slice(0, 5).map((ex, i) => (
                         <div key={i} className="flex items-center justify-between text-sm">
                             <span className="text-neutral-300 truncate">{ex.name}</span>
-                            <span className="text-neutral-500 shrink-0 ml-2">{formatVolume(ex.volumeKg)} · {ex.sets} séries</span>
+                            <span className="text-neutral-500 shrink-0 ml-2">{ex.sets} séries · {formatVolume(ex.volumeKg)}</span>
                         </div>
                     ))}
                 </div>

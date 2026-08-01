@@ -21,8 +21,20 @@ export interface TrainingWindowStats {
     sessions: number
     totalVolumeKg: number
     totalSets: number
-    /** Top exercícios por volume (desc). */
+    /** Top exercícios por VOLUME em kg (desc). Enviesado a favor de leg press/agachamento. */
     topExercises: ExerciseVolume[]
+    /**
+     * Top exercícios por SÉRIES (desc) — a métrica que diz o que foi de fato
+     * treinado.
+     *
+     * Existe porque `topExercises` sozinho produziu um diagnóstico ERRADO em
+     * produção (ago/2026): a correlação afirmou "posterior de coxa pouco
+     * treinado — ausência de mesa flexora", quando havia 55 séries de mesa
+     * flexora no período. Ela não aparecia no top-8 por volume porque flexora
+     * move carga baixa por natureza. Volume em kg NÃO é comparável entre
+     * exercícios; séries é.
+     */
+    topExercisesBySets: ExerciseVolume[]
 }
 
 interface SessionRow {
@@ -117,7 +129,7 @@ export function computeSessionStats(rawNotes: unknown): SessionStats {
  * Agrega as sessões de uma janela em estatísticas de treino por exercício.
  * `rows` já deve vir filtrado por user + datas (is_template=false).
  */
-export function aggregateTrainingWindow(rows: SessionRow[], topN = 8): TrainingWindowStats {
+export function aggregateTrainingWindow(rows: SessionRow[], topN = 12): TrainingWindowStats {
     let totalVolumeKg = 0
     let totalSets = 0
     let sessions = 0
@@ -137,15 +149,22 @@ export function aggregateTrainingWindow(rows: SessionRow[], topN = 8): TrainingW
         }
     }
 
-    const topExercises = [...byExercise.values()]
+    const all = [...byExercise.values()].map((e) => ({ name: e.name, volumeKg: Math.round(e.volumeKg), sets: e.sets }))
+
+    const topExercises = [...all]
         .sort((a, b) => b.volumeKg - a.volumeKg)
         .slice(0, topN)
-        .map((e) => ({ name: e.name, volumeKg: Math.round(e.volumeKg), sets: e.sets }))
+
+    // Desempate por volume só pra ordem ficar estável entre execuções.
+    const topExercisesBySets = [...all]
+        .sort((a, b) => b.sets - a.sets || b.volumeKg - a.volumeKg)
+        .slice(0, topN)
 
     return {
         sessions,
         totalVolumeKg: Math.round(totalVolumeKg),
         totalSets,
         topExercises,
+        topExercisesBySets,
     }
 }

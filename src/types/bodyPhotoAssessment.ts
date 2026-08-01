@@ -191,6 +191,16 @@ export const TrainingWindowSummarySchema = z.object({
         volumeKg: z.number(),
         sets: z.number(),
     })).default([]),
+    /**
+     * Top por SÉRIES. `.default([])` é obrigatório: as correlações gravadas antes
+     * deste campo existir não o têm, e sem o default elas deixariam de validar —
+     * o usuário perderia o cruzamento salvo ao abrir o laudo.
+     */
+    topExercisesBySets: z.array(z.object({
+        name: z.string(),
+        volumeKg: z.number(),
+        sets: z.number(),
+    })).default([]),
 })
 export type TrainingWindowSummary = z.infer<typeof TrainingWindowSummarySchema>
 

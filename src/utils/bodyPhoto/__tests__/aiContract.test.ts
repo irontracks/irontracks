@@ -202,6 +202,17 @@ describe('rotas da Avaliação por Foto usam structured output', () => {
         expect(correlacao).toMatch(/buildUserContextBlock\(admin, assessedUserId, \[[^\]]*'assessment'/)
     })
 
+    it('o prompt manda séries como critério e avisa que a lista é recorte', () => {
+        // O diagnóstico falso de ago/2026 ("posterior pouco treinado — ausência de
+        // mesa flexora", com 55 séries de mesa flexora no período) nasceu de mandar
+        // só o ranking por carga e o modelo ler ausência numa lista truncada.
+        const src = readFileSync('src/app/api/ai/body-composition-correlation/route.ts', 'utf8')
+        expect(src).toContain('maisTreinadosPorSeries')
+        expect(src).toContain('maisTreinadosPorCarga')
+        expect(src).toMatch(/Julgue "pouco treinado" por SÉRIES/)
+        expect(src).toMatch(/NUNCA afirme/)
+    })
+
     it('o detalhe da avaliação devolve a referência medida para a tela cruzar', () => {
         const rota = readFileSync('src/app/api/body-photo/assessments/route.ts', 'utf8')
         expect(rota).toContain('pickBodyFatReference')
