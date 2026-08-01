@@ -7,17 +7,19 @@
  * O visual do modo leitura é o mesmo de antes — número, séries × reps, badges de
  * descanso/método e as notas.
  *
- * Reordenar usa `Reorder` do framer-motion, igual ao modal que organiza a LISTA
- * de treinos (EditWorkoutListModal): mesma gramática de arrastar em duas telas
- * que fazem a mesma coisa, em vez de inventar um segundo jeito.
+ * Reordenar tem DOIS caminhos, de propósito: setas ↑ ↓ (sempre funcionam) e
+ * arrastar (`Reorder` do framer-motion, a mesma gramática do modal que organiza
+ * a lista de treinos). O arraste sozinho já falhou duas vezes em device real —
+ * disputa com o scroll da lista e é difícil de acertar no dedo.
  *
- * A ordem só vai pro banco no "Salvar" — arrastar mexe num rascunho local, e
- * "Cancelar" devolve a ordem original sem tocar em nada.
+ * Cada movimento PERSISTE na hora. A versão que guardava rascunho e esperava um
+ * "Salvar ordem" produziu o relato "organizei e não mudou": nos logs do
+ * servidor, a requisição de reordenação nunca chegou.
  */
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Reorder, useDragControls } from 'framer-motion'
-import { AlertTriangle, Check, Clock, Dumbbell, GripVertical, Loader2, ListOrdered, Trash2, X, Zap } from 'lucide-react'
+import { AlertTriangle, Check, ChevronDown, ChevronUp, Clock, Dumbbell, GripVertical, Loader2, ListOrdered, Trash2, Zap } from 'lucide-react'
 import { deleteWorkoutExercise, reorderWorkoutExercises } from '@/actions/workoutExercises-actions'
 import { notifyWorkoutsChanged } from '@/utils/workout/persistWorkoutPlan'
 
@@ -111,7 +113,13 @@ const MOVE_TOLERANCE_PX = 10
  * `select-none` + WebKit matam o texto grifado ao segurar (o toque longo
  * selecionava as palavras e a leitura embolava).
  */
-const SortableExercise = ({ ex, index }: { ex: ExerciseRecord; index: number }) => {
+const SortableExercise = ({ ex, index, total, onMove, onDragDone }: {
+    ex: ExerciseRecord
+    index: number
+    total: number
+    onMove: (index: number, direction: -1 | 1) => void
+    onDragDone: () => void
+}) => {
     const controls = useDragControls()
     const [armed, setArmed] = useState(false)
     const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -154,7 +162,7 @@ const SortableExercise = ({ ex, index }: { ex: ExerciseRecord; index: number }) 
             value={ex}
             dragListener={false}
             dragControls={controls}
-            onDragEnd={release}
+            onDragEnd={() => { release(); onDragDone() }}
             onPointerDown={onPointerDown}
             onPointerMove={onPointerMove}
             onPointerUp={release}
@@ -175,6 +183,33 @@ const SortableExercise = ({ ex, index }: { ex: ExerciseRecord; index: number }) 
                 </span>
                 <div className="flex-1 min-w-0">
                     <ExerciseBody ex={ex} index={index} />
+                </div>
+                {/*
+                 * Setas: o caminho que SEMPRE funciona.
+                 * Arrastar em WebView disputa com o scroll e falhou duas vezes em
+                 * device real. Um toque não tem ambiguidade de gesto — e cada
+                 * toque já salva, sem depender de um "confirmar" no fim.
+                 * O arraste continua disponível para quem preferir.
+                 */}
+                <div className="flex flex-col gap-1 shrink-0" onPointerDown={(e) => e.stopPropagation()}>
+                    <button
+                        type="button"
+                        onClick={() => onMove(index, -1)}
+                        disabled={index === 0}
+                        className="w-8 h-8 rounded-lg border border-neutral-700 text-neutral-300 flex items-center justify-center transition active:scale-90 disabled:opacity-25"
+                        aria-label={`Mover ${String(ex?.name || 'exercício')} para cima`}
+                    >
+                        <ChevronUp size={16} />
+                    </button>
+                    <button
+                        type="button"
+                        onClick={() => onMove(index, 1)}
+                        disabled={index === total - 1}
+                        className="w-8 h-8 rounded-lg border border-neutral-700 text-neutral-300 flex items-center justify-center transition active:scale-90 disabled:opacity-25"
+                        aria-label={`Mover ${String(ex?.name || 'exercício')} para baixo`}
+                    >
+                        <ChevronDown size={16} />
+                    </button>
                 </div>
             </div>
         </Reorder.Item>
@@ -206,27 +241,49 @@ export const QuickViewExerciseList: React.FC<Props> = ({ workoutId, exercises, c
         setOrganizing(true)
     }, [exercises])
 
-    const cancel = useCallback(() => {
+    const finish = useCallback(() => {
         setOrganizing(false)
         setDraft([])
         setError('')
     }, [])
 
-    const save = useCallback(async () => {
+    /**
+     * Persiste a ordem IMEDIATAMENTE, a cada movimento.
+     *
+     * A versão anterior guardava um rascunho e dependia de um botão de confirmar no
+     * fim — e o relato foi "organizei e não mudou": nos logs, a requisição de
+     * reordenação NUNCA chegou ao servidor. Depender de um segundo toque para
+     * confirmar é um passo a mais para dar errado. Cada movimento já vale.
+     */
+    const persistOrder = useCallback(async (next: ExerciseRecord[]) => {
         if (!workoutId) return
         setSaving(true); setError('')
-        const res = await reorderWorkoutExercises(workoutId, draft.map((ex) => String(ex.id)))
+        const res = await reorderWorkoutExercises(workoutId, next.map((ex) => String(ex.id)))
         setSaving(false)
-        if (!res.ok) { setError(res.error || 'Não consegui salvar a ordem.'); return }
+        if (!res.ok) {
+            setError(res.error || 'Não consegui salvar a ordem.')
+            setDraft(exercises)   // volta ao que o banco tem
+            return
+        }
         // O pai recebe a ordem nova ANTES do refetch chegar: quem tocar em
         // "Iniciar treino" logo em seguida parte da lista que está na tela.
-        onExercisesChange?.(draft)
-        // Mesma invalidação que o resto do app usa depois de escrever em treino —
-        // sem isso a nova ordem só apareceria reabrindo o app.
+        onExercisesChange?.(next)
         notifyWorkoutsChanged()
-        setOrganizing(false)
-        setDraft([])
-    }, [workoutId, draft, onExercisesChange])
+    }, [workoutId, exercises, onExercisesChange])
+
+    /** Move um item uma posição e salva. Setas funcionam em qualquer WebView. */
+    const move = useCallback((index: number, direction: -1 | 1) => {
+        const target = index + direction
+        if (target < 0 || target >= draft.length) return
+        const next = [...draft]
+        const [item] = next.splice(index, 1)
+        next.splice(target, 0, item)
+        setDraft(next)
+        void persistOrder(next)
+    }, [draft, persistOrder])
+
+    /** Fim do arraste: o framer já reordenou o rascunho, aqui só persistimos. */
+    const handleDragEnd = useCallback(() => { void persistOrder(draft) }, [draft, persistOrder])
 
     const remove = useCallback(async (ex: ExerciseRecord) => {
         if (!workoutId) return
@@ -265,25 +322,17 @@ export const QuickViewExerciseList: React.FC<Props> = ({ workoutId, exercises, c
                 <div className="flex items-center justify-between gap-2 px-1 pb-1">
                     {organizing ? (
                         <>
-                            <span className="text-[11px] text-neutral-500">Segure um card e arraste para reordenar.</span>
-                            <div className="flex items-center gap-1.5">
-                                <button
-                                    type="button"
-                                    onClick={cancel}
-                                    disabled={saving}
-                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-neutral-700 text-neutral-300 text-[11px] font-bold transition active:scale-95 disabled:opacity-50"
-                                >
-                                    <X size={12} /> Cancelar
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={save}
-                                    disabled={saving}
-                                    className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-black text-[11px] font-black bg-yellow-500 transition active:scale-95 disabled:opacity-50"
-                                >
-                                    {saving ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />} Salvar ordem
-                                </button>
-                            </div>
+                            <span className="text-[11px] text-neutral-500">
+                                {saving ? 'Salvando…' : 'Use ↑ ↓ para mover. Salva sozinho.'}
+                            </span>
+                            <button
+                                type="button"
+                                onClick={finish}
+                                disabled={saving}
+                                className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-black text-[11px] font-black bg-yellow-500 transition active:scale-95 disabled:opacity-50"
+                            >
+                                {saving ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />} Concluir
+                            </button>
                         </>
                     ) : (
                         <button
@@ -307,7 +356,7 @@ export const QuickViewExerciseList: React.FC<Props> = ({ workoutId, exercises, c
             {organizing ? (
                 <Reorder.Group axis="y" values={draft} onReorder={setDraft} className="space-y-2 m-0 p-0 select-none">
                     {draft.map((ex, idx) => (
-                        <SortableExercise key={exerciseKey(ex, idx)} ex={ex} index={idx} />
+                        <SortableExercise key={exerciseKey(ex, idx)} ex={ex} index={idx} total={draft.length} onMove={move} onDragDone={handleDragEnd} />
                     ))}
                 </Reorder.Group>
             ) : (
