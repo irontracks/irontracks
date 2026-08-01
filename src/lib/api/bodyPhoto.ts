@@ -4,6 +4,7 @@
  * aqui ficam as chamadas às API routes (leitura com signed URLs + análise IA).
  */
 import type { BodyPhotoAssessment, BodyPhotoAssessmentPhoto, BodyPhotoLaudo, BodyPhotoCorrelation, TrainingWindowSummary } from '@/types/bodyPhotoAssessment'
+import type { BodyFatReference } from '@/utils/bodyPhoto/bodyFatCrossCheck'
 
 export interface BodyPhotoListItem extends BodyPhotoAssessment {
     thumbnailUrl: string | null
@@ -12,6 +13,8 @@ export interface BodyPhotoListItem extends BodyPhotoAssessment {
 export interface BodyPhotoDetail {
     assessment: BodyPhotoAssessment
     photos: Array<BodyPhotoAssessmentPhoto & { signedUrl: string | null }>
+    /** % de gordura MEDIDA (dobras/BIA) mais próxima desta foto — null se o usuário não tem avaliação física. */
+    bodyFatReference: BodyFatReference | null
 }
 
 export async function fetchBodyPhotoList(): Promise<{ ok: boolean; assessments?: BodyPhotoListItem[]; error?: string }> {
@@ -30,7 +33,14 @@ export async function fetchBodyPhotoDetail(id: string): Promise<{ ok: boolean; d
         const res = await fetch(`/api/body-photo/assessments?id=${encodeURIComponent(id)}`, { method: 'GET' })
         const json = await res.json().catch(() => ({ ok: false, error: 'invalid_response' }))
         if (!res.ok || !json.ok) return { ok: false, error: json.error || 'Falha ao carregar.' }
-        return { ok: true, detail: { assessment: json.assessment, photos: json.photos } }
+        return {
+            ok: true,
+            detail: {
+                assessment: json.assessment,
+                photos: json.photos,
+                bodyFatReference: (json.bodyFatReference ?? null) as BodyFatReference | null,
+            },
+        }
     } catch (e) {
         return { ok: false, error: e instanceof Error ? e.message : 'Erro de rede.' }
     }

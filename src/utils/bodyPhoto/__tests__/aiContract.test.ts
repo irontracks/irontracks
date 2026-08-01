@@ -189,6 +189,25 @@ describe('rotas da Avaliação por Foto usam structured output', () => {
         expect(src.slice(saveIdx - 120, saveIdx + 40)).not.toMatch(/return /)
     })
 
+    it('o laudo estima NO ESCURO — o % medido nunca entra no prompt da foto', () => {
+        // Invariante de desenho do cruzamento foto × medição: se o valor medido
+        // fosse pro prompt do laudo, o modelo repetiria o número em vez de olhar a
+        // foto, e a divergência (que é o sinal de qualidade do dado) viraria eco.
+        // A correlação PODE ver — ela já recebeu a estimativa pronta.
+        const laudo = readFileSync('src/app/api/ai/body-composition-photo/route.ts', 'utf8')
+        expect(laudo).not.toContain('buildUserContextBlock')
+        expect(laudo).not.toContain('body_fat_percentage')
+
+        const correlacao = readFileSync('src/app/api/ai/body-composition-correlation/route.ts', 'utf8')
+        expect(correlacao).toMatch(/buildUserContextBlock\(admin, assessedUserId, \[[^\]]*'assessment'/)
+    })
+
+    it('o detalhe da avaliação devolve a referência medida para a tela cruzar', () => {
+        const rota = readFileSync('src/app/api/body-photo/assessments/route.ts', 'utf8')
+        expect(rota).toContain('pickBodyFatReference')
+        expect(rota).toContain('bodyFatReference')
+    })
+
     it('os responseSchema espelham os limites do Zod', () => {
         const links = CORRELATION_RESPONSE_SCHEMA.properties.links
         expect(links.maxItems).toBe(CORRELATION_LIMITS.links)

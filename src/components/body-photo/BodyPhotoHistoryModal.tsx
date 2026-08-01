@@ -25,6 +25,7 @@ import {
     type BodyPhotoAssessmentStatus,
     type BodyPhotoLaudo,
 } from '@/types/bodyPhotoAssessment'
+import { BodyFatCrossCheckCard } from './BodyFatCrossCheckCard'
 import { BodyPhotoLaudoView } from './BodyPhotoLaudoView'
 import { BodyPhotoCorrelationView } from './BodyPhotoCorrelationView'
 import { useBackHandler } from '@/hooks/useBackHandler'
@@ -173,6 +174,16 @@ export const BodyPhotoHistoryModal: React.FC<Props> = ({ onClose }) => {
                                         </div>
                                     ))}
                                 </div>
+                            ) : null}
+
+                            {/* Cruzamento foto × medição — só aparece quando existe avaliação
+                                física com % de gordura. A IA estimou sem ver este número. */}
+                            {laudo && detail.bodyFatReference ? (
+                                <BodyFatCrossCheckCard
+                                    photoLow={laudo.bodyFatRange.low}
+                                    photoHigh={laudo.bodyFatRange.high}
+                                    reference={detail.bodyFatReference}
+                                />
                             ) : null}
 
                             {laudo ? (

@@ -11,6 +11,7 @@ import { NextResponse } from 'next/server'
 import { requireUser } from '@/utils/auth/route'
 import { canCoachStudent, listCoachedStudentIds } from '@/utils/auth/studentAccess'
 import { createAdminClient } from '@/utils/supabase/admin'
+import { pickBodyFatReference, type AssessmentBodyFatRow } from '@/utils/bodyPhoto/bodyFatCrossCheck'
 import { filterVisibleAssessments } from '@/utils/bodyPhoto/listAccess'
 import { getErrorMessage } from '@/utils/errorMessage'
 import { respondDbError } from '@/utils/api/dbError'
@@ -62,7 +63,21 @@ export async function GET(request: Request) {
                 }),
             )
 
-            return NextResponse.json({ ok: true, assessment: a, photos: withUrls })
+            // % de gordura MEDIDA (dobras/BIA) mais próxima desta foto, para a tela
+            // cruzar com a faixa que a IA estimou. A IA nunca vê este número antes de
+            // estimar — ver utils/bodyPhoto/bodyFatCrossCheck.ts.
+            const { data: measuredRows } = await admin
+                .from('assessments')
+                .select('assessment_date, body_fat_percentage, body_fat_percentage_skinfold, bia_body_fat_percentage')
+                .eq('user_id', a.user_id)
+                .order('assessment_date', { ascending: false })
+                .limit(20)
+            const bodyFatReference = pickBodyFatReference(
+                (measuredRows || []) as AssessmentBodyFatRow[],
+                String(a.assessment_date || '').slice(0, 10),
+            )
+
+            return NextResponse.json({ ok: true, assessment: a, photos: withUrls, bodyFatReference })
         }
 
         // ── Lista ────────────────────────────────────────────────────────────
