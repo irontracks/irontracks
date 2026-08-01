@@ -1,12 +1,13 @@
 'use client'
 
-import React from 'react'
-import { Dumbbell, TrendingUp } from 'lucide-react'
+import React, { useState } from 'react'
+import { Dumbbell, TrendingUp, Wrench } from 'lucide-react'
 import {
     type BodyPhotoCorrelation,
     type TrainingWindowSummary,
     CORRELATION_TREND_LABELS_PT,
 } from '@/types/bodyPhotoAssessment'
+import { MuscleGapCard } from './MuscleGapCard'
 
 // Mesma regra do HistoryList (useHistoryData): 't' só a partir de 1000kg, senão kg arredondado (pt-BR).
 const formatVolume = (kg: number): string =>
@@ -29,8 +30,11 @@ const Stat = ({ label, value }: { label: string; value: string }) => (
 export const BodyPhotoCorrelationView: React.FC<{
     correlation: BodyPhotoCorrelation
     window: TrainingWindowSummary
-}> = ({ correlation, window }) => {
+    /** Sem id não há como analisar o grupo — o botão "Ajustar treino" some. */
+    assessmentId?: string | null
+}> = ({ correlation, window, assessmentId = null }) => {
     const hasTraining = window.sessions > 0
+    const [openGap, setOpenGap] = useState<string | null>(null)
     return (
         <div className="space-y-4">
             {/* Header */}
@@ -84,6 +88,11 @@ export const BodyPhotoCorrelationView: React.FC<{
                     <h4 className="text-[11px] uppercase tracking-widest font-black text-yellow-500/80">Grupo muscular × treino</h4>
                     {correlation.links.map((l, i) => {
                         const s = TREND_STYLE[l.trend]
+                        // O botão aparece onde há o que ajustar. `neutral` entra porque é
+                        // onde cai o caso "muita série e físico não acompanha" — que pede
+                        // execução, não volume; o card sabe distinguir.
+                        const adjustable = assessmentId && (l.trend === 'undertrained' || l.trend === 'neutral')
+                        const open = openGap === l.muscleGroup
                         return (
                             <div key={i} className="rounded-xl border border-neutral-800 bg-neutral-900/40 p-3">
                                 <div className="flex items-center justify-between gap-2">
@@ -93,6 +102,25 @@ export const BodyPhotoCorrelationView: React.FC<{
                                     </span>
                                 </div>
                                 {l.observation ? <p className="mt-1 text-sm text-neutral-400 leading-snug">{l.observation}</p> : null}
+                                {adjustable ? (
+                                    <button
+                                        onClick={() => setOpenGap(open ? null : l.muscleGroup)}
+                                        className="mt-2 inline-flex items-center gap-1.5 min-h-[32px] px-2.5 rounded-lg border text-[12px] font-bold transition active:scale-95"
+                                        style={{ background: 'rgba(168,85,247,0.08)', borderColor: 'rgba(168,85,247,0.3)', color: '#d8b4fe' }}
+                                    >
+                                        <Wrench className="w-3.5 h-3.5" />
+                                        {open ? 'Fechar' : 'Ajustar treino'}
+                                    </button>
+                                ) : null}
+                                {adjustable && open && assessmentId ? (
+                                    <div className="mt-3">
+                                        <MuscleGapCard
+                                            assessmentId={assessmentId}
+                                            muscleLabel={l.muscleGroup}
+                                            onClose={() => setOpenGap(null)}
+                                        />
+                                    </div>
+                                ) : null}
                             </div>
                         )
                     })}

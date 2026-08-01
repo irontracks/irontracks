@@ -239,7 +239,7 @@ export const BodyPhotoCaptureModal: React.FC<Props> = ({ open, onClose, studentU
                             {/* Correlação treino × corpo (on-demand) */}
                             <div className="pt-2 border-t border-neutral-800">
                                 {correlation ? (
-                                    <BodyPhotoCorrelationView correlation={correlation.data} window={correlation.window} />
+                                    <BodyPhotoCorrelationView correlation={correlation.data} window={correlation.window} assessmentId={assessmentId} />
                                 ) : (
                                     <div className="text-center py-2">
                                         <p className="text-sm text-neutral-400 mb-3">
