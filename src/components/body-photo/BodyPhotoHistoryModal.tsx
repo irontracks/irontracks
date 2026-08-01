@@ -204,7 +204,7 @@ export const BodyPhotoHistoryModal: React.FC<Props> = ({ onClose }) => {
                                 <div className="pt-2 border-t border-neutral-800">
                                     {correlation ? (
                                         <div className="space-y-3">
-                                            <BodyPhotoCorrelationView correlation={correlation.data} window={correlation.window} />
+                                            <BodyPhotoCorrelationView correlation={correlation.data} window={correlation.window} assessmentId={detail.assessment.id} />
                                             <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
                                                 <p className="text-[11px] text-neutral-500">
                                                     {correlation.generatedAt
