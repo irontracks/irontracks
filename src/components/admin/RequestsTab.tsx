@@ -19,6 +19,8 @@ interface AccessRequest {
     cref?: string
     status: 'pending' | 'approved' | 'rejected' | string
     created_at: string
+    /** Só nas aprovadas: o que aconteceu com o e-mail depois de sair. */
+    email_status?: { state: string; label: string; needsAttention: boolean; at: string | null }
     [key: string]: unknown
 }
 
@@ -270,7 +272,20 @@ export default function RequestsTab() {
                         </div>
 
                         {view === 'approved' ? (
-                            <div className="mt-auto pt-2">
+                            <div className="mt-auto pt-2 space-y-2">
+                                {/* Aceito pela Resend não é entregue. Um bounce chega
+                                    minutos depois e, até ago/2026, ninguém via. */}
+                                {req.email_status && req.email_status.state !== 'unknown' ? (
+                                    <div
+                                        className="flex items-center gap-2 text-[11px] font-bold px-2.5 py-2 rounded-lg border"
+                                        style={req.email_status.needsAttention
+                                            ? { background: 'rgba(239,68,68,0.1)', borderColor: 'rgba(239,68,68,0.3)', color: '#fca5a5' }
+                                            : { background: 'rgba(34,197,94,0.08)', borderColor: 'rgba(34,197,94,0.25)', color: '#86efac' }}
+                                    >
+                                        <Mail size={12} />
+                                        <span>E-mail: {req.email_status.label}</span>
+                                    </div>
+                                ) : null}
                                 <button
                                     onClick={() => handleResend(req)}
                                     disabled={!!processing}
