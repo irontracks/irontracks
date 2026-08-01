@@ -17,7 +17,8 @@
 
 import React, { useCallback, useEffect, useState } from 'react'
 import { AlertTriangle, Check, ChevronDown, Dumbbell, Loader2, Play, Plus, X } from 'lucide-react'
-import { addExerciseToWorkout, listActiveWorkouts, type ActiveWorkoutOption } from '@/actions/muscleGap-actions'
+import { listActiveWorkouts, type ActiveWorkoutOption } from '@/actions/muscleGap-actions'
+import { addExerciseToWorkout } from '@/actions/workoutExercises-actions'
 import { fetchMuscleGap, type MuscleGapResponse, type MuscleGapSuggestion } from '@/lib/api/muscleGap'
 import { notifyWorkoutsChanged } from '@/utils/workout/persistWorkoutPlan'
 
