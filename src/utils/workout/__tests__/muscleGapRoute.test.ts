@@ -42,6 +42,31 @@ describe('rota /api/workout/muscle-gap', () => {
     })
 })
 
+describe('confirmação antes de escrever no treino', () => {
+    const ui = readFileSync('src/components/body-photo/MuscleGapCard.tsx', 'utf8')
+
+    it('escolher o treino NÃO grava — arma a confirmação', () => {
+        // Escrever no treino da pessoa com um toque só é fácil demais de fazer
+        // sem querer, com a lista aparecendo logo abaixo do dedo (pedido do dono).
+        expect(ui).toMatch(/onClick=\{\(\) => chooseWorkout\(w\)\}/)
+        expect(ui).toMatch(/const chooseWorkout = useCallback[\s\S]{0,200}setConfirmTarget\(workout\)/)
+        // o clique no treino não chama mais a escrita direto
+        expect(ui).not.toMatch(/onClick=\{\(\) => confirmAdd\(w\.id\)\}/)
+    })
+
+    it('a confirmação diz O QUE entra e ONDE', () => {
+        expect(ui).toContain('Adicionar ')
+        expect(ui).toMatch(/\{confirmTarget\.name\}/)
+        expect(ui).toContain('Sim, adicionar')
+        expect(ui).toMatch(/>\s*Não\s*</)
+    })
+
+    it('cancelar ou trocar de exercício limpa a confirmação pendente', () => {
+        // Senão o "sim" seguinte gravaria no treino escolhido antes.
+        expect((ui.match(/setConfirmTarget\(null\)/g) || []).length).toBeGreaterThanOrEqual(3)
+    })
+})
+
 describe('escrita no treino (rota /api/workouts/exercises)', () => {
     const src = readFileSync('src/app/api/workouts/exercises/route.ts', 'utf8')
 
