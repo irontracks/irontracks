@@ -132,6 +132,7 @@ export async function POST(req: Request) {
             totalVolumeKg: stats.totalVolumeKg,
             totalSets: stats.totalSets,
             topExercises: stats.topExercises,
+            topExercisesBySets: stats.topExercisesBySets,
         }
 
         const promptData = {
@@ -155,7 +156,8 @@ export async function POST(req: Request) {
                 sessoes: stats.sessions,
                 volumeTotalKg: stats.totalVolumeKg,
                 seriesTotais: stats.totalSets,
-                topExercicios: stats.topExercises,
+                maisTreinadosPorSeries: stats.topExercisesBySets,
+                maisTreinadosPorCarga: stats.topExercises,
             },
         }
 
@@ -169,7 +171,17 @@ export async function POST(req: Request) {
             ...(userCtx ? [userCtx, ''] : []),
             'Você é um educador físico. Correlacione o LAUDO da avaliação por foto com o TREINO REAL executado na janela.',
             'Personalize pelo CONTEXTO DO USUÁRIO acima (objetivo, avaliação, exames, treino, nutrição).',
-            'Use seu conhecimento de quais músculos cada exercício trabalha (pelos nomes em topExercicios).',
+            'Use seu conhecimento de quais músculos cada exercício trabalha (pelos nomes das listas).',
+            '',
+            'COMO LER O TREINO — errar isto já produziu diagnóstico falso em produção:',
+            '- Julgue "pouco treinado" por SÉRIES (maisTreinadosPorSeries), NUNCA por carga.',
+            '  volumeKg não é comparável entre exercícios: leg press move múltiplas vezes',
+            '  a carga de uma mesa flexora sem que isso signifique mais estímulo.',
+            '- As duas listas são RECORTES dos maiores, não o treino completo. NUNCA afirme',
+            '  que um exercício ou grupo está ausente só porque não aparece nelas — se não',
+            '  há evidência, diga que não dá pra afirmar.',
+            '- Um grupo com muitas séries e desenvolvimento ainda fraco não precisa de MAIS',
+            '  volume: aponte execução, amplitude, variação ou padrão de movimento faltando.',
             'Seja concreto e cite números do treino (volume, séries, sessões). Se houver avaliação anterior, comente a evolução dos scores.',
             'Se não houver treino registrado na janela, diga isso com clareza e baixe a confiança.',
             '',
