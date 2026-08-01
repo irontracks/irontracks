@@ -89,8 +89,21 @@ describe('exercício adicionado vem com descrição', () => {
 
     it('falhar na descrição NÃO impede a adição', () => {
         // Adicionar o exercício é o que o usuário pediu; a descrição é bônus.
-        expect(note).toMatch(/return null/)
         expect(note).toContain('logWarnRemote')
         expect(route).not.toMatch(/generateExerciseNote[\s\S]{0,200}throw/)
+    })
+
+    it('IA fora do ar NÃO devolve exercício mudo — cai no fallback', () => {
+        // `null` silencioso aqui reproduz exatamente o sintoma que originou a
+        // feature (card sem descrição no meio de outros explicados) toda vez que
+        // a cota do Gemini estoura. Só nome vazio pode devolver null.
+        const body = note.slice(note.indexOf('export async function generateExerciseNote'))
+        const nullReturns = body.match(/return null/g) || []
+        expect(nullReturns.length).toBe(1) // apenas o guard de nome vazio
+        expect(body).toMatch(/if \(!name\) return null/)
+        // toda saída de falha da IA passa pelo fallback
+        expect(body).toMatch(/if \(!apiKey\) return fallbackNote\(input\)/)
+        expect(body).toMatch(/'errorResponse' in result\) return fallbackNote\(input\)/)
+        expect((body.match(/return fallbackNote\(input\)/g) || []).length).toBeGreaterThanOrEqual(4)
     })
 })

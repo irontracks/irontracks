@@ -23,6 +23,23 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 /** Limite do que cabe no card sem virar parede de texto. */
 const MAX_CHARS = 420
 
+/**
+ * Nota mínima para quando a IA não responde (cota estourada, rede, chave
+ * ausente). Não substitui a instrução personalizada — existe porque um card
+ * MUDO no meio de outros explicados foi exatamente a reclamação que originou
+ * este arquivo, e um `null` silencioso reproduz o sintoma toda vez que a API
+ * falha. Genérica de propósito: sem contexto do aluno, afirmar mais do que isso
+ * seria inventar.
+ */
+function fallbackNote(input: GenerateExerciseNoteInput): string {
+    const bits: string[] = []
+    if (input.patternLabel) bits.push(`Entrou no treino para cobrir ${String(input.patternLabel).toLowerCase()}`)
+    else if (input.muscleLabel) bits.push(`Entrou no treino para ${String(input.muscleLabel).toLowerCase()}`)
+    bits.push('Controle a descida e busque a amplitude completa, sem impulso')
+    bits.push('Comece com carga leve e suba só quando a execução estiver firme')
+    return `${bits.join('. ')}.`
+}
+
 export interface GenerateExerciseNoteInput {
     userId: string
     exerciseName: string
@@ -33,7 +50,8 @@ export interface GenerateExerciseNoteInput {
 }
 
 /**
- * Devolve a nota, ou `null` quando não dá para gerar.
+ * Devolve a nota — personalizada quando a IA responde, base quando não.
+ * Só é `null` sem nome de exercício, caso em que não há o que descrever.
  *
  * NUNCA lança: adicionar o exercício é o que o usuário pediu; a descrição é um
  * bônus. Falhar aqui não pode custar a adição.
@@ -46,7 +64,7 @@ export async function generateExerciseNote(
     if (!name) return null
 
     const apiKey = env.gemini.apiKey
-    if (!apiKey) return null
+    if (!apiKey) return fallbackNote(input)
 
     try {
         // 'profile' traz objetivo, equipamento e RESTRIÇÕES (onde moram as dores
@@ -75,10 +93,10 @@ export async function generateExerciseNote(
 
         const model = getGeminiModel(apiKey, env.gemini.fastModelId, { maxOutputTokens: 400, temperature: 0.5 })
         const result = await safeGemini('workout:exercise-note', () => model.generateContent(prompt), { maxAttempts: 1 })
-        if ('errorResponse' in result) return null
+        if ('errorResponse' in result) return fallbackNote(input)
 
         const raw = String(result.value?.response?.text?.() || '').trim()
-        if (!raw) return null
+        if (!raw) return fallbackNote(input)
 
         // O modelo às vezes devolve com aspas ou prefixo; limpa e corta no limite.
         const cleaned = raw
@@ -86,7 +104,7 @@ export async function generateExerciseNote(
             .replace(/^\s*(instru[çc][ãa]o|execu[çc][ãa]o)\s*:\s*/i, '')
             .replace(/\s+/g, ' ')
             .trim()
-        if (!cleaned) return null
+        if (!cleaned) return fallbackNote(input)
 
         return cleaned.length > MAX_CHARS ? `${cleaned.slice(0, MAX_CHARS - 1).trimEnd()}…` : cleaned
     } catch (e) {
@@ -94,6 +112,6 @@ export async function generateExerciseNote(
         // volta a criar exercício mudo e ninguém descobre.
         try { logWarnRemote('workout:exercise-note:failed', 'não consegui gerar a descrição', { exercise: name }) } catch { }
         void e
-        return null
+        return fallbackNote(input)
     }
 }
