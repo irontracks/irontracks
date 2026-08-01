@@ -94,9 +94,15 @@ export default function RequestsTab() {
             const json = await res.json()
 
             if (json.ok) {
+                // O aviso existia desde sempre, mas era inalcançável: o envio
+                // engolia toda falha e nunca sinalizava. Agora `email_error` diz
+                // O QUE falhou — chave ausente e provedor recusando pedem ações
+                // diferentes de "avise o usuário".
                 const msg = [
                     json.message || 'Sucesso!',
-                    json.email_warning ? '⚠️ O e-mail de notificação não foi enviado. Avise o usuário manualmente.' : null,
+                    json.email_warning
+                        ? `⚠️ ${json.email_error || 'O e-mail de notificação não foi enviado.'}\nAvise o usuário manualmente.`
+                        : null,
                 ].filter(Boolean).join('\n\n')
                 await alert(msg)
                 setRequests(prev => prev.filter(r => r.id !== req.id))
