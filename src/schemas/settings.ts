@@ -34,6 +34,19 @@ export const UserSettingsSchema = z
     // motor de carga nunca reduz o peso — só mantém ou sobe. Substitui o modal manual
     // antigo: o botão do card virou um liga/desliga por exercício.
     autoLoadDeloadOff: z.array(z.string()).default([]),
+    /**
+     * Treinos com descarga DESLIGADA (chave = nome do treino normalizado).
+     *
+     * Descarga é decisão do TREINO, não do exercício: a fadiga que a justifica é
+     * sistêmica, e aliviar um movimento só não descansa nada. Até ago/2026 o
+     * controle era por exercício (`autoLoadDeloadOff`), o que obrigava a decidir
+     * 8 vezes o que é uma decisão só — e, pior, a chave era o NOME do exercício:
+     * desligar o Supino num treino desligava em todos os outros.
+     *
+     * `autoLoadDeloadOff` continua lido para não virar a chave de quem já tinha
+     * exercício desligado (ver useWorkoutAutoload).
+     */
+    autoLoadDeloadOffWorkouts: z.array(z.string()).default([]),
     // ── Calculadora de anilhas ────────────────────────────────────────────────
     // Inventário real de anilhas do usuário: valor da anilha (kg, como string) →
     // quantidade de UNIDADES. Vazio = academia completa (DEFAULT_GYM_INVENTORY),

@@ -73,6 +73,8 @@ export type ActiveWorkoutProps = {
    * com deload off). Mesmo padrão do onToggleAutoLoad (updateSetting otimista + save).
    */
   onToggleExerciseDeload?: (exerciseKey: string, nextEnabled: boolean) => void;
+  /** Liga/desliga a descarga do TREINO inteiro (chave = nome normalizado). */
+  onToggleWorkoutDeload?: (workoutKey: string, nextEnabled: boolean) => void;
   /**
    * Calculadora de anilhas: persiste o inventário do usuário em
    * settings.plateInventory / settings.barWeightKg. Mesmo padrão do onToggleAutoLoad

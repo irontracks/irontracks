@@ -1,6 +1,7 @@
 'use client';
 
 import React from 'react';
+import { ArrowDown } from 'lucide-react';
 import { useWorkoutContext } from './WorkoutContext';
 import type { UnknownRecord } from './types';
 
@@ -22,6 +23,8 @@ export default function SessionDeloadBanner() {
     sessionDeloadModal,
     setSessionDeloadModal,
     applyDeloadToSession,
+    workoutDeloadEnabled,
+    toggleWorkoutDeload,
   } = useWorkoutContext() as unknown as {
     exercises: UnknownRecord[];
     autoLoadEnabled: boolean;
@@ -29,6 +32,8 @@ export default function SessionDeloadBanner() {
     sessionDeloadModal: { exIdxs: number[]; selected: number[]; status: string; suggestedPct: number } | null;
     setSessionDeloadModal: (v: { exIdxs: number[]; selected: number[]; status: 'stagnation' | 'overtraining'; suggestedPct: number } | null) => void;
     applyDeloadToSession: (exIdxs: number[]) => Promise<void>;
+    workoutDeloadEnabled: boolean;
+    toggleWorkoutDeload: () => void;
   };
 
   const [aplicando, setAplicando] = React.useState(false);
@@ -47,7 +52,45 @@ export default function SessionDeloadBanner() {
   // aplicação em bloco por cima do motor seria dois donos para a mesma carga.
   // O banner é, portanto, para quem NÃO usa o motor: lá o modal manual segue vivo
   // e a decisão continua sendo do usuário.
-  if (autoLoadEnabled) return null;
+  // Com a carga automática ligada, a descarga é contínua: o motor alivia série a
+  // série quando o dia pede. O que o usuário decide é se ELE PODE — e essa decisão
+  // é do TREINO. Até ago/2026 esse liga/desliga vivia em cada card: oito botões
+  // para uma decisão só, chaveados por nome de exercício (desligar o Supino aqui
+  // desligava em todos os treinos). Agora é um controle, no topo, e o card ficou
+  // limpo. Pedido do dono: "deload é por treino, não por exercício".
+  if (autoLoadEnabled) {
+    return (
+      <div className="mb-3 flex items-center justify-between gap-3 rounded-2xl border border-neutral-800 bg-neutral-900/60 px-4 py-3">
+        <div className="min-w-0">
+          <div className="text-[11px] font-bold uppercase tracking-wide text-neutral-400">
+            Descarga do treino
+          </div>
+          <div className="mt-0.5 text-[12px] leading-snug text-neutral-500">
+            {workoutDeloadEnabled
+              ? 'Em dia ruim, o app pode aliviar a carga deste treino.'
+              : 'A carga deste treino nunca é reduzida — só mantém ou sobe.'}
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={toggleWorkoutDeload}
+          aria-pressed={workoutDeloadEnabled}
+          aria-label={`Descarga do treino: ${workoutDeloadEnabled ? 'ligada' : 'desligada'}`}
+          className={[
+            'shrink-0 inline-flex h-9 items-center gap-1.5 rounded-xl border px-3 transition-colors active:scale-95',
+            workoutDeloadEnabled
+              ? 'border-amber-500/50 bg-amber-500/15 text-amber-300'
+              : 'border-neutral-800 bg-neutral-900 text-neutral-500',
+          ].join(' ')}
+        >
+          <ArrowDown size={15} className={workoutDeloadEnabled ? '' : 'opacity-50'} />
+          <span className="text-[11px] font-bold uppercase tracking-wide">
+            {workoutDeloadEnabled ? 'Ligada' : 'Desligada'}
+          </span>
+        </button>
+      </div>
+    );
+  }
   if (!sessionDeloadAlert || dispensado) return null;
 
   const pct = Math.round(sessionDeloadAlert.suggestedPct * 100);
