@@ -22,11 +22,13 @@ import {
     type BodyPhotoListItem,
 } from '@/lib/api/bodyPhoto'
 import { translateAiError } from '@/utils/ai/clientErrors'
-import type { BodyPhotoCorrelation, TrainingWindowSummary } from '@/types/bodyPhotoAssessment'
+import { parseStoredCorrelation, type BodyPhotoCorrelation, type TrainingWindowSummary } from '@/types/bodyPhotoAssessment'
 
 export interface CorrelationResult {
     data: BodyPhotoCorrelation
     window: TrainingWindowSummary
+    /** ISO de quando a correlação foi gerada — a leitura envelhece conforme a pessoa treina. */
+    generatedAt: string | null
 }
 
 export interface UseBodyPhotoHistoryResult {
@@ -91,8 +93,16 @@ export function useBodyPhotoHistory(): UseBodyPhotoHistoryResult {
         setDetailLoading(true); setDetailError('')
         setCorrelation(null); setCorrelationError('')
         const res = await fetchBodyPhotoDetail(id)
-        if (!res.ok || !res.detail) setDetailError(res.error || 'Não consegui abrir este laudo.')
-        else setDetail(res.detail)
+        if (!res.ok || !res.detail) {
+            setDetailError(res.error || 'Não consegui abrir este laudo.')
+        } else {
+            setDetail(res.detail)
+            // Hidrata a correlação JÁ SALVA (coluna `correlation`): reabrir um laudo
+            // não deve custar chamada de IA nem espera. `parseStoredCorrelation` é
+            // tolerante — formato inesperado vira null e a UI oferece gerar de novo.
+            const stored = parseStoredCorrelation(res.detail.assessment.correlation)
+            if (stored) setCorrelation({ data: stored.correlation, window: stored.window, generatedAt: stored.generatedAt })
+        }
         setDetailLoading(false)
     }, [])
 
@@ -104,7 +114,7 @@ export function useBodyPhotoHistory(): UseBodyPhotoHistoryResult {
         // `message` = texto nosso (ex.: 422 do laudo); senão traduz o código canônico
         // de IA — sem isso o usuário via "ai_error" cru na tela.
         if (!res.ok || !res.correlation || !res.window) setCorrelationError(res.message?.trim() || translateAiError(res.error))
-        else setCorrelation({ data: res.correlation, window: res.window })
+        else setCorrelation({ data: res.correlation, window: res.window, generatedAt: res.generatedAt ?? null })
         setCorrelationLoading(false)
     }, [detail])
 

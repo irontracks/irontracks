@@ -179,14 +179,41 @@ export const CORRELATION_TREND_LABELS_PT: Record<
 }
 
 /** Estatísticas da janela de treino retornadas junto da correlação. */
-export interface TrainingWindowSummary {
-    fromIso: string
-    toIso: string
-    hasPreviousAssessment: boolean
-    sessions: number
-    totalVolumeKg: number
-    totalSets: number
-    topExercises: Array<{ name: string; volumeKg: number; sets: number }>
+export const TrainingWindowSummarySchema = z.object({
+    fromIso: z.string(),
+    toIso: z.string(),
+    hasPreviousAssessment: z.boolean(),
+    sessions: z.number(),
+    totalVolumeKg: z.number(),
+    totalSets: z.number(),
+    topExercises: z.array(z.object({
+        name: z.string(),
+        volumeKg: z.number(),
+        sets: z.number(),
+    })).default([]),
+})
+export type TrainingWindowSummary = z.infer<typeof TrainingWindowSummarySchema>
+
+/**
+ * Correlação PERSISTIDA em `body_photo_assessments.correlation`.
+ *
+ * A correlação continua sendo recalculável de propósito — o resultado envelhece
+ * conforme a pessoa treina. O que se guarda é a ÚLTIMA gerada, para o laudo
+ * reabrir instantaneamente e sem gastar chamada de IA; `generatedAt` diz de
+ * quando é, e a UI oferece atualizar.
+ */
+export const StoredCorrelationSchema = z.object({
+    correlation: BodyPhotoCorrelationSchema,
+    window: TrainingWindowSummarySchema,
+    generatedAt: z.string(),
+})
+export type StoredCorrelation = z.infer<typeof StoredCorrelationSchema>
+
+/** Lê a coluna `correlation` com tolerância: formato inesperado vira null, nunca exceção. */
+export const parseStoredCorrelation = (raw: unknown): StoredCorrelation | null => {
+    if (!raw) return null
+    const parsed = StoredCorrelationSchema.safeParse(raw)
+    return parsed.success ? parsed.data : null
 }
 
 // ─── Entidades (linhas do banco) ─────────────────────────────────────────────
@@ -205,6 +232,8 @@ export interface BodyPhotoAssessment {
     body_fat_estimate_low: number | null
     body_fat_estimate_high: number | null
     analysis: BodyPhotoLaudo | null
+    /** Última correlação treino × laudo (coluna jsonb). Null até o usuário pedir a primeira. */
+    correlation: StoredCorrelation | null
     ai_model: string | null
     ai_analyzed_at: string | null
     notes: string | null
