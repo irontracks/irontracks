@@ -333,6 +333,11 @@ export default function DashboardModals(props: DashboardModalsProps) {
                                     workoutId={qw?.id != null ? String(qw.id) : null}
                                     exercises={exercises}
                                     canReorder={!qw?.completed_at && !qw?.completedAt}
+                                    // Reescreve o treino DESTA tela na hora. "Iniciar treino"
+                                    // parte deste objeto — sem atualizá-lo, o exercício apagado
+                                    // (ou a ordem antiga) ia junto pra sessão, e só sumia depois
+                                    // que o refetch chegasse.
+                                    onExercisesChange={(next) => setQuickViewWorkout({ ...qw, exercises: next })}
                                 />
 
                                 {/* Bottom padding area */}

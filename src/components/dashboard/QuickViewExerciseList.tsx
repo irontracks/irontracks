@@ -15,8 +15,8 @@
  * "Cancelar" devolve a ordem original sem tocar em nada.
  */
 
-import React, { useCallback, useMemo, useState } from 'react'
-import { Reorder } from 'framer-motion'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Reorder, useDragControls } from 'framer-motion'
 import { AlertTriangle, Check, Clock, Dumbbell, GripVertical, Loader2, ListOrdered, Trash2, X, Zap } from 'lucide-react'
 import { deleteWorkoutExercise, reorderWorkoutExercises } from '@/actions/workoutExercises-actions'
 import { notifyWorkoutsChanged } from '@/utils/workout/persistWorkoutPlan'
@@ -28,6 +28,15 @@ interface Props {
     exercises: ExerciseRecord[]
     /** Treino em execução não pode ser reordenado — os logs são indexados por posição. */
     canReorder: boolean
+    /**
+     * Avisa o PAI da nova lista, na hora.
+     *
+     * Sem isto, "Iniciar treino" partia do objeto que a tela tinha ao abrir: o
+     * usuário apagava um exercício, entrava no treino ali mesmo e ele ainda
+     * estava lá — o refetch só chegava depois. Quem inicia a sessão precisa da
+     * lista que está na TELA, não da que estava no cache.
+     */
+    onExercisesChange?: (next: ExerciseRecord[]) => void
 }
 
 const exerciseKey = (ex: ExerciseRecord, idx: number): string =>
@@ -81,40 +90,98 @@ const ExerciseBody = ({ ex, index }: { ex: ExerciseRecord; index: number }) => {
     )
 }
 
-/**
- * Item arrastável: o CARD INTEIRO é o alvo do arraste.
- *
- * A primeira versão exigia pegar num punho de 16px — difícil de acertar no dedo
- * e fácil de errar. E, ao segurar, o texto do card era selecionado pelo
- * navegador: as palavras ficavam grifadas e a leitura embolava.
- *
- * Correções, todas necessárias juntas:
- *  - `dragListener` volta ao padrão (card inteiro arrasta);
- *  - `select-none` + `WebkitUserSelect` matam o "grifado" no toque longo;
- *  - `WebkitTouchCallout: none` impede o menu de copiar do iOS;
- *  - `touch-none` entrega o gesto ao drag em vez de disputar com o scroll.
- *    Como só existe no modo Organizar, o scroll normal da lista segue intacto.
- */
-const SortableExercise = ({ ex, index }: { ex: ExerciseRecord; index: number }) => (
-    <Reorder.Item
-        value={ex}
-        className="relative bg-white/[0.03] border border-white/[0.07] rounded-2xl p-4 list-none select-none touch-none cursor-grab active:cursor-grabbing active:border-yellow-500/40 active:bg-white/[0.07]"
-        style={{ WebkitUserSelect: 'none', WebkitTouchCallout: 'none' }}
-        whileDrag={{ scale: 1.02, zIndex: 10 }}
-    >
-        <div className="absolute left-0 top-3 bottom-3 w-0.5 rounded-full bg-gradient-to-b from-yellow-500/60 to-yellow-500/10 ml-3" />
-        <div className="flex items-start gap-2">
-            <span className="mt-1 p-1.5 -ml-1 text-neutral-500" aria-hidden="true">
-                <GripVertical size={16} />
-            </span>
-            <div className="flex-1 min-w-0">
-                <ExerciseBody ex={ex} index={index} />
-            </div>
-        </div>
-    </Reorder.Item>
-)
+/** Segurar por este tempo arma o arraste. Abaixo disso, o gesto é scroll. */
+const LONG_PRESS_MS = 260
+/** Mover mais que isso antes de armar = rolagem; cancela o arraste. */
+const MOVE_TOLERANCE_PX = 10
 
-export const QuickViewExerciseList: React.FC<Props> = ({ workoutId, exercises, canReorder }) => {
+/**
+ * Item arrastável: o CARD INTEIRO arrasta, mas só depois de SEGURAR.
+ *
+ * Duas correções empilhadas, cada uma de um relato:
+ *
+ *  1. punho de 16px era difícil de acertar no dedo → o card todo virou alvo;
+ *  2. com o card todo arrastável e `touch-action: none`, a lista PAROU DE
+ *     ROLAR — qualquer toque virava arraste. Agora vale o gesto que o usuário
+ *     de fato fez: deslizou, rola; segurou ~260ms, arrasta.
+ *
+ * `touchAction` só vira 'none' DEPOIS de armar; até lá fica 'pan-y' e o
+ * navegador cuida do scroll normalmente.
+ *
+ * `select-none` + WebKit matam o texto grifado ao segurar (o toque longo
+ * selecionava as palavras e a leitura embolava).
+ */
+const SortableExercise = ({ ex, index }: { ex: ExerciseRecord; index: number }) => {
+    const controls = useDragControls()
+    const [armed, setArmed] = useState(false)
+    const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+    const startPos = useRef<{ x: number; y: number } | null>(null)
+
+    const clearTimer = useCallback(() => {
+        if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null }
+    }, [])
+
+    // Solta o timer se o componente sair antes do long press completar.
+    useEffect(() => clearTimer, [clearTimer])
+
+    const onPointerDown = useCallback((e: React.PointerEvent) => {
+        const native = e.nativeEvent
+        startPos.current = { x: e.clientX, y: e.clientY }
+        clearTimer()
+        timerRef.current = setTimeout(() => {
+            setArmed(true)
+            try { navigator.vibrate?.(15) } catch { /* sem haptics */ }
+            controls.start(native)
+        }, LONG_PRESS_MS)
+    }, [controls, clearTimer])
+
+    const onPointerMove = useCallback((e: React.PointerEvent) => {
+        if (armed || !startPos.current) return
+        const dx = Math.abs(e.clientX - startPos.current.x)
+        const dy = Math.abs(e.clientY - startPos.current.y)
+        // Moveu antes de armar: é rolagem, não arraste.
+        if (dx > MOVE_TOLERANCE_PX || dy > MOVE_TOLERANCE_PX) clearTimer()
+    }, [armed, clearTimer])
+
+    const release = useCallback(() => {
+        clearTimer()
+        setArmed(false)
+        startPos.current = null
+    }, [clearTimer])
+
+    return (
+        <Reorder.Item
+            value={ex}
+            dragListener={false}
+            dragControls={controls}
+            onDragEnd={release}
+            onPointerDown={onPointerDown}
+            onPointerMove={onPointerMove}
+            onPointerUp={release}
+            onPointerCancel={release}
+            className={`relative bg-white/[0.03] border rounded-2xl p-4 list-none select-none transition-colors ${armed ? 'border-yellow-500/50 bg-white/[0.07]' : 'border-white/[0.07]'}`}
+            style={{
+                WebkitUserSelect: 'none',
+                WebkitTouchCallout: 'none',
+                touchAction: armed ? 'none' : 'pan-y',
+                cursor: armed ? 'grabbing' : 'grab',
+            }}
+            whileDrag={{ scale: 1.03, zIndex: 10 }}
+        >
+            <div className="absolute left-0 top-3 bottom-3 w-0.5 rounded-full bg-gradient-to-b from-yellow-500/60 to-yellow-500/10 ml-3" />
+            <div className="flex items-start gap-2">
+                <span className={`mt-1 p-1.5 -ml-1 transition-colors ${armed ? 'text-yellow-400' : 'text-neutral-500'}`} aria-hidden="true">
+                    <GripVertical size={16} />
+                </span>
+                <div className="flex-1 min-w-0">
+                    <ExerciseBody ex={ex} index={index} />
+                </div>
+            </div>
+        </Reorder.Item>
+    )
+}
+
+export const QuickViewExerciseList: React.FC<Props> = ({ workoutId, exercises, canReorder, onExercisesChange }) => {
     const [organizing, setOrganizing] = useState(false)
     const [draft, setDraft] = useState<ExerciseRecord[]>([])
     const [saving, setSaving] = useState(false)
@@ -151,12 +218,15 @@ export const QuickViewExerciseList: React.FC<Props> = ({ workoutId, exercises, c
         const res = await reorderWorkoutExercises(workoutId, draft.map((ex) => String(ex.id)))
         setSaving(false)
         if (!res.ok) { setError(res.error || 'Não consegui salvar a ordem.'); return }
+        // O pai recebe a ordem nova ANTES do refetch chegar: quem tocar em
+        // "Iniciar treino" logo em seguida parte da lista que está na tela.
+        onExercisesChange?.(draft)
         // Mesma invalidação que o resto do app usa depois de escrever em treino —
         // sem isso a nova ordem só apareceria reabrindo o app.
         notifyWorkoutsChanged()
         setOrganizing(false)
         setDraft([])
-    }, [workoutId, draft])
+    }, [workoutId, draft, onExercisesChange])
 
     const remove = useCallback(async (ex: ExerciseRecord) => {
         if (!workoutId) return
@@ -167,8 +237,12 @@ export const QuickViewExerciseList: React.FC<Props> = ({ workoutId, exercises, c
         if (!res.ok) { setError(res.error || 'Não consegui excluir.'); return }
         setRemoved((prev) => [...prev, exId])
         setConfirmingDelete(null)
+        // Idem: o "Iniciar treino" daqui não pode levar o exercício que acabou
+        // de sair da tela — era esse o relato ("apaguei, entrei no treino e ele
+        // ainda estava lá").
+        onExercisesChange?.(exercises.filter((e) => String(e?.id || '') !== exId))
         notifyWorkoutsChanged()
-    }, [workoutId])
+    }, [workoutId, exercises, onExercisesChange])
 
     // Some da tela na hora; a lista real chega no refetch disparado acima.
     const visible = useMemo(
@@ -191,7 +265,7 @@ export const QuickViewExerciseList: React.FC<Props> = ({ workoutId, exercises, c
                 <div className="flex items-center justify-between gap-2 px-1 pb-1">
                     {organizing ? (
                         <>
-                            <span className="text-[11px] text-neutral-500">Arraste os cards para reordenar.</span>
+                            <span className="text-[11px] text-neutral-500">Segure um card e arraste para reordenar.</span>
                             <div className="flex items-center gap-1.5">
                                 <button
                                     type="button"
@@ -249,6 +323,8 @@ export const QuickViewExerciseList: React.FC<Props> = ({ workoutId, exercises, c
                             <div className="absolute left-0 top-3 bottom-3 w-0.5 rounded-full bg-gradient-to-b from-yellow-500/60 to-yellow-500/10 ml-3" />
                             <ExerciseBody ex={ex} index={idx} />
 
+                            {/* Excluir fica no RODAPÉ do card, nunca sobreposto: em absolute
+                                no topo direito ele caía em cima do badge "4 × 10-12". */}
                             {canDelete && exId ? (
                                 confirming ? (
                                     <div className="mt-3 ml-3 pl-3 flex items-center gap-2 border-l border-red-500/25">
@@ -272,14 +348,16 @@ export const QuickViewExerciseList: React.FC<Props> = ({ workoutId, exercises, c
                                         </button>
                                     </div>
                                 ) : (
-                                    <button
-                                        type="button"
-                                        onClick={() => { setConfirmingDelete(exId); setError('') }}
-                                        className="absolute top-3 right-3 p-1.5 rounded-lg text-neutral-600 hover:text-red-400 transition"
-                                        aria-label={`Excluir ${String(ex?.name || 'exercício')} do treino`}
-                                    >
-                                        <Trash2 size={14} />
-                                    </button>
+                                    <div className="mt-2 ml-7 pl-3 flex justify-end">
+                                        <button
+                                            type="button"
+                                            onClick={() => { setConfirmingDelete(exId); setError('') }}
+                                            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-bold text-neutral-500 hover:text-red-400 transition active:scale-95"
+                                            aria-label={`Excluir ${String(ex?.name || 'exercício')} do treino`}
+                                        >
+                                            <Trash2 size={12} /> Excluir
+                                        </button>
+                                    </div>
                                 )
                             ) : null}
                         </div>
