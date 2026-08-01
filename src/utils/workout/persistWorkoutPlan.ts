@@ -12,13 +12,47 @@
  * estratégia. Quem grava plano passa por aqui e a invalidação vem junto.
  */
 
-/** Avisa o app que a lista de treinos mudou. Seguro fora do browser. */
-export function notifyWorkoutsChanged(): void {
+/**
+ * Invalidação PENDENTE, guardada para depois do treino ativo.
+ *
+ * ⚠️ Não invalidar a lista durante a sessão em andamento é decisão de segurança,
+ * não preguiça: o refetch substitui o array de treinos por objetos novos (a RPC
+ * `save_workout_atomic` recria os exercícios, então até os ids mudam), e isso
+ * remontava a tela do treino ativo — o modal fechava sozinho no meio da série.
+ * Perder a sessão é o pior estrago possível nesta feature.
+ *
+ * Então: durante o treino, marca; ao sair, invalida.
+ */
+let pendingWorkoutsRefresh = false
+
+/**
+ * Avisa o app que a lista de treinos mudou. Seguro fora do browser.
+ *
+ * `defer: true` adia o aviso — use quando a gravação acontece DENTRO do treino
+ * ativo. O `flushPendingWorkoutsRefresh()` solta o aviso ao sair da sessão.
+ */
+export function notifyWorkoutsChanged(options?: { defer?: boolean }): void {
+    if (options?.defer) {
+        pendingWorkoutsRefresh = true
+        return
+    }
     try {
         window.dispatchEvent(new CustomEvent('irontracks:workouts-changed'))
     } catch {
         /* SSR / webview sem window — nada a invalidar nesse contexto */
     }
+}
+
+/** Solta a invalidação represada durante o treino. No-op quando não há nada pendente. */
+export function flushPendingWorkoutsRefresh(): void {
+    if (!pendingWorkoutsRefresh) return
+    pendingWorkoutsRefresh = false
+    notifyWorkoutsChanged()
+}
+
+/** Só para teste — zera o estado do módulo entre casos. */
+export function __resetPendingWorkoutsRefresh(): void {
+    pendingWorkoutsRefresh = false
 }
 
 export interface PersistWorkoutPlanResult {
@@ -35,6 +69,7 @@ export interface PersistWorkoutPlanResult {
 export async function persistWorkoutPlan(
     workoutId: string,
     workout: Record<string, unknown>,
+    options?: { deferNotify?: boolean },
 ): Promise<PersistWorkoutPlanResult> {
     const id = String(workoutId || '').trim()
     if (!id) return { ok: false, error: 'Não foi possível salvar: treino sem ID.' }
@@ -53,7 +88,7 @@ export async function persistWorkoutPlan(
             return { ok: false, error }
         }
 
-        notifyWorkoutsChanged()
+        notifyWorkoutsChanged({ defer: options?.deferNotify })
         return { ok: true }
     } catch (e: unknown) {
         const error = e instanceof Error ? e.message : 'Falha ao salvar no plano.'

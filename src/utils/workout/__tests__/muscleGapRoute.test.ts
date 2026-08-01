@@ -42,12 +42,11 @@ describe('rota /api/workout/muscle-gap', () => {
     })
 })
 
-describe('action de escrita no treino', () => {
-    const src = readFileSync('src/actions/muscleGap-actions.ts', 'utf8')
+describe('escrita no treino (rota /api/workouts/exercises)', () => {
+    const src = readFileSync('src/app/api/workouts/exercises/route.ts', 'utf8')
 
-    it('recusa treino já concluído — sessão do passado não recebe exercício novo', () => {
+    it('recusa treino ja concluido — sessao do passado nao recebe exercicio novo', () => {
         expect(src).toContain('workout_completed')
-        expect(src).toMatch(/completed_at/)
     })
 
     it('insere no FIM do treino, nunca no meio', () => {

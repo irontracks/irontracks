@@ -1,115 +1,92 @@
-import { createClient } from '@/utils/supabase/client'
-import { logError } from '@/lib/logger'
 import type { ActionResult } from '@/types/actions'
 
 /**
- * Reordenação de exercícios dentro de um treino (tela de visualização rápida).
+ * Adicionar / reordenar / excluir exercício de um treino.
  *
- * A ordem vive em `exercises.order` e é o que `mapWorkoutRow` usa pra montar a
- * lista — então reescrever a coluna é suficiente pra tela toda refletir.
+ * ⚠️ Estas funções NÃO escrevem no Supabase direto, e isso é deliberado: a lista
+ * de treinos é cacheada no SERVIDOR (`dashboard:bootstrap` por 300s,
+ * `workouts:list` por 60s). Escrevendo pelo browser, o banco mudava e o cache
+ * ficava intacto — o refetch trazia o dado antigo por até 5 minutos, que foi o
+ * sintoma relatado ("reordenei e ao iniciar o treino veio na ordem velha").
  *
- * ⚠️ Só treino NÃO iniciado. Reordenar exercício de sessão em andamento
- * embaralharia os logs, que são indexados por posição ("exIdx-setIdx"): o peso
- * registrado no exercício 3 passaria a pertencer a outro. O app tem um caminho
- * próprio pra edição mid-sessão (reconcileEditedExercises); esta action não é
- * ele e recusa o caso em vez de corromper o histórico.
+ * Tudo passa por /api/workouts/exercises, que grava e derruba os dois caches.
  */
-/**
- * Remove um exercício do treino (tela de visualização rápida).
- *
- * Mesma trava da reordenação, pelo mesmo motivo: em sessão em andamento os logs
- * são indexados por posição, e apagar do meio desloca todos os seguintes — o
- * peso do exercício 4 viraria o do 3. O treino ativo tem um caminho próprio pra
- * isso (`removeExerciseFromWorkout`, que remapeia os logs); aqui recusamos.
- *
- * As séries somem por ON DELETE CASCADE.
- */
-export async function deleteWorkoutExercise(
-    workoutId: string,
-    exerciseId: string,
-): Promise<ActionResult<{ deleted: true }>> {
+
+interface ExercisesApiBody {
+    action: 'add' | 'reorder' | 'delete'
+    workoutId: string
+    exerciseName?: string
+    muscleGroup?: string | null
+    videoUrl?: string | null
+    sets?: number
+    orderedExerciseIds?: string[]
+    exerciseId?: string
+}
+
+async function callExercisesApi<T = unknown>(body: ExercisesApiBody): Promise<ActionResult<T>> {
     try {
-        const wId = String(workoutId || '').trim()
-        const exId = String(exerciseId || '').trim()
-        if (!wId || !exId) return { ok: false, error: 'missing_params' }
-
-        const supabase = createClient()
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user?.id) return { ok: false, error: 'unauthorized' }
-
-        const { data: workout, error: wErr } = await supabase
-            .from('workouts')
-            .select('id, user_id, completed_at')
-            .eq('id', wId)
-            .maybeSingle()
-        if (wErr) return { ok: false, error: wErr.message }
-        if (!workout || (workout as { user_id?: string }).user_id !== user.id) return { ok: false, error: 'not_found' }
-        if ((workout as { completed_at?: string | null }).completed_at) return { ok: false, error: 'workout_completed' }
-
-        // `eq('workout_id')` no DELETE: sem ele, um id de exercício de outro
-        // treino apagaria conteúdo alheio ao que está na tela.
-        const { error } = await supabase
-            .from('exercises')
-            .delete()
-            .eq('id', exId)
-            .eq('workout_id', wId)
-        if (error) return { ok: false, error: error.message }
-
-        return { ok: true, data: { deleted: true } }
+        const res = await fetch('/api/workouts/exercises', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+        })
+        const json = await res.json().catch(() => null) as Record<string, unknown> | null
+        if (!res.ok || !json?.ok) {
+            return { ok: false, error: String(json?.error || 'Falha ao salvar o treino.') }
+        }
+        return { ok: true, data: json as T }
     } catch (e) {
-        const message = e instanceof Error ? e.message : String(e)
-        logError('deleteWorkoutExercise', e)
-        return { ok: false, error: message }
+        return { ok: false, error: e instanceof Error ? e.message : 'Erro de rede.' }
     }
 }
 
+export interface AddExerciseInput {
+    workoutId: string
+    exerciseName: string
+    muscleGroup?: string | null
+    sets?: number
+    videoUrl?: string | null
+}
+
+/** Insere no FIM do treino, com séries em branco prontas pra preencher na execução. */
+export async function addExerciseToWorkout(input: AddExerciseInput): Promise<ActionResult<{ exerciseId: string }>> {
+    const workoutId = String(input?.workoutId || '').trim()
+    const exerciseName = String(input?.exerciseName || '').trim()
+    if (!workoutId || !exerciseName) return { ok: false, error: 'missing_params' }
+
+    return callExercisesApi<{ exerciseId: string }>({
+        action: 'add',
+        workoutId,
+        exerciseName,
+        muscleGroup: input.muscleGroup ?? null,
+        videoUrl: input.videoUrl ?? null,
+        sets: Math.min(6, Math.max(1, Number(input.sets) || 3)),
+    })
+}
+
+/** A ordem enviada precisa conter TODOS os exercícios do treino — a rota recusa parcial. */
 export async function reorderWorkoutExercises(
     workoutId: string,
     orderedExerciseIds: string[],
 ): Promise<ActionResult<{ updated: number }>> {
-    try {
-        const id = String(workoutId || '').trim()
-        const ids = (orderedExerciseIds || []).map((v) => String(v || '').trim()).filter(Boolean)
-        if (!id || ids.length === 0) return { ok: false, error: 'missing_params' }
-        if (new Set(ids).size !== ids.length) return { ok: false, error: 'duplicated_ids' }
+    const id = String(workoutId || '').trim()
+    const ids = (orderedExerciseIds || []).map((v) => String(v || '').trim()).filter(Boolean)
+    if (!id || !ids.length) return { ok: false, error: 'missing_params' }
 
-        const supabase = createClient()
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user?.id) return { ok: false, error: 'unauthorized' }
+    const res = await callExercisesApi({ action: 'reorder', workoutId: id, orderedExerciseIds: ids })
+    if (!res.ok) return { ok: false, error: res.error }
+    return { ok: true, data: { updated: ids.length } }
+}
 
-        const { data: workout, error: wErr } = await supabase
-            .from('workouts')
-            .select('id, user_id, completed_at')
-            .eq('id', id)
-            .maybeSingle()
-        if (wErr) return { ok: false, error: wErr.message }
-        if (!workout || (workout as { user_id?: string }).user_id !== user.id) return { ok: false, error: 'not_found' }
-        if ((workout as { completed_at?: string | null }).completed_at) return { ok: false, error: 'workout_completed' }
+export async function deleteWorkoutExercise(
+    workoutId: string,
+    exerciseId: string,
+): Promise<ActionResult<{ deleted: true }>> {
+    const id = String(workoutId || '').trim()
+    const exId = String(exerciseId || '').trim()
+    if (!id || !exId) return { ok: false, error: 'missing_params' }
 
-        // Confere que os ids pertencem MESMO a este treino antes de escrever:
-        // um id de outro treino aqui moveria exercício entre treinos.
-        const { data: rows, error: exErr } = await supabase
-            .from('exercises')
-            .select('id')
-            .eq('workout_id', id)
-        if (exErr) return { ok: false, error: exErr.message }
-        const owned = new Set((rows || []).map((r) => String((r as { id: string }).id)))
-        if (ids.some((exId) => !owned.has(exId))) return { ok: false, error: 'exercise_not_in_workout' }
-        if (ids.length !== owned.size) return { ok: false, error: 'incomplete_order' }
-
-        // Sem RPC de reordenação no app: atualiza uma linha por vez. Falha no meio
-        // deixa ordem parcial — visível e corrigível na tela, não silenciosa.
-        let updated = 0
-        for (let i = 0; i < ids.length; i++) {
-            const { error } = await supabase.from('exercises').update({ order: i }).eq('id', ids[i]).eq('workout_id', id)
-            if (error) return { ok: false, error: `ordem aplicada até o ${updated}º exercício: ${error.message}` }
-            updated += 1
-        }
-
-        return { ok: true, data: { updated } }
-    } catch (e) {
-        const message = e instanceof Error ? e.message : String(e)
-        logError('reorderWorkoutExercises', e)
-        return { ok: false, error: message }
-    }
+    const res = await callExercisesApi({ action: 'delete', workoutId: id, exerciseId: exId })
+    if (!res.ok) return { ok: false, error: res.error }
+    return { ok: true, data: { deleted: true } }
 }

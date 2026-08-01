@@ -16,7 +16,7 @@
  */
 
 import React, { useCallback, useMemo, useState } from 'react'
-import { Reorder, useDragControls } from 'framer-motion'
+import { Reorder } from 'framer-motion'
 import { AlertTriangle, Check, Clock, Dumbbell, GripVertical, Loader2, ListOrdered, Trash2, X, Zap } from 'lucide-react'
 import { deleteWorkoutExercise, reorderWorkoutExercises } from '@/actions/workoutExercises-actions'
 import { notifyWorkoutsChanged } from '@/utils/workout/persistWorkoutPlan'
@@ -81,33 +81,38 @@ const ExerciseBody = ({ ex, index }: { ex: ExerciseRecord; index: number }) => {
     )
 }
 
-/** Item arrastável: o drag sai do handle, não do card — senão rolar a lista vira arrastar. */
-const SortableExercise = ({ ex, index }: { ex: ExerciseRecord; index: number }) => {
-    const controls = useDragControls()
-    return (
-        <Reorder.Item
-            value={ex}
-            dragListener={false}
-            dragControls={controls}
-            className="relative bg-white/[0.03] border border-white/[0.07] rounded-2xl p-4 list-none"
-        >
-            <div className="absolute left-0 top-3 bottom-3 w-0.5 rounded-full bg-gradient-to-b from-yellow-500/60 to-yellow-500/10 ml-3" />
-            <div className="flex items-start gap-2">
-                <button
-                    type="button"
-                    onPointerDown={(e) => controls.start(e)}
-                    className="mt-1 p-1.5 -ml-1 rounded-lg text-neutral-500 hover:text-yellow-400 touch-none cursor-grab active:cursor-grabbing"
-                    aria-label={`Arrastar ${String(ex?.name || 'exercício')}`}
-                >
-                    <GripVertical size={16} />
-                </button>
-                <div className="flex-1 min-w-0">
-                    <ExerciseBody ex={ex} index={index} />
-                </div>
+/**
+ * Item arrastável: o CARD INTEIRO é o alvo do arraste.
+ *
+ * A primeira versão exigia pegar num punho de 16px — difícil de acertar no dedo
+ * e fácil de errar. E, ao segurar, o texto do card era selecionado pelo
+ * navegador: as palavras ficavam grifadas e a leitura embolava.
+ *
+ * Correções, todas necessárias juntas:
+ *  - `dragListener` volta ao padrão (card inteiro arrasta);
+ *  - `select-none` + `WebkitUserSelect` matam o "grifado" no toque longo;
+ *  - `WebkitTouchCallout: none` impede o menu de copiar do iOS;
+ *  - `touch-none` entrega o gesto ao drag em vez de disputar com o scroll.
+ *    Como só existe no modo Organizar, o scroll normal da lista segue intacto.
+ */
+const SortableExercise = ({ ex, index }: { ex: ExerciseRecord; index: number }) => (
+    <Reorder.Item
+        value={ex}
+        className="relative bg-white/[0.03] border border-white/[0.07] rounded-2xl p-4 list-none select-none touch-none cursor-grab active:cursor-grabbing active:border-yellow-500/40 active:bg-white/[0.07]"
+        style={{ WebkitUserSelect: 'none', WebkitTouchCallout: 'none' }}
+        whileDrag={{ scale: 1.02, zIndex: 10 }}
+    >
+        <div className="absolute left-0 top-3 bottom-3 w-0.5 rounded-full bg-gradient-to-b from-yellow-500/60 to-yellow-500/10 ml-3" />
+        <div className="flex items-start gap-2">
+            <span className="mt-1 p-1.5 -ml-1 text-neutral-500" aria-hidden="true">
+                <GripVertical size={16} />
+            </span>
+            <div className="flex-1 min-w-0">
+                <ExerciseBody ex={ex} index={index} />
             </div>
-        </Reorder.Item>
-    )
-}
+        </div>
+    </Reorder.Item>
+)
 
 export const QuickViewExerciseList: React.FC<Props> = ({ workoutId, exercises, canReorder }) => {
     const [organizing, setOrganizing] = useState(false)
@@ -186,7 +191,7 @@ export const QuickViewExerciseList: React.FC<Props> = ({ workoutId, exercises, c
                 <div className="flex items-center justify-between gap-2 px-1 pb-1">
                     {organizing ? (
                         <>
-                            <span className="text-[11px] text-neutral-500">Arraste pelo punho para reordenar.</span>
+                            <span className="text-[11px] text-neutral-500">Arraste os cards para reordenar.</span>
                             <div className="flex items-center gap-1.5">
                                 <button
                                     type="button"
@@ -226,7 +231,7 @@ export const QuickViewExerciseList: React.FC<Props> = ({ workoutId, exercises, c
             ) : null}
 
             {organizing ? (
-                <Reorder.Group axis="y" values={draft} onReorder={setDraft} className="space-y-2 m-0 p-0">
+                <Reorder.Group axis="y" values={draft} onReorder={setDraft} className="space-y-2 m-0 p-0 select-none">
                     {draft.map((ex, idx) => (
                         <SortableExercise key={exerciseKey(ex, idx)} ex={ex} index={idx} />
                     ))}

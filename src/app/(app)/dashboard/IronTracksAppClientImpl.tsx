@@ -63,6 +63,7 @@ import { useUnreadBadges } from '@/hooks/useUnreadBadges'
 import { useGymGeofence } from '@/hooks/useGymGeofence'
 import { BiometricLock, useBiometricLock } from '@/components/BiometricLock'
 import { useLocalPersistence } from '@/hooks/useLocalPersistence'
+import { flushPendingWorkoutsRefresh } from '@/utils/workout/persistWorkoutPlan';
 import { useAdminPanelState } from '@/hooks/useAdminPanelState'
 import { useSignOut } from '@/hooks/useSignOut'
 import { useViewNavigation } from '@/hooks/useViewNavigation'
@@ -421,6 +422,17 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
 
     // View + activeSession local persistence — extracted to useLocalPersistence hook
     useLocalPersistence({ userId: user?.id, view, setView, activeSession })
+
+    // Edições de plano feitas DENTRO do treino ativo represam a invalidação da
+    // lista (ver persistWorkoutPlan): refetchar no meio da sessão remonta a tela
+    // e o modal do treino fechava sozinho. Ao SAIR do treino, soltamos o aviso —
+    // aí o dashboard recarrega já com a mudança.
+    const wasActiveRef = useRef(false)
+    useEffect(() => {
+        const isActive = view === 'active'
+        if (wasActiveRef.current && !isActive) flushPendingWorkoutsRefresh()
+        wasActiveRef.current = isActive
+    }, [view])
 
     // whatsNew useEffect + closeWhatsNew — handled by useWhatsNew hook above
 
