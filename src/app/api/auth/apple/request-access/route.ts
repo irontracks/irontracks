@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { waitUntil } from '@vercel/functions'
 import { z } from 'zod'
 import { parseJsonBody } from '@/utils/zod'
 import { createAdminClient } from '@/utils/supabase/admin'
@@ -118,7 +119,10 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: 'insert_failed' }, { status: 400 })
     }
 
-    notifyAdminNewSignup({ name: safeName, email, role: 'student' }).catch(() => { })
+    // `waitUntil`: sem ele a promessa fica órfã quando o Lambda congela e o
+    // push só sai quando outra requisição reaquece a instância (ver a rota
+    // irmã em api/access-request/create).
+    waitUntil(notifyAdminNewSignup({ name: safeName, email, role: 'student' }).catch(() => { }))
 
     return NextResponse.json({ ok: true, status: 'requested' })
   } catch (e) {

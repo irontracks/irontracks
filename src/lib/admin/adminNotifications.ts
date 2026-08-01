@@ -94,7 +94,25 @@ export async function notifyAdminNewSignup(args: {
   const name = args.name.trim() || args.email.trim() || 'Novo usuário'
   const roleLabel = args.role === 'teacher' ? 'professor' : 'aluno'
   await notifyAdmins({
-    type: 'admin_access_request',
+    // ⚠️ `admin_new_signup`, NÃO `admin_access_request`.
+    //
+    // O tipo vai no payload do push e decide se a notificação recebe
+    // `mutable-content: 1` → vira Communication Notification → acorda a tela
+    // bloqueada. A whitelist existe em DOIS lugares que precisam concordar:
+    // `WAKE_SCREEN_TYPES` (src/lib/push/apns.ts) e `wakeScreenTypes`
+    // (ios/App/NotificationService/NotificationService.swift).
+    //
+    // Nenhuma das duas tem `admin_access_request` — era o tipo usado aqui desde
+    // 10/05, e por isso este push (o mais urgente do app: tem gente esperando
+    // aprovação) era o único que chegava mudo, sem acender o iPhone.
+    //
+    // Corrigir pelo outro lado, adicionando o tipo às listas, exigiria build
+    // nova no TestFlight, porque a lista do Swift é compilada no app instalado.
+    // `admin_new_signup` já está nas duas e descreve a mesma coisa.
+    //
+    // `admin_access_request` segue vivo no histórico e em `ADMIN_TYPES`
+    // (api/admin/notifications/*) — notificação antiga continua listando normal.
+    type: 'admin_new_signup',
     title: '🆕 Nova solicitação de acesso',
     message: `${name} (${roleLabel}) está aguardando aprovação.`,
     link: '/admin?tab=requests',

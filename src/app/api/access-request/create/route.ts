@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { waitUntil } from '@vercel/functions'
 import { z } from 'zod'
 import { createAdminClient } from '@/utils/supabase/admin'
 import { parseJsonBody } from '@/utils/zod'
@@ -153,12 +154,24 @@ export async function POST(req: Request) {
       return NextResponse.json({ ok: false, error: 'Erro ao salvar solicitação.' }, { status: 500 })
     }
 
-    // Notifica admins in-app (fire-and-forget — não bloqueia a resposta).
-    notifyAdminNewSignup({
-      name: full_name,
-      email,
-      role: role_requested === 'teacher' ? 'teacher' : 'student',
-    }).catch(() => { })
+    // Notifica admins (não bloqueia a resposta) — mas DENTRO de `waitUntil`.
+    //
+    // Era um `.catch(() => {})` solto. Numa função serverless isso é uma
+    // promessa órfã: a Vercel devolve a resposta e CONGELA a instância, então a
+    // notificação só avança quando outra requisição por acaso reaquece o mesmo
+    // Lambda. Medido em 01/08: solicitação às 16:52, push no aparelho às 17:05.
+    //
+    // Esta rota é a que mais sofre, e não por acaso: quem chama é um visitante
+    // anônimo se cadastrando, o tráfego é esporádico e a instância está fria.
+    // Os outros pushes do app saem de rotas movimentadas e por isso pareciam
+    // funcionar — o dono relatou exatamente isso, "só o de solicitação falha".
+    waitUntil(
+      notifyAdminNewSignup({
+        name: full_name,
+        email,
+        role: role_requested === 'teacher' ? 'teacher' : 'student',
+      }).catch(() => { }),
+    )
 
     return NextResponse.json({
       ok: true,
