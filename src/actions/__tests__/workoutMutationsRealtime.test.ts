@@ -21,9 +21,27 @@ describe('escrita em treino invalida a lista (sem precisar reabrir o app)', () =
         'src/components/dashboard/QuickViewExerciseList.tsx',
     ]
 
-    it.each(files)('%s despacha irontracks:workouts-changed depois de escrever', (file) => {
+    it.each(files)('%s avisa a lista depois de escrever', (file) => {
         const src = readFileSync(file, 'utf8')
+        expect(src).toContain('notifyWorkoutsChanged()')
+    })
+
+    it('o helper único despacha o evento — e só depois de a escrita CONFIRMAR', () => {
+        // Notificar após falha faria a lista recarregar o dado antigo e parecer
+        // que a mudança foi revertida sozinha.
+        const src = readFileSync('src/utils/workout/persistWorkoutPlan.ts', 'utf8')
         expect(src).toContain("new CustomEvent('irontracks:workouts-changed')")
+        const notifyIdx = src.indexOf('notifyWorkoutsChanged()\n        return { ok: true }')
+        expect(notifyIdx).toBeGreaterThan(src.indexOf('if (!ok) {'))
+    })
+
+    it('TODA gravação de plano do treino ativo passa pelo helper', () => {
+        // Era aqui que estava o bug reportado: apagar exercício no treino ativo
+        // gravava no banco e a lista só mudava reiniciando o app.
+        const src = readFileSync('src/components/workout/hooks/useWorkoutExerciseCrud.ts', 'utf8')
+        expect(src).toContain('persistWorkoutPlan')
+        // nenhum PATCH cru sobrou fora do helper
+        expect(src).not.toContain("fetch('/api/workouts/update'")
     })
 
     it('o hook que hidrata a lista continua escutando o evento', () => {
@@ -56,6 +74,26 @@ describe('reordenação de exercícios', () => {
     })
 })
 
+describe('exclusão de exercício', () => {
+    const src = readFileSync('src/actions/workoutExercises-actions.ts', 'utf8')
+
+    it('recusa treino já iniciado — apagar do meio desloca os logs seguintes', () => {
+        const bloco = src.slice(src.indexOf('export async function deleteWorkoutExercise'), src.indexOf('export async function reorderWorkoutExercises'))
+        expect(bloco).toContain('workout_completed')
+    })
+
+    it('o DELETE trava no workout_id — id de outro treino não apaga nada', () => {
+        const bloco = src.slice(src.indexOf('export async function deleteWorkoutExercise'), src.indexOf('export async function reorderWorkoutExercises'))
+        expect(bloco).toMatch(/\.delete\(\)\s*\n\s*\.eq\('id', exId\)\s*\n\s*\.eq\('workout_id', wId\)/)
+    })
+
+    it('a UI pede confirmação antes de excluir', () => {
+        const ui = readFileSync('src/components/dashboard/QuickViewExerciseList.tsx', 'utf8')
+        expect(ui).toContain('confirmingDelete')
+        expect(ui).toContain('Excluir do treino?')
+    })
+})
+
 describe('UI da reordenação', () => {
     const src = readFileSync('src/components/dashboard/QuickViewExerciseList.tsx', 'utf8')
 
@@ -69,6 +107,10 @@ describe('UI da reordenação', () => {
     })
 
     it('a ordem só vai pro banco no Salvar — arrastar mexe num rascunho', () => {
-        expect(src).toMatch(/const list = organizing \? draft : exercises/)
+        // Enquanto organiza, a lista exibida vem de `draft`; o banco só é tocado
+        // dentro de `save`, e `cancel` descarta o rascunho inteiro.
+        expect(src).toMatch(/organizing \? draft : exercises/)
+        expect(src).toMatch(/reorderWorkoutExercises\(workoutId, draft\.map/)
+        expect(src).toMatch(/const cancel = useCallback\(\(\) => \{[\s\S]*?setDraft\(\[\]\)/)
     })
 })

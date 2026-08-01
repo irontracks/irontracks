@@ -14,6 +14,55 @@ import type { ActionResult } from '@/types/actions'
  * próprio pra edição mid-sessão (reconcileEditedExercises); esta action não é
  * ele e recusa o caso em vez de corromper o histórico.
  */
+/**
+ * Remove um exercício do treino (tela de visualização rápida).
+ *
+ * Mesma trava da reordenação, pelo mesmo motivo: em sessão em andamento os logs
+ * são indexados por posição, e apagar do meio desloca todos os seguintes — o
+ * peso do exercício 4 viraria o do 3. O treino ativo tem um caminho próprio pra
+ * isso (`removeExerciseFromWorkout`, que remapeia os logs); aqui recusamos.
+ *
+ * As séries somem por ON DELETE CASCADE.
+ */
+export async function deleteWorkoutExercise(
+    workoutId: string,
+    exerciseId: string,
+): Promise<ActionResult<{ deleted: true }>> {
+    try {
+        const wId = String(workoutId || '').trim()
+        const exId = String(exerciseId || '').trim()
+        if (!wId || !exId) return { ok: false, error: 'missing_params' }
+
+        const supabase = createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user?.id) return { ok: false, error: 'unauthorized' }
+
+        const { data: workout, error: wErr } = await supabase
+            .from('workouts')
+            .select('id, user_id, completed_at')
+            .eq('id', wId)
+            .maybeSingle()
+        if (wErr) return { ok: false, error: wErr.message }
+        if (!workout || (workout as { user_id?: string }).user_id !== user.id) return { ok: false, error: 'not_found' }
+        if ((workout as { completed_at?: string | null }).completed_at) return { ok: false, error: 'workout_completed' }
+
+        // `eq('workout_id')` no DELETE: sem ele, um id de exercício de outro
+        // treino apagaria conteúdo alheio ao que está na tela.
+        const { error } = await supabase
+            .from('exercises')
+            .delete()
+            .eq('id', exId)
+            .eq('workout_id', wId)
+        if (error) return { ok: false, error: error.message }
+
+        return { ok: true, data: { deleted: true } }
+    } catch (e) {
+        const message = e instanceof Error ? e.message : String(e)
+        logError('deleteWorkoutExercise', e)
+        return { ok: false, error: message }
+    }
+}
+
 export async function reorderWorkoutExercises(
     workoutId: string,
     orderedExerciseIds: string[],

@@ -19,6 +19,7 @@ import React, { useCallback, useEffect, useState } from 'react'
 import { AlertTriangle, Check, ChevronDown, Dumbbell, Loader2, Play, Plus, X } from 'lucide-react'
 import { addExerciseToWorkout, listActiveWorkouts, type ActiveWorkoutOption } from '@/actions/muscleGap-actions'
 import { fetchMuscleGap, type MuscleGapResponse, type MuscleGapSuggestion } from '@/lib/api/muscleGap'
+import { notifyWorkoutsChanged } from '@/utils/workout/persistWorkoutPlan'
 
 interface Props {
     assessmentId: string
@@ -102,9 +103,8 @@ export const MuscleGapCard: React.FC<Props> = ({ assessmentId, muscleLabel, onCl
         setAdded((prev) => [...prev, picking.name])
         setPicking(null)
         // Sem isto o exercício só aparecia depois de FECHAR O APP: a lista de
-        // treinos é uma query cacheada e ninguém a invalidava. O evento é o
-        // canal que `useWorkoutFetch` já escuta pra refazer a busca.
-        try { window.dispatchEvent(new CustomEvent('irontracks:workouts-changed')) } catch { /* SSR/webview sem window */ }
+        // treinos é uma query cacheada e ninguém a invalidava.
+        notifyWorkoutsChanged()
     }, [picking, state])
 
     const d = state?.diagnosis
