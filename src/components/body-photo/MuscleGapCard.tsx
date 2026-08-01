@@ -65,6 +65,8 @@ export const MuscleGapCard: React.FC<Props> = ({ assessmentId, muscleLabel, onCl
 
     const [workouts, setWorkouts] = useState<ActiveWorkoutOption[]>([])
     const [picking, setPicking] = useState<MuscleGapSuggestion | null>(null)
+    /** Treino escolhido aguardando o "sim" — escrever no treino não pode ser 1 toque. */
+    const [confirmTarget, setConfirmTarget] = useState<ActiveWorkoutOption | null>(null)
     const [saving, setSaving] = useState(false)
     const [added, setAdded] = useState<string[]>([])
     const [addError, setAddError] = useState('')
@@ -82,6 +84,7 @@ export const MuscleGapCard: React.FC<Props> = ({ assessmentId, muscleLabel, onCl
 
     const openPicker = useCallback(async (suggestion: MuscleGapSuggestion) => {
         setAddError('')
+        setConfirmTarget(null)
         setPicking(suggestion)
         if (workouts.length) return
         const res = await listActiveWorkouts()
@@ -89,11 +92,23 @@ export const MuscleGapCard: React.FC<Props> = ({ assessmentId, muscleLabel, onCl
         else setAddError(res.ok ? '' : (res.error || 'Não consegui listar seus treinos.'))
     }, [workouts.length])
 
-    const confirmAdd = useCallback(async (workoutId: string) => {
-        if (!picking) return
+    /**
+     * Escolher o treino NÃO grava — arma a confirmação.
+     *
+     * Escrever no treino da pessoa com um toque só é fácil demais de fazer sem
+     * querer, ainda mais com a lista de treinos aparecendo logo abaixo do dedo.
+     * O passo a mais mostra exatamente O QUE entra e ONDE (pedido do dono).
+     */
+    const chooseWorkout = useCallback((workout: ActiveWorkoutOption) => {
+        setAddError('')
+        setConfirmTarget(workout)
+    }, [])
+
+    const confirmAdd = useCallback(async () => {
+        if (!picking || !confirmTarget) return
         setSaving(true); setAddError('')
         const res = await addExerciseToWorkout({
-            workoutId,
+            workoutId: confirmTarget.id,
             exerciseName: picking.name,
             muscleGroup: state?.diagnosis?.muscleLabel ?? null,
             sets: 3,
@@ -103,10 +118,11 @@ export const MuscleGapCard: React.FC<Props> = ({ assessmentId, muscleLabel, onCl
         if (!res.ok) { setAddError(res.error || 'Não consegui adicionar.'); return }
         setAdded((prev) => [...prev, picking.name])
         setPicking(null)
+        setConfirmTarget(null)
         // Sem isto o exercício só aparecia depois de FECHAR O APP: a lista de
         // treinos é uma query cacheada e ninguém a invalidava.
         notifyWorkoutsChanged()
-    }, [picking, state])
+    }, [picking, confirmTarget, state])
 
     const d = state?.diagnosis
 
@@ -196,25 +212,60 @@ export const MuscleGapCard: React.FC<Props> = ({ assessmentId, muscleLabel, onCl
                                                 {/* Escolha do treino — o card nunca escreve sem passar por aqui */}
                                                 {picking?.name === s.name ? (
                                                     <div className="mt-3 pt-3 border-t border-neutral-800 space-y-1.5">
-                                                        <p className="text-[11px] uppercase tracking-wide font-bold text-neutral-500">
-                                                            Em qual treino? Entra no fim, com 3 séries em branco.
-                                                        </p>
-                                                        {workouts.length === 0 ? (
-                                                            <p className="text-[13px] text-neutral-500">Nenhum treino ativo encontrado.</p>
-                                                        ) : workouts.map((w) => (
-                                                            <button
-                                                                key={w.id}
-                                                                onClick={() => confirmAdd(w.id)}
-                                                                disabled={saving}
-                                                                className="w-full flex items-center justify-between gap-2 min-h-[38px] px-3 rounded-lg border border-neutral-700 text-left hover:border-purple-400/40 transition disabled:opacity-50"
-                                                            >
-                                                                <span className="text-[13px] text-neutral-200 truncate">{w.name}</span>
-                                                                <span className="text-[11px] text-neutral-500 shrink-0">{w.exerciseCount} ex.</span>
-                                                            </button>
-                                                        ))}
-                                                        <button onClick={() => setPicking(null)} className="text-[12px] text-neutral-500 underline underline-offset-2 mt-1">
-                                                            Cancelar
-                                                        </button>
+                                                        {confirmTarget ? (
+                                                            /* Confirmação: mostra O QUE entra e ONDE antes de gravar. */
+                                                            <div className="rounded-xl border p-3" style={{ borderColor: 'rgba(168,85,247,0.3)', background: 'rgba(168,85,247,0.06)' }}>
+                                                                <p className="text-[13px] leading-snug text-neutral-200">
+                                                                    Adicionar <span className="font-black text-white">{s.name}</span> em{' '}
+                                                                    <span className="font-black text-white">{confirmTarget.name}</span>?
+                                                                </p>
+                                                                <p className="text-[11px] text-neutral-500 mt-1">
+                                                                    Entra no fim do treino, com 3 séries em branco.
+                                                                </p>
+                                                                <div className="flex items-center gap-2 mt-3">
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={() => setConfirmTarget(null)}
+                                                                        disabled={saving}
+                                                                        className="flex-1 min-h-[40px] rounded-lg border border-neutral-700 text-neutral-300 text-[13px] font-bold transition active:scale-95 disabled:opacity-50"
+                                                                    >
+                                                                        Não
+                                                                    </button>
+                                                                    <button
+                                                                        type="button"
+                                                                        onClick={confirmAdd}
+                                                                        disabled={saving}
+                                                                        className="flex-1 min-h-[40px] rounded-lg text-black text-[13px] font-black transition active:scale-95 disabled:opacity-50 inline-flex items-center justify-center gap-1.5"
+                                                                        style={{ background: '#d8b4fe' }}
+                                                                    >
+                                                                        {saving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                                                                        {saving ? 'Adicionando…' : 'Sim, adicionar'}
+                                                                    </button>
+                                                                </div>
+                                                            </div>
+                                                        ) : (
+                                                            <>
+                                                                <p className="text-[11px] uppercase tracking-wide font-bold text-neutral-500">
+                                                                    Em qual treino? Entra no fim, com 3 séries em branco.
+                                                                </p>
+                                                                {workouts.length === 0 ? (
+                                                                    <p className="text-[13px] text-neutral-500">Nenhum treino ativo encontrado.</p>
+                                                                ) : workouts.map((w) => (
+                                                                    <button
+                                                                        key={w.id}
+                                                                        onClick={() => chooseWorkout(w)}
+                                                                        disabled={saving}
+                                                                        className="w-full flex items-center justify-between gap-2 min-h-[38px] px-3 rounded-lg border border-neutral-700 text-left hover:border-purple-400/40 transition disabled:opacity-50"
+                                                                    >
+                                                                        <span className="text-[13px] text-neutral-200 truncate">{w.name}</span>
+                                                                        <span className="text-[11px] text-neutral-500 shrink-0">{w.exerciseCount} ex.</span>
+                                                                    </button>
+                                                                ))}
+                                                                <button onClick={() => { setPicking(null); setConfirmTarget(null) }} className="text-[12px] text-neutral-500 underline underline-offset-2 mt-1">
+                                                                    Cancelar
+                                                                </button>
+                                                            </>
+                                                        )}
                                                     </div>
                                                 ) : null}
                                             </div>
