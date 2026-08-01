@@ -159,7 +159,11 @@ export async function POST(req: Request) {
             },
         }
 
-        const userCtx = await buildUserContextBlock(admin, assessedUserId, ['profile', 'nutrition', 'labs'])
+        // 'assessment' entra aqui (e NÃO no prompt do laudo): a correlação já
+        // recebeu a estimativa visual pronta, então ver o % de gordura MEDIDO
+        // ajuda a interpretar. No laudo, o mesmo número faria a IA repetir a
+        // medição em vez de olhar a foto — ver utils/bodyPhoto/bodyFatCrossCheck.ts.
+        const userCtx = await buildUserContextBlock(admin, assessedUserId, ['profile', 'assessment', 'nutrition', 'labs'])
 
         const prompt = [
             ...(userCtx ? [userCtx, ''] : []),
