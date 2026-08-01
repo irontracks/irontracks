@@ -8,6 +8,7 @@ import { type VoiceExerciseDraft } from './VoiceWorkoutModal'
 // Lazy: o VoiceWorkoutModal (854 linhas + deps de áudio/IA) só carrega quando o usuário abre
 // a captura por voz (showVoice) — sai do chunk inicial do Wizard.
 const VoiceWorkoutModal = dynamic(() => import('./VoiceWorkoutModal'), { ssr: false })
+import { trackUserEvent } from '@/lib/telemetry/userActivity'
 import { useVipCredits } from '@/hooks/useVipCredits'
 import { useFocusTrap } from '@/hooks/useFocusTrap'
 import { getErrorMessage } from '@/utils/errorMessage'
@@ -205,8 +206,33 @@ export default function WorkoutWizardModal(props: Props) {
   const formatLimit = (limit: number | null | undefined) => (limit == null ? '∞' : limit > 1000 ? '∞' : limit)
   const isWizardExhausted = (entry?: { used: number; limit: number | null }) => !!entry && entry.limit !== null && entry.used >= entry.limit
 
+  /**
+   * Funil de criação de treino (ago/2026).
+   *
+   * A telemetria pulava do clique em "Novo treino" direto para `workout_create`
+   * — nada no meio. Medido em 01/08: 29 pessoas clicaram, só 14 chegaram a
+   * salvar. Metade sumia aqui dentro e não havia como saber onde: uma aluna
+   * clicou 8 vezes em dias diferentes e nunca criou um treino.
+   *
+   * `deepestStepRef` guarda o passo mais fundo alcançado, não o atual — quem
+   * chega no 3 e volta pro 1 antes de desistir travou no 3, não no 1.
+   */
+  const deepestStepRef = React.useRef(0)
+  /** `true` depois que a pessoa pediu um treino à IA — separa quem tentou de quem só espiou. */
+  const hasStartedRef = React.useRef(false)
+  /** Último erro visto: distingue desistência de fracasso do produto. */
+  const lastErrorRef = React.useRef<string>('')
+  const outcomeRef = React.useRef<'pending' | 'manual' | 'draft_used' | 'drafts_saved'>('pending')
+
+  useEffect(() => { if (step > deepestStepRef.current) deepestStepRef.current = step }, [step])
+
   useEffect(() => {
     if (!isOpen) return
+    deepestStepRef.current = 0
+    outcomeRef.current = 'pending'
+    hasStartedRef.current = false
+    lastErrorRef.current = ''
+    try { trackUserEvent('wizard_open', { type: 'wizard', screen: 'create_workout' }) } catch { }
     setStep(0)
     setMode('single')
     setDraft(null)
@@ -229,8 +255,35 @@ export default function WorkoutWizardModal(props: Props) {
     } catch { }
   }, [isOpen])
 
+  // Abandono é medido no FECHAMENTO, com o passo mais fundo alcançado. É o
+  // único evento que responde "onde ela desistiu?" — a pergunta que a
+  // instrumentação antiga não conseguia sequer formular.
+  useEffect(() => {
+    if (isOpen) return
+    if (outcomeRef.current !== 'pending') return
+    if (!deepestStepRef.current && !hasStartedRef.current) return
+    try {
+      trackUserEvent('wizard_abandoned', {
+        type: 'wizard', screen: 'create_workout',
+        metadata: { deepestStep: deepestStepRef.current, hadError: lastErrorRef.current || null },
+      })
+    } catch { }
+  }, [isOpen])
+
   const goBack = () => { if (canBack) { setError(''); setStep((s) => Math.max(0, s - 1)) } }
   const goNext = () => { if (canNext) { setError(''); setStep((s) => Math.min(4, s + 1)) } }
+
+  /** A IA falhou: registra o MOTIVO. Sem isso, "não criou treino" e "o produto
+   *  não conseguiu montar" viram o mesmo número. */
+  const failGenerate = (reason: string, message: string) => {
+    lastErrorRef.current = reason
+    setError(message)
+    try { trackUserEvent('wizard_generate_fail', { type: 'wizard', screen: 'create_workout', metadata: { reason } }) } catch { }
+  }
+
+  const okGenerate = (count: number) => {
+    try { trackUserEvent('wizard_generate_ok', { type: 'wizard', screen: 'create_workout', metadata: { drafts: count } }) } catch { }
+  }
 
   const doGenerate = async () => {
     if (generating) return
@@ -252,6 +305,8 @@ export default function WorkoutWizardModal(props: Props) {
     setDraft(null)
     setDrafts(null)
     setDraftIdx(0)
+    hasStartedRef.current = true
+    try { trackUserEvent('wizard_generate_start', { type: 'wizard', screen: 'create_workout', metadata: { mode } }) } catch { }
     try {
       const res = await Promise.resolve(props.onGenerate(answers, { mode }))
       const many = res && typeof res === 'object' && Array.isArray((res as Record<string, unknown>)?.drafts) ? ((res as Record<string, unknown>).drafts as WorkoutDraft[]) : null
@@ -259,18 +314,20 @@ export default function WorkoutWizardModal(props: Props) {
         const safe = many
           .map((d) => ({ title: String(d?.title || '').trim() || 'Treino', exercises: Array.isArray(d?.exercises) ? d.exercises : [] }))
           .filter((d) => d.exercises.length > 0)
-        if (!safe.length) { setError('Não consegui montar um plano com esses parâmetros.'); return }
+        if (!safe.length) { failGenerate('empty_plan', 'Não consegui montar um plano com esses parâmetros.'); return }
         setDrafts(safe)
         setDraftIdx(0)
+        okGenerate(safe.length)
       } else {
         const d = res as Record<string, unknown>
         const title = String(d?.title || '').trim() || 'Treino'
         const exercises = Array.isArray(d?.exercises) ? d.exercises : []
-        if (!exercises.length) { setError('Não consegui montar um treino com esses parâmetros.'); setDraft(null); return }
+        if (!exercises.length) { failGenerate('empty_workout', 'Não consegui montar um treino com esses parâmetros.'); setDraft(null); return }
         setDraft({ title, exercises })
+        okGenerate(1)
       }
     } catch (e: unknown) {
-      setError(getErrorMessage(e) ? String(getErrorMessage(e)) : 'Falha ao gerar treino.')
+      failGenerate('exception', getErrorMessage(e) ? String(getErrorMessage(e)) : 'Falha ao gerar treino.')
       setDraft(null)
       setDrafts(null)
     } finally {
@@ -284,6 +341,8 @@ export default function WorkoutWizardModal(props: Props) {
     if (!list.length || !props.onSaveDrafts) return
     setSavingAll(true)
     setError('')
+    outcomeRef.current = 'drafts_saved'
+    try { trackUserEvent('wizard_drafts_saved', { type: 'wizard', screen: 'create_workout', metadata: { count: list.length } }) } catch { }
     try { await Promise.resolve(props.onSaveDrafts(list)) } catch (e: unknown) {
       setError(getErrorMessage(e) ? String(getErrorMessage(e)) : 'Falha ao salvar treinos.')
     } finally { setSavingAll(false) }
@@ -377,7 +436,11 @@ export default function WorkoutWizardModal(props: Props) {
                 {/* Manual */}
                 <button
                   type="button"
-                  onClick={() => { props.onClose(); props.onManual() }}
+                  onClick={() => {
+                    outcomeRef.current = 'manual'
+                    try { trackUserEvent('wizard_manual_chosen', { type: 'wizard', screen: 'create_workout' }) } catch { }
+                    props.onClose(); props.onManual()
+                  }}
                   className="group text-left rounded-xl p-4 bg-neutral-900/60 border border-neutral-800 hover:border-neutral-600 transition-all active:scale-[0.97]"
                 >
                   <span className="text-2xl">📝</span>
@@ -632,11 +695,15 @@ export default function WorkoutWizardModal(props: Props) {
                         const d = drafts[Math.max(0, Math.min(drafts.length - 1, draftIdx))]
                         if (!d) return
                         props.onClose()
+                        outcomeRef.current = 'draft_used'
+                        try { trackUserEvent('wizard_draft_used', { type: 'wizard', screen: 'create_workout' }) } catch { }
                         props.onUseDraft(d)
                         return
                       }
                       if (!draft) return
                       props.onClose()
+                      outcomeRef.current = 'draft_used'
+                      try { trackUserEvent('wizard_draft_used', { type: 'wizard', screen: 'create_workout' }) } catch { }
                       props.onUseDraft(draft)
                     }}
                     className="flex-1 min-h-[44px] px-4 py-3 rounded-xl bg-yellow-500 text-black font-black text-xs uppercase tracking-widest hover:bg-yellow-400"
