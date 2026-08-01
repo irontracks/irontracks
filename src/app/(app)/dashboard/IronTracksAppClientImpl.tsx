@@ -794,6 +794,18 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
             // (view 'dashboard'). Sem este branch, o tap só navegaria se o app abrisse no
             // dashboard por default; com ele, funciona mesmo já aberto em outra view.
             if (detail?.type === 'workout_assigned') { setView('dashboard'); return; }
+            // Avisos de admin abrem o painel na aba certa. Tem de ser pelo TYPE,
+            // não por link: o painel é uma `view` deste componente, não uma rota
+            // — `/admin` sequer existe em `app/`. O link antigo (`/admin?tab=
+            // requests`) levaria a 404; sem link nenhum, o tap só abria a tela
+            // inicial, que foi o que o dono reportou em 01/08.
+            const ADMIN_PUSH_TAB: Record<string, string> = {
+                admin_new_signup: 'requests',
+                admin_access_request: 'requests',
+                admin_vip_expiring: 'vip',
+            };
+            const adminTab = detail?.type ? ADMIN_PUSH_TAB[detail.type] : undefined;
+            if (adminTab) { openAdminPanel(adminTab); setView('admin'); return; }
             if (detail?.type === 'message') {
                 const senderId = String(detail?.senderId || '').trim();
                 if (!senderId) return;
@@ -819,7 +831,7 @@ function IronTracksApp({ initialUser, initialProfile, initialWorkouts }: { initi
         };
         window.addEventListener('irontracks:push:navigate', onPushNavigate);
         return () => window.removeEventListener('irontracks:push:navigate', onPushNavigate);
-    }, [setView, router]);
+    }, [setView, router, openAdminPanel]);
 
     useEffect(() => {
         if (!hideVipOnIos) return;

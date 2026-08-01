@@ -62,3 +62,56 @@ describe('push do resumo semanal — sem duplicata e com link', () => {
     expect(row).toMatch(/link:/)
   })
 })
+
+/**
+ * Regressão irmã (01/08): tocar no push "Nova solicitação de acesso" abria a
+ * tela inicial em vez da fila de aprovação — com gente esperando do outro lado.
+ *
+ * Duas causas somadas:
+ *   1. o push saía SEM link. `notifyAdmins` guarda o destino em `metadata.link`
+ *      (a tabela `notifications` não tem coluna `link`) e o `insertNotifications`
+ *      lia só `r.link`/`r.action_url`. O comentário no código afirmava que lia de
+ *      metadata — afirmava, e não lia.
+ *   2. o link apontava para `/admin?tab=requests`, que NÃO EXISTE em `app/`. O
+ *      painel admin é uma `view` do dashboard. Consertar só a causa 1 teria
+ *      trocado "abre a tela errada" por "abre um 404".
+ */
+describe('deep-link do push de admin → painel na aba certa', () => {
+  const IMPL = stripComments(readFileSync('src/app/(app)/dashboard/IronTracksAppClientImpl.tsx', 'utf8'))
+  const NOTIFY = stripComments(readFileSync('src/lib/social/notifyFollowers.ts', 'utf8'))
+  const ADMIN = stripComments(readFileSync('src/lib/admin/adminNotifications.ts', 'utf8'))
+
+  it('o push carrega o link guardado em metadata', () => {
+    expect(NOTIFY).toMatch(/meta\?\.link/)
+  })
+
+  it('o tap resolve a aba pelo TYPE, não por rota inexistente', () => {
+    // Pelo tipo funciona mesmo com o app já aberto em outra view — é o mesmo
+    // motivo pelo qual 'workout_assigned' tem branch próprio logo acima.
+    expect(IMPL).toMatch(/admin_new_signup: 'requests'/)
+    expect(IMPL).toMatch(/admin_access_request: 'requests'/)
+    expect(IMPL).toMatch(/openAdminPanel\(adminTab\)/)
+    expect(IMPL).toMatch(/setView\('admin'\)/)
+  })
+
+  it('nenhum aviso de admin aponta para /admin — essa rota não existe', () => {
+    // `find src/app -name "admin"` devolve só `api/admin` e `(app)/admin/
+    // acquisition`; não há page.tsx em `/admin`.
+    // Fonte CRU: `stripComments` apaga trechos demais neste arquivo e o guard
+    // passaria mesmo com o link quebrado de volta (verificado).
+    const raw = readFileSync('src/lib/admin/adminNotifications.ts', 'utf8')
+    expect(raw).not.toMatch(/link: '\/admin/)
+    expect(ADMIN).toContain('notifyAdminNewSignup')
+  })
+
+  it('a resolução por tipo vem ANTES do fallback genérico de link', () => {
+    // Senão o `router.push(link)` genérico venceria e levaria pro lugar errado.
+    // Fonte CRU aqui: `stripComments` estraga esta comparação, porque a linha do
+    // fallback contém '//' dentro de uma string e o regex a trata como comentário.
+    const raw = readFileSync('src/app/(app)/dashboard/IronTracksAppClientImpl.tsx', 'utf8')
+    const porTipo = raw.indexOf('openAdminPanel(adminTab)')
+    const fallback = raw.indexOf('router.push(link)')
+    expect(porTipo).toBeGreaterThan(0)
+    expect(fallback).toBeGreaterThan(porTipo)
+  })
+})

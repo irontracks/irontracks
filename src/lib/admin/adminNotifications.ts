@@ -27,7 +27,12 @@ interface AdminNotifyArgs {
   type: AdminNotificationType
   title: string
   message: string
-  /** Deep link opcional pra navegar ao clicar (ex: '/admin?tab=requests'). */
+  /**
+   * Deep link opcional. Use caminho REAL do app — `/admin` não existe como
+   * rota (o painel é uma `view` dentro do dashboard). O destino fino de cada
+   * aviso admin é resolvido pelo `type` no listener de push; este link é só o
+   * fallback de quem abre pela web.
+   */
   link?: string
   /** Metadata extra (user_id afetado, plano, etc). */
   metadata?: Record<string, unknown>
@@ -115,7 +120,7 @@ export async function notifyAdminNewSignup(args: {
     type: 'admin_new_signup',
     title: '🆕 Nova solicitação de acesso',
     message: `${name} (${roleLabel}) está aguardando aprovação.`,
-    link: '/admin?tab=requests',
+    link: '/dashboard',
     metadata: { email: args.email, role: args.role },
   })
 }
@@ -133,7 +138,7 @@ export async function notifyAdminVipExpiring(args: {
     type: 'admin_vip_expiring',
     title: '💳 Plano expirando',
     message: `${args.userName} (${tierLabel}) expira em ${args.daysRemaining} ${dayWord}.`,
-    link: '/admin?tab=vip',
+    link: '/dashboard',
     metadata: {
       userId: args.userId,
       planTier: args.planTier,

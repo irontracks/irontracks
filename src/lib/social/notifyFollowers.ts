@@ -244,7 +244,12 @@ export async function insertNotifications(
       const title = String(r.title || '').trim()
       const message = String(r.message || '').trim()
       const type = String(r.type || '').trim()
-      const link = String(r.link || r.action_url || '').trim()
+      // `metadata.link` também: a tabela `notifications` NÃO tem coluna `link`,
+      // então notificação de admin guarda o destino ali (ver lib/admin/
+      // adminNotifications.ts). Sem ler daqui, o push saía sem destino e o tap
+      // abria o app na tela inicial — reportado pelo dono em 01/08.
+      const meta = r.metadata && typeof r.metadata === 'object' ? r.metadata as Record<string, unknown> : null
+      const link = String(r.link || r.action_url || meta?.link || '').trim()
       if (!title || !message) continue
       const key = `${type}|${title}|${message}`
       if (!groups.has(key)) groups.set(key, { title, message, type, link: link || undefined, recipientIds: [] })
