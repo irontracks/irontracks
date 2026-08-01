@@ -23,27 +23,31 @@ const session = readFileSync(
 )
 
 describe('atualização automática do service worker', () => {
-  it('não renderiza mais o modal bloqueante', () => {
-    // Asserção sobre JSX, não sobre texto: os comentários do arquivo CITAM o
-    // modal removido ("Atualizar agora") pra explicar a mudança, e procurar a
-    // frase daria falso-positivo. O que importa é não haver markup nenhum.
-    expect(sw).not.toContain('fixed inset-0 z-[3000]')
-    expect(sw).not.toMatch(/<div/)
-    expect(sw).not.toMatch(/<button/)
-    // E o componente devolve null explicitamente.
-    expect(sw).toMatch(/\n\s*return null\n\}/)
+  it('não renderiza modal bloqueante — nada de pedágio a cada deploy', () => {
+    // O que o dono reclamou foi o modal COBRINDO a tela e travando o app até
+    // alguém tocar em "Atualizar agora". A regra original era "markup nenhum",
+    // e ela custou caro: quando a atualização ficava adiada por treino ativo,
+    // NINGUÉM sabia nem tinha como forçar, e o app passou horas atrás do
+    // servidor (ago/2026 — uma sessão inteira de correções testada contra
+    // código velho). O invariante de verdade é NÃO BLOQUEAR, não "não existir".
+    // Olha só o MARKUP: os comentários do arquivo citam o modal removido para
+    // explicar a história, e varrer o texto inteiro daria falso-positivo.
+    const jsx = sw.slice(sw.lastIndexOf('return ('))
+    expect(jsx).not.toContain('fixed inset-0')     // não cobre a tela
+    expect(jsx).not.toMatch(/backdrop|role="dialog"/)
   })
 
-  it('aplica sozinho, sem depender de clique', () => {
+  it('no caso normal segue invisível — o aviso é exceção, não regra', () => {
     expect(sw).toContain("postMessage({ type: 'SKIP_WAITING' })")
-    // Sem handler de clique — não há mais botão.
-    expect(sw).not.toMatch(/onClick=\{applyUpdate\}/)
+    // Sem versão nova travada, o componente não desenha nada.
+    expect(sw).toMatch(/if \(!deferredByWorkout \|\| updating\) return null/)
   })
 
   it('NUNCA recarrega no meio de um treino com o app à vista', () => {
-    // A guarda que impede o reload mid-série.
+    // A guarda que impede o reload mid-série. Continua valendo: o aviso novo só
+    // aplica por TOQUE do usuário, nunca sozinho.
     expect(sw).toContain("dataset.workoutActive === '1'")
-    expect(sw).toMatch(/if \(!hidden && workoutInProgress\(\)\) return/)
+    expect(sw).toMatch(/if \(!hidden && workoutInProgress\(\)\) \{ setDeferredByWorkout\(true\); return \}/)
   })
 
   it('o treino ativo realmente marca o atributo que a guarda lê', () => {

@@ -23,6 +23,14 @@ export default function ServiceWorkerRegister() {
 
   const [updateReady, setUpdateReady] = useState(false)
   const [updating, setUpdating] = useState(false)
+  /**
+   * Versão nova pronta, mas ADIADA porque há treino em andamento.
+   *
+   * Enquanto isso era invisível, o app podia ficar horas atrás do servidor sem
+   * o usuário saber nem ter como forçar — e correções "no ar" simplesmente não
+   * chegavam a quem estava testando com um treino aberto.
+   */
+  const [deferredByWorkout, setDeferredByWorkout] = useState(false)
   const registrationRef = useRef<ServiceWorkerRegistration | null>(null)
   const refreshRef = useRef(false)
   const controlledRef = useRef(false)
@@ -61,6 +69,13 @@ export default function ServiceWorkerRegister() {
         // deploy, this guarantees the update check actually sees changes.
         const reg = await navigator.serviceWorker.register(swUrl, { updateViaCache: 'none' })
         registrationRef.current = reg
+
+        // Checa versão nova JÁ NO BOOT. Sem isto, a primeira verificação só
+        // acontecia 15 min depois (ou num visibilitychange): quem abre o app,
+        // testa e fecha ficava com o bundle antigo sem nunca saber. Foi assim
+        // que uma sessão inteira de correções foi testada contra código velho
+        // (ago/2026) — o servidor certo, o aparelho atrasado.
+        try { await reg.update() } catch { /* offline: tenta de novo depois */ }
 
         if (reg.waiting) {
           setUpdateReady(true)
@@ -132,7 +147,8 @@ export default function ServiceWorkerRegister() {
       const waiting = registrationRef.current?.waiting
       if (!waiting) return
       const hidden = document.visibilityState === 'hidden'
-      if (!hidden && workoutInProgress()) return
+      if (!hidden && workoutInProgress()) { setDeferredByWorkout(true); return }
+      setDeferredByWorkout(false)
       setUpdating(true)
       trackUserEvent('sw_update_auto_applied', {
         type: 'sw',
@@ -154,6 +170,37 @@ export default function ServiceWorkerRegister() {
     }
   }, [updateReady, updating, appVersion])
 
-  // Sem UI: a atualização é silenciosa.
-  return null
+  /**
+   * Aplica na marra, a pedido do usuário. Recarrega a página — por isso só
+   * acontece por toque explícito, nunca sozinho durante o treino.
+   */
+  const applyNow = () => {
+    const waiting = registrationRef.current?.waiting
+    if (!waiting) return
+    setUpdating(true)
+    trackUserEvent('sw_update_manual_applied', { type: 'sw', metadata: { version: appVersion } })
+    try { waiting.postMessage({ type: 'SKIP_WAITING' }) } catch { }
+  }
+
+  // Silencioso no caso normal: quando dá pra aplicar, aplica sozinho e ninguém
+  // precisa ver nada. O aviso só aparece no caso em que ficaria preso —
+  // atualização pronta + treino em andamento.
+  if (!deferredByWorkout || updating) return null
+
+  return (
+    <button
+      type="button"
+      onClick={applyNow}
+      className="fixed left-1/2 -translate-x-1/2 z-[3000] inline-flex items-center gap-2 px-3 py-2 rounded-full border text-[12px] font-bold shadow-lg active:scale-95 transition"
+      style={{
+        bottom: 'calc(env(safe-area-inset-bottom, 0px) + 92px)',
+        background: 'rgba(234,179,8,0.95)',
+        borderColor: 'rgba(234,179,8,0.5)',
+        color: '#000',
+      }}
+      aria-label="Atualização disponível — tocar para aplicar agora"
+    >
+      Atualização pronta · tocar para aplicar
+    </button>
+  )
 }
