@@ -55,7 +55,7 @@ export async function analyzeBodyPhoto(
 
 export async function fetchBodyPhotoCorrelation(
     assessmentId: string,
-): Promise<{ ok: boolean; correlation?: BodyPhotoCorrelation; window?: TrainingWindowSummary; error?: string; message?: string }> {
+): Promise<{ ok: boolean; correlation?: BodyPhotoCorrelation; window?: TrainingWindowSummary; generatedAt?: string; error?: string; message?: string }> {
     try {
         const res = await fetch('/api/ai/body-composition-correlation', {
             method: 'POST',
@@ -64,7 +64,12 @@ export async function fetchBodyPhotoCorrelation(
         })
         const json = await res.json().catch(() => ({ ok: false, error: 'invalid_response' }))
         if (!res.ok || !json.ok) return { ok: false, error: json.error || 'Falha na correlação.', message: json.message }
-        return { ok: true, correlation: json.correlation as BodyPhotoCorrelation, window: json.window as TrainingWindowSummary }
+        return {
+            ok: true,
+            correlation: json.correlation as BodyPhotoCorrelation,
+            window: json.window as TrainingWindowSummary,
+            generatedAt: typeof json.generatedAt === 'string' ? json.generatedAt : undefined,
+        }
     } catch (e) {
         return { ok: false, error: e instanceof Error ? e.message : 'Erro de rede.' }
     }

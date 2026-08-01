@@ -34,12 +34,22 @@ vi.mock('@/actions/bodyPhotoAssessment-actions', () => ({
 
 import { useBodyPhotoHistory } from '../useBodyPhotoHistory'
 
-const item = (id: string, status = 'done') => ({
+const CORRELATION = {
+    headline: 'salva', narrative: 'n', whatIsWorking: [], whatIsMissing: [],
+    links: [], nextFocus: [], confidence: 'high' as const,
+}
+const WINDOW = {
+    fromIso: '2026-05-01T00:00:00Z', toIso: '2026-07-31T23:59:59Z',
+    hasPreviousAssessment: false, sessions: 34, totalVolumeKg: 184320, totalSets: 612,
+    topExercises: [{ name: 'Supino', volumeKg: 100, sets: 3 }],
+}
+
+const item = (id: string, status = 'done', correlation: unknown = null) => ({
     id, user_id: 'u1', trainer_id: null, created_by: 'u1',
     assessment_date: '2026-07-31', status,
     composition_score: 78, symmetry_score: 85, posture_score: 80, proportion_score: 82,
     body_fat_estimate_low: 14, body_fat_estimate_high: 17,
-    analysis: null, ai_model: null, ai_analyzed_at: null, notes: null,
+    analysis: null, correlation, ai_model: null, ai_analyzed_at: null, notes: null,
     created_at: '2026-07-31T00:00:00Z', updated_at: '2026-07-31T00:00:00Z',
     thumbnailUrl: null,
 })
@@ -110,6 +120,69 @@ describe('useBodyPhotoHistory', () => {
         expect(result.current.items.map((i) => i.id)).toEqual(['a2'])
         expect(result.current.detail).toBeNull()
         expect(mocks.list).toHaveBeenCalledTimes(1)
+    })
+
+    it('abre a correlação JÁ SALVA sem gastar chamada de IA', async () => {
+        // O ponto da persistência: reabrir um laudo não pode custar IA nem espera.
+        const stored = { correlation: CORRELATION, window: WINDOW, generatedAt: '2026-07-31T22:55:00Z' }
+        mocks.detail.mockResolvedValue({ ok: true, detail: { assessment: item('a1', 'done', stored), photos: [] } })
+
+        const { result } = renderHook(() => useBodyPhotoHistory())
+        await waitFor(() => expect(result.current.listLoading).toBe(false))
+        await act(async () => { await result.current.openDetail('a1') })
+
+        expect(result.current.correlation?.data.headline).toBe('salva')
+        expect(result.current.correlation?.window.sessions).toBe(34)
+        expect(result.current.correlation?.generatedAt).toBe('2026-07-31T22:55:00Z')
+        expect(mocks.correlation).not.toHaveBeenCalled()
+    })
+
+    it('correlação salva em formato inesperado não quebra a tela — cai pro estado "gerar"', async () => {
+        mocks.detail.mockResolvedValue({
+            ok: true,
+            detail: { assessment: item('a1', 'done', { correlation: { confidence: 'sim' }, window: 'nada' }), photos: [] },
+        })
+        const { result } = renderHook(() => useBodyPhotoHistory())
+        await waitFor(() => expect(result.current.listLoading).toBe(false))
+        await act(async () => { await result.current.openDetail('a1') })
+
+        expect(result.current.correlation).toBeNull()
+        expect(result.current.detail?.assessment.id).toBe('a1')
+    })
+
+    it('atualizar sobrescreve a salva e carrega o generatedAt novo', async () => {
+        const stored = { correlation: CORRELATION, window: WINDOW, generatedAt: '2026-07-01T10:00:00Z' }
+        mocks.detail.mockResolvedValue({ ok: true, detail: { assessment: item('a1', 'done', stored), photos: [] } })
+        mocks.correlation.mockResolvedValue({
+            ok: true,
+            correlation: { ...CORRELATION, headline: 'recalculada' },
+            window: { ...WINDOW, sessions: 40 },
+            generatedAt: '2026-07-31T23:00:00Z',
+        })
+
+        const { result } = renderHook(() => useBodyPhotoHistory())
+        await waitFor(() => expect(result.current.listLoading).toBe(false))
+        await act(async () => { await result.current.openDetail('a1') })
+        expect(result.current.correlation?.data.headline).toBe('salva')
+
+        await act(async () => { await result.current.correlate() })
+        expect(result.current.correlation?.data.headline).toBe('recalculada')
+        expect(result.current.correlation?.window.sessions).toBe(40)
+        expect(result.current.correlation?.generatedAt).toBe('2026-07-31T23:00:00Z')
+    })
+
+    it('falha ao atualizar PRESERVA a correlação salva na tela', async () => {
+        const stored = { correlation: CORRELATION, window: WINDOW, generatedAt: '2026-07-01T10:00:00Z' }
+        mocks.detail.mockResolvedValue({ ok: true, detail: { assessment: item('a1', 'done', stored), photos: [] } })
+        mocks.correlation.mockResolvedValue({ ok: false, error: 'ai_rate_limited' })
+
+        const { result } = renderHook(() => useBodyPhotoHistory())
+        await waitFor(() => expect(result.current.listLoading).toBe(false))
+        await act(async () => { await result.current.openDetail('a1') })
+        await act(async () => { await result.current.correlate() })
+
+        expect(result.current.correlation?.data.headline).toBe('salva')
+        expect(result.current.correlationError).not.toBe('')
     })
 
     it('falha ao apagar mantém o item na lista e mostra o erro', async () => {

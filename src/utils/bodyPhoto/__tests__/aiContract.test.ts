@@ -175,6 +175,20 @@ describe('rotas da Avaliação por Foto usam structured output', () => {
         expect(src).not.toMatch(/new Error\(res\.message \|\| res\.error/)
     })
 
+    it('a correlação é PERSISTIDA, e falha ao gravar não derruba a resposta', () => {
+        // A correlação passou a ser salva em body_photo_assessments.correlation
+        // (migration add_body_photo_correlation_column) pra reabrir sem custo de IA.
+        // Mas gravar é secundário: o usuário já esperou pela leitura — perder o
+        // cache não pode custar a ele o resultado que acabou de sair.
+        const src = readFileSync('src/app/api/ai/body-composition-correlation/route.ts', 'utf8')
+        expect(src).toMatch(/\.update\(\{ correlation: stored \}\)/)
+        expect(src).toContain('generatedAt')
+        const saveIdx = src.indexOf('correlation:save')
+        expect(saveIdx).toBeGreaterThan(-1)
+        // o erro de gravação é só logado — nada de `return` no caminho do save
+        expect(src.slice(saveIdx - 120, saveIdx + 40)).not.toMatch(/return /)
+    })
+
     it('os responseSchema espelham os limites do Zod', () => {
         const links = CORRELATION_RESPONSE_SCHEMA.properties.links
         expect(links.maxItems).toBe(CORRELATION_LIMITS.links)

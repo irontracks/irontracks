@@ -25,7 +25,7 @@ import { extractJsonFromModelText } from '@/utils/ai/extractJson'
 import { logError, logWarnRemote } from '@/lib/logger'
 import { aggregateTrainingWindow } from '@/utils/bodyPhoto/trainingWindow'
 import { CORRELATION_RESPONSE_SCHEMA, bodyPhotoGenerationConfig, normalizeCorrelation } from '@/utils/bodyPhoto/aiContract'
-import { BodyPhotoCorrelationSchema, type BodyPhotoCorrelation, type TrainingWindowSummary } from '@/types/bodyPhotoAssessment'
+import { BodyPhotoCorrelationSchema, type BodyPhotoCorrelation, type StoredCorrelation, type TrainingWindowSummary } from '@/types/bodyPhotoAssessment'
 import { buildUserContextBlock } from '@/utils/ai/userContext'
 
 export const dynamic = 'force-dynamic'
@@ -214,7 +214,17 @@ export async function POST(req: Request) {
             return NextResponse.json({ ok: false, error: 'correlation_failed', message: 'Não consegui gerar a correlação. Tente novamente.' }, { status: 422 })
         }
 
-        return NextResponse.json({ ok: true, correlation, window })
+        // Persiste a ÚLTIMA correlação para o laudo reabrir sem custo de IA. Falha
+        // ao gravar NÃO derruba a resposta: o usuário já tem o resultado na mão, e
+        // perder o cache é menos grave do que perder a leitura que ele esperou.
+        const stored: StoredCorrelation = { correlation, window, generatedAt: new Date().toISOString() }
+        const { error: saveErr } = await admin
+            .from('body_photo_assessments')
+            .update({ correlation: stored })
+            .eq('id', assessmentId)
+        if (saveErr) logError('ai:body-composition-correlation:save', saveErr)
+
+        return NextResponse.json({ ok: true, correlation, window, generatedAt: stored.generatedAt })
     } catch (e) {
         logError('ai:body-composition-correlation', e)
         return NextResponse.json({ ok: false, error: 'internal' }, { status: 500 })

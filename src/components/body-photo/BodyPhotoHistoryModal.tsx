@@ -17,7 +17,7 @@
 
 import React, { useCallback, useState } from 'react'
 import NextImage from 'next/image'
-import { AlertTriangle, ChevronLeft, Dumbbell, ImageOff, Loader2, RotateCcw, Sparkles, Trash2, X } from 'lucide-react'
+import { AlertTriangle, ChevronLeft, Dumbbell, ImageOff, Loader2, RefreshCw, RotateCcw, Sparkles, Trash2, X } from 'lucide-react'
 import { useBodyPhotoHistory } from '@/hooks/useBodyPhotoHistory'
 import {
     BODY_PHOTO_POSES,
@@ -60,6 +60,13 @@ const formatDate = (raw: string): string => {
     const [y, m, d] = String(raw || '').split('-').map((n) => Number(n))
     if (!y || !m || !d) return String(raw || '')
     return new Date(y, m - 1, d).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', year: 'numeric' })
+}
+
+/** Timestamp ISO → "31 de jul., 20:55" (a correlação envelhece; a data importa). */
+const formatDateTime = (iso: string): string => {
+    const d = new Date(iso)
+    if (Number.isNaN(d.getTime())) return ''
+    return d.toLocaleString('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })
 }
 
 const StatusBadge = ({ status }: { status: BodyPhotoAssessmentStatus }) => {
@@ -180,11 +187,38 @@ export const BodyPhotoHistoryModal: React.FC<Props> = ({ onClose }) => {
                                 </div>
                             )}
 
-                            {/* Correlação com treino — on-demand, recalculada a cada clique */}
+                            {/* Correlação com treino — a última fica SALVA na avaliação; o
+                                botão recalcula com os treinos mais recentes. */}
                             {laudo ? (
                                 <div className="pt-2 border-t border-neutral-800">
                                     {correlation ? (
-                                        <BodyPhotoCorrelationView correlation={correlation.data} window={correlation.window} />
+                                        <div className="space-y-3">
+                                            <BodyPhotoCorrelationView correlation={correlation.data} window={correlation.window} />
+                                            <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
+                                                <p className="text-[11px] text-neutral-500">
+                                                    {correlation.generatedAt
+                                                        ? `Cruzamento gerado em ${formatDateTime(correlation.generatedAt)}`
+                                                        : 'Cruzamento salvo nesta avaliação'}
+                                                </p>
+                                                <button
+                                                    onClick={correlate}
+                                                    disabled={correlationLoading}
+                                                    className="inline-flex items-center gap-1.5 min-h-[36px] px-3 rounded-lg border text-[13px] font-bold transition active:scale-95 disabled:opacity-50"
+                                                    style={{ background: 'rgba(168,85,247,0.06)', borderColor: 'rgba(168,85,247,0.25)', color: '#c4b5fd' }}
+                                                >
+                                                    {correlationLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <RefreshCw className="w-3.5 h-3.5" />}
+                                                    {correlationLoading ? 'Atualizando…' : 'Atualizar'}
+                                                </button>
+                                            </div>
+                                            {correlationError && !correlationLoading ? (
+                                                <div className="flex items-start gap-2 rounded-xl border border-red-500/25 bg-red-500/10 px-3 py-2">
+                                                    <AlertTriangle className="w-4 h-4 text-red-400 shrink-0 mt-0.5" />
+                                                    <p className="text-[13px] leading-snug text-red-300">
+                                                        {correlationError} <span className="text-red-400/70">O cruzamento acima é o anterior.</span>
+                                                    </p>
+                                                </div>
+                                            ) : null}
+                                        </div>
                                     ) : (
                                         <div className="text-center py-2">
                                             <p className="text-sm text-neutral-400 mb-3">
@@ -263,6 +297,16 @@ export const BodyPhotoHistoryModal: React.FC<Props> = ({ onClose }) => {
                                                         <div className="flex items-center gap-2 flex-wrap">
                                                             <span className="text-sm font-black text-white">{formatDate(a.assessment_date)}</span>
                                                             <StatusBadge status={a.status} />
+                                                            {a.correlation ? (
+                                                                <span
+                                                                    className="inline-flex items-center gap-1 text-[9px] uppercase font-black px-2 py-0.5 rounded-full border whitespace-nowrap"
+                                                                    style={{ background: 'rgba(168,85,247,0.1)', borderColor: 'rgba(168,85,247,0.3)', color: '#d8b4fe' }}
+                                                                    title="Este laudo já tem o cruzamento com treino salvo"
+                                                                >
+                                                                    <Dumbbell className="w-2.5 h-2.5" />
+                                                                    Cruzado
+                                                                </span>
+                                                            ) : null}
                                                         </div>
                                                         {a.status === 'done' ? (
                                                             <div className="flex items-center gap-3 mt-2">
