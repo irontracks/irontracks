@@ -113,6 +113,7 @@ export const MuscleGapCard: React.FC<Props> = ({ assessmentId, muscleLabel, onCl
             muscleGroup: state?.diagnosis?.muscleLabel ?? null,
             sets: 3,
             videoUrl: picking.videoUrl,
+            patternLabel: picking.patternLabel,
         })
         setSaving(false)
         if (!res.ok) { setAddError(res.error || 'Não consegui adicionar.'); return }
@@ -176,6 +177,27 @@ export const MuscleGapCard: React.FC<Props> = ({ assessmentId, muscleLabel, onCl
                                 <p className="text-[11px] text-neutral-500">
                                     Sugestão: {d.suggestedWeeklySets} séries por semana para começar.
                                 </p>
+
+                                {/* Restrição declarada: fica À VISTA junto das sugestões.
+                                    O catálogo cobre padrão de movimento, não dor — quem
+                                    decide o que a lombar aguenta é você, com o texto na tela. */}
+                                {state.restriction ? (
+                                    <div className="rounded-xl border p-3" style={{ borderColor: 'rgba(250,204,21,0.25)', background: 'rgba(250,204,21,0.06)' }}>
+                                        <p className="text-[12px] font-bold text-yellow-300 flex items-center gap-1.5">
+                                            <AlertTriangle className="w-3.5 h-3.5 shrink-0" /> Suas restrições
+                                        </p>
+                                        <p className="text-[12px] leading-snug text-neutral-300 mt-1">“{state.restriction.text}”</p>
+                                        {state.restriction.excluded.length ? (
+                                            <p className="text-[11px] text-neutral-400 mt-1.5">
+                                                Tirei da lista: {state.restriction.excluded.join(', ')}.
+                                            </p>
+                                        ) : null}
+                                        <p className="text-[11px] text-neutral-500 mt-1.5">
+                                            Confira se o que sobrou respeita a sua limitação antes de adicionar.
+                                        </p>
+                                    </div>
+                                ) : null}
+
                                 <div className="space-y-2">
                                     {(state.suggestions ?? []).map((s) => {
                                         const done = added.includes(s.name)

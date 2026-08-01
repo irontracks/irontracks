@@ -30,7 +30,7 @@ import { respondDbError } from '@/utils/api/dbError'
 import { logError } from '@/lib/logger'
 import { aggregateTrainingWindow } from '@/utils/bodyPhoto/trainingWindow'
 import { diagnoseMuscleGap, type DevelopmentLevel } from '@/utils/workout/muscleGapDiagnosis'
-import { TECHNIQUE_CUES } from '@/utils/workout/movementPatterns'
+import { TECHNIQUE_CUES, isExerciseRestricted } from '@/utils/workout/movementPatterns'
 import { ID_TO_LIBRARY_MUSCLES, muscleIdFromLabel } from '@/utils/workout/muscleIdMapping'
 import type { BodyPhotoLaudo } from '@/types/bodyPhotoAssessment'
 
@@ -147,13 +147,32 @@ export async function POST(req: Request) {
             development: development ?? null,
         })
 
+        // ── Restrições declaradas pelo aluno ─────────────────────────────────
+        // O catálogo não sabe de dor. Este card já sugeriu Stiff a quem escreveu
+        // "SEM hip thrust/coice (lombar)" — sugestão tecnicamente correta pro
+        // padrão faltante e errada pra pessoa. O que o texto NOMEIA sai da lista;
+        // o resto vai visível pro card, porque inferir que outro exercício carrega
+        // a mesma estrutura é julgamento clínico, não regex.
+        const { data: profileRow } = await admin
+            .from('vip_profile').select('constraints').eq('user_id', row.user_id).maybeSingle()
+        const rawConstraints = (profileRow as { constraints?: unknown } | null)?.constraints ?? null
+        const constraintsText = typeof rawConstraints === 'string'
+            ? rawConstraints.trim()
+            : rawConstraints ? JSON.stringify(rawConstraints) : ''
+
         // ── Sugestões: só quando falta PADRÃO. Volume e execução não pedem
         //    exercício novo — mandar um aqui seria o conselho errado. ──────────
         const trainedNames = new Set(trained.map((e) => norm(e.name)))
+        const excludedByRestriction: string[] = []
         const suggestions = diagnosis.kind !== 'missing_pattern' ? [] : diagnosis.missingPatterns.flatMap((pattern) =>
             library
                 .filter((l) => l.display_name_pt && pattern.match.test(l.display_name_pt))
                 .filter((l) => !trainedNames.has(norm(l.display_name_pt)))
+                .filter((l) => {
+                    if (!isExerciseRestricted(String(l.display_name_pt), constraintsText)) return true
+                    excludedByRestriction.push(String(l.display_name_pt))
+                    return false
+                })
                 .sort((a, b) => Number(!!b.video_url) - Number(!!a.video_url) || Number(!!b.is_compound) - Number(!!a.is_compound))
                 .slice(0, MAX_SUGGESTIONS)
                 .map((l) => ({
@@ -170,6 +189,9 @@ export async function POST(req: Request) {
             ok: true,
             // Cues só no caso de execução — em qualquer outro tipo eles seriam ruído.
             techniqueCues: diagnosis.kind === 'technique' ? (TECHNIQUE_CUES[muscle] ?? []) : [],
+            restriction: constraintsText && suggestions.length + excludedByRestriction.length > 0
+                ? { text: constraintsText.slice(0, 300), excluded: [...new Set(excludedByRestriction)].slice(0, 5) }
+                : null,
             diagnosis: {
                 kind: diagnosis.kind,
                 muscle: diagnosis.muscle,
