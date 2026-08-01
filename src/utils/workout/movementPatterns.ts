@@ -170,6 +170,43 @@ export const MOVEMENT_PATTERNS: Partial<Record<MuscleId, MovementPattern[]>> = {
     ],
 }
 
+/**
+ * Cues de execução por grupo — usados quando o volume já está na faixa e os
+ * padrões cobertos, mas o físico não acompanha (`kind: 'technique'`).
+ *
+ * É o caso da panturrilha do usuário que originou a feature: 119 séries em 5
+ * variações e desenvolvimento moderado. Mandar treinar mais seria repetir o que
+ * já não funcionou; o que falta é como.
+ */
+export const TECHNIQUE_CUES: Partial<Record<MuscleId, string[]>> = {
+    calves: [
+        'Pause 2 segundos no ponto mais baixo, com o calcanhar abaixo da linha do apoio.',
+        'Suba até a extensão completa e segure 1 segundo no topo.',
+        'Tire o impulso: se a carga só sobe com repique, ela está alta demais.',
+        'Concentre em 2 variações e progrida carga nelas, em vez de somar exercícios.',
+    ],
+    abs: [
+        'Puxe as costelas em direção à pelve — encurte o abdômen, não flexione o quadril.',
+        'Adicione carga e trabalhe entre 8 e 15 repetições, como em qualquer outro grupo.',
+    ],
+    hamstrings: [
+        'Na flexora, controle a fase excêntrica por 3 segundos.',
+        'Nos movimentos de quadril, procure o alongamento com a coluna neutra — a amplitude vem do quadril.',
+    ],
+    quads: [
+        'Amplitude completa: parar acima do paralelo tira justamente a parte que mais estimula.',
+        'Controle a descida; a fase excêntrica é onde o estímulo se acumula.',
+    ],
+    chest: [
+        'Deixe o peitoral alongar no fundo, sem quicar a barra ou a máquina.',
+        'Ombro estável e escápula retraída — sem isso o deltoide anterior assume o trabalho.',
+    ],
+    lats: [
+        'Puxe com o cotovelo, não com a mão: pense em levar o cotovelo pro bolso.',
+        'Deixe o dorsal alongar por completo no topo antes de puxar de novo.',
+    ],
+}
+
 export interface PatternCoverage {
     pattern: MovementPattern
     /** Séries encontradas no período para este padrão. */
