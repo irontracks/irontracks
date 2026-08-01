@@ -207,6 +207,47 @@ export const TECHNIQUE_CUES: Partial<Record<MuscleId, string[]>> = {
     ],
 }
 
+/**
+ * Remove das sugestões o que a restrição do aluno menciona explicitamente.
+ *
+ * A restrição é texto livre escrito por humano ("Treino: Upper/Lower 5 dias,
+ * SEM hip thrust/coice (lombar)"). Casar por MENÇÃO LITERAL é limitado de
+ * propósito: dá pra afirmar com segurança que "hip thrust" está fora quando a
+ * pessoa escreveu "hip thrust", mas inferir que outro exercício carrega a mesma
+ * estrutura é julgamento clínico — e chutar isso é pior que não filtrar.
+ *
+ * O que o sistema NÃO consegue decidir, ele mostra: o card exibe a restrição ao
+ * lado das sugestões para a pessoa escolher com a informação à vista.
+ */
+const normalizeText = (raw: unknown): string =>
+    String(raw ?? '')
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]+/g, ' ')
+        .trim()
+
+/** Palavras curtas demais para casar sozinhas ("pe", "de") gerariam falso positivo. */
+const MIN_TOKEN = 4
+
+export function isExerciseRestricted(exerciseName: string, constraints: unknown): boolean {
+    const restriction = normalizeText(constraints)
+    const name = normalizeText(exerciseName)
+    if (!restriction || !name) return false
+
+    // Nome inteiro citado ("stiff com barra" dentro do texto).
+    if (restriction.includes(name)) return true
+
+    // Ou uma sequência significativa do nome ("hip thrust" dentro de
+    // "sem hip thrust/coice"). Exige 2+ palavras para não casar por acaso.
+    const tokens = name.split(' ').filter((t) => t.length >= MIN_TOKEN)
+    for (let i = 0; i < tokens.length - 1; i++) {
+        if (restriction.includes(`${tokens[i]} ${tokens[i + 1]}`)) return true
+    }
+    // Palavra única e distintiva (>= 5 letras) também vale: "coice", "agachamento".
+    return tokens.some((t) => t.length >= 5 && restriction.includes(t))
+}
+
 export interface PatternCoverage {
     pattern: MovementPattern
     /** Séries encontradas no período para este padrão. */

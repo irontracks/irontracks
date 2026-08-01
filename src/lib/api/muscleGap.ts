@@ -42,11 +42,22 @@ export interface MuscleGapSuggestion {
     why: string
 }
 
+/**
+ * Restrição declarada pelo aluno, quando ela toca as sugestões deste grupo.
+ * `excluded` são os exercícios que o texto NOMEIA — já removidos da lista.
+ * O texto vai junto porque o que a regra não consegue decidir, a pessoa decide.
+ */
+export interface MuscleGapRestriction {
+    text: string
+    excluded: string[]
+}
+
 export interface MuscleGapResponse {
     ok: boolean
     diagnosis?: MuscleGapDiagnosisDto
     suggestions?: MuscleGapSuggestion[]
     techniqueCues?: string[]
+    restriction?: MuscleGapRestriction | null
     windowWeeks?: number
     error?: string
 }
@@ -65,6 +76,7 @@ export async function fetchMuscleGap(assessmentId: string, muscleLabel: string):
             diagnosis: json.diagnosis as MuscleGapDiagnosisDto,
             suggestions: (json.suggestions ?? []) as MuscleGapSuggestion[],
             techniqueCues: (json.techniqueCues ?? []) as string[],
+            restriction: (json.restriction ?? null) as MuscleGapRestriction | null,
             windowWeeks: Number(json.windowWeeks) || 0,
         }
     } catch (e) {

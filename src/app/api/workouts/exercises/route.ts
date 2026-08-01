@@ -25,6 +25,7 @@ import { parseJsonBody } from '@/utils/zod'
 import { respondDbError } from '@/utils/api/dbError'
 import { cacheDeletePattern } from '@/utils/cache'
 import { logError } from '@/lib/logger'
+import { generateExerciseNote } from '@/utils/workout/exerciseNote'
 
 export const dynamic = 'force-dynamic'
 
@@ -37,6 +38,8 @@ const BodySchema = z.object({
     exerciseName: z.string().min(1).max(120).optional(),
     muscleGroup: z.string().max(60).nullable().optional(),
     videoUrl: z.string().max(500).nullable().optional(),
+    /** Padrão que o exercício veio cobrir — dá foco à instrução gerada. */
+    patternLabel: z.string().max(60).nullable().optional(),
     sets: z.number().int().min(1).max(6).optional(),
     // reorder
     orderedExerciseIds: z.array(z.string().uuid()).max(60).optional(),
@@ -84,11 +87,22 @@ export async function POST(req: Request) {
                 .order('order', { ascending: false }).limit(1)
             const lastOrder = Number((lastRows as Array<{ order: number | null }> | null)?.[0]?.order ?? -1)
 
+            // Instrução de execução com o contexto REAL do aluno (restrições e
+            // dores inclusas). Exercício mudo no meio de outros explicados é o
+            // que o dono reportou; falhar aqui NÃO impede a adição.
+            const note = await generateExerciseNote(supabase, {
+                userId: user.id,
+                exerciseName: name,
+                muscleLabel: body.muscleGroup ?? null,
+                patternLabel: body.patternLabel ?? null,
+            })
+
             const { data: created, error: exErr } = await supabase
                 .from('exercises')
                 .insert({
                     workout_id: body.workoutId,
                     name,
+                    notes: note,
                     muscle_group: body.muscleGroup ?? null,
                     video_url: body.videoUrl ?? null,
                     rest_time: DEFAULT_REST_SECONDS,

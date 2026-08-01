@@ -18,6 +18,7 @@ interface ExercisesApiBody {
     exerciseName?: string
     muscleGroup?: string | null
     videoUrl?: string | null
+    patternLabel?: string | null
     sets?: number
     orderedExerciseIds?: string[]
     exerciseId?: string
@@ -46,6 +47,8 @@ export interface AddExerciseInput {
     muscleGroup?: string | null
     sets?: number
     videoUrl?: string | null
+    /** Padrão de movimento que o exercício veio cobrir — dá foco à descrição gerada. */
+    patternLabel?: string | null
 }
 
 /** Insere no FIM do treino, com séries em branco prontas pra preencher na execução. */
@@ -60,6 +63,7 @@ export async function addExerciseToWorkout(input: AddExerciseInput): Promise<Act
         exerciseName,
         muscleGroup: input.muscleGroup ?? null,
         videoUrl: input.videoUrl ?? null,
+        patternLabel: input.patternLabel ?? null,
         sets: Math.min(6, Math.max(1, Number(input.sets) || 3)),
     })
 }
