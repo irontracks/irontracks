@@ -7,6 +7,7 @@ import { parseTrainingNumber } from '@/utils/trainingNumber';
 import { editedSetDetails, stripMethodBlobs } from '../helpers/editedSetDetails';
 import { canonicalEditorMethod } from '../helpers/editorMethod';
 import { applyExerciseOrder, buildExerciseDraft, draftOrderKeys } from '@/lib/workoutReorder';
+import { persistWorkoutPlan } from '@/utils/workout/persistWorkoutPlan';
 import {
   tagExercisesForEdit,
   reconcileEditedExercises,
@@ -413,14 +414,9 @@ export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
         nextLogs[`${remap.get(exI)}${k.slice(dash)}`] = v;
       }
       const payload = { ...workout, exercises: orderedExercises };
-      const response = await fetch('/api/workouts/update', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: workoutId, workout: payload }),
-      }).catch((): null => null);
-      const result = response ? await response.json().catch((): null => null) : null;
-      if (!response || !response.ok || !result?.ok) {
-        setOrganizeError(String(result?.error || 'Falha ao salvar a ordem.'));
+      const saved = await persistWorkoutPlan(workoutId, payload);
+      if (!saved.ok) {
+        setOrganizeError(saved.error || 'Falha ao salvar a ordem.');
         setOrganizeSaving(false);
         return;
       }
@@ -492,19 +488,12 @@ export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
         try { await alert('Não foi possível salvar: treino sem ID.'); } catch { }
         return;
       }
-      try {
-        const response = await fetch('/api/workouts/update', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: workoutId, workout: { ...workout, exercises: nextExercises } }),
-        }).catch((): null => null);
-        const result = response ? await response.json().catch((): null => null) : null;
-        if (!response?.ok || !(result as Record<string, unknown>)?.ok) {
-          try { await alert(String((result as Record<string, unknown>)?.error || 'Falha ao salvar no plano.')); } catch { }
-        }
-      } catch (e: unknown) {
-        const msg = isObject(e) && typeof e.message === 'string' ? e.message : 'Falha ao salvar no plano.';
-        try { await alert(msg); } catch { }
+      // persistWorkoutPlan invalida a lista de treinos ao confirmar. Sem isso, o
+      // exercício removido continuava aparecendo até reiniciar o app (bug real,
+      // reportado em ago/2026 justamente com um exercício apagado no treino ativo).
+      const saved = await persistWorkoutPlan(workoutId, { ...workout, exercises: nextExercises });
+      if (!saved.ok) {
+        try { await alert(saved.error || 'Falha ao salvar no plano.'); } catch { }
       }
     }
   };
@@ -580,17 +569,8 @@ export function useWorkoutExerciseCrud(deps: ExerciseCrudDeps) {
     if (persist) {
       const workoutId = String(workout?.id ?? (workout as UnknownRecord)?.workout_id ?? '').trim();
       if (workoutId) {
-        try {
-          const response = await fetch('/api/workouts/update', {
-            method: 'PATCH',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id: workoutId, workout: { ...workout, exercises: nextExercises } }),
-          }).catch((): null => null);
-          const result = response ? await response.json().catch((): null => null) : null;
-          if (!response?.ok || !(result as UnknownRecord)?.ok) {
-            try { await alert('As mudanças valem para hoje, mas não consegui salvar no treino para as próximas vezes.'); } catch { }
-          }
-        } catch {
+        const saved = await persistWorkoutPlan(workoutId, { ...workout, exercises: nextExercises });
+        if (!saved.ok) {
           try { await alert('As mudanças valem para hoje, mas não consegui salvar no treino para as próximas vezes.'); } catch { }
         }
       }

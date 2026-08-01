@@ -17,8 +17,9 @@
 
 import React, { useCallback, useMemo, useState } from 'react'
 import { Reorder, useDragControls } from 'framer-motion'
-import { AlertTriangle, Check, Clock, Dumbbell, GripVertical, Loader2, ListOrdered, X, Zap } from 'lucide-react'
-import { reorderWorkoutExercises } from '@/actions/workoutExercises-actions'
+import { AlertTriangle, Check, Clock, Dumbbell, GripVertical, Loader2, ListOrdered, Trash2, X, Zap } from 'lucide-react'
+import { deleteWorkoutExercise, reorderWorkoutExercises } from '@/actions/workoutExercises-actions'
+import { notifyWorkoutsChanged } from '@/utils/workout/persistWorkoutPlan'
 
 type ExerciseRecord = Record<string, unknown>
 
@@ -113,6 +114,10 @@ export const QuickViewExerciseList: React.FC<Props> = ({ workoutId, exercises, c
     const [draft, setDraft] = useState<ExerciseRecord[]>([])
     const [saving, setSaving] = useState(false)
     const [error, setError] = useState('')
+    /** Exclusão pede confirmação no próprio card — é destrutiva e não tem desfazer. */
+    const [confirmingDelete, setConfirmingDelete] = useState<string | null>(null)
+    const [deleting, setDeleting] = useState<string | null>(null)
+    const [removed, setRemoved] = useState<string[]>([])
 
     /** Reordenar exige id em TODOS: sem id não há o que mandar pro banco. */
     const allHaveId = useMemo(
@@ -120,6 +125,8 @@ export const QuickViewExerciseList: React.FC<Props> = ({ workoutId, exercises, c
         [exercises],
     )
     const reorderEnabled = canReorder && allHaveId && !!workoutId && exercises.length > 1
+    /** Excluir usa a MESMA trava do reordenar (treino não iniciado), mas vale já com 1 exercício. */
+    const canDelete = canReorder && !!workoutId && !organizing
 
     const start = useCallback(() => {
         setDraft(exercises)
@@ -141,12 +148,28 @@ export const QuickViewExerciseList: React.FC<Props> = ({ workoutId, exercises, c
         if (!res.ok) { setError(res.error || 'Não consegui salvar a ordem.'); return }
         // Mesma invalidação que o resto do app usa depois de escrever em treino —
         // sem isso a nova ordem só apareceria reabrindo o app.
-        try { window.dispatchEvent(new CustomEvent('irontracks:workouts-changed')) } catch { /* sem window */ }
+        notifyWorkoutsChanged()
         setOrganizing(false)
         setDraft([])
     }, [workoutId, draft])
 
-    const list = organizing ? draft : exercises
+    const remove = useCallback(async (ex: ExerciseRecord) => {
+        if (!workoutId) return
+        const exId = String(ex?.id || '')
+        setDeleting(exId); setError('')
+        const res = await deleteWorkoutExercise(workoutId, exId)
+        setDeleting(null)
+        if (!res.ok) { setError(res.error || 'Não consegui excluir.'); return }
+        setRemoved((prev) => [...prev, exId])
+        setConfirmingDelete(null)
+        notifyWorkoutsChanged()
+    }, [workoutId])
+
+    // Some da tela na hora; a lista real chega no refetch disparado acima.
+    const visible = useMemo(
+        () => (organizing ? draft : exercises).filter((ex) => !removed.includes(String(ex?.id || ''))),
+        [organizing, draft, exercises, removed],
+    )
 
     return (
         <div className="px-3 py-2 flex-1 min-h-0 overflow-y-auto space-y-2">
@@ -209,15 +232,54 @@ export const QuickViewExerciseList: React.FC<Props> = ({ workoutId, exercises, c
                     ))}
                 </Reorder.Group>
             ) : (
-                list.map((ex, idx) => (
-                    <div
-                        key={exerciseKey(ex, idx)}
-                        className="group relative bg-white/[0.03] border border-white/[0.07] hover:border-yellow-500/20 hover:bg-white/[0.05] rounded-2xl p-4 transition-all duration-200"
-                    >
-                        <div className="absolute left-0 top-3 bottom-3 w-0.5 rounded-full bg-gradient-to-b from-yellow-500/60 to-yellow-500/10 ml-3" />
-                        <ExerciseBody ex={ex} index={idx} />
-                    </div>
-                ))
+                visible.map((ex, idx) => {
+                    const exId = String(ex?.id || '')
+                    const confirming = confirmingDelete === exId
+                    const isDeleting = deleting === exId
+                    return (
+                        <div
+                            key={exerciseKey(ex, idx)}
+                            className="group relative bg-white/[0.03] border border-white/[0.07] hover:border-yellow-500/20 hover:bg-white/[0.05] rounded-2xl p-4 transition-all duration-200"
+                        >
+                            <div className="absolute left-0 top-3 bottom-3 w-0.5 rounded-full bg-gradient-to-b from-yellow-500/60 to-yellow-500/10 ml-3" />
+                            <ExerciseBody ex={ex} index={idx} />
+
+                            {canDelete && exId ? (
+                                confirming ? (
+                                    <div className="mt-3 ml-3 pl-3 flex items-center gap-2 border-l border-red-500/25">
+                                        <p className="text-[12px] text-neutral-300 flex-1">Excluir do treino?</p>
+                                        <button
+                                            type="button"
+                                            onClick={() => setConfirmingDelete(null)}
+                                            disabled={isDeleting}
+                                            className="px-2.5 py-1 rounded-lg border border-neutral-700 text-neutral-300 text-[11px] font-bold transition active:scale-95 disabled:opacity-50"
+                                        >
+                                            Cancelar
+                                        </button>
+                                        <button
+                                            type="button"
+                                            onClick={() => remove(ex)}
+                                            disabled={isDeleting}
+                                            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-white text-[11px] font-black transition active:scale-95 disabled:opacity-50"
+                                            style={{ background: 'rgba(239,68,68,0.9)' }}
+                                        >
+                                            {isDeleting ? <Loader2 size={11} className="animate-spin" /> : <Trash2 size={11} />} Excluir
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <button
+                                        type="button"
+                                        onClick={() => { setConfirmingDelete(exId); setError('') }}
+                                        className="absolute top-3 right-3 p-1.5 rounded-lg text-neutral-600 hover:text-red-400 transition"
+                                        aria-label={`Excluir ${String(ex?.name || 'exercício')} do treino`}
+                                    >
+                                        <Trash2 size={14} />
+                                    </button>
+                                )
+                            ) : null}
+                        </div>
+                    )
+                })
             )}
         </div>
     )
