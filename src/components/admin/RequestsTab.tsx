@@ -43,12 +43,18 @@ export default function RequestsTab() {
     const [requests, setRequests] = useState<AccessRequest[]>([])
     const [loading, setLoading] = useState(true)
     const [processing, setProcessing] = useState<string | null>(null) // id being processed
+    /**
+     * A aba só mostrava pendentes. Quando o e-mail de aprovação falha, a
+     * solicitação já virou `approved` e sumia da tela — o admin ficava sem
+     * nenhum caminho para tentar de novo. A visão "Aprovadas" existe para isso.
+     */
+    const [view, setView] = useState<'pending' | 'approved'>('pending')
 
     const fetchRequests = useCallback(async () => {
         setLoading(true)
         try {
             const headers = await getAuthHeaders()
-            const res = await fetch('/api/admin/access-requests/list?status=pending', { headers })
+            const res = await fetch(`/api/admin/access-requests/list?status=${view}`, { headers })
             const json = await res.json()
             if (json.ok) {
                 setRequests((json.data || []) as AccessRequest[])
@@ -60,11 +66,29 @@ export default function RequestsTab() {
         } finally {
             setLoading(false)
         }
-    }, [])
+    }, [view])
 
     useEffect(() => {
         fetchRequests()
     }, [fetchRequests])
+
+    const handleResend = async (req: AccessRequest) => {
+        setProcessing(req.id)
+        try {
+            const headers = await getAuthHeaders()
+            const res = await fetch('/api/admin/access-requests/action', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json', ...headers },
+                body: JSON.stringify({ requestId: req.id, action: 'resend_email' }),
+            })
+            const json = await res.json()
+            await alert(json.ok ? (json.message || 'E-mail reenviado.') : `Não deu para reenviar.\n\n${json.error || ''}`)
+        } catch {
+            await alert('Erro de conexão.')
+        } finally {
+            setProcessing(null)
+        }
+    }
 
     const handleAction = async (req: AccessRequest, action: string) => {
         if (action === 'reject') {
@@ -152,23 +176,43 @@ export default function RequestsTab() {
         )
     }
 
+    const tabs = (
+        <div className="flex items-center gap-2">
+            {(['pending', 'approved'] as const).map((v) => (
+                <button
+                    key={v}
+                    onClick={() => setView(v)}
+                    disabled={loading}
+                    className={`px-3 py-1.5 rounded-lg text-[10px] font-black uppercase tracking-widest transition-colors disabled:opacity-60 ${view === v
+                        ? 'bg-yellow-500 text-black'
+                        : 'bg-neutral-900 text-neutral-400 border border-neutral-800 hover:text-white'}`}
+                >
+                    {v === 'pending' ? 'Pendentes' : 'Aprovadas'}
+                </button>
+            ))}
+        </div>
+    )
+
     if (requests.length === 0) {
         return (
-            <div className="flex flex-col items-center justify-center h-64 text-neutral-500">
-                <div className="w-16 h-16 bg-neutral-900 rounded-full flex items-center justify-center mb-4 border border-neutral-800">
-                    <Check className="text-neutral-700" size={32} />
+            <div className="w-full space-y-4">
+                <div className="flex items-center justify-between px-1">{tabs}</div>
+                <div className="flex flex-col items-center justify-center h-64 text-neutral-500">
+                    <div className="w-16 h-16 bg-neutral-900 rounded-full flex items-center justify-center mb-4 border border-neutral-800">
+                        <Check className="text-neutral-700" size={32} />
+                    </div>
+                    <p className="font-bold text-sm uppercase tracking-widest">
+                        {view === 'pending' ? 'Nenhuma solicitação pendente' : 'Nenhuma solicitação aprovada'}
+                    </p>
                 </div>
-                <p className="font-bold text-sm uppercase tracking-widest">Nenhuma solicitação pendente</p>
             </div>
         )
     }
 
     return (
         <div className="w-full space-y-4">
-            <div className="flex items-center justify-between px-1">
-                <h3 className="text-xs font-black uppercase tracking-widest text-neutral-400">
-                    Solicitações Pendentes ({requests.length})
-                </h3>
+            <div className="flex items-center justify-between px-1 gap-2">
+                {tabs}
                 <button onClick={fetchRequests} disabled={loading} className="text-[10px] font-bold text-yellow-500 hover:text-yellow-400 uppercase disabled:opacity-60">
                     Atualizar
                 </button>
@@ -225,6 +269,18 @@ export default function RequestsTab() {
                             </div>
                         </div>
 
+                        {view === 'approved' ? (
+                            <div className="mt-auto pt-2">
+                                <button
+                                    onClick={() => handleResend(req)}
+                                    disabled={!!processing}
+                                    className="w-full flex items-center justify-center gap-2 py-3 rounded-xl bg-neutral-800 text-neutral-200 hover:bg-neutral-700 border border-neutral-700 text-xs font-black uppercase transition-colors disabled:opacity-50"
+                                >
+                                    {processing === req.id ? <Loader2 className="animate-spin" size={14} /> : <Mail size={14} />}
+                                    Reenviar e-mail
+                                </button>
+                            </div>
+                        ) : (
                         <div className="grid grid-cols-2 gap-2 mt-auto pt-2">
                             <button
                                 onClick={() => handleAction(req, 'reject')}
@@ -243,6 +299,7 @@ export default function RequestsTab() {
                                 Aceitar
                             </button>
                         </div>
+                        )}
                     </div>
                 ))}
             </div>

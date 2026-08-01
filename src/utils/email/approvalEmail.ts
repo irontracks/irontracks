@@ -115,3 +115,57 @@ export function buildApprovalEmail(input: ApprovalEmailInput): BuiltEmail {
 
     return { subject, html, text }
 }
+
+/**
+ * E-mail de recusa.
+ *
+ * Até ago/2026 quem era recusado não recebia nada: a solicitação era apagada, a
+ * conta (quando existia) deletada, e a pessoa continuava na tela de espera para
+ * sempre, sem saber. Ela pediu acesso a um produto e merece uma resposta.
+ *
+ * Não damos motivo porque não existe campo de motivo — inventar um seria pior
+ * que não dar. O que o e-mail oferece é o caminho para falar com alguém.
+ */
+export function buildRejectionEmail(input: { name?: string | null }): BuiltEmail {
+    const name = firstName(input?.name)
+    const safeName = escapeHtml(name)
+
+    const subject = 'Sobre sua solicitação de acesso ao IronTracks'
+    const lead = 'Sua solicitação de acesso não foi aprovada desta vez.'
+    const follow = 'Se você acha que houve engano, ou quiser entender melhor, é só responder este e-mail.'
+    const preheader = 'Uma resposta sobre o acesso que você pediu.'
+
+    const html = `<!doctype html>
+<html lang="pt-BR">
+<body style="margin:0;padding:0;background:#0a0a0a">
+  <span style="display:none;max-height:0;overflow:hidden;opacity:0">${escapeHtml(preheader)}</span>
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#0a0a0a;padding:24px 12px">
+    <tr><td align="center">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#141414;border:1px solid #262626;border-radius:16px">
+        <tr><td style="padding:32px 28px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Arial,sans-serif;color:#e5e5e5">
+          <p style="margin:0 0 4px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#737373;font-weight:700">IronTracks</p>
+          <h1 style="margin:0 0 16px;font-size:20px;line-height:1.3;color:#ffffff">Olá, ${safeName}.</h1>
+          <p style="margin:0 0 16px;font-size:15px;line-height:1.6;color:#a3a3a3">${escapeHtml(lead)}</p>
+          <p style="margin:0;font-size:15px;line-height:1.6;color:#a3a3a3">${escapeHtml(follow)}</p>
+          <hr style="border:0;border-top:1px solid #262626;margin:28px 0 16px">
+          <p style="margin:0;font-size:12px;line-height:1.6;color:#525252">
+            Você também pode escrever para ${escapeHtml(SUPPORT_EMAIL)}.
+          </p>
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`
+
+    const text = [
+        `Olá, ${name}.`,
+        '',
+        lead,
+        '',
+        follow,
+        `Você também pode escrever para ${SUPPORT_EMAIL}.`,
+    ].join('\n')
+
+    return { subject, html, text }
+}

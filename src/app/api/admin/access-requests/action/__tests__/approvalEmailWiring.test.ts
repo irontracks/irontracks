@@ -38,13 +38,46 @@ describe('rota de aprovação: envio de e-mail', () => {
         // Vercel expira e o Sentry não recebe erro de rota server neste projeto.
         expect(src).toContain('approval_email_sent')
         expect(src).toContain('approval_email_failed')
-        expect(src).toMatch(/provider_id: emailResult\.id/)
+        expect(src).toMatch(/provider_id: input\.result\.id/)
+        expect(src).toMatch(/recordEmailAttempt\(admin, \{/)
     })
 
     it('não usa logWarn para falha de envio — é no-op em produção', () => {
         // `logWarn` tem `if (IS_PROD) return`: o sinal morria antes de sair.
         expect(src).not.toMatch(/logWarn\([^)]*[Ee]mail/)
-        expect(src).not.toMatch(/logWarn\([^)]*WhatsApp/)
+    })
+
+    it('a recusa também avisa o usuário', () => {
+        // Antes: a solicitação sumia, a conta era deletada, e a pessoa ficava na
+        // tela de espera para sempre sem saber de nada.
+        expect(src).toContain('buildRejectionEmail')
+        expect(src).toMatch(/avisado por e-mail/)
+    })
+
+    it('o e-mail de recusa é enviado DEPOIS das escritas', () => {
+        // A recusa não pode depender do e-mail: se o provedor cair, a decisão
+        // administrativa já tem de estar gravada.
+        const deleteAt = src.indexOf("from('access_requests').delete()")
+        // a CHAMADA, não a linha de import — o import vem sempre antes de tudo
+        const mailAt = src.indexOf('buildRejectionEmail({')
+        expect(deleteAt).toBeGreaterThan(0)
+        expect(mailAt).toBeGreaterThan(deleteAt)
+    })
+
+    it('existe reenvio, e só para solicitação já aprovada', () => {
+        // Se o envio falhava, o admin não tinha segundo tiro — só avisar por fora.
+        expect(src).toContain("'resend_email'")
+        expect(src).toMatch(/if \(!wasApproved\)/)
+        expect(src).toMatch(/resent: true/)
+    })
+
+    it('não chama mais API externa direto — o Z-API saiu junto', () => {
+        // O aviso por WhatsApp tinha o MESMO `.catch(() => null)` sem checar
+        // `res.ok`. O sistema inteiro foi removido em ago/2026 (2 conversas no
+        // total, a última em maio); o e-mail é o único canal agora.
+        expect(src).not.toContain('z-api.io')
+        expect(src).not.toContain('sendWhatsAppMessage')
+        expect(src).not.toContain('env.zapi')
     })
 
     it('falha de e-mail NÃO derruba a aprovação já gravada', () => {

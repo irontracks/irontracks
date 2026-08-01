@@ -37,7 +37,10 @@ describe('crons — guard de autorização', () => {
   it('encontra os handlers de cron (sanidade da varredura)', () => {
     // Se este número cair pra zero, a varredura quebrou e os testes abaixo
     // passariam vazios — o pior tipo de guard falso.
-    expect(routes.length).toBeGreaterThanOrEqual(16)
+    // Era 16 até ago/2026, quando `whatsapp-reactivation` foi removido junto com
+    // o resto do sistema de WhatsApp (decisão do dono). O piso acompanha a
+    // remoção real de um cron — não afrouxe por conveniência.
+    expect(routes.length).toBeGreaterThanOrEqual(15)
   })
 
   it.each(routes.map((r) => [r.name, r] as const))(
