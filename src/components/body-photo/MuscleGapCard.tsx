@@ -101,6 +101,10 @@ export const MuscleGapCard: React.FC<Props> = ({ assessmentId, muscleLabel, onCl
         if (!res.ok) { setAddError(res.error || 'Não consegui adicionar.'); return }
         setAdded((prev) => [...prev, picking.name])
         setPicking(null)
+        // Sem isto o exercício só aparecia depois de FECHAR O APP: a lista de
+        // treinos é uma query cacheada e ninguém a invalidava. O evento é o
+        // canal que `useWorkoutFetch` já escuta pra refazer a busca.
+        try { window.dispatchEvent(new CustomEvent('irontracks:workouts-changed')) } catch { /* SSR/webview sem window */ }
     }, [picking, state])
 
     const d = state?.diagnosis
