@@ -76,9 +76,31 @@ describe('reordenação e exclusão de exercícios', () => {
 describe('UI da reordenação', () => {
     const src = readFileSync('src/components/dashboard/QuickViewExerciseList.tsx', 'utf8')
 
-    it('o CARD INTEIRO arrasta — punho de 16px era difícil de acertar no dedo', () => {
-        expect(src).not.toContain('dragListener={false}')
-        expect(src).not.toContain('useDragControls')
+    it('o CARD INTEIRO arrasta, mas só depois de SEGURAR — senão a lista não rola', () => {
+        // Punho de 16px era difícil de acertar; card todo arrastável com
+        // touch-action:none matou o scroll. O long press separa os dois gestos.
+        expect(src).toContain('LONG_PRESS_MS')
+        expect(src).toMatch(/setTimeout\(\(\) => \{[\s\S]*?controls\.start\(native\)/)
+        expect(src).toMatch(/touchAction: armed \? 'none' : 'pan-y'/)
+    })
+
+    it('deslizar antes de armar cancela o arraste (é rolagem)', () => {
+        expect(src).toContain('MOVE_TOLERANCE_PX')
+        expect(src).toMatch(/dx > MOVE_TOLERANCE_PX \|\| dy > MOVE_TOLERANCE_PX\) clearTimer\(\)/)
+    })
+
+    it('excluir não fica sobreposto ao badge de séries', () => {
+        // Em `absolute top-3 right-3` o botão caía em cima do "4 × 10-12".
+        // Agora vive no fluxo, num rodapé alinhado à direita.
+        expect(src).not.toContain('absolute top-3 right-3')
+        expect(src).toContain('flex justify-end')
+    })
+
+    it('a tela avisa o PAI na hora — "Iniciar treino" não pode levar o que foi apagado', () => {
+        expect(src).toMatch(/onExercisesChange\?\.\(draft\)/)
+        expect(src).toMatch(/onExercisesChange\?\.\(exercises\.filter/)
+        const pai = readFileSync('src/app/(app)/dashboard/DashboardModals.tsx', 'utf8')
+        expect(pai).toMatch(/onExercisesChange=\{\(next\) => setQuickViewWorkout\(\{ \.\.\.qw, exercises: next \}\)\}/)
     })
 
     it('não deixa o texto ser selecionado ao segurar (as palavras grifavam)', () => {
