@@ -167,6 +167,47 @@ Aconteceu em 31/07/2026 (1.18 → 1.19). Se for subir build e a versão atual j�
 
 **Warning conhecido, não é falha:** `Upload Symbols Failed … dSYM for the Sentry.framework`. O upload conclui; o efeito é crash dentro do framework do Sentry vir sem símbolos.
 
+## E-mail transacional (Resend) — "aceito" ≠ "chegou"
+
+Provedor **Resend**, domínio `irontracks.com.br` verificado (região São Paulo).
+Remetente padrão `IronTracks <noreply@irontracks.com.br>` — `RESEND_FROM` não
+existe na Vercel, o default do código é que vale. Envio em
+`utils/email/sendEmail.ts`, templates puros em `utils/email/approvalEmail.ts`.
+
+**A lição que custou uma auditoria inteira (ago/2026): as duas metades.**
+
+1. **Envio** — `fetch` para a API. Resolver NÃO significa aceito: era um
+   `.catch(() => null)` sem olhar `res.ok`, então chave ausente, domínio não
+   verificado e erro de rede saíam todos como sucesso. O `email_warning` da UI
+   do admin era **código inalcançável** porque a função nunca lançava. Hoje
+   `sendTransactionalEmail` devolve resultado tipado e nunca lança.
+2. **Entrega** — chega **minutos depois**, por webhook. Nenhuma checagem no
+   momento do envio alcança isso. Em 23/07 uma aprovação foi aceita (HTTP 200) e
+   nunca chegou: caixa do destinatário cheia. `POST /api/webhooks/resend` existe
+   só por causa disso.
+
+**Onde ver o que aconteceu:** `audit_events`. `approval_email_sent`/`_failed`
+(com `metadata.provider_id` = id da Resend) e `email_delivery_*` (com o mesmo id
+em `entity_id`). `resolveDeliveryStatus` cruza os dois — gravidade manda sobre
+recência, senão um `delivered` apaga o `complained` que veio depois.
+
+```sql
+select created_at, action, metadata->>'email', metadata->>'reason'
+from audit_events where action like 'approval_email_%' or action like 'email_delivery_%'
+order by created_at desc limit 20;
+```
+
+**⚠️ `logWarn` é NO-OP em produção** (`if (IS_PROD) return`) e o Sentry não
+recebe erro de rota server neste projeto. Para sinal de falha em rota, use
+`logError` (vai pro runtime log da Vercel) **e** grave em `audit_events` — o log
+da Vercel expira, a pergunta "fulano recebeu?" não.
+
+**Templates:** o nome vem de `access_requests.full_name`, campo de **formulário
+público sem `.max()`** — sempre `escapeHtml`. E-mail é HTML de 2005: tabela (não
+flex/grid), CSS inline (clientes removem `<style>`), botão com fallback VML
+(Outlook ignora padding em `<a>`), zero imagem externa (bloqueada por padrão —
+por isso a marca é texto). Guards em `utils/email/__tests__/`.
+
 ## Supabase — padrões obrigatórios
 - Novas migrations via MCP (`mcp__supabase__apply_migration` / `list_migrations`); ficam em `supabase/migrations/` com timestamp. Verificar `mcp__supabase__get_advisors` depois.
 - **Row Level Security obrigatório** em toda tabela nova. `supabase-js` v2 (nunca v1). URL/keys só via `.env.local` (nunca hardcodar).
