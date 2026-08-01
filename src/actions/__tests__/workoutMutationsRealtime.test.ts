@@ -97,7 +97,7 @@ describe('UI da reordenação', () => {
     })
 
     it('a tela avisa o PAI na hora — "Iniciar treino" não pode levar o que foi apagado', () => {
-        expect(src).toMatch(/onExercisesChange\?\.\(draft\)/)
+        expect(src).toMatch(/onExercisesChange\?\.\(next\)/)
         expect(src).toMatch(/onExercisesChange\?\.\(exercises\.filter/)
         const pai = readFileSync('src/app/(app)/dashboard/DashboardModals.tsx', 'utf8')
         expect(pai).toMatch(/onExercisesChange=\{\(next\) => setQuickViewWorkout\(\{ \.\.\.qw, exercises: next \}\)\}/)
@@ -113,9 +113,26 @@ describe('UI da reordenação', () => {
         expect(src).toMatch(/canReorder && allHaveId/)
     })
 
-    it('a ordem só vai pro banco no Salvar — arrastar mexe num rascunho', () => {
-        expect(src).toMatch(/organizing \? draft : exercises/)
-        expect(src).toMatch(/reorderWorkoutExercises\(workoutId, draft\.map/)
-        expect(src).toMatch(/const cancel = useCallback\(\(\) => \{[\s\S]*?setDraft\(\[\]\)/)
+    it('cada movimento salva na hora, sem depender de um "confirmar" no fim', () => {
+        // Relato: "organizei e não mudou". Nos logs do servidor a requisição de
+        // reordenação NUNCA chegou — depender de um segundo toque para confirmar
+        // era um passo a mais para dar errado.
+        expect(src).toContain('void persistOrder(next)')
+        expect(src).toContain('onDragDone')
+        // não existe mais BOTÃO de confirmar (a menção em comentário é histórico)
+        expect(src).not.toMatch(/>\s*\{?[^<>]*Salvar ordem/)
+    })
+
+    it('tem setas de mover — arrastar em WebView disputa com o scroll', () => {
+        // O arraste continua disponível, mas nunca é o ÚNICO caminho: um toque
+        // não tem ambiguidade de gesto.
+        expect(src).toContain('onMove(index, -1)')
+        expect(src).toContain('onMove(index, 1)')
+        expect(src).toContain('para cima')
+        expect(src).toContain('para baixo')
+    })
+
+    it('falha ao salvar devolve a lista para o que o banco tem', () => {
+        expect(src).toMatch(/setError\(res\.error[\s\S]{0,120}setDraft\(exercises\)/)
     })
 })
