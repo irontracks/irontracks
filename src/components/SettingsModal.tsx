@@ -11,6 +11,7 @@ import { useDialog } from '@/contexts/DialogContext'
 import { DEFAULT_SETTINGS } from '@/hooks/useUserSettings'
 import { createClient } from '@/utils/supabase/client'
 import { getErrorMessage } from '@/utils/errorMessage'
+import { hardRefreshApp } from '@/utils/app/hardRefresh';
 import { isIosNative } from '@/utils/platform'
 import { useIsIosNative } from '@/hooks/useIsIosNative'
 import { useFocusTrap } from '@/hooks/useFocusTrap'
@@ -441,7 +442,7 @@ export default function SettingsModal(props: SettingsModalProps) {
               <button type="button" onClick={async () => { try { setDraft(DEFAULT_SETTINGS); await alert('Preferências resetadas. Clique em Salvar para aplicar.') } catch (e: unknown) { await alert('Falha ao resetar: ' + (getErrorMessage(e) ?? String(e))) } }} className="min-h-[44px] px-4 py-3 rounded-xl border text-neutral-200 font-black hover:border-yellow-500/30 hover:text-yellow-400 transition-all inline-flex items-center justify-center gap-2" style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'rgba(255,255,255,0.06)' }}>
                 <RotateCcw size={16} className="text-yellow-500" /> Resetar
               </button>
-              <button type="button" onClick={async () => { try { if (typeof window === 'undefined') return; const keys: string[] = []; for (let i = 0; i < window.localStorage.length; i += 1) { const k = window.localStorage.key(i); if (k) keys.push(k) } keys.forEach((k) => { if (k.startsWith('irontracks.')) { try { window.localStorage.removeItem(k) } catch { } } }); try { window.location.reload() } catch { } } catch (e: unknown) { await alert('Falha ao limpar cache: ' + (getErrorMessage(e) ?? String(e))) } }} className="min-h-[44px] px-4 py-3 rounded-xl border text-neutral-200 font-black hover:border-yellow-500/30 hover:text-yellow-400 transition-all inline-flex items-center justify-center gap-2" style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'rgba(255,255,255,0.06)' }}>
+              <button type="button" onClick={async () => { try { await hardRefreshApp() } catch (e: unknown) { await alert('Falha ao limpar cache: ' + (getErrorMessage(e) ?? String(e))) } }} className="min-h-[44px] px-4 py-3 rounded-xl border text-neutral-200 font-black hover:border-yellow-500/30 hover:text-yellow-400 transition-all inline-flex items-center justify-center gap-2" style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'rgba(255,255,255,0.06)' }} title="Limpa dados locais, o cache de versao e recarrega o app do servidor">
                 <Trash2 size={16} className="text-yellow-500" /> Limpar cache
               </button>
             </div>
