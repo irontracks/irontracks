@@ -6,6 +6,7 @@ import { X, Check, Upload, ArrowLeft, Clock, Dumbbell, Zap, ChevronRight, PlayCi
 import SectionErrorBoundary from '@/components/SectionErrorBoundary'
 import { BackButton } from '@/components/ui/BackButton'
 import { CheckinScale } from '@/components/workout/CheckinScale'
+import { QuickViewExerciseList } from '@/components/dashboard/QuickViewExerciseList'
 import type { AdminUser } from '@/types/admin'
 import type { ActiveWorkoutSession } from '@/types/app'
 import { getLatestWhatsNew } from '@/content/whatsNew'
@@ -327,74 +328,12 @@ export default function DashboardModals(props: DashboardModalsProps) {
                                 {/* Gold divider */}
                                 <div className="mx-5 h-px bg-gradient-to-r from-transparent via-yellow-500/20 to-transparent mb-1" />
 
-                                {/* Exercise list */}
-                                <div className="px-3 py-2 flex-1 min-h-0 overflow-y-auto space-y-2">
-                                    {exCount === 0 && (
-                                        <div className="flex flex-col items-center justify-center py-10 text-center gap-3">
-                                            <div className="w-12 h-12 rounded-2xl bg-neutral-800/60 border border-neutral-700/40 flex items-center justify-center">
-                                                <Dumbbell size={20} className="text-neutral-600" />
-                                            </div>
-                                            <p className="text-neutral-500 text-sm">Este treino não tem exercícios.</p>
-                                        </div>
-                                    )}
-                                    {exercises.map((ex, idx) => {
-                                        const sets = parseInt(String(ex?.sets ?? ex?.numSets ?? '')) || 0
-                                        const reps = String(ex?.reps || '—')
-                                        const rest = ex?.restTime ? `${parseInt(String(ex.restTime))}s` : ex?.rest_time ? `${parseInt(String(ex.rest_time))}s` : null
-                                        const method = String(ex?.method || '')
-                                        const notes = String(ex?.notes || '').trim()
-                                        const isSpecialMethod = method && method.toLowerCase() !== 'normal' && method.toLowerCase() !== ''
-                                        return (
-                                            <div
-                                                key={idx}
-                                                className="group relative bg-white/[0.03] border border-white/[0.07] hover:border-yellow-500/20 hover:bg-white/[0.05] rounded-2xl p-4 transition-all duration-200"
-                                            >
-                                                {/* Exercise number accent */}
-                                                <div className="absolute left-0 top-3 bottom-3 w-0.5 rounded-full bg-gradient-to-b from-yellow-500/60 to-yellow-500/10 ml-3" />
-
-                                                <div className="pl-3">
-                                                    {/* Top row: name + sets/reps */}
-                                                    <div className="flex items-start justify-between gap-3 mb-2">
-                                                        <div className="flex items-start gap-2.5 min-w-0">
-                                                            <span className="flex-shrink-0 w-5 h-5 rounded-md bg-yellow-500/15 border border-yellow-500/25 flex items-center justify-center text-[10px] font-black text-yellow-400 leading-none mt-0.5">
-                                                                {idx + 1}
-                                                            </span>
-                                                            <h4 className="font-bold text-white text-[13.5px] leading-snug">{String(ex?.name || '—')}</h4>
-                                                        </div>
-                                                        {sets > 0 && (
-                                                            <div className="flex-shrink-0 px-2.5 py-1 rounded-lg bg-yellow-500/10 border border-yellow-500/20">
-                                                                <span className="text-[12px] font-black text-yellow-400">{sets} × {reps}</span>
-                                                            </div>
-                                                        )}
-                                                    </div>
-
-                                                    {/* Badges row */}
-                                                    <div className="flex flex-wrap items-center gap-1.5 ml-7">
-                                                        {rest && (
-                                                            <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-neutral-800/80 border border-neutral-700/50">
-                                                                <Clock size={10} className="text-yellow-500" />
-                                                                <span className="text-[10.5px] font-bold text-neutral-400">Descanso: {rest}</span>
-                                                            </div>
-                                                        )}
-                                                        {isSpecialMethod && (
-                                                            <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/10 border border-amber-500/20">
-                                                                <Zap size={10} className="text-amber-400" />
-                                                                <span className="text-[10.5px] font-bold text-amber-400">{method}</span>
-                                                            </div>
-                                                        )}
-                                                    </div>
-
-                                                    {/* Notes */}
-                                                    {notes && (
-                                                        <div className="mt-2.5 ml-7 pl-3 border-l border-yellow-500/20">
-                                                            <p className="text-[11.5px] text-neutral-400 leading-relaxed italic">{notes}</p>
-                                                        </div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        )
-                                    })}
-                                </div>
+                                {/* Exercise list — leitura + modo Organizar (arrastar) */}
+                                <QuickViewExerciseList
+                                    workoutId={qw?.id != null ? String(qw.id) : null}
+                                    exercises={exercises}
+                                    canReorder={!qw?.completed_at && !qw?.completedAt}
+                                />
 
                                 {/* Bottom padding area */}
                                 <div className="h-2" />
