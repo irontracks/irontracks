@@ -70,6 +70,8 @@ export const env = {
   resend: {
     get apiKey() { return optionalEnv('RESEND_API_KEY') },
     get from() { return optionalEnv('RESEND_FROM', 'IronTracks <noreply@irontracks.com.br>') },
+    /** Segredo do webhook de entrega (formato `whsec_...`, gerado no painel da Resend). */
+    get webhookSecret() { return optionalEnv('RESEND_WEBHOOK_SECRET') },
   },
 
   // ── Firebase Cloud Messaging ──────────────────────────────
