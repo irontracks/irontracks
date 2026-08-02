@@ -7,6 +7,7 @@ import { parseJsonBody, parseJsonWithSchema } from '@/utils/zod'
 import { env } from '@/utils/env'
 import { safeGemini, handleGeminiError } from '@/utils/ai/handleGeminiError'
 import { getGeminiModel } from '@/utils/ai/gemini'
+import { nutritionWeeklyGenerationConfig } from '@/utils/ai/routeContracts'
 import { buildUserContextBlock } from '@/utils/ai/userContext'
 
 export const dynamic = 'force-dynamic'
@@ -110,7 +111,7 @@ export async function POST(req: Request) {
       '{ "summary": string, "highlights": string[], "tip": string }',
     ].filter(Boolean).join('\n')
 
-    const model = getGeminiModel(apiKey, MODEL)
+    const model = getGeminiModel(apiKey, MODEL, nutritionWeeklyGenerationConfig())
     const geminiResult = await safeGemini('nutrition-weekly-report', () =>
       model.generateContent([{ text: prompt }]),
     )

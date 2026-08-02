@@ -99,3 +99,73 @@ describe('muscle-map-day / muscle-map-week (contrato compartilhado)', () => {
         expect(zodOf(DAY).replace(/\s+/g, ' ')).toBe(zodOf(WEEK).replace(/\s+/g, ' '))
     })
 })
+
+// ─── Lote 3: nutrição ────────────────────────────────────────────────────────
+import {
+    NUTRITION_LABEL_RESPONSE_SCHEMA,
+    POST_WORKOUT_MEAL_RESPONSE_SCHEMA,
+    NUTRITION_WEEKLY_RESPONSE_SCHEMA,
+    MEAL_PLAN_RESPONSE_SCHEMA,
+    nutritionLabelGenerationConfig,
+    mealPlanGenerationConfig,
+} from '../routeContracts'
+
+describe('scan-nutrition-label', () => {
+    const ROUTE = readFileSync('src/app/api/ai/scan-nutrition-label/route.ts', 'utf8')
+
+    it('required = só os 4 macros; o resto tem default no Zod', () => {
+        // Obrigar porção/fibra faria o modelo inventar o que não leu no rótulo.
+        expect([...NUTRITION_LABEL_RESPONSE_SCHEMA.required].sort())
+            .toEqual(['carbsPer100g', 'fatPer100g', 'kcalPer100g', 'proteinPer100g'])
+        expect(ROUTE).toMatch(/d\.kcalPer100g > 0/) // a rota descarta rótulo sem kcal
+    })
+
+    it('mantém o thinking desligado — visão + thinking truncava o JSON', () => {
+        const cfg = nutritionLabelGenerationConfig()
+        expect(cfg.thinkingConfig).toEqual({ thinkingBudget: 0 })
+        expect(cfg.maxOutputTokens).toBe(1024)
+        expect(ROUTE).toMatch(/nutritionLabelGenerationConfig\(\)/)
+    })
+})
+
+describe('post-workout-meal', () => {
+    it('o contrato cobre exatamente o que o normalizador da rota extrai', () => {
+        const ROUTE = readFileSync('src/app/api/ai/post-workout-meal/route.ts', 'utf8')
+        for (const campo of Object.keys(POST_WORKOUT_MEAL_RESPONSE_SCHEMA.properties)) {
+            expect(ROUTE, campo).toContain(`meal.${campo}`)
+        }
+        expect(ROUTE).toMatch(/postWorkoutMealGenerationConfig\(\)/)
+    })
+})
+
+describe('nutrition-weekly-report', () => {
+    it('tip é opcional no Zod e fora do required no contrato', () => {
+        const ROUTE = readFileSync('src/app/api/ai/nutrition-weekly-report/route.ts', 'utf8')
+        expect(ROUTE).toMatch(/tip: z\.string\(\)[^\n]*\.optional\(\)/)
+        expect([...NUTRITION_WEEKLY_RESPONSE_SCHEMA.required].sort()).toEqual(['highlights', 'summary'])
+        expect(ROUTE).toMatch(/nutritionWeeklyGenerationConfig\(\)/)
+    })
+})
+
+describe('meal-plan', () => {
+    const ROUTE = readFileSync('src/app/api/ai/meal-plan/route.ts', 'utf8')
+
+    it('o contrato é a forma que o PROMPT pede — antes existia só como texto', () => {
+        // A rota repassa o objeto ao cliente sem Zod próprio: o contrato é a
+        // única definição executável. Cada campo do prompt precisa existir nele.
+        for (const campo of ['planName', 'dailyCalories', 'macros', 'trainingDay', 'restDay', 'tips', 'supplements']) {
+            expect(Object.keys(MEAL_PLAN_RESPONSE_SCHEMA.properties), campo).toContain(campo)
+            expect(ROUTE, campo).toContain(`"${campo}"`)
+        }
+    })
+
+    it('refeição carrega macros e alimentos, como o prompt descreve', () => {
+        const meal = MEAL_PLAN_RESPONSE_SCHEMA.properties.trainingDay.properties.meals.items
+        expect([...meal.required].sort()).toEqual(['calories', 'carbs', 'fat', 'foods', 'name', 'protein', 'time'])
+    })
+
+    it('mantém o teto antigo de 8192 — plano de 2 dias é longo', () => {
+        expect(mealPlanGenerationConfig().maxOutputTokens).toBe(8192)
+        expect(ROUTE).toMatch(/mealPlanGenerationConfig\(\)/)
+    })
+})

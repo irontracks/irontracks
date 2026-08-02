@@ -9,6 +9,7 @@
  */
 import { NextResponse } from 'next/server'
 import { getGeminiModel } from '@/utils/ai/gemini'
+import { nutritionLabelGenerationConfig } from '@/utils/ai/routeContracts'
 import { z } from 'zod'
 import { requireUser } from '@/utils/auth/route'
 import { checkRateLimitAsync, getRequestIp } from '@/utils/rateLimit'
@@ -126,12 +127,10 @@ export async function POST(req: Request) {
     // gemini-2.5-flash liga "thinking" por padrão; com visão de imagem ele
     // raciocina demais e consome o orçamento de saída, truncando/atrapalhando
     // o JSON do rótulo. Desligar o thinking + forçar JSON puro resolve.
-    const generationConfig = {
-      maxOutputTokens: 1024,
-      responseMimeType: 'application/json',
-      thinkingConfig: { thinkingBudget: 0 },
-    }
-    const model = getGeminiModel(apiKey, MODEL, generationConfig)
+    // Config centralizada no contrato (lote 3): mesma essência de antes
+    // (teto 1024 + thinking off, ver comentário acima), agora com o
+    // responseSchema que faltava — era o único pedaço sem garantia.
+    const model = getGeminiModel(apiKey, MODEL, nutritionLabelGenerationConfig())
     const geminiResult = await safeGemini('scan-nutrition-label', () =>
       model.generateContent([
         { text: prompt },
