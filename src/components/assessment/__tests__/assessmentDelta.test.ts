@@ -94,3 +94,55 @@ describe('lista do histórico', () => {
         expect(ITEM).not.toMatch(/grid-cols-2 md:grid-cols-5/)
     })
 })
+
+/**
+ * Barra de ações (ago/2026, "não estou gostando dos botões").
+ *
+ * O que havia: cinco ações em duas linhas, com DOIS botões amarelos
+ * competindo — Gerar PDF e Plano IA. Quando tudo é primário, nada é. E a
+ * lixeira vermelha ficava em destaque permanente para uma ação rara.
+ */
+describe('barra de ações do card', () => {
+    const ITEM = readFileSync('src/components/assessment/AssessmentListItem.tsx', 'utf8')
+    const PDF = readFileSync('src/components/assessment/AssessmentPDFGenerator.tsx', 'utf8')
+
+    it('só UMA ação em destaque dourado — o Plano IA', () => {
+        // Se o PDF voltar a ser amarelo, voltam os dois primários brigando.
+        const acoes = ITEM.slice(ITEM.indexOf('Barra de ações'))
+        const dourados = acoes.match(/from-yellow-400|bg-yellow-500/g) || []
+        expect(dourados.length).toBe(1)
+        expect(acoes).toMatch(/from-yellow-400 to-amber-500[\s\S]{0,400}Plano IA/)
+    })
+
+    it('as ações cabem em UMA linha', () => {
+        // O contêiner antigo era `flex-col` com duas `Row`.
+        expect(ITEM).toMatch(/mt-3 flex items-center gap-2/)
+        expect(ITEM).not.toMatch(/\{\/\* Row 2: AI \+ Edit \+ Delete/)
+    })
+
+    it('secundárias são ícone, mas continuam acessíveis', () => {
+        // Ícone sem rótulo acessível é armadilha para leitor de tela.
+        expect(ITEM).toMatch(/aria-label="Editar avaliação"/)
+        expect(ITEM).toMatch(/aria-label="Excluir avaliação"/)
+        expect(PDF).toMatch(/aria-label="Gerar PDF da avaliação"/)
+    })
+
+    it('excluir mantém confirmação inline (nunca apaga em um toque)', () => {
+        expect(ITEM).toMatch(/confirmDeleteId === assessmentId \?/)
+        expect(ITEM).toMatch(/onConfirmDelete\(null\)/)
+    })
+
+    it('o PDF ganhou variante de ícone sem perder a primária', () => {
+        expect(PDF).toMatch(/variant\?: 'primary' \| 'icon'/)
+        expect(PDF).toMatch(/if \(variant === 'icon'\)/)
+        // a versão com rótulo segue existindo para outros usos
+        expect(PDF).toMatch(/Gerando…' : 'Gerar PDF'/)
+    })
+
+    it('o PDF continua recebendo o treinador da avaliação', () => {
+        // Regressão real cometida durante este redesign: o nome virou uma string
+        // fixa ("IronTracks") e teria ido parar no PDF de todo mundo.
+        expect(ITEM).toMatch(/trainerName=\{String\(assessment\.trainer_name \?\? ''\)\}/)
+        expect(ITEM).not.toMatch(/trainerName="IronTracks"/)
+    })
+})
