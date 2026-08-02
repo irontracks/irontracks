@@ -52,6 +52,12 @@ describe('estimateSessionKcal', () => {
 // acontecera DENTRO da sessão cronometrada. Uma aula de 60 min numa sessão de
 // 51 min zerava o tempo de força → 9 dos 10 exercícios com 0 kcal no relatório.
 const fitDance = { name: 'FitDance', method: 'Cardio', sets: 1, reps: '60', rpe: 5 }
+/**
+ * Log da aula CONCLUÍDA (60 min). Desde ago/2026 cardio só conta quando foi
+ * feito — a aula lançada e não marcada não gera kcal, igual à esteira que
+ * ficou no plano. `exIdx` varia com a posição da aula na lista.
+ */
+const aulaFeita = (exIdx: number) => ({ [`${exIdx}-0`]: { done: true, durationSeconds: 3600 } })
 
 /** Musculação de ~51 min (exec 14 + descanso 26,8) — espelha o caso real. */
 const strengthPart = {
@@ -69,6 +75,7 @@ const strengthPart = {
 const withClass = {
   ...strengthPart,
   exercises: [...strengthPart.exercises, fitDance],
+  logs: { ...strengthPart.logs, ...aulaFeita(2) },
 }
 const opts = { bodyWeightKg: 65, biologicalSex: 'female' }
 
@@ -98,7 +105,7 @@ describe('estimateSessionKcalBreakdown — aula de cardio maior que a sessão', 
   })
 
   it('sessão que É só a aula continua com força zerada (sem kcal fantasma)', () => {
-    const bd = estimateSessionKcalBreakdown({ totalTime: 3600, exercises: [fitDance], logs: {} }, opts)
+    const bd = estimateSessionKcalBreakdown({ totalTime: 3600, exercises: [fitDance], logs: aulaFeita(0) }, opts)
     expect(bd.strengthKcal).toBe(0)
     expect(bd.cardioTotalKcal).toBeGreaterThan(0)
   })
@@ -108,7 +115,7 @@ describe('estimateSessionKcalBreakdown — aula de cardio maior que a sessão', 
     const bd = estimateSessionKcalBreakdown({
       totalTime: 3091,
       exercises: [{ name: 'Rosca Scott' }, fitDance],
-      logs: { '0-0': { weight: '15' } },
+      logs: { '0-0': { weight: '15' }, ...aulaFeita(1) },
     }, opts)
     expect(bd.strengthKcal).toBeGreaterThan(0) // há peso registrado → houve treino
     expect(bd.cardioTotalKcal).toBeGreaterThan(0)
