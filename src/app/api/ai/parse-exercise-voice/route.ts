@@ -7,6 +7,7 @@ import { sanitizeAiInput } from '@/lib/nutrition/security'
 import { env } from '@/utils/env'
 import { safeGemini, handleGeminiError } from '@/utils/ai/handleGeminiError'
 import { getGeminiModel } from '@/utils/ai/gemini'
+import { voiceGenerationConfig } from '@/utils/ai/routeContracts'
 
 export const dynamic = 'force-dynamic'
 
@@ -97,7 +98,7 @@ export async function POST(req: Request) {
       `Entrada: "${sanitized}"`,
     ].join('\n')
 
-    const model = getGeminiModel(apiKey, MODEL)
+    const model = getGeminiModel(apiKey, MODEL, voiceGenerationConfig())
     const geminiResult = await safeGemini('parse-exercise-voice', () =>
       model.generateContent([{ text: prompt }]),
     )
